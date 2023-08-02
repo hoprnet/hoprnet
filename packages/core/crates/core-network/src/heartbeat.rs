@@ -16,7 +16,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use utils_log::info;
+use utils_log::{error,info};
 use utils_metrics::metrics::SimpleHistogram;
 use utils_metrics::histogram_start_measure;
 
@@ -43,12 +43,12 @@ pub struct HeartbeatConfig {
 }
 
 #[cfg_attr(test, mockall::automock)]
-pub trait HeartbeatExternalAPI {
+pub trait HeartbeatExternalApi {
     fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId>;
 }
 
 
-pub struct Heartbeat<T: Pinging, API: HeartbeatExternalAPI> {
+pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     config: HeartbeatConfig,
     pinger: T,
     external_api: API,
@@ -56,7 +56,7 @@ pub struct Heartbeat<T: Pinging, API: HeartbeatExternalAPI> {
     metric_time_to_heartbeat: Option<SimpleHistogram>,
 }
 
-impl<T: Pinging, API: HeartbeatExternalAPI> Heartbeat<T, API> {
+impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
     pub fn new(config: HeartbeatConfig, pinger: T, external_api: API) -> Self {
         Self {
             config, pinger, external_api,
@@ -121,8 +121,13 @@ impl<T: Pinging, API: HeartbeatExternalAPI> Heartbeat<T, API> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::str::FromStr;
+
+    use super::*;
     use crate::heartbeat::HeartbeatConfig;
     use wasm_bindgen::prelude::*;
+
+    use super::{Heartbeat, HeartbeatExternalApi};
 
     #[wasm_bindgen]
     impl HeartbeatConfig {
@@ -137,6 +142,37 @@ pub mod wasm {
                 heartbeat_interval,
                 heartbeat_threshold,
             }
+        }
+    }
+
+    #[wasm_bindgen]
+    struct WasmHeartbeatApi {
+        get_peers: js_sys::Function,
+    }
+
+    impl HeartbeatExternalApi for WasmHeartbeatApi {
+        fn get_peers(&self, from_timestamp: u64) -> Vec<libp2p_identity::PeerId> {
+            let this = JsValue::null();
+            let timestamp = JsValue::from(from_timestamp);
+
+            return match self.get_peers.call1(&this, &timestamp) {
+                Ok(v) => {
+                    js_sys::Array::from(&v)
+                        .to_vec()
+                        .into_iter()
+                        .filter_map(|v| libp2p_identity::PeerId::from_str(String::from(js_sys::JsString::from(v)).as_str()).ok())
+                        .collect()
+                }
+                Err(err) => {
+                    error!(
+                        "Failed to perform on peer offline operation with: {}",
+                        err.as_string()
+                            .unwrap_or_else(|| { "Unknown error occurred on fetching the peers to ping".to_owned() })
+                            .as_str()
+                    );
+                    Vec::new()
+                }
+            };
         }
     }
 }
@@ -173,7 +209,7 @@ mod tests {
         let ping_delay = 5u64;
         let expected_loop_count = 2;
 
-        let mut mock = MockHeartbeatExternalAPI::new();
+        let mut mock = MockHeartbeatExternalApi::new();
         mock.expect_get_peers()
             .times(expected_loop_count)
             .return_const(vec![PeerId::random(), PeerId::random()]);
@@ -195,7 +231,7 @@ mod tests {
         let ping_delay = 2 * config.heartbeat_interval as u64;
         let expected_loop_count = 2;
 
-        let mut mock = MockHeartbeatExternalAPI::new();
+        let mut mock = MockHeartbeatExternalApi::new();
         mock.expect_get_peers()
             .times(expected_loop_count)
             .return_const(vec![PeerId::random(), PeerId::random()]);

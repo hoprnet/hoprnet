@@ -14,6 +14,7 @@ pub struct HeartbeatChallenge(pub PeerId, pub ControlMessage);
 #[derive(Debug, Clone, PartialEq)]
 pub struct ManualPingChallenge(pub PeerId, pub ControlMessage);
 
+
 // TODO: NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
 // in case of faster input than output the memory might run out
 pub type HeartbeaRequestRx = mpsc::UnboundedReceiver<(PeerId, ControlMessage)>;

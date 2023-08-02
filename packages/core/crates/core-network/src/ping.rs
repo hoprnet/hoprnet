@@ -57,8 +57,6 @@ type PingMeasurement = (PeerId, crate::types::Result);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
     pub max_parallel_pings: usize,
-    pub network: String,
-    pub normalized_version: String,
     pub timeout: Duration,
 }
 
@@ -228,148 +226,88 @@ impl Pinging for Ping {
     }
 }
 
-// #[cfg(feature = "wasm")]
-// pub mod wasm {
-//     use super::*;
-//     use js_sys::JsString;
-//     use std::str::FromStr;
-//     use wasm_bindgen::prelude::*;
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use super::*;
+    use js_sys::JsString;
+    use std::str::FromStr;
+    use wasm_bindgen::prelude::*;
 
-//     #[wasm_bindgen]
-//     struct WasmPingApi {
-//         _network: String,
-//         _version: String,
-//         on_finished_ping_cb: js_sys::Function,
-//     }
+    #[wasm_bindgen]
+    struct WasmPingApi {
+        on_finished_ping_cb: js_sys::Function,
+    }
 
-//     impl PingExternalAPI for WasmPingApi {
-//         fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result) {
-//             let this = JsValue::null();
-//             let peer = JsValue::from(peer.to_base58());
-//             let res = {
-//                 if let Ok(v) = result {
-//                     JsValue::from(v as f64)
-//                 } else {
-//                     JsValue::undefined()
-//                 }
-//             };
+    impl PingExternalAPI for WasmPingApi {
+        fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result) {
+            let this = JsValue::null();
+            let peer = JsValue::from(peer.to_base58());
+            let res = {
+                if let Ok(v) = result {
+                    JsValue::from(v as f64)
+                } else {
+                    JsValue::undefined()
+                }
+            };
 
-//             if let Err(err) = self.on_finished_ping_cb.call2(&this, &peer, &res) {
-//                 error!(
-//                     "Failed to perform on peer offline operation with: {}",
-//                     err.as_string()
-//                         .unwrap_or_else(|| { "Unspecified error occurred on registering the ping result".to_owned() })
-//                         .as_str()
-//                 )
-//             };
-//         }
-//     }
+            if let Err(err) = self.on_finished_ping_cb.call2(&this, &peer, &res) {
+                error!(
+                    "Failed to perform on peer offline operation with: {}",
+                    err.as_string()
+                        .unwrap_or_else(|| { "Unspecified error occurred on registering the ping result".to_owned() })
+                        .as_str()
+                )
+            };
+        }
+    }
 
-//     /// WASM wrapper for the Ping that accepts a JS function for sending a ping message and returing
-//     /// a Future for the peer reply.
-//     #[wasm_bindgen]
-//     pub struct Pinger {
-//         pinger: Ping,
-//     }
+    /// WASM wrapper for the Ping that accepts a JS function for sending a ping message and returing
+    /// a Future for the peer reply.
+    #[wasm_bindgen]
+    pub struct Pinger {
+        pinger: Ping,
+    }
 
-//     #[wasm_bindgen]
-//     impl Pinger {
-//         #[wasm_bindgen]
-//         pub fn build(
-//             network: String,
-//             version: String,
-//             on_finished_ping_cb: js_sys::Function,
-//             send_msg_cb: js_sys::Function,
-//         ) -> Self {
-//             let api = Box::new(WasmPingApi {
-//                 _network: network.clone(),
-//                 _version: version.clone(),
-//                 on_finished_ping_cb,
-//             });
+    #[wasm_bindgen]
+    impl Pinger {
+        // TODO: needs to be constructed from a common object that builds and binds about channels
+        // #[wasm_bindgen]
+        // pub fn build(
+        //     on_finished_ping_cb: js_sys::Function,
+        // ) -> Self {
+        //     let api = Box::new(WasmPingApi {
+        //         on_finished_ping_cb,
+        //     });
 
-//             let config = PingConfig {
-//                 network,
-//                 normalized_version: version,
-//                 max_parallel_pings: PINGS_MAX_PARALLEL,
-//                 timeout: Duration::from_secs(30),
-//             };
+        //     let config = PingConfig {
+        //         max_parallel_pings: PINGS_MAX_PARALLEL,
+        //         timeout: Duration::from_secs(30),
+        //     };
 
-//             Self {
-//                 pinger: Ping::new(config, api),
-//                 send_msg_cb,
-//             }
-//         }
+        //     Self {
+        //         pinger: Ping::new(config, api),
+        //     }
+        // }
 
-//         /// Ping the peers represented as a Vec<JsString> values that are converted into usable
-//         /// PeerIds.
-//         ///
-//         /// # Arguments
-//         /// * `peers` - Vector of String representations of the PeerIds to be pinged.
-//         #[wasm_bindgen]
-//         pub async fn ping(&self, mut peers: Vec<JsString>) {
-//             let converted = peers
-//                 .drain(..)
-//                 .filter_map(|x| {
-//                     let x: String = x.into();
-//                     PeerId::from_str(&x).ok()
-//                 })
-//                 .collect::<Vec<_>>();
+        /// Ping the peers represented as a Vec<JsString> values that are converted into usable
+        /// PeerIds.
+        ///
+        /// # Arguments
+        /// * `peers` - Vector of String representations of the PeerIds to be pinged.
+        #[wasm_bindgen]
+        pub async fn ping(&mut self, mut peers: Vec<JsString>) {
+            let converted = peers
+                .drain(..)
+                .filter_map(|x| {
+                    let x: String = x.into();
+                    PeerId::from_str(&x).ok()
+                })
+                .collect::<Vec<_>>();
 
-//             let message_transport =
-//                 |msg: Box<[u8]>,
-//                  peer: String|
-//                  -> std::pin::Pin<Box<dyn futures::Future<Output = Result<Box<[u8]>, String>>>> {
-//                     Box::pin(async move {
-//                         let this = JsValue::null();
-//                         let data: JsValue = js_sys::Uint8Array::from(msg.as_ref()).into();
-//                         let peer: JsValue = <JsValue as From<String>>::from(peer);
-
-//                         // call a send_msg_cb producing a JS promise that is further converted to a Future
-//                         // holding the reply of the pinged peer for the ping message.
-//                         match self.send_msg_cb.call2(&this, &data, &peer) {
-//                             Ok(r) => {
-//                                 let promise = js_sys::Promise::from(r);
-//                                 match wasm_bindgen_futures::JsFuture::from(promise).await {
-//                                     Ok(x) => {
-//                                         if x.is_undefined() {
-//                                             Err("Failed to send ping message".into())
-//                                         } else {
-//                                             debug!("transport returned {:?}", x);
-//                                             let arr = js_sys::Array::from(x.as_ref());
-//                                             if arr.length() > 0 {
-//                                                 Ok(js_sys::Uint8Array::from(arr.get(0)).to_vec().into_boxed_slice())
-//                                             } else {
-//                                                 error!("transport has returned an empty response");
-//                                                 Err("Empty response returned from ping transport".into())
-//                                             }
-//                                         }
-//                                     }
-//                                     Err(e) => {
-//                                         error!("Failed to send ping message");
-//                                         error!("{:?}", e);
-//                                         Err("Failed to send ping message".into())
-//                                     }
-//                                 }
-//                             }
-//                             Err(e) => {
-//                                 error!(
-//                                     "The message transport could not be established: {}",
-//                                     e.as_string()
-//                                         .unwrap_or_else(|| {
-//                                             "The message transport failed with unknown error".to_owned()
-//                                         })
-//                                         .as_str()
-//                                 );
-//                                 Err(format!("Failed to extract transport error as string: {:?}", e))
-//                             }
-//                         }
-//                     })
-//                 };
-
-//             self.pinger.ping_peers(converted, &message_transport).await;
-//         }
-//     }
-// }
+            self.pinger.ping(converted).await;
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -382,8 +320,6 @@ mod tests {
     fn simple_ping_config() -> PingConfig {
         PingConfig {
             max_parallel_pings: 2,
-            network: "test".to_owned(),
-            normalized_version: "1.0a".to_owned(),
             timeout: Duration::from_millis(150),
         }
     }
