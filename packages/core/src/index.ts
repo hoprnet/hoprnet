@@ -56,7 +56,9 @@ import {
   HalfKeyChallenge,
   Balance,
   BalanceType,
-  pickVersion, OffchainKeypair, ChainKeypair
+  pickVersion,
+  OffchainKeypair,
+  ChainKeypair
 } from '@hoprnet/hopr-utils'
 
 import {
@@ -517,11 +519,7 @@ class Hopr extends EventEmitter {
       let tkt = AcknowledgedTicket.deserialize(ackTicket)
       connector.emit('ticket:acknowledged', tkt)
     }
-    this.acknowledgements = new WasmAckInteraction(
-      this.db.clone(),
-      onAck,
-      onAckTicket
-    )
+    this.acknowledgements = new WasmAckInteraction(this.db.clone(), onAck, onAckTicket)
 
     let acknowledgementProtocols = [
       // current
@@ -1060,12 +1058,17 @@ class Hopr extends EventEmitter {
       throw Error(`Message does not fit into one packet. Please split message into chunks of ${PACKET_SIZE} bytes`)
     }
 
-    let path: Path;
+    let path: Path
     if (intermediatePath != undefined) {
       // Validate the manually specified intermediate path
-      let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()];
+      let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
       try {
-        path = await Path.validated(withDestination, Packet_Address.deserialize(this.chainKeypair.to_address().serialize()), true, this.db)
+        path = await Path.validated(
+          withDestination,
+          Packet_Address.deserialize(this.chainKeypair.to_address().serialize()),
+          true,
+          this.db
+        )
       } catch (e) {
         metric_sentMessageFailCount.increment()
         throw e
@@ -1080,7 +1083,7 @@ class Hopr extends EventEmitter {
           throw Error(`Failed to find automatic path`)
         }
 
-        let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()];
+        let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
         path = new Path(withDestination)
       } else {
         log(``)
@@ -1650,9 +1653,7 @@ class Hopr extends EventEmitter {
   public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
     let chain_key = await this.peerIdToChainKey(id)
     if (chain_key) {
-      return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(
-        Address.deserialize(chain_key.serialize())
-      )
+      return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(Address.deserialize(chain_key.serialize()))
     } else {
       log(`failed to determine channel key of ${id.toString()}`)
       return false
@@ -1681,8 +1682,7 @@ class Hopr extends EventEmitter {
         try {
           const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(address)
           return this.networkPeers.quality_of(pk.to_peerid_str())
-        }
-        catch (e) {
+        } catch (e) {
           log(`error while looking up the packet key of ${address}`)
           return 0
         }

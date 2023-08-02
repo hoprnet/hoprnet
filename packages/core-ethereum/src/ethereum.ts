@@ -19,7 +19,9 @@ import {
   type AcknowledgedTicket,
   type DeferType,
   type Hash,
-  create_counter, AnnouncementData, u8aSplit
+  create_counter,
+  AnnouncementData,
+  u8aSplit
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
@@ -433,25 +435,21 @@ export async function createChainWrapper(
 
   /**
    * Initiates a transaction that announces nodes on-chain.
-   * @param multiaddr the address to be announced
+   * @param data prepared announcement data
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
   const announce = async (data: AnnouncementData, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
     log('Announcing on-chain with %s', data.to_string())
-    let sendResult: SendTransactionReturn
-    let error: unknown
 
+    let confirmationEssentialTxPayload: TransactionPayload
     let keyBinding = data.key_binding
-    if (!keyBinding)
-      throw new Error("announcing without key-binding at the same time not supported at the moment")
 
-    if (!keyBinding.chain_key.eq(publicKey.to_address()))
-      throw new Error("cannot bind with different public key")
+    if (keyBinding) {
+      if (!keyBinding.chain_key.eq(publicKey.to_address())) throw new Error('cannot bind with different public key')
 
-    try {
       let sgn = u8aSplit(keyBinding.signature.serialize(), [32])
-      const confirmationEssentialTxPayload = buildEssentialTxPayload(
+      confirmationEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels, // TODO: change the target contract used for announcement
         'bindKeysAnnounce',
@@ -460,6 +458,15 @@ export async function createChainWrapper(
         keyBinding.packet_key.serialize(),
         data.to_multiaddress_str()
       )
+    } else {
+      // Announce without key binding.
+      // Currently separate key binding call is not implemented in the connector.
+      throw new Error('announcing without key binding is not implemented')
+    }
+
+    let sendResult: SendTransactionReturn
+    let error: unknown
+    try {
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
     } catch (err) {
       error = err

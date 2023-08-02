@@ -1,8 +1,8 @@
-use std::fmt::{Display, Formatter};
-use multiaddr::{Multiaddr, Protocol};
 use core_crypto::errors::CryptoError;
 use core_crypto::keypairs::{Keypair, OffchainKeypair};
 use core_crypto::types::{OffchainPublicKey, OffchainSignature};
+use multiaddr::{Multiaddr, Protocol};
+use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError;
 use utils_types::errors::GeneralError::{InvalidInput, NonSpecificError};
 use utils_types::primitives::Address;
@@ -17,7 +17,7 @@ use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 pub struct KeyBinding {
     pub chain_key: Address,
     pub packet_key: OffchainPublicKey,
-    pub signature: OffchainSignature
+    pub signature: OffchainSignature,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -37,7 +37,7 @@ impl KeyBinding {
         Self {
             chain_key,
             packet_key: packet_key.public().clone(),
-            signature: OffchainSignature::sign_message(&to_sign, packet_key)
+            signature: OffchainSignature::sign_message(&to_sign, packet_key),
         }
     }
 }
@@ -45,10 +45,19 @@ impl KeyBinding {
 impl KeyBinding {
     /// Re-construct binding from the chain key and packet key, while also verifying the given signature of the binding.
     /// Fails if the signature is not valid for the given entries.
-    pub fn from_parts(chain_key: Address, packet_key: OffchainPublicKey, signature: OffchainSignature) -> Result<Self, GeneralError> {
+    pub fn from_parts(
+        chain_key: Address,
+        packet_key: OffchainPublicKey,
+        signature: OffchainSignature,
+    ) -> Result<Self, GeneralError> {
         let to_verify = Self::prepare_for_signing(&chain_key, &packet_key);
-        signature.verify_message(&to_verify, &packet_key)
-            .then_some(Self { chain_key, packet_key, signature})
+        signature
+            .verify_message(&to_verify, &packet_key)
+            .then_some(Self {
+                chain_key,
+                packet_key,
+                signature,
+            })
             .ok_or(GeneralError::Other(CryptoError::SignatureVerification.into()))
     }
 }
@@ -59,7 +68,7 @@ impl Display for KeyBinding {
             .field("ChainKey", &self.chain_key.to_hex())
             .field("PacketKey", &self.packet_key.to_hex())
             .field("Signature", &self.signature.to_hex())
-        .finish()
+            .finish()
     }
 }
 
@@ -70,7 +79,7 @@ impl Display for KeyBinding {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AnnouncementData {
     multiaddress: Multiaddr,
-    pub key_binding: Option<KeyBinding>
+    pub key_binding: Option<KeyBinding>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -88,16 +97,23 @@ impl AnnouncementData {
         let mut decapsulated = multiaddress.clone();
         match decapsulated.pop().ok_or(InvalidInput)? {
             Protocol::P2p(peer) => {
-                if key_binding.clone().is_some_and(|kb| !peer.eq(&kb.packet_key.to_peerid())) {
-                    return Err(NonSpecificError("decapsulated peer id does not match key binding".into()))
+                if key_binding
+                    .clone()
+                    .is_some_and(|kb| !peer.eq(&kb.packet_key.to_peerid()))
+                {
+                    return Err(NonSpecificError(format!(
+                        "decapsulated peer id {peer} does not match the key binding"
+                    )));
                 }
             }
-            _ => return Err(InvalidInput)
+            _ => return Err(InvalidInput),
         };
 
-        Ok(Self { multiaddress: decapsulated, key_binding })
+        Ok(Self {
+            multiaddress: decapsulated,
+            key_binding,
+        })
     }
-
 }
 
 impl Display for AnnouncementData {
@@ -105,17 +121,17 @@ impl Display for AnnouncementData {
         f.debug_struct("AnnouncementData")
             .field("Multiaddress", &self.multiaddress)
             .field("Keybinding", &self.key_binding)
-        .finish()
+            .finish()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use multiaddr::Multiaddr;
+    use crate::announcement::{AnnouncementData, KeyBinding};
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
+    use multiaddr::Multiaddr;
     use utils_types::primitives::Address;
     use utils_types::traits::PeerIdLike;
-    use crate::announcement::{AnnouncementData, KeyBinding};
 
     #[test]
     fn test_key_binding() {
@@ -139,42 +155,49 @@ mod tests {
             .expect("construction of announcement data should work");
         assert_eq!("/ip4/127.0.0.1/tcp/10000", ad.to_multiaddress_str());
 
-        let maddr: Multiaddr = format!("/ip4/147.75.83.83/udp/4001/quic/p2p/{peer_id}").parse().unwrap();
+        let maddr: Multiaddr = format!("/ip4/147.75.83.83/udp/4001/quic/p2p/{peer_id}")
+            .parse()
+            .unwrap();
         let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))
             .expect("construction of announcement data should work with multiple protocols");
         assert_eq!("/ip4/147.75.83.83/udp/4001/quic", ad.to_multiaddress_str());
 
         let maddr: Multiaddr = "/ip4/127.0.0.1/udt/sctp/5678".parse().unwrap();
-        AnnouncementData::new(maddr, Some(key_binding.clone()))
-            .expect_err("should not work without p2p protocol");
+        AnnouncementData::new(maddr, Some(key_binding.clone())).expect_err("should not work without p2p protocol");
 
         let peer_id = OffchainKeypair::random().public().to_peerid();
         let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
-        AnnouncementData::new(maddr, Some(key_binding.clone()))
-            .expect_err("should not work with different peer ID");
+        AnnouncementData::new(maddr, Some(key_binding.clone())).expect_err("should not work with different peer ID");
 
         let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
         AnnouncementData::new(maddr, None)
             .expect("should not work with different peer ID if no key binding was specified");
-
     }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use multiaddr::Multiaddr;
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::announcement::{AnnouncementData, KeyBinding};
     use core_crypto::types::{OffchainPublicKey, OffchainSignature};
+    use multiaddr::Multiaddr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
-    use crate::announcement::{AnnouncementData, KeyBinding};
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl KeyBinding {
         #[wasm_bindgen(js_name = "from_parts")]
-        pub fn _from_parts(chain_key: &Address, packet_key: &OffchainPublicKey, signature: &OffchainSignature) -> JsResult<KeyBinding> {
-            ok_or_jserr!(Self::from_parts(chain_key.clone(), packet_key.clone(), signature.clone()))
+        pub fn _from_parts(
+            chain_key: &Address,
+            packet_key: &OffchainPublicKey,
+            signature: &OffchainSignature,
+        ) -> JsResult<KeyBinding> {
+            ok_or_jserr!(Self::from_parts(
+                chain_key.clone(),
+                packet_key.clone(),
+                signature.clone()
+            ))
         }
     }
 

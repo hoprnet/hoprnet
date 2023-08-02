@@ -17,7 +17,6 @@ pub enum AccountType {
 }
 
 impl Display for AccountType {
-
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             NotAnnounced => {
@@ -26,12 +25,11 @@ impl Display for AccountType {
             Announced {
                 multiaddr,
                 updated_block,
-            } => {
-                f.debug_struct("AccountType")
-                    .field("MultiAddr", multiaddr)
-                    .field("UpdatedAt", updated_block)
-                    .finish()
-            }
+            } => f
+                .debug_struct("AccountType")
+                .field("MultiAddr", multiaddr)
+                .field("UpdatedAt", updated_block)
+                .finish(),
         }
     }
 }
@@ -233,18 +231,14 @@ pub mod wasm {
     use std::str::FromStr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
+    use utils_types::primitives::Address;
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use utils_types::primitives::Address;
 
     #[wasm_bindgen]
     impl AccountEntry {
         #[wasm_bindgen(constructor)]
-        pub fn _new(
-            chain_key: Address,
-            multiaddr: Option<String>,
-            updated_at: Option<u32>,
-        ) -> JsResult<AccountEntry> {
+        pub fn _new(chain_key: Address, multiaddr: Option<String>, updated_at: Option<u32>) -> JsResult<AccountEntry> {
             if (multiaddr.is_some() && updated_at.is_some()) || (multiaddr.is_none() && updated_at.is_none()) {
                 Ok(Self {
                     chain_key,

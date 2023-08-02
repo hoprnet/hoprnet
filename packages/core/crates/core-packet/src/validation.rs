@@ -102,8 +102,8 @@ mod tests {
     use crate::errors::PacketError;
     use crate::validation::validate_unacknowledged_ticket;
     use async_trait::async_trait;
-    use core_crypto::types::OffchainPublicKey;
     use core_crypto::random::random_bytes;
+    use core_crypto::types::OffchainPublicKey;
     use core_crypto::types::{HalfKey, Response};
     use core_crypto::{
         iterated_hash::IteratedHash,

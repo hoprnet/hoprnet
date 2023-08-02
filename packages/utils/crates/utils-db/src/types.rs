@@ -1,9 +1,9 @@
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use core::task::{Context, Poll};
-    use std::pin::Pin;
     use futures_lite::stream::{Stream, StreamExt};
     use pin_project_lite::pin_project;
+    use std::pin::Pin;
     use wasm_bindgen_futures::stream::JsStream;
 
     pin_project! {

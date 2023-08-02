@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use async_trait::async_trait;
 
-use core_crypto::types::{OffchainPublicKey};
+use core_crypto::types::OffchainPublicKey;
 use core_crypto::{
     iterated_hash::IteratedHash,
     types::{HalfKeyChallenge, Hash},
@@ -63,7 +63,7 @@ pub trait HoprCoreEthereumDbActions {
         &mut self,
         chain_key: &Address,
         packet_key: &OffchainPublicKey,
-        snapshot: &Snapshot
+        snapshot: &Snapshot,
     ) -> Result<()>;
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>>;

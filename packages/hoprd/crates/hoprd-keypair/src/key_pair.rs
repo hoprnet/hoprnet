@@ -114,9 +114,9 @@ impl std::fmt::Display for HoprKeys {
         f.write_str(
             format!(
                 "packet_key: {}, chain_key: {} (Ethereum address: {})\nUUID: {}",
-            self.packet_key.public().to_peerid_str(),
-            self.chain_key.public().to_hex(),
-            self.chain_key.public().0.to_address(),
+                self.packet_key.public().to_peerid_str(),
+                self.chain_key.public().to_hex(),
+                self.chain_key.public().0.to_address(),
                 self.id.to_string()
             )
             .as_str(),
@@ -480,10 +480,10 @@ impl Debug for HoprKeys {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::IdentityOptions;
-    use wasm_bindgen::prelude::*;
+    use crate::key_pair::HoprKeys;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use crate::key_pair::HoprKeys;
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     impl HoprKeys {

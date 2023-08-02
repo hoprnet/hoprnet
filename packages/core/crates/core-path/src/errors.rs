@@ -23,7 +23,7 @@ pub enum PathError {
     DatabaseError(#[from] DbError),
 
     #[error(transparent)]
-    OtherError(#[from] GeneralError)
+    OtherError(#[from] GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, PathError>;

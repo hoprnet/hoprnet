@@ -29,7 +29,10 @@ import {
   U256,
   random_integer,
   Hash,
-  number_to_channel_status, KeyBinding, OffchainSignature, u8aConcat
+  number_to_channel_status,
+  KeyBinding,
+  OffchainSignature,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -771,10 +774,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           break
         case 'KeyBinding':
         case 'KeyBinding(bytes32,bytes32,bytes32,address)':
-          await this.onKeyBinding(
-            event as Event<'KeyBinding'>,
-            lastDatabaseSnapshot
-          )
+          await this.onKeyBinding(event as Event<'KeyBinding'>, lastDatabaseSnapshot)
           break
         case 'ChannelUpdated':
         case 'ChannelUpdated(address,address,tuple)':
@@ -848,13 +848,16 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         Ethereum_OffchainPublicKey.deserialize(keyBinding.packet_key.serialize()),
         Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
       )
-    }
-    catch (e) {
+    } catch (e) {
       log(`failed to link packet key with chain key: ${e}`)
     }
   }
 
-  private async onAddressAnnouncement(event: Event<'AddressAnnouncement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
+  private async onAddressAnnouncement(
+    event: Event<'AddressAnnouncement'>,
+    blockNumber: BN,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
     let chainKey = event.args.node
     let multiAddrPrefix = event.args.baseMultiaddr
     try {
@@ -865,9 +868,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
 
       const peerId = packetKey.to_peerid_str()
-      const multiaddr = new Multiaddr(`${multiAddrPrefix}/p2p/${peerId}`)
-
-      const account= new AccountEntry(chainKey, multiaddr.toString(), blockNumber.toNumber())
+      const account = new AccountEntry(
+        chainKey,
+        new Multiaddr(`${multiAddrPrefix}/p2p/${peerId}`).toString(),
+        blockNumber.toNumber()
+      )
 
       log('New node announced', peerId, account.get_multiaddress_str())
       metric_numAnnouncements.increment()
@@ -882,8 +887,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         id: peerIdFromString(peerId),
         multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
       })
-    }
-    catch (e) {
+    } catch (e) {
       log(`Failed to process announcement of ${chainKey.to_string()}`)
       log(e)
     }

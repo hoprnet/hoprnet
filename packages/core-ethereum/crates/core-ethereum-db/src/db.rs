@@ -241,8 +241,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>> {
-        let key =
-            utils_db::db::Key::new_with_prefix(chain_key, CHAIN_KEY_PREFIX)?;
+        let key = utils_db::db::Key::new_with_prefix(chain_key, CHAIN_KEY_PREFIX)?;
         self.db.get_or_none(key).await
     }
 
@@ -255,7 +254,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         &mut self,
         chain_key: &Address,
         packet_key: &OffchainPublicKey,
-        snapshot: &Snapshot
+        snapshot: &Snapshot,
     ) -> Result<()> {
         let mut batch = Batch::new();
         let ck_key = utils_db::db::Key::new_with_prefix(chain_key, CHAIN_KEY_PREFIX)?;
@@ -263,7 +262,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         batch.put(ck_key, packet_key);
         batch.put(pk_key, chain_key);
-        batch.put(utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?, snapshot);
+        batch.put(
+            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
+            snapshot,
+        );
 
         self.db.batch(batch, true).await
     }
@@ -939,8 +941,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_acknowledged_tickets(filter).await)
-                .map(WasmVecAcknowledgedTicket::from)
+            utils_misc::ok_or_jserr!(db.get_acknowledged_tickets(filter).await).map(WasmVecAcknowledgedTicket::from)
             //}
         }
 
@@ -1174,7 +1175,7 @@ pub mod wasm {
             &self,
             chain_key: &Address,
             packet_key: &OffchainPublicKey,
-            snapshot: &Snapshot
+            snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {

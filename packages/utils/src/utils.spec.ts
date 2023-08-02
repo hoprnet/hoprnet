@@ -14,11 +14,11 @@ describe('utils', () => {
     let kp = OffchainKeypair.random()
     let peerId = await peerIdFromKeys(kp.public().serialize(), kp.secret())
 
-    assert.equal(peerId.type, "Ed25519", "must yield ed25519 peerid")
-    assert.equal(peerId.toString(), kp.to_peerid_str(), "must yield same peer ids")
-    assert(peerId.privateKey, "must have private key")
+    assert.equal(peerId.type, 'Ed25519', 'must yield ed25519 peerid')
+    assert.equal(peerId.toString(), kp.to_peerid_str(), 'must yield same peer ids')
+    assert(peerId.privateKey, 'must have private key')
 
-    assert.equal(peerId.publicKey, kp.public(), "public keys must be equal")
-    assert.equal(peerId.privateKey, kp.secret(), "private keys must be equal")
+    assert.equal(peerId.publicKey, kp.public(), 'public keys must be equal')
+    assert.equal(peerId.privateKey, kp.secret(), 'private keys must be equal')
   })
 })

@@ -17,7 +17,10 @@ import {
   type DeferType,
   PublicKey,
   AccountEntry,
-  create_counter, ChainKeypair, OffchainKeypair, KeyBinding
+  create_counter,
+  ChainKeypair,
+  OffchainKeypair,
+  KeyBinding
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -192,9 +195,9 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   announce(multiaddr: Multiaddr, packetKeypair: OffchainKeypair): Promise<string> {
+    // Currently we announce always with key bindings
     let keyBinding = new KeyBinding(this.chainKeypair.to_address(), packetKeypair)
     let data = new AnnouncementData(multiaddr.toString(), keyBinding)
-
     return this.chain.announce(data, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
@@ -605,11 +608,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       getAccount: () => {
         connectorLogger('getAccount method was called')
         return Promise.resolve(
-          new AccountEntry(
-            chainKeypair.public().to_address(),
-            `/ip4/127.0.0.1/tcp/124/p2p/${peerId.toString()}`,
-            1
-          )
+          new AccountEntry(chainKeypair.public().to_address(), `/ip4/127.0.0.1/tcp/124/p2p/${peerId.toString()}`, 1)
         )
       },
       waitForPublicNodes: () => {

@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::errors::PacketError::{
     AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError,
-    PacketDecodingError, PathError, Retry, TagReplay,Timeout, TransportError,
+    PacketDecodingError, PathError, Retry, TagReplay, Timeout, TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
@@ -503,8 +503,7 @@ where
         let next_ticket = if path.length() == 1 {
             Ticket::new_zero_hop(next_peer, &self.cfg.chain_keypair)
         } else {
-            self.create_multihop_ticket(next_peer, path.length() as u8)
-                .await?
+            self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
 
         // Create the packet
@@ -644,15 +643,15 @@ where
                             "failed to find channel key for packet key {previous_hop} on previous hop"
                         )))?;
 
-                let next_hop_addr =
-                    self.db
-                        .read()
-                        .await
-                        .get_chain_key(next_hop)
-                        .await?
-                        .ok_or(PacketDecodingError(format!(
-                            "failed to find channel key for packet key {next_hop} on next hop"
-                        )))?;
+                let next_hop_addr = self
+                    .db
+                    .read()
+                    .await
+                    .get_chain_key(next_hop)
+                    .await?
+                    .ok_or(PacketDecodingError(format!(
+                        "failed to find channel key for packet key {next_hop} on next hop"
+                    )))?;
 
                 // Find the corresponding channel
                 debug!("looking for channel with {previous_hop}");
@@ -965,7 +964,7 @@ mod tests {
     }
 
     async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
-        let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
+        let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
         for (index, peer_key) in PEERS_PRIVS.iter().enumerate().take(dbs.len()) {
@@ -978,7 +977,8 @@ mod tests {
             for peer_key in PEERS_PRIVS {
                 let node_key = OffchainPublicKey::from_privkey(&peer_key)?;
                 let chain_key = PublicKey::from_privkey(&peer_key)?;
-                db.link_chain_and_packet_keys(&chain_key, &node_key).await?;
+                db.link_chain_and_packet_keys(&chain_key.to_address(), &node_key, &Snapshot::default())
+                    .await?;
             }
 
             let mut channel: Option<ChannelEntry> = None;
