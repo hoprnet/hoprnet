@@ -119,64 +119,6 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
 } 
 
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use std::str::FromStr;
-
-    use super::*;
-    use crate::heartbeat::HeartbeatConfig;
-    use wasm_bindgen::prelude::*;
-
-    use super::{Heartbeat, HeartbeatExternalApi};
-
-    #[wasm_bindgen]
-    impl HeartbeatConfig {
-        #[wasm_bindgen]
-        pub fn build(
-            heartbeat_variance: f32,
-            heartbeat_interval: u32,
-            heartbeat_threshold: u64,
-        ) -> Self {
-            Self {
-                heartbeat_variance,
-                heartbeat_interval,
-                heartbeat_threshold,
-            }
-        }
-    }
-
-    #[wasm_bindgen]
-    struct WasmHeartbeatApi {
-        get_peers: js_sys::Function,
-    }
-
-    impl HeartbeatExternalApi for WasmHeartbeatApi {
-        fn get_peers(&self, from_timestamp: u64) -> Vec<libp2p_identity::PeerId> {
-            let this = JsValue::null();
-            let timestamp = JsValue::from(from_timestamp);
-
-            return match self.get_peers.call1(&this, &timestamp) {
-                Ok(v) => {
-                    js_sys::Array::from(&v)
-                        .to_vec()
-                        .into_iter()
-                        .filter_map(|v| libp2p_identity::PeerId::from_str(String::from(js_sys::JsString::from(v)).as_str()).ok())
-                        .collect()
-                }
-                Err(err) => {
-                    error!(
-                        "Failed to perform on peer offline operation with: {}",
-                        err.as_string()
-                            .unwrap_or_else(|| { "Unknown error occurred on fetching the peers to ping".to_owned() })
-                            .as_str()
-                    );
-                    Vec::new()
-                }
-            };
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
