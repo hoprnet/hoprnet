@@ -4,12 +4,12 @@ use async_lock::{Mutex};
 use async_trait::async_trait;
 
 pub type Tag = u16;
-const RESERVED_TAG: Tag = 0;
+pub const RESERVED_TAG: Tag = 0;
 
 #[async_trait(?Send)]
 pub trait InboxBackend<T> {
     fn new_with_capacity(cap: usize) -> Self;
-    async fn push(&mut self, tag: Tag, payload: T);
+    async fn push(&mut self, tag: Option<Tag>, payload: T);
     async fn count(&self, tag: Option<Tag>) -> usize;
     async fn pop(&mut self, tag: Option<Tag>) -> Option<T>;
     async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<T>;
@@ -67,7 +67,7 @@ where P: AsRef<[u8]>, B: InboxBackend<P> {
     pub async fn push(&mut self, payload: P) {
         let tag = Self::extract_tag(&payload);
         let mut db = self.backend.lock().await;
-        db.push(tag.unwrap_or(RESERVED_TAG), payload)
+        db.push(tag, payload)
             .await;
         db.purge((self.time)().as_secs() - self.cfg.max_age_millis).await;
     }
