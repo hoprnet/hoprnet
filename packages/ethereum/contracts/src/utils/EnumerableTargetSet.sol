@@ -4,7 +4,7 @@
 
 pragma solidity ^0.8.0;
 
-import "./TargetUtils.sol";
+import {TargetUtils, Target} from "./TargetUtils.sol";
 
 struct TargetSet {
     // Storage of set values

@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
-import "../../src/node-stake/permissioned-module/NodeManagementModule.sol";
-import "../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
-import "../../src/node-stake/NodeStakeFactory.sol";
-import "safe-contracts/Safe.sol";
-import "../../script/utils/SafeSuiteLib.sol";
-import "../utils/SafeSingleton.sol";
 import "forge-std/Test.sol";
-import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 
-contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
+import {HoprNodeManagementModule} from "../../src/node-stake/permissioned-module/NodeManagementModule.sol";
+import {HoprCapabilityPermissions} from "../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
+import {HoprNodeStakeFactory} from "../../src/node-stake/NodeStakeFactory.sol";
+import {Safe} from "safe-contracts/Safe.sol";
+import {SafeSuiteLib} from "../../script/utils/SafeSuiteLib.sol";
+import {SafeSingletonFixtureTest} from "../utils/SafeSingleton.sol";
+import {ClonesUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+
+contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest {
     using ClonesUpgradeable for address;
 
     HoprNodeManagementModule public moduleSingleton;
@@ -67,8 +68,6 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
 
         uint256 nonce = 0;
         address[] memory admins = new address[](0);
-        address expectedModuleAddress =
-            factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
 
         vm.prank(caller);
         vm.expectRevert(HoprNodeStakeFactory.TooFewOwners.selector);
@@ -152,7 +151,8 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         emit OwnershipTransferred(address(0), safeAddr);
         vm.expectEmit(true, false, false, false, address(moduleProxy));
         emit SetMultisendAddress(multisendAddr);
-        moduleProxy.call(moduleInitializer);
+        (bool success,) = moduleProxy.call(moduleInitializer);
+        assertTrue(success);
         vm.clearMockedCalls();
     }
 
@@ -170,7 +170,8 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         // add Safe and multisend to the module
         bytes memory moduleInitializer =
             abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
-        moduleProxy.call(moduleInitializer);
+        (bool success,) = moduleProxy.call(moduleInitializer);
+        assertFalse(success);
         vm.clearMockedCalls();
     }
 
@@ -188,25 +189,31 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         // add Safe and multisend to the module
         bytes memory moduleInitializer =
             abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
-        moduleProxy.call(moduleInitializer);
+        (bool success,) = moduleProxy.call(moduleInitializer);
+        assertFalse(success);
         vm.clearMockedCalls();
     }
 
-    function testRevert_CloneButFailToInitializeTwice(uint256 nonce, address safeAddr, address multisendAddr) public {
-        vm.assume(safeAddr != address(0) && multisendAddr != address(0));
+    function testRevert_CloneButFailToInitializeTwice(uint256 nonce) public {
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
         // 1. Deploy node management module
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
 
         // initialize module proxy with valid variables
         bytes memory moduleInitializer =
-            abi.encodeWithSignature("initialize(bytes)", abi.encode(address(1), address(2)));
-        moduleProxy.call(moduleInitializer);
-        // re-initialize module proxy with variables
-        bytes memory moduleReinitializer =
-            abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
-        vm.expectRevert(AlreadyInitialized.selector);
-        moduleProxy.call(moduleReinitializer);
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(address(1),
+                                                      address(2)));
+
+        (bool success1,) = moduleProxy.call(moduleInitializer);
+        assertTrue(success1);
+        // re-initialize module proxy
+        bytes memory moduleReInitializer =
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(address(3),
+                                                      address(4)));
+
+        vm.expectRevert(HoprNodeManagementModule.AlreadyInitialized.selector);
+        (bool success2,) = moduleProxy.call(moduleReInitializer);
+        assertFalse(success2);
         vm.clearMockedCalls();
     }
 }

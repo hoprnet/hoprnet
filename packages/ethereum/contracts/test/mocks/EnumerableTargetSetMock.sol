@@ -19,27 +19,27 @@ contract EnumerableTargetSetMock {
         return EnumerableTargetSet.remove(targetSet, targetAddress);
     }
 
-    function contains(address targetAddress) public returns (bool) {
+    function contains(address targetAddress) public view returns (bool) {
         return EnumerableTargetSet.contains(targetSet, targetAddress);
     }
 
-    function length() public returns (uint256) {
+    function length() public view returns (uint256) {
         return EnumerableTargetSet.length(targetSet);
     }
 
-    function at(uint256 index) public returns (Target) {
+    function at(uint256 index) public view returns (Target) {
         return EnumerableTargetSet.at(targetSet, index);
     }
 
-    function values() public returns (Target[] memory) {
+    function values() public view returns (Target[] memory) {
         return EnumerableTargetSet.values(targetSet);
     }
 
-    function tryGet(address targetAddress) public returns (bool, Target) {
+    function tryGet(address targetAddress) public view returns (bool, Target) {
         return EnumerableTargetSet.tryGet(targetSet, targetAddress);
     }
 
-    function get(address targetAddress) public returns (Target) {
+    function get(address targetAddress) public view returns (Target) {
         return EnumerableTargetSet.get(targetSet, targetAddress);
     }
 }

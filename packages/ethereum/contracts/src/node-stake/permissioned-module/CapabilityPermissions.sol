@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.0 <0.9.0;
 
-import "safe-contracts/common/Enum.sol";
-import "../../Channels.sol";
-import "../../utils/EnumerableTargetSet.sol";
-
-import "forge-std/console2.sol";
+import {Enum} from "safe-contracts/common/Enum.sol";
+import {HoprChannels} from "../../Channels.sol";
+import {EnumerableTargetSet, TargetSet} from "../../utils/EnumerableTargetSet.sol";
+import {TargetUtils, Target, TargetPermission, TargetType,
+Clearance, CapabilityPermission} from "../../utils/TargetUtils.sol";
 
 enum GranularPermission {
     NONE,
@@ -206,7 +206,6 @@ library HoprCapabilityPermissions {
                 // We offset the load address by 85 byte (operation byte + 20 address bytes + 32 value bytes + 32 data length bytes)
                 out := add(data, add(i, 0x35))
             }
-            // console2.logBytes(data[:100]);
             checkTransaction(role, to, value, out, operation);
         }
     }
@@ -395,7 +394,7 @@ library HoprCapabilityPermissions {
      */
     function getDefaultPermission(uint256 dataLength, Target target, bytes4 functionSig)
         internal
-        view
+        pure
         returns (TargetPermission)
     {
         // check default target permission

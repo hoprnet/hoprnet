@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import "../../src/static/HoprWrapper.sol";
-import "../../src/static/HoprToken.sol";
-import "../utils/ERC1820Registry.sol";
-import "../mocks/ERC677Mock.sol";
-import "openzeppelin-contracts-4.4.2/token/ERC20/IERC20.sol";
+import "forge-std/Test.sol";
+
+import {HoprWrapper} from "../../src/static/HoprWrapper.sol";
+import {HoprToken} from "../../src/static/HoprToken.sol";
+import {ERC1820RegistryFixtureTest} from "../utils/ERC1820Registry.sol";
+import {ERC677Mock} from "../mocks/ERC677Mock.sol";
+import {IERC20} from "openzeppelin-contracts-4.4.2/token/ERC20/IERC20.sol";
 
 contract HoprWrapperTest is Test, ERC1820RegistryFixtureTest {
     // to alter the storage

@@ -2,8 +2,8 @@
 pragma solidity 0.8.19;
 
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
-import "openzeppelin-contracts/utils/math/Math.sol";
-import "../interfaces/INetworkRegistryRequirement.sol";
+import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
+import {IHoprNetworkRegistryRequirement} from "../interfaces/INetworkRegistryRequirement.sol";
 
 /**
  * @dev Interface for staking contract
@@ -45,7 +45,8 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     NftTypeAndRank[] public eligibleNftTypeAndRank;
     // for holders of special NFT, it's the cap of peer ids one address can register.
     uint256[] public maxRegistrationsPerSpecialNft;
-    // list of NFTs whose owner are considered as eligible to the network without meeting the `stakeThreshold`, e.g. "Network_registry NFT"
+    // list of NFTs whose owner are considered as eligible to the network
+    // without meeting the `stakeThreshold`, e.g. "Network_registry NFT"
     NftTypeAndRank[] public specialNftTypeAndRank;
 
     // emit when a new NFT type and rank gets included in the eligibility list
@@ -114,7 +115,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     /**
      * @dev Get if the staking account is eligible to act on node address
      */
-    function canOperateFor(address, address) external view returns (bool eligiblity) {
+    function canOperateFor(address, address) external pure returns (bool eligiblity) {
         return true;
     }
 

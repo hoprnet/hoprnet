@@ -5,17 +5,12 @@ pragma solidity ^0.8.0;
  * This contract follows the principle of `zodiac/core/Module.sol`
  * but implement differently in order to overwrite functionalities
  */
-import "./SimplifiedModule.sol";
-import "./CapabilityPermissions.sol";
-import "../../Channels.sol";
-import "../../interfaces/INodeManagementModule.sol";
-
-// when the contract has already been initialized
-error AlreadyInitialized();
-// when a node is a member of the role
-error WithMembership();
-// Once module gets created, the ownership cannot be transferred
-error CannotChangeOwner();
+import {Enum} from "safe-contracts/common/Enum.sol";
+import {SimplifiedModule} from "./SimplifiedModule.sol";
+import {HoprCapabilityPermissions, Role, GranularPermission} from "./CapabilityPermissions.sol";
+import {HoprChannels} from "../../Channels.sol";
+import {IHoprNodeManagementModule} from "../../interfaces/INodeManagementModule.sol";
+import {TargetUtils, Target} from "../../utils/TargetUtils.sol";
 
 /**
  * @title Permissioned capability-based module for HOPR nodes operations
@@ -41,6 +36,13 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     event SetMultisendAddress(address indexed multisendAddress);
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
+
+    // when the contract has already been initialized
+    error AlreadyInitialized();
+    // when a node is a member of the role
+    error WithMembership();
+    // Once module gets created, the ownership cannot be transferred
+    error CannotChangeOwner();
 
     modifier nodeOnly() {
         if (!role.members[_msgSender()]) {

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.0;
+pragma solidity 0.8.19;
 
-import "../interfaces/INetworkRegistryRequirement.sol";
-import "../interfaces/INodeSafeRegistry.sol";
-import "openzeppelin-contracts/access/AccessControlEnumerable.sol";
+import {IHoprNetworkRegistryRequirement} from "../interfaces/INetworkRegistryRequirement.sol";
+import {IHoprNodeSafeRegistry} from "../interfaces/INodeSafeRegistry.sol";
+import {AccessControlEnumerable} from "openzeppelin-contracts/access/AccessControlEnumerable.sol";
 
 /**
  * @dev Minimum interface for token contract
@@ -82,7 +82,8 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
     }
 
     /**
-     * @dev Manager updates the block number of the token balance snapshot, which is used for calculating maxAllowedRegistrations
+     * @dev Manager updates the block number of the token balance snapshot,
+     * which is used for calculating maxAllowedRegistrations
      * @param newSnapshotBlock new block number of the token balance snapshot
      */
     function updateSnapshotBlockNumber(uint128 newSnapshotBlock) external onlyRole(MANAGER_ROLE) {

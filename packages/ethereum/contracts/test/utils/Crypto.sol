@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import "../../src/Crypto.sol";
-import "../../src/Channels.sol";
-import "solcrypto/SECP2561k.sol";
-import "forge-std/Test.sol";
+import {HoprCrypto} from "../../src/Crypto.sol";
+import {HoprChannels} from "../../src/Channels.sol";
+import {SECP2561k} from "solcrypto/SECP2561k.sol";
+import {Test} from "forge-std/Test.sol";
 
 abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
     uint256 constant SECP256K1_HALF_FIELD_ORDER = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0;
@@ -12,7 +12,7 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
     struct RedeemTicketArgBuilder {
         uint256 privKeyA;
         uint256 privKeyB;
-        bytes DST;
+        bytes dst;
         address src;
         address dest;
         uint256 amount;
@@ -30,7 +30,7 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
     function getRedeemableTicket(RedeemTicketArgBuilder memory args, bytes32 dstHash)
         internal
         view
-        returns (HoprChannels.RedeemableTicket memory redeemable, VRF_Parameters memory vrf)
+        returns (HoprChannels.RedeemableTicket memory redeemable, VRFParameters memory vrf)
     {
         bytes32 channelId = _getChannelId(args.src, args.dest);
 
@@ -62,7 +62,7 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
 
         redeemable = HoprChannels.RedeemableTicket(ticketData, sig, args.porSecret);
 
-        vrf = getVRFParameters(args.privKeyB, args.DST, ticketHash);
+        vrf = getVRFParameters(args.privKeyB, args.dst, ticketHash);
     }
 
     function toCompactSignature(uint8 v, bytes32 r, bytes32 s)
@@ -87,39 +87,39 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         r_out = r;
     }
 
-    function getVRFParameters(uint256 privKey, bytes memory DST, bytes32 vrfMessage)
+    function getVRFParameters(uint256 privKey, bytes memory dst, bytes32 vrfMessage)
         internal
         view
-        returns (HoprCrypto.VRF_Parameters memory params)
+        returns (HoprCrypto.VRFParameters memory params)
     {
-        HoprCrypto.VRF_Payload memory payload;
+        HoprCrypto.VRFPayload memory payload;
 
         // stack height optimization, doesn't compile otherwise
         {
             address chain_addr = HoprCrypto.scalarTimesBasepoint(privKey);
             payload.message = vrfMessage;
             payload.signer = chain_addr;
-            payload.DST = abi.encodePacked(DST);
+            payload.dst = abi.encodePacked(dst);
         }
 
         // stack height optimization, doesn't compile otherwise
         {
-            (uint256 b_x, uint256 b_y) =
-                HoprCrypto.hashToCurve(abi.encodePacked(payload.signer, payload.message), payload.DST);
+            (uint256 bx, uint256 by) =
+                HoprCrypto.hashToCurve(abi.encodePacked(payload.signer, payload.message), payload.dst);
 
             {
-                (uint256 v_x, uint256 v_y) = SECP2561k.ecmul(b_x, b_y, privKey);
-                params.v_x = v_x;
-                params.v_y = v_y;
+                (uint256 vx, uint256 vy) = SECP2561k.ecmul(bx, by, privKey);
+                params.vx = vx;
+                params.vy = vy;
             }
 
-            uint256 r = HoprCrypto.hashToScalar(abi.encodePacked(privKey, b_x, b_y, payload.message), payload.DST);
+            uint256 r = HoprCrypto.hashToScalar(abi.encodePacked(privKey, bx, by, payload.message), payload.dst);
 
-            (uint256 b_r_x, uint256 b_r_y) = SECP2561k.ecmul(b_x, b_y, r);
+            (uint256 brx, uint256 bry) = SECP2561k.ecmul(bx, by, r);
 
             params.h = HoprCrypto.hashToScalar(
-                abi.encodePacked(payload.signer, params.v_x, params.v_y, b_r_x, b_r_y, payload.message),
-                abi.encodePacked(DST)
+                abi.encodePacked(payload.signer, params.vx, params.vy, brx, bry, payload.message),
+                abi.encodePacked(dst)
             );
 
             // s = r + h * a (mod p)
@@ -127,13 +127,13 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
                 addmod(r, mulmod(params.h, privKey, HoprCrypto.SECP256K1_FIELD_ORDER), HoprCrypto.SECP256K1_FIELD_ORDER);
 
             {
-                (uint256 s_b_x, uint256 s_b_y) = SECP2561k.ecmul(b_x, b_y, params.s);
-                params.sB_x = s_b_x;
-                params.sB_y = s_b_y;
+                (uint256 sBx, uint256 sBy) = SECP2561k.ecmul(bx, by, params.s);
+                params.sBx = sBx;
+                params.sBy = sBy;
 
-                (uint256 h_v_x, uint256 h_v_y) = SECP2561k.ecmul(params.v_x, params.v_y, params.h);
-                params.hV_x = h_v_x;
-                params.hV_y = h_v_y;
+                (uint256 h_v_x, uint256 h_v_y) = SECP2561k.ecmul(params.vx, params.vy, params.h);
+                params.hVx = h_v_x;
+                params.hVy = h_v_y;
             }
         }
     }

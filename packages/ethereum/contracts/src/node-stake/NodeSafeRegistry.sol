@@ -90,7 +90,7 @@ contract HoprNodeSafeRegistry {
     /**
      * @dev checks whether a NodeSafe combination has been registered before.
      */
-    function isNodeSafeRegistered(NodeSafe memory nodeSafe) external returns (bool) {
+    function isNodeSafeRegistered(NodeSafe memory nodeSafe) external view returns (bool) {
         return nodeToSafe[nodeSafe.nodeChainKeyAddress] == nodeSafe.safeAddress;
     }
 

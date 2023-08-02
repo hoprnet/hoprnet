@@ -138,7 +138,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         _helperAddNodes(accounts);
 
         assertTrue(moduleProxy.isNode(accounts[index]));
-        vm.expectRevert(WithMembership.selector);
+        vm.expectRevert(HoprNodeManagementModule.WithMembership.selector);
         moduleProxy.addNode(accounts[index]);
         vm.stopPrank();
         vm.clearMockedCalls();
@@ -1206,7 +1206,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.CalldataOutOfBounds.selector);
-        bool result = moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
+        moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
         vm.clearMockedCalls();
     }
     /**
@@ -1230,7 +1230,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.CalldataOutOfBounds.selector);
-        bool result = moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
+        moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -1294,6 +1294,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
      */
     function _helperGetUniqueAddressArrayAndRandomItem(address[] memory addrs, uint256 randomIndex)
         private
+        view
         returns (address[] memory, address)
     {
         if (addrs.length == 0) {
@@ -1324,7 +1325,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         uint256[] memory txValues,
         uint256[] memory dataLengths,
         bytes[] memory data
-    ) private returns (bytes memory) {
+    ) private pure returns (bytes memory) {
         bytes memory encodePacked;
         for (uint256 i = 0; i < txOperations.length; i++) {
             encodePacked =

@@ -643,7 +643,7 @@ contract HoprNetworkRegistryTest is Test {
     /**
      * @dev add create node addresses
      */
-    function _helperCreateNodeAddresses(uint256 accountIndex) private returns (address[] memory) {
+    function _helperCreateNodeAddresses(uint256 accountIndex) private pure returns (address[] memory) {
         address[] memory nodeAddresses = new address[](accountIndex);
         if (accountIndex > 0) {
             uint256 nodeStartingIndex = (accountIndex - 1) * accountIndex / 2 + STAKING_ACCOUNTS_SIZE + 1;

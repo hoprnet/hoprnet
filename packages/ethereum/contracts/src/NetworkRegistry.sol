@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import "openzeppelin-contracts/access/AccessControlEnumerable.sol";
-import "./interfaces/INetworkRegistryRequirement.sol";
+import {AccessControlEnumerable} from "openzeppelin-contracts/access/AccessControlEnumerable.sol";
+import {IHoprNetworkRegistryRequirement} from "./interfaces/INetworkRegistryRequirement.sol";
 
 /**
  * @title HoprNetworkRegistry
@@ -26,9 +26,12 @@ import "./interfaces/INetworkRegistryRequirement.sol";
 contract HoprNetworkRegistry is AccessControlEnumerable {
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
-    IHoprNetworkRegistryRequirement public requirementImplementation; // Implementation of network registry proxy
-    mapping(address => uint256) public countRegisterdNodesPerAccount; // counter for registered nodes per staking account
-    mapping(address => address) public nodeRegisterdToAccount; // account address that a node is registered to
+    // Implementation of network registry proxy
+    IHoprNetworkRegistryRequirement public requirementImplementation;
+    // counter for registered nodes per staking account
+    mapping(address => uint256) public countRegisterdNodesPerAccount;
+    // account address that a node is registered to
+    mapping(address => address) public nodeRegisterdToAccount;
     bool public enabled;
 
     error GloballyDisabledRegistry();
@@ -327,7 +330,7 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
         }
     }
 
-    function _operationGuard(address stakingAccount, address nodeAddress) private {
+    function _operationGuard(address stakingAccount, address nodeAddress) private view {
         bool isEligibleAction = requirementImplementation.canOperateFor(stakingAccount, nodeAddress);
         // revert when the stakingAccountstakingAccount cannot operate for the node
         if (!isEligibleAction) {
