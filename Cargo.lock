@@ -1104,11 +1104,13 @@ name = "core-network"
 version = "0.2.1"
 dependencies = [
  "async-std",
+ "async-trait",
  "bincode",
  "blake2",
  "console_error_panic_hook",
  "core-crypto",
  "futures",
+ "futures-lite",
  "getrandom 0.2.10",
  "gloo-timers",
  "js-sys",

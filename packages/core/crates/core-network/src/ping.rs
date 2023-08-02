@@ -1,5 +1,6 @@
 use std::{time::Duration, pin::Pin, result};
 
+use async_trait::async_trait;
 use futures::{
     channel::mpsc,
     future::{
@@ -45,13 +46,13 @@ pub type HeartbeatGetPongRx = futures::channel::mpsc::UnboundedReceiver<(PeerId,
 
 #[cfg_attr(test, mockall::automock)]
 pub trait PingExternalAPI {
-    fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId>;
     fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result);
 }
 
 /// Basic type used for internally aggregating ping results to be further processed in the
 /// PingExternalAPI callbacks.
 type PingMeasurement = (PeerId, crate::types::Result);
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PingConfig {
@@ -61,6 +62,11 @@ pub struct PingConfig {
     pub timeout: Duration,
 }
 
+#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
+pub trait Pinging {
+    async fn ping(&mut self, peers: Vec<PeerId>);
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Ping {
     config: PingConfig,
@@ -68,7 +74,6 @@ pub struct Ping {
     send_ping: HeartbeatSendPingTx,
     receive_pong: HeartbeatGetPongRx,
     external_api: Box<dyn PingExternalAPI>,
-    metric_time_to_heartbeat: Option<SimpleHistogram>,
     metric_time_to_ping: Option<SimpleHistogram>,
     metric_successful_ping_count: Option<SimpleCounter>,
     metric_failed_ping_count: Option<SimpleCounter>,
@@ -87,12 +92,6 @@ impl Ping {
             send_ping,
             receive_pong,
             external_api,
-            metric_time_to_heartbeat: if cfg!(test) {None} else {SimpleHistogram::new(
-                "core_histogram_heartbeat_time_seconds",
-                "Measures total time it takes to probe all other nodes (in seconds)",
-                vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
-            )
-            .ok()},
             metric_time_to_ping: if cfg!(test) {None} else {SimpleHistogram::new(
                 "core_histogram_ping_time_seconds",
                 "Measures total time it takes to ping a single node (seconds)",
@@ -112,47 +111,27 @@ impl Ping {
         }
     }
 
-    /// Heartbeat loop responsible for periodically requesting peers to ping around from the 
-    /// external API interface.
-    /// 
-    /// The loop never ends and will run indefinitely, until the program is explicitly terminated.
-    /// As such, this feature should therefore be joined with other internal loops and awaited
-    /// after all components have been initialized.
-    pub async fn heartbeat_loop(&mut self) {
-        loop {
-            let heartbeat_round_timer = if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
-                Some(histogram_start_measure!(metric_time_to_heartbeat))
+    fn initiate_peer_ping(&mut self, peer: &PeerId) -> bool {
+        if ! self.active_pings.contains_key(&peer) {
+            info!("Pinging peer '{}'", peer);
+
+            let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();
+
+            let ping_peer_timer = if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
+                Some(histogram_start_measure!(metric_time_to_ping))
             } else {
                 None
             };
-
-            let start = current_timestamp();
-            // let ping = futures::future::pending().fuse();
-
-            // pin_mut!(timeout, ping);
-
-            // TODO: select over this
-            //let timeout = sleep(self.config.timeout).fuse();
-            // let from_timestamp = if start > self.config.heartbeat_threshold { start - self.config.heartbeat_threshold } else { start };
-            // self.external_api.get_peers(from_timestamp);
-        // try {
-        //     const thresholdTime = Date.now() - Number(this.config.heartbeat_threshold)
-        //     log(`Checking nodes since ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
-    
-        //     await this.pinger.ping(this.networkPeers.peers_to_ping(BigInt(thresholdTime)))
-        //   } catch (err) {
-        //     log('FATAL ERROR IN HEARTBEAT', err)
-            // sleep if pinging was too fast
-
-            if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
-                metric_time_to_heartbeat.record_measure(heartbeat_round_timer.unwrap());
-            };
-
-            sleep(std::time::Duration::from_millis(0u64.max(current_timestamp() - start))).await
+            let _ = self.active_pings.insert(peer.clone(), (current_timestamp(), ping_challenge.clone(), ping_peer_timer));
+            return self.send_ping.start_send((peer.clone(), ping_challenge)).is_ok()
         }
 
+        false
     }
+}
 
+#[async_trait(? Send)] 
+impl Pinging for Ping {
     /// Performs multiple concurrent async pings to the specified peers.
     ///
     /// A sliding window mechanism is used to select at most a fixed number of concurrently processed
@@ -163,9 +142,10 @@ impl Ping {
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
     /// * `send_msg` - The send function producing a Future with the reply of the pinged peer
-    pub async fn ping_peers(&mut self, mut peers: Vec<PeerId>)
+    async fn ping(&mut self, peers: Vec<PeerId>)
     {
         let start_all_peers = current_timestamp();
+        let mut peers = peers;
 
         if peers.is_empty() {
             debug!("Received an empty peer list, not pinging any peers");
@@ -245,24 +225,6 @@ impl Ping {
                 }
             }
         }
-    }
-
-    fn initiate_peer_ping(&mut self, peer: &PeerId) -> bool {
-        if ! self.active_pings.contains_key(&peer) {
-            info!("Pinging peer '{}'", peer);
-
-            let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();
-
-            let ping_peer_timer = if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
-                Some(histogram_start_measure!(metric_time_to_ping))
-            } else {
-                None
-            };
-            let _ = self.active_pings.insert(peer.clone(), (current_timestamp(), ping_challenge.clone(), ping_peer_timer));
-            return self.send_ping.start_send((peer.clone(), ping_challenge)).is_ok()
-        }
-
-        false
     }
 }
 
@@ -416,7 +378,6 @@ mod tests {
     use crate::ping::Ping;
     use mockall::*;
     use more_asserts::*;
-    use std::str::FromStr;
 
     fn simple_ping_config() -> PingConfig {
         PingConfig {
@@ -435,7 +396,7 @@ mod tests {
         let (_tx_pong, rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
-        pinger.ping_peers(vec![]).await;
+        pinger.ping(vec![]).await;
     }
 
     #[async_std::test]
@@ -461,7 +422,7 @@ mod tests {
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
         futures::join!(
-            pinger.ping_peers(vec![peer.clone()]),
+            pinger.ping(vec![peer.clone()]),
             ideal_single_use_channel
         );
     }
@@ -489,7 +450,7 @@ mod tests {
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
         futures::join!(
-            pinger.ping_peers(vec![peer.clone()]),
+            pinger.ping(vec![peer.clone()]),
             bad_pong_single_use_channel
         );
     }
@@ -521,7 +482,7 @@ mod tests {
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
         futures::join!(
-            pinger.ping_peers(vec![peer.clone()]),
+            pinger.ping(vec![peer.clone()]),
             timeout_single_use_channel
         );
     }
@@ -557,7 +518,7 @@ mod tests {
 
         let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
         futures::join!(
-            pinger.ping_peers(peers),
+            pinger.ping(peers),
             ideal_twice_usable_channel
         );    
     }
@@ -601,7 +562,7 @@ mod tests {
         
         let start = current_timestamp();
         futures::join!(
-            pinger.ping_peers(peers),
+            pinger.ping(peers),
             ideal_twice_usable_linearly_delaying_channel
         );  
         let end = current_timestamp();

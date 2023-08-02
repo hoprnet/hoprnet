@@ -10,9 +10,11 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
+async-trait = "0.1"
 bincode = "1.3.3"
 blake2 = "0.10.4"
 futures = { workspace = true }
+futures-lite = { workspace = true }
 libp2p-identity = { version = "0.2.2", features = ["secp256k1", "peerid"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { version = "1", features = ["derive"] }

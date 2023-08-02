@@ -12,16 +12,7 @@ use crate::errors::{Result, P2PError};
 pub struct HeartbeatChallenge(pub PeerId, pub ControlMessage);
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Triggers {
-    Heartbeat(HeartbeatChallenge),
-    MixerMessage(String),       // TODO: This should hold the `Packet` object
-}
-
-impl From<HeartbeatChallenge> for Triggers {
-    fn from(value: HeartbeatChallenge) -> Self {
-        Self::Heartbeat(value)
-    }
-}
+pub struct ManualPingChallenge(pub PeerId, pub ControlMessage);
 
 // TODO: NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
 // in case of faster input than output the memory might run out
@@ -81,6 +72,35 @@ impl Stream for HeartbeatRequester {
 
         return match this.receiver.poll_next(cx) {
             std::task::Poll::Ready(Some((peer, challenge))) => std::task::Poll::Ready(Some(HeartbeatChallenge(peer, challenge))),
+            std::task::Poll::Ready(None) => std::task::Poll::Ready(None),
+            std::task::Poll::Pending => std::task::Poll::Pending,
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, None)
+    }
+}
+
+pub struct ManualPingRequester {
+    receiver: HeartbeaRequestRx,
+}
+
+impl ManualPingRequester {
+    pub fn new(receiver: HeartbeaRequestRx) -> Self
+    {
+        Self { receiver }
+    }
+}
+
+impl Stream for ManualPingRequester {
+    type Item = ManualPingChallenge;
+
+    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
+        let mut this = Pin::new(&mut self);
+
+        return match this.receiver.poll_next(cx) {
+            std::task::Poll::Ready(Some((peer, challenge))) => std::task::Poll::Ready(Some(ManualPingChallenge(peer, challenge))),
             std::task::Poll::Ready(None) => std::task::Poll::Ready(None),
             std::task::Poll::Pending => std::task::Poll::Pending,
         }

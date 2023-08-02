@@ -97,29 +97,51 @@ pub fn build_p2p_network(me: &PeerId) -> libp2p_swarm::Swarm<HoprNetworkBehavior
     SwarmBuilder::with_wasm_executor(transport, behavior, me.clone()).build()
 }
 
-pub enum X {
-    U8(u8),
-    H(api::HeartbeatChallenge)
+#[derive(Debug, Clone, PartialEq)]
+pub enum Inputs {
+    Heartbeat(api::HeartbeatChallenge),
+    ManualPing(api::ManualPingChallenge),
+    MixerMessage(String),       // TODO: This should hold the `Packet` object
 }
 
+impl From<api::HeartbeatChallenge> for Inputs {
+    fn from(value: api::HeartbeatChallenge) -> Self {
+        Self::Heartbeat(value)
+    }
+}
+
+impl From<api::ManualPingChallenge> for Inputs {
+    fn from(value: api::ManualPingChallenge) -> Self {
+        Self::ManualPing(value)
+    }
+}
+
+
 pub async fn build_p2p_main_loop(swarm: libp2p_swarm::Swarm<HoprNetworkBehavior>,
-    heartbeat_requests: api::HeartbeatRequester, heartbeat_responds: api::HeartbeatResponder)
+    heartbeat_requests: api::HeartbeatRequester, heartbeat_responds: api::HeartbeatResponder,
+    manual_ping_requests: api::ManualPingRequester, manual_ping_responds: api::HeartbeatResponder)
 {
     let mut swarm = swarm;
     let mut heartbeat_responds = heartbeat_responds;
+    let mut manual_ping_responds = manual_ping_responds;
 
+    let mut active_manual_pings: std::collections::HashSet<libp2p_request_response::RequestId> = std::collections::HashSet::new();
+
+    // TODO: return this loop
     let a = async move {
-        // TODO: use the merged stream instead of the select
-        // let x = (notifier.map(X::H), futures_lite::stream::once(1u8).map(X::U8)).merge();
-        // let r = notifier.register_pong((PeerId::random(), Err(()))).await;
-
-        let mut hb_reqs = heartbeat_requests.fuse();
+        let mut inputs = (
+            heartbeat_requests.map(Inputs::Heartbeat),
+            manual_ping_requests.map(Inputs::ManualPing)).merge().fuse();
         loop {
             select! {
-                input = hb_reqs.select_next_some() => match api::Triggers::from(input) {
-                    api::Triggers::Heartbeat(api::HeartbeatChallenge(peer, challenge)) => {
+                input = inputs.select_next_some() => match input {
+                    Inputs::Heartbeat(api::HeartbeatChallenge(peer, challenge)) => {
                         swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
                     },
+                    Inputs::ManualPing(api::ManualPingChallenge(peer, challenge)) => {
+                        let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
+                        active_manual_pings.insert(req_id);
+                    }
                     _ => {}
                 },
                 event = swarm.select_next_some() => match event {
@@ -147,10 +169,20 @@ pub async fn build_p2p_main_loop(swarm: libp2p_swarm::Swarm<HoprNetworkBehavior>
                             },
                     })) => {
                         info!("Heartbeat protocol: Received a Pong response for request {} from {}", request_id, peer);
-                        match heartbeat_responds.record_pong((peer, Ok(response.0))).await {
-                            Ok(_) => {},
-                            Err(e) => {
-                                error!("Heartbeat mechanism could not be updated with pong messages: {}", e);
+                        if let Some(_) = active_manual_pings.take(&request_id) {
+                            debug!("Processing manual ping response from peer {}", peer);
+                            match manual_ping_responds.record_pong((peer, Ok(response.0))).await {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    error!("Manual ping mechanism could not be updated with pong messages: {}", e);
+                                }
+                            }
+                        } else {
+                            match heartbeat_responds.record_pong((peer, Ok(response.0))).await {
+                                Ok(_) => {},
+                                Err(e) => {
+                                    error!("Heartbeat mechanism could not be updated with pong messages: {}", e);
+                                }
                             }
                         }
                     },
