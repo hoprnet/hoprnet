@@ -14,6 +14,12 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 # base names of all crates
 CRATES_NAMES := $(foreach crate,${CRATES},$(shell basename $(crate)))
 
+# Gets all solidity files which can be modified
+SOLIDITY_SRC_FILES := $(shell find ./packages/ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
+SOLIDITY_TEST_FILES := $(shell find ./packages/ethereum/contracts/test -type f -name "*.sol")
+SOLIDITY_SCRIPT_FILES := $(shell find ./packages/ethereum/contracts/script -type f -name "*.sol")
+SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_TEST_FILES) $(SOLIDITY_SCRIPT_FILES)
+
 # define specific crate for hopli which is a native helper
 HOPLI_CRATE := ./packages/hopli
 
@@ -258,7 +264,9 @@ lint: ## run linter for TS, Rust, Python, Solidity
 
 .PHONY: lint-sol
 lint-sol: ## run linter for Solidity
-	$(foreach f, $(SOLIDITY_FILES), forge fmt --check $(f) && ) echo ""
+	for f in $(SOLIDITY_FILES); do \
+		forge fmt --check $${f} || exit 1; \
+	done
 
 .PHONY: lint-ts
 lint-ts: ## run linter for TS
@@ -273,8 +281,14 @@ lint-python: ## run linter for Python
 	source .venv/bin/activate && ruff --fix . && black --check tests/
 
 .PHONY: fmt
-fmt: fmt-ts fmt-rust fmt-python
-fmt: ## run code formatter for TS, Rust and Python
+fmt: fmt-ts fmt-rust fmt-python fmt-sol
+fmt: ## run code formatter for TS, Rust, Python, Solidity
+
+.PHONY: fmt-sol
+fmt-sol: ## run code formatter for Solidity
+	for f in $(SOLIDITY_FILES); do \
+		forge fmt $${f}; \
+	done
 
 .PHONY: fmt-ts
 fmt-ts: ## run code formatter for TS
