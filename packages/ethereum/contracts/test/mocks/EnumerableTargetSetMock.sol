@@ -2,7 +2,7 @@ pragma solidity ^0.8.0;
 
 import "../../src/utils/EnumerableTargetSet.sol";
 
-/** 
+/**
  * @dev Mock contract to test internal library of EnumerableTargetSet
  * Each function from the libarray has a wrapper in the mock contract
  */

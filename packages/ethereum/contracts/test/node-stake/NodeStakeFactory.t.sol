@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
-import '../../src/node-stake/permissioned-module/NodeManagementModule.sol';
-import '../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
-import '../../src/node-stake/NodeStakeFactory.sol';
-import 'safe-contracts/Safe.sol';
+import "../../src/node-stake/permissioned-module/NodeManagementModule.sol";
+import "../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
+import "../../src/node-stake/NodeStakeFactory.sol";
+import "safe-contracts/Safe.sol";
 import "../../script/utils/SafeSuiteLib.sol";
 import "../utils/SafeSingleton.sol";
-import 'forge-std/Test.sol';
+import "forge-std/Test.sol";
 import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 
 contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
@@ -21,8 +21,8 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
     address payable public safe;
 
     /**
-    * Manually import events and errors
-    */
+     * Manually import events and errors
+     */
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event SetMultisendAddress(address indexed multisendAddress);
     event NewHoprNodeStakeModule(address instance);
@@ -51,53 +51,48 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         assertGt(SafeSuiteLib.SAFE_SafeProxyFactory_ADDRESS.code.length, 0);
         // there's code in Safe MultiSendCallOnly
         assertGt(SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS.code.length, 0);
-        // there's code in Safe CompatibilityFallbackHandler 
+        // there's code in Safe CompatibilityFallbackHandler
         assertGt(SafeSuiteLib.SAFE_CompatibilityFallbackHandler_ADDRESS.code.length, 0);
         // safe version matches
         assertEq(factory.safeVersion(), SafeSuiteLib.SAFE_VERSION);
     }
 
     /**
-    * @dev Fail to clone a safe when there's not event one admin
-    */
+     * @dev Fail to clone a safe when there's not event one admin
+     */
     function testRevert_CloneSafeAndModuleWithFewOwner() public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
 
         uint256 nonce = 0;
         address[] memory admins = new address[](0);
-        address expectedModuleAddress = factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
-        
+        address expectedModuleAddress =
+            factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
+
         vm.prank(caller);
         vm.expectRevert(HoprNodeStakeFactory.TooFewOwners.selector);
-        (module, safe) = factory.clone(address(moduleSingleton), admins, nonce, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"));
+        (module, safe) = factory.clone(
+            address(moduleSingleton),
+            admins,
+            nonce,
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+        );
         vm.clearMockedCalls();
     }
 
     /**
-    * @dev Clone a safe and a module and they are wired
-    */
+     * @dev Clone a safe and a module and they are wired
+     */
     function test_CloneSafeAndModule() public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
 
         uint256 nonce = 0;
-        address expectedModuleAddress = factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
-        
+        address expectedModuleAddress =
+            factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
+
         vm.startPrank(caller);
         vm.expectEmit(true, false, false, false, address(factory));
         emit NewHoprNodeStakeModule(expectedModuleAddress);
@@ -106,7 +101,12 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         for (uint256 i = 0; i < admins.length; i++) {
             admins[i] = vm.addr(200 + i);
         }
-        (module, safe) = factory.clone(address(moduleSingleton), admins, nonce, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"));
+        (module, safe) = factory.clone(
+            address(moduleSingleton),
+            admins,
+            nonce,
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+        );
 
         // Safe should have module enabled
         assertTrue(Safe(safe).isModuleEnabled(module));
@@ -115,13 +115,17 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         address[] memory owners = Safe(safe).getOwners();
         assertEq(owners.length, admins.length, "Wrong number of owners");
         for (uint256 j = 0; j < admins.length; j++) {
-            assertTrue(Safe(safe).isOwner(admins[j]));   
+            assertTrue(Safe(safe).isOwner(admins[j]));
         }
         assertFalse(Safe(safe).isOwner(address(factory)));
         // module owner should be safe
         assertEq(HoprNodeManagementModule(module).owner(), safe, "Wrong module owner");
         // module multisend should beSafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS
-        assertEq(HoprNodeManagementModule(module).multisend(), SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS, "Wrong module owner");
+        assertEq(
+            HoprNodeManagementModule(module).multisend(),
+            SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS,
+            "Wrong module owner"
+        );
 
         vm.stopPrank();
         vm.clearMockedCalls();
@@ -130,20 +134,19 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
     function testFuzz_InitializeModuleProxy(uint256 nonce, address safeAddr, address multisendAddr) public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
         vm.assume(safeAddr != address(0));
         vm.assume(multisendAddr != address(0));
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
         // 1. Deploy node management module
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
         // add Safe and multisend to the module
-        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
+        bytes memory moduleInitializer = abi.encodeWithSignature(
+            "initialize(bytes)",
+            abi.encode(
+                safeAddr, multisendAddr, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+            )
+        );
 
         vm.expectEmit(true, true, false, false, address(moduleProxy));
         emit OwnershipTransferred(address(0), safeAddr);
@@ -165,7 +168,8 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         // initialize module proxy with invalid variables
         vm.expectRevert(HoprCapabilityPermissions.AddressIsZero.selector);
         // add Safe and multisend to the module
-        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        bytes memory moduleInitializer =
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
         moduleProxy.call(moduleInitializer);
         vm.clearMockedCalls();
     }
@@ -182,7 +186,8 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         // initialize module proxy with invalid variables
         vm.expectRevert(HoprCapabilityPermissions.AddressIsZero.selector);
         // add Safe and multisend to the module
-        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        bytes memory moduleInitializer =
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
         moduleProxy.call(moduleInitializer);
         vm.clearMockedCalls();
     }
@@ -194,10 +199,12 @@ contract HoprNodeManagementModuleTest is Test, SafeSingletonFixtureTest {
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
 
         // initialize module proxy with valid variables
-        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(address(1), address(2)));
+        bytes memory moduleInitializer =
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(address(1), address(2)));
         moduleProxy.call(moduleInitializer);
         // re-initialize module proxy with variables
-        bytes memory moduleReinitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        bytes memory moduleReinitializer =
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
         vm.expectRevert(AlreadyInitialized.selector);
         moduleProxy.call(moduleReinitializer);
         vm.clearMockedCalls();

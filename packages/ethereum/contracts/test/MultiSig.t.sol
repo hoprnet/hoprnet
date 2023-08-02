@@ -1,124 +1,114 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import 'forge-std/Test.sol';
-import './utils/Accounts.sol';
+import "forge-std/Test.sol";
+import "./utils/Accounts.sol";
 
-import '../src/MultiSig.sol';
-import '../src/node-stake/NodeSafeRegistry.sol';
+import "../src/MultiSig.sol";
+import "../src/node-stake/NodeSafeRegistry.sol";
 
 // We need this dummy contract to correctly set msg.sender
 // when testing modifiers of abstract contracts
 contract MultiSigContract is HoprMultiSig {
-  function modifierOnlySafe(address self) onlySafe(self) public {}
+    function modifierOnlySafe(address self) public onlySafe(self) {}
 
-  function modifierNoSafeSet() noSafeSet public {}
+    function modifierNoSafeSet() public noSafeSet {}
 
-  function mySetNodeSafeRegistry(HoprNodeSafeRegistry registry) public {
-    setNodeSafeRegistry(registry);
-  }
+    function mySetNodeSafeRegistry(HoprNodeSafeRegistry registry) public {
+        setNodeSafeRegistry(registry);
+    }
 }
 
 contract MulitSigTest is Test, AccountsFixtureTest {
-  HoprNodeSafeRegistry safeRegistry;
-  MultiSigContract msContract;
+    HoprNodeSafeRegistry safeRegistry;
+    MultiSigContract msContract;
 
-  function setUp() public { 
-    msContract = new MultiSigContract();
-    safeRegistry = new HoprNodeSafeRegistry();
-  }
+    function setUp() public {
+        msContract = new MultiSigContract();
+        safeRegistry = new HoprNodeSafeRegistry();
+    }
 
-  function testRevert_initializeTwice() public {
-    msContract.mySetNodeSafeRegistry(safeRegistry);
+    function testRevert_initializeTwice() public {
+        msContract.mySetNodeSafeRegistry(safeRegistry);
 
-    vm.expectRevert(HoprMultiSig.AlreadyInitialized.selector);
-    msContract.mySetNodeSafeRegistry(safeRegistry);
-  }
+        vm.expectRevert(HoprMultiSig.AlreadyInitialized.selector);
+        msContract.mySetNodeSafeRegistry(safeRegistry);
+    }
 
-  function test_emptySafeAddress() public {
-    (bool success, bytes memory result) = address(msContract).staticcall(abi.encodeWithSelector(MultiSigContract.mySetNodeSafeRegistry.selector, address(0)));
+    function test_emptySafeAddress() public {
+        (bool success, bytes memory result) = address(msContract).staticcall(
+            abi.encodeWithSelector(MultiSigContract.mySetNodeSafeRegistry.selector, address(0))
+        );
 
-    assertFalse(success);
-    assertEq(bytes32(result), HoprMultiSig.InvalidSafeAddress.selector);
-  }
+        assertFalse(success);
+        assertEq(bytes32(result), HoprMultiSig.InvalidSafeAddress.selector);
+    }
 
-  function testRevert_uninitialized(address caller) public {
-    vm.expectRevert(HoprMultiSig.MultiSigUninitialized.selector);
+    function testRevert_uninitialized(address caller) public {
+        vm.expectRevert(HoprMultiSig.MultiSigUninitialized.selector);
 
-    vm.mockCall(
-      address(safeRegistry),
-      abi.encodeWithSignature('nodeToSafe(address)', caller),
-      abi.encode(address(0))
-    );
+        vm.mockCall(
+            address(safeRegistry), abi.encodeWithSignature("nodeToSafe(address)", caller), abi.encode(address(0))
+        );
 
-    vm.prank(caller);
-    msContract.modifierNoSafeSet();
+        vm.prank(caller);
+        msContract.modifierNoSafeSet();
 
-    vm.clearMockedCalls();
-  }
+        vm.clearMockedCalls();
+    }
 
-  function test_noSafeSet(address caller) public {
-    msContract.mySetNodeSafeRegistry(safeRegistry);
-    vm.prank(caller);
+    function test_noSafeSet(address caller) public {
+        msContract.mySetNodeSafeRegistry(safeRegistry);
+        vm.prank(caller);
 
-    vm.mockCall(
-      address(safeRegistry),
-      abi.encodeWithSignature('nodeToSafe(address)', caller),
-      abi.encode(address(0))
-    );
+        vm.mockCall(
+            address(safeRegistry), abi.encodeWithSignature("nodeToSafe(address)", caller), abi.encode(address(0))
+        );
 
-    msContract.modifierNoSafeSet();
+        msContract.modifierNoSafeSet();
 
-    vm.clearMockedCalls();
-  }
+        vm.clearMockedCalls();
+    }
 
-  function test_noSafeSetButSafeSet(address caller, address safeAddress) public {
-    vm.assume(safeAddress != address(0));
+    function test_noSafeSetButSafeSet(address caller, address safeAddress) public {
+        vm.assume(safeAddress != address(0));
 
-    msContract.mySetNodeSafeRegistry(safeRegistry);
-    vm.mockCall(
-      address(safeRegistry),
-      abi.encodeWithSignature('nodeToSafe(address)', caller),
-      abi.encode(address(1))
-    );
-    
-    vm.prank(caller);
-    vm.expectRevert(HoprMultiSig.ContractNotResponsible.selector);
-    msContract.modifierNoSafeSet();
+        msContract.mySetNodeSafeRegistry(safeRegistry);
+        vm.mockCall(
+            address(safeRegistry), abi.encodeWithSignature("nodeToSafe(address)", caller), abi.encode(address(1))
+        );
 
-    vm.clearMockedCalls();
-  }
+        vm.prank(caller);
+        vm.expectRevert(HoprMultiSig.ContractNotResponsible.selector);
+        msContract.modifierNoSafeSet();
 
-  function test_onlySafe(address safeAddr, address caller) public {
-    vm.assume(safeAddr != address(0));
+        vm.clearMockedCalls();
+    }
 
-    msContract.mySetNodeSafeRegistry(safeRegistry);
+    function test_onlySafe(address safeAddr, address caller) public {
+        vm.assume(safeAddr != address(0));
 
-    vm.mockCall(
-      address(safeRegistry),
-      abi.encodeWithSignature('nodeToSafe(address)', caller),
-      abi.encode(safeAddr)
-    );
+        msContract.mySetNodeSafeRegistry(safeRegistry);
 
-    vm.prank(safeAddr);
-    msContract.modifierOnlySafe(caller);
-  }
+        vm.mockCall(address(safeRegistry), abi.encodeWithSignature("nodeToSafe(address)", caller), abi.encode(safeAddr));
 
-  function testRevert_onlySafe(address safeAddr, address caller, address setSafeAddr) public {
-    vm.assume(safeAddr != address(0));
-    vm.assume(safeAddr != setSafeAddr);
-    vm.assume(setSafeAddr != address(0));
+        vm.prank(safeAddr);
+        msContract.modifierOnlySafe(caller);
+    }
 
-    msContract.mySetNodeSafeRegistry(safeRegistry);
+    function testRevert_onlySafe(address safeAddr, address caller, address setSafeAddr) public {
+        vm.assume(safeAddr != address(0));
+        vm.assume(safeAddr != setSafeAddr);
+        vm.assume(setSafeAddr != address(0));
 
-    vm.mockCall(
-      address(safeRegistry),
-      abi.encodeWithSignature('nodeToSafe(address)', caller),
-      abi.encode(setSafeAddr)
-    );
+        msContract.mySetNodeSafeRegistry(safeRegistry);
 
-    vm.expectRevert(HoprMultiSig.ContractNotResponsible.selector);
-    vm.prank(safeAddr);
-    msContract.modifierOnlySafe(caller);
-  }
+        vm.mockCall(
+            address(safeRegistry), abi.encodeWithSignature("nodeToSafe(address)", caller), abi.encode(setSafeAddr)
+        );
+
+        vm.expectRevert(HoprMultiSig.ContractNotResponsible.selector);
+        vm.prank(safeAddr);
+        msContract.modifierOnlySafe(caller);
+    }
 }

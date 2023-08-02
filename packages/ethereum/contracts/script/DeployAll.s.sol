@@ -34,7 +34,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // 2. Get deployer internal key.
         // Set to default when it's in development environment (uint for 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
-        uint256 deployerPrivateKey = currentEnvironmentType == EnvironmentType.LOCAL ? 77814517325470205911140941194401928579557062014761831930645393041380819009408 : vm.envUint("DEPLOYER_PRIVATE_KEY");
+        uint256 deployerPrivateKey = currentEnvironmentType == EnvironmentType.LOCAL
+            ? 77814517325470205911140941194401928579557062014761831930645393041380819009408
+            : vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         emit log_named_address("deployerAddress", deployerAddress);
         vm.startBroadcast(deployerPrivateKey);
@@ -63,18 +65,14 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         ) {
             // deploy channels contract
             uint256 closure = currentEnvironmentType == EnvironmentType.LOCAL ? 15 : 5 * 60;
-            currentNetworkDetail.channelsContractAddress =
-                deployCode(
-                    "Channels.sol:HoprChannels",
-                    abi.encode(
-                        currentNetworkDetail.tokenContractAddress,
-                        closure,
-                        currentNetworkDetail.nodeSafeRegistryAddress
-                    )
-                );
+            currentNetworkDetail.channelsContractAddress = deployCode(
+                "Channels.sol:HoprChannels",
+                abi.encode(
+                    currentNetworkDetail.tokenContractAddress, closure, currentNetworkDetail.nodeSafeRegistryAddress
+                )
+            );
             isHoprChannelsDeployed = true;
         }
-
 
         // 3.6. NetworkRegistryProxy Contract
         // Only deploy NetworkRegistryProxy contract when no deployed one is detected.
@@ -84,7 +82,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // 3.7. NetworkRegistry Contract
         // Only deploy NetworkRegistrycontract when no deployed one is detected.
         // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in development/staging/production
-         _deployNetworkRegistry(deployerAddress);
+        _deployNetworkRegistry(deployerAddress);
 
         // 3.8. TicketPriceOracle
         _deployHoprTicketPriceOracle(deployerAddress, 100);
@@ -118,13 +116,14 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     /**
      * @dev Deploy node management module
      */
-     function _deployHoprNodeManagementModule() internal {
+    function _deployHoprNodeManagementModule() internal {
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.moduleImplementationAddress)
         ) {
             // deploy HoprNodeManagementModule contract
-            currentNetworkDetail.moduleImplementationAddress = deployCode("NodeManagementModule.sol:HoprNodeManagementModule");
+            currentNetworkDetail.moduleImplementationAddress =
+                deployCode("NodeManagementModule.sol:HoprNodeManagementModule");
         }
     }
 
@@ -177,8 +176,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     function _deployNRProxy(address deployerAddress) internal {
         if (currentEnvironmentType == EnvironmentType.LOCAL) {
             // deploy DummyProxy in LOCAL environment
-            currentNetworkDetail.networkRegistryProxyContractAddress =
-                deployCode("DummyProxyForNetworkRegistry.sol:HoprDummyProxyForNetworkRegistry", abi.encode(deployerAddress));
+            currentNetworkDetail.networkRegistryProxyContractAddress = deployCode(
+                "DummyProxyForNetworkRegistry.sol:HoprDummyProxyForNetworkRegistry", abi.encode(deployerAddress)
+            );
             isHoprNetworkRegistryDeployed = true;
         } else if (!isValidAddress(currentNetworkDetail.networkRegistryProxyContractAddress)) {
             // deploy StakingProxy in other environment types, if no proxy contract is given.
@@ -188,7 +188,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                     COMM_MULTISIG_ADDRESS,
                     deployerAddress,
                     0, // disable self-registry
-                    block.number,   // latest block number
+                    block.number, // latest block number
                     currentNetworkDetail.tokenContractAddress,
                     currentNetworkDetail.nodeSafeRegistryAddress
                 )
@@ -210,9 +210,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             currentNetworkDetail.networkRegistryContractAddress = deployCode(
                 "NetworkRegistry.sol:HoprNetworkRegistry",
                 abi.encode(
-                    currentNetworkDetail.networkRegistryProxyContractAddress,
-                    COMM_MULTISIG_ADDRESS,
-                    deployerAddress
+                    currentNetworkDetail.networkRegistryProxyContractAddress, COMM_MULTISIG_ADDRESS, deployerAddress
                 )
             );
             // NetworkRegistry should be enabled (default behavior) in staging/production, and disabled in development
@@ -231,11 +229,13 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * @dev deploy ticket price oracle
      */
     function _deployHoprTicketPriceOracle(address deployerAddress, uint256 price) internal {
-        if ( currentEnvironmentType == EnvironmentType.LOCAL
+        if (
+            currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.ticketPriceOracleContractAddress)
         ) {
             // deploy contract
-            currentNetworkDetail.ticketPriceOracleContractAddress = deployCode("TicketPriceOracle.sol:HoprTicketPriceOracle", abi.encode(deployerAddress, price));
+            currentNetworkDetail.ticketPriceOracleContractAddress =
+                deployCode("TicketPriceOracle.sol:HoprTicketPriceOracle", abi.encode(deployerAddress, price));
         }
     }
 }
