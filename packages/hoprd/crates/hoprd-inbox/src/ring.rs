@@ -1,59 +1,28 @@
-use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 use async_trait::async_trait;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 use crate::inbox::{InboxBackend, TimestampFn};
 
-// NOTE on equality: if same payloads arrived at the very same instant, they are considered equal!
-#[derive(PartialEq, Eq)]
-struct PayloadWrapper<M: Eq> {
+struct PayloadWrapper<M> {
     payload: M,
     ts: Duration
-}
-
-impl<T: Eq> PartialOrd<Self> for PayloadWrapper<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-// Needs to implement Ord to be sortable by the BTreeSet, but must allow Payloads with
-// the same timestamps (unlikely but possible) into the set.
-impl<T: Eq> Ord for PayloadWrapper<T>{
-    fn cmp(&self, other: &Self) -> Ordering {
-        let c = self.ts.cmp(&other.ts);
-        match &c {
-            Ordering::Equal => {
-                if !self.eq(other) {
-                    // In an unlikely situation when timestamps are equal, but
-                    // the payloads are different, prefer the `other`.
-                    // This allows insertion into the BTreeSet and still having the items sorted by time.
-                    Ordering::Less
-                } else {
-                    // If payloads are same and timestamps too, then
-                    Ordering::Equal
-                }
-            }
-            _ => c,
-        }
-    }
 }
 
 /// Ring buffer based heap-allocated backend.
 /// The capacity must be a power-of-two due to optimizations.
 /// Tags `T` must be represented by a type that's also a valid key for the `HashMap`
 pub struct RingBufferInboxBackend<T, M>
-where T: Copy + Default + PartialEq + Eq + Hash, M: Eq {
+where T: Copy + Default + PartialEq + Eq + Hash, {
     buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,
     ts: TimestampFn
 }
 
 impl<T, M> RingBufferInboxBackend<T, M>
-where T: Copy + Default + PartialEq + Eq + Hash, M: Eq {
+where T: Copy + Default + PartialEq + Eq + Hash, {
     /// Creates new backend with default timestamping function from std::time.
     /// This is incompatible with WASM runtimes.
     #[cfg(not(feature = "wasm"))]
@@ -69,7 +38,7 @@ where T: Copy + Default + PartialEq + Eq + Hash, M: Eq {
 
 #[async_trait(? Send)]
 impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
-where T: Copy + Default + PartialEq + Eq + Hash, M: Eq {
+where T: Copy + Default + PartialEq + Eq + Hash, {
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");
         Self { capacity, buffers: HashMap::new(), ts}
@@ -132,11 +101,17 @@ where T: Copy + Default + PartialEq + Eq + Hash, M: Eq {
             }
             None => {
                 // Pop across all the tags, need to sort again based on the timestamp
-                self.buffers
+                let mut all = self.buffers
                     .drain()
                     .flat_map(|(_, buf)| buf.into_iter())
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
+                    .collect::<Vec<_>>();
+
+                // NOTE: this approach is due to the requirement of considering
+                // messages with equal payload and timestamp to be distinct
+                // If this requirement was relaxed, the drained entries could be collected into a BTreeSet.
+                all.sort_unstable_by(|a,b| a.ts.cmp(&b.ts));
+
+                all.into_iter()
                     .map(|w| w.payload)
                     .collect()
             }
