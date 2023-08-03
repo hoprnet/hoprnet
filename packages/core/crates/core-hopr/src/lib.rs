@@ -3,6 +3,7 @@ mod helpers;
 mod p2p;
 
 use std::str::FromStr;
+use std::sync::Arc;
 
 use futures::{StreamExt, FutureExt, future::BoxFuture};
 
@@ -22,13 +23,14 @@ use crate::p2p::api;
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HoprTools {
     ping: Ping
+    peers: Arc<RwLock<Network>>
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl HoprTools {
     // pub async fn ping()
-    pub fn new(ping: Ping) -> Self {
-        Self { ping }
+    pub fn new(ping: Ping, peers: Network) -> Self {
+        Self { ping, Arc::new(RwLock::new(peers)) }
     }
 }
 
