@@ -26,6 +26,7 @@ utils-log = { path = "../../../utils/crates/utils-log", default-features = false
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 
 [dev-dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
 tempfile = "3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]

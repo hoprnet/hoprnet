@@ -2430,6 +2430,7 @@ name = "hoprd-inbox"
 version = "0.1.0"
 dependencies = [
  "async-lock",
+ "async-std",
  "async-trait",
  "console_error_panic_hook",
  "core-packet",

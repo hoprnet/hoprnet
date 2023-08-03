@@ -6,15 +6,30 @@ use async_trait::async_trait;
 pub type Tag = u16;
 pub const RESERVED_TAG: Tag = 0;
 
+/// Represents a simple timestamping function.
+/// This is useful if used in WASM or environment which might have different means of measuring time.
 pub type TimestampFn = fn() -> Duration;
 
 #[async_trait(?Send)]
 pub trait InboxBackend<T> {
+    /// Create new storage with the given capacity and the timestamping function
     fn new_with_capacity(cap: usize, ts: TimestampFn) -> Self;
+
+    /// Push a new entry with an optional `tag`.
     async fn push(&mut self, tag: Option<Tag>, payload: T);
+
+    /// Count number of entries with the given `tag`.
+    /// If no `tag` is given, returns the total count of all tagged and untagged entries.
     async fn count(&self, tag: Option<Tag>) -> usize;
+
+    /// Pops oldest entry with the given `tag` or oldest entry in general, if no `tag` was given.
+    /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
     async fn pop(&mut self, tag: Option<Tag>) -> Option<T>;
+
+    /// Pops all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
     async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<T>;
+
+    /// Purges all entries strictly older than the given timestamp.
     async fn purge(&mut self, older_than_ts: Duration);
 }
 
@@ -36,16 +51,17 @@ impl Default for MessageInboxConfiguration {
     }
 }
 
-pub struct MessageInbox<P, B>
-where P: AsRef<[u8]>, B: InboxBackend<P> {
+/// Represents a thread-safe message inbox of messages `M`
+pub struct MessageInbox<M, B>
+where M: AsRef<[u8]>, B: InboxBackend<M> {
     cfg: MessageInboxConfiguration,
     backend: Mutex<B>,
     time: TimestampFn,
-    _data: PhantomData<P>
+    _data: PhantomData<M>
 }
 
-impl<P,B> MessageInbox<P, B>
-where P: AsRef<[u8]>, B: InboxBackend<P> {
+impl<M, B> MessageInbox<M, B>
+where M: AsRef<[u8]>, B: InboxBackend<M> {
     #[cfg(any(not(feature = "wasm"), test))]
     pub fn new(cfg: MessageInboxConfiguration) -> Self {
         Self::new_with_time(cfg, || std::time::SystemTime::now()
@@ -60,17 +76,16 @@ where P: AsRef<[u8]>, B: InboxBackend<P> {
         }
     }
 
-    fn extract_tag(payload: &P) -> Option<Tag> {
+    fn extract_tag(payload: &M) -> Option<Tag> {
         // TODO: specify application-layer format
         let data: [u8; 2] = payload.as_ref()[0..2].try_into().ok()?;
         Some(Tag::from_be_bytes(data))
     }
 
-    pub async fn push(&mut self, payload: P) {
+    pub async fn push(&mut self, payload: M) {
         let tag = Self::extract_tag(&payload);
         let mut db = self.backend.lock().await;
-        db.push(tag, payload)
-            .await;
+        db.push(tag, payload).await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
     }
 
@@ -78,13 +93,13 @@ where P: AsRef<[u8]>, B: InboxBackend<P> {
         self.backend.lock().await.count(tag).await
     }
 
-    pub async fn pop(&mut self, tag: Option<Tag>) -> Option<P> {
+    pub async fn pop(&mut self, tag: Option<Tag>) -> Option<M> {
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
         db.pop(tag).await
     }
 
-    pub async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<P> {
+    pub async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<M> {
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
         db.pop_all(tag).await
