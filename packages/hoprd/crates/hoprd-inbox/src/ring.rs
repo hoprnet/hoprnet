@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
 
+/// Acts a simple wrapper of a message with added insertion timestamp.
 struct PayloadWrapper<M> {
     payload: M,
     ts: Duration,
@@ -59,6 +60,7 @@ where
     }
 
     async fn push(&mut self, tag: Option<T>, payload: M) {
+        // Either use an existing ringbuffer or initialize a new one, if such tag does not exist yet.
         match self.buffers.entry(tag.unwrap_or(T::default())) {
             Entry::Occupied(mut e) => e.get_mut().push(PayloadWrapper {
                 payload,
@@ -73,14 +75,17 @@ where
 
     async fn count(&self, tag: Option<T>) -> usize {
         match tag {
+            // Count across all the tags
             None => self.buffers.iter().map(|(_, buf)| buf.len()).sum(),
+            // Count messages with a specific tag only
             Some(specific_tag) => self.buffers.get(&specific_tag).map(|buf| buf.len()).unwrap_or(0),
         }
     }
 
     async fn pop(&mut self, tag: Option<T>) -> Option<M> {
         let specific_tag = match tag {
-            None => self // If no tag was given, we need to find a tag which has the oldest entry in it
+            // If no tag was given, we need to find a tag which has the oldest entry in it
+            None => self
                 .buffers
                 .iter()
                 .min_by(|(_, a), (_, b)| {
@@ -91,6 +96,8 @@ where
                     ts_a.cmp(&ts_b)
                 })
                 .map(|(t, _)| *t)?,
+
+            // If a tag was given, just use it
             Some(t) => t,
         };
 
@@ -127,6 +134,7 @@ where
     }
 
     async fn purge(&mut self, older_than: Duration) {
+        // Remove all the messages across all the tags, which do not satisfy the threshold
         self.buffers.iter_mut().for_each(|(_, buf)| {
             while buf.peek().map(|w| w.ts).unwrap_or(Duration::MAX) < older_than {
                 buf.dequeue();
@@ -172,6 +180,8 @@ mod test {
         assert_eq!(4, rb.count(Some(1)).await);
         assert_eq!(1, rb.count(Some(10)).await);
         assert_eq!(1, rb.count(Some(11)).await);
+        assert_eq!(0, rb.count(Some(100)).await);
+        assert_eq!(0, rb.count(Some(23)).await);
         assert_eq!(7, rb.count(None).await);
         assert_eq!(1, rb.count_untagged());
 
@@ -180,6 +190,10 @@ mod test {
         assert_eq!(4, rb.pop(Some(1)).await.unwrap());
         assert_eq!(5, rb.pop(Some(1)).await.unwrap());
         assert_eq!(0, rb.count(Some(1)).await);
+        assert!(rb.pop(Some(1)).await.is_none());
+
+        assert!(rb.pop(Some(100)).await.is_none());
+        assert!(rb.pop(Some(23)).await.is_none());
 
         assert_eq!(6, rb.pop(Some(10)).await.unwrap());
         assert_eq!(0, rb.count(Some(10)).await);
