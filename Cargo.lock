@@ -1051,13 +1051,17 @@ dependencies = [
  "console_error_panic_hook",
  "core-ethereum-db",
  "core-ethereum-misc",
+ "core-network",
  "core-p2p",
  "core-packet",
+ "futures",
+ "futures-concurrency",
  "js-sys",
  "utils-log",
  "utils-metrics",
  "utils-misc",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -1138,7 +1142,6 @@ dependencies = [
  "core-network",
  "env_logger",
  "futures",
- "futures-concurrency",
  "futures-lite",
  "getrandom 0.2.10",
  "js-sys",
