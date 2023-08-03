@@ -21,6 +21,7 @@ js-sys = { version = "0.3.63", optional = true }
 lazy_static = "1.4"
 libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid", "serde"] }
 serde = "1.0"
+serde_bytes = "0.11"
 thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }

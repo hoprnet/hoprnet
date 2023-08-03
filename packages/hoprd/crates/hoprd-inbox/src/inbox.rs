@@ -1,7 +1,7 @@
-use std::marker::PhantomData;
 use std::time::Duration;
 use async_lock::{Mutex};
 use async_trait::async_trait;
+use core_packet::interaction::{Tag, ApplicationData};
 
 /// Represents a simple timestamping function.
 /// This is useful if used in WASM or environment which might have different means of measuring time.
@@ -32,9 +32,6 @@ pub trait InboxBackend<T: Copy + Default, M> {
     async fn purge(&mut self, older_than_ts: Duration);
 }
 
-/// Tags are currently 16-bit unsigned integers
-type Tag = u16;
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct MessageInboxConfiguration {
@@ -53,17 +50,17 @@ impl Default for MessageInboxConfiguration {
     }
 }
 
-/// Represents a thread-safe message inbox of messages `M`
-pub struct MessageInbox<M, B>
-where M: AsRef<[u8]>, B: InboxBackend<Tag, M> {
+/// Represents a thread-safe message inbox of messages of type `M`
+/// This type is thin frontend over `InboxBackend` using 16-bit unsigned integer tags.
+pub struct MessageInbox<B>
+where B: InboxBackend<Tag, ApplicationData> {
     cfg: MessageInboxConfiguration,
     backend: Mutex<B>,
     time: TimestampFn,
-    _data: PhantomData<M>
 }
 
-impl<M, B> MessageInbox<M, B>
-where M: AsRef<[u8]>, B: InboxBackend<Tag, M> {
+impl<B> MessageInbox<B>
+where B: InboxBackend<Tag, ApplicationData> {
     #[cfg(any(not(feature = "wasm"), test))]
     pub fn new(cfg: MessageInboxConfiguration) -> Self {
         Self::new_with_time(cfg, || std::time::SystemTime::now()
@@ -74,20 +71,13 @@ where M: AsRef<[u8]>, B: InboxBackend<Tag, M> {
     pub fn new_with_time(cfg: MessageInboxConfiguration, time: TimestampFn) -> Self {
         Self {
             backend: Mutex::new(B::new_with_capacity(cfg.capacity as usize, time)),
-            time, cfg, _data: PhantomData
+            time, cfg,
         }
     }
 
-    fn extract_tag(payload: &M) -> Option<Tag> {
-        // TODO: specify application-layer format
-        let data: [u8; 2] = payload.as_ref()[0..2].try_into().ok()?;
-        Some(Tag::from_be_bytes(data))
-    }
-
-    pub async fn push(&self, payload: M) {
-        let tag = Self::extract_tag(&payload);
+    pub async fn push(&self, payload: ApplicationData) {
         let mut db = self.backend.lock().await;
-        db.push(tag, payload).await;
+        db.push(payload.application_tag, payload).await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
     }
 
@@ -95,13 +85,13 @@ where M: AsRef<[u8]>, B: InboxBackend<Tag, M> {
         self.backend.lock().await.count(tag).await
     }
 
-    pub async fn pop(&self, tag: Option<Tag>) -> Option<M> {
+    pub async fn pop(&self, tag: Option<Tag>) -> Option<ApplicationData> {
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
         db.pop(tag).await
     }
 
-    pub async fn pop_all(&self, tag: Option<Tag>) -> Vec<M> {
+    pub async fn pop_all(&self, tag: Option<Tag>) -> Vec<ApplicationData> {
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
         db.pop_all(tag).await
@@ -115,8 +105,9 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::time::Duration;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use core_packet::interaction::Payload;
+    use core_packet::interaction::ApplicationData;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use crate::inbox::Tag;
@@ -127,21 +118,21 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct MessageInbox {
-        w: super::MessageInbox<Payload, RingBufferInboxBackend<Tag, Payload>>
+        w: super::MessageInbox<RingBufferInboxBackend<Tag, ApplicationData>>
     }
 
     #[wasm_bindgen]
     impl MessageInbox {
         #[wasm_bindgen(constructor)]
         pub fn new(cfg: MessageInboxConfiguration) -> Self {
-            Self { w: super::MessageInbox::new(cfg) }
+            Self { w: super::MessageInbox::new_with_time(cfg, || Duration::from_millis(js_sys::Date::now() as u64)) }
         }
 
-        pub async fn push(&self, payload: Payload) {
+        pub async fn push(&self, payload: ApplicationData) {
             self.w.push(payload).await
         }
 
-        pub async fn pop(&self, tag: Option<u16>) -> Option<Payload> {
+        pub async fn pop(&self, tag: Option<u16>) -> Option<ApplicationData> {
             self.w.pop(tag).await
         }
 

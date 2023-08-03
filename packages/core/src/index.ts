@@ -529,7 +529,7 @@ class Hopr extends EventEmitter {
     let packetCfg = new PacketInteractionConfig(privateKeyFromPeer(this.id))
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
-    const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
+    const onMessage = (_tag: number, msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new WasmPacketInteraction(this.db.clone(), onMessage, packetCfg)
 
     let packetProtocols = [
@@ -1068,7 +1068,8 @@ class Hopr extends EventEmitter {
     msg: Uint8Array,
     destination: PeerId,
     intermediatePath?: PublicKey[],
-    hops?: number
+    hops?: number,
+    application_tag?: number
   ): Promise<string> {
     if (this.status != 'RUNNING') {
       metric_sentMessageFailCount.increment()
@@ -1100,7 +1101,7 @@ class Hopr extends EventEmitter {
     const path = new Path([...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()])
     metric_pathLength.observe(path.length())
 
-    return (await this.forward.send_packet(msg, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
+    return (await this.forward.send_packet(msg, application_tag, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
   }
 
   /**

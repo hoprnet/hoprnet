@@ -1051,6 +1051,7 @@ dependencies = [
  "parameterized",
  "rusty-leveldb",
  "serde",
+ "serde_bytes",
  "serial_test",
  "thiserror",
  "utils-db",
