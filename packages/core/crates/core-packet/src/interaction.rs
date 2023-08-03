@@ -1,7 +1,10 @@
 use async_lock::RwLock;
 use std::fmt::{Display, Formatter};
 
-use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketDecodingError, PathNotValid, Retry, TagReplay, Timeout, TransportError};
+use crate::errors::PacketError::{
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketDecodingError, PathNotValid,
+    Retry, TagReplay, Timeout, TransportError,
+};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
 use crate::path::Path;
@@ -14,7 +17,7 @@ use core_types::channels::Ticket;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p_identity::PeerId;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::ops::Mul;
 use std::sync::Arc;
 use std::time::Duration;
@@ -89,12 +92,17 @@ pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 pub struct ApplicationData {
     pub application_tag: Option<Tag>,
     #[serde(with = "serde_bytes")]
-    pub plain_text: Box<[u8]>
+    pub plain_text: Box<[u8]>,
 }
 
 impl Display for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}): {}", self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG), hex::encode(&self.plain_text))
+        write!(
+            f,
+            "({}): {}",
+            self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG),
+            hex::encode(&self.plain_text)
+        )
     }
 }
 
@@ -111,8 +119,12 @@ impl BinarySerializable<'_> for ApplicationData {
         if data.len() <= PAYLOAD_SIZE && data.len() >= 2 {
             let tag = u16::from_be_bytes(data[0..2].try_into().map_err(|_| ParseError)?);
             Ok(Self {
-                application_tag: if tag != DEFAULT_APPLICATION_TAG { Some(tag) } else { None },
-                plain_text: (&data[2..]).into()
+                application_tag: if tag != DEFAULT_APPLICATION_TAG {
+                    Some(tag)
+                } else {
+                    None
+                },
+                plain_text: (&data[2..]).into(),
             })
         } else {
             Err(ParseError)
@@ -434,7 +446,11 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, on_final_packet: Option<Sender<ApplicationData>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new(
+        db: Arc<RwLock<Db>>,
+        on_final_packet: Option<Sender<ApplicationData>>,
+        cfg: PacketInteractionConfig,
+    ) -> Self {
         Self {
             db,
             incoming_packets: bounded(PACKET_RX_QUEUE_SIZE),
@@ -531,7 +547,13 @@ where
     /// If `timeout` is given, the method waits the given time if the TX queue is full until there's space.
     /// If `timeout` is zero, the method waits indefinitely.
     /// If `timeout` is `None` and the TX queue is full, the method fails with `Err(Retry)`
-    pub async fn send_packet(&self, msg: &[u8], app_tag: Option<Tag>, path: Path, timeout: Option<Duration>) -> Result<HalfKeyChallenge> {
+    pub async fn send_packet(
+        &self,
+        msg: &[u8],
+        app_tag: Option<Tag>,
+        path: Path,
+        timeout: Option<Duration>,
+    ) -> Result<HalfKeyChallenge> {
         // Check if the path is valid
         if !path.valid() {
             return Err(PathNotValid);
@@ -550,7 +572,7 @@ where
         // Create the packet with application tag
         let app_data = ApplicationData {
             application_tag: app_tag,
-            plain_text: msg.into()
+            plain_text: msg.into(),
         };
 
         let packet = Packet::new(&app_data.to_bytes(), &path.hops(), &self.cfg.private_key, next_ticket)?;
@@ -640,10 +662,9 @@ where
 
                 // We're the destination of the packet, so emit the packet contents
                 if let Some(emitter) = &self.on_final_packet {
-                    let fd = ApplicationData::from_bytes(&plain_text)
-                                .map_err(|_| PacketDecodingError(
-                                    format!("final plaintext is malformed: {}", hex::encode(&plain_text))
-                                ))?;
+                    let fd = ApplicationData::from_bytes(&plain_text).map_err(|_| {
+                        PacketDecodingError(format!("final plaintext is malformed: {}", hex::encode(&plain_text)))
+                    })?;
                     debug!("emitting final packet: {fd}");
 
                     if let Err(e) = emitter.try_send(fd) {
@@ -848,7 +869,10 @@ where
 #[cfg(test)]
 mod tests {
     use crate::errors::PacketError::PacketDbError;
-    use crate::interaction::{AcknowledgementInteraction, ApplicationData, PacketInteraction, PacketInteractionConfig, Payload, PRICE_PER_PACKET};
+    use crate::interaction::{
+        AcknowledgementInteraction, ApplicationData, PacketInteraction, PacketInteractionConfig, Payload,
+        PRICE_PER_PACKET,
+    };
     use crate::path::Path;
     use crate::por::ProofOfRelayValues;
     use async_std::sync::RwLock;
@@ -1522,7 +1546,12 @@ mod tests {
         // Start sending packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_packet(&TEST_MESSAGE, Some(42), packet_path.clone(), Some(Duration::from_secs(10)))
+                .send_packet(
+                    &TEST_MESSAGE,
+                    Some(42),
+                    packet_path.clone(),
+                    Some(Duration::from_secs(10)),
+                )
                 .await
                 .unwrap();
         }
@@ -1559,7 +1588,7 @@ mod tests {
     fn test_final_data() {
         let fd_1 = ApplicationData {
             application_tag: Some(65535),
-            plain_text: (*b"test msg").into()
+            plain_text: (*b"test msg").into(),
         };
         let fd_2 = ApplicationData::from_bytes(&fd_1.to_bytes()).expect("should be able to deserialize");
         assert_eq!(fd_1, fd_2, "should be deserialized equal");
@@ -1567,7 +1596,7 @@ mod tests {
 
         let fd_1 = ApplicationData {
             application_tag: None,
-            plain_text: (*b"test msg").into()
+            plain_text: (*b"test msg").into(),
         };
         let fd_2 = ApplicationData::from_bytes(&fd_1.to_bytes()).expect("should be able to deserialize");
         assert_eq!(fd_1, fd_2, "should be deserialized equal");
@@ -1751,7 +1780,10 @@ pub mod wasm {
     impl WasmPacketInteraction {
         #[wasm_bindgen(constructor)]
         pub fn new(db: Database, on_final_packet: Option<js_sys::Function>, cfg: PacketInteractionConfig) -> Self {
-            let on_msg = on_final_packet.is_some().then(unbounded::<super::ApplicationData>).unzip();
+            let on_msg = on_final_packet
+                .is_some()
+                .then(unbounded::<super::ApplicationData>)
+                .unzip();
 
             // For WASM we need to create mixer with gloo-timers
             let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
@@ -1765,7 +1797,10 @@ pub mod wasm {
                     let this = JsValue::null();
                     let cb = on_final_packet.unwrap();
                     while let Ok(pkt) = on_msg_recv.recv().await {
-                        debug!("wasm packet interaction loop iteration {}", hex::encode(&pkt.plain_text));
+                        debug!(
+                            "wasm packet interaction loop iteration {}",
+                            hex::encode(&pkt.plain_text)
+                        );
                         let param1: JsValue = pkt.application_tag.map(JsValue::from).unwrap_or(JsValue::UNDEFINED);
                         let param2: JsValue = Uint8Array::from(pkt.plain_text.as_ref()).into();
                         if let Err(e) = cb.call2(&this, &param1, &param2) {
@@ -1782,7 +1817,13 @@ pub mod wasm {
             ok_or_jserr!(self.w.received_packet(payload, false).await)
         }
 
-        pub async fn send_packet(&self, msg: &[u8], app_tag: Option<u16>, path: Path, timeout_secs: u64) -> JsResult<HalfKeyChallenge> {
+        pub async fn send_packet(
+            &self,
+            msg: &[u8],
+            app_tag: Option<u16>,
+            path: Path,
+            timeout_secs: u64,
+        ) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(
                 self.w
                     .send_packet(msg, app_tag, path, Some(Duration::from_secs(timeout_secs)))

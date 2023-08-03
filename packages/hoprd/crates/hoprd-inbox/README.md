@@ -1,5 +1,4 @@
-hoprd-inbox
-----
+## hoprd-inbox
 
 This crate implements the functionality of the Message Inbox (MI) backend.
 
@@ -11,6 +10,7 @@ Application tag is represented by a 16-bit payload prefix and is built-in the HO
 The MI can use different backends, which must implement the `InboxBackend` trait.
 
 ## How `InboxBackend` works
+
 The backend must ensure that both tagged and untagged messages can be `push`ed and `pop`ed to/from it.
 Backend can be persistent, but the current `RingBufferInboxBackend` is in-memory only.
 
@@ -34,11 +34,14 @@ type is set to `ApplicationData` type from `core-packet`.
 The `MessageInbox` currently uses a `RingBufferInboxBacked` as its `InboxBackend` implementations.
 This backend is implemented as hash map (with application tag as a key) of ring-buffers of certain capacity `N`.
 Each bucket can therefore hold `N` messages which can be `pop`ed from oldest to newest.
+The maximum number of messages held in this instantiation of MI is therefore 65536 \* `N`
+(unless some tags are excluded).
 
 Each `push` and `pop` operation is always followed by a `purge` call to evict expired entries.
+
+The frontend has the ability to filter out certain application tags on `push`, so that they are ignored by the MI.
 
 ## Usage
 
 The `MessageInbox` is supposed to live a singleton in the `hoprd` application, and as messages arrive, they
 will be pushed into the inbox. The REST API can then access this singleton to pop messages per request.
-

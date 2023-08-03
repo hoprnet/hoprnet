@@ -1,33 +1,41 @@
+use crate::inbox::{InboxBackend, TimestampFn};
+use async_trait::async_trait;
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::Duration;
-use async_trait::async_trait;
-use ringbuffer::{AllocRingBuffer, RingBuffer};
-use crate::inbox::{InboxBackend, TimestampFn};
 
 struct PayloadWrapper<M> {
     payload: M,
-    ts: Duration
+    ts: Duration,
 }
 
 /// Ring buffer based heap-allocated backend.
 /// The capacity must be a power-of-two due to optimizations.
 /// Tags `T` must be represented by a type that's also a valid key for the `HashMap`
 pub struct RingBufferInboxBackend<T, M>
-where T: Copy + Default + PartialEq + Eq + Hash, {
+where
+    T: Copy + Default + PartialEq + Eq + Hash,
+{
     buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,
-    ts: TimestampFn
+    ts: TimestampFn,
 }
 
 impl<T, M> RingBufferInboxBackend<T, M>
-where T: Copy + Default + PartialEq + Eq + Hash, {
+where
+    T: Copy + Default + PartialEq + Eq + Hash,
+{
     /// Creates new backend with default timestamping function from std::time.
     /// This is incompatible with WASM runtimes.
     #[cfg(not(feature = "wasm"))]
     pub fn new(capacity: usize) -> Self {
-        Self::new_with_capacity(capacity, || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap())
+        Self::new_with_capacity(capacity, || {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+        })
     }
 
     /// Counts only the untagged entries.
@@ -38,34 +46,35 @@ where T: Copy + Default + PartialEq + Eq + Hash, {
 
 #[async_trait(? Send)]
 impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
-where T: Copy + Default + PartialEq + Eq + Hash, {
+where
+    T: Copy + Default + PartialEq + Eq + Hash,
+{
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");
-        Self { capacity, buffers: HashMap::new(), ts}
+        Self {
+            capacity,
+            buffers: HashMap::new(),
+            ts,
+        }
     }
 
     async fn push(&mut self, tag: Option<T>, payload: M) {
         match self.buffers.entry(tag.unwrap_or(T::default())) {
-            Entry::Occupied(mut e) => {
-                e.get_mut()
-                    .push(PayloadWrapper { payload, ts: (self.ts)() })
-            }
-            Entry::Vacant(e) => {
-                e.insert(AllocRingBuffer::new(self.capacity))
-                    .push(PayloadWrapper { payload, ts: (self.ts)() })
-            }
+            Entry::Occupied(mut e) => e.get_mut().push(PayloadWrapper {
+                payload,
+                ts: (self.ts)(),
+            }),
+            Entry::Vacant(e) => e.insert(AllocRingBuffer::new(self.capacity)).push(PayloadWrapper {
+                payload,
+                ts: (self.ts)(),
+            }),
         }
     }
 
     async fn count(&self, tag: Option<T>) -> usize {
         match tag {
-            None => self.buffers.iter().map(|(_,buf)| buf.len()).sum(),
-            Some(specific_tag) => {
-                self.buffers
-                    .get(&specific_tag)
-                    .map(|buf| buf.len())
-                    .unwrap_or(0)
-            }
+            None => self.buffers.iter().map(|(_, buf)| buf.len()).sum(),
+            Some(specific_tag) => self.buffers.get(&specific_tag).map(|buf| buf.len()).unwrap_or(0),
         }
     }
 
@@ -74,15 +83,15 @@ where T: Copy + Default + PartialEq + Eq + Hash, {
             None => self // If no tag was given, we need to find a tag which has the oldest entry in it
                 .buffers
                 .iter()
-                .min_by(|(_, a),(_,b)| {
+                .min_by(|(_, a), (_, b)| {
                     // Compare timestamps of the oldest entries in buckets
                     // Empty buckets are moved away
-                    let ts_a = a.peek().map(|w|w.ts).unwrap_or(Duration::MAX);
-                    let ts_b = b.peek().map(|w|w.ts).unwrap_or(Duration::MAX);
+                    let ts_a = a.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
+                    let ts_b = b.peek().map(|w| w.ts).unwrap_or(Duration::MAX);
                     ts_a.cmp(&ts_b)
                 })
-                .map(|(t,_)| *t)?,
-            Some(t) => t
+                .map(|(t, _)| *t)?,
+            Some(t) => t,
         };
 
         self.buffers
@@ -101,7 +110,8 @@ where T: Copy + Default + PartialEq + Eq + Hash, {
             }
             None => {
                 // Pop across all the tags, need to sort again based on the timestamp
-                let mut all = self.buffers
+                let mut all = self
+                    .buffers
                     .drain()
                     .flat_map(|(_, buf)| buf.into_iter())
                     .collect::<Vec<_>>();
@@ -109,40 +119,38 @@ where T: Copy + Default + PartialEq + Eq + Hash, {
                 // NOTE: this approach is due to the requirement of considering
                 // messages with equal payload and timestamp to be distinct
                 // If this requirement was relaxed, the drained entries could be collected into a BTreeSet.
-                all.sort_unstable_by(|a,b| a.ts.cmp(&b.ts));
+                all.sort_unstable_by(|a, b| a.ts.cmp(&b.ts));
 
-                all.into_iter()
-                    .map(|w| w.payload)
-                    .collect()
+                all.into_iter().map(|w| w.payload).collect()
             }
         }
-
     }
 
     async fn purge(&mut self, older_than: Duration) {
-        self.buffers
-            .iter_mut()
-            .for_each(|(_, buf)| {
-                while buf.peek().map(|w| w.ts).unwrap_or(Duration::MAX) < older_than {
-                    buf.dequeue();
-                }
-            });
+        self.buffers.iter_mut().for_each(|(_, buf)| {
+            while buf.peek().map(|w| w.ts).unwrap_or(Duration::MAX) < older_than {
+                buf.dequeue();
+            }
+        });
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::ops::Add;
-    use std::time::Duration;
     use crate::inbox::InboxBackend;
     use crate::ring::RingBufferInboxBackend;
+    use std::ops::Add;
+    use std::time::Duration;
 
     fn make_backend(capacity: usize) -> RingBufferInboxBackend<u16, i32> {
-        RingBufferInboxBackend::new_with_capacity(capacity, ||
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .add(Duration::from_millis(1)) // for testing, ensure the timestamps are at least 5ms apart
+        RingBufferInboxBackend::new_with_capacity(
+            capacity,
+            || {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .add(Duration::from_millis(1))
+            }, // for testing, ensure the timestamps are at least 5ms apart
         )
     }
 
@@ -203,7 +211,7 @@ mod test {
 
         rb.push(None, 5).await;
 
-        assert_eq!(vec![1,2,3,4,5], rb.pop_all(None).await);
+        assert_eq!(vec![1, 2, 3, 4, 5], rb.pop_all(None).await);
         assert_eq!(0, rb.count(None).await);
         assert_eq!(0, rb.count_untagged());
     }
@@ -221,7 +229,7 @@ mod test {
 
         rb.push(None, 5).await;
 
-        assert_eq!(vec![2,1], rb.pop_all(Some(1)).await);
+        assert_eq!(vec![2, 1], rb.pop_all(Some(1)).await);
         assert_eq!(2, rb.count(Some(2)).await);
         assert_eq!(3, rb.count(None).await);
     }
@@ -268,7 +276,9 @@ mod test {
         rb.push(None, 3).await;
 
         async_std::task::sleep(Duration::from_millis(100)).await;
-        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
 
         rb.push(None, 4).await;
         rb.push(None, 5).await;
@@ -280,7 +290,7 @@ mod test {
         rb.purge(ts).await;
 
         assert_eq!(4, rb.count(None).await);
-        assert_eq!(vec![4,5,6,7], rb.pop_all(None).await);
+        assert_eq!(vec![4, 5, 6, 7], rb.pop_all(None).await);
     }
 
     #[async_std::test]
@@ -299,6 +309,6 @@ mod test {
         rb.push(Some(1), 0).await;
         rb.push(Some(1), 0).await;
 
-        assert_eq!(vec![0,0,0,0,0,0,0,0], rb.pop_all(None).await);
+        assert_eq!(vec![0, 0, 0, 0, 0, 0, 0, 0], rb.pop_all(None).await);
     }
 }
