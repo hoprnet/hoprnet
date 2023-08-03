@@ -95,7 +95,7 @@ where
     fn is_excluded_tag(&self, tag: &Option<Tag>) -> bool {
         match tag {
             None => false,
-            Some(t) => self.cfg.excluded_tags.iter().any(|e| e.eq(t))
+            Some(t) => self.cfg.excluded_tags.iter().any(|e| e.eq(t)),
         }
     }
 
@@ -103,7 +103,7 @@ where
     /// has been excluded based on the configured exluded tags.
     pub async fn push(&self, payload: ApplicationData) -> bool {
         if self.is_excluded_tag(&payload.application_tag) {
-            return false
+            return false;
         }
 
         // Push only if there is no tag, or if the tag is not excluded
@@ -119,7 +119,7 @@ where
     /// if no `tag` is given.
     pub async fn size(&self, tag: Option<Tag>) -> usize {
         if self.is_excluded_tag(&tag) {
-            return 0
+            return 0;
         }
 
         let mut db = self.backend.lock().await;
@@ -133,7 +133,7 @@ where
     /// or if the whole inbox is empty (if no `tag` is given).
     pub async fn pop(&self, tag: Option<Tag>) -> Option<ApplicationData> {
         if self.is_excluded_tag(&tag) {
-            return None
+            return None;
         }
 
         let mut db = self.backend.lock().await;
@@ -146,7 +146,7 @@ where
     /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
     pub async fn pop_all(&self, tag: Option<Tag>) -> Vec<ApplicationData> {
         if self.is_excluded_tag(&tag) {
-            return Vec::new()
+            return Vec::new();
         }
 
         let mut db = self.backend.lock().await;
@@ -158,25 +158,49 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-    use core_packet::interaction::{ApplicationData, Tag};
     use crate::inbox::{MessageInbox, MessageInboxConfiguration};
     use crate::ring::RingBufferInboxBackend;
+    use core_packet::interaction::{ApplicationData, Tag};
+    use std::time::Duration;
 
     #[async_std::test]
     async fn test_basic_flow() {
         let cfg = MessageInboxConfiguration {
             capacity: 4,
             excluded_tags: vec![2],
-            max_age_sec: 2
+            max_age_sec: 2,
         };
 
         let mi = MessageInbox::<RingBufferInboxBackend<Tag, ApplicationData>>::new(cfg);
 
-        assert!(mi.push(ApplicationData { application_tag: None, plain_text: (*b"test msg 0").into() }).await);
-        assert!(mi.push(ApplicationData { application_tag: Some(1), plain_text: (*b"test msg 1").into() }).await);
-        assert!(mi.push(ApplicationData { application_tag: Some(1), plain_text: (*b"test msg 2").into() }).await);
-        assert!(! mi.push(ApplicationData { application_tag: Some(2), plain_text: (*b"test msg").into() }).await);
+        assert!(
+            mi.push(ApplicationData {
+                application_tag: None,
+                plain_text: (*b"test msg 0").into()
+            })
+            .await
+        );
+        assert!(
+            mi.push(ApplicationData {
+                application_tag: Some(1),
+                plain_text: (*b"test msg 1").into()
+            })
+            .await
+        );
+        assert!(
+            mi.push(ApplicationData {
+                application_tag: Some(1),
+                plain_text: (*b"test msg 2").into()
+            })
+            .await
+        );
+        assert!(
+            !mi.push(ApplicationData {
+                application_tag: Some(2),
+                plain_text: (*b"test msg").into()
+            })
+            .await
+        );
         assert_eq!(3, mi.size(None).await);
         assert_eq!(2, mi.size(Some(1)).await);
         assert_eq!(0, mi.size(Some(2)).await);
@@ -193,7 +217,6 @@ mod tests {
         async_std::task::sleep(Duration::from_millis(2500)).await;
 
         assert_eq!(0, mi.size(None).await);
-
     }
 }
 
