@@ -1,5 +1,25 @@
-use core_network::{PeerId, ping::PingExternalAPI, types::Result};
+use std::sync::Arc;
+
+use async_lock::RwLock;
+use async_trait::async_trait;
+
+use core_network::{PeerId, network::Network, ping::PingExternalAPI, types::Result};
 use utils_log::error;
+
+#[derive(Clone)]
+pub(crate) struct PingAdaptor {
+    network: Arc<RwLock<Network>>
+}
+
+#[async_trait]
+impl PingExternalAPI for PingAdaptor {
+    async fn on_finished_ping(&self, peer: &PeerId, result: Result) {
+        let writer = self.network.write().await;
+        (*writer).update_with_metadata(peer, result, None)
+    }
+}
+
+
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

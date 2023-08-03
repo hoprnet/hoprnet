@@ -21,7 +21,6 @@ use utils_metrics::metrics::SimpleHistogram;
 use utils_metrics::metrics::SimpleTimer;
 use utils_types::traits::BinarySerializable;
 
-use crate::errors::NetworkingError;
 use crate::errors::NetworkingError::{DecodingError, Other, Timeout};
 use crate::messaging::{ControlMessage, PingMessage};
 
@@ -45,8 +44,9 @@ pub type HeartbeatGetPongRx = futures::channel::mpsc::UnboundedReceiver<(PeerId,
 
 
 #[cfg_attr(test, mockall::automock)]
+#[async_trait]
 pub trait PingExternalAPI {
-    fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result);
+    async fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result);
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -61,20 +61,19 @@ pub trait Pinging {
     async fn ping(&mut self, peers: Vec<PeerId>);
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct Ping {
+pub struct Ping<T: PingExternalAPI> {
     config: PingConfig,
     active_pings: std::collections::HashMap<PeerId, (u64, ControlMessage, Option<SimpleTimer>)>,
     send_ping: HeartbeatSendPingTx,
     receive_pong: HeartbeatGetPongRx,
-    external_api: Box<dyn PingExternalAPI>,
+    external_api: T,
     metric_time_to_ping: Option<SimpleHistogram>,
     metric_successful_ping_count: Option<SimpleCounter>,
     metric_failed_ping_count: Option<SimpleCounter>,
 }
 
-impl Ping {
-    pub fn new(config: PingConfig, send_ping: HeartbeatSendPingTx, receive_pong: HeartbeatGetPongRx, external_api: Box<dyn PingExternalAPI>) -> Ping {
+impl<T: PingExternalAPI> Ping<T> {
+    pub fn new(config: PingConfig, send_ping: HeartbeatSendPingTx, receive_pong: HeartbeatGetPongRx, external_api: T) -> Ping<T> {
         let config = PingConfig {
             max_parallel_pings: config.max_parallel_pings.min(PINGS_MAX_PARALLEL),
             ..config
@@ -125,7 +124,7 @@ impl Ping {
 }
 
 #[async_trait(? Send)] 
-impl Pinging for Ping {
+impl<T: PingExternalAPI> Pinging for Ping<T> {
     /// Performs multiple concurrent async pings to the specified peers.
     ///
     /// A sliding window mechanism is used to select at most a fixed number of concurrently processed
@@ -208,7 +207,7 @@ impl Pinging for Ping {
                 }
             }
 
-            self.external_api.on_finished_ping(&peer, result.map(|v| v.as_millis() as u64));
+            self.external_api.on_finished_ping(&peer, result.map(|v| v.as_millis() as u64)).await;
 
             let remaining_time = current_timestamp() - start_all_peers;
             if (remaining_time as u128) < self.config.timeout as u128 {
@@ -233,7 +232,7 @@ mod tests {
     fn simple_ping_config() -> PingConfig {
         PingConfig {
             max_parallel_pings: 2,
-            timeout: Duration::from_millis(150),
+            timeout: 150, //Duration::from_millis(150),
         }
     }
 
@@ -244,7 +243,7 @@ mod tests {
         let (tx, _rx_ping) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
         let (_tx_pong, rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
+        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
         pinger.ping(vec![]).await;
     }
 
@@ -269,7 +268,7 @@ mod tests {
             };
         };
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
+        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
         futures::join!(
             pinger.ping(vec![peer.clone()]),
             ideal_single_use_channel
@@ -297,7 +296,7 @@ mod tests {
             };
         };
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
+        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
         futures::join!(
             pinger.ping(vec![peer.clone()]),
             bad_pong_single_use_channel
@@ -329,7 +328,7 @@ mod tests {
             };
         };
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
+        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
         futures::join!(
             pinger.ping(vec![peer.clone()]),
             timeout_single_use_channel
@@ -365,7 +364,7 @@ mod tests {
             }
         };
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
+        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
         futures::join!(
             pinger.ping(peers),
             ideal_twice_usable_channel
@@ -407,7 +406,7 @@ mod tests {
             }
         };
 
-        let mut pinger = Ping::new(simple_ping_config(), tx, rx, Box::new(mock));
+        let mut pinger = Ping::new(simple_ping_config(), tx, rx, mock);
         
         let start = current_timestamp();
         futures::join!(

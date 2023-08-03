@@ -19,6 +19,8 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys",
 prometheus = ["dep:utils-metrics", "core-packet/prometheus"]
 
 [dependencies]
+async-trait = { workspace = true } 
+async-lock = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = "7.3.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
