@@ -244,7 +244,9 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(cfg: MessageInboxConfiguration) -> Self {
             Self {
-                w: super::MessageInbox::new_with_time(cfg, || Duration::from_millis(utils_misc::time::wasm::current_timestamp())),
+                w: super::MessageInbox::new_with_time(cfg, || {
+                    Duration::from_millis(utils_misc::time::wasm::current_timestamp())
+                }),
             }
         }
 

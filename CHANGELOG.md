@@ -24,7 +24,7 @@
 - Change `core-ethereum` to operate on Ethereum `Address`es rather than `PublicKey`s ([#5189](https://github.com/hoprnet/hoprnet/pull/5189))
 - Change the ticket auto redeem and check unrealized balance cli arguments ([#5235](https://github.com/hoprnet/hoprnet/pull/5235))
 - Fixed DB deadlocks and changed the DB backend & fixed channel and ticket issues in the DB ([#5229](https://github.com/hoprnet/hoprnet/pull/5229))
-- Add `application_tag` into the payload of HOPR protocol, prepare Message Inbox backend ([#5260](https://github.com/hoprnet/hoprnet/pull/5260)) 
+- Add `application_tag` into the payload of HOPR protocol, prepare Message Inbox backend ([#5260](https://github.com/hoprnet/hoprnet/pull/5260))
 
 <a name="1.93"></a>
 
