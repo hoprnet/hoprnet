@@ -19,6 +19,8 @@ gloo-timers = { version = "0.2.6", optional = true }
 hex = "0.4.3"
 ringbuffer = "0.14.2"
 js-sys = { version = "0.3.63", optional = true }
+serde-wasm-bindgen = { version = "0.5", optional = true }
+wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 core-packet = { path = "../../../core/crates/core-packet", default-features = false }
@@ -41,5 +43,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "core-packet/wasm", "utils-log/wasm", "utils-misc/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-packet/wasm", "utils-log/wasm", "utils-misc/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

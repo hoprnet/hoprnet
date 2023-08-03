@@ -17,6 +17,7 @@ use core_types::channels::Ticket;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p_identity::PeerId;
+use serde::{Serialize, Deserialize};
 use std::ops::Mul;
 use std::sync::Arc;
 use std::time::Duration;
@@ -63,7 +64,7 @@ const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
 
 /// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Payload {
     remote_peer: PeerId,
     data: Box<[u8]>,
@@ -75,6 +76,12 @@ impl Display for Payload {
             .field("remote_peer", &self.remote_peer)
             .field("data", &hex::encode(&self.data))
             .finish()
+    }
+}
+
+impl AsRef<[u8]> for Payload {
+    fn as_ref(&self) -> &[u8] {
+        self.data.as_ref()
     }
 }
 

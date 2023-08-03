@@ -84,7 +84,7 @@ where M: AsRef<[u8]>, B: InboxBackend<Tag, M> {
         Some(Tag::from_be_bytes(data))
     }
 
-    pub async fn push(&mut self, payload: M) {
+    pub async fn push(&self, payload: M) {
         let tag = Self::extract_tag(&payload);
         let mut db = self.backend.lock().await;
         db.push(tag, payload).await;
@@ -95,13 +95,13 @@ where M: AsRef<[u8]>, B: InboxBackend<Tag, M> {
         self.backend.lock().await.count(tag).await
     }
 
-    pub async fn pop(&mut self, tag: Option<Tag>) -> Option<M> {
+    pub async fn pop(&self, tag: Option<Tag>) -> Option<M> {
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
         db.pop(tag).await
     }
 
-    pub async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<M> {
+    pub async fn pop_all(&self, tag: Option<Tag>) -> Vec<M> {
         let mut db = self.backend.lock().await;
         db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec)).await;
         db.pop_all(tag).await
@@ -115,5 +115,43 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use core_packet::interaction::Payload;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use crate::inbox::Tag;
+    use wasm_bindgen::JsValue;
+    use crate::inbox::MessageInboxConfiguration;
+    use crate::ring::RingBufferInboxBackend;
 
+
+    #[wasm_bindgen]
+    pub struct MessageInbox {
+        w: super::MessageInbox<Payload, RingBufferInboxBackend<Tag, Payload>>
+    }
+
+    #[wasm_bindgen]
+    impl MessageInbox {
+        #[wasm_bindgen(constructor)]
+        pub fn new(cfg: MessageInboxConfiguration) -> Self {
+            Self { w: super::MessageInbox::new(cfg) }
+        }
+
+        pub async fn push(&self, payload: Payload) {
+            self.w.push(payload).await
+        }
+
+        pub async fn pop(&self, tag: Option<u16>) -> Option<Payload> {
+            self.w.pop(tag).await
+        }
+
+        pub async fn pop_all(&self, tag: Option<u16>) -> JsResult<JsValue> {
+            let all = self.w.pop_all(tag).await;
+            ok_or_jserr!(serde_wasm_bindgen::to_value(&all))
+        }
+
+        pub async fn size(&self, tag: Option<u16>) -> u32 {
+            self.w.size(tag).await as u32
+        }
+    }
 }

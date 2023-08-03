@@ -213,15 +213,15 @@ mod test {
         let mut rb = make_backend(2);
 
         rb.push(Some(1), 0).await;
-        rb.push(Some(1), 1).await;
         rb.push(Some(1), 2).await;
+        rb.push(Some(1), 1).await;
 
         rb.push(Some(2), 3).await;
         rb.push(Some(2), 4).await;
 
         rb.push(None, 5).await;
 
-        assert_eq!(vec![1,2], rb.pop_all(Some(1)).await);
+        assert_eq!(vec![2,1], rb.pop_all(Some(1)).await);
         assert_eq!(2, rb.count(Some(2)).await);
         assert_eq!(3, rb.count(None).await);
     }
