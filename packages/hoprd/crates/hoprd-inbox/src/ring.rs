@@ -1,41 +1,39 @@
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeSet, HashMap};
+use std::hash::Hash;
 use std::time::Duration;
 use async_trait::async_trait;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-use crate::inbox::{InboxBackend, RESERVED_TAG, Tag, TimestampFn};
+use crate::inbox::{InboxBackend, TimestampFn};
 
-struct PayloadWrapper<T: PartialEq> {
-    payload: T,
+// NOTE on equality: if same payloads arrived at the very same instant, they are considered equal!
+#[derive(PartialEq, Eq)]
+struct PayloadWrapper<M: Eq> {
+    payload: M,
     ts: Duration
 }
 
-impl<T: PartialEq> Eq for PayloadWrapper<T> {}
-
-impl<T: PartialEq> PartialEq<Self> for PayloadWrapper<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.payload.eq(&other.payload)
-    }
-}
-
-impl<T: PartialEq> PartialOrd<Self> for PayloadWrapper<T> {
+impl<T: Eq> PartialOrd<Self> for PayloadWrapper<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T: PartialEq> Ord for PayloadWrapper<T>{
+// Needs to implement Ord to be sortable by the BTreeSet, but must allow Payloads with
+// the same timestamps (unlikely but possible) into the set.
+impl<T: Eq> Ord for PayloadWrapper<T>{
     fn cmp(&self, other: &Self) -> Ordering {
         let c = self.ts.cmp(&other.ts);
         match &c {
             Ordering::Equal => {
                 if !self.eq(other) {
                     // In an unlikely situation when timestamps are equal, but
-                    // the payloads are different, prefer the other.
-                    // This allows insertion into the BTreeSet and still having the items sorted by TS.
+                    // the payloads are different, prefer the `other`.
+                    // This allows insertion into the BTreeSet and still having the items sorted by time.
                     Ordering::Less
                 } else {
+                    // If payloads are same and timestamps too, then
                     Ordering::Equal
                 }
             }
@@ -46,13 +44,18 @@ impl<T: PartialEq> Ord for PayloadWrapper<T>{
 
 /// Ring buffer based heap-allocated backend.
 /// The capacity must be a power-of-two due to optimizations.
-pub struct RingBufferInboxBackend<T: PartialEq> {
-    buffers: HashMap<Tag, AllocRingBuffer<PayloadWrapper<T>>>,
+/// Tags `T` must be represented by a type that's also a valid key for the `HashMap`
+pub struct RingBufferInboxBackend<T, M>
+where T: Copy + Default + PartialEq + Eq + Hash, M: Eq {
+    buffers: HashMap<T, AllocRingBuffer<PayloadWrapper<M>>>,
     capacity: usize,
     ts: TimestampFn
 }
 
-impl<T: PartialEq> RingBufferInboxBackend<T> {
+impl<T, M> RingBufferInboxBackend<T, M>
+where T: Copy + Default + PartialEq + Eq + Hash, M: Eq {
+    /// Creates new backend with default timestamping function from std::time.
+    /// This is incompatible with WASM runtimes.
     #[cfg(not(feature = "wasm"))]
     pub fn new(capacity: usize) -> Self {
         Self::new_with_capacity(capacity, || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap())
@@ -60,19 +63,20 @@ impl<T: PartialEq> RingBufferInboxBackend<T> {
 
     /// Counts only the untagged entries.
     pub fn count_untagged(&self) -> usize {
-        self.buffers.get(&RESERVED_TAG).map(|buf| buf.len()).unwrap_or(0)
+        self.buffers.get(&T::default()).map(|buf| buf.len()).unwrap_or(0)
     }
 }
 
 #[async_trait(? Send)]
-impl<T: PartialEq> InboxBackend<T> for RingBufferInboxBackend<T> {
+impl<T, M> InboxBackend<T, M> for RingBufferInboxBackend<T, M>
+where T: Copy + Default + PartialEq + Eq + Hash, M: Eq {
     fn new_with_capacity(capacity: usize, ts: TimestampFn) -> Self {
         assert!(capacity.is_power_of_two(), "capacity must be a power of two");
         Self { capacity, buffers: HashMap::new(), ts}
     }
 
-    async fn push(&mut self, tag: Option<Tag>, payload: T) {
-        match self.buffers.entry(tag.unwrap_or(RESERVED_TAG)) {
+    async fn push(&mut self, tag: Option<T>, payload: M) {
+        match self.buffers.entry(tag.unwrap_or(T::default())) {
             Entry::Occupied(mut e) => {
                 e.get_mut()
                     .push(PayloadWrapper { payload, ts: (self.ts)() })
@@ -84,7 +88,7 @@ impl<T: PartialEq> InboxBackend<T> for RingBufferInboxBackend<T> {
         }
     }
 
-    async fn count(&self, tag: Option<Tag>) -> usize {
+    async fn count(&self, tag: Option<T>) -> usize {
         match tag {
             None => self.buffers.iter().map(|(_,buf)| buf.len()).sum(),
             Some(specific_tag) => {
@@ -96,10 +100,9 @@ impl<T: PartialEq> InboxBackend<T> for RingBufferInboxBackend<T> {
         }
     }
 
-    async fn pop(&mut self, tag: Option<Tag>) -> Option<T> {
-        // If no tag was given, we need to find a tag which has the oldest entry in it
+    async fn pop(&mut self, tag: Option<T>) -> Option<M> {
         let specific_tag = match tag {
-            None => self
+            None => self // If no tag was given, we need to find a tag which has the oldest entry in it
                 .buffers
                 .iter()
                 .min_by(|(_, a),(_,b)| {
@@ -118,17 +121,17 @@ impl<T: PartialEq> InboxBackend<T> for RingBufferInboxBackend<T> {
             .and_then(|buf| buf.dequeue().map(|w| w.payload))
     }
 
-    async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<T> {
+    async fn pop_all(&mut self, tag: Option<T>) -> Vec<M> {
         match tag {
             Some(specific_tag) => {
                 // Pop only all messages of a specific tag
                 self.buffers
                     .get_mut(&specific_tag)
                     .map(|buf| buf.drain().map(|w| w.payload).collect::<Vec<_>>())
-                    .unwrap_or_else(Vec::<T>::new)
+                    .unwrap_or_else(Vec::<M>::new)
             }
             None => {
-                // Pop across all the tags, need to sort again based on timestamp
+                // Pop across all the tags, need to sort again based on the timestamp
                 self.buffers
                     .drain()
                     .flat_map(|(_, buf)| buf.into_iter())
@@ -159,12 +162,12 @@ mod test {
     use crate::inbox::InboxBackend;
     use crate::ring::RingBufferInboxBackend;
 
-    fn make_backend(capacity: usize) -> RingBufferInboxBackend<i32> {
+    fn make_backend(capacity: usize) -> RingBufferInboxBackend<u16, i32> {
         RingBufferInboxBackend::new_with_capacity(capacity, ||
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .add(Duration::from_secs(1)) // for testing, ensure the timestamps are at least 1 s apart
+                .add(Duration::from_millis(1)) // for testing, ensure the timestamps are at least 5ms apart
         )
     }
 
@@ -278,5 +281,49 @@ mod test {
 
         assert_eq!(0, rb.count(Some(2)).await);
         assert_eq!(0, rb.count(None).await);
+    }
+
+    #[async_std::test]
+    async fn test_purge() {
+        let mut rb = make_backend(8);
+
+        rb.push(None, 0).await;
+        rb.push(None, 1).await;
+        rb.push(None, 2).await;
+        rb.push(None, 3).await;
+
+        async_std::task::sleep(Duration::from_millis(100)).await;
+        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
+
+        rb.push(None, 4).await;
+        rb.push(None, 5).await;
+        rb.push(None, 6).await;
+        rb.push(None, 7).await;
+
+        assert_eq!(8, rb.count(None).await);
+
+        rb.purge(ts).await;
+
+        assert_eq!(4, rb.count(None).await);
+        assert_eq!(vec![4,5,6,7], rb.pop_all(None).await);
+    }
+
+    #[async_std::test]
+    async fn test_duplicates() {
+        let mut rb = make_backend(4);
+
+        rb.push(None, 1).await;
+        rb.push(None, 0).await;
+        rb.push(None, 0).await;
+        rb.push(None, 0).await;
+        rb.push(None, 0).await;
+
+        rb.push(Some(1), 1).await;
+        rb.push(Some(1), 0).await;
+        rb.push(Some(1), 0).await;
+        rb.push(Some(1), 0).await;
+        rb.push(Some(1), 0).await;
+
+        assert_eq!(vec![0,0,0,0,0,0,0,0], rb.pop_all(None).await);
     }
 }

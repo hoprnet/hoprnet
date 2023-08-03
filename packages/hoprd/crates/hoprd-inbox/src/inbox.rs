@@ -3,35 +3,37 @@ use std::time::Duration;
 use async_lock::{Mutex};
 use async_trait::async_trait;
 
-pub type Tag = u16;
-pub const RESERVED_TAG: Tag = 0;
-
 /// Represents a simple timestamping function.
 /// This is useful if used in WASM or environment which might have different means of measuring time.
 pub type TimestampFn = fn() -> Duration;
 
+/// Represents a generic backend trait for the message inbox.
+/// Messages `M` can be tagged or untagged via the type `T`
 #[async_trait(?Send)]
-pub trait InboxBackend<T> {
+pub trait InboxBackend<T: Copy + Default, M> {
     /// Create new storage with the given capacity and the timestamping function
     fn new_with_capacity(cap: usize, ts: TimestampFn) -> Self;
 
     /// Push a new entry with an optional `tag`.
-    async fn push(&mut self, tag: Option<Tag>, payload: T);
+    async fn push(&mut self, tag: Option<T>, payload: M);
 
     /// Count number of entries with the given `tag`.
     /// If no `tag` is given, returns the total count of all tagged and untagged entries.
-    async fn count(&self, tag: Option<Tag>) -> usize;
+    async fn count(&self, tag: Option<T>) -> usize;
 
     /// Pops oldest entry with the given `tag` or oldest entry in general, if no `tag` was given.
     /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
-    async fn pop(&mut self, tag: Option<Tag>) -> Option<T>;
+    async fn pop(&mut self, tag: Option<T>) -> Option<M>;
 
     /// Pops all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
-    async fn pop_all(&mut self, tag: Option<Tag>) -> Vec<T>;
+    async fn pop_all(&mut self, tag: Option<T>) -> Vec<M>;
 
     /// Purges all entries strictly older than the given timestamp.
     async fn purge(&mut self, older_than_ts: Duration);
 }
+
+/// Tags are currently 16-bit unsigned integers
+type Tag = u16;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -53,7 +55,7 @@ impl Default for MessageInboxConfiguration {
 
 /// Represents a thread-safe message inbox of messages `M`
 pub struct MessageInbox<M, B>
-where M: AsRef<[u8]>, B: InboxBackend<M> {
+where M: AsRef<[u8]>, B: InboxBackend<Tag, M> {
     cfg: MessageInboxConfiguration,
     backend: Mutex<B>,
     time: TimestampFn,
@@ -61,7 +63,7 @@ where M: AsRef<[u8]>, B: InboxBackend<M> {
 }
 
 impl<M, B> MessageInbox<M, B>
-where M: AsRef<[u8]>, B: InboxBackend<M> {
+where M: AsRef<[u8]>, B: InboxBackend<Tag, M> {
     #[cfg(any(not(feature = "wasm"), test))]
     pub fn new(cfg: MessageInboxConfiguration) -> Self {
         Self::new_with_time(cfg, || std::time::SystemTime::now()
