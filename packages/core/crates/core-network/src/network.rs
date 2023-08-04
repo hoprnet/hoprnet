@@ -169,6 +169,7 @@ impl std::fmt::Display for PeerStatus {
     }
 }
 
+#[derive(Debug)]
 pub struct Network<T: NetworkExternalActions> {
     me: PeerId,
     cfg: NetworkConfig,

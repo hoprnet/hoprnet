@@ -9,7 +9,7 @@ use futures::{StreamExt, FutureExt};
 
 use core_network::{
     PeerId,
-    network::{Network, NetworkConfig},
+    network::Network,
     heartbeat::{Heartbeat, HeartbeatConfig},
     messaging::ControlMessage,
     ping::{Ping, PingConfig}
@@ -21,9 +21,10 @@ use crate::p2p::api;
 
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Clone)]
 pub struct HoprTools {
-    ping: Ping<adaptors::ping::PingExternalInteractions>,
-    peers: adaptors::network::wasm::WasmNetwork
+    ping: adaptors::ping::wasm::WasmPing,
+    network: adaptors::network::wasm::WasmNetwork
 }
 
 impl HoprTools {
@@ -32,8 +33,16 @@ impl HoprTools {
         peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>) -> Self
     {
         Self {
-            ping,
-            peers: adaptors::network::wasm::WasmNetwork::new(peers) }
+            ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
+            network: adaptors::network::wasm::WasmNetwork::new(peers) }
+    }
+
+    pub fn ping(&self) -> adaptors::ping::wasm::WasmPing {
+        self.ping.clone()
+    }
+
+    pub fn network(&self) -> adaptors::network::wasm::WasmNetwork {
+        self.network.clone()
     }
 }
 
@@ -58,14 +67,10 @@ impl std::fmt::Display for HoprLoopComponents {
 
 /// The main core loop containing all of the individual core components running indefinitely
 /// or until the first error/panic.
-/// 
-/// # Arguments
-/// me: Placeholder for an object that can transform to the libp2p_identity::Keypair
-// #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub async fn build_components(me: String,
-    network_cfg: NetworkConfig, network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig) -> (HoprTools, futures::future::BoxFuture<'static, ()>) {
-    // TODO: this needs to be passed from above -> packet key
-    let identity = libp2p_identity::Keypair::generate_ed25519();
+pub fn build_components(me: libp2p_identity::Keypair,
+    network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig) -> (HoprTools, impl std::future::Future<Output=()>)
+{
+    let identity = me;
 
     let network = Arc::new(RwLock::new(Network::new(
         PeerId::from(identity.public()),
@@ -84,65 +89,74 @@ pub async fn build_components(me: String,
         adaptors::ping::PingExternalInteractions::new(network.clone())
     );
 
-    let network_for_heartbeat = network.clone();
-    let main_loop = async move {
-        let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
-    
-        let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
-            // TODO: network mechanism to process connections (register, unregister, close...)
-            // heartbeat mechanism
-            Box::pin(async move {
-                let hb_pinger = Ping::new(ping_cfg, hb_ping_tx, hb_pong_rx, adaptors::ping::PingExternalInteractions::new(network_for_heartbeat.clone()));
-                Heartbeat::new(hb_cfg, hb_pinger, adaptors::heartbeat::HeartbeatExternalInteractions::new(network_for_heartbeat))
-                    .heartbeat_loop()
-                    .map(|_| HoprLoopComponents::Heartbeat).await
-                }
-            ),
-            Box::pin(p2p::p2p_loop(identity,
-                api::HeartbeatRequester::new(hb_ping_rx), api::HeartbeatResponder::new(hb_pong_tx),
-                api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx)
-            ).map(|_| HoprLoopComponents::Swarm))
-        ];
+    let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
+    let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
 
-        let mut futs = helpers::to_futures_unordered(ready_loops);
+    let heartbeat_network_clone = network.clone();
+    let ping_network_clone = network.clone();
+    let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+        // TODO: network mechanism to process connections (register, unregister, close...)
+        // heartbeat mechanism
+        Box::pin(async move {
+            let hb_pinger = Ping::new(ping_cfg, hb_ping_tx, hb_pong_rx, adaptors::ping::PingExternalInteractions::new(ping_network_clone));
+            Heartbeat::new(hb_cfg, hb_pinger, adaptors::heartbeat::HeartbeatExternalInteractions::new(heartbeat_network_clone))
+                .heartbeat_loop()
+                .map(|_| HoprLoopComponents::Heartbeat).await
+            }
+        ),
+        Box::pin(p2p::p2p_loop(identity,
+            api::HeartbeatRequester::new(hb_ping_rx), api::HeartbeatResponder::new(hb_pong_tx),
+            api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx)
+        ).map(|_| HoprLoopComponents::Swarm))
+    ];
+    let mut futs = helpers::to_futures_unordered(ready_loops);
+
+    let main_loop = async move {
         while let Some(process) = futs.next().await {
             error!("CRITICAL: the core system loop unexpectadly stopped: '{}'", process);
             unreachable!("Futures inside the main loop should never terminate, but run in the background");
         };
     };
 
-    // TODO: once main_loop is Send, it can be used
-    // (HoprTools::new(ping, network), Box::pin(main_loop))
-    (HoprTools::new(ping, network), Box::pin(async {}))
+    (HoprTools::new(ping, network), main_loop)
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm_impl {
     use super::*;
-    use std::str::FromStr;
     use wasm_bindgen::prelude::*;
-    
-    use core_network::ping::Pinging;
 
     #[wasm_bindgen]
-    impl HoprTools {
-        /// Ping the peers represented as a Vec<JsString> values that are converted into usable
-        /// PeerIds.
-        ///
-        /// # Arguments
-        /// * `peers` - Vector of String representations of the PeerIds to be pinged.
-        #[wasm_bindgen]
-        pub async fn ping(&mut self, mut peers: Vec<js_sys::JsString>) {
-            let converted = peers
-                .drain(..)
-                .filter_map(|x| {
-                    let x: String = x.into();
-                    core_network::PeerId::from_str(&x).ok()
-                })
-                .collect::<Vec<_>>();
+    pub struct CoreApp {
+        tools: Option<HoprTools>,
+        main_loop: Option<js_sys::Promise>
+    }
 
-            self.ping.ping(converted).await;
+    #[wasm_bindgen]
+    impl CoreApp {
+        /// Constructor
+        /// 
+        /// # Arguments
+        /// me: A value convertible to the `libp2p_identity::Keypair` needed by the swarm
+        #[wasm_bindgen]
+        pub fn new(me: String, network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig) -> Self {
+            let me = libp2p_identity::Keypair::generate_ed25519();
+            let (tools, run_loop) = build_components(me, network_quality_threshold, hb_cfg, ping_cfg);
+
+            Self {
+                tools: Some(tools),
+                main_loop: Some(wasm_bindgen_futures::future_to_promise(run_loop.map(|_| -> Result<JsValue,JsValue> { Ok(JsValue::UNDEFINED)})))
+            }
+        }
+
+        #[wasm_bindgen]
+        pub fn tools(self) -> HoprTools {
+            self.tools.expect("HOPR tools can only be extracted once")
+        }
+
+        #[wasm_bindgen]
+        pub fn main_loop(self) -> js_sys::Promise {
+            self.main_loop.expect("HOPR main loop can only be extracted once")
         }
     }
 }
