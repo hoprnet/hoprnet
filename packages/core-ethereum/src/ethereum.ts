@@ -448,7 +448,7 @@ export async function createChainWrapper(
         throw new Error('cannot bind with different public key')
       }
 
-      log(`announcing ${data.to_multiaddress_str} with key binding`)
+      log(`announcing ${data.to_multiaddress_str()} with key binding`)
       let sgn = u8aSplit(keyBinding.signature.serialize(), [32])
       confirmationEssentialTxPayload = buildEssentialTxPayload(
         0,
@@ -460,7 +460,7 @@ export async function createChainWrapper(
         data.to_multiaddress_str()
       )
     } else {
-      log(`announcing ${data.to_multiaddress_str} without key binding`)
+      log(`announcing ${data.to_multiaddress_str()} without key binding`)
       confirmationEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels, // TODO: change the target contract used for announcement
