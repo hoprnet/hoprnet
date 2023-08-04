@@ -4,19 +4,37 @@
 
 pragma solidity ^0.8.0;
 
-enum Clearance { NONE, FUNCTION }
+enum Clearance {
+    NONE,
+    FUNCTION
+}
 
-enum TargetType { TOKEN, CHANNELS, SEND }
+enum TargetType {
+    TOKEN,
+    CHANNELS,
+    SEND
+}
 
-enum TargetPermission { BLOCK_ALL, SPECIFIC_FALLBACK_BLOCK, SPECIFIC_FALLBACK_ALLOW, ALLOW_ALL}
+enum TargetPermission {
+    BLOCK_ALL,
+    SPECIFIC_FALLBACK_BLOCK,
+    SPECIFIC_FALLBACK_ALLOW,
+    ALLOW_ALL
+}
 
-enum CapabilityPermission { NONE, BLOCK_ALL, SPECIFIC_FALLBACK_BLOCK, SPECIFIC_FALLBACK_ALLOW, ALLOW_ALL}
+enum CapabilityPermission {
+    NONE,
+    BLOCK_ALL,
+    SPECIFIC_FALLBACK_BLOCK,
+    SPECIFIC_FALLBACK_ALLOW,
+    ALLOW_ALL
+}
 
 /**
  * @dev it stores the following information in uint256 = (160 + 8 * 12)
- * (address)            as uint160: targetAddress 
- * (Clearance)            as uint8: clearance 
- * (TargetType)           as uint8: targetType 
+ * (address)              as uint160: targetAddress
+ * (Clearance)            as uint8: clearance
+ * (TargetType)           as uint8: targetType
  * (TargetPermission)     as uint8: defaultTargetPermission                                       (for the target)
  * (CapabilityPermission) as uint8: defaultRedeemTicketSafeFunctionPermisson                      (for Channels contract)
  * (CapabilityPermission) as uint8: RESERVED FOR defaultBatchRedeemTicketsSafeFunctionPermisson   (for Channels contract)
@@ -67,7 +85,11 @@ library TargetUtils {
         return TargetPermission(uint8((Target.unwrap(target) << 176) >> 248));
     }
 
-    function getDefaultCapabilityPermissionAt(Target target, uint256 position) internal pure returns (CapabilityPermission) {
+    function getDefaultCapabilityPermissionAt(Target target, uint256 position)
+        internal
+        pure
+        returns (CapabilityPermission)
+    {
         if (position > NUM_CAPABILITY_PERMISSIONS) {
             revert TooManyCapabilities();
         }
@@ -83,32 +105,32 @@ library TargetUtils {
         uint256 typeMask;
         if (targetType == TargetType.CHANNELS) {
             /**
-             remove all the default token function permissions (uint16). Equivalent to
-             updatedTarget = (Target.unwrap(target) >> 16) << 16;  
-             updatedTarget &= ~targetTypeMask;
+             * remove all the default token function permissions (uint16). Equivalent to
+             *          updatedTarget = (Target.unwrap(target) >> 16) << 16;
+             *          updatedTarget &= ~targetTypeMask;
              */
             typeMask = uint256(bytes32(hex"ffffffffffffffffffffffffffffffffffffffffff00ffffffffffffffff0000"));
         } else if (targetType == TargetType.TOKEN) {
             /**
-             remove all the default function permissions (uint72)
-             add the last 16 bits (from right) back. Equivalent to
-             updatedTarget = (Target.unwrap(target) >> 72) << 72;
-             updatedTarget |= (Target.unwrap(target) << 240) >> 240;
-             updatedTarget &= ~targetTypeMask;
+             * remove all the default function permissions (uint72)
+             *          add the last 16 bits (from right) back. Equivalent to
+             *          updatedTarget = (Target.unwrap(target) >> 72) << 72;
+             *          updatedTarget |= (Target.unwrap(target) << 240) >> 240;
+             *          updatedTarget &= ~targetTypeMask;
              */
             typeMask = uint256(bytes32(hex"ffffffffffffffffffffffffffffffffffffffffff00ff00000000000000ffff"));
         } else {
             /**
-             remove all the default function permissions (uint72). Equivalent to
-             updatedTarget = (Target.unwrap(target) >> 72) << 72;
-             updatedTarget &= ~targetTypeMask;
+             * remove all the default function permissions (uint72). Equivalent to
+             *          updatedTarget = (Target.unwrap(target) >> 72) << 72;
+             *          updatedTarget &= ~targetTypeMask;
              */
             typeMask = uint256(bytes32(hex"ffffffffffffffffffffffffffffffffffffffffff00ff000000000000000000"));
         }
         updatedTarget = Target.unwrap(target) & typeMask;
 
-        // force clear target type and overwrite with expected one 
-        updatedTarget |= uint256(targetType) << 80;   
+        // force clear target type and overwrite with expected one
+        updatedTarget |= uint256(targetType) << 80;
         return Target.wrap(updatedTarget);
     }
 
@@ -161,15 +183,17 @@ library TargetUtils {
      * @dev Decode the target type to target address, clearance, target type and default permissions
      * @param target the wrapped target
      */
-    function decodeDefaultPermissions(
-        Target target
-    ) internal pure returns (
-        address targetAddress,
-        Clearance clearance,
-        TargetType targetType,
-        TargetPermission targetPermission,
-        CapabilityPermission[] memory capabilityPermissions
-    ) {
+    function decodeDefaultPermissions(Target target)
+        internal
+        pure
+        returns (
+            address targetAddress,
+            Clearance clearance,
+            TargetType targetType,
+            TargetPermission targetPermission,
+            CapabilityPermission[] memory capabilityPermissions
+        )
+    {
         // take the first 160 bits and parse it as address
         targetAddress = address(uint160(Target.unwrap(target) >> 96));
         // take the next 8 bits as clearance
@@ -189,7 +213,11 @@ library TargetUtils {
         }
     }
 
-    function convertFunctionToTargetPermission(CapabilityPermission capabilityPermission) internal pure returns (TargetPermission) {
+    function convertFunctionToTargetPermission(CapabilityPermission capabilityPermission)
+        internal
+        pure
+        returns (TargetPermission)
+    {
         uint8 permissionIndex = uint8(capabilityPermission);
         if (permissionIndex == 0) {
             revert PermissionNotFound();

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
-import '../../src/node-stake/NodeSafeRegistry.sol';
-import '../utils/Precompiles.sol';
-import 'openzeppelin-contracts/utils/cryptography/ECDSA.sol';
-import 'forge-std/Test.sol';
-import 'forge-std/StdCheats.sol';
+import "../../src/node-stake/NodeSafeRegistry.sol";
+import "../utils/Precompiles.sol";
+import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import "forge-std/Test.sol";
+import "forge-std/StdCheats.sol";
 
 contract HoprNodeSafeRegistryTest is Test {
     // to alter the storage
@@ -17,8 +17,8 @@ contract HoprNodeSafeRegistryTest is Test {
     uint256 private constant pageSize = 100;
 
     /**
-    * Manually import events and errors
-    */
+     * Manually import events and errors
+     */
     event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
     event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
 
@@ -49,12 +49,13 @@ contract HoprNodeSafeRegistryTest is Test {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
         vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
 
-        HoprNodeSafeRegistry.NodeSafe memory nodeSafe = HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
+        HoprNodeSafeRegistry.NodeSafe memory nodeSafe =
+            HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
 
         // verify the registration is not known beforehand
         assertFalse(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
 
-        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey,nodeSafe);
+        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, nodeSafe);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
         // vm.prank(nodeAddress);
@@ -79,7 +80,7 @@ contract HoprNodeSafeRegistryTest is Test {
 
         vm.store(
             address(nodeSafeRegistry),
-            bytes32(stdstore.target(address(nodeSafeRegistry)).sig('nodeToSafe(address)').with_key(nodeAddress).find()),
+            bytes32(stdstore.target(address(nodeSafeRegistry)).sig("nodeToSafe(address)").with_key(nodeAddress).find()),
             bytes32(abi.encode(address(1)))
         );
         vm.prank(nodeAddress);
@@ -131,7 +132,9 @@ contract HoprNodeSafeRegistryTest is Test {
     /**
      * @dev node fail to register a node due to node and safe addresses are random
      */
-    function testRevert_FailToRegisterSafeByNodeDueToNotSafeOwnerNorNode(address safeAddress, address nodeAddress) public {
+    function testRevert_FailToRegisterSafeByNodeDueToNotSafeOwnerNorNode(address safeAddress, address nodeAddress)
+        public
+    {
         vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
         vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
 
@@ -139,7 +142,7 @@ contract HoprNodeSafeRegistryTest is Test {
 
         vm.store(
             address(nodeSafeRegistry),
-            bytes32(stdstore.target(address(nodeSafeRegistry)).sig('nodeToSafe(address)').with_key(nodeAddress).find()),
+            bytes32(stdstore.target(address(nodeSafeRegistry)).sig("nodeToSafe(address)").with_key(nodeAddress).find()),
             bytes32(abi.encode(address(0)))
         );
         vm.prank(nodeAddress);
@@ -181,7 +184,7 @@ contract HoprNodeSafeRegistryTest is Test {
 
         vm.store(
             address(nodeSafeRegistry),
-            bytes32(stdstore.target(address(nodeSafeRegistry)).sig('nodeToSafe(address)').with_key(nodeAddress).find()),
+            bytes32(stdstore.target(address(nodeSafeRegistry)).sig("nodeToSafe(address)").with_key(nodeAddress).find()),
             bytes32(abi.encode(address(1)))
         );
 
@@ -196,51 +199,33 @@ contract HoprNodeSafeRegistryTest is Test {
     /**
      * @dev mock return of module
      */
-    function _helperMockSafe(
-        address safeAddress,
-        address nodeAddress,
-        bool isModuleSet,
-        bool isNodeIncluded
-    ) private {
+    function _helperMockSafe(address safeAddress, address nodeAddress, bool isModuleSet, bool isNodeIncluded) private {
         // modules
         address[] memory modules = new address[](1);
         modules[0] = vm.addr(303);
 
         vm.mockCall(
             safeAddress,
-            abi.encodeWithSignature(
-                "getModulesPaginated(address,uint256)",
-                SENTINEL_MODULES,
-                pageSize
-            ),
+            abi.encodeWithSignature("getModulesPaginated(address,uint256)", SENTINEL_MODULES, pageSize),
             abi.encode(modules, SENTINEL_MODULES)
         );
 
-        vm.mockCall(
-            modules[0],
-            abi.encodeWithSignature(
-                "isHoprNodeManagementModule()"
-            ),
-            abi.encode(isModuleSet)
-        );
+        vm.mockCall(modules[0], abi.encodeWithSignature("isHoprNodeManagementModule()"), abi.encode(isModuleSet));
 
-        vm.mockCall(
-            modules[0],
-            abi.encodeWithSignature(
-                "isNode(address)",
-                nodeAddress
-            ),
-            abi.encode(isNodeIncluded)
-        );
+        vm.mockCall(modules[0], abi.encodeWithSignature("isNode(address)", nodeAddress), abi.encode(isNodeIncluded));
     }
 
     /**
      * @dev Build a registration signature for node
      */
-    function _helperBuildSig(uint256 mockNodePrivateKey, HoprNodeSafeRegistry.NodeSafe memory nodeSafe) private returns (address, bytes memory) {
+    function _helperBuildSig(uint256 mockNodePrivateKey, HoprNodeSafeRegistry.NodeSafe memory nodeSafe)
+        private
+        returns (address, bytes memory)
+    {
         bytes32 hashStruct = keccak256(abi.encode(nodeSafeRegistry.NODE_SAFE_TYPEHASH(), nodeSafe));
         // build typed digest
-        bytes32 registerHash = keccak256(abi.encode(bytes1(0x19), bytes1(0x01), nodeSafeRegistry.domainSeparator(), hashStruct));
+        bytes32 registerHash =
+            keccak256(abi.encode(bytes1(0x19), bytes1(0x01), nodeSafeRegistry.domainSeparator(), hashStruct));
 
         address nodeAddress = vm.addr(mockNodePrivateKey);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(mockNodePrivateKey, registerHash);

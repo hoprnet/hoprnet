@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "../../src/utils/EnumerableTargetSet.sol";
 
-/** 
+/**
  * @dev Mock contract to test internal library of EnumerableTargetSet
  * Each function from the libarray has a wrapper in the mock contract
  */
@@ -29,7 +29,7 @@ contract EnumerableTargetSetMock {
         return EnumerableTargetSet.length(targetSet);
     }
 
-    function at(uint256 index) view public returns (Target) {
+    function at(uint256 index) public view returns (Target) {
         return EnumerableTargetSet.at(targetSet, index);
     }
 

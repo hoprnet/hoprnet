@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
-import '../../../src/node-stake/permissioned-module/NodeManagementModule.sol';
-import '../../../src/node-stake/permissioned-module/CapabilityPermissions.sol';
+import "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
+import "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
 import "../../utils/CapabilityLibrary.sol";
-import '../../../script/utils/SafeSuiteLib.sol';
-import '../../utils/SafeSingleton.sol';
-import '../../../src/interfaces/IAvatar.sol';
-import '../../../src/Crypto.sol';
-import 'forge-std/Test.sol';
-import 'openzeppelin-contracts/token/ERC20/IERC20.sol';
+import "../../../script/utils/SafeSuiteLib.sol";
+import "../../utils/SafeSingleton.sol";
+import "../../../src/interfaces/IAvatar.sol";
+import "../../../src/Crypto.sol";
+import "forge-std/Test.sol";
+import "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 
 /**
@@ -28,8 +28,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     address public token;
     CapabilityPermission[] internal defaultFunctionPermission;
     /**
-    * Manually import events and errors
-    */
+     * Manually import events and errors
+     */
+
     event SetMultisendAddress(address indexed multisendAddress);
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
@@ -47,21 +48,21 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleProxy = HoprNodeManagementModule(address(moduleSingleton).cloneDeterministic(bytes32(hex"abcd")));
         defaultFunctionPermission = new CapabilityPermission[](TargetUtils.NUM_CAPABILITY_PERMISSIONS);
         defaultFunctionPermission = [
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultRedeemTicketSafeFunctionPermisson
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultBatchRedeemTicketsSafeFunctionPermisson
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultCloseIncomingChannelSafeFunctionPermisson
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultFundChannelMultiFunctionPermisson
-            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW,   // defaultSetCommitmentSafeFunctionPermisson
-            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK,   // defaultApproveFunctionPermisson
-            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK    // defaultSendFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultBatchRedeemTicketsSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultCloseIncomingChannelSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK, // defaultApproveFunctionPermisson
+            CapabilityPermission.SPECIFIC_FALLBACK_BLOCK // defaultSendFunctionPermisson
         ];
     }
 
     /**
-    * @dev Failes to add token target(s) when the account is not address zero
-    */
+     * @dev Failes to add token target(s) when the account is not address zero
+     */
     function testRevert_CannotInitializeSingleton() public {
         emit log_named_address("capabilityLibraryLibAddress", capabilityLibraryLibAddress);
 
@@ -70,20 +71,19 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.clearMockedCalls();
     }
     /**
-    * @dev Anyone can initialize a proxy
-    */
+     * @dev Anyone can initialize a proxy
+     */
+
     function test_CanInitializeProxy() public {
         address _channels = 0x0101010101010101010101010101010101010101;
         address _token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(
-            _channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(_token)
-        );
+        vm.mockCall(_channels, abi.encodeWithSignature("token()"), abi.encode(_token));
         emit SetMultisendAddress(multiaddr);
-        moduleProxy.initialize(abi.encode(address(1), multiaddr, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
+        moduleProxy.initialize(
+            abi.encode(
+                address(1), multiaddr, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+            )
+        );
         assertEq(moduleProxy.owner(), address(1));
         vm.clearMockedCalls();
     }
@@ -138,7 +138,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         _helperAddNodes(accounts);
 
         assertTrue(moduleProxy.isNode(accounts[index]));
-        vm.expectRevert(WithMembership.selector);
+        vm.expectRevert(HoprNodeManagementModule.WithMembership.selector);
         moduleProxy.addNode(accounts[index]);
         vm.stopPrank();
         vm.clearMockedCalls();
@@ -186,8 +186,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev Add channels target(s) when the account is not address zero
-    */
+     * @dev Add channels target(s) when the account is not address zero
+     */
     function testFuzz_ScopeTargetChannelsFromModule(address channelsAddress) public {
         vm.assume(channelsAddress != address(0));
         address owner = moduleProxy.owner();
@@ -208,8 +208,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev fail to channels target(s) when the account is address zero
-    */
+     * @dev fail to channels target(s) when the account is address zero
+     */
     function testRevert_ScopeZeroAddressTargetChannelsFromModule() public {
         address channelsAddress = address(0);
         address owner = moduleProxy.owner();
@@ -224,22 +224,22 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.startPrank(owner);
 
         vm.expectRevert(HoprCapabilityPermissions.AddressIsZero.selector);
-        moduleProxy.scopeTargetChannels(channelsTarget); 
+        moduleProxy.scopeTargetChannels(channelsTarget);
         vm.clearMockedCalls();
     }
 
     /**
-    * @dev fail to add channels target(s) when the account has been scopec
-    */
-    function testRevert_ScopeExistingTargetChannelsFromModule(address[] memory channelsAddresses, uint256 randomIndex) public {
+     * @dev fail to add channels target(s) when the account has been scopec
+     */
+    function testRevert_ScopeExistingTargetChannelsFromModule(address[] memory channelsAddresses, uint256 randomIndex)
+        public
+    {
         vm.assume(channelsAddresses.length > 0);
-        
+
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
-        (address[] memory results, address oneAddress) = _helperGetUniqueAddressArrayAndRandomItem(
-            channelsAddresses,
-            randomIndex
-        );
+        (address[] memory results, address oneAddress) =
+            _helperGetUniqueAddressArrayAndRandomItem(channelsAddresses, randomIndex);
         vm.assume(results.length > 0);
 
         for (uint256 i = 0; i < results.length; i++) {
@@ -255,11 +255,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
 
         Target existingChannelsTarget = TargetUtils.encodeDefaultPermissions(
-            oneAddress,
-            Clearance.FUNCTION,
-            TargetType.CHANNELS,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
+            oneAddress, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         );
         vm.expectRevert(HoprCapabilityPermissions.TargetIsScoped.selector);
         moduleProxy.scopeTargetChannels(existingChannelsTarget);
@@ -267,17 +263,13 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev Add token target(s) when the account is not address zero
-    */
+     * @dev Add token target(s) when the account is not address zero
+     */
     function testFuzz_ScopeTargetTokenFromModule(address tokenAddress) public {
         vm.assume(tokenAddress != address(0));
         address owner = moduleProxy.owner();
         Target actualTokenTarget = TargetUtils.encodeDefaultPermissions(
-            tokenAddress,
-            Clearance.FUNCTION,
-            TargetType.TOKEN,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
+            tokenAddress, Clearance.FUNCTION, TargetType.TOKEN, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         );
 
         vm.startPrank(owner);
@@ -289,17 +281,13 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev fail to token target(s) when the account is address zero
-    */
+     * @dev fail to token target(s) when the account is address zero
+     */
     function testRevert_ScopeZeroAddressTargetTokenFromModule() public {
         address tokenAddress = address(0);
         address owner = moduleProxy.owner();
         Target tokenTarget = TargetUtils.encodeDefaultPermissions(
-            tokenAddress,
-            Clearance.FUNCTION,
-            TargetType.TOKEN,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
+            tokenAddress, Clearance.FUNCTION, TargetType.TOKEN, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         );
 
         vm.startPrank(owner);
@@ -310,39 +298,31 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev fail to add token target(s) when the account has been scopec
-    */
-    function testRevert_ScopeExistingTargetTokenFromModule(address[] memory tokenAddresses, uint256 randomIndex) public {
+     * @dev fail to add token target(s) when the account has been scopec
+     */
+    function testRevert_ScopeExistingTargetTokenFromModule(address[] memory tokenAddresses, uint256 randomIndex)
+        public
+    {
         vm.assume(tokenAddresses.length > 0);
-        
+
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
-        (address[] memory results, address oneAddress) = _helperGetUniqueAddressArrayAndRandomItem(
-            tokenAddresses,
-            randomIndex
-        );
+        (address[] memory results, address oneAddress) =
+            _helperGetUniqueAddressArrayAndRandomItem(tokenAddresses, randomIndex);
         vm.assume(results.length > 0);
 
         for (uint256 i = 0; i < results.length; i++) {
             vm.assume(results[i] != address(0));
             Target tokenTarget = TargetUtils.encodeDefaultPermissions(
-                results[i],
-                Clearance.FUNCTION,
-                TargetType.TOKEN,
-                TargetPermission.ALLOW_ALL,
-                defaultFunctionPermission
+                results[i], Clearance.FUNCTION, TargetType.TOKEN, TargetPermission.ALLOW_ALL, defaultFunctionPermission
             );
 
             moduleProxy.scopeTargetToken(tokenTarget);
         }
 
         Target existingTokenTarget = TargetUtils.encodeDefaultPermissions(
-                oneAddress,
-                Clearance.FUNCTION,
-                TargetType.TOKEN,
-                TargetPermission.ALLOW_ALL,
-                defaultFunctionPermission
-            );
+            oneAddress, Clearance.FUNCTION, TargetType.TOKEN, TargetPermission.ALLOW_ALL, defaultFunctionPermission
+        );
 
         vm.expectRevert(HoprCapabilityPermissions.TargetIsScoped.selector);
         moduleProxy.scopeTargetToken(existingTokenTarget);
@@ -350,8 +330,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev Add send target(s) when the account is a member
-    */
+     * @dev Add send target(s) when the account is a member
+     */
     function testFuzz_ScopeTargetSendFromModule(address[] memory accounts, uint256 index) public {
         vm.assume(accounts.length > 0);
         index = bound(index, 0, accounts.length - 1);
@@ -364,11 +344,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         assertTrue(moduleProxy.isNode(accounts[index]));
 
         Target sendTarget = TargetUtils.encodeDefaultPermissions(
-            accounts[index],
-            Clearance.FUNCTION,
-            TargetType.SEND,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
+            accounts[index], Clearance.FUNCTION, TargetType.SEND, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         );
 
         vm.expectEmit(true, false, false, false, address(moduleProxy));
@@ -378,32 +354,25 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev Add send target(s) when the account is a member
-    */
+     * @dev Add send target(s) when the account is a member
+     */
     function testFuzz_IncludeANode(address node) public {
         vm.assume(node != address(0));
         address owner = moduleProxy.owner();
 
         // add nodes and take one from the added node
         Target sendTarget = TargetUtils.encodeDefaultPermissions(
-            node,
-            Clearance.FUNCTION,
-            TargetType.SEND,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
+            node, Clearance.FUNCTION, TargetType.SEND, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         );
 
-        CapabilityPermission[] memory updatedPermission = new CapabilityPermission[](TargetUtils.NUM_CAPABILITY_PERMISSIONS);
+        CapabilityPermission[] memory updatedPermission =
+            new CapabilityPermission[](TargetUtils.NUM_CAPABILITY_PERMISSIONS);
         for (uint256 j = 0; j < updatedPermission.length; j++) {
             updatedPermission[j] = CapabilityPermission.NONE;
         }
         // add nodes and take one from the added node
         Target upatedTarget = TargetUtils.encodeDefaultPermissions(
-            node,
-            Clearance.FUNCTION,
-            TargetType.SEND,
-            TargetPermission.ALLOW_ALL,
-            updatedPermission
+            node, Clearance.FUNCTION, TargetType.SEND, TargetPermission.ALLOW_ALL, updatedPermission
         );
 
         vm.prank(owner);
@@ -418,17 +387,13 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev fail to scope send target(s) when the account is address zero
-    */
+     * @dev fail to scope send target(s) when the account is address zero
+     */
     function testRevert_ScopeNonMemberTargetSendFromModule() public {
         address tokenAddress = address(0);
         address owner = moduleProxy.owner();
         Target sendTarget = TargetUtils.encodeDefaultPermissions(
-            tokenAddress,
-            Clearance.FUNCTION,
-            TargetType.SEND,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
+            tokenAddress, Clearance.FUNCTION, TargetType.SEND, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         );
 
         vm.prank(owner);
@@ -437,17 +402,14 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.clearMockedCalls();
     }
     /**
-    * @dev fail to scope send target(s) when the account is address zero
-    */
+     * @dev fail to scope send target(s) when the account is address zero
+     */
+
     function testRevert_ScopeZeroAddressTargetSendFromModule() public {
         address sendAddress = address(0);
         address owner = moduleProxy.owner();
         Target sendTarget = TargetUtils.encodeDefaultPermissions(
-            sendAddress,
-            Clearance.FUNCTION,
-            TargetType.SEND,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
+            sendAddress, Clearance.FUNCTION, TargetType.SEND, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         );
 
         vm.startPrank(owner);
@@ -458,17 +420,15 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev fail to add send target(s) when the account has been scopec
-    */
+     * @dev fail to add send target(s) when the account has been scopec
+     */
     function testRevert_ScopeExistingTargetSendFromModule(address[] memory sendAddresses, uint256 randomIndex) public {
         vm.assume(sendAddresses.length > 0);
-        
+
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
-        (address[] memory results, address oneAddress) = _helperGetUniqueAddressArrayAndRandomItem(
-            sendAddresses,
-            randomIndex
-        );
+        (address[] memory results, address oneAddress) =
+            _helperGetUniqueAddressArrayAndRandomItem(sendAddresses, randomIndex);
         vm.assume(results.length > 0);
         // add nodes and take one from the added node
         _helperAddNodes(results);
@@ -477,23 +437,15 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             vm.assume(results[i] != address(0));
             assertTrue(moduleProxy.isNode(results[i]));
             Target sendTarget = TargetUtils.encodeDefaultPermissions(
-                results[i],
-                Clearance.FUNCTION,
-                TargetType.SEND,
-                TargetPermission.ALLOW_ALL,
-                defaultFunctionPermission
+                results[i], Clearance.FUNCTION, TargetType.SEND, TargetPermission.ALLOW_ALL, defaultFunctionPermission
             );
 
             moduleProxy.scopeTargetSend(sendTarget);
         }
 
         Target existingSendTarget = TargetUtils.encodeDefaultPermissions(
-                oneAddress,
-                Clearance.FUNCTION,
-                TargetType.SEND,
-                TargetPermission.ALLOW_ALL,
-                defaultFunctionPermission
-            );
+            oneAddress, Clearance.FUNCTION, TargetType.SEND, TargetPermission.ALLOW_ALL, defaultFunctionPermission
+        );
 
         vm.expectRevert(HoprCapabilityPermissions.TargetIsScoped.selector);
         moduleProxy.scopeTargetSend(existingSendTarget);
@@ -501,8 +453,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev Add Channels and Token targets, where channel is vm.addr()
-    */
+     * @dev Add Channels and Token targets, where channel is vm.addr()
+     */
     function test_AddChannelsAndTokenTarget(uint256 targetUint) public {
         address owner = moduleProxy.owner();
         Target target = Target.wrap(targetUint);
@@ -512,13 +464,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.assume(channelAddress != tokenAddress);
 
         vm.startPrank(owner);
-        vm.mockCall(
-            channelAddress,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(tokenAddress)
-        );
+        vm.mockCall(channelAddress, abi.encodeWithSignature("token()"), abi.encode(tokenAddress));
 
         // token target overwritten mask
         // <         160 bits for address         >    <>              <func>
@@ -526,10 +472,16 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // channels target overwritten mask
         // <         160 bits for address         >    <   functions  >
         // ffffffffffffffffffffffffffffffffffffffff0000ffffffffffffffff0000
-        Target overwrittenTokenTarget = _helperTargetBitwiseAnd(target, hex"ffffffffffffffffffffffffffffffffffffffff0000ff00000000000000ffff");
-        overwrittenTokenTarget = _helperTargetBitwiseOr(overwrittenTokenTarget, hex"0000000000000000000000000000000000000000010100000000000000000000");
-        Target overwrittenChannelTarget = _helperTargetBitwiseAnd(target, hex"ffffffffffffffffffffffffffffffffffffffff0000ffffffffffffffff0000");
-        overwrittenChannelTarget = _helperTargetBitwiseOr(overwrittenChannelTarget, hex"0000000000000000000000000000000000000000010200000000000000000000");
+        Target overwrittenTokenTarget =
+            _helperTargetBitwiseAnd(target, hex"ffffffffffffffffffffffffffffffffffffffff0000ff00000000000000ffff");
+        overwrittenTokenTarget = _helperTargetBitwiseOr(
+            overwrittenTokenTarget, hex"0000000000000000000000000000000000000000010100000000000000000000"
+        );
+        Target overwrittenChannelTarget =
+            _helperTargetBitwiseAnd(target, hex"ffffffffffffffffffffffffffffffffffffffff0000ffffffffffffffff0000");
+        overwrittenChannelTarget = _helperTargetBitwiseOr(
+            overwrittenChannelTarget, hex"0000000000000000000000000000000000000000010200000000000000000000"
+        );
         vm.expectEmit(true, false, false, false, address(moduleProxy));
         emit HoprCapabilityPermissions.ScopedTargetChannels(channelAddress, overwrittenChannelTarget);
         vm.expectEmit(true, false, false, false, address(moduleProxy));
@@ -540,25 +492,19 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
     // test revokeTarget
     /**
-    * @dev owner revoke a target
-    */
+     * @dev owner revoke a target
+     */
     function testFuzz_RevokeTargetFromModule(address[] memory accounts, uint256 randomIndex) public {
         // scope some targets
         vm.assume(accounts.length > 0);
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
-        (address[] memory results, address oneAddress) = _helperGetUniqueAddressArrayAndRandomItem(
-            accounts,
-            randomIndex
-        );
+        (address[] memory results, address oneAddress) =
+            _helperGetUniqueAddressArrayAndRandomItem(accounts, randomIndex);
         for (uint256 i = 0; i < results.length; i++) {
             vm.assume(results[i] != address(0));
             Target tokenTarget = TargetUtils.encodeDefaultPermissions(
-                results[i],
-                Clearance.FUNCTION,
-                TargetType.TOKEN,
-                TargetPermission.ALLOW_ALL,
-                defaultFunctionPermission
+                results[i], Clearance.FUNCTION, TargetType.TOKEN, TargetPermission.ALLOW_ALL, defaultFunctionPermission
             );
 
             moduleProxy.scopeTargetToken(tokenTarget);
@@ -572,8 +518,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     }
 
     /**
-    * @dev fail to remove a target that is not scoped
-    */
+     * @dev fail to remove a target that is not scoped
+     */
     function testRevert_RevokeNonScopedTargetFromModule(address scopeTargetAddr) public {
         address owner = moduleProxy.owner();
 
@@ -594,22 +540,27 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         GranularPermission[] memory permissions = new GranularPermission[](_size);
         for (uint256 i = 0; i < _size; i++) {
             functionSigs[i] = _randomFunctionSigs[i];
-            permissions[i] = GranularPermission(uint8(uint256(bytes32(_randomFunctionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+            permissions[i] = GranularPermission(
+                uint8(uint256(bytes32(_randomFunctionSigs[i])) % (uint256(type(GranularPermission).max) + 1))
+            );
         }
-        (bytes32 encoded, uint256 length) = HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
+        (bytes32 encoded, uint256 length) =
+            HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
         assertEq(length, _size);
         // scope capabilities
         vm.prank(moduleProxy.owner());
         for (uint256 j = 0; j < length; j++) {
             if (functionSigs[j] != bytes4(hex"00")) {
                 vm.expectEmit(true, true, false, false, address(moduleProxy));
-                emit HoprCapabilityPermissions.ScopedGranularChannelCapability(vm.addr(200), bytes32(hex"0200"), functionSigs[j], permissions[j]);
+                emit HoprCapabilityPermissions.ScopedGranularChannelCapability(
+                    vm.addr(200), bytes32(hex"0200"), functionSigs[j], permissions[j]
+                );
             }
         }
         moduleProxy.scopeChannelsCapabilities(
-            vm.addr(200),       // mocked targetAddress
+            vm.addr(200), // mocked targetAddress
             bytes32(hex"0200"), // mocked channelId
-            encoded             // encodeSigsPermissions
+            encoded // encodeSigsPermissions
         );
         vm.clearMockedCalls();
     }
@@ -624,7 +575,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         for (uint256 i = 0; i < functionSigs.length; i++) {
             functionSigs[i] = bytes4(bytes32(i));
-            permissions[i] = GranularPermission(uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+            permissions[i] = GranularPermission(
+                uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1))
+            );
         }
         vm.expectRevert(HoprCapabilityPermissions.ArrayTooLong.selector);
         moduleProxy.encodeFunctionSigsAndPermissions(functionSigs, permissions);
@@ -632,6 +585,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     /**
      * @dev encode function permissions but revert due to ArraysDifferentLength
      */
+
     function testRevert_EncodeFunctionSigsAndPermissionsMismatchedLengths() public {
         uint256 size = 6;
         bytes4[] memory functionSigs = new bytes4[](size);
@@ -639,7 +593,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         for (uint256 i = 0; i < functionSigs.length; i++) {
             functionSigs[i] = bytes4(bytes32(i));
-            permissions[i] = GranularPermission(uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+            permissions[i] = GranularPermission(
+                uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1))
+            );
         }
         permissions[6] = GranularPermission(0);
         vm.expectRevert(HoprCapabilityPermissions.ArraysDifferentLength.selector);
@@ -648,6 +604,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     /**
      * @dev encode function permissions but revert due to ArraysDifferentLength
      */
+
     function test_EncodeFunctionSigsAndPermissionsMismatchedLengths() public {
         uint256 size = 6;
         bytes4[] memory functionSigs = new bytes4[](size);
@@ -655,16 +612,20 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         for (uint256 i = 0; i < functionSigs.length; i++) {
             functionSigs[i] = bytes4(bytes32(i));
-            permissions[i] = GranularPermission(uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+            permissions[i] = GranularPermission(
+                uint8(uint256(bytes32(functionSigs[i])) % (uint256(type(GranularPermission).max) + 1))
+            );
         }
         (bytes32 encoded, uint256 length) = moduleProxy.encodeFunctionSigsAndPermissions(functionSigs, permissions);
-        (bytes4[] memory _functionSigs, GranularPermission[] memory _permissions) = moduleProxy.decodeFunctionSigsAndPermissions(encoded, length);
+        (bytes4[] memory _functionSigs, GranularPermission[] memory _permissions) =
+            moduleProxy.decodeFunctionSigsAndPermissions(encoded, length);
         assertEq(_functionSigs.length, size);
         assertEq(_permissions.length, size);
     }
     /**
      * @dev deecode function permissions but revert due to ArrayTooLong
      */
+
     function testRevert_DecodeFunctionSigsAndPermissionsLengths() public {
         vm.expectRevert(HoprCapabilityPermissions.ArrayTooLong.selector);
         moduleProxy.decodeFunctionSigsAndPermissions(bytes32(hex"1234567890"), 8);
@@ -681,23 +642,28 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         GranularPermission[] memory permissions = new GranularPermission[](_size);
         for (uint256 i = 0; i < _size; i++) {
             functionSigs[i] = _randomFunctionSigs[i];
-            permissions[i] = GranularPermission(uint8(uint256(bytes32(_randomFunctionSigs[i])) % (uint256(type(GranularPermission).max) + 1)));
+            permissions[i] = GranularPermission(
+                uint8(uint256(bytes32(_randomFunctionSigs[i])) % (uint256(type(GranularPermission).max) + 1))
+            );
         }
-        (bytes32 encoded, uint256 length) = HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
+        (bytes32 encoded, uint256 length) =
+            HoprCapabilityPermissions.encodeFunctionSigsAndPermissions(functionSigs, permissions);
         assertEq(length, _size);
         // scope capabilities
         vm.prank(moduleProxy.owner());
         for (uint256 j = 0; j < length; j++) {
             if (functionSigs[j] != bytes4(hex"00") && j < 2) {
                 vm.expectEmit(true, true, false, false, address(moduleProxy));
-                emit HoprCapabilityPermissions.ScopedGranularTokenCapability(vm.addr(200), vm.addr(201), vm.addr(202), functionSigs[j], permissions[j]);
+                emit HoprCapabilityPermissions.ScopedGranularTokenCapability(
+                    vm.addr(200), vm.addr(201), vm.addr(202), functionSigs[j], permissions[j]
+                );
             }
         }
         moduleProxy.scopeTokenCapabilities(
-            vm.addr(200),       // mocked nodeAddress
-            vm.addr(201),       // mocked targetAddress
-            vm.addr(202),       // mocked beneficiary
-            encoded             // encodeSigsPermissions
+            vm.addr(200), // mocked nodeAddress
+            vm.addr(201), // mocked targetAddress
+            vm.addr(202), // mocked beneficiary
+            encoded // encodeSigsPermissions
         );
         vm.clearMockedCalls();
     }
@@ -706,7 +672,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
      * @dev scope tokens for (source, destination)
      */
     function testFuzz_ScopeSendCapability(bytes4 functionSig) public {
-        GranularPermission permission = GranularPermission(uint8(uint256(bytes32(functionSig)) % (uint256(type(GranularPermission).max) + 1)));
+        GranularPermission permission =
+            GranularPermission(uint8(uint256(bytes32(functionSig)) % (uint256(type(GranularPermission).max) + 1)));
 
         // scope capabilities
         vm.prank(moduleProxy.owner());
@@ -715,9 +682,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             emit HoprCapabilityPermissions.ScopedGranularSendCapability(vm.addr(200), vm.addr(201), permission);
         }
         moduleProxy.scopeSendCapability(
-            vm.addr(200),       // mocked nodeAddress
-            vm.addr(201),       // mocked beneficiary
-            permission          // encodeSigsPermissions
+            vm.addr(200), // mocked nodeAddress
+            vm.addr(201), // mocked beneficiary
+            permission // encodeSigsPermissions
         );
         vm.clearMockedCalls();
     }
@@ -735,12 +702,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         assertFalse(moduleProxy.isNode(caller));
         vm.prank(caller);
         vm.expectRevert(HoprCapabilityPermissions.NoMembership.selector);
-        moduleProxy.execTransactionFromModule(
-            token,
-            0,
-            hex"12345678",
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(token, 0, hex"12345678", Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -757,12 +719,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // cannot call from
         vm.prank(caller);
         vm.expectRevert(HoprCapabilityPermissions.FunctionSignatureTooShort.selector);
-        moduleProxy.execTransactionFromModule(
-            token,
-            0,
-            hex"00",
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(token, 0, hex"00", Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -778,23 +735,14 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleProxy.addNode(caller);
         // target exist but not the target address of the calling function
         Target target = TargetUtils.encodeDefaultPermissions(
-            token,
-            Clearance.NONE,
-            TargetType.TOKEN,
-            TargetPermission.BLOCK_ALL,
-            defaultFunctionPermission
-        ); 
+            token, Clearance.NONE, TargetType.TOKEN, TargetPermission.BLOCK_ALL, defaultFunctionPermission
+        );
         moduleProxy.scopeTargetToken(target);
         vm.stopPrank();
 
         vm.prank(caller);
         vm.expectRevert(HoprCapabilityPermissions.TargetAddressNotAllowed.selector);
-        moduleProxy.execTransactionFromModule(
-            token,
-            0,
-            hex"12345678",
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(token, 0, hex"12345678", Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -810,23 +758,14 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleProxy.addNode(caller);
         // target exist but not the target address of the calling function
         Target target = TargetUtils.encodeDefaultPermissions(
-            caller,
-            Clearance.FUNCTION,
-            TargetType.TOKEN,
-            TargetPermission.BLOCK_ALL,
-            defaultFunctionPermission
-        ); 
+            caller, Clearance.FUNCTION, TargetType.TOKEN, TargetPermission.BLOCK_ALL, defaultFunctionPermission
+        );
         moduleProxy.scopeTargetToken(target);
         vm.stopPrank();
 
         vm.prank(caller);
         vm.expectRevert(HoprCapabilityPermissions.SendNotAllowed.selector);
-        moduleProxy.execTransactionFromModule(
-            caller,
-            1,
-            hex"",
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(caller, 1, hex"", Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -851,18 +790,13 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             TargetType.SEND,
             TargetPermission.SPECIFIC_FALLBACK_ALLOW,
             channelsTokenPermission
-        ); 
+        );
         moduleProxy.scopeTargetSend(target);
         vm.stopPrank();
 
         vm.prank(caller);
         vm.expectRevert(HoprCapabilityPermissions.ParameterNotAllowed.selector);
-        moduleProxy.execTransactionFromModule(
-            caller,
-            1,
-            hex"12345678",
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(caller, 1, hex"12345678", Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -878,26 +812,16 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleProxy.addNode(caller);
         // target exist but not the target address of the calling function
         Target target = TargetUtils.encodeDefaultPermissions(
-            token,
-            Clearance.FUNCTION,
-            TargetType.TOKEN,
-            TargetPermission.BLOCK_ALL,
-            defaultFunctionPermission
-        ); 
+            token, Clearance.FUNCTION, TargetType.TOKEN, TargetPermission.BLOCK_ALL, defaultFunctionPermission
+        );
         moduleProxy.scopeTargetToken(target);
         vm.stopPrank();
 
         vm.prank(caller);
         vm.expectRevert(HoprCapabilityPermissions.DelegateCallNotAllowed.selector);
-        moduleProxy.execTransactionFromModule(
-            token,
-            0,
-            hex"12345678",
-            Enum.Operation.DelegateCall
-        );
+        moduleProxy.execTransactionFromModule(token, 0, hex"12345678", Enum.Operation.DelegateCall);
         vm.clearMockedCalls();
     }
-
 
     /**
      * @dev revert due to default permission not allowed
@@ -907,28 +831,11 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         address msgSender = vm.addr(1);
 
         Target target = TargetUtils.encodeDefaultPermissions(
-            channels,
-            Clearance.FUNCTION,
-            TargetType.CHANNELS,
-            TargetPermission.BLOCK_ALL,
-            defaultFunctionPermission
-        );   // clerance: FUNCTION default ALLOW_ALL
-        stdstore
-            .target(address(moduleProxy))
-            .sig("owner()")
-            .checked_write(safe);
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
+            channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.BLOCK_ALL, defaultFunctionPermission
+        ); // clerance: FUNCTION default ALLOW_ALL
+        stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
 
@@ -944,12 +851,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.DefaultPermissionRejected.selector);
-        moduleProxy.execTransactionFromModule(
-            token,
-            0,
-            data,
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(token, 0, data, Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -961,28 +863,11 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         address msgSender = vm.addr(1);
 
         Target target = TargetUtils.encodeDefaultPermissions(
-            channels,
-            Clearance.FUNCTION,
-            TargetType.CHANNELS,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
-        );   // clerance: FUNCTION default ALLOW_ALL
-        stdstore
-            .target(address(moduleProxy))
-            .sig("owner()")
-            .checked_write(safe);
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
+            channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.ALLOW_ALL, defaultFunctionPermission
+        ); // clerance: FUNCTION default ALLOW_ALL
+        stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
 
@@ -997,12 +882,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         // execute function
         vm.prank(msgSender);
-        bool result = moduleProxy.execTransactionFromModule(
-            token,
-            0,
-            data,
-            Enum.Operation.Call
-        );
+        bool result = moduleProxy.execTransactionFromModule(token, 0, data, Enum.Operation.Call);
         assertTrue(result);
         vm.clearMockedCalls();
     }
@@ -1020,23 +900,10 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             TargetType.CHANNELS,
             TargetPermission.SPECIFIC_FALLBACK_ALLOW,
             defaultFunctionPermission
-        );   // clerance: FUNCTION default ALLOW_ALL
-        stdstore
-            .target(address(moduleProxy))
-            .sig("owner()")
-            .checked_write(safe);
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
+        ); // clerance: FUNCTION default ALLOW_ALL
+        stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
 
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
@@ -1052,12 +919,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.GranularPermissionRejected.selector);
-        moduleProxy.execTransactionFromModule(
-            token,
-            0,
-            data,
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(token, 0, data, Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -1069,23 +931,10 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         address msgSender = vm.addr(1);
 
         Target target = TargetUtils.encodeDefaultPermissions(
-            channels,
-            Clearance.FUNCTION,
-            TargetType.CHANNELS,
-            TargetPermission.ALLOW_ALL,
-            defaultFunctionPermission
-        );   // clerance: FUNCTION default ALLOW_ALL
-        stdstore
-            .target(address(moduleProxy))
-            .sig("owner()")
-            .checked_write(safe);
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
+            channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.ALLOW_ALL, defaultFunctionPermission
+        ); // clerance: FUNCTION default ALLOW_ALL
+        stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
         vm.mockCall(
             safe,
             abi.encodeWithSelector(IAvatar.execTransactionFromModuleReturnData.selector),
@@ -1104,26 +953,19 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         // execute function
         vm.prank(msgSender);
-        (bool success, bytes memory result) = moduleProxy.execTransactionFromModuleReturnData(
-            token,
-            0,
-            data,
-            Enum.Operation.Call
-        );
+        (bool success, bytes memory result) =
+            moduleProxy.execTransactionFromModuleReturnData(token, 0, data, Enum.Operation.Call);
         assertTrue(success);
         assertEq(result, hex"12345678");
         vm.clearMockedCalls();
     }
 
     /**
-     * @dev Fail to call to multisend address 
+     * @dev Fail to call to multisend address
      */
     function testRevert_InvalidMultiSendData() public {
         // set the multisend address to be multiaddr
-        stdstore
-            .target(address(moduleProxy))
-            .sig("multisend()")
-            .checked_write(multiaddr);
+        stdstore.target(address(moduleProxy)).sig("multisend()").checked_write(multiaddr);
 
         address owner = moduleProxy.owner();
         address caller = vm.addr(301);
@@ -1135,10 +977,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         vm.prank(caller);
         vm.expectRevert(HoprCapabilityPermissions.UnacceptableMultiSendOffset.selector);
         moduleProxy.execTransactionFromModule(
-            multiaddr,
-            0,
-            abi.encodePacked(bytes32(hex"12"), bytes32(hex"34")),
-            Enum.Operation.DelegateCall
+            multiaddr, 0, abi.encodePacked(bytes32(hex"12"), bytes32(hex"34")), Enum.Operation.DelegateCall
         );
         vm.clearMockedCalls();
     }
@@ -1155,10 +994,10 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         channelsTokenPermission[8] = CapabilityPermission.SPECIFIC_FALLBACK_BLOCK;
         // scope channels and token contract
         _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
-        
+
         // prepare a simple token approve and a native token transfer
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);   // approve on token
+        data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100); // approve on token
         uint8[] memory txOperations = new uint8[](2);
         txOperations[0] = 0;
         txOperations[1] = 0;
@@ -1176,12 +1015,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         // execute function
         vm.prank(msgSender);
-        bool result = moduleProxy.execTransactionFromModule(
-            multiaddr,
-            0,
-            safeTxData,
-            Enum.Operation.DelegateCall
-        );
+        bool result = moduleProxy.execTransactionFromModule(multiaddr, 0, safeTxData, Enum.Operation.DelegateCall);
         assertTrue(result);
         vm.clearMockedCalls();
     }
@@ -1198,12 +1032,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
         // scope channels and token contract
         _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
-        // make execTransactionFromModule go through 
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
+        // make execTransactionFromModule go through
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
 
         // add another node
         address owner = moduleProxy.owner();
@@ -1212,22 +1042,19 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleProxy.addNode(anotherNode);
 
         // prepare a simple token approve
-        bytes memory data = abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, anotherNode, vm.addr(404));
+        bytes memory data =
+            abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, anotherNode, vm.addr(404));
 
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.NodePermissionRejected.selector);
-        moduleProxy.execTransactionFromModule(
-            channels,
-            0,
-            data,
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
         vm.clearMockedCalls();
     }
     /**
      * @dev fail when calling the wrong target (channels)
      */
+
     function testRevert_ExecTransactionFromModuleButGranularPermissionRejectParameterNotAllowedForChannels() public {
         // scope channels and token contract
         address msgSender = vm.addr(1);
@@ -1237,12 +1064,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
         // scope channels and token contract
         _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
-        // make execTransactionFromModule go through 
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
+        // make execTransactionFromModule go through
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
 
         // add another node
         address owner = moduleProxy.owner();
@@ -1251,22 +1074,19 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         moduleProxy.addNode(anotherNode);
 
         // prepare a simple token approve
-        bytes memory data = abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, anotherNode, vm.addr(404));
+        bytes memory data =
+            abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, anotherNode, vm.addr(404));
 
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.ParameterNotAllowed.selector);
-        moduleProxy.execTransactionFromModule(
-            token,
-            0,
-            data,
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(token, 0, data, Enum.Operation.Call);
         vm.clearMockedCalls();
     }
     /**
      * @dev fail when calling the wrong target (token)
      */
+
     function testRevert_ExecTransactionFromModuleButGranularPermissionRejectParameterNotAllowedForToken() public {
         // scope channels and token contract
         address msgSender = vm.addr(1);
@@ -1276,12 +1096,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
         // scope channels and token contract
         _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
-        // make execTransactionFromModule go through 
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
+        // make execTransactionFromModule go through
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
 
         // add another node
         address owner = moduleProxy.owner();
@@ -1295,12 +1111,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.ParameterNotAllowed.selector);
-        moduleProxy.execTransactionFromModule(
-            channels,
-            0,
-            data,
-            Enum.Operation.Call
-        );
+        moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
         vm.clearMockedCalls();
     }
 
@@ -1315,13 +1126,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
         // scope channels and token contract
         _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
-        // make execTransactionFromModule go through 
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
-        
+        // make execTransactionFromModule go through
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
+
         // try all functions on tokens
         uint256 size = 7;
         bytes[] memory data = new bytes[](size);
@@ -1338,23 +1145,22 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             HoprChannels.ChannelEpoch.wrap(1),
             HoprChannels.WinProb.wrap(1)
         );
-        HoprChannels.CompactSignature memory dummyCompactSignature = HoprCrypto.CompactSignature(
-            bytes32(hex"22"),
-            bytes32(hex"33")
-        );
-        HoprChannels.RedeemableTicket memory dummyRedeemableTicket = HoprChannels.RedeemableTicket(
-            dummyTicketData,
-            dummyCompactSignature,
-            uint256(bytes32(hex"44"))
-        );
+        HoprChannels.CompactSignature memory dummyCompactSignature =
+            HoprCrypto.CompactSignature(bytes32(hex"22"), bytes32(hex"33"));
+        HoprChannels.RedeemableTicket memory dummyRedeemableTicket =
+            HoprChannels.RedeemableTicket(dummyTicketData, dummyCompactSignature, uint256(bytes32(hex"44")));
 
         data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);
-        data[1] = abi.encodeWithSignature("send(address,uint256,bytes)", vm.addr(200),vm.addr(201), hex"ff");
+        data[1] = abi.encodeWithSignature("send(address,uint256,bytes)", vm.addr(200), vm.addr(201), hex"ff");
         data[2] = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector, msgSender, dummyRedeemableTicket);
         data[3] = abi.encodeWithSelector(HoprChannels.closeIncomingChannelSafe.selector, msgSender, vm.addr(404));
-        data[4] = abi.encodeWithSelector(HoprChannels.initiateOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
-        data[5] = abi.encodeWithSelector(HoprChannels.finalizeOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
-        data[6] = abi.encodeWithSelector(HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannels.Balance.wrap(66));
+        data[4] =
+            abi.encodeWithSelector(HoprChannels.initiateOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
+        data[5] =
+            abi.encodeWithSelector(HoprChannels.finalizeOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
+        data[6] = abi.encodeWithSelector(
+            HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannels.Balance.wrap(66)
+        );
         // data[7] nothing
         // data[8] nothing
 
@@ -1375,18 +1181,14 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         // execute function
         vm.prank(msgSender);
-        bool result = moduleProxy.execTransactionFromModule(
-            multiaddr,
-            0,
-            safeTxData,
-            Enum.Operation.DelegateCall
-        );
+        bool result = moduleProxy.execTransactionFromModule(multiaddr, 0, safeTxData, Enum.Operation.DelegateCall);
         assertTrue(result);
         vm.clearMockedCalls();
     }
     /**
      * @dev fail to retrieve data at a specific index (Bytes32)
      */
+
     function testRevert_CalldataOutOfBoundsWhenPluckingOneBytes32() public {
         address msgSender = vm.addr(1);
         CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
@@ -1395,15 +1197,11 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
         // scope channels and token contract
         _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
-        // make execTransactionFromModule go through 
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
-        
+        // make execTransactionFromModule go through
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
+
         // prepare a simple token approve
-        bytes memory data = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector, msgSender); 
+        bytes memory data = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector, msgSender);
 
         // execute function
         vm.prank(msgSender);
@@ -1421,6 +1219,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     /**
      * @dev fail to retrieve data at a specific index (address)
      */
+
     function testRevert_CalldataOutOfBoundsWhenPluckingOneStaticAddress() public {
         address msgSender = vm.addr(1);
         CapabilityPermission[] memory channelsTokenPermission = new CapabilityPermission[](9);
@@ -1429,15 +1228,11 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
         // scope channels and token contract
         _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, channelsTokenPermission);
-        // make execTransactionFromModule go through 
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
-        
+        // make execTransactionFromModule go through
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
+
         // prepare a simple token approve
-        bytes memory data = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector); 
+        bytes memory data = abi.encodeWithSelector(HoprChannels.redeemTicketSafe.selector);
 
         // execute function
         vm.prank(msgSender);
@@ -1464,10 +1259,10 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         }
         // scope channels and token contract
         _helperAddTokenAndChannelTarget(msgSender, channelsTokenPermission, defaultFunctionPermission);
-        
+
         // prepare a simple token approve and a native token transfer
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100);   // approve on token
+        data[0] = abi.encodeWithSelector(IERC20.approve.selector, vm.addr(200), 100); // approve on token
         uint8[] memory txOperations = new uint8[](2);
         txOperations[0] = 0;
         txOperations[1] = 0;
@@ -1485,12 +1280,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         // execute function
         vm.prank(msgSender);
-        bool result = moduleProxy.execTransactionFromModule(
-            multiaddr,
-            0,
-            safeTxData,
-            Enum.Operation.DelegateCall
-        );
+        bool result = moduleProxy.execTransactionFromModule(multiaddr, 0, safeTxData, Enum.Operation.DelegateCall);
         assertTrue(result);
         vm.clearMockedCalls();
     }
@@ -1500,11 +1290,11 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     function _helperTargetBitwiseAnd(Target target, bytes32 mask) private pure returns (Target) {
         return Target.wrap(uint256(bytes32(Target.unwrap(target)) & mask));
     }
-    
+
     function _helperTargetBitwiseOr(Target target, bytes32 mask) private pure returns (Target) {
         return Target.wrap(uint256(bytes32(Target.unwrap(target)) | mask));
     }
-    
+
     function _helperAddNodes(address[] memory accounts) private {
         for (uint256 i = 0; i < accounts.length; i++) {
             if (moduleProxy.isNode(accounts[i])) continue;
@@ -1516,17 +1306,18 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
      * @dev return an array with all unique addresses which does not contain address zeo
      * return a random item
      */
-    function _helperGetUniqueAddressArrayAndRandomItem(
-        address[] memory addrs,
-        uint256 randomIndex
-    ) private view returns (address[] memory, address) {
+    function _helperGetUniqueAddressArrayAndRandomItem(address[] memory addrs, uint256 randomIndex)
+        private
+        view
+        returns (address[] memory, address)
+    {
         if (addrs.length == 0) {
             return (new address[](0), address(0));
         } else if (addrs.length == 1) {
             return (addrs, addrs[0]);
         }
 
-        // for addrs are more 
+        // for addrs are more
         address[] memory results = addrs;
         for (uint256 i = 0; i < results.length; i++) {
             address cur = results[i];
@@ -1535,7 +1326,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
                     delete results[i];
                     break;
                 }
-            }            
+            }
         }
 
         randomIndex = bound(randomIndex, 0, results.length - 1);
@@ -1551,14 +1342,15 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     ) private pure returns (bytes memory) {
         bytes memory encodePacked;
         for (uint256 i = 0; i < txOperations.length; i++) {
-            encodePacked = abi.encodePacked(encodePacked, txOperations[i], txTos[i], txValues[i], dataLengths[i], data[i]);
+            encodePacked =
+                abi.encodePacked(encodePacked, txOperations[i], txTos[i], txValues[i], dataLengths[i], data[i]);
         }
         return abi.encodeWithSignature("multiSend(bytes)", encodePacked);
     }
 
     function _helperAddTokenAndChannelTarget(
         address caller,
-        CapabilityPermission[] memory channelsTokenPermission, 
+        CapabilityPermission[] memory channelsTokenPermission,
         CapabilityPermission[] memory nodePermission
     ) private {
         // scope channels and token contract
@@ -1568,40 +1360,20 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             TargetType.CHANNELS,
             TargetPermission.SPECIFIC_FALLBACK_ALLOW,
             channelsTokenPermission
-        );   // clerance: FUNCTION default ALLOW_ALL
+        ); // clerance: FUNCTION default ALLOW_ALL
         Target nodeTarget = TargetUtils.encodeDefaultPermissions(
-            caller,
-            Clearance.FUNCTION,
-            TargetType.SEND,
-            TargetPermission.SPECIFIC_FALLBACK_ALLOW,
-            nodePermission
-        );   // clerance: FUNCTION default ALLOW_ALL
-        
+            caller, Clearance.FUNCTION, TargetType.SEND, TargetPermission.SPECIFIC_FALLBACK_ALLOW, nodePermission
+        ); // clerance: FUNCTION default ALLOW_ALL
+
         // set the multisend address to be multiaddr
-        stdstore
-            .target(address(moduleProxy))
-            .sig("owner()")
-            .checked_write(safe);
-        stdstore
-            .target(address(moduleProxy))
-            .sig("multisend()")
-            .checked_write(multiaddr);
+        stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
+        stdstore.target(address(moduleProxy)).sig("multisend()").checked_write(multiaddr);
 
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
 
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
-        vm.mockCall(
-            safe,
-            abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector),
-            abi.encode(true)
-        );
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         vm.deal(safe, 1 ether);
         assertEq(safe.balance, 1 ether);
 

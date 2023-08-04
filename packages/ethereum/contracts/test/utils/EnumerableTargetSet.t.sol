@@ -11,14 +11,14 @@ contract EnumerableTargetSetTest is Test {
 
     EnumerableTargetSetMock public enumerableTargetSetMock;
 
-    /** 
-     * @dev create mock for test 
+    /**
+     * @dev create mock for test
      */
     function setUp() public {
         enumerableTargetSetMock = new EnumerableTargetSetMock();
     }
 
-    /** 
+    /**
      * @dev fuzz test oln add, length and contains
      */
     function testFuzz_AddLengthContains(uint256 targetVal) public {
@@ -41,8 +41,8 @@ contract EnumerableTargetSetTest is Test {
         assertTrue(enumerableTargetSetMock.contains(targetAddress));
     }
 
-    /** 
-     * @dev fuzz test on remove a random value from the set 
+    /**
+     * @dev fuzz test on remove a random value from the set
      */
     function testFuzz_RemoveRandom(uint256[] memory targetVals, uint256 index) public {
         vm.assume(targetVals.length > 0);
@@ -62,7 +62,7 @@ contract EnumerableTargetSetTest is Test {
         }
     }
 
-    /** 
+    /**
      * @dev fuzz test on removing the last (and the first if applicable) from the set
      */
     function testFuzz_RemoveTheFirstAndLast(uint256[] memory targetVals) public {
@@ -87,7 +87,7 @@ contract EnumerableTargetSetTest is Test {
         }
     }
 
-    /** 
+    /**
      * @dev fuzz test on removing a non existing target address
      */
     function testFuzz_RemoveNonExisting(uint256[] memory targetVals, address targetAddress) public {
@@ -107,7 +107,7 @@ contract EnumerableTargetSetTest is Test {
         }
     }
 
-    /** 
+    /**
      * @dev test values
      */
     function test_Values() public {
@@ -116,7 +116,7 @@ contract EnumerableTargetSetTest is Test {
         assertEq(values.length, 0);
     }
 
-    /** 
+    /**
      * @dev fuzz test at
      */
     function testFuzz_At(uint256[] memory targetVals) public {
@@ -130,7 +130,7 @@ contract EnumerableTargetSetTest is Test {
         }
     }
 
-    /** 
+    /**
      * @dev fuzz test get and tryGet methods
      */
     function testFuzz_GetAndTryGetWithInArray(uint256[] memory targetVals) public {
@@ -154,7 +154,7 @@ contract EnumerableTargetSetTest is Test {
         }
     }
 
-    /** 
+    /**
      * @dev test revert condition of get, namely when the address does not exist
      */
     function testRevert_Get(uint256[] memory targetVals, address targetAddress) public {
@@ -163,18 +163,18 @@ contract EnumerableTargetSetTest is Test {
 
         bool tryResult;
         if (!enumerableTargetSetMock.contains(targetAddress)) {
-            (tryResult, ) = enumerableTargetSetMock.tryGet(targetAddress);
+            (tryResult,) = enumerableTargetSetMock.tryGet(targetAddress);
             assertFalse(tryResult);
 
             vm.expectRevert(EnumerableTargetSet.NonExistentKey.selector);
             enumerableTargetSetMock.get(targetAddress);
         } else {
-            (tryResult, ) = enumerableTargetSetMock.tryGet(targetAddress);
+            (tryResult,) = enumerableTargetSetMock.tryGet(targetAddress);
             assertTrue(tryResult);
         }
     }
 
-    /** 
+    /**
      * @dev helper function to create a set with an array of target values in fuzz testing
      */
     function _helperCreateTargetSet(uint256[] memory targetVals) private {

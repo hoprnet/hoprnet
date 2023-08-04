@@ -14,7 +14,7 @@ contract ERC677MockTest is Test {
 
     function setUp() public {
         recipients[0] = vm.addr(101);
-        
+
         erc677Mock = new ERC677Mock();
     }
 
@@ -29,18 +29,10 @@ contract ERC677MockTest is Test {
         vm.assume(sender != msgSender);
         vm.assume(amount > 0);
 
-        stdstore
-            .target(address(erc677Mock))
-            .sig(erc677Mock.balanceOf.selector)
-            .with_key(sender)
-            .checked_write(amount);
+        stdstore.target(address(erc677Mock)).sig(erc677Mock.balanceOf.selector).with_key(sender).checked_write(amount);
         assertEq(erc677Mock.balanceOf(sender), amount);
 
-        stdstore
-            .target(address(erc677Mock))
-            .sig(erc677Mock.allowance.selector)
-            .with_key(msgSender)
-            .with_key(sender)
+        stdstore.target(address(erc677Mock)).sig(erc677Mock.allowance.selector).with_key(msgSender).with_key(sender)
             .checked_write(amount);
         assertEq(erc677Mock.allowance(msgSender, sender), amount);
 
@@ -56,18 +48,10 @@ contract ERC677MockTest is Test {
         vm.assume(sender != msgSender);
         vm.assume(amount > 0);
 
-        stdstore
-            .target(address(erc677Mock))
-            .sig(erc677Mock.balanceOf.selector)
-            .with_key(sender)
-            .checked_write(amount);
+        stdstore.target(address(erc677Mock)).sig(erc677Mock.balanceOf.selector).with_key(sender).checked_write(amount);
         assertEq(erc677Mock.balanceOf(sender), amount);
 
-        stdstore
-            .target(address(erc677Mock))
-            .sig(erc677Mock.allowance.selector)
-            .with_key(msgSender)
-            .with_key(sender)
+        stdstore.target(address(erc677Mock)).sig(erc677Mock.allowance.selector).with_key(msgSender).with_key(sender)
             .checked_write(amount);
         assertEq(erc677Mock.allowance(msgSender, sender), amount);
 
