@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 log = "0.4.17"
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 

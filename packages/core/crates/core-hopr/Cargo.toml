@@ -17,7 +17,7 @@ prometheus = ["dep:utils-metrics", "core-packet/prometheus"]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }

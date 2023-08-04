@@ -25,7 +25,7 @@ impl Scalar for curve25519_dalek::scalar::Scalar {
             clamped[31] &= 0b0111_1111; // clear the 256-th bit
             clamped[31] |= 0b0100_0000; // make it 255-bit number
 
-            Ok(curve25519_dalek::scalar::Scalar::from_bits(clamped))
+            Ok(curve25519_dalek::scalar::Scalar::from_bytes_mod_order(clamped))
         } else {
             Err(InvalidInputValue)
         }

@@ -1,11 +1,11 @@
+use digest::Digest;
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::random::{random_bytes, random_group_element};
 use crate::shared_keys::Scalar;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
 use crate::utils::SecretValue;
-use curve25519_dalek::digest::Digest;
-use ed25519_dalek::Sha512;
+use sha2::Sha512;
 use generic_array::{ArrayLength, GenericArray};
 use subtle::{Choice, ConstantTimeEq};
 use utils_types::traits::BinarySerializable;
@@ -79,7 +79,7 @@ impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
     /// This is required, so that the secret keys used to generate Sphinx shared secrets
     /// are corresponding to the public keys we obtain from the Ed25519 peer ids.
     fn from(value: &OffchainKeypair) -> Self {
-        let mut h: Sha512 = Sha512::new();
+        let mut h: Sha512 = Sha512::default();
         h.update(&value.0);
         let hash = h.finalize();
 

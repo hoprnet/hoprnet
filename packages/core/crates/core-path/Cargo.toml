@@ -16,7 +16,7 @@ core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", de
 core-crypto = { path = "../../../core/crates/core-crypto", default-features = false }
 core-types = { path = "../../../core/crates/core-types", default-features = false }
 hex = "0.4"
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 thiserror = "1"
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }

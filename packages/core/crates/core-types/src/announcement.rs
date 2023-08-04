@@ -82,7 +82,7 @@ pub struct AnnouncementData {
     pub key_binding: Option<KeyBinding>,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AnnouncementData {
     pub fn to_multiaddress_str(&self) -> String {
         self.multiaddress.to_string()

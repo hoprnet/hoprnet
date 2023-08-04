@@ -484,7 +484,7 @@ impl BinarySerializable for OffchainPublicKey {
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             Ok(Self {
-                compressed: CompressedEdwardsY::from_slice(data),
+                compressed: CompressedEdwardsY::from_slice(data).map_err(|_| ParseError)?,
             })
         } else {
             Err(ParseError)
@@ -503,9 +503,8 @@ impl PeerIdLike for OffchainPublicKey {
             libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
                 .map_err(|_| ParseError)
                 .and_then(|pk| pk.try_into_ed25519().map(|p| p.to_bytes()).map_err(|_| ParseError))
-                .map(|pk| Self {
-                    compressed: CompressedEdwardsY::from_slice(&pk),
-                })
+                .and_then(|pk| CompressedEdwardsY::from_slice(&pk).map_err(|_| ParseError))
+                .map(|compressed| Self { compressed })
         } else {
             Err(ParseError)
         }
@@ -529,7 +528,7 @@ impl OffchainPublicKey {
         let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk).map_err(|_| InvalidInputValue)?;
         let kp: libp2p_identity::ed25519::Keypair = sk.into();
         Ok(Self {
-            compressed: CompressedEdwardsY::from_slice(&kp.public().to_bytes()),
+            compressed: CompressedEdwardsY::from_slice(&kp.public().to_bytes()).map_err(|_| ParseError)?,
         })
     }
 }

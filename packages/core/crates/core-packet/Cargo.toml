@@ -17,7 +17,7 @@ async-lock = "2.7.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 futures = "0.3"
 hex = "0.4"
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 lazy_static = "1.4"
 libp2p-identity = { workspace = true }
 thiserror = "1.0"
