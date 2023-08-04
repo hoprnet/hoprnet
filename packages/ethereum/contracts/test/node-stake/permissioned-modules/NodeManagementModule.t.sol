@@ -1414,6 +1414,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             data,
             Enum.Operation.Call
         );
+        // must revert
+        assertFalse(result);
         vm.clearMockedCalls();
     }
     /**
@@ -1446,6 +1448,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
             data,
             Enum.Operation.Call
         );
+        // must revert
+        assertFalse(result);
         vm.clearMockedCalls();
     }
 
@@ -1515,7 +1519,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
     function _helperGetUniqueAddressArrayAndRandomItem(
         address[] memory addrs,
         uint256 randomIndex
-    ) private returns (address[] memory, address) {
+    ) private view returns (address[] memory, address) {
         if (addrs.length == 0) {
             return (new address[](0), address(0));
         } else if (addrs.length == 1) {
@@ -1544,7 +1548,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         uint256[] memory txValues,
         uint256[] memory dataLengths,
         bytes[] memory data
-    ) private returns (bytes memory) {
+    ) private pure returns (bytes memory) {
         bytes memory encodePacked;
         for (uint256 i = 0; i < txOperations.length; i++) {
             encodePacked = abi.encodePacked(encodePacked, txOperations[i], txTos[i], txValues[i], dataLengths[i], data[i]);

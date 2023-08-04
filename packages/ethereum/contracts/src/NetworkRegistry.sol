@@ -328,7 +328,7 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
     }
   }
 
-  function _operationGuard(address stakingAccount, address nodeAddress) private {
+  function _operationGuard(address stakingAccount, address nodeAddress) private view {
     bool isEligibleAction = requirementImplementation.canOperateFor(stakingAccount, nodeAddress);
     // revert when the stakingAccountstakingAccount cannot operate for the node
     if (!isEligibleAction) {

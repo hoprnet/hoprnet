@@ -338,13 +338,15 @@ contract HoprNodeStakeIntegrationTest is Test, ERC1820RegistryFixtureTest, SafeS
 
         // open a channel with directly with HoprChannels contract
         vm.prank(node3);
-        hoprToken.call(
+        (bool successFirst, ) = hoprToken.call(
             abi.encodeWithSignature("approve(address,uint256)", address(hoprChannels), 10 ether)
         );
+        assertTrue(successFirst);
         vm.prank(caller);
-        hoprToken.call(
+        (bool successSecond, ) = hoprToken.call(
             abi.encodeWithSignature("approve(address,uint256)", address(hoprChannels), 99999 ether)
         );
+        assertTrue(successSecond);
     }
 
     // function _helperSetupNodeStaking(

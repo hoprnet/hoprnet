@@ -403,7 +403,7 @@ library HoprCapabilityPermissions {
         uint256 dataLength,
         Target target, 
         bytes4 functionSig
-    ) internal view returns (TargetPermission) {
+    ) internal pure returns (TargetPermission) {
         // check default target permission
         TargetPermission defaultTargetPermission = target.getDefaultTargetPermission();
         // early return when the permission allows

@@ -38,10 +38,8 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
 
   /**
     * @dev Get if the staking account is eligible to act on node address
-    * @param stakingAccount Staking account
-    * @param nodeAddress node address
     */
-  function canOperateFor(address stakingAccount, address nodeAddress) external view returns (bool eligiblity) {
+  function canOperateFor(address, address) external pure returns (bool eligiblity) {
       return true;
   }
 
