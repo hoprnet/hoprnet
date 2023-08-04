@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.0;
+pragma solidity 0.8.19;
 
-import '../interfaces/INetworkRegistryRequirement.sol';
-import '../interfaces/INodeSafeRegistry.sol';
-import 'openzeppelin-contracts/access/AccessControlEnumerable.sol';
+import {IHoprNetworkRegistryRequirement} from "../interfaces/INetworkRegistryRequirement.sol";
+import {IHoprNodeSafeRegistry} from "../interfaces/INodeSafeRegistry.sol";
+import {AccessControlEnumerable} from "openzeppelin-contracts/access/AccessControlEnumerable.sol";
 
 /**
  * @dev Minimum interface for token contract
@@ -18,13 +18,14 @@ interface IERC777Snapshot {
  * Nodes' safe holding HOPR token blances above certain threshold
  */
 contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, AccessControlEnumerable {
-    bytes32 public constant MANAGER_ROLE = keccak256('MANAGER_ROLE');
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     IERC777Snapshot public token;
     IHoprNodeSafeRegistry public nodeSafeRegistry;
     uint256 public stakeThreshold;
     uint128 public snapshotBlockNumber;
 
     error SameValue();
+
     event ThresholdUpdated(uint256 indexed threshold);
     event SnapshotUpdated(uint128 indexed blockNumber);
     event TokenAndRegistryUpdated(address indexed token, address indexed nodeSafeRegistry);
@@ -49,8 +50,8 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
     }
 
     /**
-    * @dev See {IERC165-supportsInterface}.
-    */
+     * @dev See {IERC165-supportsInterface}.
+     */
     function supportsInterface(bytes4 interfaceId)
         public
         view
@@ -79,10 +80,10 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
         address safeAddress = nodeSafeRegistry.nodeToSafe(nodeAddress);
         return safeAddress == stakingAccount;
     }
- 
 
     /**
-     * @dev Manager updates the block number of the token balance snapshot, which is used for calculating maxAllowedRegistrations
+     * @dev Manager updates the block number of the token balance snapshot,
+     * which is used for calculating maxAllowedRegistrations
      * @param newSnapshotBlock new block number of the token balance snapshot
      */
     function updateSnapshotBlockNumber(uint128 newSnapshotBlock) external onlyRole(MANAGER_ROLE) {

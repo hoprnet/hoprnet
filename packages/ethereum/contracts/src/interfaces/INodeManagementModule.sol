@@ -5,6 +5,6 @@ pragma solidity ^0.8;
  * @title HoprNodeManagementModule interface
  */
 interface IHoprNodeManagementModule {
-  function isHoprNodeManagementModule() external view returns (bool);
-  function isNode(address nodeAddress) external view returns (bool);
+    function isHoprNodeManagementModule() external view returns (bool);
+    function isNode(address nodeAddress) external view returns (bool);
 }

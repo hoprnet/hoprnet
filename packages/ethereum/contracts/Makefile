@@ -156,8 +156,7 @@ ifeq ($(peer_ids),)
 	echo "parameter <peer_ids> missing" >&2 && exit 1
 endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "selfRegisterNodes(string[])" [$(peer_ids)] 
-
+		--broadcast --sig "selfRegisterNodes(string[])" [$(peer_ids)]
 
 # E.g. make self-deregister-node network=anvil-localhost environment-type=local peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: self-deregister-node

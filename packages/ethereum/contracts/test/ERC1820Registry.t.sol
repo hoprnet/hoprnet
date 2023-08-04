@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.6.0 <0.9.0;
 
-import "./utils/ERC1820Registry.sol";
-import "forge-std/Test.sol";
+import {ERC1820RegistryFixtureTest} from "./utils/ERC1820Registry.sol";
+import {Test} from "forge-std/Test.sol";
 
 contract ERC1820RegistryTest is Test, ERC1820RegistryFixtureTest {
     function setUp() public virtual override {

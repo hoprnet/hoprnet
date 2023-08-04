@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 
-import '../../script/DeployNodeSafe.s.sol';
-import '../../script/DeployAll.s.sol';
+import "../../script/DeployNodeSafe.s.sol";
+import "../../script/DeployAll.s.sol";
 import "../utils/ERC1820Registry.sol";
-import 'forge-std/Test.sol';
+import "forge-std/Test.sol";
 
 contract DeployNodeSafeScriptTest is Test, ERC1820RegistryFixtureTest {
     DeployAllContractsScript public deployScriptContract;

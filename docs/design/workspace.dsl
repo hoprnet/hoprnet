@@ -1,5 +1,6 @@
 workspace {
   !docs docs
+  !docs sc-audit-2023
 
     model {
         user = person "User"

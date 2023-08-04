@@ -1,8 +1,8 @@
 ## Network Registry
 
-The network registry is used to control nodes' access to the network. 
-In the monte_rosa network, the network registry maintains the link between staking accounts and HOPR node peer IDs. 
-Starting from the provindence release, network registry peer IDs are deprecated and replaced by HOPR node Ethereum addresses. 
+The network registry is used to control nodes' access to the network.
+In the monte_rosa network, the network registry maintains the link between staking accounts and HOPR node peer IDs.
+Starting from the provindence release, network registry peer IDs are deprecated and replaced by HOPR node Ethereum addresses.
 This design document specifically describes the network registry for the provindence release onwards.
 
 ### Architecture
@@ -10,6 +10,7 @@ This design document specifically describes the network registry for the provind
 (See [diagram](https://whimsical.com/network-registry-RcSfnsAxeJ5tMcCZP4xHXQ))
 
 ### Functionalities in Network Registry
+
 In the local development environment, the design is simplified to allow all nodes to join the local network.
 
 In the production environment:
@@ -31,6 +32,7 @@ In the production environment:
 ### Functionalities in Network Registry Proxy
 
 There are three "network registry proxies" (NR proxies) used in HOPR network:
+
 - HoprDummyProxyForNetworkRegistry
 - HoprStakingProxyForNetworkRegistry
 - HoprSafeProxyForNetworkRegistry
@@ -38,6 +40,7 @@ There are three "network registry proxies" (NR proxies) used in HOPR network:
 This section specifically describes the third "NR proxy for Safe" as it will be used in the upcoming networks.
 
 This "NR proxy for Safe":
+
 - Is controlled by one or multiple manager accounts.
 - When staking accounts add/remove nodes to/from the network registry, the maximum number of nodes a staking account is allowed to register is calculated as the floor value of the division between the "wxHOPR balance of a Hopr Safe" and the "staking threshold."
 - If a manager wants to disable the ability for staking accounts to register nodes by themselves (and only allow managers to include/remove nodes), the manager should call updateStakeThreshold(0). By setting the threshold to zero, the "maxAllowedRegistrations" per node becomes not-a-number.

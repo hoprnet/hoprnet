@@ -233,6 +233,6 @@ debug-identity
 # make sure anything which is vendored is copied
 !/vendor/**/*
 
-# design docs
-/docs/design/.structurizr
-/docs/design/workspace.json
+# technical docs
+/docs/*/.structurizr
+/docs/*/workspace.json

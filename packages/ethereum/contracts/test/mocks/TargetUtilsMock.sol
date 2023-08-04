@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "../../src/utils/TargetUtils.sol";
 
-/** 
+/**
  * @dev Mock contract to test internal library of TargetUtils
  * Each function from the libarray has a wrapper in the mock contract
  */
@@ -16,39 +16,39 @@ contract TargetUtilsMock {
         target = Target.wrap(targetVal);
     }
 
-    function getNumCapabilityPermissions() pure public returns (uint256) {
+    function getNumCapabilityPermissions() public pure returns (uint256) {
         return TargetUtils.getNumCapabilityPermissions();
     }
 
-    function getTargetAddress() view public returns (address) {
+    function getTargetAddress() public view returns (address) {
         return TargetUtils.getTargetAddress(target);
     }
 
-    function getTargetClearance() view public returns (Clearance) {
+    function getTargetClearance() public view returns (Clearance) {
         return TargetUtils.getTargetClearance(target);
     }
 
-    function getTargetType() view public returns (TargetType) {
+    function getTargetType() public view returns (TargetType) {
         return TargetUtils.getTargetType(target);
     }
 
-    function isTargetType(TargetType targetType) view public returns (bool) {
+    function isTargetType(TargetType targetType) public view returns (bool) {
         return TargetUtils.isTargetType(target, targetType);
     }
 
-    function getDefaultTargetPermission() view public returns (TargetPermission) {
+    function getDefaultTargetPermission() public view returns (TargetPermission) {
         return TargetUtils.getDefaultTargetPermission(target);
     }
 
-    function getDefaultCapabilityPermissionAt(uint256 position) view public returns (CapabilityPermission) {
+    function getDefaultCapabilityPermissionAt(uint256 position) public view returns (CapabilityPermission) {
         return TargetUtils.getDefaultCapabilityPermissionAt(target, position);
     }
 
-    function forceWriteAsTargetType(TargetType targetType) view public returns (Target) {
+    function forceWriteAsTargetType(TargetType targetType) public view returns (Target) {
         return TargetUtils.forceWriteAsTargetType(target, targetType);
     }
 
-    function forceWriteTargetAddress(address targetAddress) view public returns (Target) {
+    function forceWriteTargetAddress(address targetAddress) public view returns (Target) {
         return TargetUtils.forceWriteTargetAddress(target, targetAddress);
     }
 
@@ -58,29 +58,31 @@ contract TargetUtilsMock {
         TargetType targetType,
         TargetPermission targetPermission,
         CapabilityPermission[] memory functionPermissions
-    ) pure public returns (Target) {
+    ) public pure returns (Target) {
         return TargetUtils.encodeDefaultPermissions(
-            targetAddress,
-            clearance,
-            targetType,
-            targetPermission,
-            functionPermissions
+            targetAddress, clearance, targetType, targetPermission, functionPermissions
         );
     }
 
-    function decodeDefaultPermissions() view public returns (
-        address targetAddress,
-        Clearance clearance,
-        TargetType targetType,
-        TargetPermission targetPermission,
-        CapabilityPermission[] memory functionPermissions
-    ) {
-        return TargetUtils.decodeDefaultPermissions(
-            target
-        );
+    function decodeDefaultPermissions()
+        public
+        view
+        returns (
+            address targetAddress,
+            Clearance clearance,
+            TargetType targetType,
+            TargetPermission targetPermission,
+            CapabilityPermission[] memory functionPermissions
+        )
+    {
+        return TargetUtils.decodeDefaultPermissions(target);
     }
 
-    function convertFunctionToTargetPermission(CapabilityPermission functionPermission) pure public returns (TargetPermission) {
+    function convertFunctionToTargetPermission(CapabilityPermission functionPermission)
+        public
+        pure
+        returns (TargetPermission)
+    {
         return TargetUtils.convertFunctionToTargetPermission(functionPermission);
     }
 }
