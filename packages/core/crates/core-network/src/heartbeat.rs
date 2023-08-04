@@ -43,8 +43,9 @@ pub struct HeartbeatConfig {
 }
 
 #[cfg_attr(test, mockall::automock)]
+#[async_trait]
 pub trait HeartbeatExternalApi {
-    fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId>;
+    async fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId>;
 }
 
 
@@ -87,7 +88,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             let start = current_timestamp();
             let from_timestamp = if start > self.config.heartbeat_threshold { start - self.config.heartbeat_threshold } else { start };
             info!("Starting a heartbeat round for peers since timestamp {}", from_timestamp);
-            let peers = self.external_api.get_peers(from_timestamp);
+            let peers = self.external_api.get_peers(from_timestamp).await;
 
             // random timeout to avoid network sync:
             let timeout_in_ms: u64 = if self.config.heartbeat_variance > 1.0 {
@@ -122,8 +123,6 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mockall::*;
-    use more_asserts::*;
 
     fn simple_heartbeat_config() -> HeartbeatConfig {
         HeartbeatConfig {
