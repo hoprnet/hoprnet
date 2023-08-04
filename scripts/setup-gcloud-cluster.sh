@@ -15,11 +15,11 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="setup-gcloud-cluster"
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${mydir}/gcloud.sh"
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${mydir}/testnet.sh"
 
 usage() {
@@ -51,7 +51,6 @@ usage() {
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
   msg "HOPRD_RESET_METADATA\t\tset to 'true' to trigger metadata reset on instances"
-  msg "HOPRD_SKIP_UNSTAKED\t\tset to 'true' to stake all nodes and not keep the first unstaked"
   msg
 }
 
@@ -75,10 +74,6 @@ declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
-declare skip_unstaked="${HOPRD_SKIP_UNSTAKED:-false}"
-
-# Append network as Docker image version, if not specified
-[[ "${docker_image}" != *:* ]] && docker_image="${docker_image}:${network}"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -194,14 +189,6 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   api_peer_id="$(get_hopr_address "${api_token}@${node_ip}:3001")"
 
   if [[ -z "${staking_status}" ]]; then
-    # If the instance does not have metadata yet, we set it once
-
-    # NOTE: We leave only the first public node unstaked
-    if [[ ${instance_idx} -eq 0 && "${instance_template_name}" != *-nat* && "${skip_unstaked}" != "true" ]]; then
-      staking_status="unstaked"
-    else
-      staking_status="staked"
-    fi
 
     # Save the metadata
     declare new_metadata="HOPRD_WALLET_ADDR=${api_wallet_addr},HOPRD_PEER_ID=${api_peer_id},HOPRD_STAKING_STATUS=${staking_status}"
@@ -221,23 +208,23 @@ for instance_idx in "${!instance_names_arr[@]}" ; do
   ip_addrs+=( "${node_ip}" )
 
   # Build an array of hopr_addrs to be staked
-  if [[ "${staking_status}" != "unstaked" ]]; then
-    hopr_addrs+=( "${api_peer_id}" )
-  fi
+  hopr_addrs+=( "${api_peer_id}" )
+
 
   # Fund the node as well
   fund_if_empty "${api_wallet_addr}" "${network}"
 done
 
-# Register all nodes in cluster
-IFS=','
-
-# use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
-PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
-  network="${network}" \
-  peer_ids="${hopr_addrs[*]}" \
-  environment_type="${environment_type}"
-unset IFS
+if [ ! -z "${hopr_addrs}" ]; then
+  # Register all nodes in cluster
+  IFS=','
+  # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
+  PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
+    network="${network}" \
+    peer_ids="${hopr_addrs[*]}" \
+    environment_type="${environment_type}"
+  unset IFS
+fi
 
 # Finally wait for the public nodes to come up, for NAT nodes this isn't possible
 # because the P2P port is not exposed.

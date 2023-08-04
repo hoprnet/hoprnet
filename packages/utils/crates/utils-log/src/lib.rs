@@ -1,8 +1,6 @@
-#[cfg(feature = "wasm")]
 #[macro_use]
 pub mod macros;
 
-#[cfg(feature = "wasm")]
 pub mod logger;
 
 pub use log as downstream_log;

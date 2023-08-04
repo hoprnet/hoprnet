@@ -1,4 +1,4 @@
-name: HOPR Lint fix
+name: Lint
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
@@ -7,21 +7,24 @@ env:
   RUSTC_WRAPPER: "sccache"
 
 on:
-  push:
-    branches: ['**']
+  pull_request:
+    types:
+      - synchronize
+      - ready_for_review
     paths-ignore:
       - 'docs/**/*'
-      - 'packages/*/docs/**/*'
-
+      - '**/*.md'
+concurrency:
+  group: ${{ github.head_ref }}-lint
+  cancel-in-progress: true
 jobs:
   lint:
-    name: Lint
-    runs-on: ubuntu-latest
+    name: Linter
+    runs-on: ubuntu-2-core
+    if: github.event.pull_request.draft == false
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Configure Git info
-        run: ./scripts/configure-git-info.sh
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
@@ -49,7 +52,7 @@ jobs:
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
 
       - name: restore yarn cache
         uses: actions/cache@v3
@@ -81,11 +84,11 @@ jobs:
 
   shellcheck:
     name: Shellcheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
+    if: github.event.pull_request.draft == false
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
       - name: Check shell scripts (not enforced for now)
-        continue-on-error: true
-        run:
-          shellcheck -a --norc -s bash -x scripts/*.sh
+        run: shellcheck -a --norc -s bash -x scripts/*.sh

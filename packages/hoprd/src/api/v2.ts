@@ -9,7 +9,7 @@ import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 
-import { debug, Address, HoprDB, PublicKey } from '@hoprnet/hopr-utils'
+import { debug, Address, PublicKey } from '@hoprnet/hopr-utils'
 import {
   authenticateWsConnection,
   getStatusCodeForInvalidInputInRequest,
@@ -26,6 +26,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
 import type { Token } from './token.js'
+import { Database } from '../../../core/lib/core_hopr.js'
 
 const debugLog = debug('hoprd:api:v2')
 
@@ -64,7 +65,7 @@ async function handleWebsocketMessage(node: Hopr, data: string) {
 }
 
 async function authenticateAndAuthorize(
-  db: HoprDB,
+  db: Database,
   req: Request,
   reqToken: string,
   superuserToken: string

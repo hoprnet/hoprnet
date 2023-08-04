@@ -12,12 +12,13 @@ license = "GPL-3.0-only"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 
+[features]
+default = [ "wasm" ]
+wasm = [ "dep:wasm-bindgen" ]
+
 [dependencies]
 thiserror = "1.0"
-wasm-bindgen = { workspace = true }
-
-[dev-dependencies]
-wasm-bindgen-test = "0.3.36"
+wasm-bindgen = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

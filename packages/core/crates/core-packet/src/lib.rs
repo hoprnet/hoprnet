@@ -34,6 +34,7 @@ pub mod wasm {
         console_error_panic_hook::set_once();
     }
 
+    #[cfg(feature = "prometheus")]
     #[wasm_bindgen]
     pub fn core_packet_gather_metrics() -> JsResult<String> {
         utils_metrics::metrics::wasm::gather_all_metrics()

@@ -19,3 +19,10 @@ pub enum DbError {
 }
 
 pub type Result<T> = std::result::Result<T, DbError>;
+
+#[cfg(feature = "wasm")]
+impl From<DbError> for wasm_bindgen::JsValue {
+    fn from(value: DbError) -> Self {
+        value.to_string().into()
+    }
+}

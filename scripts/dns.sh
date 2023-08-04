@@ -16,8 +16,8 @@ gcloud_dns_entry() {
 gcloud_dns_txt_record() {
   # Multiple runs in the same machine will fail w/an existing transaction.yml file
   rm -f transaction.yaml
-  local dns_entry=$(gcloud_dns_entry $1 $2)
-  local txt_record=$(dig TXT +short $dns_entry)
+  local dns_entry=$(gcloud_dns_entry "$1" "$2")
+  local txt_record=$(dig TXT +short "$dns_entry")
   if [ -z "$txt_record" ]; then
     # echo "log | Dns Entry: $dns_entry"
     # Google takes some time to propagate their DNS entries, so it could be that the record has already been created.
@@ -39,11 +39,11 @@ gcloud_dns_txt_record() {
       # echo "log | Status: Created but not propagated."
       # Google echos “record-sets lists” in the form “NAME TYPE TTL DATA $dns_entry. TXT 30 "dnsaddr=..."'
       # echo "debug | Maybe Record: $maybe_txt_record"
-      local txt_record=$(echo $maybe_txt_record | cut -f8 -d' ')
+      local txt_record=$(echo "$maybe_txt_record" | cut -f8 -d' ')
       # echo "debug | Record: $txt_record"
     fi
   fi
-  echo $txt_record
+  echo "$txt_record"
 }
 
 # Get or create a TXT record within a release
@@ -55,5 +55,5 @@ gcloud_dns_txt_record() {
 # - RELEASE_NAME
 gcloud_txt_record() {
   # Workaround with file descriptors to avoid poluting stdout
-  ( gcloud_dns_txt_record $1 $2 $3 3>&1 1>&2- 2>&3- ) | grep 'dnsaddr'
+  ( gcloud_dns_txt_record "$1" "$2" "$3" 3>&1 1>&2- 2>&3- ) | grep 'dnsaddr'
 }

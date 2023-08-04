@@ -52,7 +52,6 @@ fn to_checked_secret_scalar(secret_scalar: &[u8]) -> Result<NonZeroScalar> {
 
 /// Structure containing shared keys for peers.
 /// The members are exposed only using specialized methods.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SharedKeys {
     alpha: CurvePoint,
     secrets: Vec<Box<[u8]>>,
@@ -233,62 +232,5 @@ pub mod tests {
 
         let keyshares = SharedKeys::generate(&mut OsRng, &pub_keys).unwrap();
         assert_eq!(3, keyshares.secrets().len());
-    }
-}
-
-/// This module contains wrapper for the Rust code
-/// to be properly called from the JS.
-/// Code in this module does not need to be unit tested, as it already
-/// wraps code that has been unit tested in pure Rust.
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::shared_keys::SharedKeys;
-    use crate::types::{CurvePoint, PublicKey};
-    use elliptic_curve::rand_core::OsRng;
-    use js_sys::Uint8Array;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    impl SharedKeys {
-        /// Get the `alpha` value of the derived shared secrets.
-        pub fn get_alpha(&self) -> Uint8Array {
-            self.alpha().serialize_compressed().as_ref().into()
-        }
-
-        /// Gets the shared secret of the peer on the given index.
-        /// The indices are assigned in the same order as they were given to the
-        /// [`generate`] function.
-        pub fn get_peer_shared_key(&self, peer_idx: usize) -> Option<Uint8Array> {
-            self.secrets.get(peer_idx).map(|k| Uint8Array::from(k.as_ref()))
-        }
-
-        /// Returns the number of shared keys generated in this structure.
-        pub fn count_shared_keys(&self) -> usize {
-            self.secrets.len()
-        }
-
-        #[wasm_bindgen(js_name = "forward_transform")]
-        pub fn _forward_transform(alpha: &[u8], private_key: &[u8]) -> JsResult<SharedKeys> {
-            let (alpha, secret) = ok_or_jserr!(SharedKeys::forward_transform(
-                CurvePoint::_deserialize(alpha)?,
-                private_key
-            ))?;
-            Ok(SharedKeys {
-                alpha,
-                secrets: vec![secret],
-            })
-        }
-
-        /// Generate shared keys given the peer public keys
-        #[wasm_bindgen(js_name = "generate")]
-        pub fn _generate(peer_public_keys: Vec<Uint8Array>) -> JsResult<SharedKeys> {
-            let public_keys = ok_or_jserr!(peer_public_keys
-                .into_iter()
-                .map(|v| PublicKey::from_bytes(&v.to_vec()))
-                .collect::<utils_types::errors::Result<Vec<PublicKey>>>())?;
-            ok_or_jserr!(super::SharedKeys::generate(&mut OsRng, &public_keys))
-        }
     }
 }

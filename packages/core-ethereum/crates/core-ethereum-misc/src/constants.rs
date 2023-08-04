@@ -29,7 +29,7 @@ pub const MAX_TRANSACTION_BACKOFF: u32 = 1_800_000; // 30 minutes
 #[cfg(feature = "wasm")]
 pub mod wasm {
     // Need load as wasm_bindgen to make field annotations work
-    use utils_proc_macros::wasm_bindgen_if as wasm_bindgen;
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     pub struct CoreEthereumConstants {

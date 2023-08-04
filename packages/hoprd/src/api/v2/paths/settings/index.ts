@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import type { State } from '../../../../types.js'
+import type { State, StateOps } from '../../../../types.js'
 import { STATUS_CODES } from '../../utils.js'
 
 export const getSettings = (state: State) => {
@@ -8,7 +8,7 @@ export const getSettings = (state: State) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { stateOps } = req.context
+    const { stateOps }: { stateOps: StateOps } = req.context
 
     try {
       const settings = getSettings(stateOps.getState())

@@ -20,7 +20,7 @@ pub const DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY: u32 = 50_000;
 #[cfg(feature = "wasm")]
 pub mod wasm {
     // Need to load as wasm_bindgen to make field annotations work
-    use utils_proc_macros::wasm_bindgen_if as wasm_bindgen;
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     pub struct CoreConstants {

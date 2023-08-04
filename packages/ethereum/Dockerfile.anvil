@@ -1,8 +1,8 @@
-ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-gcr.io/hoprassociation/hopr-toolchain:latest}
+ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-toolchain:latest}
 
 # Creates a Docker container that encapsulates a local testnet with deployed smart contracts
 
-FROM ${HOPR_TOOLCHAIN_IMAGE} as build
+FROM ${HOPR_TOOLCHAIN_IMAGE}
 
 WORKDIR /app/hoprnet
 

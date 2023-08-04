@@ -28,9 +28,7 @@
   },
   "devDependencies": {
     "@ethersproject/cli": "5.7.0",
-    "@hoprnet/avadosdk": "0.4.4-rc.1",
-    "@types/node": "16",
-    "@types/yargs": "^17.0.23",
+    "@types/node": "18",
     "prettier": "2.8.8",
     "ts-node": "10.9.1",
     "typescript": "5.0.4"
@@ -52,5 +50,5 @@
     "printWidth": 120,
     "trailingComma": "none"
   },
-  "packageManager": "yarn@3.5.0"
+  "packageManager": "yarn@3.6.1"
 }

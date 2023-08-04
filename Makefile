@@ -72,7 +72,8 @@ init: ## initialize repository (idempotent operation)
 $(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
 # --out-dir is relative to working directory
 	echo "use wasm-pack build"
-	env WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 \
+	wasm-pack build --target=bundler --out-dir ./pkg $@
+	#env WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 \
 		wasm-pack build --target=bundler --out-dir ./pkg $@
 
 .PHONY: $(HOPLI_CRATE)
@@ -235,7 +236,7 @@ reset: clean
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 ifeq ($(package),)
 	yarn workspaces foreach -pv run test
-	cargo test
+	cargo test --no-default-features
 # disabled until `wasm-bindgen-test-runner` supports ESM
 # cargo test --target wasm32-unknown-unknow
 else
@@ -301,7 +302,6 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 run-local: args=
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
-		--experimental-wasm-reftypes \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity=`pwd`/.identity-local.id \
 		--network anvil-localhost --announce \
@@ -325,7 +325,7 @@ fund-local-all: id_dir=/tmp/
 fund-local-all: id_password=local
 fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
-	IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
@@ -339,10 +339,6 @@ ifeq ($(image),)
 else
 	./scripts/build-docker.sh --local --force -i $(image)
 endif
-
-.PHONY: docker-build-gcb
-docker-build-gcb: ## build Docker images on Google Cloud Build
-	./scripts/build-docker.sh --no-tags --force
 
 .PHONY: request-funds
 request-funds: ensure-environment-and-network-are-set
@@ -497,14 +493,19 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
-ensure-environment-and-network-are-set:
+# These targets needs to be splitted in macOs systems
+ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set
+
+ensure-network-is-set:
 ifeq ($(network),)
 	echo "parameter <network> missing" >&2 && exit 1
 else
 environment_type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
-ifeq ($(environment_type),)
-	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
 endif
+
+ensure-environment-is-set:
+ifeq ($(environment_type),)
+	echo "could not read environment info from packages/ethereum/contracts/contracts-addresses.json" >&2 && exit 1
 endif
 
 .PHONY: run-docker-dev

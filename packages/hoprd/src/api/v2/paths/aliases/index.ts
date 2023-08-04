@@ -87,7 +87,7 @@ GET.apiDoc = {
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { stateOps } = req.context
+    const { stateOps }: { stateOps: StateOps } = req.context
     const { peerId, alias } = req.body
 
     try {

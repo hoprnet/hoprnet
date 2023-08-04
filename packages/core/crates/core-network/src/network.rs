@@ -7,6 +7,9 @@ use libp2p_identity::PeerId;
 use utils_log::{error, info, warn};
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
@@ -439,7 +442,31 @@ impl Network {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg(not(feature = "wasm"))]
+impl Network {
+    /// Total count of the peers observed withing the network
+    pub fn length(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns the quality of the network as a network health indicator.
+    pub fn health(&self) -> Health {
+        self.last_health
+    }
+
+    pub fn debug_output(&self) -> String {
+        let mut output = "".to_string();
+
+        for (_, entry) in &self.entries {
+            output.push_str(format!("{}\n", entry).as_str());
+        }
+
+        output
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
 impl Network {
     /// Total count of the peers observed withing the network
     #[wasm_bindgen]
@@ -471,7 +498,6 @@ pub mod wasm {
     use js_sys::JsString;
     use std::str::FromStr;
     use utils_misc::utils::wasm::js_map_to_hash_map;
-    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     pub fn health_to_string(h: Health) -> String {

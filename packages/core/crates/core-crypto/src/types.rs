@@ -344,6 +344,12 @@ pub struct HalfKeyChallenge {
     hkc: [u8; Self::SIZE],
 }
 
+impl Display for HalfKeyChallenge {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(&self.hkc))
+    }
+}
+
 impl Default for HalfKeyChallenge {
     fn default() -> Self {
         // Note that the default HalfKeyChallenge is the identity point on secp256k1, therefore
@@ -429,6 +435,12 @@ impl Default for Hash {
     }
 }
 
+impl std::fmt::Display for Hash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_hex().as_str())
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Hash {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
@@ -462,12 +474,6 @@ impl BinarySerializable<'_> for Hash {
 
     fn to_bytes(&self) -> Box<[u8]> {
         self.hash.into()
-    }
-}
-
-impl Display for Hash {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex())
     }
 }
 
@@ -661,7 +667,7 @@ impl PublicKey {
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
     /// Generates new random keypair (private key, public key)
-    pub fn random_keypair() -> (Box<[u8]>, PublicKey) {
+    pub fn random_keypair() -> ([u8; 32], PublicKey) {
         let (private, cp) = random_group_element();
         (private, PublicKey::try_from(cp).unwrap())
     }
@@ -785,6 +791,12 @@ impl Default for Response {
                 .as_slice(),
         );
         ret
+    }
+}
+
+impl std::fmt::Display for Response {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_hex().as_str())
     }
 }
 
@@ -1423,6 +1435,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1460,6 +1473,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1492,6 +1506,7 @@ pub mod wasm {
             self.eq(other)
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1539,6 +1554,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1583,6 +1599,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1625,6 +1642,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1641,7 +1659,10 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "random_keypair")]
         pub fn _random_keypair() -> KeyPair {
             let (private, public) = Self::random_keypair();
-            KeyPair { private, public }
+            KeyPair {
+                private: Box::new(private),
+                public,
+            }
         }
 
         #[wasm_bindgen(js_name = "deserialize")]
@@ -1726,6 +1747,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -1753,6 +1775,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }

@@ -107,7 +107,7 @@ export async function getPeers(
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const quality = parseFloat(String(req.query.quality ?? 0))
 
     try {

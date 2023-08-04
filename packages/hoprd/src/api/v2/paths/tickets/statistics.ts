@@ -21,9 +21,10 @@ export const getTicketsStatistics = async (node: Hopr) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
 
     try {
+      console.log(`about to get ticket statistics`)
       const tickets = await getTicketsStatistics(node)
       return res.status(200).send(tickets)
     } catch (err) {

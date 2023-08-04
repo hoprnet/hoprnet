@@ -11,8 +11,9 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="smoke-fixture-setup"
-
+# shellcheck disable=SC1090
 source "${mydir}/testnet.sh"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -90,14 +91,13 @@ declare node5_id="${node5_dir}.id"
 declare node6_id="${node6_dir}.id"
 declare node7_id="${node7_dir}.id"
 
-declare node1_privkey="0x1f5b172a64947589be6e279fbcbc09aca6e623a64a92aa359fae9c6613b7e801"
-declare node2_privkey="0xcb9c3533beb75b996b6c77150ecda32134d13710a16121f04dc591113329cd7c"
-declare node3_privkey="0x9a96a7711e2e9c9f71767bb9f248f699b29aebe7f590de8eeec0e71796b869e0"
-declare node4_privkey="0x7dea49b4dbeea4dcbbb9d071bc7212347748dc3a2f16896f504417236b6adb84"
-declare node5_privkey="0x800fee12d472c1a8448b786eb9e5d6c7f643c78b9727032893da9a6a55db288b"
-declare node6_privkey="0x79b94be0c06dac87139c54416228dcacfb084c6884bbf4e48fff4cab8f40baa6"
-declare node7_privkey="0x9b813edd8a85cffbe3cd2e242dc0992cfa04be15caa9f50b0b03b5ebcb2f770a"
-
+declare node1_privkey="0xf1d438861b30707b2d918ece60b837536521d31b142a5f8f88039261fa37fbd1e1a81bb95e6ae0ad124a187f3f5f908d88c30c7dd2880b441f07deeada71944d"
+declare node2_privkey="0x7f68149557e9114d72aa8925988246d7d5b77e3e756673b97b1f00fe59341a25db2ce95e8ef2624398f68c107328672ef1f3a66c5c1a04faabd8055425352669"
+declare node3_privkey="0xa0d51a3401c8d89e07b43e1f9ee7ebb53269bb90510b79c0129cf62f506e1d9383dacd73a65f00c18e5982c956e1b3a9ddfe90bd14a6481375ec972442927a59"
+declare node4_privkey="0xee240f3583c059c4deee617cf0e1eca1e9cca53e9d749ee199d776bb7900233c2da432bc3c111e628ed1ff86ba40386105e1a2c48215e7b6087a4698914a1b65"
+declare node5_privkey="0x7092f55182bd2d7cda73ad8f491b7f3e180105e281b4fc18620fa6e818cbde4d746cb426ab8013579b198ab344cdf2d637037782eafb9c64157c6e6a495d50b3"
+declare node6_privkey="0x667b54fbe53f237327be22bf8ba5eaae95a91c1feeb01ba91bbf1c261d4b6ca287ec2ea308f9d1f2f06c62f3db0975a61a4e7c3ca4872bcb65abab2f78452f58"
+declare node7_privkey="0xa0170c8441d30e15937c1f8cf54657acbd30b9331a0ba146d8d8e579d078210383a7d0eec06153e2a7848a6761d17126c4e7bf6faa08addba7d156b36cdef4cf"
 declare password="e2e-test"
 
 declare anvil_rpc_log="${tmp}/hopr-smoke-test-anvil-rpc.log"
@@ -119,7 +119,7 @@ function cleanup {
 
   # Cleaning up everything
   log "Cleaning up processes"
-  for port in ${all_ports[@]}; do
+  for port in "${all_ports[@]}"; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -129,16 +129,16 @@ function cleanup {
       continue
     fi
 
-    log=$(grep -E "Process exiting with signal [0-9]" ${node_log} || echo "")
+    log=$(grep -E "Process exiting with signal [0-9]" "${node_log}" || echo "")
 
     if [ -z "${log}" ]; then
       log "${node_log}: Process did not exit properly"
       exit_code=1
     else
-      exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
+      exit_code=$(echo "${log}" | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     fi
 
-    if [ ${exit_code} != "0" ]; then
+    if [ "${exit_code}" != "0" ]; then
       non_zero=true
       log "${node_log}: terminated with non-zero exit code ${exit_code}"
     fi
@@ -209,7 +209,7 @@ function setup_node() {
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
-    node --experimental-wasm-reftypes packages/hoprd/lib/main.cjs \
+    node packages/hoprd/lib/main.cjs \
       --data="${dir}" \
       --host="127.0.0.1:${node_port}" \
       --identity="${id}" \
@@ -272,7 +272,11 @@ declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
-${mydir}/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
+"${mydir}"/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
+if [ ! -f "${anvil_cfg_file}" ]; then
+  log "Could not find anvil cfg file ${anvil_cfg_file}"
+  exit 1
+fi
 
 # read auto-generated private key from anvil configuration
 declare anvil_private_key
@@ -304,13 +308,13 @@ setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${nod
 
 # DO NOT MOVE THIS STEP
 #  --- Wait until private key has been created or recovered --- {{{
-wait_for_regex ${node1_log} "please fund this node"
-wait_for_regex ${node2_log} "please fund this node"
-wait_for_regex ${node3_log} "please fund this node"
-wait_for_regex ${node4_log} "please fund this node"
-wait_for_regex ${node5_log} "please fund this node"
-wait_for_regex ${node6_log} "please fund this node"
-wait_for_regex ${node7_log} "please fund this node"
+wait_for_regex "${node1_log}" "please fund this node"
+wait_for_regex "${node2_log}" "please fund this node"
+wait_for_regex "${node3_log}" "please fund this node"
+wait_for_regex "${node4_log}" "please fund this node"
+wait_for_regex "${node5_log}" "please fund this node"
+wait_for_regex "${node6_log}" "please fund this node"
+wait_for_regex "${node7_log}" "please fund this node"
 # }}}
 
 log "Funding nodes"
@@ -322,19 +326,19 @@ make -C "${mydir}/../" fund-local-all \
 log "Waiting for port binding"
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_regex ${node1_log} "STARTED NODE"
-wait_for_regex ${node2_log} "STARTED NODE"
-wait_for_regex ${node3_log} "STARTED NODE"
-wait_for_regex ${node4_log} "STARTED NODE"
-wait_for_regex ${node5_log} "STARTED NODE"
-wait_for_regex ${node6_log} "STARTED NODE"
+wait_for_regex "${node1_log}" "STARTED NODE"
+wait_for_regex "${node2_log}" "STARTED NODE"
+wait_for_regex "${node3_log}" "STARTED NODE"
+wait_for_regex "${node4_log}" "STARTED NODE"
+wait_for_regex "${node5_log}" "STARTED NODE"
+wait_for_regex "${node6_log}" "STARTED NODE"
 wait_for_port 19096 "127.0.0.1" "${node6_log}"
-wait_for_regex ${node7_log} "STARTED NODE"
+wait_for_regex "${node7_log}" "STARTED NODE"
 # }}}
 
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
-  declare node_dir_db="${node_dir}/db/LOG"
+  declare node_dir_db="${node_dir}/db/db.sqlite"
   declare node_dir_peerstore="${node_dir}/peerstore/LOG"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
   [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }

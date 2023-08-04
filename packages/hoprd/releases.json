@@ -1,7 +1,7 @@
 {
-  "master": {
+  "development": {
     "git_ref": "^master$",
-    "network": "master"
+    "network": "rotsee"
   },
   "valencia": {
     "git_ref": "^(release|staging)/valencia$",
@@ -33,6 +33,6 @@
   },
   "integration-test": {
     "git_ref": "^integration/.*",
-    "network": "master"
+    "network": "rotsee"
   }
 }

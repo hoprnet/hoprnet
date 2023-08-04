@@ -1,11 +1,14 @@
-use crate::identity_input::LocalIdentityArgs;
-use crate::key_pair::read_identities;
-use crate::password::PasswordArgs;
-use crate::process::{child_process_call_foundry_self_register, set_process_path_env};
-use crate::utils::{Cmd, HelperErrors};
+use crate::{
+    identity_input::LocalIdentityArgs,
+    key_pair::read_identities,
+    password::PasswordArgs,
+    process::{child_process_call_foundry_self_register, set_process_path_env},
+    utils::{Cmd, HelperErrors},
+};
 use clap::Parser;
 use log::{log, Level};
 use std::env;
+use utils_types::traits::PeerIdLike;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -73,7 +76,7 @@ impl RegisterInNetworkRegistryArgs {
             // read all the identities from the directory
             match read_identities(local_files, &pwd) {
                 Ok(node_identities) => {
-                    all_peer_ids.extend(node_identities.iter().map(|ni| ni.peer_id.clone()));
+                    all_peer_ids.extend(node_identities.iter().map(|ni| ni.chain_key.1.to_peerid_str()));
                 }
                 Err(e) => {
                     println!("error {:?}", e);

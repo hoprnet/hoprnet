@@ -5,7 +5,7 @@ import type { Initializable, Components } from '@libp2p/interfaces/components'
 import {
   u8aEquals,
   checkNetworks,
-  isAvadoPrivateNetwork,
+  isDappnodePrivateNetwork,
   isPrivateAddress,
   isLinkLocaleAddress,
   isReservedAddress,
@@ -169,10 +169,10 @@ export class Filter implements Initializable {
    */
   private filterDirectDial(address: DirectAddress, ma: Multiaddr): boolean {
     if (
-      (process.env.AVADO ?? 'false').toLowerCase() === 'true' &&
-      isAvadoPrivateNetwork(address.address, address.type)
+      (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true' &&
+      isDappnodePrivateNetwork(address.address, address.type)
     ) {
-      // Never attempt to dial internal container addresses of DAppnode or AVADO machines
+      // Never attempt to dial internal container addresses of Dappnode machines
       return false
     }
 

@@ -9,7 +9,9 @@ import {
   setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
-  pickVersion
+  pickVersion,
+  defer,
+  privKeyToPeerId
 } from '@hoprnet/hopr-utils'
 import {
   Health,
@@ -28,13 +30,18 @@ import {
   parse_private_key,
   HoprdConfig,
   type Api,
-  type CliArgs
+  type CliArgs,
+  hoprd_misc_initialize_crate
 } from '../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
+
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
 import { LogStream } from './logs.js'
-import { getIdentity } from './identity.js'
+
+import { HoprKeys, IdentityOptions, hoprd_keypair_set_panic_hook } from '../lib/hoprd_keypair.js'
+hoprd_keypair_set_panic_hook()
 import { decodeMessage } from './api/utils.js'
 import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v2.js'
@@ -64,7 +71,7 @@ const metric_version = create_multi_gauge('hoprd_mgauge_version', 'Executed vers
 // reading the version manually to ensure the path is read correctly
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
 const version = get_package_version(packageFile)
-const on_avado = (process.env.AVADO ?? 'false').toLowerCase() === 'true'
+const on_dappnode = (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true'
 
 function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOptions {
   let strategy: ChannelStrategyInterface
@@ -183,6 +190,20 @@ async function main() {
     }
   }
 
+  function stopGracefully(signal) {
+    logs.log(`Process exiting with signal ${signal}`)
+    process.exit()
+  }
+
+  process.on('uncaughtExceptionMonitor', (err, origin) => {
+    // Make sure we get a log.
+    logs.log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
+  })
+
+  process.once('exit', stopGracefully)
+  process.on('SIGINT', stopGracefully)
+  process.on('SIGTERM', stopGracefully)
+
   const setState = (newState: State): void => {
     state = newState
   }
@@ -258,18 +279,26 @@ async function main() {
     logs.log(`This is HOPRd version ${version}`)
     metric_version.set([pickVersion(version)], 1.0)
 
-    if (on_avado) {
-      logs.log('This node appears to be running on an AVADO/Dappnode')
+    if (on_dappnode) {
+      logs.log('This node appears to be running on an Dappnode')
     }
 
     // 1. Find or create an identity
-    const peerId = await getIdentity({
-      initialize: cfg.db.initialize,
-      idPath: cfg.identity.file,
-      password: cfg.identity.password,
-      useWeakCrypto: cfg.test.use_weak_crypto,
-      privateKey: cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
-    })
+    const keypair = HoprKeys.init(
+      new IdentityOptions(
+        cfg.db.initialize,
+        cfg.identity.file,
+        cfg.identity.password,
+        cfg.test.use_weak_crypto,
+        cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
+      )
+    )
+
+    // total hack. peerIdFromKeys seems to produce incorrect objects
+    const peerId = privKeyToPeerId(keypair.chainKeyPrivKey)
+
+    console.log(`chain_key`, (await keypair.chainKeyPeerId).toString())
+    console.log(`packet_key`, (await keypair.packetKeyPeerId).toString())
 
     // 2. Create node instance
     logs.log('Creating HOPR Node')
@@ -279,78 +308,71 @@ async function main() {
     // Subscribe to node events
     node.on('hopr:message', logMessageToNode)
     node.on('hopr:network-health-changed', networkHealthChanged)
+
+    let continueStartup = defer<void>()
     node.subscribeOnConnector('hopr:connector:created', () => {
       // 2.b - Connector has been created, and we can now trigger the next set of steps.
       logs.log('Connector has been loaded properly.')
       node.emit('hopr:monitoring:start')
-    })
-    node.once('hopr:monitoring:start', async () => {
-      // 3. start all monitoring services, and continue with the rest of the setup.
-
-      let api = cfg.api as Api
-      console.log(JSON.stringify(api, null, 2))
-      const startApiListen = setupAPI(
-        node,
-        logs,
-        { getState, setState },
-        {
-          disableApiAuthentication: api.is_auth_disabled(),
-          apiHost: api.host.ip,
-          apiPort: api.host.port,
-          apiToken: api.is_auth_disabled() ? null : api.auth_token()
-        }
-      )
-      // start API server only if API flag is true
-      if (cfg.api.enable) startApiListen()
-
-      if (cfg.healthcheck.enable) {
-        setupHealthcheck(node, logs, cfg.healthcheck.host, cfg.healthcheck.port)
-      }
-
-      logs.log(`Node address: ${node.getId().toString()}`)
-
-      const ethAddr = node.getEthereumAddress().to_hex()
-      const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
-
-      logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
-
-      // 2.5 Await funding of wallet.
-      await node.waitForFunds()
-      logs.log('Node has been funded, starting...')
-
-      // 3. Start the node.
-      await node.start()
-
-      // alias self
-      state.aliases.set('me', node.getId())
-
-      logs.logStatus('READY')
-      logs.log('Node has started!')
-      metric_nodeStartupTime.record_measure(metric_startupTimer)
+      continueStartup.resolve()
     })
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
     logs.log(`Ready to request on-chain connector to connect to provider.`)
     node.emitOnConnector('connector:create')
+
+    await continueStartup.promise
+
+    // 3. start all monitoring services, and continue with the rest of the setup.
+
+    let api = cfg.api as Api
+    console.log(JSON.stringify(api, null, 2))
+    const startApiListen = setupAPI(
+      node,
+      logs,
+      { getState, setState },
+      {
+        disableApiAuthentication: api.is_auth_disabled(),
+        apiHost: api.host.ip,
+        apiPort: api.host.port,
+        apiToken: api.is_auth_disabled() ? null : api.auth_token()
+      }
+    )
+    // start API server only if API flag is true
+    if (cfg.api.enable) startApiListen()
+
+    if (cfg.healthcheck.enable) {
+      setupHealthcheck(node, logs, cfg.healthcheck.host, cfg.healthcheck.port)
+    }
+
+    logs.log(`Node address: ${node.getId().toString()}`)
+
+    const ethAddr = node.getEthereumAddress().to_hex()
+    const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
+
+    logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
+
+    // 2.5 Await funding of wallet.
+    await node.waitForFunds()
+    logs.log('Node has been funded, starting...')
+
+    // 3. Start the node.
+    await node.start()
+
+    // alias self
+    state.aliases.set('me', node.getId())
+
+    logs.logStatus('READY')
+    logs.log('Node has started!')
+    metric_nodeStartupTime.record_measure(metric_startupTimer)
+
+    // Won't return until node is terminated
+    await node.startProcessing()
   } catch (e) {
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
     process.exit(1)
   }
-
-  function stopGracefully(signal) {
-    logs.log(`Process exiting with signal ${signal}`)
-    process.exit()
-  }
-
-  process.on('uncaughtExceptionMonitor', (err, origin) => {
-    // Make sure we get a log.
-    logs.log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
-  })
-
-  process.once('exit', stopGracefully)
-  process.on('SIGINT', stopGracefully)
-  process.on('SIGTERM', stopGracefully)
 }
 
 main()

@@ -11,6 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="notify-matrix-github-workflow-failure"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -42,4 +43,4 @@ declare branch
 branch=$(git rev-parse --abbrev-ref HEAD)
 declare msg="Github workflow ${workflow} failed on branch ${branch}, see ${url}"
 
-${mydir}/notify-matrix.sh "${room}" "${msg}"
+"${mydir}"/notify-matrix.sh "${room}" "${msg}"

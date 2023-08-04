@@ -10,6 +10,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="update-protocol-config"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -30,7 +31,7 @@ while (( "$#" )); do
       ;;
     -n|--network)
       network="${2}"
-      : ${network?"parameter <network> must not be empty"}
+      : "${network?"parameter <network> must not be empty"}"
       shift 2
       ;;
     -*|--*=)

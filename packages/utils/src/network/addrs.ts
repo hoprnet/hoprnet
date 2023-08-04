@@ -5,7 +5,7 @@ import {
   LOOPBACK_ADDRS,
   RESERVED_ADDRS,
   type Network,
-  PRIVATE_V4_CLASS_AVADO
+  PRIVATE_V4_CLASS_DAPPNODE
 } from './constants.js'
 
 import { networkInterfaces, type NetworkInterfaceInfo } from 'os'
@@ -56,14 +56,13 @@ export function isPrivateAddress(address: Uint8Array, family: NetworkInterfaceIn
 }
 
 /**
- * Checks if given address is in internally network of
- * Dappnode or AVADO based nodes.
+ * Checks if given address is in internally network of Dappnode based nodes.
  * @param address
  * @param family
  * @returns
  */
-export function isAvadoPrivateNetwork(address: Uint8Array, family: NetworkInterfaceInfo['family']): boolean {
-  return checkNetworks([PRIVATE_V4_CLASS_AVADO], address, family)
+export function isDappnodePrivateNetwork(address: Uint8Array, family: NetworkInterfaceInfo['family']): boolean {
+  return checkNetworks([PRIVATE_V4_CLASS_DAPPNODE], address, family)
 }
 
 /**

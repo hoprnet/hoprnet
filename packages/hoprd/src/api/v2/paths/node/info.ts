@@ -32,7 +32,7 @@ export const getInfo = async (node: Hopr) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
 
     try {
       const info = await getInfo(node)

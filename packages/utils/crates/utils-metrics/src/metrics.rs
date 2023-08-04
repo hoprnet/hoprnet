@@ -278,24 +278,30 @@ impl MultiGauge {
 /// the SimpleTimer object.
 /// First argument is either SimpleHistogram or MultiHistogram.
 /// If MultiHistogram has been supplied, an additional argument with labels must be passed.
+#[cfg(all(feature = "wasm", not(test)))]
 #[macro_export]
 macro_rules! histogram_start_measure {
     // SimpleHistogram case
     ($v:ident) => {
-        if cfg!(feature = "wasm") && !cfg!(test) {
-            $v.wasm_start_measure()
-        } else {
-            $v.start_measure()
-        }
+        $v.wasm_start_measure()
     };
     // MultiHistogram case
     ($v:ident, $l:expr) => {
-        if cfg!(feature = "wasm") && !cfg!(test) {
-            $v.wasm_start_measure($l.iter().map(|s| js_sys::JsString::from(*s)).collect())
-                .map_err(|_| prometheus::Error::Msg("invalid label".into()))
-        } else {
-            $v.start_measure($l)
-        }
+        $v.wasm_start_measure($l.iter().map(|s| js_sys::JsString::from(*s)).collect())
+            .map_err(|_| prometheus::Error::Msg("invalid label".into()))
+    };
+}
+
+#[cfg(any(not(feature = "wasm"), test))]
+#[macro_export]
+macro_rules! histogram_start_measure {
+    // SimpleHistogram case
+    ($v:ident) => {
+        $v.start_measure()
+    };
+    // MultiHistogram case
+    ($v:ident, $l:expr) => {
+        $v.start_measure($l)
     };
 }
 

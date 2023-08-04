@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "2.0.0-next.1",
+  "version": "2.0.0",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -13,7 +13,7 @@
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
-    "test": "NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha -n experimental-wasm-reftypes --reporter=tap --full-trace",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --reporter=tap --full-trace",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
     "build": "yarn clean && yarn build:wasm && tsc",
     "docs:generate": "typedoc",
@@ -37,20 +37,16 @@
     "chalk": "5.2.0",
     "debug": "4.3.4",
     "ethers": "5.7.2",
-    "heap-js": "2.2.0",
     "multiaddr": "10.0.1",
-    "retimer": "3.0.0",
-    "secp256k1": "4.0.3"
+    "retimer": "3.0.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.1",
-    "@types/chai": "4.3.5",
     "@types/mocha": "10.0.1",
     "@types/sinon": "10.0.15",
-    "chai": "4.3.7",
     "mocha": "10.2.0",
     "sinon": "12.0.1",
-    "typedoc": "0.24.7",
+    "typedoc": "0.24.8",
     "typedoc-plugin-markdown": "3.15.3",
     "typescript": "5.0.4"
   },

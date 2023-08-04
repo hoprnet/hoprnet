@@ -25,7 +25,7 @@ export const getAlias = (state: Readonly<State>, alias: string): string => {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { stateOps } = req.context
+    const { stateOps }: { stateOps: StateOps } = req.context
     const { alias } = req.params
 
     try {

@@ -11,6 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="get-package-version"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -32,6 +33,6 @@ pkg_path="${mydir}/../packages/${pkg}/package.json"
 log "Get package version for ${pkg} from ${pkg_path}"
 
 # get full version info from package description
-version=$(jq -r '.version' ${pkg_path})
+version=$(jq -r '.version' "${pkg_path}")
 
 echo "${version}"

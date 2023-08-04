@@ -9,10 +9,14 @@ use core_strategy::{
 };
 use hex;
 use proc_macro_regex::regex;
-use real_base::real;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use real_base::file::native::read_file;
+#[cfg(all(feature = "wasm", not(test)))]
+use real_base::file::wasm::read_file;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -44,7 +48,7 @@ fn parse_host(s: &str) -> Result<crate::config::Host, String> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
     if crate::config::validate_private_key(s).is_ok() {
-        let mut decoded = [0u8; 32];
+        let mut decoded = [0u8; 64];
 
         let priv_key = match s.strip_prefix("0x") {
             Some(priv_without_prefix) => priv_without_prefix,
@@ -57,7 +61,7 @@ pub fn parse_private_key(s: &str) -> Result<Box<[u8]>, String> {
         Ok(Box::new(decoded))
     } else {
         Err(format!(
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         ))
     }
 }
@@ -116,17 +120,19 @@ pub struct CliArgs {
         long,
         env = "HOPRD_ANNOUNCE",
         help = "Run as a Public Relay Node (PRN)",
-        action = ArgAction::SetTrue
+        action = ArgAction::SetTrue,
+        default_value_t = crate::config::NetworkOptions::default().announce
     )]
-    pub announce: Option<bool>,
+    pub announce: bool,
 
     #[arg(
         long,
         env = "HOPRD_API",
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
         action = ArgAction::SetTrue,
+        default_value_t = crate::config::Api::default().enable
     )]
-    pub api: Option<bool>,
+    pub api: bool,
 
     #[arg(
         long = "apiHost",
@@ -150,9 +156,10 @@ pub struct CliArgs {
         help = "Completely disables the token authentication for the API, overrides any apiToken if set",
         action = ArgAction::SetTrue,
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Api::default().is_auth_disabled()
     )]
-    pub disable_api_authentication: Option<bool>,
+    pub disable_api_authentication: bool,
 
     #[arg(
         long = "apiToken",
@@ -168,9 +175,10 @@ pub struct CliArgs {
         long = "healthCheck",
         env = "HOPRD_HEALTH_CHECK",
         help = "Run a health check end point",
-        action = ArgAction::SetTrue
+        action = ArgAction::SetTrue,
+        default_value_t = crate::config::HealthCheck::default().enable
     )]
-    pub health_check: Option<bool>,
+    pub health_check: bool,
 
     #[arg(
         long = "healthCheckHost",
@@ -216,20 +224,22 @@ pub struct CliArgs {
     pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
     #[arg(
-        long = "autoRedeemTickets",
-        env = "HOPRD_AUTO_REDEEEM_TICKETS",
-        help = "If enabled automatically redeems winning tickets.",
-        action = ArgAction::SetTrue
+        long = "disableTicketAutoRedeem",
+        env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
+        help = "Disables automatic redeemeing of winning tickets.",
+        action = ArgAction::SetFalse,
+        default_value_t = crate::config::Strategy::default().auto_redeem_tickets
     )]
-    pub auto_redeem_tickets: Option<bool>,
+    pub auto_redeem_tickets: bool,
 
     #[arg(
-        long = "checkUnrealizedBalance",
-        env = "HOPRD_CHECK_UNREALIZED_BALANCE",
-        help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets.",
-        action = ArgAction::SetTrue
+        long = "disableUnrealizedBalanceCheck",
+        env = "HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK",
+        help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
+        action = ArgAction::SetFalse,
+        default_value_t = crate::config::Chain::default().check_unrealized_balance
     )]
-    pub check_unrealized_balance: Option<bool>,
+    pub check_unrealized_balance: bool,
 
     #[arg(
         long,
@@ -253,18 +263,18 @@ pub struct CliArgs {
         help = "initialize a database if it doesn't already exist",
         action = ArgAction::SetTrue,
         env = "HOPRD_INIT",
-        action = ArgAction::SetTrue
+        default_value_t = crate::config::Db::default().initialize
     )]
-    pub init: Option<bool>,
+    pub init: bool,
 
     #[arg(
         long = "forceInit",
         help = "initialize a database, even if it already exists",
         action = ArgAction::SetTrue,
         env = "HOPRD_FORCE_INIT",
-        action = ArgAction::SetTrue
+        default_value_t = crate::config::Db::default().force_initialize
     )]
-    pub force_init: Option<bool>,
+    pub force_init: bool,
 
     #[arg(
         long = "privateKey",
@@ -280,16 +290,18 @@ pub struct CliArgs {
         env = "HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS",
         action = ArgAction::SetTrue,
         help = "Allow connections to other nodes running on localhost",
+        default_value_t = crate::config::NetworkOptions::default().allow_local_node_connections
     )]
-    pub allow_local_node_connections: Option<bool>,
+    pub allow_local_node_connections: bool,
 
     #[arg(
         long = "allowPrivateNodeConnections",
         env = "HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS",
         action = ArgAction::SetTrue,
         help = "Allow connections to other nodes running on private addresses",
+        default_value_t = crate::config::NetworkOptions::default().allow_private_node_connections
     )]
-    pub allow_private_node_connections: Option<bool>,
+    pub allow_private_node_connections: bool,
 
     #[arg(
         long = "maxParallelConnections",
@@ -305,17 +317,19 @@ pub struct CliArgs {
         env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
         action = ArgAction::SetTrue,
+        default_value_t = crate::config::Testing::default().announce_local_addresses
     )]
-    pub test_announce_local_addresses: Option<bool>,
+    pub test_announce_local_addresses: bool,
 
     #[arg(
         long = "testPreferLocalAddresses",
         env = "HOPRD_TEST_PREFER_LOCAL_ADDRESSES",
         action = ArgAction::SetTrue,
         help = "For testing local testnets. Prefer local peers to remote",
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Testing::default().prefer_local_addresses
     )]
-    pub test_prefer_local_addresses: Option<bool>,
+    pub test_prefer_local_addresses: bool,
 
     #[arg(
         long = "testUseWeakCrypto",
@@ -323,43 +337,48 @@ pub struct CliArgs {
         action = ArgAction::SetTrue,
         help = "weaker crypto for faster node startup",
         hide = true,
+        default_value_t = crate::config::Testing::default().use_weak_crypto
     )]
-    pub test_use_weak_crypto: Option<bool>,
+    pub test_use_weak_crypto: bool,
 
     #[arg(
         long = "testNoDirectConnections",
         help = "NAT traversal testing: prevent nodes from establishing direct TCP connections",
         env = "HOPRD_TEST_NO_DIRECT_CONNECTIONS",
         action = ArgAction::SetTrue,
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Testing::default().no_direct_connections
     )]
-    pub test_no_direct_connections: Option<bool>,
+    pub test_no_direct_connections: bool,
 
     #[arg(
         long = "testNoWebRTCUpgrade",
         help = "NAT traversal testing: prevent nodes from establishing direct TCP connections",
         env = "HOPRD_TEST_NO_WEBRTC_UPGRADE",
         action = ArgAction::SetTrue,
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Testing::default().no_webrtc_upgrade
     )]
-    pub test_no_webrtc_upgrade: Option<bool>,
+    pub test_no_webrtc_upgrade: bool,
 
     #[arg(
         long = "noRelay",
         help = "disable NAT relay functionality entirely",
         env = "HOPRD_NO_RELAY",
         action = ArgAction::SetTrue,
+        default_value_t = crate::config::NetworkOptions::default().no_relay
     )]
-    pub no_relay: Option<bool>,
+    pub no_relay: bool,
 
     #[arg(
         long = "testLocalModeStun",
         help = "Transport testing: use full-featured STUN with local addresses",
         env = "HOPRD_TEST_LOCAL_MODE_STUN",
         action = ArgAction::SetTrue,
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Testing::default().local_mode_stun
     )]
-    pub test_local_mode_stun: Option<bool>,
+    pub test_local_mode_stun: bool,
 
     #[arg(
         long = "heartbeatInterval",
@@ -492,7 +511,7 @@ struct DefaultNetworkFile {
 impl FromJsonFile for DefaultNetworkFile {
     fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
         let default_environment_json_path: String = format!("{}/default-network.json", mono_repo_path);
-        let data = ok_or_str!(real::read_file(default_environment_json_path.as_str()))?;
+        let data = ok_or_str!(read_file(default_environment_json_path.as_str()))?;
 
         ok_or_str!(serde_json::from_slice::<DefaultNetworkFile>(&data))
     }
@@ -519,11 +538,12 @@ mod tests {
     #[test]
     fn parse_private_key() {
         let parsed =
-            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+            super::parse_private_key("56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae").unwrap();
 
         let priv_key: Vec<u8> = vec![
-            205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
-            222, 195, 226, 141, 224, 126, 3, 23,
+            86, 178, 156, 239, 205, 245, 118, 238, 163, 6, 186, 47, 213, 243, 46, 101, 28, 9, 224, 171, 188, 1, 140,
+            71, 189, 198, 239, 68, 246, 183, 80, 111, 16, 80, 249, 81, 55, 119, 4, 120, 245, 11, 69, 98, 103, 247, 97,
+            241, 184, 179, 65, 161, 61, 166, 139, 195, 46, 92, 150, 152, 79, 205, 82, 174,
         ];
 
         assert_eq!(parsed, priv_key.into())
@@ -532,11 +552,12 @@ mod tests {
     #[test]
     fn parse_private_key_with_prefix() {
         let parsed_with_prefix =
-            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e0317").unwrap();
+            super::parse_private_key("0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae").unwrap();
 
         let priv_key: Vec<u8> = vec![
-            205, 9, 249, 41, 63, 253, 214, 155, 233, 120, 3, 44, 83, 59, 107, 205, 2, 223, 213, 217, 55, 201, 135, 190,
-            222, 195, 226, 141, 224, 126, 3, 23,
+            86, 178, 156, 239, 205, 245, 118, 238, 163, 6, 186, 47, 213, 243, 46, 101, 28, 9, 224, 171, 188, 1, 140,
+            71, 189, 198, 239, 68, 246, 183, 80, 111, 16, 80, 249, 81, 55, 119, 4, 120, 245, 11, 69, 98, 103, 247, 97,
+            241, 184, 179, 65, 161, 61, 166, 139, 195, 46, 92, 150, 152, 79, 205, 82, 174,
         ];
 
         assert_eq!(parsed_with_prefix, priv_key.into())
@@ -545,22 +566,22 @@ mod tests {
     #[test]
     fn parse_too_short_private_key() {
         let parsed =
-            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e031").unwrap_err();
+            super::parse_private_key("56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52").unwrap_err();
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 
     #[test]
     fn parse_too_long_private_key() {
         let parsed =
-            super::parse_private_key("cd09f9293ffdd69be978032c533b6bcd02dfd5d937c987bedec3e28de07e03177").unwrap_err();
+            super::parse_private_key("0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52aeae").unwrap_err();
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 
@@ -570,7 +591,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            "Given string is not a private key. A private key must contain 64 hex chars."
+            "Given string is not a private key. A private key must contain 128 hex chars."
         )
     }
 }

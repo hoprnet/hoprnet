@@ -1,5 +1,5 @@
 import type { Operation } from 'express-openapi'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 import {
   type ChannelEntry,
   ChannelStatus,
@@ -7,25 +7,22 @@ import {
   generate_channel_id,
   PublicKey,
   channel_status_to_string,
-  type DeferType
+  type DeferType,
+  Address
 } from '@hoprnet/hopr-utils'
-import { PeerId } from '@libp2p/interface-peer-id'
-import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
   channelId: string
-  peerId: string
+  address: string
   status: string
   balance: string
 }
 
 export interface ChannelTopologyInfo {
   channelId: string
-  sourcePeerId: string
-  destinationPeerId: string
   sourceAddress: string
   destinationAddress: string
   balance: string
@@ -45,10 +42,8 @@ export interface ChannelTopologyInfo {
 export const formatChannelTopologyInfo = (channel: ChannelEntry): ChannelTopologyInfo => {
   return {
     channelId: channel.get_id().to_hex(),
-    sourcePeerId: channel.source.to_peerid_str(),
-    destinationPeerId: channel.destination.to_peerid_str(),
-    sourceAddress: channel.source.to_address().to_hex(),
-    destinationAddress: channel.destination.to_address().to_hex(),
+    sourceAddress: channel.source.to_hex(),
+    destinationAddress: channel.destination.to_hex(),
     balance: channel.balance.to_string(),
     status: channel_status_to_string(channel.status),
     commitment: channel.commitment.to_hex(),
@@ -63,7 +58,7 @@ export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
     channelId: channel.get_id().to_hex(),
-    peerId: channel.destination.to_peerid_str(),
+    address: channel.destination.to_string(),
     status: channel_status_to_string(channel.status),
     balance: channel.balance.to_string()
   }
@@ -73,7 +68,7 @@ export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'incoming',
     channelId: channel.get_id().to_hex(),
-    peerId: channel.source.to_peerid_str(),
+    address: channel.source.to_string(),
     status: channel_status_to_string(channel.status),
     balance: channel.balance.to_string()
   }
@@ -111,7 +106,7 @@ export const getAllChannels = async (node: Hopr) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { includingClosed, fullTopology } = req.query
 
     try {
@@ -222,13 +217,13 @@ async function validateOpenChannelParameters(
     }
   | {
       valid: true
-      counterparty: PeerId
+      counterparty: Address
       amount: BN
     }
 > {
-  let counterparty: PeerId
+  let counterparty: Address
   try {
-    counterparty = peerIdFromString(counterpartyStr)
+    counterparty = PublicKey.from_peerid_str(counterpartyStr).to_address()
   } catch (err) {
     return {
       valid: false,
@@ -286,10 +281,7 @@ export async function openChannel(
     return { success: false, reason: validationResult.reason }
   }
 
-  const channelId = generate_channel_id(
-    node.getEthereumAddress(),
-    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address()
-  )
+  const channelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
 
   let openingRequest = openingRequests.get(channelId.to_hex())
 
@@ -321,7 +313,7 @@ export async function openChannel(
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerId, amount } = req.body
 
     const openingResult = await openChannel(node, peerId, amount)

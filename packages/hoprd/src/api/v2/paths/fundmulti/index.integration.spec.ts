@@ -1,5 +1,4 @@
 import request from 'supertest'
-import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 import {
@@ -12,13 +11,13 @@ import {
 import { Balance, BalanceType } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
-let node = sinon.fake() as any
-node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR())
-node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.Native))
-node.getBalance = sinon.fake.returns(new Balance('5', BalanceType.HOPR))
+let node = {} as any
+node.getId = () => ALICE_PEER_ID
+node.getEthereumAddress = () => ALICE_NATIVE_ADDR
+node.getNativeBalance = () => new Balance('10', BalanceType.Native)
+node.getBalance = () => new Balance('5', BalanceType.HOPR)
 
-node.fundChannel = sinon.fake.returns(Promise.resolve('testReceipt'))
+node.fundChannel = async () => 'testReceipt'
 
 describe('POST /fundmulti', () => {
   let service: any

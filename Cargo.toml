@@ -2,6 +2,7 @@
 
 members = [
     "packages/core/crates/core-crypto",
+    "packages/core/crates/core-hopr",
     "packages/core/crates/core-misc",
     "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",
@@ -13,17 +14,17 @@ members = [
     "packages/ethereum/crates/bindings",
     "packages/hopli",
     "packages/real/crates/real-base",
+    "packages/hoprd/crates/hoprd-keypair",
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-db",
     "packages/utils/crates/utils-log",
     "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-misc",
-    "packages/utils/crates/utils-proc-macros",
     "packages/utils/crates/utils-types"
 ]
 
 [workspace.dependencies]
-wasm-pack = "0.11.1"
+wasm-pack = "0.12.0"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.86"
 

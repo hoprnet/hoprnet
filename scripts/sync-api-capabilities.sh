@@ -11,6 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="sync-api-capabilities"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -44,7 +45,7 @@ mv "${caps_file_path}.merged" "${caps_file_path}"
 rm "${caps_file_path}.base"
 
 # get list of endpoints from newly updated caps file
-endpoints="$(jq -r "to_entries | map(.key)" ${caps_file_path})"
+endpoints="$(jq -r "to_entries | map(.key)" "${caps_file_path}")"
 
 # update list in API documentation
 yq e -o=json '.' "${partial_spec_file_path}" | \

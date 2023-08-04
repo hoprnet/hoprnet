@@ -7,6 +7,7 @@ use pin_project_lite::pin_project;
 #[cfg(feature = "wasm")]
 use wasm_bindgen_futures::stream::JsStream;
 
+#[cfg(feature = "wasm")]
 pin_project! {
     pub struct BinaryStreamWrapper {
         #[pin]
@@ -14,12 +15,14 @@ pin_project! {
     }
 }
 
+#[cfg(feature = "wasm")]
 impl BinaryStreamWrapper {
     pub fn new(s: JsStream) -> Self {
         Self { stream: s }
     }
 }
 
+#[cfg(feature = "wasm")]
 impl Stream for BinaryStreamWrapper {
     type Item = crate::errors::Result<Box<[u8]>>;
 

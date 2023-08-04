@@ -1,7 +1,6 @@
 use core_types::channels::ChannelStatus;
-use libp2p_identity::PeerId;
 use std::str::FromStr;
-use utils_types::primitives::{Balance, BalanceType};
+use utils_types::primitives::{Address, Balance, BalanceType};
 
 /// Basic strategy trait that all strategies must implement.
 /// Strategies make decisions to automatically open/close certain channels.
@@ -14,12 +13,16 @@ pub trait ChannelStrategy {
     /// Human readable name of the strategy
     const NAME: &'static str;
 
+    fn name(&self) -> String {
+        Self::NAME.into()
+    }
+
     /// Performs the strategy tick - deciding which new channels should be opened and
     /// which existing channels should be closed.
     fn tick<Q>(
         &mut self,
         balance: Balance,
-        peer_ids: impl Iterator<Item = PeerId>,
+        addresses: impl Iterator<Item = Address>,
         outgoing_channels: Vec<OutgoingChannelStatus>,
         quality_of_peer: Q,
     ) -> StrategyTickResult
@@ -35,7 +38,7 @@ pub trait ChannelStrategy {
 /// Represents a request to open a channel with a stake.
 #[derive(Clone, Debug)]
 pub struct OutgoingChannelStatus {
-    pub peer_id: PeerId,
+    pub address: Address,
     pub stake: Balance,
     pub status: ChannelStatus,
 }
@@ -44,7 +47,7 @@ pub struct OutgoingChannelStatus {
 impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
     fn from(x: &wasm::OutgoingChannelStatus) -> Self {
         OutgoingChannelStatus {
-            peer_id: PeerId::from_str(&x.peer_id).expect("invalid peer id given"),
+            address: Address::from_str(&x.address).expect("invalid peer id given"),
             stake: Balance::from_str(x.stake_str.as_str(), BalanceType::HOPR),
             status: x.status.clone(),
         }
@@ -58,12 +61,12 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
 pub struct StrategyTickResult {
     max_auto_channels: usize,
     to_open: Vec<OutgoingChannelStatus>,
-    to_close: Vec<PeerId>,
+    to_close: Vec<Address>,
 }
 
 impl StrategyTickResult {
     /// Constructor for the strategy tick result.
-    pub fn new(max_auto_channels: usize, to_open: Vec<OutgoingChannelStatus>, to_close: Vec<PeerId>) -> Self {
+    pub fn new(max_auto_channels: usize, to_open: Vec<OutgoingChannelStatus>, to_close: Vec<Address>) -> Self {
         StrategyTickResult {
             max_auto_channels,
             to_open,
@@ -83,7 +86,7 @@ impl StrategyTickResult {
     }
 
     /// Peer IDs to which any open channels should be closed according to this strategy.
-    pub fn to_close(&self) -> &Vec<PeerId> {
+    pub fn to_close(&self) -> &Vec<Address> {
         &self.to_close
     }
 }
@@ -91,21 +94,19 @@ impl StrategyTickResult {
 /// WASM bindings for the generic strategy-related classes
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use core_types::channels::ChannelStatus;
     use js_sys::JsString;
-    use libp2p_identity::PeerId;
+    use serde::{Deserialize, Serialize};
     use std::str::FromStr;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_types::primitives::Address;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-
-    use core_types::channels::ChannelStatus;
-    use serde::{Deserialize, Serialize};
-
     #[derive(Serialize, Deserialize)]
     pub struct OutgoingChannelStatus {
-        pub peer_id: String,
+        pub address: String,
         pub stake_str: String,
         pub status: ChannelStatus,
     }
@@ -113,7 +114,7 @@ pub mod wasm {
     impl From<&super::OutgoingChannelStatus> for OutgoingChannelStatus {
         fn from(x: &crate::generic::OutgoingChannelStatus) -> Self {
             OutgoingChannelStatus {
-                peer_id: x.peer_id.to_base58(),
+                address: x.address.to_string(),
                 stake_str: x.stake.to_string(),
                 status: x.status.clone(),
             }
@@ -128,22 +129,23 @@ pub mod wasm {
     #[wasm_bindgen]
     impl StrategyTickResult {
         #[wasm_bindgen(constructor)]
-        pub fn new(max_auto_channels: u32, to_open: JsValue, to_close: Vec<JsString>) -> JsResult<StrategyTickResult> {
+        pub fn new(
+            max_auto_channels: u32,
+            to_open_js: JsValue,
+            to_close_js: Vec<JsString>,
+        ) -> JsResult<StrategyTickResult> {
+            let to_open = serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(to_open_js)?
+                .into_iter()
+                .map(|x| super::OutgoingChannelStatus::from(&x))
+                .collect();
+
+            let to_close = to_close_js
+                .iter()
+                .map(|s| Address::from_str(s.as_string().unwrap().as_str()).unwrap())
+                .collect();
+
             Ok(StrategyTickResult {
-                w: super::StrategyTickResult::new(
-                    max_auto_channels as usize,
-                    serde_wasm_bindgen::from_value::<Vec<OutgoingChannelStatus>>(to_open)?
-                        .into_iter()
-                        .map(|x| super::OutgoingChannelStatus::from(&x))
-                        .collect(),
-                    to_close
-                        .iter()
-                        .map(|s| {
-                            PeerId::from_str(String::from(s).as_str())
-                                .expect(format!("invalid peer id given: {0}", s).as_str())
-                        })
-                        .collect(),
-                ),
+                w: super::StrategyTickResult::new(max_auto_channels as usize, to_open, to_close),
             })
         }
 
@@ -167,7 +169,7 @@ pub mod wasm {
             self.w
                 .to_close()
                 .iter()
-                .map(|s| JsString::from(s.to_base58()))
+                .map(|s| JsString::from(s.to_string()))
                 .collect()
         }
     }
@@ -184,11 +186,7 @@ pub mod wasm {
                         v.and_then(|v| {
                             v.as_string()
                                 .ok_or(wasm_bindgen::JsValue::from("not a string"))
-                                .and_then(|s| {
-                                    utils_misc::ok_or_jserr!(<libp2p_identity::PeerId as std::str::FromStr>::from_str(
-                                        &s
-                                    ))
-                                })
+                                .and_then(|s| utils_misc::ok_or_jserr!(Address::from_str(&s)))
                         })
                         .unwrap()
                     }),

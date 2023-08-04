@@ -1,19 +1,20 @@
 import type { Operation } from 'express-openapi'
-import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../../utils.js'
+import type Hopr from '@hoprnet/hopr-core'
+import { PublicKey } from '@hoprnet/hopr-utils'
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerid } = req.params
 
     try {
-      const validPeerId = peerIdFromString(peerid)
-      const tickets = await node.getTickets(validPeerId)
+      const pubKey = PublicKey.from_peerid_str(peerid)
+      const tickets = await node.getTickets(pubKey.to_address())
       if (tickets.length <= 0) {
         return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
       }
-      await node.redeemTicketsInChannel(validPeerId)
+      await node.redeemTicketsInChannel(pubKey.to_address())
       return res.status(204).send()
     } catch (err) {
       return res

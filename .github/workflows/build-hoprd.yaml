@@ -1,0 +1,102 @@
+---
+name: Build Hoprd
+
+on:
+  workflow_call:
+    secrets:
+      GOOGLE_HOPRASSOCIATION_PROJECT:
+        required: true
+      GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
+        required: true
+      K8S_SSH_SERVICE_HOST:
+        required: true
+      K8S_SSH_SERVICE_USERNAME:
+        required: true
+      K8S_SSH_SERVICE_PASSWORD:
+    inputs:
+      build_toolchain:
+        type: string
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref }}-hoprd
+  cancel-in-progress: true
+
+jobs:
+
+  build:
+    name: docker
+    runs-on: ubuntu-2-core
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Login Google Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          driver: kubernetes
+
+      - name: "Set PR number on version"
+        run: |
+          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          new_version=$(./scripts/get-package-version.sh | sed 's/+/-/')
+          echo "DOCKER_TAG=${new_version}" >> $GITHUB_ENV
+
+          if [ "${{ inputs.build_toolchain }}" == "true" ]; then
+            echo "TOOLCHAIN_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
+          else
+            echo "TOOLCHAIN_IMAGE_TAG=latest" >> $GITHUB_ENV
+          fi
+
+      - name: Build and push docker image
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          file: packages/hoprd/Dockerfile
+          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}-cache
+          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}-cache,mode=max
+          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}
+          build-args: |
+            TOOLCHAIN_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.TOOLCHAIN_IMAGE_TAG }}
+
+  restart_deployment:
+    name: Restart deployment
+    runs-on: ubuntu-2-core
+    needs: build
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - name: "Restart deployments"
+        run: |
+          prBase="${{ github.event.pull_request.base.ref }}"
+          # Identify the network to deploy nodes
+          network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" packages/hoprd/releases.json | sed 's/_/-/')
+          # In case the base PR is pointing to an unknown branch/release, we deploy to the default network "rotsee"
+          if [ -z $network ]; then 
+            network="rotsee"  
+          fi
+          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          DOCKER_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/')
+          echo "[INFO] Restarting deployments on ${network} from pr-${{ github.event.pull_request.number }}"
+          # Get list of deployments to restart
+          export deployments=($(kubectl get deployments -n ${network} -l hoprds.hoprnet.org/cluster=hoprd-${ DOCKER_TAG } -o jsonpath="{.items[*].metadata.name}"))
+          for deployment in "${deployments[@]}"; do
+            echo "[INFO] Restarting hoprd node ${deployments}"
+            kubectl rollout restart deployments -n ${network} $deployment;
+          done

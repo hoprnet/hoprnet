@@ -1,5 +1,4 @@
-use eth_keystore::KeystoreError;
-use k256::ecdsa;
+use hoprd_keypair::errors::KeyPairError;
 use std::time::SystemTimeError;
 use thiserror::Error;
 
@@ -21,6 +20,9 @@ pub enum HelperErrors {
     // SystemTime(SystemTimeError),
     #[error("unable to create identity")]
     UnableToCreateIdentity,
+
+    #[error("incorrect filename: {0}")]
+    IncorrectFilename(String),
 
     #[error("unable to read identity")]
     UnableToReadIdentity,
@@ -45,15 +47,7 @@ pub enum HelperErrors {
 
     #[error("unable read private key")]
     UnableToReadPrivateKey,
-    /// Underlying eth keystore error
 
     #[error(transparent)]
-    // #[error("error in eth store: {0:?}")]
-    EthKeystoreError(#[from] KeystoreError),
-}
-
-impl From<ecdsa::Error> for HelperErrors {
-    fn from(_e: ecdsa::Error) -> Self {
-        Self::EthKeystoreError(KeystoreError::MacMismatch)
-    }
+    KeyStoreError(#[from] KeyPairError),
 }

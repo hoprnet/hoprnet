@@ -1,8 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type { default as Hopr } from '@hoprnet/hopr-core'
-import { defer, generate_channel_id, PublicKey, type DeferType } from '@hoprnet/hopr-utils'
-import { peerIdFromString } from '@libp2p/peer-id'
-import { PeerId } from '@libp2p/interface-peer-id'
+import { defer, generate_channel_id, PublicKey, type DeferType, Address } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -20,16 +18,16 @@ async function validateFundChannelMultiParameters(
     }
   | {
       valid: true
-      counterparty: PeerId
+      counterparty: Address
       outgoingAmount: BN
       incomingAmount: BN
     }
 > {
-  let counterparty: PeerId
+  let counterparty: Address
   try {
-    counterparty = peerIdFromString(counterpartyStr)
+    counterparty = PublicKey.from_peerid_str(counterpartyStr).to_address()
     // cannot open channel to self
-    if (counterparty.equals(node.getId())) {
+    if (counterparty.eq(node.getEthereumAddress())) {
       throw Error('Counter party is the same as current node')
     }
   } catch (err) {
@@ -100,14 +98,8 @@ export async function fundMultiChannels(
     return { success: false, reason: validationResult.reason }
   }
 
-  const outgoingChannelId = generate_channel_id(
-    node.getEthereumAddress(),
-    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address()
-  )
-  const incomingChannelId = generate_channel_id(
-    PublicKey.from_peerid_str(validationResult.counterparty.toString()).to_address(),
-    node.getEthereumAddress()
-  )
+  const outgoingChannelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
+  const incomingChannelId = generate_channel_id(validationResult.counterparty, node.getEthereumAddress())
 
   let fundingOutgoingChannelRequest = fundingRequests.get(outgoingChannelId.to_hex())
   let fundingIncomingChannelRequest = fundingRequests.get(incomingChannelId.to_hex())
@@ -147,7 +139,7 @@ export async function fundMultiChannels(
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
     const { peerId, outgoingAmount, incomingAmount } = req.body
 
     const fundingResult = await fundMultiChannels(node, peerId, outgoingAmount, incomingAmount)

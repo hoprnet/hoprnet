@@ -8,14 +8,8 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-default = ["console_error_panic_hook", "wasm", "compat-ping"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom", "dep:js-sys", "dep:gloo-timers"]
-compat-ping = []
-
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
-core-crypto = { path = "../core-crypto" }
 bincode = "1.3.3"
 blake2 = "0.10.4"
 futures = "0.3.28"
@@ -23,26 +17,33 @@ libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
 rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "1.0"
-utils-log = { path = "../../../utils/crates/utils-log"}
-utils-misc = { path = "../../../utils/crates/utils-misc"}
-utils-metrics = { path = "../../../utils/crates/utils-metrics"}
-utils-types = { path = "../../../utils/crates/utils-types"}
 validator = { version = "0.16.0", features = ["derive"] }
 gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
 console_error_panic_hook = { version = "0.1.7", optional = true }
-getrandom = { version = "0.2.8", features = ["js"], optional = true }
+getrandom = "0.2.8"
 js-sys = { version = "0.3.63", optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
+
+core-crypto = { path = "../core-crypto", default-features = false }
+utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
+utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+utils-metrics = { path = "../../../utils/crates/utils-metrics", default-features = false }
+utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
 [dev-dependencies]
 mockall = "0.11.3"
 more-asserts = "0.3.1"
-wasm-bindgen-test = "0.3.36"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm", "compat-ping"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:gloo-timers", "getrandom/js", "core-crypto/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics/wasm", "utils-types/wasm"]
+compat-ping = []
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+

@@ -1,11 +1,13 @@
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
+import type Hopr from '@hoprnet/hopr-core'
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { node }: { node: Hopr } = req.context
 
     try {
+      console.log(`about to redeem tickets`)
       await node.redeemAllTickets()
       return res.status(204).send()
     } catch (err) {

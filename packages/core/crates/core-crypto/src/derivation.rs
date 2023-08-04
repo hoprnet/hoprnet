@@ -119,7 +119,6 @@ pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
 
 /// Used in Proof of Relay to derive own half-key (S0)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn derive_own_key_share(secret: &[u8]) -> HalfKey {
     assert_eq!(SECRET_KEY_LENGTH, secret.len());
 
@@ -128,7 +127,6 @@ pub fn derive_own_key_share(secret: &[u8]) -> HalfKey {
 
 /// Used in Proof of Relay to derive the half-key of for the acknowledgement (S1)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn derive_ack_key_share(secret: &[u8]) -> HalfKey {
     assert_eq!(SECRET_KEY_LENGTH, secret.len());
 

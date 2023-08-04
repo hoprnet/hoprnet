@@ -11,19 +11,11 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys"]
-
 [dependencies]
 log = "0.4.17"
 js-sys = { version = "0.3.63", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
-
-[dev-dependencies]
-wasm-bindgen-test = "0.3.36"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
@@ -34,3 +26,8 @@ wasm-opt = false
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:console_error_panic_hook" ]
+console_error_panic_hook = ["dep:console_error_panic_hook"]

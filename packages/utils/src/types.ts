@@ -37,5 +37,6 @@ export {
   UnacknowledgedTicket,
   channel_status_to_string,
   random_integer,
-  random_big_integer
+  random_big_integer,
+  number_to_channel_status
 } from '../../core/lib/core_types.js'

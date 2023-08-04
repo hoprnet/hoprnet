@@ -10,6 +10,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="deploy-smart-contracts"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -33,7 +34,7 @@ while (( "$#" )); do
       ;;
     -b|--branch)
       branch="${2}"
-      : ${branch?"parameter <branch> must not be empty"}
+      : "${branch?"parameter <branch> must not be empty"}"
       shift 2
       ;;
     -*|--*=)

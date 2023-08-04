@@ -88,10 +88,10 @@ forge verify-check --chain-id <number> <GUID>
 #### Deploy new staking season contract
 
 1. Create a new season contract from `HoprStakeBase.sol` and update the parameters (start, end timestamp) accordingly
-2. Change the `"stake_season":` to the number of the new season, for `master-staging`, `debug-staging` and the running production environment.
+2. Change the `"stake_season":` to the number of the new season, for `rotsee`, `debug-staging` and the running production environment.
 3. Deploy for each network with
    - `debug-staging`: `FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
-   - `master-staging`: FOUNDRY_PROFILE=staging NETWORK=master-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
+   - `rotsee`: FOUNDRY_PROFILE=staging NETWORK=rotsee forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
    - `monte_rosa`: _Temporarily update the `token_contract_address` to wxHOPR. Then run_ `FOUNDRY_PROFILE=production NETWORK=monte_rosa forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
 4. Switch back `token_contract_address` for `monte_rosa`
 5. Commit contract changes and make a PR

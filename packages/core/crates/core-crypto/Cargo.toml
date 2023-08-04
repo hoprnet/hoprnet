@@ -1,6 +1,6 @@
 [package]
 name = "core-crypto"
-version = "0.3.3"
+version = "0.4.0"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -11,22 +11,20 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
-
 [dependencies]
 aes = "0.8"
+async-std = { version = "1", features = ["attributes"] }
 blake2 = "0.10"
 chacha20 = "0.9"
 ctr = "0.9"
+console_error_panic_hook = { version = "0.1.7", optional = true }
 curve25519-dalek = { version = "4.0.0-rc.2", features = ["serde", "rand_core"] }
 digest = "0.10"
 ed25519-dalek = "1.0.1"
 elliptic-curve = { version = "0.13", features = ["serde"] }
 futures = "0.3.28"
 generic-array = "0.14.7"
-getrandom = { version = "0.2.8", features = ["js"] }
+getrandom = "0.2.8"
 hex = "0.4"
 hex-literal = "0.4"
 hkdf = "0.12"
@@ -40,23 +38,24 @@ sha3 = "0.10"
 subtle = "2"
 typenum = "1.16"
 thiserror = "1.0"
-utils-log = { path = "../../../utils/crates/utils-log" }
-utils-misc = { path = "../../../utils/crates/utils-misc" }
-utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
-utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
 
-console_error_panic_hook = { version = "0.1.7", optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
+utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
+utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+
 
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
 parameterized = "1.0"
-wasm-bindgen-test = "0.3.36"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "getrandom/js", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+console_error_panic_hook = ["dep:console_error_panic_hook"]

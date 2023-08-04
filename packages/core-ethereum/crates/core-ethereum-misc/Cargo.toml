@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-misc"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -11,33 +11,30 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys" ]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]
-
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-trait = "0.1"
-core-crypto = { path = "../../../core/crates/core-crypto" }
-core-ethereum-db = { path = "../core-ethereum-db" }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 futures = "0.3"
 js-sys = { version = "0.3.63", optional = true }
 libp2p-identity = "0.1.2"
 thiserror = "1.0"
-utils-db = { path = "../../../utils/crates/utils-db" }
-utils-log = { path = "../../../utils/crates/utils-log" }
-utils-proc-macros = { path = "../../../utils/crates/utils-proc-macros" }
-utils-types = { path = "../../../utils/crates/utils-types" }
 wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 
-console_error_panic_hook = { version = "0.1.7", optional = true }
-# wee_alloc = { version = "0.4.5", optional = true }
+core-crypto = { path = "../../../core/crates/core-crypto", default-features = false }
+core-ethereum-db = { path = "../core-ethereum-db", default-features = false }
+core-types = { path = "../../../core/crates/core-types", default-features = false }
+utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
+utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
+utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+
 
 [dev-dependencies]
+env_logger = "0.10"
 mockall = "0.11.4"
 hex-literal = "0.4"
-wasm-bindgen-test = "0.3.36"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 rusty-leveldb = "1.0"
@@ -51,3 +48,8 @@ wasm-opt = false
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]

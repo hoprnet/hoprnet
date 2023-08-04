@@ -9,7 +9,7 @@ set -Eeuo pipefail
 
 # $1=version string, semver
 function get_version_maj_min() {
-  echo $(get_version_maj_min_pat $1 | cut -d. -f1,2)
+  echo $(get_version_maj_min_pat "$1" | cut -d. -f1,2)
 }
 
 # $1=version string, semver
@@ -25,7 +25,8 @@ function get_version_maj_min_pat() {
 
 # $1 = port
 function ensure_port_is_free() {
-  local port=${1}
+  local port
+  port="${1}"
 
   if lsof -i ":${port}" -s TCP:LISTEN; then
     log "Port is not free $1"
@@ -40,12 +41,14 @@ function ensure_port_is_free() {
 # $4 = optional: delay between checks in seconds, defaults to 2s
 # $5 = optional: max number of checks, defaults to 1000
 function wait_for_http_port() {
-  local port=${1}
-  local host=${2}
-  local log_file=${3:-}
-  local delay=${4:-2}
-  local max_wait=${5:-1000}
-  local cmd="curl --silent "${host}:${port}""
+  local port host log_file delay max_wait cmd
+
+  port=${1}
+  host=${2}
+  log_file=${3:-}
+  delay=${4:-2}
+  max_wait=${5:-1000}
+  cmd="curl --silent "${host}:${port}""
 
   wait_for_port "${port}" "${host}" "${log_file}" "${delay}" "${max_wait}" "${cmd}"
 }
@@ -57,13 +60,15 @@ function wait_for_http_port() {
 # $5 = optional: max number of checks, defaults to 1000
 # $6 = optional: command to check
 function wait_for_port() {
-  local port=${1}
-  local host=${2:-127.0.0.1}
-  local log_file=${3:-}
-  local delay=${4:-10}
-  local max_wait=${5:-1000}
+  local port host log_file delay max_wait cmd
+
+  port=${1}
+  host=${2:-127.0.0.1}
+  log_file=${3:-}
+  delay=${4:-10}
+  max_wait=${5:-1000}
   # by default we do a basic listen check
-  local cmd=${6:-nc -z -w 1 ${host} ${port}}
+  cmd=${6:-nc -z -w 1 ${host} ${port}}
 
   i=0
   until ${cmd}; do
@@ -72,9 +77,9 @@ function wait_for_port() {
       log "Last 5 logs from ${log_file}:"
       tail -n 5 "${log_file}" | sed "s/^/\\t/"
     fi
-    sleep ${delay}
+    sleep "${delay}"
     ((i=i+1))
-    if [ $i -gt ${max_wait} ]; then
+    if [ $i -gt "${max_wait}" ]; then
       exit 1
     fi
   done
@@ -82,11 +87,16 @@ function wait_for_port() {
 
 setup_colors() {
   if [[ -t 2 ]] && [[ -z "${NO_COLOR:-}" ]] && [[ "${TERM:-}" != "dumb" ]]; then
+    # shellcheck disable=SC2034
     NOFORMAT='\033[0m' RED='\033[0;31m' GREEN='\033[0;32m' ORANGE='\033[0;33m'
+    # shellcheck disable=SC2034
     BLUE='\033[0;34m' PURPLE='\033[0;35m' CYAN='\033[0;36m'
+    # shellcheck disable=SC2034
     YELLOW='\033[1;33m'
   else
+    # shellcheck disable=SC2034
     NOFORMAT='' RED='' GREEN='' ORANGE='' BLUE='' PURPLE='' CYAN=''
+    # shellcheck disable=SC2034
     YELLOW=''
   fi
 }
@@ -106,41 +116,42 @@ msg() {
 # $2 optional: number of retries, defaults to 0
 # $3 optional: seconds between retries, defaults to 1
 try_cmd() {
-  local cmd="${1}"
-  local retries_left=${2:-0}
-  local wait_in_sec="${3:-1}"
-  local cmd_exit_code result
+  local cmd retries_left wait_in_sec result output_file
+
+  cmd="${1}"
+  retries_left=${2:-0}
+  wait_in_sec="${3:-1}"
 
   if [ "${HOPR_VERBOSE:-false}" = "true" ]; then
     log "Executing command: ${cmd}"
   fi
 
-  if [ ${retries_left} -le 0 ]; then
+  if [ "${retries_left}" -le 0 ]; then
     # no retries left, so we just execute the command as is
+    # shellcheck disable=SC2086
     eval ${cmd}
   else
     # the output needs to be captured to not mess up the return result
     # also exit on error needs to be disabled for execution of the command and re-enabled afterwards again
-    local output_file=$(mktemp -q)
-    rm -f ${output_file}
+    output_file="$(mktemp -q)"
+    rm -f "${output_file}"
     set +Eeo pipefail
-    if eval ${cmd} > ${output_file}; then
+    if eval "${cmd}" > "${output_file}"; then
       # command succeeded, return the output
       set -Eeo pipefail
-      local result
-      result=$(cat ${output_file})
-      rm -f ${output_file}
-      echo ${result}
+      result="$(cat "${output_file}")"
+      rm -f "${output_file}"
+      echo "${result}"
     else
       # command failed, need to retry
       set -Eeo pipefail
-      rm -f ${output_file}
+      rm -f "${output_file}"
       ((retries_left--))
-      if [ ${wait_in_sec} > 0 ]; then
-        sleep ${wait_in_sec}
+      if [ "${wait_in_sec}" -gt 0 ]; then
+        sleep "${wait_in_sec}"
       fi
       log "Retrying command ${retries_left} more time(s)"
-      try_cmd "${cmd}" ${retries_left} ${wait_in_sec}
+      try_cmd "${cmd}" ${retries_left} "${wait_in_sec}"
     fi
   fi
 }
@@ -149,19 +160,20 @@ try_cmd() {
 # $2 = regexp to look for
 # $3 = delay, defaults to 1.0 (seconds)
 function wait_for_regex {
-  local file="${1}"
-  local regex="${2}"
-  local delay="${delay:-1.0}"
-  local res
+  local file regex delay res
+
+  file="${1}"
+  regex="${2}"
+  delay="${delay:-1.0}"
 
   while true; do
-    if [ -f ${file} ]; then
+    if [ -f "${file}" ]; then
       res=$(grep -E "${regex}" "${file}" || echo "")
       if [ -n "${res}" ]; then
         break
       fi
     fi
-    sleep ${delay}
+    sleep "${delay}"
   done
 
   echo "${res}"
@@ -170,9 +182,11 @@ function wait_for_regex {
 # $1 = filename
 # $2 = expected content
 function expect_file_content() {
-  local filename="${1}"
-  local expected="${2}"
-  local actual="$(cat "${filename}")"
+  local filename expected actual
+
+  filename="${1}"
+  expected="${2}"
+  actual="$(cat "${filename}")"
 
   if [[ "${expected}" != "${actual}" ]]; then
     log "⛔️ bad content for ${filename}"
@@ -185,7 +199,9 @@ function expect_file_content() {
 }
 
 function find_tmp_dir() {
-  local tmp="/tmp"
+  local tmp
+
+  tmp="/tmp"
 
   if [ ! -d "${tmp}" ] || [ ! -w "${tmp}" ]; then
     tmp="/var/tmp"
@@ -202,25 +218,32 @@ function find_tmp_dir() {
 # encode API token
 # $1 = api token
 encode_api_token(){
-  local api_token=${1}
+  local api_token
+
+  api_token=${1}
+
   # ideally we would use base64's option -w but it's not available in all envs
   echo -n "$api_token" | base64 | tr -d \\n
 }
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_native_address(){
-  local endpoint="${1:-localhost:3001}"
-  local url="${endpoint}/api/v2/account/addresses"
-  local cmd="$(get_authenticated_curl_cmd ${url})"
+  local endpoint url cmd
+
+  endpoint="${1:-localhost:3001}"
+  url="${endpoint}/api/v2/account/addresses"
+  cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".native"
 }
 
 # $1 = optional: endpoint, defaults to http://localhost:3001
 get_hopr_address() {
-  local endpoint="${1:-localhost:3001}"
-  local url="${endpoint}/api/v2/account/addresses"
-  local cmd="$(get_authenticated_curl_cmd ${url})"
+  local endpoint url cmd
+
+  endpoint="${1:-localhost:3001}"
+  url="${endpoint}/api/v2/account/addresses"
+  cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".hopr"
 }
@@ -228,9 +251,10 @@ get_hopr_address() {
 # $1 = endpoint
 # $2 = api token
 validate_hopr_address() {
-  local hopr_address
-  local endpoint="${1}"
-  local api_token="${2}"
+  local hopr_address endpoint api_token valid
+
+  endpoint="${1}"
+  api_token="${2}"
 
   hopr_address="$(get_hopr_address "${api_token}@${endpoint}")"
   if [[ -z "${hopr_address}" ]]; then
@@ -238,7 +262,7 @@ validate_hopr_address() {
     exit 1
   fi
 
-  local valid="$(node -e "(import('@hoprnet/hopr-utils')).then(pId => console.log(pId.hasB58String('${hopr_address}')))")"
+  valid="$(node -e "(import('@hoprnet/hopr-utils')).then(pId => console.log(pId.hasB58String('${hopr_address}')))")"
 
   if ! [[ $valid == "true" ]]; then
     log "Node returns an invalid hopr address: ${hopr_address} derived from endpoint ${endpoint}"
@@ -251,17 +275,18 @@ validate_hopr_address() {
 # $1 = endpoint
 # $2 = api token
 validate_native_address() {
-  local native_address
-  local endpoint="${1}"
-  local api_token="${2}"
+  local native_address endpoint api_token
+
+  endpoint="${1}"
+  api_token="${2}"
 
   native_address="$(get_native_address "${api_token}@${endpoint}")"
-  if [[ -z "${native_address}" ]]; then
+  if [ -z "${native_address}" ]; then
     log "-- could not derive native address from endpoint ${endpoint}"
     exit 1
   fi
 
-  if ! [[ -n $(echo "${native_address}" | sed -nE "/0x[0-9a-fA-F]{40}/p") ]]; then
+  if [ -z "$(echo "${native_address}" | sed -nE "/0x[0-9a-fA-F]{40}/p")" ]; then
     log "Node returns an invalid native address: ${native_address} derived from endpoint ${endpoint}"
     exit 1
   fi
@@ -288,11 +313,11 @@ get_authenticated_curl_cmd() {
   local protocol="http://"
   # extract protocol prefix incl. separator ://
   if [[ "${full_endpoint}" =~ "://" ]]; then
-    protocol="$(echo ${full_endpoint} | sed -e's,^\(.*://\).*,\1,g')"
+    protocol="$(echo "${full_endpoint}" | sed -e's,^\(.*://\).*,\1,g')"
   fi
 
   # remove protocol from endpoint
-  local endpoint_wo_protocol="${full_endpoint#$protocol}"
+  local endpoint_wo_protocol="${full_endpoint#"$protocol"}"
 
   # extract host:port/url portion of endpoint
   local host_w_port="${endpoint_wo_protocol#*@}"
@@ -308,7 +333,8 @@ get_authenticated_curl_cmd() {
 
   # add auth info if token was found previously
   if [ -n "${api_token}" ]; then
-    local api_token_encoded="$(encode_api_token $api_token)"
+    local api_token_encoded
+    api_token_encoded="$(encode_api_token "${api_token}")"
     cmd+=" --header \"Authorization: Basic ${api_token_encoded}\""
   fi
 
@@ -321,14 +347,15 @@ get_authenticated_curl_cmd() {
 # $2 - source_network network name of source e.g. anvil-localhost
 # $3 - destination_network network name of destination e.g. anvil-localhost2
 update_protocol_config_addresses() {
-  local target_file="${1}"
-  local source_file="${2}"
-  local source_network="${3}"
-  local destination_network="${4}"
+  local target_file source_file source_network destination_network source_data
+
+  target_file="${1}"
+  source_file="${2}"
+  source_network="${3}"
+  destination_network="${4}"
 
   log "updating contract addresses in protocol configuration"
 
-  local source_data
   # copy all the fields except for the `stake_season`
   source_data="$(jq -r ".networks.\"${source_network}\"" "${source_file}" | jq "{environment_type: .environment_type, indexer_start_block_number: .indexer_start_block_number, token_contract_address: .token_contract_address, channels_contract_address: .channels_contract_address, xhopr_contract_address: .xhopr_contract_address, boost_contract_address: .boost_contract_address, stake_contract_address: .stake_contract_address, network_registry_proxy_contract_address: .network_registry_proxy_contract_address, network_registry_contract_address: .network_registry_contract_address}")"
   jq --argjson inputdata "${source_data}" ".networks.\"${destination_network}\" += \$inputdata" "${target_file}" > "${target_file}.new"

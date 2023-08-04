@@ -1,16 +1,23 @@
 use ethnum::{u256, AsU256};
+use getrandom::getrandom;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Mul};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::traits::{BinarySerializable, ToHex};
+use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
+}
+
+impl Display for Address {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
 }
 
 impl Default for Address {
@@ -43,6 +50,14 @@ impl Address {
         self.to_hex()
     }
     // }
+
+    /// Creates a random Ethereum address, mostly used for testing
+    pub fn random() -> Self {
+        let mut addr = [0u8; Self::SIZE];
+        getrandom(&mut addr[..]).unwrap();
+
+        Self { addr }
+    }
 }
 
 impl BinarySerializable<'_> for Address {
@@ -73,8 +88,17 @@ impl std::str::FromStr for Address {
             hex::decode(&value[2..])
         } else {
             hex::decode(value)
-        };
-        Self::from_bytes(&decoded.map_err(|_| ParseError)?)
+        }
+        .map_err(|_| ParseError)?;
+        if decoded.len() == Self::SIZE {
+            let mut res = Self {
+                addr: [0u8; Self::SIZE],
+            };
+            res.addr.copy_from_slice(&decoded);
+            Ok(res)
+        } else {
+            Err(ParseError)
+        }
     }
 }
 
@@ -177,7 +201,11 @@ impl Balance {
         assert_eq!(self.balance_type(), other.balance_type());
         Self {
             value: U256 {
-                value: self.value().value().sub(other.value().value()),
+                value: self
+                    .value()
+                    .value()
+                    .checked_sub(other.value().value().clone())
+                    .unwrap_or(u256::ZERO),
             },
             balance_type: self.balance_type,
         }
@@ -186,7 +214,7 @@ impl Balance {
     pub fn isub(&self, amount: u64) -> Self {
         Self {
             value: U256 {
-                value: self.value().value().sub(amount.as_u256()),
+                value: self.value().value().checked_sub(amount.as_u256()).unwrap_or(u256::ZERO),
             },
             balance_type: self.balance_type,
         }
@@ -296,6 +324,16 @@ pub struct Snapshot {
     pub log_index: U256,
 }
 
+impl Default for Snapshot {
+    fn default() -> Self {
+        Self {
+            block_number: U256::zero(),
+            transaction_index: U256::zero(),
+            log_index: U256::zero(),
+        }
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Snapshot {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
@@ -351,6 +389,10 @@ impl U256 {
 
     pub fn zero() -> Self {
         Self { value: u256::ZERO }
+    }
+
+    pub fn max() -> Self {
+        Self { value: u256::MAX }
     }
 
     pub fn one() -> Self {
@@ -463,11 +505,43 @@ impl U256 {
     }
 }
 
+// TODO: move this somewhere more appropriate
+/// Represents an immutable authorization token used by the REST API.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct AuthorizationToken {
+    id: String,
+    token: Box<[u8]>,
+}
+
+impl AutoBinarySerializable<'_> for AuthorizationToken {}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl AuthorizationToken {
+    /// Creates new token from the serialized data and id
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(id: String, data: &[u8]) -> Self {
+        assert!(data.len() < 2048, "invalid token size");
+        Self { id, token: data.into() }
+    }
+
+    /// Gets the id of the token
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    /// Gets token binary data
+    pub fn get(&self) -> Box<[u8]> {
+        self.token.clone()
+    }
+}
+
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
     use super::*;
     use hex_literal::hex;
+    use std::cmp::Ordering;
     use std::str::FromStr;
 
     #[test]
@@ -490,23 +564,51 @@ mod tests {
     }
 
     #[test]
-    fn balance_tests() {
+    fn balance_test_serialize() {
         let b_1 = Balance::from_str("10", BalanceType::HOPR);
         assert_eq!("10 HOPR".to_string(), b_1.to_string(), "to_string failed");
 
         let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
         assert_eq!(b_1, b_2, "deserialized balance does not match");
+    }
 
-        let b3 = Balance::new(100_u32.into(), BalanceType::HOPR);
-        let b4 = Balance::new(200_u32.into(), BalanceType::HOPR);
+    #[test]
+    fn balance_test_arithmetic() {
+        let test_1 = 100_u32;
+        let test_2 = 200_u32;
 
-        assert_eq!(300_u32, b3.add(&b4).value().value().as_u32(), "add test failed");
-        assert_eq!(100_u32, b4.sub(&b3).value().value().as_u32(), "sub test failed");
+        let b3 = Balance::new(test_1.into(), BalanceType::HOPR);
+        let b4 = Balance::new(test_2.into(), BalanceType::HOPR);
+
+        assert_eq!(test_1 + test_2, b3.add(&b4).value().value().as_u32(), "add test failed");
+        assert_eq!(test_2 - test_1, b4.sub(&b3).value().value().as_u32(), "sub test failed");
+        assert_eq!(test_2 - 10, b4.isub(10).value().value().as_u32(), "sub test failed");
+
+        assert_eq!(0_u32, b3.sub(&b4).value().value().as_u32(), "negative test failed");
+        assert_eq!(
+            0_u32,
+            b3.isub(test_2 as u64).value().value().as_u32(),
+            "negative test failed"
+        );
+
+        assert_eq!(
+            test_1 * test_2,
+            b3.mul(&b4).value().value.as_u32(),
+            "multiplication test failed"
+        );
+        assert_eq!(
+            test_2 * test_1,
+            b4.mul(&b3).value().value.as_u32(),
+            "multiplication test failed"
+        );
+        assert_eq!(
+            test_2 * test_1,
+            b4.imul(test_1 as u64).value().value.as_u32(),
+            "multiplication test failed"
+        );
 
         assert!(b3.lt(&b4) && b4.gt(&b3), "lte or lt test failed");
         assert!(b3.lte(&b3) && b4.gte(&b4), "gte or gt test failed");
-
-        //assert!(Balance::new(100_u32.into()).lte(), "lte or lte test failed")
     }
 
     #[test]
@@ -531,6 +633,11 @@ mod tests {
         let u_2 = U256::from_bytes(&u_1.to_bytes()).unwrap();
 
         assert_eq!(u_1, u_2);
+
+        let u_3 = U256::new("2");
+        let u_4 = U256::new("3");
+        assert_eq!(Ordering::Less, u_3.cmp(&u_4));
+        assert_eq!(Ordering::Greater, u_4.cmp(&u_3));
     }
 }
 
@@ -576,6 +683,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -608,6 +716,7 @@ pub mod wasm {
             self.value.to_string()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -640,6 +749,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -662,6 +772,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
@@ -718,6 +829,7 @@ pub mod wasm {
             self.clone()
         }
 
+        #[wasm_bindgen]
         pub fn size() -> u32 {
             Self::SIZE as u32
         }

@@ -1,7 +1,7 @@
 import type { HoprToken, HoprChannels, HoprNetworkRegistry, TypedEventFilter } from '../utils/index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Multiaddr } from '@multiformats/multiaddr'
-import type { Address, ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
+import type { Address, ChannelEntry } from '@hoprnet/hopr-utils'
 
 /**
  * Typechain does not provide us with clean event types, in the lines below we infer
@@ -65,11 +65,7 @@ type StatusListener = (status: IndexerStatus) => void
 type PeerListener = (peerData: { id: PeerId; multiaddrs: Multiaddr[] }) => void
 type ChannelUpdateListener = (channel: ChannelEntry) => void
 type IndexerEventsListener = (txHash: string) => void
-type NetworkRegistryEligibilityChangedListener = (
-  account: Address,
-  hoprNodes: PublicKey[],
-  eligibility: boolean
-) => void
+type NetworkRegistryEligibilityChangedListener = (account: Address, hoprNodes: Address[], eligibility: boolean) => void
 type NetworkRegistryStatusChangedListener = (isEnabled: boolean) => void
 
 export interface IndexerEventEmitter {
@@ -96,7 +92,7 @@ export interface IndexerEventEmitter {
   emit(
     event: NetworkRegistryEligibilityChangedEventName,
     account: Address,
-    hoprNodes: PublicKey[],
+    hoprNodes: Address[],
     eligibility: boolean
   ): boolean
   emit(event: NetworkRegistryStatusChangedEventName, isEnabled: boolean): boolean

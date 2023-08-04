@@ -10,8 +10,7 @@ SHELL := env PATH=$(PATH) $(shell which bash)
 # utility wrapper for forge script to use same options on every invocation
 forge := time forge
 forge-bind = time forge bind
-forge-script = env NETWORK=$(network) FOUNDRY_PROFILE=$(environment-type) time forge script
-
+forge-script = env NETWORK=$(network) FOUNDRY_PROFILE=$(environment-type) ETHERSCAN_API_KEY=$(etherscan_api_key) time forge script
 .PHONY: sc-test
 sc-test:
 	$(forge) test --gas-report
@@ -236,14 +235,28 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "syncEligibility(string[])" $(peer_ids)
 
-ensure-environment-and-network-are-set:
+# These targets needs to be splitted in macOs systems
+ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set ensure-etherscan-api-key-is-set
+
+ensure-network-is-set:
 ifeq ($(network),)
 	echo "parameter <network> missing" >&2 && exit 1
 else
 environment-type != jq '.networks."$(network)".environment_type // empty' contracts-addresses.json
+endif
+
+.PHONY: ensure-etherscan-api-key-is-set
+ensure-etherscan-api-key-is-set:
+ifeq ($(origin ETHERSCAN_API_KEY),undefined)
+# On local testing a dummy key is needed
+	etherscan_api_key=dummyKey
+else
+	etherscan_api_key=${ETHERSCAN_API_KEY}
+endif
+
+ensure-environment-is-set:
 ifeq ($(environment-type),)
 	echo "could not read environment info from contracts-addresses.json" >&2 && exit 1
-endif
 endif
 
 ensure-privatekey-is-set:

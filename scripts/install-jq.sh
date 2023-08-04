@@ -8,6 +8,7 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="install-jq"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 declare exit_code=0

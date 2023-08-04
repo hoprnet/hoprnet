@@ -14,8 +14,11 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="e2e-gcloud-test"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1090
 source "${mydir}/gcloud.sh"
+# shellcheck disable=SC1090
 source "${mydir}/testnet.sh"
 
 usage() {
@@ -56,7 +59,7 @@ declare skip_cleanup="${HOPRD_SKIP_CLEANUP:-false}"
 declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
 declare run_cleanup_only="${HOPRD_RUN_CLEANUP_ONLY:-false}"
 
-: ${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}
+: "${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -151,5 +154,5 @@ done
 
 # --- Run test --- {{{
 HOPRD_API_TOKEN="${api_token}" "${mydir}/../test/integration-test.sh" \
-  ${node_ips_arr[@]/%/:3001}
+  "${node_ips_arr[@]/%/:3001}"
 # }}}

@@ -1,19 +1,19 @@
-use crate::identity_input::LocalIdentityArgs;
-use crate::key_pair::read_identities;
-use crate::password::PasswordArgs;
-use crate::process::{child_process_call_foundry_faucet, set_process_path_env};
+use crate::{
+    identity_input::LocalIdentityArgs,
+    key_pair::read_identities,
+    password::PasswordArgs,
+    process::{child_process_call_foundry_faucet, set_process_path_env},
+    utils::{Cmd, HelperErrors},
+};
 use clap::Parser;
+use core_crypto::types::ToChecksum;
 use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
 use log::{log, Level};
-use std::env;
-use std::str::FromStr;
+use std::{env, str::FromStr};
 use utils_types::primitives::Address;
-
-use crate::utils::{Cmd, HelperErrors};
-use core_crypto::types::ToChecksum;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]
@@ -110,7 +110,7 @@ impl FaucetArgs {
 
             match read_identities(local_files, &pwd) {
                 Ok(node_identities) => {
-                    addresses_all.extend(node_identities.iter().map(|ni| ni.ethereum_address.clone()));
+                    addresses_all.extend(node_identities.iter().map(|ni| ni.chain_key.1.to_address().to_string()));
                 }
                 Err(e) => return Err(e),
             }

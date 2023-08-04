@@ -1,6 +1,9 @@
+use async_lock::RwLock;
+use std::fmt::{Display, Formatter};
+
 use crate::errors::PacketError::{
     AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay,
-    TransportError,
+    Timeout, TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
@@ -11,11 +14,14 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
+use futures::future::{select, Either};
+use futures::pin_mut;
 use libp2p_identity::PeerId;
-use std::ops::{Deref, Mul};
-use std::sync::{Arc, Mutex};
+use std::ops::Mul;
+use std::sync::Arc;
+use std::time::Duration;
 use utils_log::{debug, error, info};
-use utils_types::primitives::{Balance, BalanceType, U256};
+use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 use crate::validation::validate_unacknowledged_ticket;
@@ -57,9 +63,19 @@ const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
 
 /// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug)]
 pub struct Payload {
     remote_peer: PeerId,
     data: Box<[u8]>,
+}
+
+impl Display for Payload {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Payload")
+            .field("remote_peer", &self.remote_peer)
+            .field("data", &hex::encode(&self.data))
+            .finish()
+    }
 }
 
 // Default sizes of the acknowledgement queues
@@ -77,8 +93,7 @@ const ACK_RX_QUEUE_SIZE: usize = 2048;
 /// When no more processing needs to be done, the instance should be stopped via the `stop` method.
 /// Once the instance is stopped, it cannot be restarted.
 pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
-    db: Arc<Mutex<Db>>,
-    // TODO: remove closures and use Sender<T> to allow the type to be Send + Sync
+    db: Arc<RwLock<Db>>,
     pub on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
     pub on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
     public_key: PublicKey,
@@ -89,7 +104,7 @@ pub struct AcknowledgementInteraction<Db: HoprCoreEthereumDbActions> {
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new(
-        db: Arc<Mutex<Db>>,
+        db: Arc<RwLock<Db>>,
         public_key: PublicKey,
         on_acknowledgement: Option<Sender<HalfKeyChallenge>>,
         on_acknowledged_ticket: Option<Sender<AcknowledgedTicket>>,
@@ -105,7 +120,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     }
 
     /// Pushes the `Payload` received from the transport layer into processing.
-    /// If `wait` is `true`, the method waits if the RX queue is full until there's space.
+    /// If `wait` is `true`, the method waits indefinitely if the RX queue is full until there's space.
     /// If `wait` is `false` and the RX queue is full, the method fails with `Err(Retry)`. At this point, the
     /// caller can decide whether to discard the acknowledgement.
     pub async fn received_acknowledgement(&self, payload: Payload, wait: bool) -> Result<()> {
@@ -124,26 +139,33 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     }
 
     /// Pushes a new outgoing acknowledgement into the processing given its destination.
-    /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
-    /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
+    /// If `timeout` is given, the method waits the given time if the TX queue is full until there's space.
+    /// If the `timeout` is zero, the method waits indefinitely.
+    /// If `timeout` is `None` and the TX queue is full, the method fails with `Err(Retry)`
     pub async fn send_acknowledgement(
         &self,
         acknowledgement: Acknowledgement,
         destination: PeerId,
-        wait: bool,
+        timeout: Option<Duration>,
     ) -> Result<()> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_SENT_ACKS.increment();
 
-        if wait {
-            self.outgoing_channel
-                .0
-                .send(Payload {
-                    remote_peer: destination,
-                    data: acknowledgement.to_bytes(),
-                })
-                .await
-                .map_err(|_| TransportError("queue is closed".to_string()))
+        if let Some(timeout_val) = timeout {
+            let push = self.outgoing_channel.0.send(Payload {
+                remote_peer: destination,
+                data: acknowledgement.to_bytes(),
+            });
+            if timeout_val.is_zero() {
+                let timeout = async_std::task::sleep(timeout_val);
+                pin_mut!(push, timeout);
+                match select(push, timeout).await {
+                    Either::Left((res, _)) => res.map_err(|_| TransportError("queue is closed".to_string())),
+                    Either::Right(_) => Err(Timeout(timeout_val.as_secs())),
+                }
+            } else {
+                push.await.map_err(|_| TransportError("queue is closed".to_string()))
+            }
         } else {
             self.outgoing_channel
                 .0
@@ -161,6 +183,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
     /// Start processing the incoming acknowledgement queue.
     pub async fn handle_incoming_acknowledgements(&self) {
         while let Ok(payload) = self.incoming_channel.1.recv().await {
+            debug!("handle incoming acknowledgement loop iteration {payload}");
+
             match Acknowledgement::from_bytes(&payload.data) {
                 Ok(ack) => {
                     if let Err(e) = self.handle_acknowledgement(ack, &payload.remote_peer).await {
@@ -185,6 +209,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
         while let Ok(payload) = self.outgoing_channel.1.recv().await {
+            debug!("handle incoming acknowledgement loop iteration {payload}");
+
             if let Err(e) = message_transport(payload.data, payload.remote_peer.to_string()).await {
                 error!("failed to send acknowledgement to {}: {e}", payload.remote_peer);
             }
@@ -220,8 +246,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
 
         let pending = self
             .db
-            .lock()
-            .unwrap()
+            .read()
+            .await
             .get_pending_acknowledgement(&ack.ack_challenge())
             .await?
             .ok_or_else(|| {
@@ -261,8 +287,8 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 })?;
 
                 self.db
-                    .lock()
-                    .unwrap()
+                    .read()
+                    .await
                     .get_channel_from(&unackowledged.signer)
                     .await
                     .map_err(|e| {
@@ -284,11 +310,13 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 );
 
                 // replace the un-acked ticket with acked ticket.
+                //debug!(">>> WRITE replacing unack with acked");
                 self.db
-                    .lock()
-                    .unwrap()
+                    .write()
+                    .await
                     .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
                     .await?;
+                //debug!("<<< WRITE replacing unack with acked");
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACKED_TICKETS.increment();
@@ -313,6 +341,18 @@ pub struct PacketInteractionConfig {
     pub mixer: MixerConfig,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl PacketInteractionConfig {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(private_key: Box<[u8]>) -> Self {
+        Self {
+            private_key,
+            check_unrealized_balance: true,
+            mixer: MixerConfig::default(),
+        }
+    }
+}
+
 // Default sizes of the packet queues
 const PACKET_TX_QUEUE_SIZE: usize = 2048;
 const PACKET_RX_QUEUE_SIZE: usize = 2048;
@@ -331,7 +371,7 @@ pub struct PacketInteraction<Db>
 where
     Db: HoprCoreEthereumDbActions,
 {
-    db: Arc<Mutex<Db>>,
+    db: Arc<RwLock<Db>>,
     incoming_packets: (Sender<Payload>, Receiver<Payload>),
     outgoing_packets: (Sender<Payload>, Receiver<Payload>),
     pub on_final_packet: Option<Sender<Box<[u8]>>>,
@@ -344,7 +384,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<Mutex<Db>>, on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
             incoming_packets: bounded(PACKET_RX_QUEUE_SIZE),
@@ -358,31 +398,36 @@ where
     async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
         let current_ticket_index = self
             .db
-            .lock()
-            .unwrap()
+            .read()
+            .await
             .get_current_ticket_index(channel_id)
             .await?
             .unwrap_or(U256::one());
 
+        //debug!(">>> WRITE bumping ticket index");
         self.db
-            .lock()
-            .unwrap()
+            .write()
+            .await
             .set_current_ticket_index(channel_id, current_ticket_index.addn(1))
             .await?;
+        //debug!("<<< WRITE bumping ticket index");
 
         Ok(current_ticket_index)
     }
 
-    async fn create_multihop_ticket(&self, destination: PublicKey, path_pos: u8) -> Result<Ticket> {
+    async fn create_multihop_ticket(&self, destination: Address, path_pos: u8) -> Result<Ticket> {
+        debug!("begin creating multihop ticket for destination {destination}");
         let channel = self
             .db
-            .lock()
-            .unwrap()
+            .read()
+            .await
+            // TODO: map from off-chain key to on-chain address
             .get_channel_to(&destination)
             .await?
-            .ok_or(ChannelNotFound(destination.to_peerid().to_string()))?;
+            .ok_or(ChannelNotFound(destination.to_string()))?;
 
         let channel_id = channel.get_id();
+        debug!("going to bump ticket index for channel id {channel_id}");
         let current_index = self.bump_ticket_index(&channel_id).await?;
         let amount = Balance::new(
             U256::new(PRICE_PER_PACKET)
@@ -391,12 +436,8 @@ where
             BalanceType::HOPR,
         );
 
-        let outstanding_balance = self
-            .db
-            .lock()
-            .unwrap()
-            .get_pending_balance_to(&destination.to_address())
-            .await?;
+        debug!("retrieving pending balance to {destination}");
+        let outstanding_balance = self.db.read().await.get_pending_balance_to(&destination).await?;
 
         let channel_balance = channel.balance.sub(&outstanding_balance);
 
@@ -410,7 +451,7 @@ where
         }
 
         let ticket = Ticket::new(
-            destination.to_address(),
+            destination,
             channel.ticket_epoch,
             current_index,
             amount,
@@ -419,23 +460,26 @@ where
             &self.cfg.private_key,
         );
 
-        self.db.lock().unwrap().mark_pending(&ticket).await?;
+        //debug!(">>> WRITE mark_pending lock");
+        self.db.write().await.mark_pending(&ticket).await?;
+        //debug!("<<< WRITE mark_pending lock");
 
         debug!(
             "Creating ticket in channel {channel_id}. Ticket data: {}",
             ticket.to_hex()
         );
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_TICKETS_COUNT.increment();
+        // #[cfg(all(feature = "prometheus", not(test)))]
+        // METRIC_TICKETS_COUNT.increment();
 
         Ok(ticket)
     }
 
     /// Pushes the packet with the given payload for sending via the given valid path.
-    /// If `wait` is `true`, the method waits if the TX queue is full until there's space.
-    /// If `wait` is `false` and the TX queue is full, the method fails with `Err(Retry)`
-    pub async fn send_packet(&self, msg: &[u8], path: Path, wait: bool) -> Result<HalfKeyChallenge> {
+    /// If `timeout` is given, the method waits the given time if the TX queue is full until there's space.
+    /// If `timeout` is zero, the method waits indefinitely.
+    /// If `timeout` is `None` and the TX queue is full, the method fails with `Err(Retry)`
+    pub async fn send_packet(&self, msg: &[u8], path: Path, timeout: Option<Duration>) -> Result<HalfKeyChallenge> {
         // Check if the path is valid
         if !path.valid() {
             return Err(PathNotValid);
@@ -444,33 +488,45 @@ where
         // Decide whether to create 0-hop or multihop ticket
         let next_peer = PublicKey::from_peerid(&path.hops()[0])?;
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, &self.cfg.private_key)
+            // TODO: map from off-chain key to on-chain address
+            Ticket::new_zero_hop(next_peer.to_address(), &self.cfg.private_key)
         } else {
-            self.create_multihop_ticket(next_peer, path.length() as u8).await?
+            self.create_multihop_ticket(next_peer.to_address(), path.length() as u8)
+                .await?
         };
 
         // Create the packet
         let packet = Packet::new(msg, &path.hops(), &self.cfg.private_key, next_ticket)?;
+        debug!("packet state {}", packet.state());
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
+                //debug!(">>> WRITE store_pending_lock");
                 self.db
-                    .lock()
-                    .unwrap()
+                    .write()
+                    .await
                     .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                     .await?;
+
+                //debug!("<<< WRITE store_pending_lock");
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PACKETS_COUNT.increment();
 
-                if wait {
-                    self.outgoing_packets
-                        .0
-                        .send(Payload {
-                            remote_peer: path.hops()[0].clone(),
-                            data: packet.to_bytes(),
-                        })
-                        .await
-                        .map_err(|_| TransportError("queue is closed".to_string()))?;
+                if let Some(timeout_value) = timeout {
+                    let push = self.outgoing_packets.0.send(Payload {
+                        remote_peer: path.hops()[0].clone(),
+                        data: packet.to_bytes(),
+                    });
+                    if !timeout_value.is_zero() {
+                        let timeout = async_std::task::sleep(timeout_value);
+                        pin_mut!(push, timeout);
+                        match select(push, timeout).await {
+                            Either::Left((res, _)) => res.map_err(|_| TransportError("queue is closed".to_string())),
+                            Either::Right(_) => Err(Timeout(timeout_value.as_secs())),
+                        }
+                    } else {
+                        push.await.map_err(|_| TransportError("queue is closed".to_string()))
+                    }
                 } else {
                     self.outgoing_packets
                         .0
@@ -481,11 +537,17 @@ where
                         .map_err(|e| match e {
                             TrySendError::Full(_) => Retry,
                             TrySendError::Closed(_) => TransportError("queue is closed".to_string()),
-                        })?;
-                }
+                        })
+                }?;
+
                 Ok(ack_challenge.clone())
             }
-            _ => panic!("invalid packet state"),
+            _ => {
+                debug!("invalid packet state {:?}", packet.state());
+                Err(crate::errors::PacketError::Other(
+                    utils_types::errors::GeneralError::Other("invalid packet state".into()),
+                ))
+            }
         }
     }
 
@@ -513,23 +575,29 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
+                //debug!(">>> WRITE check_and_set_packet_tag final lock");
+                if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
+                //debug!("<<< WRITE check_and_set_packet_tag final lock");
 
                 // We're the destination of the packet, so emit the packet contents
                 if let Some(emitter) = &self.on_final_packet {
                     // Can we avoid cloning plain_text here ?
+                    debug!("emitting final packet: {}", hex::encode(plain_text));
                     if let Err(e) = emitter.try_send(plain_text.clone()) {
                         error!("failed to emit received final packet: {e}");
                     }
                 }
 
-                // And create acknowledgement
+                // And create acknowledgement, but do not fail completely if it fails
                 let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-                ack_interaction
-                    .send_acknowledgement(ack, previous_hop.to_peerid(), true)
-                    .await?;
+                if let Err(e) = ack_interaction
+                    .send_acknowledgement(ack, previous_hop.to_peerid(), None)
+                    .await
+                {
+                    error!("failed acknowledge the final packet: {e}");
+                }
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECV_MESSAGE_COUNT.increment();
@@ -546,27 +614,31 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if self.db.lock().unwrap().check_and_set_packet_tag(packet_tag).await? {
+                //debug!(">>> WRITE check_and_set_packet_tag forwarded lock");
+                if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
+                //debug!("<<< WRITE check_and_set_packet_tag forwarded lock");
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
                 // Find the corresponding channel
+                debug!("looking for channel {}", previous_hop.to_address());
                 let channel = self
                     .db
-                    .lock()
-                    .unwrap()
-                    .get_channel_from(&previous_hop)
+                    .read()
+                    .await
+                    // TODO: map from off-chain key to on-chain address
+                    .get_channel_from(&previous_hop.to_address())
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
                 // Validate the ticket first
                 if let Err(e) = validate_unacknowledged_ticket::<Db>(
-                    self.db.lock().unwrap().deref(),
+                    &*self.db.read().await,
                     &packet.ticket,
                     &channel,
-                    &previous_hop,
+                    &previous_hop.to_address(),
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                     inverse_win_prob,
                     self.cfg.check_unrealized_balance,
@@ -574,29 +646,32 @@ where
                 .await
                 {
                     // Mark as reject and passthrough the error
-                    self.db.lock().unwrap().mark_rejected(&packet.ticket).await?;
+                    //debug!(">>> WRITE mark_rejected forwarded lock");
+                    self.db.write().await.mark_rejected(&packet.ticket).await?;
+                    //debug!("<<< WRITE mark_rejected forwarded lock");
                     return Err(e);
                 }
 
-                self.db
-                    .lock()
-                    .unwrap()
-                    .set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index)
-                    .await?;
+                //debug!(">>> WRITE storing pending ack");
+                {
+                    let mut g = self.db.write().await;
+                    g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index)
+                        .await?;
 
-                // Store the unacknowledged ticket
-                self.db
-                    .lock()
-                    .unwrap()
-                    .store_pending_acknowledgment(
+                    //debug!(">>> <<< updated current ticket index");
+
+                    // Store the unacknowledged ticket
+                    g.store_pending_acknowledgment(
                         ack_challenge.clone(),
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             packet.ticket.clone(),
                             own_key.clone(),
-                            previous_hop.clone(),
+                            previous_hop.to_address(),
                         )),
                     )
                     .await?;
+                }
+                //debug!("<<< WRITE storing pending ack");
 
                 let path_pos = packet
                     .ticket
@@ -604,9 +679,9 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop.clone(), &self.cfg.private_key)
+                    Ticket::new_zero_hop(next_hop.to_address(), &self.cfg.private_key)
                 } else {
-                    self.create_multihop_ticket(next_hop.clone(), path_pos).await?
+                    self.create_multihop_ticket(next_hop.to_address(), path_pos).await?
                 };
                 previous_peer = previous_hop.to_peerid();
                 next_peer = next_hop.to_peerid();
@@ -621,9 +696,11 @@ where
             .await
             .map_err(|e| TransportError(e))?;
 
-        // Acknowledge to the previous hop that we forwarded the packet
+        // Acknowledge to the previous hop that we forwarded the packet, but do not fail if the acknowledgement fails
         let ack = packet.create_acknowledgement(&self.cfg.private_key).unwrap();
-        ack_interaction.send_acknowledgement(ack, previous_peer, true).await?;
+        if let Err(e) = ack_interaction.send_acknowledgement(ack, previous_peer, None).await {
+            error!("failed to acknowledge relayed packet: {e}");
+        }
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_FWD_MESSAGE_COUNT.increment();
@@ -638,6 +715,7 @@ where
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
         while let Ok(payload) = self.outgoing_packets.1.recv().await {
+            debug!("handle outgoing packet loop iteration {payload}");
             // Send the packet
             if let Err(e) = message_transport(payload.data, payload.remote_peer.to_string()).await {
                 error!("failed to send packet to {}: {e}", payload.remote_peer);
@@ -657,6 +735,7 @@ where
         F: futures::Future<Output = core::result::Result<(), String>>,
     {
         while let Ok(payload) = self.incoming_packets.1.recv().await {
+            debug!("handle incoming packet loop iteration {payload}");
             // Add some random delay via mixer
             let mixed_packet = self.mixer.mix(payload).await;
             match Packet::from_bytes(&mixed_packet.data, &self.cfg.private_key, &mixed_packet.remote_peer) {
@@ -677,7 +756,7 @@ where
     }
 
     /// Pushes the `Payload` received from the transport layer into processing.
-    /// If `wait` is `true`, the method waits if the RX queue is full until there's space.
+    /// If `wait` is `true`, the method waits indefinitely if the RX queue is full until there's space.
     /// If `wait` is `false` and the RX queue is full, the method fails with `Err(Retry)`. At this point, the
     /// caller can decide whether to discard the packet.
     pub async fn received_packet(&self, payload: Payload, wait: bool) -> Result<()> {
@@ -705,7 +784,7 @@ where
     }
 }
 
-#[cfg(all(not(target_arch = "wasm32"), test))]
+#[cfg(test)]
 mod tests {
     use crate::errors::PacketError::PacketDbError;
     use crate::interaction::{
@@ -713,13 +792,13 @@ mod tests {
     };
     use crate::path::Path;
     use crate::por::ProofOfRelayValues;
-    use async_trait::async_trait;
+    use async_std::sync::RwLock;
     use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::random::random_bytes;
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_ethereum_misc::commitment::{initialize_commitment, ChainCommitter, ChannelCommitmentInfo};
+    use core_ethereum_misc::commitment::{initialize_commitment, ChannelCommitmentInfo};
     use core_mixer::mixer::MixerConfig;
     use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement};
     use core_types::channels::{ChannelEntry, ChannelStatus};
@@ -728,7 +807,6 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
-    use mockall::mock;
     use serial_test::serial;
     use std::collections::HashMap;
     use std::ops::Mul;
@@ -739,7 +817,7 @@ mod tests {
     use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
-    use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
+    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
@@ -806,10 +884,10 @@ mod tests {
         Some(MESSAGES.lock().unwrap()[PROTO].get_mut(&for_peer)?.drain(..).collect())
     }
 
-    fn create_dummy_channel(from: &PeerId, to: &PeerId) -> ChannelEntry {
+    fn create_dummy_channel(from: &Address, to: &Address) -> ChannelEntry {
         ChannelEntry::new(
-            PublicKey::from_peerid(from).unwrap(),
-            PublicKey::from_peerid(to).unwrap(),
+            from.to_owned(),
+            to.to_owned(),
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
             Hash::new(&random_bytes::<32>()),
             U256::zero(),
@@ -830,25 +908,16 @@ mod tests {
             .collect()
     }
 
-    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<Mutex<CoreEthereumDb<RustyLevelDbShim>>>> {
+    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
         dbs.iter()
             .enumerate()
             .map(|(i, db)| {
-                Arc::new(Mutex::new(CoreEthereumDb::new(
+                Arc::new(RwLock::new(CoreEthereumDb::new(
                     DB::new(RustyLevelDbShim::new(db.clone())),
-                    PublicKey::from_peerid(&PEERS[i]).unwrap(),
+                    PublicKey::from_peerid(&PEERS[i]).unwrap().to_address(),
                 )))
             })
             .collect::<Vec<_>>()
-    }
-
-    mock! {
-        pub Commiter { }
-        #[async_trait(? Send)]
-        impl ChainCommitter for Commiter {
-            async fn get_commitment(&self) -> Option<Hash>;
-            async fn set_commitment(&mut self, _commitment: &Hash) -> String;
-        }
     }
 
     async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
@@ -858,13 +927,16 @@ mod tests {
         for (index, peer_id) in PEERS.iter().enumerate().take(dbs.len()) {
             let mut db = CoreEthereumDb::new(
                 DB::new(RustyLevelDbShim::new(dbs[index].clone())),
-                PublicKey::from_peerid(&peer_id).unwrap(),
+                PublicKey::from_peerid(&peer_id).unwrap().to_address(),
             );
 
             let mut channel: Option<ChannelEntry> = None;
 
             if index < PEERS.len() - 1 {
-                channel = Some(create_dummy_channel(&peer_id, &PEERS[index + 1]));
+                channel = Some(create_dummy_channel(
+                    &PublicKey::from_peerid(peer_id).unwrap().to_address(),
+                    &PublicKey::from_peerid(&PEERS[index + 1]).unwrap().to_address(),
+                ));
 
                 db.update_channel_and_snapshot(
                     &channel.clone().unwrap().get_id(),
@@ -889,11 +961,7 @@ mod tests {
                     channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
                 };
 
-                let mut commiter = MockCommiter::new();
-                commiter.expect_get_commitment().return_const(None);
-                commiter.expect_set_commitment().return_const("");
-
-                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info, &mut commiter)
+                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info)
                     .await
                     .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }
@@ -1020,8 +1088,8 @@ mod tests {
 
             // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
             core_dbs[0]
-                .lock()
-                .unwrap()
+                .write()
+                .await
                 .store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
                 .await
                 .expect("failed to store pending ack");
@@ -1062,7 +1130,7 @@ mod tests {
                 .send_acknowledgement(
                     Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
                     PEERS[0].clone(),
-                    false,
+                    None,
                 )
                 .await
                 .expect("failed to send ack");
@@ -1196,7 +1264,7 @@ mod tests {
         // Peer 1: start sending out packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_packet(&TEST_MESSAGE, packet_path.clone(), false)
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), None)
                 .await
                 .unwrap();
         }
@@ -1395,7 +1463,7 @@ mod tests {
         // Start sending packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_packet(&TEST_MESSAGE, packet_path.clone(), true)
+                .send_packet(&TEST_MESSAGE, packet_path.clone(), Some(Duration::from_secs(10)))
                 .await
                 .unwrap();
         }
@@ -1435,6 +1503,7 @@ pub mod wasm {
     use crate::path::Path;
     use async_std::channel::unbounded;
     use core_crypto::types::{HalfKeyChallenge, PublicKey};
+    use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_mixer::mixer::Mixer;
     use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement};
@@ -1443,15 +1512,14 @@ pub mod wasm {
     use std::future::Future;
     use std::pin::Pin;
     use std::str::FromStr;
-    use std::sync::{Arc, Mutex};
-    use utils_db::db::DB;
-    use utils_db::leveldb::{LevelDb, LevelDbShim};
-    use utils_log::error;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use utils_db::leveldb::wasm::LevelDbShim;
+    use utils_log::{debug, error};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
@@ -1476,15 +1544,15 @@ pub mod wasm {
                     match $transport_cb.call2(&this, &data, &peer) {
                         Ok(r) => {
                             let promise = js_sys::Promise::from(r);
-                            wasm_bindgen_futures::JsFuture::from(promise)
-                                .await
-                                .map(|_| ())
-                                .map_err(|x| {
-                                    x.dyn_ref::<JsString>()
-                                        .map_or("Failed to send ping message".to_owned(), |x| -> String {
-                                            x.into()
-                                        })
-                                })
+                            match wasm_bindgen_futures::JsFuture::from(promise).await {
+                                Ok(_) => Ok(()),
+                                Err(e) => {
+                                    error!("Failed to send message in packet / acknowledgement interaction");
+                                    error!("{:?}", e);
+
+                                    Err("Failed to send message in packet / acknowledgement interaction".into())
+                                }
+                            }
                         }
                         Err(e) => {
                             error!(
@@ -1510,7 +1578,7 @@ pub mod wasm {
     impl WasmAckInteraction {
         #[wasm_bindgen(constructor)]
         pub fn new(
-            db: LevelDb,
+            db: Database,
             chain_key: PublicKey,
             on_acknowledgement: Option<js_sys::Function>,
             on_acknowledged_ticket: Option<js_sys::Function>,
@@ -1526,6 +1594,8 @@ pub mod wasm {
                     let this = JsValue::null();
                     let cb = on_acknowledgement.unwrap();
                     while let Ok(ack) = ack_recv.recv().await {
+                        debug!("wasm ack recv interaction loop iteration {ack}");
+
                         let param: JsValue = Uint8Array::from(ack.to_bytes().as_ref()).into();
                         if let Err(e) = cb.call1(&this, &param) {
                             error!("failed to call on_ack closure: {:?}", e.as_string());
@@ -1539,6 +1609,8 @@ pub mod wasm {
                     let this = JsValue::null();
                     let cb = on_acknowledged_ticket.unwrap();
                     while let Ok(ack) = ack_tkt_recv.recv().await {
+                        debug!("wasm ack ticket recv interaction loop iteration {ack}");
+
                         let param: JsValue = Uint8Array::from(ack.to_bytes().as_ref()).into();
                         if let Err(e) = cb.call1(&this, &param) {
                             error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
@@ -1549,10 +1621,7 @@ pub mod wasm {
 
             Self {
                 w: Arc::new(AcknowledgementInteraction::new(
-                    Arc::new(Mutex::new(CoreEthereumDb::new(
-                        DB::new(LevelDbShim::new(db)),
-                        chain_key.clone(),
-                    ))),
+                    db.as_ref_counted(),
                     chain_key,
                     on_ack.0,
                     on_ack_ticket.0,
@@ -1564,10 +1633,19 @@ pub mod wasm {
             ok_or_jserr!(self.w.received_acknowledgement(payload, false).await)
         }
 
-        pub async fn send_acknowledgement(&self, ack: Acknowledgement, dest: String) -> JsResult<()> {
+        pub async fn send_acknowledgement(
+            &self,
+            ack: Acknowledgement,
+            dest: String,
+            timeout_secs: u64,
+        ) -> JsResult<()> {
             ok_or_jserr!(
                 self.w
-                    .send_acknowledgement(ack, ok_or_jserr!(PeerId::from_str(&dest))?, false)
+                    .send_acknowledgement(
+                        ack,
+                        ok_or_jserr!(PeerId::from_str(&dest))?,
+                        Some(Duration::from_secs(timeout_secs))
+                    )
                     .await
             )
         }
@@ -1594,20 +1672,14 @@ pub mod wasm {
     #[wasm_bindgen]
     impl WasmPacketInteraction {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: LevelDb, on_final_packet: Option<js_sys::Function>, cfg: PacketInteractionConfig) -> Self {
+        pub fn new(db: Database, on_final_packet: Option<js_sys::Function>, cfg: PacketInteractionConfig) -> Self {
             let on_msg = on_final_packet.is_some().then(unbounded::<Box<[u8]>>).unzip();
 
             // For WASM we need to create mixer with gloo-timers
             let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer.clone());
 
-            let mut w = PacketInteraction::new(
-                Arc::new(Mutex::new(CoreEthereumDb::new(
-                    DB::new(LevelDbShim::new(db)),
-                    PublicKey::from_privkey(&cfg.private_key).expect("invalid private key"),
-                ))),
-                on_msg.0,
-                cfg,
-            );
+            let mut w = PacketInteraction::new(db.as_ref_counted(), on_msg.0, cfg);
+
             w.mixer = gloo_mixer;
 
             if let Some(on_msg_recv) = on_msg.1 {
@@ -1615,6 +1687,7 @@ pub mod wasm {
                     let this = JsValue::null();
                     let cb = on_final_packet.unwrap();
                     while let Ok(ack) = on_msg_recv.recv().await {
+                        debug!("wasm packet interaction loop iteration {}", hex::encode(&ack));
                         let param: JsValue = Uint8Array::from(ack.as_ref()).into();
                         if let Err(e) = cb.call1(&this, &param) {
                             error!("failed to call on_msg closure: {:?}", e.as_string());
@@ -1630,8 +1703,12 @@ pub mod wasm {
             ok_or_jserr!(self.w.received_packet(payload, false).await)
         }
 
-        pub async fn send_packet(&self, msg: &[u8], path: Path) -> JsResult<HalfKeyChallenge> {
-            ok_or_jserr!(self.w.send_packet(msg, path, false).await)
+        pub async fn send_packet(&self, msg: &[u8], path: Path, timeout_secs: u64) -> JsResult<HalfKeyChallenge> {
+            ok_or_jserr!(
+                self.w
+                    .send_packet(msg, path, Some(Duration::from_secs(timeout_secs)))
+                    .await
+            )
         }
 
         pub async fn handle_outgoing_packets(&self, transport_cb: &js_sys::Function) {

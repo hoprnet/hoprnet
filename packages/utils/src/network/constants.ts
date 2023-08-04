@@ -18,8 +18,8 @@ export const PRIVATE_V4_CLASS_B: Network = {
   family: 'IPv4'
 }
 
-// Avado/Dappnode considers this subnet also private
-export const PRIVATE_V4_CLASS_AVADO: Network = {
+// Dappnode considers this subnet also private
+export const PRIVATE_V4_CLASS_DAPPNODE: Network = {
   subnet: Uint8Array.from([255, 255, 0, 0]),
   networkPrefix: Uint8Array.from([172, 33, 0, 0]),
   family: 'IPv4'

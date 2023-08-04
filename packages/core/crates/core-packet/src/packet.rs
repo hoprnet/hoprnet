@@ -8,6 +8,7 @@ use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Publi
 use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge};
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
+use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -253,8 +254,17 @@ pub enum PacketState {
     },
 }
 
+impl Display for PacketState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Final { .. } => write!(f, "Final"),
+            Forwarded { .. } => write!(f, "Forwarded"),
+            Outgoing { .. } => write!(f, "Outgoing"),
+        }
+    }
+}
+
 /// Represents a HOPR packet
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Packet {
     packet: MetaPacket,
     pub challenge: AcknowledgementChallenge,
@@ -422,7 +432,6 @@ impl Packet {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Packet {
     pub fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
@@ -559,7 +568,7 @@ mod tests {
                 private_key,
             )
         } else {
-            Ticket::new_zero_hop(PublicKey::from_peerid(next_peer).unwrap(), private_key)
+            Ticket::new_zero_hop(PublicKey::from_peerid(next_peer).unwrap().to_address(), private_key)
         }
     }
 
@@ -601,129 +610,6 @@ mod tests {
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),
             }
-        }
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::packet::wasm::WasmPacketState::{Final, Forwarded, Outgoing};
-    use crate::packet::{Packet, PacketState};
-    use core_crypto::types::{HalfKey, HalfKeyChallenge, PublicKey};
-    use core_types::channels::Ticket;
-    use js_sys::JsString;
-    use libp2p_identity::{ParseError, PeerId};
-    use std::str::FromStr;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    pub enum WasmPacketState {
-        Final,
-        Forwarded,
-        Outgoing,
-    }
-
-    #[wasm_bindgen]
-    impl Packet {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(msg: &[u8], path: Vec<JsString>, private_key: &[u8], first_ticket: Ticket) -> JsResult<Packet> {
-            let peers = ok_or_jserr!(path
-                .into_iter()
-                .map(|s| PeerId::from_str(&s.as_string().unwrap()))
-                .collect::<Result<Vec<_>, ParseError>>())?;
-            ok_or_jserr!(Self::new(
-                msg,
-                &peers.iter().collect::<Vec<_>>(),
-                private_key,
-                first_ticket
-            ))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8], private_key: &[u8], sender: &str) -> JsResult<Packet> {
-            let sender = ok_or_jserr!(PeerId::from_str(sender))?;
-            ok_or_jserr!(Self::from_bytes(data, private_key, &sender))
-        }
-
-        #[wasm_bindgen(js_name = "forward")]
-        pub fn _forward(&mut self, private_key: &[u8], next_ticket: Ticket) -> JsResult<()> {
-            ok_or_jserr!(self.forward(private_key, next_ticket))
-        }
-
-        #[wasm_bindgen(js_name = "own_key")]
-        pub fn _own_key(&self) -> Option<HalfKey> {
-            match &self.state {
-                PacketState::Forwarded { own_key, .. } => Some(own_key.clone()),
-                PacketState::Outgoing { .. } | PacketState::Final { .. } => None,
-            }
-        }
-
-        #[wasm_bindgen(js_name = "ack_challenge")]
-        pub fn _ack_challenge(&self) -> Option<HalfKeyChallenge> {
-            match &self.state {
-                PacketState::Forwarded { ack_challenge, .. } | PacketState::Outgoing { ack_challenge, .. } => {
-                    Some(ack_challenge.clone())
-                }
-                PacketState::Final { .. } => None,
-            }
-        }
-
-        #[wasm_bindgen(js_name = "next_hop")]
-        pub fn _next_hop(&self) -> Option<PublicKey> {
-            match &self.state {
-                PacketState::Forwarded { next_hop, .. } | PacketState::Outgoing { next_hop, .. } => {
-                    Some(next_hop.clone())
-                }
-                PacketState::Final { .. } => None,
-            }
-        }
-
-        #[wasm_bindgen(js_name = "previous_hop")]
-        pub fn _previous_hop(&self) -> Option<PublicKey> {
-            match &self.state {
-                PacketState::Final { previous_hop, .. } | PacketState::Forwarded { previous_hop, .. } => {
-                    Some(previous_hop.clone())
-                }
-                PacketState::Outgoing { .. } => None,
-            }
-        }
-
-        #[wasm_bindgen(js_name = "packet_tag")]
-        pub fn _packet_tag(&self) -> Option<Box<[u8]>> {
-            match &self.state {
-                PacketState::Final { packet_tag, .. } | PacketState::Forwarded { packet_tag, .. } => {
-                    Some(packet_tag.clone())
-                }
-                PacketState::Outgoing { .. } => None,
-            }
-        }
-
-        #[wasm_bindgen(js_name = "plaintext")]
-        pub fn _plaintext(&self) -> Option<Box<[u8]>> {
-            match &self.state {
-                PacketState::Final { plain_text, .. } => Some(plain_text.clone()),
-                PacketState::Forwarded { .. } | PacketState::Outgoing { .. } => None,
-            }
-        }
-
-        #[wasm_bindgen(js_name = "state")]
-        pub fn _state(&self) -> WasmPacketState {
-            match &self.state {
-                PacketState::Final { .. } => Final,
-                PacketState::Forwarded { .. } => Forwarded,
-                PacketState::Outgoing { .. } => Outgoing,
-            }
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
         }
     }
 }
