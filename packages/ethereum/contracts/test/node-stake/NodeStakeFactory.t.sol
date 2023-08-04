@@ -201,15 +201,13 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest {
 
         // initialize module proxy with valid variables
         bytes memory moduleInitializer =
-            abi.encodeWithSignature("initialize(bytes)", abi.encode(address(1),
-                                                      address(2)));
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(address(1), address(2)));
 
         (bool success1,) = moduleProxy.call(moduleInitializer);
         assertTrue(success1);
         // re-initialize module proxy
         bytes memory moduleReInitializer =
-            abi.encodeWithSignature("initialize(bytes)", abi.encode(address(3),
-                                                      address(4)));
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(address(3), address(4)));
 
         vm.expectRevert(HoprNodeManagementModule.AlreadyInitialized.selector);
         (bool success2,) = moduleProxy.call(moduleReInitializer);

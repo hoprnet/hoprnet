@@ -4,8 +4,14 @@ pragma solidity >=0.8.0 <0.9.0;
 import {Enum} from "safe-contracts/common/Enum.sol";
 import {HoprChannels} from "../../Channels.sol";
 import {EnumerableTargetSet, TargetSet} from "../../utils/EnumerableTargetSet.sol";
-import {TargetUtils, Target, TargetPermission, TargetType,
-Clearance, CapabilityPermission} from "../../utils/TargetUtils.sol";
+import {
+    TargetUtils,
+    Target,
+    TargetPermission,
+    TargetType,
+    Clearance,
+    CapabilityPermission
+} from "../../utils/TargetUtils.sol";
 
 enum GranularPermission {
     NONE,

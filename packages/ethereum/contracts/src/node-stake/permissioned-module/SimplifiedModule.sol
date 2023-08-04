@@ -9,7 +9,7 @@ import "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
  * @title Simplified Module Interface - A contract that can pass messages to a Module Manager contract if enabled by that contract.
  * @dev Adapted from Zodiac's `Module.sol` at
  * https://github.com/gnosis/zodiac/tree/8a77e7b224af8004bd9f2ff4e2919642e93ffd85/contracts/core/Module.sol
- , which * was audited https://github.com/gnosis/zodiac/tree/master/audits
+ *  , which * was audited https://github.com/gnosis/zodiac/tree/master/audits
  * This module removes target attribute, removes guard, and uses UUPS proxy.
  */
 abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
