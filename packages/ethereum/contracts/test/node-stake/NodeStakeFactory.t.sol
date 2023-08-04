@@ -194,6 +194,25 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest {
         vm.clearMockedCalls();
     }
 
+    function testRevert_CloneButFailToInitializeWithMultisendSameAddress(uint256 nonce, address safeAddr) public {
+        vm.assume(safeAddr != address(0));
+
+        address multisendAddr = safeAddr;
+
+        bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
+        // 1. Deploy node management module
+        address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
+
+        // initialize module proxy with invalid variables
+        vm.expectRevert(HoprNodeManagementModule.SafeMultisendSameAddress.selector);
+        // add Safe and multisend to the module
+        bytes memory moduleInitializer =
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        (bool success,) = moduleProxy.call(moduleInitializer);
+        assertFalse(success);
+        vm.clearMockedCalls();
+    }
+
     function testRevert_CloneButFailToInitializeTwice(uint256 nonce, address safeAddr, address multisendAddr) public {
         vm.assume(safeAddr != address(0) && multisendAddr != address(0));
 
