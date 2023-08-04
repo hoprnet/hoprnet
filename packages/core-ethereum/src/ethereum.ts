@@ -440,14 +440,15 @@ export async function createChainWrapper(
    * @returns a Promise that resolves with the transaction hash
    */
   const announce = async (data: AnnouncementData, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
-    log('Announcing on-chain with %s', data.to_string())
-
     let confirmationEssentialTxPayload: TransactionPayload
     let keyBinding = data.key_binding
 
     if (keyBinding) {
-      if (!keyBinding.chain_key.eq(publicKey.to_address())) throw new Error('cannot bind with different public key')
+      if (!keyBinding.chain_key.eq(publicKey.to_address())) {
+        throw new Error('cannot bind with different public key')
+      }
 
+      log(`announcing ${data.to_multiaddress_str} with key binding`)
       let sgn = u8aSplit(keyBinding.signature.serialize(), [32])
       confirmationEssentialTxPayload = buildEssentialTxPayload(
         0,
@@ -459,9 +460,13 @@ export async function createChainWrapper(
         data.to_multiaddress_str()
       )
     } else {
-      // Announce without key binding.
-      // Currently separate key binding call is not implemented in the connector.
-      throw new Error('announcing without key binding is not implemented')
+      log(`announcing ${data.to_multiaddress_str} without key binding`)
+      confirmationEssentialTxPayload = buildEssentialTxPayload(
+        0,
+        channels, // TODO: change the target contract used for announcement
+        'announce',
+        data.to_multiaddress_str() // this already passes the decapsulated multiaddress
+      )
     }
 
     let sendResult: SendTransactionReturn
