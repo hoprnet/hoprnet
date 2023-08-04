@@ -89,6 +89,13 @@ impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
     }
 }
 
+impl From<&OffchainKeypair> for libp2p_identity::Keypair {
+    fn from(value: &OffchainKeypair) -> Self {
+        libp2p_identity::Keypair::ed25519_from_bytes(value.0.clone())
+            .expect("invalid offchain keypair") // must not happen
+    }
+}
+
 /// Represents a keypair consisting of a secp256k1 private and public key
 #[derive(Clone, ZeroizeOnDrop)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -138,6 +145,7 @@ mod tests {
     use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
     use subtle::ConstantTimeEq;
+    use utils_types::traits::PeerIdLike;
 
     #[test]
     fn test_offchain_keypair() {
@@ -160,6 +168,14 @@ mod tests {
 
         assert_eq!(s1.ct_eq(&s2).unwrap_u8(), 1);
         assert_eq!(p1, p2);
+    }
+
+    #[test]
+    fn test_offchain_keypair_libp2p_compatibility() {
+        let kp_1 = OffchainKeypair::random();
+
+        let p2p_kp: libp2p_identity::Keypair = (&kp_1).into();
+        assert_eq!(kp_1.public().to_peerid(), p2p_kp.public().to_peer_id(), "peer ids must be equal");
     }
 
     #[test]

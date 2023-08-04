@@ -73,6 +73,12 @@ impl<L: ArrayLength<u8>> Default for SecretValue<L> {
     }
 }
 
+impl<L: ArrayLength<u8>> AsMut<[u8]> for SecretValue<L> {
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.0.as_mut()
+    }
+}
+
 impl<L: ArrayLength<u8>> SecretValue<L> {
     /// Length of the secret value in bytes.
     pub const LENGTH: usize = L::USIZE;
