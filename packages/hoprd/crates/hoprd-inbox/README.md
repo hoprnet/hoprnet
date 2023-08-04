@@ -6,6 +6,7 @@ The MI works as a non-persistent storage of received HOPR packets categorized by
 The application tag works as a distinguisher of applications running on top of the HOPR protocol, similarly like
 ports work in TCP or UDP.
 Application tag is represented by a 16-bit payload prefix and is built-in the HOPR protocol (see `core-packet`).
+If no tag is given, it defaults to `0`.
 
 The MI can use different backends, which must implement the `InboxBackend` trait.
 
@@ -35,7 +36,7 @@ The `MessageInbox` currently uses a `RingBufferInboxBacked` as its `InboxBackend
 This backend is implemented as hash map (with application tag as a key) of ring-buffers of certain capacity `N`.
 Each bucket can therefore hold `N` messages which can be `pop`ed from oldest to newest.
 The maximum number of messages held in this instantiation of MI is therefore 65536 \* `N`
-(unless some tags are excluded).
+(unless some tags are excluded). Note that in this implementation `N` must be a power of 2.
 
 Each `push` and `pop` operation is always followed by a `purge` call to evict expired entries.
 
@@ -45,3 +46,9 @@ The frontend has the ability to filter out certain application tags on `push`, s
 
 The `MessageInbox` is supposed to live a singleton in the `hoprd` application, and as messages arrive, they
 will be pushed into the inbox. The REST API can then access this singleton to pop messages per request.
+
+## Default configuration
+
+- capacity per tag: 512
+- maximum message age: 15 minutes
+- excluded tags: `0` (this is the default tag, which means untagged messages are excluded at `push`)

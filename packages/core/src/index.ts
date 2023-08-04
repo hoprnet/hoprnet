@@ -99,6 +99,7 @@ import {
   core_hopr_initialize_crate,
   core_hopr_gather_metrics,
   Database,
+  ApplicationData,
   Address as Packet_Address,
   PacketInteractionConfig,
   Path,
@@ -529,7 +530,7 @@ class Hopr extends EventEmitter {
     let packetCfg = new PacketInteractionConfig(privateKeyFromPeer(this.id))
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
-    const onMessage = (_tag: number, msg: Uint8Array) => this.emit('hopr:message', msg)
+    const onMessage = (data: ApplicationData) => this.emit('hopr:message', data)
     this.forward = new WasmPacketInteraction(this.db.clone(), onMessage, packetCfg)
 
     let packetProtocols = [

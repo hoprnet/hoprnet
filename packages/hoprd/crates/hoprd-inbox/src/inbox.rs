@@ -1,6 +1,6 @@
 use async_lock::Mutex;
 use async_trait::async_trait;
-use core_packet::interaction::{ApplicationData, Tag};
+use core_packet::interaction::{ApplicationData, Tag, DEFAULT_APPLICATION_TAG};
 use std::time::Duration;
 
 /// Represents a simple timestamping function.
@@ -42,7 +42,7 @@ pub struct MessageInboxConfiguration {
     /// In the current implementation, the capacity must be a power of two.
     pub capacity: u32,
     /// Maximum age of a message held in the inbox until it is purged.
-    pub max_age_sec: u64,
+    pub max_age_sec: u64, // cannot use std::time::Duration here due to wasm-bindgen
     /// List of tags that are excluded on `push`.
     pub excluded_tags: Vec<Tag>,
 }
@@ -50,9 +50,9 @@ pub struct MessageInboxConfiguration {
 impl Default for MessageInboxConfiguration {
     fn default() -> Self {
         Self {
-            capacity: 1024,
-            max_age_sec: 15 * 60_u64,
-            excluded_tags: vec![],
+            capacity: 512,                                // must be a power of 2 with this implementation
+            max_age_sec: 15 * 60,                         // 15 minutes
+            excluded_tags: vec![DEFAULT_APPLICATION_TAG], // exclude untagged messages pre default
         }
     }
 }
@@ -233,6 +233,14 @@ pub mod wasm {
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
+
+    #[wasm_bindgen]
+    impl MessageInboxConfiguration {
+        #[wasm_bindgen(constructor)]
+        pub fn _new() -> Self {
+            Self::default()
+        }
+    }
 
     #[wasm_bindgen]
     pub struct MessageInbox {

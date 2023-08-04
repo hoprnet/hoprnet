@@ -113,10 +113,10 @@ impl AsRef<[u8]> for ApplicationData {
 }
 
 impl BinarySerializable<'_> for ApplicationData {
-    const SIZE: usize = 2;
+    const SIZE: usize = 2; // minimum size
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if data.len() <= PAYLOAD_SIZE && data.len() >= 2 {
+        if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
             let tag = u16::from_be_bytes(data[0..2].try_into().map_err(|_| ParseError)?);
             Ok(Self {
                 application_tag: if tag != DEFAULT_APPLICATION_TAG {
@@ -1801,10 +1801,12 @@ pub mod wasm {
                             "wasm packet interaction loop iteration {}",
                             hex::encode(&pkt.plain_text)
                         );
-                        let param1: JsValue = pkt.application_tag.map(JsValue::from).unwrap_or(JsValue::UNDEFINED);
-                        let param2: JsValue = Uint8Array::from(pkt.plain_text.as_ref()).into();
-                        if let Err(e) = cb.call2(&this, &param1, &param2) {
-                            error!("failed to call on_msg closure: {:?}", e.as_string());
+                        if let Ok(param) = serde_wasm_bindgen::to_value(&pkt) {
+                            if let Err(e) = cb.call1(&this, &param) {
+                                error!("failed to call on_msg closure: {:?}", e.as_string());
+                            }
+                        } else {
+                            error!("failed to serialize application data")
                         }
                     }
                 });
