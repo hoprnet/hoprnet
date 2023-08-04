@@ -1,19 +1,35 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
+use futures::channel::mpsc::UnboundedSender;
 
 use core_network::{
     PeerId,
-    network::{Network, NetworkExternalActions, PeerStatus}
+    network::{Network, NetworkExternalActions, PeerStatus, NetworkEvent}
 };
-use utils_log::{warn};
+use utils_log::{warn,error};
 
-pub struct ExternalNetworkInteractions {}
+pub struct ExternalNetworkInteractions {
+    emitter: UnboundedSender<NetworkEvent>
+}
+
+impl ExternalNetworkInteractions {
+    pub fn new(emitter: UnboundedSender<NetworkEvent>) -> Self {
+        Self { emitter }
+    }
+}
 
 impl NetworkExternalActions for ExternalNetworkInteractions {
     fn is_public(&self, _: &PeerId) -> bool {
         // NOTE: In the Providence release all nodes are public
         true
+    }
+
+    fn emit(&mut self, event: NetworkEvent) {
+        match self.emitter.start_send(event.clone()) {
+            Ok(_) => {},
+            Err(_) => error!("Failed to emit a network status: {}", event)
+        }
     }
 }
 

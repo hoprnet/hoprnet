@@ -125,6 +125,8 @@ impl std::fmt::Display for NetworkEvent {
 #[cfg_attr(test, mockall::automock)]
 pub trait NetworkExternalActions {
     fn is_public(&self, peer: &PeerId) -> bool;
+
+    fn emit(&mut self, event: NetworkEvent);
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -325,14 +327,14 @@ impl<T: NetworkExternalActions> Network<T> {
                 entry.quality = 0.0_f64.max(entry.quality - self.cfg.quality_step);
 
                 if entry.quality < (self.cfg.quality_step / 2.0) {
-                    self.events_to_emit.push_back(NetworkEvent::CloseConnection(entry.id.clone()));
+                    self.network_actions_api.emit(NetworkEvent::CloseConnection(entry.id.clone()));
                     self.prune_from_network_status(&entry.id);
                     self.entries.remove(&entry.id);
                     return;
                 } else if entry.quality < self.cfg.quality_bad_threshold {
                     self.ignored.insert(entry.id, current_timestamp());
                 } else if entry.quality < self.cfg.quality_offline_threshold {
-                    self.events_to_emit.push_back(NetworkEvent::PeerOffline(entry.id.clone()));
+                    self.network_actions_api.emit(NetworkEvent::PeerOffline(entry.id.clone()));
                 }
             } else {
                 entry.last_seen = ping_result.ok().unwrap();
@@ -555,6 +557,8 @@ mod tests {
         fn is_public(&self, _: &PeerId) -> bool {
             false
         }
+
+        fn emit(&mut self, _: NetworkEvent) { }
     }
 
     fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction> {
@@ -836,6 +840,9 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(3).returning(move |x| x == &public);
+        mock.expect_emit()
+            .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer.clone())))
+            .return_const(());
 
         let mut peers = Network::new(PeerId::random(), 0.6, mock);
 
@@ -844,7 +851,6 @@ mod tests {
         peers.update(&peer, Ok(current_timestamp()));
         peers.update(&peer, Err(()));
 
-        assert_eq!(peers.events_since_last_poll(), vec![NetworkEvent::CloseConnection(peer.clone())]);
         assert!(!peers.has(&public));
     }
 

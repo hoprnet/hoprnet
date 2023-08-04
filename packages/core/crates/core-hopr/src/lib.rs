@@ -9,7 +9,7 @@ use futures::{StreamExt, FutureExt};
 
 use core_network::{
     PeerId,
-    network::Network,
+    network::{Network, NetworkEvent},
     heartbeat::{Heartbeat, HeartbeatConfig},
     messaging::ControlMessage,
     ping::{Ping, PingConfig}
@@ -72,10 +72,12 @@ pub fn build_components(me: libp2p_identity::Keypair,
 {
     let identity = me;
 
+    let (network_events_tx, network_events_rx) = futures::channel::mpsc::unbounded::<NetworkEvent>();
+
     let network = Arc::new(RwLock::new(Network::new(
         PeerId::from(identity.public()),
         network_quality_threshold,
-        adaptors::network::ExternalNetworkInteractions{}
+        adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone())
     )));
 
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
@@ -94,6 +96,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
 
     let heartbeat_network_clone = network.clone();
     let ping_network_clone = network.clone();
+    let swarm_network_clone = network.clone();
     let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
         // TODO: network mechanism to process connections (register, unregister, close...)
         // heartbeat mechanism
@@ -104,7 +107,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
                 .map(|_| HoprLoopComponents::Heartbeat).await
             }
         ),
-        Box::pin(p2p::p2p_loop(identity,
+        Box::pin(p2p::p2p_loop(identity, swarm_network_clone, network_events_rx,
             api::HeartbeatRequester::new(hb_ping_rx), api::HeartbeatResponder::new(hb_pong_tx),
             api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx)
         ).map(|_| HoprLoopComponents::Swarm))
