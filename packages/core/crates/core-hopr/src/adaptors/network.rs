@@ -27,6 +27,7 @@ pub(crate) mod wasm {
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
+    #[derive(Clone)]
     pub struct WasmNetwork {
         network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
     }
