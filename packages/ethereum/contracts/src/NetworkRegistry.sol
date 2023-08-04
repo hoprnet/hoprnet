@@ -263,10 +263,25 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
     }
 
     /**
+     * @dev Returns if a hopr address is registered by a given account.
+     * @param nodeAddress hopr node address
+     * @param account account address
+     */
+    function isNodeRegisteredByAccount(address nodeAddress, address account) public view returns (bool) {
+        if (nodeAddress == address(0) || account == address(0)) {
+            return false;
+        }
+        return account == nodeRegisterdToAccount[nodeAddress];
+    }
+
+    /**
      * @dev Returns if a hopr address is registered and its associated account is eligible or not.
      * @param nodeAddress hopr node address
      */
     function isNodeRegisteredAndEligible(address nodeAddress) public view returns (bool) {
+        if (nodeAddress == address(0)) {
+            return false;
+        }
         // check if peer id is registered
         address registeredAccount = nodeRegisterdToAccount[nodeAddress];
         if (registeredAccount == address(0)) {

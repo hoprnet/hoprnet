@@ -230,6 +230,7 @@ contract HoprNetworkRegistryTest is Test {
         // registered nodes are eligible
         for (uint256 j = 0; j < nodeAddresses.length; j++) {
             assertTrue(hoprNetworkRegistry.isNodeRegisteredAndEligible(nodeAddresses[j]));
+            assertTrue(hoprNetworkRegistry.isNodeRegisteredByAccount(nodeAddresses[j], stakingAccount));
         }
         vm.clearMockedCalls();
     }
@@ -311,6 +312,7 @@ contract HoprNetworkRegistryTest is Test {
         // registerd nodes are beyond their eligibility
         for (uint256 j = 0; j < nodeAddresses.length; j++) {
             assertFalse(hoprNetworkRegistry.isNodeRegisteredAndEligible(nodeAddresses[j]));
+            assertTrue(hoprNetworkRegistry.isNodeRegisteredByAccount(nodeAddresses[j], stakingAccounts[j]));
         }
         vm.clearMockedCalls();
     }
