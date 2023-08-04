@@ -265,6 +265,11 @@ pub mod wasm {
             ok_or_jserr!(Self::from_bytes(data))
         }
 
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &AccountEntry) -> bool {
+            self.eq(other)
+        }
+
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
             self.clone()
