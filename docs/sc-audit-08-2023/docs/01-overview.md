@@ -145,6 +145,38 @@ to a payout of funds.
 The on-chain parts of this concept are implemented in the `Channels.sol` file as
 the `HoprChannels` contract.
 
+### Proof-Of-Relay
+
+Messages in the HOPR network are sent as packets along paths. When sending a packet, the source samples a random path and encodes it into the packet. By using the SPHINX packet format, the creator of the packet derives a shared key with each node along the path. This allows the sender to create secret sharings for adjacent nodes along the path. Once a node processes a mixnet packet, it is able to derive the first part of the secret share. The second part can be derived by the next downstream node and gets sent as an acknowledgement.
+
+In order to claim incentives on-chain for relaying packets, nodes need to reveal the reconstructed secret which we call `porSecret`. This proves to the smart contract that a node has processed a mixnet packet and that the next downstream node has received it and considered it valid.
+
+### Probabilistic Payments
+
+To decouple packet processing from observable on-chain state changes when claiming the incentive for relaying a packet, the HOPR protocol makes use of probabilistic payments. This is not only beneficial for privacy reasons, it also minimizes the number of on-chain state changes.
+
+Incentives for relaying packets are embedded in a data structure that we call "ticket". Once issued, each ticket has a winning probability, which compiles some tickets into an actual payout whereas other do not have any added value. Note that at the time a ticket is issued, it is unclear whether the ticket is a win or not. The HOPR protocol hides this information until the relayer has received the acknowledgement from the next downstream node.
+
+The relayer then combines both key shares and derives a deterministic but pseudo-random secret using a verifiable random function (VRF) that takes the node's private key and the serial number of the ticket. The decision whether a ticket is a win thus depends on entropy from the relayer and from the creator of the packet.
+
+In case ticket issuer and packet creator are not the same party, which applies to all relayers, the ticket issuer has no control on the conditions which turn a ticket into a win or not. To prevent the ticket issuer collusion attacks of packet creator and next downstream node, the decision whether a ticket is a win also depends on the signature of the ticket issuer over the ticket data.
+
+### Payment Channels
+
+By default, probabilisitic payments come with no guarantee that there are any funds to cover for a winning ticket. To still secure payments, nodes create a deposit from which the payout of a ticket gets deducted.
+
+Within the HOPR protocol, creating such a deposit is implemented using unidirectional payment channels. The node who creates the deposit is referred to as source of the payment channel whereas the the node who claim incentives for relaying packets is called destination of the payment channel.
+
+Each payment channel is modeled by a finite state machine with three states: OPEN, CLOSED and PENDING_TO_CLOSE. A payment channel with state CLOSED does not include any funds and thus cannot be used for claiming incentives. Once a node deposits funds in a payment channel, the channel has state OPEN. As long as the payment channel has state or OPEN or PENDING_TO_CLOSE, the destination of the payment channel is allowed to claim incentives for relaying packets, which we call "redeem tickets". Payment channels can be torn down in order to pull out locked funds. This can be initiated by the source and the destination of the payment channel. In case of the latter, this can happen immediately and results in the deposited fund being transferred to the source of the payment channel. On the other hand, if the source attempts to close the channel, it must be possible for the destination to redeem all their tickets as they lose their validity once the channel gets closed. For that reason, the protocol foresees a notice period in which the destination of a payment channel has the opportunity to redeem all their tickets. This state is called PENDING_TO_CLOSE. Once the notice period is due, the source or the destination of the payment channel can finally close the channel.
+
+### Aggregatable tickets
+
+Tickets encode a winning probability which is chosen when issuing the ticket. As not all tickets lead to an actual payout, the value of a ticket is given by the expected value, the product of winning probability and the embedded amount. Winning probability and amount should be chosen according to the usage of the data channel link between source and destination such that there is high chance to have a winning probability in a defined time interval that can be one hour.
+
+Although the node has received a winning ticket, that ticket needs to be submitted to the smart contract and thus leads to a potentially costly state change.
+
+To mitigate this, winning tickets can get aggregated off-chain by the ticket issuer. To do so, the ticket redeemer proves to the ticket issuer that it has received a winning ticket. Since the decision whether a ticket is a win is deterministic and only depends on the ticket, this does not reveal sensitive information to the ticket issuer. Therefore, the ticket issuer can issue a ticket with 100% winning probabilitiy worth the sum of all presented tickets.
+
 ## Threat Model
 
 In our design we consider the following actors:
@@ -160,11 +192,11 @@ In our design we consider the following actors:
 
 As explained previously we also distinguish between 3 private keys:
 
-1. Packet Key: An ed25519 key which is used by a single node. Its generated by
+1. Packet Key: An ed25519 key which is used by a single node. It is generated by
    the node itself at initialization of the node. The packet key is used for
    HOPR packet-related cryptographic operations. Via separation of concerns its
    different from the chain key on purpose.
-2. Chain Key: An secp256k1 key which is used by a single node. Its generated by
+2. Chain Key: An secp256k1 key which is used by a single node. It is generated by
    the node itself at initialization of the node. The chain key is used for any
    on-chain operation of the node. In wallet-terms it may be considered to be a
    hot wallet, because the node can use it at runtime without user interaction.
