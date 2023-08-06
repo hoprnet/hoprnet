@@ -181,7 +181,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
     }
 
     function test_fundChannel(uint96 amount1, uint96 amount2, address src, address dest, address safeContract) public {
-        amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE));
+        amount1 = uint96(bound(amount1, MIN_USED_BALANCE, MAX_USED_BALANCE - MIN_USED_BALANCE));
         amount2 = uint96(bound(amount2, MIN_USED_BALANCE, MAX_USED_BALANCE - amount1));
         vm.assume(src != dest && safeContract != src && safeContract != dest);
         vm.assume(src != address(0) && dest != address(0) && safeContract != address(0));

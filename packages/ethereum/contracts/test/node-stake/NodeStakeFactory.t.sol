@@ -194,32 +194,51 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest {
         vm.clearMockedCalls();
     }
 
+    function testRevert_CloneButFailToInitializeWithMultisendSameAddress(uint256 nonce, address safeAddr) public {
+        vm.assume(safeAddr != address(0));
+
+        address multisendAddr = safeAddr;
+
+        bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
+        // 1. Deploy node management module
+        address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
+
+        // initialize module proxy with invalid variables
+        vm.expectRevert(HoprNodeManagementModule.SafeMultisendSameAddress.selector);
+        // add Safe and multisend to the module
+        bytes memory moduleInitializer =
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        (bool success,) = moduleProxy.call(moduleInitializer);
+        assertFalse(success);
+        vm.clearMockedCalls();
+    }
+
     function testRevert_CloneButFailToInitializeTwice(uint256 nonce, address safeAddr, address multisendAddr) public {
         vm.assume(safeAddr != address(0) && multisendAddr != address(0));
 
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(
-            channels,
-            abi.encodeWithSignature(
-                'token()'
-            ),
-            abi.encode(token)
-        );
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
 
         // 1. Deploy node management module
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
 
         // initialize module proxy with valid variables
-        bytes memory moduleInitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(address(1), address(2), bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
-        (bool result, ) = moduleProxy.call(moduleInitializer);
+        bytes memory moduleInitializer = abi.encodeWithSignature(
+            "initialize(bytes)",
+            abi.encode(
+                address(1), address(2), bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+            )
+        );
+        (bool result,) = moduleProxy.call(moduleInitializer);
         // must not revert
         assertTrue(result);
         // re-initialize module proxy with variables
-        bytes memory moduleReinitializer = abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
+        bytes memory moduleReinitializer =
+            abi.encodeWithSignature("initialize(bytes)", abi.encode(safeAddr, multisendAddr));
         // vm.expectRevert(AlreadyInitialized.selector);
-        (bool secondResult, ) = moduleProxy.call(moduleReinitializer);
+        (bool secondResult,) = moduleProxy.call(moduleReinitializer);
         // must revert
         assertFalse(secondResult);
         vm.clearMockedCalls();
