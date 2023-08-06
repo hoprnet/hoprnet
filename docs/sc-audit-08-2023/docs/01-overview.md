@@ -8,14 +8,6 @@ and steps on how to run tests and other operations on it.
 
 ## Scope
 
----
-
-**FIXME:**
-
-Pin final version prior to submitting for audit.
-
----
-
 All HOPR smart contracts can be found in the hoprnet monorepo:
 
 ```
@@ -25,7 +17,7 @@ https://github.com/hoprnet/hoprnet
 The Git commit hash under audit is:
 
 ```
-d3dbcbe20975c1b0b4bd02fa8afaf42cf0d34c25
+41fa52c9c50b0029cd8329f04409b05d31eb063b
 ```
 
 All smart contracts can be found within the folder:
@@ -38,7 +30,7 @@ For convenience, the following link points to the source folder using the
 correct version:
 
 ```
-https://github.com/hoprnet/hoprnet/tree/d3dbcbe20975c1b0b4bd02fa8afaf42cf0d34c25/packages/ethereum/contracts/src
+https://github.com/hoprnet/hoprnet/tree/41fa52c9c50b0029cd8329f04409b05d31eb063b/packages/ethereum/contracts/src
 ```
 
 Specifically, the following contracts are within the scope of the audit:
