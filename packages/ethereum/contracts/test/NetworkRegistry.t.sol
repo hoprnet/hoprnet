@@ -51,7 +51,11 @@ contract HoprNetworkRegistryTest is Test {
             uint256 allowance = abi.decode(returndataAllowance, (uint256));
             assertEq(allowance, allowances[i]);
             // check eligibility
-            assertTrue(hoprNetworkRegistry.isAccountEligible(stakingAccounts[i]));
+            if (allowance > 0) {
+                assertTrue(hoprNetworkRegistry.isAccountEligible(stakingAccounts[i]));
+            } else {
+                assertFalse(hoprNetworkRegistry.isAccountEligible(stakingAccounts[i]));
+            }
         }
 
         vm.clearMockedCalls();
@@ -223,9 +227,11 @@ contract HoprNetworkRegistryTest is Test {
             vm.expectEmit(true, false, false, true, address(hoprNetworkRegistry));
             emit Registered(stakingAccount, nodeAddresses[i]);
         }
-        vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
-        emit EligibilityUpdated(stakingAccount, true);
-        hoprNetworkRegistry.selfRegister(nodeAddresses);
+        if (nodeAddresses.length > 0) {
+            vm.expectEmit(true, true, false, false, address(hoprNetworkRegistry));
+            emit EligibilityUpdated(stakingAccount, true);
+            hoprNetworkRegistry.selfRegister(nodeAddresses);
+        }
 
         // registered nodes are eligible
         for (uint256 j = 0; j < nodeAddresses.length; j++) {
