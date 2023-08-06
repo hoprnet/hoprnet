@@ -235,7 +235,27 @@ By default, probabilisitic payments come with no guarantee that there are any fu
 
 Within the HOPR protocol, creating such a deposit is implemented using unidirectional payment channels. The node who creates the deposit is referred to as source of the payment channel whereas the the node who claim incentives for relaying packets is called destination of the payment channel.
 
-Each payment channel is modeled by a finite state machine with three states: OPEN, CLOSED and PENDING_TO_CLOSE. A payment channel with state CLOSED does not include any funds and thus cannot be used for claiming incentives. Once a node deposits funds in a payment channel, the channel has state OPEN. As long as the payment channel has state or OPEN or PENDING_TO_CLOSE, the destination of the payment channel is allowed to claim incentives for relaying packets, which we call "redeem tickets". Payment channels can be torn down in order to pull out locked funds. This can be initiated by the source and the destination of the payment channel. In case of the latter, this can happen immediately and results in the deposited fund being transferred to the source of the payment channel. On the other hand, if the source attempts to close the channel, it must be possible for the destination to redeem all their tickets as they lose their validity once the channel gets closed. For that reason, the protocol foresees a notice period in which the destination of a payment channel has the opportunity to redeem all their tickets. This state is called PENDING_TO_CLOSE. Once the notice period is due, the source or the destination of the payment channel can finally close the channel.
+Each payment channel is modeled by a finite state machine with three states: `OPEN`, `CLOSED` and `PENDING_TO_CLOSE`. A payment channel with state `CLOSED` does not include any funds and thus cannot be used for claiming incentives. Once a node deposits funds in a payment channel, the channel has state `OPEN`. As long as the payment channel has state or `OPEN` or `PENDING_TO_CLOSE`, the destination of the payment channel is allowed to claim incentives for relaying packets, which we call "redeem tickets". Payment channels can be torn down in order to pull out locked funds. This can be initiated by the source and the destination of the payment channel. In case of the latter, this can happen immediately and results in the deposited fund being transferred to the source of the payment channel. On the other hand, if the source attempts to close the channel, it must be possible for the destination to redeem all their tickets as they lose their validity once the channel gets closed. For that reason, the protocol foresees a notice period in which the destination of a payment channel has the opportunity to redeem all their tickets. This state is called `PENDING_TO_CLOSE`. Once the notice period is due, the source or the destination of the payment channel can finally close the channel.
+
+```
+                                  redeemTicket()
+                                     ┌──────┐
+ finalizeChannelClosure()            v      │
+  (after notice period), or  ┌──────────────────────┐
+  closeIncomingChannel()     │                      │ initiateChannelClosure()
+            ┌────────────────│   Pending To Close   │<─────────────────┐
+            │                │                      │                  │
+            │                └──────────────────────┘                  │
+            v                                                          │
+     ┌────────────┐      tokensReceived() / fundChannel()         ┌──────────┐
+     │            │──────────────────────────────────────────────>│          │
+     │   Closed   │           closeIncomingChannel()              │   Open   │
+     │            │<──────────────────────────────────────────────│          │
+     └────────────┘                                               └──────────┘
+                                                                    │      ^
+                                                                    └──────┘
+                                                                  redeemTicket()
+```
 
 ### Aggregatable tickets
 

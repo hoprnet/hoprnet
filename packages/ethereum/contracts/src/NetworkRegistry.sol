@@ -338,6 +338,9 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
      */
     function _checkEligibility(address stakingAccount) private view returns (bool) {
         uint256 maxAllowedRegistration = requirementImplementation.maxAllowedRegistrations(stakingAccount);
+        if (maxAllowedRegistration == 0) {
+            return false;
+        }
         if (countRegisterdNodesPerAccount[stakingAccount] <= maxAllowedRegistration) {
             return true;
         } else {
