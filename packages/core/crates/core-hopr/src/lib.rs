@@ -2,13 +2,14 @@ mod adaptors;
 mod helpers;
 mod p2p;
 
-use std::str::FromStr;
+use std::sync::Arc;
 
-use futures::{StreamExt, FutureExt, future::BoxFuture};
+use async_lock::RwLock;
+use futures::{StreamExt, FutureExt, channel::mpsc::Sender};
 
 use core_network::{
     PeerId,
-    network::Network,
+    network::{Network, NetworkEvent},
     heartbeat::{Heartbeat, HeartbeatConfig},
     messaging::ControlMessage,
     ping::{Ping, PingConfig}
@@ -19,19 +20,40 @@ use utils_log::error;
 use crate::p2p::api;
 
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct HoprTools {
-    ping: Ping
-}
+const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
+
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Clone)]
+pub struct HoprTools {
+    ping: adaptors::ping::wasm::WasmPing,
+    network: adaptors::network::wasm::WasmNetwork
+}
+
 impl HoprTools {
     // pub async fn ping()
-    pub fn new(ping: Ping) -> Self {
-        Self { ping }
+    pub fn new(ping: Ping<adaptors::ping::PingExternalInteractions>,
+        peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+        change_notifier: Sender<NetworkEvent>) -> Self
+    {
+        Self {
+            ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
+            network: adaptors::network::wasm::WasmNetwork::new(peers, change_notifier) }
+    }
+
+    pub fn ping(&self) -> adaptors::ping::wasm::WasmPing {
+        self.ping.clone()
+    }
+
+    pub fn network(&self) -> adaptors::network::wasm::WasmNetwork {
+        self.network.clone()
     }
 }
 
+/// Enum differentiator for loop component futures.
+/// 
+/// Used to differentiate the type of the future that exits the loop premateruly
+/// by tagging it as an enum.
 #[derive(Debug, Clone)]
 pub enum HoprLoopComponents {
     Swarm,
@@ -49,78 +71,97 @@ impl std::fmt::Display for HoprLoopComponents {
 
 /// The main core loop containing all of the individual core components running indefinitely
 /// or until the first error/panic.
-/// 
-/// # Arguments
-/// me: Placeholder for an object that can transform to the libp2p_identity::Keypair
-// #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub async fn build_components(me: String,
-    hb_cfg: HeartbeatConfig, hb_api: adaptors::heartbeat::wasm::WasmHeartbeatApi,
-    ping_cfg: PingConfig, ping_api: adaptors::ping::wasm::WasmPingApi
-) -> (HoprTools, futures::future::BoxFuture<'static, ()>) {
+pub fn build_components(me: libp2p_identity::Keypair,
+    network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig) -> (HoprTools, impl std::future::Future<Output=()>)
+{
+    let identity = me;
+
+    let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkEvent>(MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
+
+    let network = Arc::new(RwLock::new(Network::new(
+        PeerId::from(identity.public()),
+        network_quality_threshold,
+        adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone())
+    )));
+
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (pong_tx, pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
     
     // manual ping explicitly called by the API
-    let ping = Ping::new(ping_cfg.clone(), ping_tx, pong_rx, Box::new(ping_api.clone()));
+    let ping = Ping::new(
+        ping_cfg.clone(),
+        ping_tx,
+        pong_rx, 
+        adaptors::ping::PingExternalInteractions::new(network.clone())
+    );
+
+    let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
+    let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
+
+    let heartbeat_network_clone = network.clone();
+    let ping_network_clone = network.clone();
+    let swarm_network_clone = network.clone();
+    let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+        Box::pin(async move {
+            let hb_pinger = Ping::new(ping_cfg, hb_ping_tx, hb_pong_rx, adaptors::ping::PingExternalInteractions::new(ping_network_clone));
+            Heartbeat::new(hb_cfg, hb_pinger, adaptors::heartbeat::HeartbeatExternalInteractions::new(heartbeat_network_clone))
+                .heartbeat_loop()
+                .map(|_| HoprLoopComponents::Heartbeat).await
+            }
+        ),
+        Box::pin(p2p::p2p_loop(identity, swarm_network_clone, network_events_rx,
+            api::HeartbeatRequester::new(hb_ping_rx), api::HeartbeatResponder::new(hb_pong_tx),
+            api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx)
+        ).map(|_| HoprLoopComponents::Swarm))
+    ];
+    let mut futs = helpers::to_futures_unordered(ready_loops);
 
     let main_loop = async move {
-        let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
-    
-        let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
-            // heartbeat mechanism
-            Box::pin(async move {
-                let hb_pinger = Ping::new(ping_cfg, hb_ping_tx, hb_pong_rx, Box::new(ping_api));
-                Heartbeat::<Ping, adaptors::heartbeat::wasm::WasmHeartbeatApi>::new(hb_cfg, hb_pinger, hb_api)
-                    .heartbeat_loop()
-                    .map(|_| HoprLoopComponents::Heartbeat).await
-                }
-            ),
-            // TODO: this needs to be passed from above, packet key
-            Box::pin(p2p::p2p_loop(libp2p_identity::Keypair::generate_ed25519(),
-                api::HeartbeatRequester::new(hb_ping_rx), api::HeartbeatResponder::new(hb_pong_tx),
-                api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx)
-            ).map(|_| HoprLoopComponents::Swarm))
-        ];
-
-        let mut futs = helpers::to_futures_unordered(ready_loops);
         while let Some(process) = futs.next().await {
             error!("CRITICAL: the core system loop unexpectadly stopped: '{}'", process);
             unreachable!("Futures inside the main loop should never terminate, but run in the background");
         };
     };
 
-    // TODO: once main_loop is Send, it can be used
-    // (HoprTools::new(ping), Box::pin(main_loop))
-    (HoprTools::new(ping), Box::pin(async {}))
+    (HoprTools::new(ping, network, network_events_tx), main_loop)
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm_impl {
     use super::*;
-    use std::str::FromStr;
     use wasm_bindgen::prelude::*;
-    
-    use core_network::ping::Pinging;
 
     #[wasm_bindgen]
-    impl HoprTools {
-        /// Ping the peers represented as a Vec<JsString> values that are converted into usable
-        /// PeerIds.
-        ///
-        /// # Arguments
-        /// * `peers` - Vector of String representations of the PeerIds to be pinged.
-        #[wasm_bindgen]
-        pub async fn ping(&mut self, mut peers: Vec<js_sys::JsString>) {
-            let converted = peers
-                .drain(..)
-                .filter_map(|x| {
-                    let x: String = x.into();
-                    core_network::PeerId::from_str(&x).ok()
-                })
-                .collect::<Vec<_>>();
+    pub struct CoreApp {
+        tools: Option<HoprTools>,
+        main_loop: Option<js_sys::Promise>
+    }
 
-            self.ping.ping(converted).await;
+    #[wasm_bindgen]
+    impl CoreApp {
+        /// Constructor
+        /// 
+        /// # Arguments
+        /// me: A value convertible to the `libp2p_identity::Keypair` needed by the swarm
+        #[wasm_bindgen]
+        pub fn new(me: String, network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig) -> Self {
+            let me = libp2p_identity::Keypair::generate_ed25519();
+            let (tools, run_loop) = build_components(me, network_quality_threshold, hb_cfg, ping_cfg);
+
+            Self {
+                tools: Some(tools),
+                main_loop: Some(wasm_bindgen_futures::future_to_promise(run_loop.map(|_| -> Result<JsValue,JsValue> { Ok(JsValue::UNDEFINED)})))
+            }
+        }
+
+        #[wasm_bindgen]
+        pub fn tools(&mut self) -> HoprTools {
+            self.tools.take().expect("HOPR tools should only be extracted once")
+        }
+
+        #[wasm_bindgen]
+        pub fn main_loop(&mut self) -> js_sys::Promise {
+            self.main_loop.take().expect("HOPR main loop should only be extracted once")
         }
     }
 }

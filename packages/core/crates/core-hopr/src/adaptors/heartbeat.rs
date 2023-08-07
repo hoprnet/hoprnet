@@ -1,48 +1,26 @@
-use core_network::{PeerId, heartbeat::HeartbeatExternalApi};
-use utils_log::error;
+use std::sync::Arc;
 
+use async_lock::RwLock;
+use async_trait::async_trait;
 
-#[cfg(feature = "wasm")]
-pub(crate) mod wasm {
-    use super::*;
-    use std::str::FromStr;
-    use wasm_bindgen::prelude::*;
+use core_network::{PeerId, network::Network, heartbeat::HeartbeatExternalApi};
 
-    #[wasm_bindgen]
-    pub struct WasmHeartbeatApi {
-        get_peers: js_sys::Function,
+use crate::adaptors::network::ExternalNetworkInteractions;
+
+pub struct HeartbeatExternalInteractions {
+    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>
+}
+
+impl HeartbeatExternalInteractions {
+    pub fn new(network: Arc<RwLock<Network<ExternalNetworkInteractions>>>) -> Self {
+        Self { network }
     }
+}
 
-    #[wasm_bindgen]
-    impl WasmHeartbeatApi {
-        pub(crate) fn new(get_peers: js_sys::Function) -> Self {
-            Self { get_peers }
-        }
-    }
-
-    impl HeartbeatExternalApi for WasmHeartbeatApi {
-        fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId> {
-            let this = JsValue::null();
-            let timestamp = JsValue::from(from_timestamp);
-
-            return match self.get_peers.call1(&this, &timestamp) {
-                Ok(v) => {
-                    js_sys::Array::from(&v)
-                        .to_vec()
-                        .into_iter()
-                        .filter_map(|v| PeerId::from_str(String::from(js_sys::JsString::from(v)).as_str()).ok())
-                        .collect()
-                }
-                Err(err) => {
-                    error!(
-                        "Failed to perform on peer offline operation with: {}",
-                        err.as_string()
-                            .unwrap_or_else(|| { "Unknown error occurred on fetching the peers to ping".to_owned() })
-                            .as_str()
-                    );
-                    Vec::new()
-                }
-            };
-        }
+#[async_trait]
+impl HeartbeatExternalApi for HeartbeatExternalInteractions {
+    async fn get_peers(&self, from_timestamp: u64) -> Vec<PeerId> {
+        let reader = self.network.write().await;
+        (*reader).find_peers_to_ping(from_timestamp)
     }
 }

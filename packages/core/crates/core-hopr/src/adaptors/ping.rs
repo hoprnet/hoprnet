@@ -1,38 +1,75 @@
-use core_network::{PeerId, ping::PingExternalAPI, types::Result};
-use utils_log::error;
+use std::sync::Arc;
+
+use async_lock::RwLock;
+use async_trait::async_trait;
+
+use core_network::{
+    PeerId,
+    network::Network,
+    ping::{Ping, PingExternalAPI},
+    types::Result
+};
+
+use crate::adaptors::network::ExternalNetworkInteractions;
+
+
+#[derive(Clone)]
+pub struct PingExternalInteractions {
+    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>
+}
+
+impl PingExternalInteractions {
+    pub fn new(network: Arc<RwLock<Network<ExternalNetworkInteractions>>>) -> Self {
+        Self { network }
+    }
+}
+
+#[async_trait]
+impl PingExternalAPI for PingExternalInteractions {
+    async fn on_finished_ping(&self, peer: &PeerId, result: Result) {
+        let mut writer = self.network.write().await;
+        (*writer).update_with_metadata(peer, result, None)
+    }
+}
+
 
 #[cfg(feature = "wasm")]
-pub mod wasm {
+pub(crate) mod wasm {
     use super::*;
+    use std::str::FromStr;
+    use core_network::ping::Pinging;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
-    #[derive(Debug, Clone)]
-    pub struct WasmPingApi {
-        on_finished_ping_cb: js_sys::Function,
+    #[derive(Clone)]
+    pub struct WasmPing {
+        ping: Arc<RwLock<Ping<PingExternalInteractions>>>,
     }
 
-    impl PingExternalAPI for WasmPingApi {
-        fn on_finished_ping(&self, peer: &PeerId, result: Result) {
-            let this = JsValue::null();
-            let peer = JsValue::from(peer.to_base58());
-            let res = {
-                if let Ok(v) = result {
-                    JsValue::from(v as f64)
-                } else {
-                    JsValue::undefined()
-                }
-            };
-
-            if let Err(err) = self.on_finished_ping_cb.call2(&this, &peer, &res) {
-                error!(
-                    "Failed to perform on peer offline operation with: {}",
-                    err.as_string()
-                        .unwrap_or_else(|| { "Unspecified error occurred on registering the ping result".to_owned() })
-                        .as_str()
-                )
-            };
+    impl WasmPing {
+        pub(crate) fn new(ping: Arc<RwLock<Ping<PingExternalInteractions>>>) -> Self {
+            Self { ping }
         }
     }
 
+    #[wasm_bindgen] 
+    impl WasmPing {
+        /// Ping the peers represented as a Vec<JsString> values that are converted into usable
+        /// PeerIds.
+        ///
+        /// # Arguments
+        /// * `peers` - Vector of String representations of the PeerIds to be pinged.
+        #[wasm_bindgen]
+        pub async fn ping(&mut self, mut peers: Vec<js_sys::JsString>) {
+            let converted = peers
+                .drain(..)
+                .filter_map(|x| {
+                    let x: String = x.into();
+                    core_network::PeerId::from_str(&x).ok()
+                })
+                .collect::<Vec<_>>();
+
+            (*self.ping.write().await).ping(converted).await;
+        }
+    }
 }
