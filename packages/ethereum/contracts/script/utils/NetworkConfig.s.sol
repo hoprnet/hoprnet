@@ -71,23 +71,23 @@ contract NetworkConfig is Script {
 
         // console2.log_string(addresses);
 
-        address tokenAddr = json.readAddress(string(abi.encodePacked(addresses, ".token_contract_address")));
+        address tokenAddr = json.readAddress(string(abi.encodePacked(addresses, ".token")));
         address channelAddr =
-            json.readAddress(string(abi.encodePacked(addresses, ".channels_contract_address")));
+            json.readAddress(string(abi.encodePacked(addresses, ".channels")));
         address nodeStakeV2FactoryAddr =
-            json.readAddress(string(abi.encodePacked(addresses, ".node_stake_v2_factory_address")));
+            json.readAddress(string(abi.encodePacked(addresses, ".node_stake_v2_factory")));
         address moduleImplementationAddr =
-            json.readAddress(string(abi.encodePacked(addresses, ".module_implementation_address")));
+            json.readAddress(string(abi.encodePacked(addresses, ".module_implementation")));
         address nodeSafeRegistryAddr =
-            json.readAddress(string(abi.encodePacked(addresses, ".node_safe_registry_address")));
+            json.readAddress(string(abi.encodePacked(addresses, ".node_safe_registry")));
         address networkRegistryProxyAddr =
-            json.readAddress(string(abi.encodePacked(addresses, ".network_registry_proxy_contract_address")));
+            json.readAddress(string(abi.encodePacked(addresses, ".network_registry_proxy")));
         address networkRegistryAddr =
-            json.readAddress(string(abi.encodePacked(addresses, ".network_registry_contract_address")));
+            json.readAddress(string(abi.encodePacked(addresses, ".network_registry")));
         address ticketPriceOracleAddress =
-            json.readAddress(string(abi.encodePacked(addresses, ".ticket_price_oracle_contract_address")));
+            json.readAddress(string(abi.encodePacked(addresses, ".ticket_price_oracle")));
         address announcementAdddress = 
-            json.readAddress(string(abi.encodePacked(addresses, ".announcements_contract_address")));
+            json.readAddress(string(abi.encodePacked(addresses, ".announcements")));
 
         Addresses memory addressStruct = Addresses({
             tokenContractAddress: tokenAddr,
@@ -264,15 +264,15 @@ contract NetworkConfig is Script {
 
 
         string memory addresses = "addresses";
-        addresses.serialize("token_contract_address", networkDetail.addresses.tokenContractAddress);
-        addresses.serialize("channels_contract_address", networkDetail.addresses.channelsContractAddress);
-        addresses.serialize("node_stake_v2_factory_address", networkDetail.addresses.nodeStakeV2FactoryAddress);
-        addresses.serialize("module_implementation_address", networkDetail.addresses.moduleImplementationAddress);
-        addresses.serialize("node_safe_registry_address", networkDetail.addresses.nodeSafeRegistryAddress);
-        addresses.serialize("network_registry_proxy_contract_address", networkDetail.addresses.networkRegistryProxyContractAddress);
-        addresses.serialize("ticket_price_oracle_contract_address", networkDetail.addresses.ticketPriceOracleContractAddress);
-        addresses.serialize("announcements_contract_address", networkDetail.addresses.announcements);
-        addresses = addresses.serialize("network_registry_contract_address", networkDetail.addresses.networkRegistryContractAddress);
+        addresses.serialize("token", networkDetail.addresses.tokenContractAddress);
+        addresses.serialize("channels", networkDetail.addresses.channelsContractAddress);
+        addresses.serialize("node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
+        addresses.serialize("module_implementation", networkDetail.addresses.moduleImplementationAddress);
+        addresses.serialize("node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
+        addresses.serialize("network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress);
+        addresses.serialize("ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
+        addresses.serialize("announcements", networkDetail.addresses.announcements);
+        addresses = addresses.serialize("network_registry", networkDetail.addresses.networkRegistryContractAddress);
 
         json.serialize("addresses", addresses);
         json.serialize("environment_type", parseEnvironmentTypeToString(networkDetail.environmentType));

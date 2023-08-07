@@ -1,78 +1,78 @@
 {
   "networks": {
     "anvil-localhost": {
-      "environment_type": "local",
       "indexer_start_block_number": 1,
       "addresses": {
-        "node_stake_v2_factory_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-        "network_registry_proxy_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-        "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-        "channels_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-        "module_implementation_address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-        "node_safe_registry_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-        "ticket_price_oracle_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
-        "network_registry_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-        "announcements_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
-      }
+        "network_registry_proxy": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+        "module_implementation": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "node_stake_v2_factory": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "node_safe_registry": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "ticket_price_oracle": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+        "channels": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+        "token": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        "announcements": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+        "network_registry": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+      },
+      "environment_type": "local"
     },
     "anvil-localhost2": {
-      "environment_type": "local",
       "indexer_start_block_number": 1,
       "addresses": {
-        "node_stake_v2_factory_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-        "network_registry_proxy_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-        "token_contract_address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-        "channels_contract_address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-        "module_implementation_address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-        "node_safe_registry_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-        "ticket_price_oracle_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
-        "network_registry_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-        "announcements_contract_address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
-      }
+        "network_registry_proxy": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+        "module_implementation": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "node_stake_v2_factory": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "node_safe_registry": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "ticket_price_oracle": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+        "channels": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+        "token": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        "announcements": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+        "network_registry": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+      },
+      "environment_type": "local"
     },
     "rotsee": {
       "environment_type": "staging",
       "indexer_start_block_number": 26356392,
       "addresses": {
-        "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
-        "module_implementation_address": "0x1cf6329673e8A2F009b00883118b3d15E35be529",
-        "network_registry_contract_address": "0x625D27594DF4564A52a0ea5667b0D0450a6f6685",
-        "network_registry_proxy_contract_address": "0xaefC99476f9F04326a748B7E32364B10B8fF4158",
-        "node_safe_registry_address": "0xf5FD9e286662830672B720c21A7Ddc67a00da77a",
-        "node_stake_v2_factory_address": "0x060Cb76C6541bF28f94088e658E4167966E37eF9",
-        "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-        "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000",
-        "announcements_contract_address": "0x0000000000000000000000000000000000000000"
+        "channels": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
+        "module_implementation": "0x1cf6329673e8A2F009b00883118b3d15E35be529",
+        "network_registry": "0x625D27594DF4564A52a0ea5667b0D0450a6f6685",
+        "network_registry_proxy": "0xaefC99476f9F04326a748B7E32364B10B8fF4158",
+        "node_safe_registry": "0xf5FD9e286662830672B720c21A7Ddc67a00da77a",
+        "node_stake_v2_factory": "0x060Cb76C6541bF28f94088e658E4167966E37eF9",
+        "token": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
       }
     },
     "debug-staging": {
       "indexer_start_block_number": 26356264,
       "environment_type": "staging",
       "addresses": {
-        "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
-        "network_registry_contract_address": "0xED4977EBf25137d5E5e039A7a848149d67679F6c",
-        "network_registry_proxy_contract_address": "0x9937Fa1497bE80C473c14B944E213bb381F18C34",
-        "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-        "node_stake_v2_factory_address": "0x0000000000000000000000000000000000000000",
-        "node_safe_registry_address": "0x0000000000000000000000000000000000000000",
-        "module_implementation_address": "0x0000000000000000000000000000000000000000",
-        "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000",
-        "announcements_contract_address": "0x0000000000000000000000000000000000000000"
+        "channels": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
+        "network_registry": "0xED4977EBf25137d5E5e039A7a848149d67679F6c",
+        "network_registry_proxy": "0x9937Fa1497bE80C473c14B944E213bb381F18C34",
+        "token": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
       }
     },
     "monte_rosa": {
       "environment_type": "production",
       "indexer_start_block_number": 24097267,
       "addresses": {
-        "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
-        "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
-        "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
-        "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
-        "node_stake_v2_factory_address": "0x0000000000000000000000000000000000000000",
-        "node_safe_registry_address": "0x0000000000000000000000000000000000000000",
-        "module_implementation_address": "0x0000000000000000000000000000000000000000",
-        "ticket_price_oracle_contract_address": "0x0000000000000000000000000000000000000000",
-        "announcements_contract_address": "0x0000000000000000000000000000000000000000"
+        "channels": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
+        "network_registry": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
+        "network_registry_proxy": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
+        "token": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
       }
     }
   }
