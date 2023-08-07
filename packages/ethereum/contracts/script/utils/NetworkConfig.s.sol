@@ -113,13 +113,22 @@ contract NetworkConfig is Script {
     }
 
     function writeNetwork(string memory _networkName, NetworkDetail memory networkDetail) internal {
-        string memory parsedNewEnvDetail = parseNetworkDetailToString(networkDetail);
-
         // write parsedNewEnvDetail to corresponding key
         string memory configKey = string(abi.encodePacked(".networks.", _networkName));
 
-        // write to file;
-        vm.writeJson(parsedNewEnvDetail, pathToDeploymentFile, configKey);
+        // use vm.writeJson to preserve order of JSON properties
+        vm.writeJson(vm.toString(networkDetail.addresses.tokenContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.token")));
+        vm.writeJson(vm.toString(networkDetail.addresses.channelsContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.channels")));
+        vm.writeJson(vm.toString(networkDetail.addresses.nodeStakeV2FactoryAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.node_stake_v2_factory")));
+        vm.writeJson(vm.toString(networkDetail.addresses.moduleImplementationAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.module_implementation")));
+        vm.writeJson(vm.toString(networkDetail.addresses.nodeSafeRegistryAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.node_safe_registry")));
+        vm.writeJson(vm.toString(networkDetail.addresses.networkRegistryProxyContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.network_registry_proxy")));
+        vm.writeJson(vm.toString(networkDetail.addresses.ticketPriceOracleContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.ticket_price_oracle")));
+        vm.writeJson(vm.toString(networkDetail.addresses.announcements), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.announcements")));
+        vm.writeJson(vm.toString(networkDetail.addresses.networkRegistryContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.network_registry")));
+
+        vm.writeJson(parseEnvironmentTypeToString(networkDetail.environmentType), pathToDeploymentFile, string(abi.encodePacked(configKey, ".environment_type")));
+        vm.writeJson(vm.toString(networkDetail.indexerStartBlockNumber), pathToDeploymentFile, string(abi.encodePacked(configKey, ".indexer_start_block_number")));
     }
 
     function writeCurrentNetwork() internal {
@@ -257,26 +266,5 @@ contract NetworkConfig is Script {
         } else {
             return "local";
         }
-    }
-
-    function parseNetworkDetailToString(NetworkDetail memory networkDetail) internal returns (string memory) {
-        string memory json = "config";
-
-
-        string memory addresses = "addresses";
-        addresses.serialize("token", networkDetail.addresses.tokenContractAddress);
-        addresses.serialize("channels", networkDetail.addresses.channelsContractAddress);
-        addresses.serialize("node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
-        addresses.serialize("module_implementation", networkDetail.addresses.moduleImplementationAddress);
-        addresses.serialize("node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
-        addresses.serialize("network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress);
-        addresses.serialize("ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
-        addresses.serialize("announcements", networkDetail.addresses.announcements);
-        addresses = addresses.serialize("network_registry", networkDetail.addresses.networkRegistryContractAddress);
-
-        json.serialize("addresses", addresses);
-        json.serialize("environment_type", parseEnvironmentTypeToString(networkDetail.environmentType));
-        json = json.serialize("indexer_start_block_number", networkDetail.indexerStartBlockNumber);
-        return json;
     }
 }
