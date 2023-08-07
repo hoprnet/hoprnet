@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
 import "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
@@ -1206,7 +1206,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.CalldataOutOfBounds.selector);
-        moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
+        bool result = moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
+        // must revert
+        assertFalse(result);
         vm.clearMockedCalls();
     }
     /**
@@ -1230,7 +1232,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // execute function
         vm.prank(msgSender);
         vm.expectRevert(HoprCapabilityPermissions.CalldataOutOfBounds.selector);
-        moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
+        bool result = moduleProxy.execTransactionFromModule(channels, 0, data, Enum.Operation.Call);
+        // must revert
+        assertFalse(result);
         vm.clearMockedCalls();
     }
 

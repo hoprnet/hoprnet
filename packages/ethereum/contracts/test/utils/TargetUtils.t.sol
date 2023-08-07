@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
@@ -333,7 +334,6 @@ contract TargetUtilsTest is Test {
         }
 
         if (functionPermissionVal == 0) {
-            CapabilityPermission functionPermission = CapabilityPermission(functionPermissionVal);
             vm.expectRevert(PermissionNotFound.selector);
             targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
         }

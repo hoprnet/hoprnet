@@ -213,13 +213,11 @@ contract HoprStakeSeason4 is Ownable, IERC777Recipient, IERC721Receiver, Reentra
    * Account state, and update totalLocked.
    * @param _from address Address of tokens sender
    * @param _value uint256 token amount being transferred
-   * @param _data bytes Data being sent along with token transfer
    */
   function onTokenTransfer(
     address _from,
     uint256 _value,
-    // solhint-disable-next-line no-unused-vars
-    bytes memory _data
+    bytes memory
   ) external returns (bool) {
     require(msg.sender == LOCK_TOKEN, 'HoprStake: Only accept LOCK_TOKEN in staking');
     require(block.timestamp <= PROGRAM_END, 'HoprStake: Program ended, cannot stake anymore.');
@@ -234,23 +232,17 @@ contract HoprStakeSeason4 is Ownable, IERC777Recipient, IERC721Receiver, Reentra
 
   /**
    * @dev ERC777 hook. To receive wxHOPR to fuel the reward pool with `send()` method. It updates the availableReward by tokenAmount.
-   * @param operator address operator requesting the transfer
    * @param from address token holder address
    * @param to address recipient address
    * @param amount uint256 amount of tokens to transfer
-   * @param userData bytes hex information provided by the token holder (if any)
-   * @param operatorData bytes extra information provided by the operator (if any)
    */
   function tokensReceived(
-    // solhint-disable-next-line no-unused-vars
-    address operator,
+    address,
     address from,
     address to,
     uint256 amount,
-    // solhint-disable-next-line no-unused-vars
-    bytes calldata userData,
-    // solhint-disable-next-line no-unused-vars
-    bytes calldata operatorData
+    bytes calldata,
+    bytes calldata
   ) external override {
     require(msg.sender == REWARD_TOKEN, 'HoprStake: Sender must be wxHOPR token');
     require(to == address(this), 'HoprStake: Must be sending tokens to HoprStake contract');
@@ -263,18 +255,14 @@ contract HoprStakeSeason4 is Ownable, IERC777Recipient, IERC721Receiver, Reentra
    * @dev Whenever a boost `tokenId` token is transferred to this contract via {IERC721-safeTransferFrom}
    * when redeeming, this function is called. Boost factor associated with the
    * It must return its Solidity selector to confirm the token transfer upon success.
-   * @param operator address operator requesting the transfer
    * @param from address token holder address
    * @param tokenId uint256 amount of tokens to transfer
-   * @param data bytes hex information provided by the token holder (if any)
    */
   function onERC721Received(
-    // solhint-disable-next-line no-unused-vars
-    address operator,
+    address,
     address from,
     uint256 tokenId,
-    // solhint-disable-next-line no-unused-vars
-    bytes calldata data
+    bytes calldata
   ) external override returns (bytes4) {
     require(_msgSender() == address(NFT_CONTRACT), 'HoprStake: Cannot SafeTransferFrom tokens other than HoprBoost.');
     require(block.timestamp <= PROGRAM_END, 'HoprStake: Program ended, cannot redeem boosts.');

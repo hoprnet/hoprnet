@@ -43,6 +43,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     error WithMembership();
     // Once module gets created, the ownership cannot be transferred
     error CannotChangeOwner();
+    // when safe and multisend address are the same
+    error SafeMultisendSameAddress();
 
     modifier nodeOnly() {
         if (!role.members[_msgSender()]) {
@@ -63,6 +65,11 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
         // cannot accept a zero address as Safe or multisend contract
         if (_safe == address(0) || _multisend == address(0)) {
             revert HoprCapabilityPermissions.AddressIsZero();
+        }
+
+        // cannot use same address for safe and multisend
+        if (_safe == _multisend) {
+            revert SafeMultisendSameAddress();
         }
 
         // cannot setup again if it's been set up
