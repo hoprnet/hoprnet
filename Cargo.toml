@@ -25,10 +25,12 @@ members = [
 
 [workspace.dependencies]
 async-lock = "2.7.0"
+async-std = { version = "1.12.0", features = ["attributes"] }
 async-trait = "0.1"
 futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
+libp2p-identity = { version = "0.2.1" }
 libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
 serde = { version = "1.0" }
 thiserror = "1.0"
@@ -43,9 +45,12 @@ core-crypto = { path = "packages/core/crates/core-crypto", default-features = fa
 core-network = { path = "packages/core/crates/core-network", default-features = false }
 core-packet = { path = "packages/core/crates/core-packet", default-features = false }
 core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
+core-types = { path = "packages/core/crates/core-types", default-features = false }
+utils-db = { path = "packages/utils/crates/utils-db", default-features = false }
 utils-log = { path = "packages/utils/crates/utils-log", default-features = false }
 utils-misc = { path = "packages/utils/crates/utils-misc", default-features = false}
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
+utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
 
 
 [profile.release]

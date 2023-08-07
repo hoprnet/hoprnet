@@ -17,7 +17,7 @@ async-trait = "0.1"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 futures = "0.3"
 js-sys = { version = "0.3.63", optional = true }
-libp2p-identity = "0.1.2"
+libp2p-identity = { workspace = true }
 thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }

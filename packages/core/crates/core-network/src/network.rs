@@ -5,9 +5,8 @@ use std::time::Duration;
 
 use libp2p_identity::PeerId;
 
-use utils_log::{log, error, info, warn};
+use utils_log::{info, warn};
 use utils_metrics::{
-    histogram_start_measure,
     metrics::{MultiGauge, SimpleGauge}
 };
 
