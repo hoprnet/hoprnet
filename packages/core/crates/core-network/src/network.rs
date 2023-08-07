@@ -108,12 +108,12 @@ impl std::fmt::Display for Health {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum NetworkEvent {
     CloseConnection(PeerId),
     PeerOffline(PeerId),
-    Register(PeerId),
-    Unregister(PeerId)
+    Register(PeerId, PeerOrigin),
+    Unregister(PeerId),
 }
 
 impl std::fmt::Display for NetworkEvent {

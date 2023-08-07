@@ -4,7 +4,7 @@ use async_lock::RwLock;
 use core_network::network::{Network, NetworkEvent};
 use futures::{
     select, StreamExt,
-    channel::mpsc::UnboundedReceiver
+    channel::mpsc::Receiver
 };
 use futures_concurrency::stream::Merge;
 
@@ -51,14 +51,13 @@ impl From<NetworkEvent> for Inputs {
 /// This future can only be resolved by an error or a panic.
 pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     network: Arc<RwLock<Network<crate::adaptors::network::ExternalNetworkInteractions>>>,
-    network_update_input: UnboundedReceiver<NetworkEvent>,
+    network_update_input: Receiver<NetworkEvent>,
     heartbeat_requests: api::HeartbeatRequester,
     heartbeat_responds: api::HeartbeatResponder,
     manual_ping_requests: api::ManualPingRequester,
     manual_ping_responds: api::HeartbeatResponder)
 {
     let mut swarm = core_p2p::build_p2p_network(me);
-    let mut network = network;
     let mut heartbeat_responds = heartbeat_responds;
     let mut manual_ping_responds = manual_ping_responds;
     
@@ -81,10 +80,22 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                     active_manual_pings.insert(req_id);
                 },
                 Inputs::NetworkUpdate(event) => match event {
-                    NetworkEvent::CloseConnection(peer) => {},
-                    NetworkEvent::PeerOffline(peer) => {},
-                    NetworkEvent::Register(peer) => todo!(),
-                    NetworkEvent::Unregister(peer) => todo!(),
+                    NetworkEvent::CloseConnection(peer) => {
+                        if swarm.is_connected(&peer) {
+                            let _ = swarm.disconnect_peer_id(peer);
+                        }
+                    },
+                    NetworkEvent::PeerOffline(_peer) => {
+                        // TODO: this functionality may not be needed after swtich to rust-libp2p
+                    },
+                    NetworkEvent::Register(peer, origin) => {
+                        let mut writer = network.write().await;
+                        (*writer).add(&peer, origin)
+                    },
+                    NetworkEvent::Unregister(peer) => {
+                        let mut writer = network.write().await;
+                        (*writer).remove(&peer)
+                    },
                 }
             },
             event = swarm.select_next_some() => match event {

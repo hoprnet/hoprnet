@@ -5,7 +5,7 @@ mod p2p;
 use std::sync::Arc;
 
 use async_lock::RwLock;
-use futures::{StreamExt, FutureExt};
+use futures::{StreamExt, FutureExt, channel::mpsc::Sender};
 
 use core_network::{
     PeerId,
@@ -20,6 +20,9 @@ use utils_log::error;
 use crate::p2p::api;
 
 
+const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
+
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone)]
 pub struct HoprTools {
@@ -30,11 +33,12 @@ pub struct HoprTools {
 impl HoprTools {
     // pub async fn ping()
     pub fn new(ping: Ping<adaptors::ping::PingExternalInteractions>,
-        peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>) -> Self
+        peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+        change_notifier: Sender<NetworkEvent>) -> Self
     {
         Self {
             ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
-            network: adaptors::network::wasm::WasmNetwork::new(peers) }
+            network: adaptors::network::wasm::WasmNetwork::new(peers, change_notifier) }
     }
 
     pub fn ping(&self) -> adaptors::ping::wasm::WasmPing {
@@ -72,7 +76,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
 {
     let identity = me;
 
-    let (network_events_tx, network_events_rx) = futures::channel::mpsc::unbounded::<NetworkEvent>();
+    let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkEvent>(MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
 
     let network = Arc::new(RwLock::new(Network::new(
         PeerId::from(identity.public()),
@@ -98,8 +102,6 @@ pub fn build_components(me: libp2p_identity::Keypair,
     let ping_network_clone = network.clone();
     let swarm_network_clone = network.clone();
     let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
-        // TODO: network mechanism to process connections (register, unregister, close...)
-        // heartbeat mechanism
         Box::pin(async move {
             let hb_pinger = Ping::new(ping_cfg, hb_ping_tx, hb_pong_rx, adaptors::ping::PingExternalInteractions::new(ping_network_clone));
             Heartbeat::new(hb_cfg, hb_pinger, adaptors::heartbeat::HeartbeatExternalInteractions::new(heartbeat_network_clone))
@@ -121,7 +123,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
         };
     };
 
-    (HoprTools::new(ping, network), main_loop)
+    (HoprTools::new(ping, network, network_events_tx), main_loop)
 }
 
 #[cfg(feature = "wasm")]
@@ -153,13 +155,13 @@ pub mod wasm_impl {
         }
 
         #[wasm_bindgen]
-        pub fn tools(self) -> HoprTools {
-            self.tools.expect("HOPR tools can only be extracted once")
+        pub fn tools(&mut self) -> HoprTools {
+            self.tools.take().expect("HOPR tools should only be extracted once")
         }
 
         #[wasm_bindgen]
-        pub fn main_loop(self) -> js_sys::Promise {
-            self.main_loop.expect("HOPR main loop can only be extracted once")
+        pub fn main_loop(&mut self) -> js_sys::Promise {
+            self.main_loop.take().expect("HOPR main loop should only be extracted once")
         }
     }
 }
