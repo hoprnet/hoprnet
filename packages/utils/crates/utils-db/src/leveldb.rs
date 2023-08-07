@@ -316,7 +316,7 @@ pub mod wasm {
     }
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
+// #[cfg(any(not(feature = "wasm"), test))]
 pub mod rusty {
     use async_trait::async_trait;
     use std::cmp::Ordering;

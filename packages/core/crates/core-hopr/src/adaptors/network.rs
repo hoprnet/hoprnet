@@ -127,7 +127,7 @@ pub(crate) mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn register_with_metadata(&mut self, peer: JsString, origin: PeerOrigin, metadata: &js_sys::Map) {
+        pub async fn register_with_metadata(&mut self, peer: JsString, origin: PeerOrigin, _metadata: &js_sys::Map) {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
                 Ok(p) => {
