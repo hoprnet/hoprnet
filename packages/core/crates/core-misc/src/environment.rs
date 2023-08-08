@@ -96,26 +96,15 @@ pub struct Network {
     /// must match one of the Network.id
     pub chain: String,
     pub environment_type: EnvironmentType,
-    // Node.js-fashioned semver string
+    /// Node.js-fashioned semver string
     pub version_range: String,
+    /// block number to start the indexer from
     pub indexer_start_block_number: u32,
-    /// an Ethereum address
-    pub token_contract_address: String,
-    /// an Ethereum address
-    pub channels_contract_address: String,
-    /// an Ethereum address
-    pub xhopr_contract_address: String,
-    /// an Ethereum address
-    pub boost_contract_address: String,
-    /// an Ethereum address
-    pub stake_contract_address: String,
-    /// an Ethereum address
-    pub network_registry_proxy_contract_address: String,
-    /// an Ethereum address
-    pub network_registry_contract_address: String,
     pub tags: Vec<String>,
     /// the associated staking season
     pub stake_season: Option<u32>,
+    /// contract addresses used by the network
+    pub addresses: Addresses,
 }
 
 // duplicate due to issue of wasm_bindgen with proc macros on struct properties
@@ -129,27 +118,41 @@ pub struct Network {
     /// must match one of the Network.id
     pub chain: String,
     pub environment_type: EnvironmentType,
-    // Node.js-fashioned semver string
+    /// Node.js-fashioned semver string
     pub version_range: String,
+    /// block number to start the indexer from
     pub indexer_start_block_number: u32,
-    /// an Ethereum address
-    pub token_contract_address: String,
-    /// an Ethereum address
-    pub channels_contract_address: String,
-    /// an Ethereum address
-    pub xhopr_contract_address: String,
-    /// an Ethereum address
-    pub boost_contract_address: String,
-    /// an Ethereum address
-    pub stake_contract_address: String,
-    /// an Ethereum address
-    pub network_registry_proxy_contract_address: String,
-    /// an Ethereum address
-    pub network_registry_contract_address: String,
     #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Vec<String>,
     /// the associated staking season
     pub stake_season: Option<u32>,
+    /// contract addresses used by the network
+    pub addresses: Addresses,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+#[wasm_bindgen(getter_with_clone)]
+pub struct Addresses {
+    /// address of contract that manages authorization to access the Hopr network
+    pub network_registry: String,
+    /// address of contract that maps to the requirements that need to be fulfilled
+    /// in order to access the network, upgradeable
+    pub network_registry_proxy: String,
+    /// HoprChannels contract address, implementation of mixnet incentives
+    pub channels: String,
+    /// Hopr token contract address
+    pub token_contract: String,
+    /// contract address of Safe capability module implementation
+    pub module_implementation: String,
+    /// address of contract that maps between Safe instances and node addresses
+    pub node_safe_registry: String,
+    /// address of contract that allows Hopr Association to dictate price per packet in Hopr
+    pub ticket_price_oracle: String,
+    /// address of contract that manages transport announcements in the hopr network
+    pub announcements: String,
+    /// factory contract to produce Safe instances
+    pub node_stake_v2_factory: String,
 }
 
 #[derive(Deserialize)]
@@ -232,21 +235,26 @@ pub struct ResolvedNetwork {
     pub id: String,
     pub chain: ChainOptions,
     pub environment_type: EnvironmentType,
-    /// an Ethereum address
-    pub channels_contract_address: String,
     pub channel_contract_deploy_block: u32,
-    /// an Ethereum address
-    pub token_contract_address: String,
-    /// an Ethereum address
-    pub xhopr_contract_address: String,
-    /// an Ethereum address
-    pub boost_contract_address: String,
-    /// an Ethereum address
-    pub stake_contract_address: String,
-    /// an Ethereum address
-    pub network_registry_proxy_contract_address: String,
-    /// an Ethereum address
-    pub network_registry_contract_address: String,
+    /// address of contract that manages authorization to access the Hopr network
+    pub network_registry: String,
+    /// address of contract that maps to the requirements that need to be fulfilled
+    /// in order to access the network, upgradeable
+    pub network_registry_proxy: String,
+    /// HoprChannels contract address, implementation of mixnet incentives
+    pub channels: String,
+    /// Hopr token contract address
+    pub token_contract: String,
+    /// contract address of Safe capability module implementation
+    pub module_implementation: String,
+    /// address of contract that maps between Safe instances and node addresses
+    pub node_safe_registry: String,
+    /// address of contract that allows Hopr Association to dictate price per packet in Hopr
+    pub ticket_price_oracle: String,
+    /// address of contract that manages transport announcements in the hopr network
+    pub announcements: String,
+    /// factory contract to produce Safe instances
+    pub node_stake_v2_factory: String,
 }
 
 impl ResolvedNetwork {
@@ -275,13 +283,15 @@ impl ResolvedNetwork {
                 chain: chain.to_owned(),
                 environment_type: network.environment_type,
                 channel_contract_deploy_block: network.indexer_start_block_number,
-                token_contract_address: network.token_contract_address.to_owned(),
-                channels_contract_address: network.channels_contract_address.to_owned(),
-                xhopr_contract_address: network.xhopr_contract_address.to_owned(),
-                boost_contract_address: network.boost_contract_address.to_owned(),
-                stake_contract_address: network.stake_contract_address.to_owned(),
-                network_registry_contract_address: network.network_registry_contract_address.to_owned(),
-                network_registry_proxy_contract_address: network.network_registry_proxy_contract_address.to_owned(),
+                token_contract: network.addresses.token_contract.to_owned(),
+                channels: network.addresses.channels.to_owned(),
+                network_registry: network.addresses.network_registry.to_owned(),
+                network_registry_proxy: network.addresses.network_registry_proxy.to_owned(),
+                module_implementation: network.addresses.module_implementation.to_owned(),
+                node_safe_registry: network.addresses.node_safe_registry.to_owned(),
+                ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
+                announcements: network.addresses.announcements.to_owned(),
+                node_stake_v2_factory: network.addresses.node_stake_v2_factory.to_owned()
             }),
             Ok(false) => protocol_config.supported_networks(mono_repo_path).and_then(|envs| {
                 Err(format!(

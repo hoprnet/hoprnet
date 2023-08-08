@@ -18,7 +18,7 @@ contract GetAccountBalancesScript is Script, Test, NetworkConfig {
         nativeBalance = account.balance;
         // check token balance of account;
         (bool successReadTokenBalance, bytes memory returndataTokenBalance) =
-            currentNetworkDetail.tokenContractAddress.staticcall(abi.encodeWithSignature("balanceOf(address)", account));
+            currentNetworkDetail.addresses.tokenContractAddress.staticcall(abi.encodeWithSignature("balanceOf(address)", account));
         if (!successReadTokenBalance) {
             revert("Cannot read balanceOf token contract");
         }
