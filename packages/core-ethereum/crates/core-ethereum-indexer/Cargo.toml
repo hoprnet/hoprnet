@@ -1,0 +1,30 @@
+[package]
+name = "core-ethereum-indexer"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Core-Ethereum-specific interaction with the backend database"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+thiserror = "1.0"
+console_error_panic_hook = { version = "0.1.7", optional = true }
+ethers = { version = "2", default-features = false, features = ["abigen"] }
+wasm-bindgen = { workspace = true, optional = true }
+js-sys = { version = "0.3.63", optional = true }
+hex = "0.4.3"
+wasm-bindgen-futures = { version = "0.4.36", optional = true }
+
+bindings = { path = "../../../ethereum/crates/bindings", default-features = false }
+core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
+utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
