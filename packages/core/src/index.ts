@@ -1334,7 +1334,7 @@ class Hopr extends EventEmitter {
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
-    channelClosureSecs: number
+    noticePeriodChannelClosure: number
   } {
     return HoprCoreEthereum.getInstance().smartContractInfo()
   }

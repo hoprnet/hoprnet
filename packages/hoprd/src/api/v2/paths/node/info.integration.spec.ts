@@ -41,7 +41,7 @@ describe('GET /node/info', () => {
       hoprTokenAddress: HOPR_TOKEN_ADDRESS,
       hoprChannelsAddress: HOPR_CHANNELS_ADDRESS,
       hoprNetworkRegistryAddress: HOPR_NEWTWORK_REGISTRY_ADDRESS,
-      channelClosureSecs: 60
+      noticePeriodChannelClosure: 60
     })
     node.getAddressesAnnouncedToDHT = sinon.fake.resolves(DHT_ADDRESSES)
     node.getListeningAddresses = sinon.fake.returns(LISTENING_ADDRS)

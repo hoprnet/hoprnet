@@ -29,8 +29,6 @@ impl fmt::Display for EnvironmentType {
 /// Contract addresses and configuration associated with a environment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkDetail {
-    /// number of the staking season used in the environment
-    pub stake_season: u8,
     /// block number from which the indexer starts
     pub indexer_start_block_number: u32,
     /// Type of environment
@@ -50,7 +48,7 @@ pub struct Addresses {
     /// HoprChannels contract address, implementation of mixnet incentives
     pub channels: String, 
     /// Hopr token contract address
-    pub token_contract: String,
+    pub token: String,
     /// contract address of Safe capability module implementation 
     pub module_implementation: String,
     /// address of contract that maps between Safe instances and node addresses

@@ -101,8 +101,6 @@ pub struct Network {
     /// block number to start the indexer from
     pub indexer_start_block_number: u32,
     pub tags: Vec<String>,
-    /// the associated staking season
-    pub stake_season: Option<u32>,
     /// contract addresses used by the network
     pub addresses: Addresses,
 }
@@ -124,8 +122,6 @@ pub struct Network {
     pub indexer_start_block_number: u32,
     #[wasm_bindgen(skip)] // no tags in Typescript
     pub tags: Vec<String>,
-    /// the associated staking season
-    pub stake_season: Option<u32>,
     /// contract addresses used by the network
     pub addresses: Addresses,
 }
@@ -142,7 +138,7 @@ pub struct Addresses {
     /// HoprChannels contract address, implementation of mixnet incentives
     pub channels: String,
     /// Hopr token contract address
-    pub token_contract: String,
+    pub token: String,
     /// contract address of Safe capability module implementation
     pub module_implementation: String,
     /// address of contract that maps between Safe instances and node addresses
@@ -244,7 +240,7 @@ pub struct ResolvedNetwork {
     /// HoprChannels contract address, implementation of mixnet incentives
     pub channels: String,
     /// Hopr token contract address
-    pub token_contract: String,
+    pub token: String,
     /// contract address of Safe capability module implementation
     pub module_implementation: String,
     /// address of contract that maps between Safe instances and node addresses
@@ -283,7 +279,7 @@ impl ResolvedNetwork {
                 chain: chain.to_owned(),
                 environment_type: network.environment_type,
                 channel_contract_deploy_block: network.indexer_start_block_number,
-                token_contract: network.addresses.token_contract.to_owned(),
+                token: network.addresses.token.to_owned(),
                 channels: network.addresses.channels.to_owned(),
                 network_registry: network.addresses.network_registry.to_owned(),
                 network_registry_proxy: network.addresses.network_registry_proxy.to_owned(),
