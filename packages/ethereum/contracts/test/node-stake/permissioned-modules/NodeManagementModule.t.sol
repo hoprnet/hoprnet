@@ -342,9 +342,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
         // add nodes and take one from the added node
         _helperAddNodes(accounts);
 
-        if (accounts[index] == address(0)) {
-            return;
-        }
+        vm.assume(accounts[index] != address(0));
 
         assertTrue(moduleProxy.isNode(accounts[index]));
 
