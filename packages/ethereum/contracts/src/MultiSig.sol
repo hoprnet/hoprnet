@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-import "./node-stake/NodeSafeRegistry.sol";
+import {HoprNodeSafeRegistry} from "./node-stake/NodeSafeRegistry.sol";
 
 /**
  *    &&&&
@@ -19,7 +19,6 @@ import "./node-stake/NodeSafeRegistry.sol";
  *                                          %%%%
  *
  * Provides modifiers to enforce usage of a MultiSig contract
- *
  */
 abstract contract HoprMultiSig {
     error AlreadyInitialized();

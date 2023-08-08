@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 
-contract HoprTicketPriceOracleEvents {
+abstract contract HoprTicketPriceOracleEvents {
     // emitted when ticket price was updated
     event TicketPriceUpdated(uint256, uint256);
 }

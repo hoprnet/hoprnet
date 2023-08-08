@@ -17,7 +17,6 @@ pragma solidity 0.8.19;
  *                                          %%%%
  *
  * Indexes data trustlessly to allow a fast-sync for nodes in the network.
- *
  */
 abstract contract HoprLedger {
     string public constant LEDGER_VERSION = "1.0.0";

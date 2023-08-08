@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import "forge-std/Test.sol";
-import "./utils/Accounts.sol";
+import {Test} from "forge-std/Test.sol";
+import {AccountsFixtureTest} from  "./utils/Accounts.sol";
 
-import "../src/MultiSig.sol";
-import "../src/node-stake/NodeSafeRegistry.sol";
+import {HoprMultiSig} from "../src/MultiSig.sol";
+import {HoprNodeSafeRegistry} from "../src/node-stake/NodeSafeRegistry.sol";
 
 // We need this dummy contract to correctly set msg.sender
 // when testing modifiers of abstract contracts

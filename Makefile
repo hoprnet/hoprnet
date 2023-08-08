@@ -6,7 +6,7 @@ mydir := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
 
 # Gets all packages that include a Rust crates
 # Disable automatic compilation of SC bindings. Can still be done manually.
-WORKSPACES_WITH_RUST_MODULES := $(filter-out ./packages/ethereum/crates,$(wildcard $(addsuffix /crates, $(wildcard ./packages/*))))
+WORKSPACES_WITH_RUST_MODULES := $(wildcard $(addsuffix /crates, $(wildcard ./packages/*)))
 
 # Gets all individual crates such that they can get built
 CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(crate)/*/Cargo.toml)))

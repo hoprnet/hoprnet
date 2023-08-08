@@ -3,8 +3,27 @@ pragma solidity 0.8.19;
 
 import "openzeppelin-contracts/utils/Multicall.sol";
 
-import "./MultiSig.sol";
-import "./node-stake/NodeSafeRegistry.sol";
+import {HoprMultiSig} from "./MultiSig.sol";
+import {HoprNodeSafeRegistry} from "./node-stake/NodeSafeRegistry.sol";
+
+abstract contract HoprAnnouncementsEvents {
+    event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
+
+    /**
+     * A node is announce with a multiaddress base which a peer can use to
+     * construct a full p2p multiaddress.
+     * Examples:
+     *   /dns4/ams-2.bootstrap.libp2p.io/tcp/443/wss
+     *   /ip6/2604:1380:2000:7a00::1/tcp/4001
+     *   /ip4/147.75.83.83/tcp/4001
+     *   /ip6/2604:1380:2000:7a00::1/udp/4001/quic
+     *   /ip4/147.75.83.83/udp/4001/quic
+     *   /dns6/ams-2.bootstrap.libp2p.io/tcp/443/wss
+     */
+    event AddressAnnouncement(address node, string baseMultiaddr);
+
+    event RevokeAnnouncement(address node);
+}
 
 /**
  *    &&&&
@@ -24,24 +43,7 @@ import "./node-stake/NodeSafeRegistry.sol";
  * Publishes transport-layer information in the hopr network.
  *
  */
-contract HoprAnnouncements is Multicall, HoprMultiSig {
-    event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
-
-    /**
-     * A node is announce with a multiaddress base which a peer can use to
-     * construct a full p2p multiaddress.
-     * Examples:
-     *   /dns4/ams-2.bootstrap.libp2p.io/tcp/443/wss
-     *   /ip6/2604:1380:2000:7a00::1/tcp/4001
-     *   /ip4/147.75.83.83/tcp/4001
-     *   /ip6/2604:1380:2000:7a00::1/udp/4001/quic
-     *   /ip4/147.75.83.83/udp/4001/quic
-     *   /dns6/ams-2.bootstrap.libp2p.io/tcp/443/wss
-     */
-    event AddressAnnouncement(address node, string baseMultiaddr);
-
-    event RevokeAnnouncement(address node);
-
+contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
     constructor(HoprNodeSafeRegistry safeRegistry) {
         setNodeSafeRegistry(safeRegistry);
     }

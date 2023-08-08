@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import "forge-std/Test.sol";
-import "../src/Announcements.sol";
-import "../src/node-stake/NodeSafeRegistry.sol";
+import {Test} from "forge-std/Test.sol";
+import {HoprAnnouncements, HoprAnnouncementsEvents} from "../src/Announcements.sol";
+import {HoprNodeSafeRegistry} from "../src/node-stake/NodeSafeRegistry.sol";
 
 // Dummy since there is no verification happening on-chain
 bytes32 constant ed25519_sig_0 = 0x000000000000000000000000000000000000000000000000000000000ed25519;
@@ -13,7 +13,7 @@ string constant multiaddress = "/ip6/2604:1380:2000:7a00::1/udp/4001/quic";
 
 bytes32 constant ed25519_pub_key = 0x3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c;
 
-contract AccountTest is Test {
+contract AnnouncementsTest is Test {
     HoprNodeSafeRegistry safeRegistry;
     HoprAnnouncements announcements;
 
