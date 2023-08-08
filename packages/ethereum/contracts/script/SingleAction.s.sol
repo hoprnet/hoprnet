@@ -475,33 +475,33 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     //   _stakeNft(boostContractAddr, sender, recipient, tokenId);
     // }
 
-    // /**
-    //  * @dev This function funds a recipient wallet with HOPR tokens and native tokens, but only when the recipient has not yet received
-    //  * enough value.
-    //  * First, HOPR tokens are prioritized to be transferred than minted to the recipient
-    //  * Native tokens are transferred to the recipient
-    //  * @param recipient The address of the recipient wallet.
-    //  * @param hoprTokenAmountInWei, The amount of HOPR tokens that recipient is desired to receive
-    //  * @param nativeTokenAmountInWei The amount of native tokens that recipient is desired to receive
-    //  */
-    // function transferOrMintHoprAndSendNativeToAmount(
-    //   address recipient,
-    //   uint256 hoprTokenAmountInWei,
-    //   uint256 nativeTokenAmountInWei
-    // ) external payable {
-    //   // 1. get environment and msg.sender
-    //   getNetworkAndMsgSender();
+    /**
+     * @dev This function funds a recipient wallet with HOPR tokens and native tokens, but only when the recipient has not yet received
+     * enough value.
+     * First, HOPR tokens are prioritized to be transferred than minted to the recipient
+     * Native tokens are transferred to the recipient
+     * @param recipient The address of the recipient wallet.
+     * @param hoprTokenAmountInWei, The amount of HOPR tokens that recipient is desired to receive
+     * @param nativeTokenAmountInWei The amount of native tokens that recipient is desired to receive
+     */
+    function transferOrMintHoprAndSendNativeToAmount(
+      address recipient,
+      uint256 hoprTokenAmountInWei,
+      uint256 nativeTokenAmountInWei
+    ) external payable {
+      // 1. get environment and msg.sender
+      getNetworkAndMsgSender();
 
-    //   // 2. transfer or mint hopr tokens
-    //   _transferOrMintHoprToAmount(currentNetworkDetail.hoprTokenContractAddress, recipient, hoprTokenAmountInWei);
+      // 2. transfer or mint hopr tokens
+      _transferOrMintHoprToAmount(currentNetworkDetail.addresses.tokenContractAddress, recipient, hoprTokenAmountInWei);
 
-    //   // 3. transfer native balance to the recipient
-    //   if (nativeTokenAmountInWei > recipient.balance) {
-    //     (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}('');
-    //     require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
-    //   }
-    //   vm.stopBroadcast();
-    // }
+      // 3. transfer native balance to the recipient
+      if (nativeTokenAmountInWei > recipient.balance) {
+        (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}('');
+        require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
+      }
+      vm.stopBroadcast();
+    }
 
     // /**
     //  * @dev private function to check if an account owns a Network Registry NFT of nftRank
@@ -544,18 +544,18 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     //   return (ownsNft, tokenId);
     // }
 
-    // /**
-    //  * Get the token balance of a wallet
-    //  */
-    // function _getTokenBalanceOf(address tokenAddress, address wallet) internal view returns (uint256) {
-    //   (bool successReadOwnedTokens, bytes memory returndataReadOwnedTokens) = tokenAddress.staticcall(
-    //     abi.encodeWithSignature('balanceOf(address)', wallet)
-    //   );
-    //   if (!successReadOwnedTokens) {
-    //     revert FailureInReadBalance(tokenAddress);
-    //   }
-    //   return abi.decode(returndataReadOwnedTokens, (uint256));
-    // }
+    /**
+     * Get the token balance of a wallet
+     */
+    function _getTokenBalanceOf(address tokenAddress, address wallet) internal view returns (uint256) {
+      (bool successReadOwnedTokens, bytes memory returndataReadOwnedTokens) = tokenAddress.staticcall(
+        abi.encodeWithSignature('balanceOf(address)', wallet)
+      );
+      if (!successReadOwnedTokens) {
+        revert FailureInReadBalance(tokenAddress);
+      }
+      return abi.decode(returndataReadOwnedTokens, (uint256));
+    }
 
     // /**
     //  * ported from HoprStakeBase.sol
@@ -640,48 +640,48 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     //   }
     // }
 
-    // function _transferOrMintHoprToAmount(
-    //   address hoprTokenContractAddress,
-    //   address recipient,
-    //   uint256 hoprTokenAmountInWei
-    // ) private {
-    //   // 1. get recipient balance
-    //   uint256 recipientTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, recipient);
+    function _transferOrMintHoprToAmount(
+      address hoprTokenContractAddress,
+      address recipient,
+      uint256 hoprTokenAmountInWei
+    ) private {
+      // 1. get recipient balance
+      uint256 recipientTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, recipient);
 
-    //   // 2. transfer some Hopr tokens to the recipient, or mint tokens
-    //   if (hoprTokenAmountInWei > recipientTokenBalance) {
-    //     // get the difference to transfer
-    //     uint256 hoprTokenToTransfer = hoprTokenAmountInWei - recipientTokenBalance;
-    //     // check the hopr token balance
-    //     uint256 senderHoprTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, msgSender);
+      // 2. transfer some Hopr tokens to the recipient, or mint tokens
+      if (hoprTokenAmountInWei > recipientTokenBalance) {
+        // get the difference to transfer
+        uint256 hoprTokenToTransfer = hoprTokenAmountInWei - recipientTokenBalance;
+        // check the hopr token balance
+        uint256 senderHoprTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, msgSender);
 
-    //     if (senderHoprTokenBalance >= hoprTokenToTransfer) {
-    //       // call transfer
-    //       (bool successTransfserTokens, ) = hoprTokenContractAddress.call(
-    //         abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenToTransfer)
-    //       );
-    //       if (!successTransfserTokens) {
-    //         emit log_string('Cannot transfer HOPR tokens to the recipient');
-    //       }
-    //     } else {
-    //       // if transfer cannot be called, try minting token as a minter
-    //       bytes32 MINTER_ROLE = keccak256('MINTER_ROLE');
-    //       (bool successHasRole, bytes memory returndataHasRole) = hoprTokenContractAddress.staticcall(
-    //         abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender)
-    //       );
-    //       if (!successHasRole) {
-    //         revert('Cannot check role for Hopr token.');
-    //       }
-    //       bool isMinter = abi.decode(returndataHasRole, (bool));
-    //       require(isMinter, 'Caller is not a minter');
+        if (senderHoprTokenBalance >= hoprTokenToTransfer) {
+          // call transfer
+          (bool successTransfserTokens, ) = hoprTokenContractAddress.call(
+            abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenToTransfer)
+          );
+          if (!successTransfserTokens) {
+            emit log_string('Cannot transfer HOPR tokens to the recipient');
+          }
+        } else {
+          // if transfer cannot be called, try minting token as a minter
+          bytes32 MINTER_ROLE = keccak256('MINTER_ROLE');
+          (bool successHasRole, bytes memory returndataHasRole) = hoprTokenContractAddress.staticcall(
+            abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender)
+          );
+          if (!successHasRole) {
+            revert('Cannot check role for Hopr token.');
+          }
+          bool isMinter = abi.decode(returndataHasRole, (bool));
+          require(isMinter, 'Caller is not a minter');
 
-    //       (bool successMintTokens, ) = hoprTokenContractAddress.call(
-    //         abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenToTransfer, hex'00', hex'00')
-    //       );
-    //       if (!successMintTokens) {
-    //         emit log_string('Cannot mint HOPR tokens to the recipient');
-    //       }
-    //     }
-    //   }
-    // }
+          (bool successMintTokens, ) = hoprTokenContractAddress.call(
+            abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenToTransfer, hex'00', hex'00')
+          );
+          if (!successMintTokens) {
+            emit log_string('Cannot mint HOPR tokens to the recipient');
+          }
+        }
+      }
+    }
 }
