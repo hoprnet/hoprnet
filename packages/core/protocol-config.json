@@ -4,14 +4,14 @@
       "chain": "anvil",
       "environment_type": "local",
       "version_range": "*",
-      "indexer_start_block_number": 2,
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-      "stake_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "network_registry_proxy_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "network_registry_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+      "indexer_start_block_number": 11,
+      "token_contract_address": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+      "channels_contract_address": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+      "xhopr_contract_address": null,
+      "boost_contract_address": null,
+      "stake_contract_address": null,
+      "network_registry_proxy_contract_address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+      "network_registry_contract_address": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
       "tags": []
     },
     "anvil-localhost2": {
@@ -40,7 +40,9 @@
       "stake_contract_address": "0x26d1CEC4Ba2F98Ff35ec549Fcd1b82A90bb32065",
       "network_registry_proxy_contract_address": "0x628ED93eEBF1840bF26e8fB62BCe4F1BCCDE9e95",
       "network_registry_contract_address": "0x278A44a487D2Ca9303c2B9Abe00605B075cBa69F",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     },
     "debug-staging": {
       "chain": "xdai",
@@ -54,7 +56,9 @@
       "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998",
       "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
       "network_registry_proxy_contract_address": "0x9937Fa1497bE80C473c14B944E213bb381F18C34",
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "tuttlingen": {
       "environment_type": "production",
@@ -152,7 +156,9 @@
       "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
       "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
       "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     },
     "monte_rosa": {
       "chain": "xdai",
@@ -166,7 +172,9 @@
       "stake_contract_address": "0x65c39e6BD97f80B5aE5d2120a47644578Fd2B8DC",
       "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
       "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     }
   },
   "chains": {

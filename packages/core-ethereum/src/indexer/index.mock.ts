@@ -4,7 +4,7 @@ import type { HoprChannels, HoprNetworkRegistry, HoprToken, TypedEvent } from '.
 
 import {
   Address,
-  Hash,
+  // Hash,
   generate_channel_id,
   Balance,
   BalanceType,
@@ -13,10 +13,10 @@ import {
   AccountEntry,
   PublicKey,
   LevelDb,
-  ChannelEntry,
-  U256,
-  stringToU8a,
-  number_to_channel_status
+  // ChannelEntry,
+  // U256,
+  // stringToU8a,
+  // number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
 import { Ethereum_Address, Ethereum_Database as Database } from '../db.js'
@@ -62,7 +62,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 
   const handleEvent = (ev: TypedEvent<any, any>) => {
     if (ev.event == 'ChannelUpdated') {
-      const updateEvent = ev as Event<'ChannelUpdated'>
+      const updateEvent = ev // as Event<'ChannelUpdated'>
 
       const eventChannelId = generate_channel_id(
         Address.from_string(updateEvent.args.source),
@@ -84,30 +84,30 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       return channels[channelId]
     }
 
-    async bumpChannel(_counterparty: string, _comm: string) {
-      let newEvent = {
-        event: 'ChannelUpdated',
-        transactionHash: '',
-        blockNumber: 3,
-        transactionIndex: 0,
-        logIndex: 0,
-        args: {
-          source: PARTY_B().to_address().to_hex(),
-          destination: PARTY_A().to_address().to_hex(),
-          newState: {
-            balance: BigNumber.from('3'),
-            commitment: Hash.create([new TextEncoder().encode('commA')]).to_hex(),
-            ticketEpoch: BigNumber.from('1'),
-            ticketIndex: BigNumber.from('0'),
-            status: 2,
-            channelEpoch: BigNumber.from('0'),
-            closureTime: BigNumber.from('0')
-          }
-        } as any
-      } as Event<'ChannelUpdated'>
-      handleEvent(newEvent)
-      pastEvents.push(newEvent)
-    }
+    // async bumpChannel(_counterparty: string, _comm: string) {
+    //   let newEvent = {
+    //     event: 'ChannelUpdated',
+    //     transactionHash: '',
+    //     blockNumber: 3,
+    //     transactionIndex: 0,
+    //     logIndex: 0,
+    //     args: {
+    //       source: PARTY_B().to_address().to_hex(),
+    //       destination: PARTY_A().to_address().to_hex(),
+    //       newState: {
+    //         balance: BigNumber.from('3'),
+    //         commitment: Hash.create([new TextEncoder().encode('commA')]).to_hex(),
+    //         ticketEpoch: BigNumber.from('1'),
+    //         ticketIndex: BigNumber.from('0'),
+    //         status: 2,
+    //         channelEpoch: BigNumber.from('0'),
+    //         closureTime: BigNumber.from('0')
+    //       }
+    //     } as any
+    //   } as Event<'ChannelUpdated'>
+    //   handleEvent(newEvent)
+    //   pastEvents.push(newEvent)
+    // }
 
     async queryFilter() {
       return pastEvents
@@ -268,8 +268,8 @@ const createChainMock = (
       )
     },
     getPublicKey: () => fixtures.PARTY_A(),
-    setCommitment: (counterparty: Address, commitment: Hash) =>
-      hoprChannels.bumpChannel(counterparty.to_hex(), commitment.to_hex()),
+    // setCommitment: (counterparty: Address, commitment: Hash) =>
+    //   hoprChannels.bumpChannel(counterparty.to_hex(), commitment.to_hex()), // FIXME: 
     getAllQueuingTransactionRequests: () => [txRequest],
     getAllUnconfirmedHash: () => [fixtures.OPENED_EVENT.transactionHash]
   } as unknown as ChainWrapper
@@ -315,29 +315,29 @@ export const useFixtures = async (
     newTokenEvent,
     newRegistryEvent,
     indexer: new TestingIndexer(id.to_address(), db, 1, 5),
-    chain,
-    OPENED_CHANNEL: new ChannelEntry(
-      Address.from_string(fixtures.OPENED_EVENT.args.source),
-      Address.from_string(fixtures.OPENED_EVENT.args.destination),
-      new Balance(fixtures.OPENED_EVENT.args.newState.balance.toString(), BalanceType.HOPR),
-      new Hash(stringToU8a(fixtures.OPENED_EVENT.args.newState.commitment)),
-      new U256(fixtures.OPENED_EVENT.args.newState.ticketEpoch.toString()),
-      new U256(fixtures.OPENED_EVENT.args.newState.ticketIndex.toString()),
-      number_to_channel_status(fixtures.OPENED_EVENT.args.newState.status),
-      new U256(fixtures.OPENED_EVENT.args.newState.channelEpoch.toString()),
-      new U256(fixtures.OPENED_EVENT.args.newState.closureTime.toString())
-    ),
-    COMMITTED_CHANNEL: new ChannelEntry(
-      Address.from_string(fixtures.COMMITTED_EVENT.args.source),
-      Address.from_string(fixtures.COMMITTED_EVENT.args.destination),
-      new Balance(fixtures.COMMITTED_EVENT.args.newState.balance.toString(), BalanceType.HOPR),
-      new Hash(stringToU8a(fixtures.COMMITTED_EVENT.args.newState.commitment)),
-      new U256(fixtures.COMMITTED_EVENT.args.newState.ticketEpoch.toString()),
-      new U256(fixtures.COMMITTED_EVENT.args.newState.ticketIndex.toString()),
-      number_to_channel_status(fixtures.COMMITTED_EVENT.args.newState.status),
-      new U256(fixtures.COMMITTED_EVENT.args.newState.channelEpoch.toString()),
-      new U256(fixtures.COMMITTED_EVENT.args.newState.closureTime.toString())
-    )
+    chain
+    // OPENED_CHANNEL: new ChannelEntry(
+    //   Address.from_string(fixtures.OPENED_EVENT.args.source),
+    //   Address.from_string(fixtures.OPENED_EVENT.args.destination),
+    //   new Balance(fixtures.OPENED_EVENT.args.newState.balance.toString(), BalanceType.HOPR),
+    //   new Hash(stringToU8a(fixtures.OPENED_EVENT.args.newState.commitment)),
+    //   new U256(fixtures.OPENED_EVENT.args.newState.ticketEpoch.toString()),
+    //   new U256(fixtures.OPENED_EVENT.args.newState.ticketIndex.toString()),
+    //   number_to_channel_status(fixtures.OPENED_EVENT.args.newState.status),
+    //   new U256(fixtures.OPENED_EVENT.args.newState.channelEpoch.toString()),
+    //   new U256(fixtures.OPENED_EVENT.args.newState.closureTime.toString())
+    // ),
+    // COMMITTED_CHANNEL: new ChannelEntry(
+    //   Address.from_string(fixtures.COMMITTED_EVENT.args.source),
+    //   Address.from_string(fixtures.COMMITTED_EVENT.args.destination),
+    //   new Balance(fixtures.COMMITTED_EVENT.args.newState.balance.toString(), BalanceType.HOPR),
+    //   new Hash(stringToU8a(fixtures.COMMITTED_EVENT.args.newState.commitment)),
+    //   new U256(fixtures.COMMITTED_EVENT.args.newState.ticketEpoch.toString()),
+    //   new U256(fixtures.COMMITTED_EVENT.args.newState.ticketIndex.toString()),
+    //   number_to_channel_status(fixtures.COMMITTED_EVENT.args.newState.status),
+    //   new U256(fixtures.COMMITTED_EVENT.args.newState.channelEpoch.toString()),
+    //   new U256(fixtures.COMMITTED_EVENT.args.newState.closureTime.toString())
+    // )
   }
 }
 

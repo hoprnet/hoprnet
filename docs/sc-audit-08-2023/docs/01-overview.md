@@ -232,9 +232,9 @@ Each payment channel is modeled by a finite state machine with three states: `OP
 ```
                                   redeemTicket()
                                      ┌──────┐
- finalizeChannelClosure()            v      │
+ finalizeOutgoingChannelClosure()            v      │
   (after notice period), or  ┌──────────────────────┐
-  closeIncomingChannel()     │                      │ initiateChannelClosure()
+  closeIncomingChannel()     │                      │ initiateOutgoingChannelClosure()
             ┌────────────────│   Pending To Close   │<─────────────────┐
             │                │                      │                  │
             │                └──────────────────────┘                  │

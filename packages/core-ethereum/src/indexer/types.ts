@@ -1,4 +1,4 @@
-import type { HoprToken, HoprChannels, HoprNetworkRegistry, TypedEventFilter } from '../utils/index.js'
+import type { HoprToken, HoprChannels, HoprNetworkRegistry, HoprAnnouncements, TypedEventFilter } from '../utils/index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Address, ChannelEntry } from '@hoprnet/hopr-utils'
@@ -17,6 +17,10 @@ export type TokenEvent<T extends TokenEventNames> = extractEventArgs<ReturnType<
 export type RegistryEventNames = keyof HoprNetworkRegistry['filters']
 export type RegistryEvent<T extends RegistryEventNames> = extractEventArgs<
   ReturnType<Pick<HoprNetworkRegistry['filters'], T>[T]>
+>
+export type AnnouncementsEventNames = keyof HoprAnnouncements['filters']
+export type AnnouncementsEvent<T extends AnnouncementsEventNames> = extractEventArgs<
+  ReturnType<Pick<HoprAnnouncements['filters'], T>[T]>
 >
 
 export enum IndexerStatus {

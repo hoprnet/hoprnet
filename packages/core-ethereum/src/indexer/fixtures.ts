@@ -5,7 +5,7 @@ import {
   Hash,
   AccountEntry,
   ChannelEntry,
-  u8aToHex,
+  // u8aToHex,
   Ticket,
   Challenge,
   stringToU8a,
@@ -37,31 +37,31 @@ export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelE
   assert(actual.closure_time.eq(expected.closure_time), 'closureTime')
 }
 
-export const PARTY_A_INITIALIZED_EVENT = {
-  event: 'Announcement',
-  transactionHash: '',
-  blockNumber: 1,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    account: PARTY_A().to_address().to_hex(),
-    publicKey: PARTY_A().to_hex(false),
-    multiaddr: u8aToHex(PARTY_A_MULTIADDR.bytes)
-  }
-} as Event<'Announcement'>
+// export const PARTY_A_INITIALIZED_EVENT = {
+//   event: 'AddressAnnouncement',
+//   transactionHash: '',
+//   blockNumber: 1,
+//   transactionIndex: 0,
+//   logIndex: 0,
+//   args: {
+//     account: PARTY_A().to_address().to_hex(),
+//     publicKey: PARTY_A().to_hex(false),
+//     multiaddr: u8aToHex(PARTY_A_MULTIADDR.bytes)
+//   }
+// } as Event<'AddressAnnouncement'>
 
-export const PARTY_B_INITIALIZED_EVENT = {
-  event: 'Announcement',
-  transactionHash: '',
-  blockNumber: 1,
-  transactionIndex: 1,
-  logIndex: 0,
-  args: {
-    account: PARTY_B().to_address().to_hex(),
-    publicKey: PARTY_B().to_hex(false),
-    multiaddr: u8aToHex(PARTY_B_MULTIADDR.bytes)
-  }
-} as Event<'Announcement'>
+// export const PARTY_B_INITIALIZED_EVENT = {
+//   event: 'AddressAnnouncement',
+//   transactionHash: '',
+//   blockNumber: 1,
+//   transactionIndex: 1,
+//   logIndex: 0,
+//   args: {
+//     account: PARTY_B().to_address().to_hex(),
+//     publicKey: PARTY_B().to_hex(false),
+//     multiaddr: u8aToHex(PARTY_B_MULTIADDR.bytes)
+//   }
+// } as Event<'AddressAnnouncement'>
 
 // TODO LP: Ensure clone here
 export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A(), PARTY_A_MULTIADDR.toString(), 1)
@@ -87,7 +87,7 @@ export const OPENED_EVENT = {
       closureTime: BigNumber.from('0')
     }
   } as any
-} as Event<'ChannelUpdated'>
+} // as Event<'ChannelUpdated'> FIXME:
 
 export const COMMITTED_EVENT = {
   event: 'ChannelUpdated',
@@ -108,7 +108,7 @@ export const COMMITTED_EVENT = {
       closureTime: BigNumber.from('0')
     }
   } as any
-} as Event<'ChannelUpdated'>
+} // as Event<'ChannelUpdated'> FIXME:
 
 export const UPDATED_WHEN_REDEEMED_EVENT = {
   event: 'ChannelUpdated',
@@ -129,7 +129,7 @@ export const UPDATED_WHEN_REDEEMED_EVENT = {
       closureTime: BigNumber.from('0')
     }
   } as any
-} as Event<'ChannelUpdated'>
+} // as Event<'ChannelUpdated'> FIXME:
 
 export const TICKET_REDEEMED_EVENT = {
   event: 'TicketRedeemed',

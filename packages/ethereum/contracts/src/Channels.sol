@@ -139,9 +139,9 @@ contract HoprChannels is
      * @dev Channel state machine
      *                                  redeemTicket()
      *                                     ┌──────┐
-     * finalizeChannelClosure()            v      │
+     * finalizeOutgoingChannelClosure()            v      │
      *  (after notice period), or  ┌──────────────────────┐
-     *  closeIncomingChannel()     │                      │ initiateChannelClosure()
+     *  closeIncomingChannel()     │                      │ initiateOutgoingChannelClosure()
      *            ┌────────────────│   Pending To Close   │<─────────────────┐
      *            │                │                      │                  │
      *            │                └──────────────────────┘                  │
