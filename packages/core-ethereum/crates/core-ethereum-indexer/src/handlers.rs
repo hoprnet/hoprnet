@@ -2,14 +2,19 @@ use crate::errors::Result;
 use bindings::hopr_announcements::HoprAnnouncementsEvents;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
+use utils_types::primitives::Snapshot;
 
-pub async fn on_announce<T>(db: &T, log: RawLog) -> Result<()>
+
+pub async fn on_announce<T>(db: &T, log: RawLog, snapshot: &Snapshot) -> Result<()>
 where
     T: HoprCoreEthereumDbActions,
 {
+    // big TODO
     HoprAnnouncementsEvents::decode_log(&log)?;
+
     // hopr_announcements::HoprAnnouncements::events(&self)
 
+    db.update_account_and_snapshot(account, snapshot).await;
     todo!()
 }
 
@@ -21,9 +26,10 @@ pub mod wasm {
     use js_sys::{Array, Uint8Array};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures;
+    use utils_types::primitives::Snapshot;
 
     #[wasm_bindgen]
-    pub async fn on_announcement_event(db: &Database, topics: Array, data: String) {
+    pub async fn on_announcement_event(db: &Database, topics: Array, data: String, snapshot: &Snapshot) {
         let mut decoded_data = Vec::with_capacity(data.len() * 2);
         decode_to_slice(data, &mut decoded_data);
 
@@ -46,6 +52,7 @@ pub mod wasm {
                     .collect(),
                 data: decoded_data,
             },
+            snapshot
         )
         .await;
     }

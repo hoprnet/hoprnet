@@ -62,6 +62,8 @@ import {
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
+import { on_announcement_event } from '../../lib/core_ethereum_indexer.js'
+
 // @ts-ignore untyped library
 import retimer from 'retimer'
 import assert from 'assert'
@@ -828,6 +830,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
+    // big TODO
+    await on_announcement_event(this.db, event.topics, event.data)
+  
     // publicKey given by the SC is verified
     const publicKey = PublicKey.deserialize(stringToU8a(event.args.publicKey))
 

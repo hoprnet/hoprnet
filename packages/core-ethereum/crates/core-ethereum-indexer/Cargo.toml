@@ -22,9 +22,11 @@ wasm-bindgen-futures = { version = "0.4.36", optional = true }
 
 bindings = { path = "../../../ethereum/crates/bindings", default-features = false }
 core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
+core-types = { path = "../../../core-ethereum/crates/core-types", default-features = false }
 utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
+utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-types/wasm", "utils-db/wasm", "utils-types/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

@@ -922,6 +922,7 @@ dependencies = [
  "js-sys",
  "thiserror",
  "utils-db",
+ "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
