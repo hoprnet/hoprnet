@@ -22,7 +22,7 @@ wasm-bindgen-futures = { version = "0.4.36", optional = true }
 
 bindings = { path = "../../../ethereum/crates/bindings", default-features = false }
 core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
-core-types = { path = "../../../core-ethereum/crates/core-types", default-features = false }
+core-types = { path = "../../../core/crates/core-types", default-features = false }
 utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 

@@ -14,7 +14,7 @@ where
 
     // hopr_announcements::HoprAnnouncements::events(&self)
 
-    db.update_account_and_snapshot(account, snapshot).await;
+    // db.update_account_and_snapshot(account, snapshot).await;
     todo!()
 }
 
