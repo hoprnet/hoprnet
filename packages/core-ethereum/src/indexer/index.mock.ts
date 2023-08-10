@@ -11,13 +11,8 @@ import {
   SUGGESTED_NATIVE_BALANCE,
   debug,
   AccountEntry,
-  PublicKey,
   LevelDb,
-  OffchainPublicKey,
-  // ChannelEntry,
-  // U256,
-  // stringToU8a,
-  // number_to_channel_status
+  OffchainPublicKey
 } from '@hoprnet/hopr-utils'
 
 import { Ethereum_Address, Ethereum_Database as Database } from '../db.js'
@@ -25,8 +20,7 @@ import Indexer from './index.js'
 import type { ChainWrapper } from '../ethereum.js'
 import type { Event, TokenEvent, RegistryEvent } from './types.js'
 import * as fixtures from './fixtures.js'
-import { ACCOUNT_A, PARTY_A, PARTY_A_MULTIADDR, PARTY_B } from '../fixtures.js'
-import { MOCK_PUBLIC_KEY } from './fixtures.js'
+import { ACCOUNT_A, ACCOUNT_B, PARTY_A, PARTY_A_MULTIADDR } from '../fixtures.js'
 
 //@TODO: Refactor this logger and mock outside of indexer
 const chainLogger = debug(`hopr:mocks:indexer-chain`)
@@ -146,8 +140,8 @@ const createHoprTokenMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
         transactionIndex: 0,
         logIndex: 0,
         args: {
-          source: PARTY_A().to_address().to_hex(),
-          destination: PARTY_B().to_address().to_hex(),
+          source: ACCOUNT_A.address,
+          destination: ACCOUNT_B.address,
           balance: BigNumber.from('1')
         } as any
       } as TokenEvent<'Transfer'>
@@ -265,7 +259,7 @@ const createChainMock = (
     getAccount: () => {
       chainLogger('getAccount method was called')
       return Promise.resolve(
-        new AccountEntry(OffchainPublicKey.random(), fixtures.MOCK_ADDRESS(), `/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A().to_peerid_str()}`, 1)
+        new AccountEntry(fixtures.PARTY_A(), Address.from_string(ACCOUNT_A.address), `/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A().to_peerid_str()}`, 1)
       )
     },
     getPublicKey: () => fixtures.PARTY_A(),
@@ -288,13 +282,14 @@ export const useFixtures = async (
     pastEvents?: Event<any>[]
     pastHoprTokenEvents?: TokenEvent<any>[]
     pastHoprRegistryEvents?: RegistryEvent<any>[]
-    id?: PublicKey
+    chainKey?: Address,
+    id?: OffchainPublicKey
   } = {}
 ) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
-  const id = ops.id ?? MOCK_PUBLIC_KEY()
+  const chain_key = ops.chainKey ?? fixtures.MOCK_ADDRESS()
 
-  const db = new Database(new LevelDb(), Ethereum_Address.deserialize(id.to_address().serialize()))
+  const db = new Database(new LevelDb(), Ethereum_Address.deserialize(chain_key.serialize()))
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents: ops.pastEvents ?? [] })
   const { hoprToken, newEvent: newTokenEvent } = createHoprTokenMock({
@@ -315,7 +310,7 @@ export const useFixtures = async (
     newEvent,
     newTokenEvent,
     newRegistryEvent,
-    indexer: new TestingIndexer(id.to_address(), db, 1, 5),
+    indexer: new TestingIndexer(chain_key, db, 1, 5),
     chain
     // OPENED_CHANNEL: new ChannelEntry(
     //   Address.from_string(fixtures.OPENED_EVENT.args.source),

@@ -68,6 +68,28 @@ where
     })
 }
 
+#[cfg(test)]
+pub mod tests {
+    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use std::sync::{Arc, Mutex};
+    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use utils_types::primitives::Address;
+
+    fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
+        let opt = rusty_leveldb::in_memory();
+        let db = rusty_leveldb::DB::open("test", opt).unwrap();
+
+        CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
+            Address::random(),
+        )
+    }
+
+    #[test]
+    fn announce_workflow() {
+        let mut db = create_mock_db();
+    }
+}
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use core_ethereum_db::db::wasm::Database;

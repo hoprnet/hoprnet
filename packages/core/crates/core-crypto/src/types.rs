@@ -509,6 +509,10 @@ impl OffchainPublicKey {
         let (_, pk) = Self::random_keypair();
         pk
     }
+
+    pub fn to_string(&self) -> String {
+        self.to_hex()
+    }
 }
 
 impl BinarySerializable for OffchainPublicKey {
