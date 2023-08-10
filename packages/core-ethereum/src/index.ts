@@ -15,7 +15,6 @@ import {
   ChannelEntry,
   type DeferType,
   PublicKey,
-  AccountEntry,
   create_counter
 } from '@hoprnet/hopr-utils'
 import {
@@ -576,58 +575,59 @@ export default class HoprCoreEthereum extends EventEmitter {
     return await is_allowed_to_access_network(this.db, Ethereum_Address.deserialize(hoprNode.to_address().serialize()))
   }
 
-  public static createMockInstance(peer: PeerId): HoprCoreEthereum {
-    const connectorLogger = debug(`hopr:mocks:connector`)
-    HoprCoreEthereum._instance = {
-      start: () => {
-        connectorLogger('starting connector called.')
-        return {} as unknown as HoprCoreEthereum
-      },
-      stop: () => {
-        connectorLogger('stopping connector called.')
-        return Promise.resolve()
-      },
-      getNativeBalance: () => {
-        connectorLogger('getNativeBalance method was called')
-        return Promise.resolve(new Balance('10000000000000000000', BalanceType.Native))
-      },
-      getPublicKey: () => {
-        connectorLogger('getPublicKey method was called')
-        return PublicKey.from_peerid_str(peer.toString())
-      },
-      getAccount: () => {
-        connectorLogger('getAccount method was called')
-        return Promise.resolve(
-          new AccountEntry(
-            PublicKey.from_peerid_str(peer.toString()),
-            `/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`,
-            1
-          )
-        )
-      },
-      waitForPublicNodes: () => {
-        connectorLogger('On-chain request for existing public nodes.')
-        return Promise.resolve([])
-      },
-      announce: () => {
-        connectorLogger('On-chain announce request sent')
-      },
-      on: (event: string) => {
-        connectorLogger(`On-chain signal for event "${event}"`)
-      },
-      indexer: {
-        on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
-        off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
-        getPublicNodes: () => Promise.resolve([])
-      },
-      isAllowedAccessToNetwork: () => Promise.resolve(true)
-    } as unknown as HoprCoreEthereum
+  // public static createMockInstance(peer: PeerId): HoprCoreEthereum {
+  //   const connectorLogger = debug(`hopr:mocks:connector`)
+  //   HoprCoreEthereum._instance = {
+  //     start: () => {
+  //       connectorLogger('starting connector called.')
+  //       return {} as unknown as HoprCoreEthereum
+  //     },
+  //     stop: () => {
+  //       connectorLogger('stopping connector called.')
+  //       return Promise.resolve()
+  //     },
+  //     getNativeBalance: () => {
+  //       connectorLogger('getNativeBalance method was called')
+  //       return Promise.resolve(new Balance('10000000000000000000', BalanceType.Native))
+  //     },
+  //     getPublicKey: () => {
+  //       connectorLogger('getPublicKey method was called')
+  //       return PublicKey.from_peerid_str(peer.toString())
+  //     },
+  //     getAccount: () => {
+  //       connectorLogger('getAccount method was called')
+  //       return Promise.resolve(
+  //         new AccountEntry(
+  //           OffchainPublicKey.from_peerid_str(peer.toString()),
 
-    return HoprCoreEthereum._instance
-  }
+  //           `/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`,
+  //           1
+  //         )
+  //       )
+  //     },
+  //     waitForPublicNodes: () => {
+  //       connectorLogger('On-chain request for existing public nodes.')
+  //       return Promise.resolve([])
+  //     },
+  //     announce: () => {
+  //       connectorLogger('On-chain announce request sent')
+  //     },
+  //     on: (event: string) => {
+  //       connectorLogger(`On-chain signal for event "${event}"`)
+  //     },
+  //     indexer: {
+  //       on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
+  //       off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
+  //       getPublicNodes: () => Promise.resolve([])
+  //     },
+  //     isAllowedAccessToNetwork: () => Promise.resolve(true)
+  //   } as unknown as HoprCoreEthereum
+
+  //   return HoprCoreEthereum._instance
+  // }
 }
 
-export { useFixtures } from './indexer/index.mock.js'
+// export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
 export { ChannelEntry, ChannelCommitmentInfo, Indexer, ChainWrapper, createChainWrapper }

@@ -12,7 +12,7 @@ import {
   BalanceType
 } from '@hoprnet/hopr-utils'
 
-import { expectAccountsToBeEqual, expectChannelsToBeEqual, PARTY_A, PARTY_B, PARTY_B_MULTIADDR } from './fixtures.js'
+import { expectAccountsToBeEqual, expectChannelsToBeEqual, ACCOUNT_A, ACCOUNT_B, PARTY_B_MULTIADDR } from './fixtures.js'
 import * as fixtures from './fixtures.js'
 import { type Event, IndexerStatus } from './types.js'
 import { useFixtures } from './index.mock.js'
@@ -114,7 +114,7 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const account = await indexer.getAccount(fixtures.PARTY_A().to_address())
+    const account = await indexer.getAccount(Address.from_string(fixtures.ACCOUNT_A.address))
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
     assert.equal(await get_channel(db, OPENED_CHANNEL.get_id()), undefined)
@@ -137,10 +137,10 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const account = await indexer.getAccount(fixtures.PARTY_A().to_address())
+    const account = await indexer.getAccount(Address.from_string(fixtures.ACCOUNT_A.address))
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const account2 = await indexer.getAccount(fixtures.PARTY_B().to_address())
+    const account2 = await indexer.getAccount(Address.from_string(fixtures.ACCOUNT_B.address))
     expectAccountsToBeEqual(account2, fixtures.PARTY_B_INITIALIZED_ACCOUNT)
   })
 
@@ -188,7 +188,7 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A().to_address())
+    const pubKey = await indexer.getPublicKeyOf(Address.from_string(fixtures.ACCOUNT_A.address))
     assert(pubKey.eq(fixtures.PARTY_A()))
   })
 
@@ -209,7 +209,7 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    const account = await indexer.getAccount(fixtures.PARTY_A().to_address())
+    const account = await indexer.getAccount(Address.from_string(fixtures.ACCOUNT_A.address))
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
     const channel = await get_channel(db, OPENED_CHANNEL.get_id())
@@ -220,11 +220,11 @@ describe('test indexer', function () {
     // TODO: iterate over the channels
     // expectChannelsToBeEqual(channels[0], OPENED_CHANNEL)
 
-    const channelsFromPartyA = await get_channels_from(db, fixtures.PARTY_A().to_address())
+    const channelsFromPartyA = await get_channels_from(db, Address.from_string(fixtures.ACCOUNT_A.address))
     assert.strictEqual(channelsFromPartyA.len(), 1)
     expectChannelsToBeEqual(ChannelEntry.deserialize(channelsFromPartyA.next().serialize()), OPENED_CHANNEL)
 
-    const channelsOfPartyB = await get_channels_from(db, fixtures.PARTY_B().to_address())
+    const channelsOfPartyB = await get_channels_from(db, Address.from_string(fixtures.ACCOUNT_B.address))
     assert.strictEqual(channelsOfPartyB.len(), 0)
   })
 
@@ -342,8 +342,8 @@ describe('test indexer', function () {
       transactionIndex: 0,
       logIndex: 0,
       args: {
-        source: PARTY_B().to_address().to_hex(),
-        destination: PARTY_A().to_address().to_hex(),
+        source: ACCOUNT_B.address,
+        destination: ACCOUNT_A.address,
         newState: {
           balance: BigNumber.from('3'),
           commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
@@ -370,8 +370,8 @@ describe('test indexer', function () {
       transactionIndex: 0,
       logIndex: 0,
       args: {
-        source: PARTY_B().to_address().to_hex(),
-        destination: PARTY_A().to_address().to_hex(),
+        source: ACCOUNT_B.address,
+        destination: ACCOUNT_A.address,
         newState: {
           balance: BigNumber.from('3'),
           commitment: Hash.create([new TextEncoder().encode('commA')]).to_hex(),
@@ -397,8 +397,8 @@ describe('test indexer', function () {
       transactionIndex: 0,
       logIndex: 0,
       args: {
-        source: PARTY_B().to_address().to_hex(),
-        destination: PARTY_A().to_address().to_hex(),
+        source: ACCOUNT_B.address,
+        destination: ACCOUNT_A.address,
         newState: {
           balance: BigNumber.from('0'),
           commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
@@ -462,8 +462,8 @@ describe('test indexer', function () {
     })
     // sender node has pending ticket...
     await mark_pending(db, fixtures.oneLargeTicket)
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 2)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 2)
 
     const blockMined = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -481,8 +481,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockMined.promise
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 0)
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for sender when db has no outstanding balance', async function () {
@@ -497,8 +497,8 @@ describe('test indexer', function () {
       id: fixtures.PARTY_A()
     })
     // sender node has pending ticket...
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 0)
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -516,8 +516,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockProcessed.promise
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 0)
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for recipient', async function () {
@@ -532,8 +532,8 @@ describe('test indexer', function () {
       id: fixtures.PARTY_B()
     })
     // recipient node has no ticket...
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 0)
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -553,8 +553,8 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 0)
   })
 
   it('should process TicketRedeemed event and not reduce outstanding balance for a third node', async function () {
@@ -568,8 +568,8 @@ describe('test indexer', function () {
       ]
     })
     // recipient node has no ticket...
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 0)
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -588,8 +588,8 @@ describe('test indexer', function () {
 
     await blockProcessed.promise
 
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 0)
   })
 
   it('should process TicketRedeemed event and reduce outstanding balance to zero for sender when some history is missing', async function () {
@@ -605,8 +605,8 @@ describe('test indexer', function () {
     })
     // sender node has some pending tickets, but not the entire history...
     await mark_pending(db, fixtures.oneSmallTicket)
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 1)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 1)
 
     const blockProcessed = defer<void>()
     indexer.on('block-processed', (blockNumber: number) => {
@@ -624,8 +624,8 @@ describe('test indexer', function () {
     newBlock()
 
     await blockProcessed.promise
-    assert.equal((await get_pending_balance_to(db, PARTY_A().to_address())).amount().as_u32(), 0)
-    assert.equal((await get_pending_balance_to(db, PARTY_B().to_address())).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_A.address))).amount().as_u32(), 0)
+    assert.equal((await get_pending_balance_to(db, Address.from_string(ACCOUNT_B.address))).amount().as_u32(), 0)
   })
 
   it('should process Transfer events and reduce balance', async function () {
@@ -682,7 +682,7 @@ describe('test indexer', function () {
     newBlock()
     await processed.promise
     assert(await get_account_from_network_registry(db, PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
-    assert(await is_eligible(db, fixtures.PARTY_A().to_address()))
+    assert(await is_eligible(db, Address.from_string(ACCOUNT_A.address)))
   })
 
   it('should process first 4 registry events and account not be eligible', async function () {
@@ -702,7 +702,7 @@ describe('test indexer', function () {
     await processed.promise
 
     assert(await get_account_from_network_registry(db, PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())))
-    assert((await is_eligible(db, fixtures.PARTY_A().to_address())) === false)
+    assert((await is_eligible(db, Address.from_string(ACCOUNT_A.address))) === false)
   })
 
   it('should process all registry events and account not be registered but be eligible', async function () {
@@ -730,7 +730,7 @@ describe('test indexer', function () {
       await get_account_from_network_registry(db, PublicKey.from_peerid_str(PARTY_B_MULTIADDR.getPeerId())),
       undefined
     )
-    assert(await is_eligible(db, fixtures.PARTY_A().to_address()))
+    assert(await is_eligible(db, Address.from_string(ACCOUNT_A.address)))
   })
 
   it('should process register enabled', async function () {

@@ -9,7 +9,7 @@ import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 
-import { debug, Address, PublicKey } from '@hoprnet/hopr-utils'
+import { debug, Address, OffchainPublicKey } from '@hoprnet/hopr-utils'
 import {
   authenticateWsConnection,
   getStatusCodeForInvalidInputInRequest,
@@ -49,9 +49,9 @@ async function handleWebsocketMessage(node: Hopr, data: string) {
       const hops = args['hops']
 
       // only set path if given, otherwise a path will be chosen by hopr core
-      let path: PublicKey[]
+      let path: OffchainPublicKey[]
       if (args['path'] != undefined) {
-        path = args['path'].map((peer: string) => PublicKey.from_peerid_str(peer))
+        path = args['path'].map((peer: string) => OffchainPublicKey.from_peerid_str(peer))
       }
 
       // send message and return ack challenge over websocket

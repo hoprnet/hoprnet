@@ -56,7 +56,8 @@ import {
   HalfKeyChallenge,
   Balance,
   BalanceType,
-  pickVersion
+  pickVersion,
+  OffchainPublicKey
 } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -449,7 +450,7 @@ class Hopr extends EventEmitter {
         // otherwise there is nothing to do
         if (!eligible) {
           for (const nodeAddr of nodeAddrs) {
-            let pk: PublicKey
+            let pk: OffchainPublicKey
             try {
               pk = await connector.getPublicKeyOf(nodeAddr)
             } catch (err) {
@@ -1067,7 +1068,7 @@ class Hopr extends EventEmitter {
   public async sendMessage(
     msg: Uint8Array,
     destination: PeerId,
-    intermediatePath?: PublicKey[],
+    intermediatePath?: OffchainPublicKey[],
     hops?: number
   ): Promise<string> {
     if (this.status != 'RUNNING') {
@@ -1083,6 +1084,8 @@ class Hopr extends EventEmitter {
     if (intermediatePath != undefined) {
       // Validate the manually specified intermediate path
       try {
+        // TODO: fixed with curve switch PR(s)
+        // @ts-ignore
         await this.validateIntermediatePath(intermediatePath)
       } catch (e) {
         metric_sentMessageFailCount.increment()
@@ -1284,7 +1287,7 @@ class Hopr extends EventEmitter {
     const ownAccount = await connector.getAccount(this.getEthereumAddress())
 
     // Do not announce if our last is equal to what we intend to announce
-    if (ownAccount?.get_multiaddress_str() === addrToAnnounce.toString()) {
+    if (ownAccount?.get_multiaddr_str() === addrToAnnounce.toString()) {
       log(`intended address has already been announced, nothing to do`)
       return
     }
@@ -1607,7 +1610,7 @@ class Hopr extends EventEmitter {
     return ret
   }
 
-  public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
+  public async getPublicKeyOf(addr: Address): Promise<OffchainPublicKey> {
     return await HoprCoreEthereum.getInstance().getPublicKeyOf(addr)
   }
 
@@ -1669,7 +1672,7 @@ class Hopr extends EventEmitter {
    * @param destination instance of peerInfo that contains the peerId of the destination
    * @param hops optional number of required intermediate nodes (must be an integer 1,2,...MAX_HOPS inclusive)
    */
-  private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<PublicKey[]> {
+  private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<OffchainPublicKey[]> {
     if (!hops) {
       hops = INTERMEDIATE_HOPS
     } else if (![...Array(MAX_HOPS).keys()].map((i) => i + 1).includes(hops)) {
