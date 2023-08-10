@@ -184,6 +184,7 @@ impl BinarySerializable for AccountEntry {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct AccountSignature {
     pub signature: OffchainSignature,
     pub pub_key: OffchainPublicKey,
@@ -222,9 +223,13 @@ impl AccountSignature {
 
 #[cfg(test)]
 mod test {
+    use super::AccountSignature;
     use crate::account::AccountEntry;
     use crate::account::AccountType::{Announced, NotAnnounced};
-    use core_crypto::types::OffchainPublicKey;
+    use core_crypto::{
+        keypairs::{Keypair, OffchainKeypair},
+        types::OffchainPublicKey,
+    };
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use utils_types::{primitives::Address, traits::BinarySerializable};
@@ -293,6 +298,15 @@ mod test {
 
         let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
         assert_eq!(ae1, ae2);
+    }
+
+    #[test]
+    fn test_account_signature_workflow() {
+        let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
+        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
+
+        let sig = AccountSignature::new(&keypair, chain_addr);
+        assert!(sig.verify());
     }
 }
 

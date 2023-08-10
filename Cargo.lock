@@ -915,6 +915,7 @@ dependencies = [
 name = "core-ethereum-indexer"
 version = "0.1.0"
 dependencies = [
+ "async-std",
  "bindings",
  "console_error_panic_hook",
  "core-crypto",
@@ -922,8 +923,10 @@ dependencies = [
  "core-types",
  "ethers",
  "hex",
+ "hex-literal 0.4.1",
  "js-sys",
  "multiaddr",
+ "rusty-leveldb",
  "thiserror",
  "utils-db",
  "utils-log",

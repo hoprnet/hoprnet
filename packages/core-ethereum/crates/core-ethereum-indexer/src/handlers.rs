@@ -70,10 +70,27 @@ where
 
 #[cfg(test)]
 pub mod tests {
+    use async_std;
+    use bindings::hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter};
+    use core_crypto::{
+        keypairs::{Keypair, OffchainKeypair},
+        types::{OffchainPublicKey, OffchainSignature},
+    };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use core_types::account::{AccountEntry, AccountSignature, AccountType};
+    use ethers::{abi::{RawLog, encode, Token, Address as EthereumAddress}, prelude::*};
+    use hex_literal::hex;
+    use multiaddr::Multiaddr;
+    use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
-    use utils_types::primitives::Address;
+    use utils_types::{
+        primitives::{Address, Snapshot},
+        traits::BinarySerializable,
+    };
+
+    const SELF_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+    const SELF_CHAIN_ADDRESS: [u8; 20] = hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a");
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
         let opt = rusty_leveldb::in_memory();
@@ -85,9 +102,59 @@ pub mod tests {
         )
     }
 
-    #[test]
-    fn announce_workflow() {
+    #[async_std::test]
+    async fn announce_workflow() {
         let mut db = create_mock_db();
+
+        let keypair = OffchainKeypair::from_secret(&SELF_PRIV_KEY).unwrap();
+        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+
+        let sig = AccountSignature::new(&keypair, chain_key);
+
+        let mut keybinding_payload = Vec::with_capacity(OffchainSignature::SIZE + OffchainPublicKey::SIZE + 32);
+        keybinding_payload.extend_from_slice(&sig.signature.to_bytes());
+        keybinding_payload.extend_from_slice(&sig.pub_key.to_bytes());
+        // pad the chain_key address
+        keybinding_payload.extend_from_slice(&[0u8; 12]);
+        keybinding_payload.extend_from_slice(&chain_key.to_bytes());
+
+        let keybinding_log = RawLog {
+            topics: vec![KeyBindingFilter::signature()],
+            data: encode(&[Token::FixedBytes(Vec::from(sig.signature.to_bytes())), Token::FixedBytes(Vec::from(sig.pub_key.to_bytes())), Token::Address(EthereumAddress::from_slice(&chain_key.to_bytes()))]),
+        };
+
+        let account_entry = AccountEntry::new(keypair.public().clone(), chain_key, AccountType::NotAnnounced);
+
+        assert_eq!(
+            super::on_announce(&mut db, &keybinding_log, 0u32, &Snapshot::default())
+                .await
+                .unwrap(),
+            account_entry
+        );
+
+        assert_eq!(db.get_account(&chain_key).await.unwrap().unwrap(), account_entry);
+
+        let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
+
+        let address_announcement_log = RawLog {
+            topics: vec![AddressAnnouncementFilter::signature()],
+            data: encode(&[Token::Address(EthereumAddress::from_slice(&chain_key.to_bytes())), Token::String(test_multiaddr.to_string())]),
+        };
+
+        let announced_account_entry = AccountEntry::new(keypair.public().clone(), chain_key, AccountType::Announced { multiaddr: test_multiaddr, updated_block: 0 });
+
+        assert_eq!(super::on_announce(&mut db, &address_announcement_log, 0u32, &Snapshot::default()).await.unwrap(), announced_account_entry);
+
+        assert_eq!(db.get_account(&chain_key).await.unwrap().unwrap(), announced_account_entry);
+
+        let revoke_announcement_log = RawLog {
+            topics: vec![RevokeAnnouncementFilter::signature()],
+            data: encode(&[Token::Address(EthereumAddress::from_slice(&chain_key.to_bytes()))]),
+        };
+
+        assert_eq!(super::on_announce(&mut db, &revoke_announcement_log, 0u32, &Snapshot::default()).await.unwrap(), account_entry);
+
+        assert_eq!(db.get_account(&chain_key).await.unwrap().unwrap(), account_entry);
     }
 }
 #[cfg(feature = "wasm")]

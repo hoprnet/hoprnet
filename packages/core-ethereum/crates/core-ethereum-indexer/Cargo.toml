@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
 thiserror = "1.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 ethers = { version = "2", default-features = false, features = ["abigen"] }
@@ -29,6 +30,9 @@ utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+
+[dev-dependencies]
+hex-literal = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 rusty-leveldb = "1.0"
