@@ -40,12 +40,6 @@ abstract contract HoprChannelsEvents {
     event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
 
     /**
-     * Emitted once a commitment has been set for a channel. Includes
-     * the current epoch since this value is necessary for issuing tickets.
-     */
-    event CommitmentSet(bytes32 indexed channelId, HoprChannels.ChannelEpoch epoch);
-
-    /**
      * Emitted once a party initiates the closure of an outgoing
      * channel. Includes the timestamp when the notice period is due.
      */
