@@ -1084,17 +1084,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    log('[DEBUG] getPublicNodes starting...')
     const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
     let out = `Known public nodes:\n`
     
-    let publicAccounts;
-    try {
-      publicAccounts = await this.db.get_public_node_accounts()
-      log(`[DEBUG] getPublicNodes ${publicAccounts.len()}`)
-    } catch (error) {
-      log(`[DEBUG] getPublicNodes error ${error}`)
-    }
+    let publicAccounts = await this.db.get_public_node_accounts()
 
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
@@ -1106,7 +1099,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       })
     }
     
-    log(`[DEBUG] getPublicNodes before return`)
     // Remove last `\n`
     log(out.substring(0, out.length - 1))
 
