@@ -3,6 +3,7 @@ use getrandom::getrandom;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul};
+use primitive_types::H160;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -60,7 +61,7 @@ impl Address {
     }
 }
 
-impl BinarySerializable<'_> for Address {
+impl BinarySerializable for Address {
     const SIZE: usize = 20;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
@@ -77,6 +78,22 @@ impl BinarySerializable<'_> for Address {
 
     fn to_bytes(&self) -> Box<[u8]> {
         self.addr.into()
+    }
+}
+
+impl TryFrom<[u8; Address::SIZE]> for Address {
+    type Error = GeneralError;
+
+    fn try_from(value: [u8; Address::SIZE]) -> std::result::Result<Self, Self::Error> {
+        Address::from_bytes(&value)
+    }
+}
+
+impl TryFrom<H160> for Address {
+    type Error = GeneralError;
+
+    fn try_from(value: H160) -> std::result::Result<Self, Self::Error> {
+        Address::try_from(value.0)
     }
 }
 
@@ -299,7 +316,7 @@ impl EthereumChallenge {
     }
 }
 
-impl BinarySerializable<'_> for EthereumChallenge {
+impl BinarySerializable for EthereumChallenge {
     const SIZE: usize = 20;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
@@ -346,7 +363,7 @@ impl Snapshot {
     }
 }
 
-impl BinarySerializable<'_> for Snapshot {
+impl BinarySerializable for Snapshot {
     const SIZE: usize = 3 * U256::SIZE;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
@@ -436,7 +453,7 @@ impl Mul for U256 {
     }
 }
 
-impl BinarySerializable<'_> for U256 {
+impl BinarySerializable for U256 {
     const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
@@ -514,7 +531,7 @@ pub struct AuthorizationToken {
     token: Box<[u8]>,
 }
 
-impl AutoBinarySerializable<'_> for AuthorizationToken {}
+impl AutoBinarySerializable for AuthorizationToken {}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AuthorizationToken {

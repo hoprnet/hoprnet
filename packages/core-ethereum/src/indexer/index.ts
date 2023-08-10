@@ -12,7 +12,6 @@ import {
   Address,
   ChannelEntry,
   AccountEntry,
-  PublicKey,
   Snapshot,
   debug,
   retryWithBackoffThenThrow,
@@ -50,7 +49,6 @@ import { BigNumber, type Contract, errors } from 'ethers'
 
 import {
   CORE_ETHEREUM_CONSTANTS,
-  Ethereum_AccountEntry,
   Ethereum_Address,
   Ethereum_Balance,
   Ethereum_ChannelEntry,
@@ -63,6 +61,7 @@ import {
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
 import { on_announcement_event } from '../../lib/core_ethereum_indexer.js'
+import { OffchainPublicKey } from '../../lib/core_ethereum_misc.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
@@ -72,6 +71,7 @@ import assert from 'assert'
 const constants = CORE_ETHEREUM_CONSTANTS()
 
 const log = debug('hopr-core-ethereum:indexer')
+const error = debug('hopr-core-ethereum:indexer:error')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
@@ -767,7 +767,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         case 'Announcement(address,bytes,bytes)':
           await this.onAnnouncement(
             event as Event<'Announcement'>,
-            new BN(blockNumber.toPrecision()),
+            blockNumber.toPrecision().toString(),
             lastDatabaseSnapshot
           )
           break
@@ -829,40 +829,21 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
   }
 
-  private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN, lastSnapshot: Snapshot): Promise<void> {
-    // big TODO
-    await on_announcement_event(this.db, event.topics, event.data)
-  
-    // publicKey given by the SC is verified
-    const publicKey = PublicKey.deserialize(stringToU8a(event.args.publicKey))
-
-    let multiaddr: Multiaddr
+  private async onAnnouncement(event: Event<'Announcement'>, blockNumber: string, lastSnapshot: Snapshot): Promise<void> {
+    let account: AccountEntry
     try {
-      multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
-        // remove "p2p" and corresponding peerID
-        .decapsulateCode(421)
-        // add new peerID
-        .encapsulate(`/p2p/${publicKey.to_peerid_str()}`)
-    } catch (error) {
-      log(`Invalid multiaddr '${event.args.multiaddr}' given in event 'onAnnouncement'`)
-      log(error)
+      account = await on_announcement_event(this.db, event.topics, event.data, blockNumber, lastSnapshot)
+    } catch (err) {
+      error("error while handling announcement:")
       return
     }
 
-    const account = new AccountEntry(publicKey, multiaddr.toString(), blockNumber.toNumber())
-
-    log('New node announced', account.get_address().to_hex(), account.get_multiaddress_str())
+    log('New node announced', account.chain_addr, account.get_multiaddr_str())
     metric_numAnnouncements.increment()
 
-    assert(lastSnapshot !== undefined)
-    await this.db.update_account_and_snapshot(
-      Ethereum_AccountEntry.deserialize(account.serialize()),
-      Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-    )
-
     this.emit('peer', {
-      id: peerIdFromString(account.get_peer_id_str()),
-      multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
+      id: peerIdFromString(account.public_key.to_peerid_str()),
+      multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
     })
   }
 
@@ -1078,7 +1059,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     return account
   }
 
-  public async getPublicKeyOf(address: Address): Promise<PublicKey> {
+  public async getPublicKeyOf(address: Address): Promise<OffchainPublicKey> {
     const account = await this.getAccount(address)
     if (account !== undefined) {
       return account.public_key
@@ -1089,7 +1070,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public async *getAddressesAnnouncedOnChain() {
     let announced = await this.db.get_accounts()
     while (announced.len() > 0) {
-      yield new Multiaddr(announced.next().get_multiaddress_str())
+      yield new Multiaddr(announced.next().get_multiaddr_str())
     }
   }
 
@@ -1101,10 +1082,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
 
-      out += `  - ${account.get_peer_id_str()} ${account.get_multiaddress_str()}\n`
+      out += `  - ${account.public_key.to_peerid_str()} ${account.get_multiaddr_str()}\n`
       result.push({
-        id: peerIdFromString(account.get_peer_id_str()),
-        multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
+        id: peerIdFromString(account.public_key.to_peerid_str()),
+        multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
       })
     }
 

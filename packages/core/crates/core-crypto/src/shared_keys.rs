@@ -18,6 +18,18 @@ use crate::parameters;
 use crate::errors::Result;
 use crate::types::{CurvePoint, PublicKey};
 
+/// Types representing a valid non-zero scalar an additive abelian group.
+pub trait Scalar: Mul<Output = Self> + Sized {
+    /// Generates a random scalar using a cryptographically secure RNG.
+    fn random() -> Self;
+
+    /// Create scalar from bytes
+    fn from_bytes(bytes: &[u8]) -> Result<Self>;
+
+    /// Convert scalar to bytes.
+    fn to_bytes(&self) -> Box<[u8]>;
+}
+
 /// Type for the secret keys with fixed size
 /// The GenericArray<..> is mostly deprecated since Rust 1.51 and it's introduction of const generics,
 /// but we need to use it because elliptic_curves and all RustCrypto crates mostly expose it in their

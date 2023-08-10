@@ -136,7 +136,7 @@ impl std::fmt::Display for ChannelEntry {
     }
 }
 
-impl BinarySerializable<'_> for ChannelEntry {
+impl BinarySerializable for ChannelEntry {
     const SIZE: usize = Address::SIZE
         + Address::SIZE
         + Balance::SIZE
@@ -373,7 +373,7 @@ impl Ticket {
     }
 }
 
-impl BinarySerializable<'_> for Ticket {
+impl BinarySerializable for Ticket {
     const SIZE: usize =
         Address::SIZE + EthereumChallenge::SIZE + 2 * U256::SIZE + Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
 
