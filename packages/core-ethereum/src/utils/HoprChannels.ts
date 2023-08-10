@@ -11,732 +11,1269 @@ import type {
   Overrides,
   PopulatedTransaction,
   Signer,
-  utils
-} from 'ethers'
-import type { FunctionFragment, Result, EventFragment } from '@ethersproject/abi'
-import type { Listener, Provider } from '@ethersproject/providers'
-import type { TypedEventFilter, TypedEvent, TypedListener, OnEvent } from './common.js'
+  utils,
+} from "ethers";
+import type {
+  FunctionFragment,
+  Result,
+  EventFragment,
+} from "@ethersproject/abi";
+import type { Listener, Provider } from "@ethersproject/providers";
+import type {
+  TypedEventFilter,
+  TypedEvent,
+  TypedListener,
+  OnEvent,
+} from "./common.js";
 
 export declare namespace HoprChannels {
-  export type ChannelStruct = {
-    balance: BigNumberish
-    commitment: BytesLike
-    ticketEpoch: BigNumberish
-    ticketIndex: BigNumberish
-    status: BigNumberish
-    channelEpoch: BigNumberish
-    closureTime: BigNumberish
-  }
+  export type TicketDataStruct = {
+    channelId: BytesLike;
+    amount: BigNumberish;
+    ticketIndex: BigNumberish;
+    indexOffset: BigNumberish;
+    epoch: BigNumberish;
+    winProb: BigNumberish;
+  };
 
-  export type ChannelStructOutput = [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number] & {
-    balance: BigNumber
-    commitment: string
-    ticketEpoch: BigNumber
-    ticketIndex: BigNumber
-    status: number
-    channelEpoch: BigNumber
-    closureTime: number
-  }
+  export type TicketDataStructOutput = [
+    string,
+    BigNumber,
+    number,
+    number,
+    number,
+    BigNumber
+  ] & {
+    channelId: string;
+    amount: BigNumber;
+    ticketIndex: number;
+    indexOffset: number;
+    epoch: number;
+    winProb: BigNumber;
+  };
+
+  export type RedeemableTicketStruct = {
+    data: HoprChannels.TicketDataStruct;
+    signature: HoprCrypto.CompactSignatureStruct;
+    porSecret: BigNumberish;
+  };
+
+  export type RedeemableTicketStructOutput = [
+    HoprChannels.TicketDataStructOutput,
+    HoprCrypto.CompactSignatureStructOutput,
+    BigNumber
+  ] & {
+    data: HoprChannels.TicketDataStructOutput;
+    signature: HoprCrypto.CompactSignatureStructOutput;
+    porSecret: BigNumber;
+  };
+}
+
+export declare namespace HoprCrypto {
+  export type CompactSignatureStruct = { r: BytesLike; vs: BytesLike };
+
+  export type CompactSignatureStructOutput = [string, string] & {
+    r: string;
+    vs: string;
+  };
+
+  export type VRFParametersStruct = {
+    vx: BigNumberish;
+    vy: BigNumberish;
+    s: BigNumberish;
+    h: BigNumberish;
+    sBx: BigNumberish;
+    sBy: BigNumberish;
+    hVx: BigNumberish;
+    hVy: BigNumberish;
+  };
+
+  export type VRFParametersStructOutput = [
+    BigNumber,
+    BigNumber,
+    BigNumber,
+    BigNumber,
+    BigNumber,
+    BigNumber,
+    BigNumber,
+    BigNumber
+  ] & {
+    vx: BigNumber;
+    vy: BigNumber;
+    s: BigNumber;
+    h: BigNumber;
+    sBx: BigNumber;
+    sBy: BigNumber;
+    hVx: BigNumber;
+    hVy: BigNumber;
+  };
 }
 
 export interface HoprChannelsInterface extends utils.Interface {
   functions: {
-    'FUND_CHANNEL_MULTI_SIZE()': FunctionFragment
-    'TOKENS_RECIPIENT_INTERFACE_HASH()': FunctionFragment
-    'announce(bytes,bytes)': FunctionFragment
-    'bumpChannel(address,bytes32)': FunctionFragment
-    'canImplementInterfaceForAddress(bytes32,address)': FunctionFragment
-    'channels(bytes32)': FunctionFragment
-    'finalizeChannelClosure(address)': FunctionFragment
-    'fundChannelMulti(address,address,uint256,uint256)': FunctionFragment
-    'initiateChannelClosure(address)': FunctionFragment
-    'multicall(bytes[])': FunctionFragment
-    'publicKeys(address)': FunctionFragment
-    'redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)': FunctionFragment
-    'secsClosure()': FunctionFragment
-    'token()': FunctionFragment
-    'tokensReceived(address,address,address,uint256,bytes,bytes)': FunctionFragment
-  }
+    "ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE()": FunctionFragment;
+    "ERC777_HOOK_FUND_CHANNEL_SIZE()": FunctionFragment;
+    "LEDGER_VERSION()": FunctionFragment;
+    "MAX_USED_BALANCE()": FunctionFragment;
+    "MIN_USED_BALANCE()": FunctionFragment;
+    "TOKENS_RECIPIENT_INTERFACE_HASH()": FunctionFragment;
+    "VERSION()": FunctionFragment;
+    "_currentBlockTimestamp()": FunctionFragment;
+    "_getChannelId(address,address)": FunctionFragment;
+    "_getTicketHash(((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256))": FunctionFragment;
+    "_isWinningTicket(bytes32,((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256),(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))": FunctionFragment;
+    "canImplementInterfaceForAddress(bytes32,address)": FunctionFragment;
+    "channels(bytes32)": FunctionFragment;
+    "closeIncomingChannel(address)": FunctionFragment;
+    "closeIncomingChannelSafe(address,address)": FunctionFragment;
+    "domainSeparator()": FunctionFragment;
+    "finalizeOutgoingChannelClosure(address)": FunctionFragment;
+    "finalizeOutgoingChannelClosureSafe(address,address)": FunctionFragment;
+    "fundChannel(address,uint96)": FunctionFragment;
+    "fundChannelSafe(address,address,uint96)": FunctionFragment;
+    "initiateOutgoingChannelClosure(address)": FunctionFragment;
+    "initiateOutgoingChannelClosureSafe(address,address)": FunctionFragment;
+    "ledgerDomainSeparator()": FunctionFragment;
+    "multicall(bytes[])": FunctionFragment;
+    "noticePeriodChannelClosure()": FunctionFragment;
+    "redeemTicket(((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256),(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))": FunctionFragment;
+    "redeemTicketSafe(address,((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256),(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))": FunctionFragment;
+    "token()": FunctionFragment;
+    "tokensReceived(address,address,address,uint256,bytes,bytes)": FunctionFragment;
+  };
 
   getFunction(
     nameOrSignatureOrTopic:
-      | 'FUND_CHANNEL_MULTI_SIZE'
-      | 'TOKENS_RECIPIENT_INTERFACE_HASH'
-      | 'announce'
-      | 'bumpChannel'
-      | 'canImplementInterfaceForAddress'
-      | 'channels'
-      | 'finalizeChannelClosure'
-      | 'fundChannelMulti'
-      | 'initiateChannelClosure'
-      | 'multicall'
-      | 'publicKeys'
-      | 'redeemTicket'
-      | 'secsClosure'
-      | 'token'
-      | 'tokensReceived'
-  ): FunctionFragment
+      | "ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE"
+      | "ERC777_HOOK_FUND_CHANNEL_SIZE"
+      | "LEDGER_VERSION"
+      | "MAX_USED_BALANCE"
+      | "MIN_USED_BALANCE"
+      | "TOKENS_RECIPIENT_INTERFACE_HASH"
+      | "VERSION"
+      | "_currentBlockTimestamp"
+      | "_getChannelId"
+      | "_getTicketHash"
+      | "_isWinningTicket"
+      | "canImplementInterfaceForAddress"
+      | "channels"
+      | "closeIncomingChannel"
+      | "closeIncomingChannelSafe"
+      | "domainSeparator"
+      | "finalizeOutgoingChannelClosure"
+      | "finalizeOutgoingChannelClosureSafe"
+      | "fundChannel"
+      | "fundChannelSafe"
+      | "initiateOutgoingChannelClosure"
+      | "initiateOutgoingChannelClosureSafe"
+      | "ledgerDomainSeparator"
+      | "multicall"
+      | "noticePeriodChannelClosure"
+      | "redeemTicket"
+      | "redeemTicketSafe"
+      | "token"
+      | "tokensReceived"
+  ): FunctionFragment;
 
-  encodeFunctionData(functionFragment: 'FUND_CHANNEL_MULTI_SIZE', values?: undefined): string
-  encodeFunctionData(functionFragment: 'TOKENS_RECIPIENT_INTERFACE_HASH', values?: undefined): string
-  encodeFunctionData(functionFragment: 'announce', values: [BytesLike, BytesLike]): string
-  encodeFunctionData(functionFragment: 'bumpChannel', values: [string, BytesLike]): string
-  encodeFunctionData(functionFragment: 'canImplementInterfaceForAddress', values: [BytesLike, string]): string
-  encodeFunctionData(functionFragment: 'channels', values: [BytesLike]): string
-  encodeFunctionData(functionFragment: 'finalizeChannelClosure', values: [string]): string
-  encodeFunctionData(functionFragment: 'fundChannelMulti', values: [string, string, BigNumberish, BigNumberish]): string
-  encodeFunctionData(functionFragment: 'initiateChannelClosure', values: [string]): string
-  encodeFunctionData(functionFragment: 'multicall', values: [BytesLike[]]): string
-  encodeFunctionData(functionFragment: 'publicKeys', values: [string]): string
   encodeFunctionData(
-    functionFragment: 'redeemTicket',
-    values: [string, BytesLike, BigNumberish, BigNumberish, BytesLike, BigNumberish, BigNumberish, BytesLike]
-  ): string
-  encodeFunctionData(functionFragment: 'secsClosure', values?: undefined): string
-  encodeFunctionData(functionFragment: 'token', values?: undefined): string
+    functionFragment: "ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE",
+    values?: undefined
+  ): string;
   encodeFunctionData(
-    functionFragment: 'tokensReceived',
+    functionFragment: "ERC777_HOOK_FUND_CHANNEL_SIZE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "LEDGER_VERSION",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MAX_USED_BALANCE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MIN_USED_BALANCE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "TOKENS_RECIPIENT_INTERFACE_HASH",
+    values?: undefined
+  ): string;
+  encodeFunctionData(functionFragment: "VERSION", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "_currentBlockTimestamp",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "_getChannelId",
+    values: [string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "_getTicketHash",
+    values: [HoprChannels.RedeemableTicketStruct]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "_isWinningTicket",
+    values: [
+      BytesLike,
+      HoprChannels.RedeemableTicketStruct,
+      HoprCrypto.VRFParametersStruct
+    ]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "canImplementInterfaceForAddress",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(functionFragment: "channels", values: [BytesLike]): string;
+  encodeFunctionData(
+    functionFragment: "closeIncomingChannel",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "closeIncomingChannelSafe",
+    values: [string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "domainSeparator",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "finalizeOutgoingChannelClosure",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "finalizeOutgoingChannelClosureSafe",
+    values: [string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "fundChannel",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "fundChannelSafe",
+    values: [string, string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "initiateOutgoingChannelClosure",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "initiateOutgoingChannelClosureSafe",
+    values: [string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "ledgerDomainSeparator",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "multicall",
+    values: [BytesLike[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "noticePeriodChannelClosure",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "redeemTicket",
+    values: [
+      HoprChannels.RedeemableTicketStruct,
+      HoprCrypto.VRFParametersStruct
+    ]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "redeemTicketSafe",
+    values: [
+      string,
+      HoprChannels.RedeemableTicketStruct,
+      HoprCrypto.VRFParametersStruct
+    ]
+  ): string;
+  encodeFunctionData(functionFragment: "token", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "tokensReceived",
     values: [string, string, string, BigNumberish, BytesLike, BytesLike]
-  ): string
+  ): string;
 
-  decodeFunctionResult(functionFragment: 'FUND_CHANNEL_MULTI_SIZE', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'TOKENS_RECIPIENT_INTERFACE_HASH', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'announce', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'bumpChannel', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'canImplementInterfaceForAddress', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'channels', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'finalizeChannelClosure', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'fundChannelMulti', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'initiateChannelClosure', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'multicall', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'publicKeys', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'redeemTicket', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'secsClosure', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'token', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'tokensReceived', data: BytesLike): Result
+  decodeFunctionResult(
+    functionFragment: "ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "ERC777_HOOK_FUND_CHANNEL_SIZE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "LEDGER_VERSION",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "MAX_USED_BALANCE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "MIN_USED_BALANCE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "TOKENS_RECIPIENT_INTERFACE_HASH",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "VERSION", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "_currentBlockTimestamp",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "_getChannelId",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "_getTicketHash",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "_isWinningTicket",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "canImplementInterfaceForAddress",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "channels", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "closeIncomingChannel",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "closeIncomingChannelSafe",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "domainSeparator",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "finalizeOutgoingChannelClosure",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "finalizeOutgoingChannelClosureSafe",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "fundChannel",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "fundChannelSafe",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "initiateOutgoingChannelClosure",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "initiateOutgoingChannelClosureSafe",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "ledgerDomainSeparator",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "multicall", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "noticePeriodChannelClosure",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "redeemTicket",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "redeemTicketSafe",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "token", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "tokensReceived",
+    data: BytesLike
+  ): Result;
 
   events: {
-    'Announcement(address,bytes,bytes)': EventFragment
-    'ChannelBumped(address,address,bytes32,uint256,uint256)': EventFragment
-    'ChannelClosureFinalized(address,address,uint32,uint256)': EventFragment
-    'ChannelClosureInitiated(address,address,uint32)': EventFragment
-    'ChannelFunded(address,address,address,uint256)': EventFragment
-    'ChannelOpened(address,address)': EventFragment
-    'ChannelUpdated(address,address,tuple)': EventFragment
-    'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)': EventFragment
-  }
+    "ChannelBalanceDecreased(bytes32,uint96)": EventFragment;
+    "ChannelBalanceIncreased(bytes32,uint96)": EventFragment;
+    "ChannelClosed(bytes32)": EventFragment;
+    "ChannelOpened(address,address,uint96)": EventFragment;
+    "CommitmentSet(bytes32,uint24)": EventFragment;
+    "OutgoingChannelClosureInitiated(bytes32,uint32)": EventFragment;
+    "TicketRedeemed(bytes32,uint48)": EventFragment;
+  };
 
-  getEvent(nameOrSignatureOrTopic: 'Announcement'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'ChannelBumped'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'ChannelClosureFinalized'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'ChannelClosureInitiated'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'ChannelFunded'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'ChannelOpened'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'ChannelUpdated'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'TicketRedeemed'): EventFragment
+  getEvent(nameOrSignatureOrTopic: "ChannelBalanceDecreased"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ChannelBalanceIncreased"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ChannelClosed"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "ChannelOpened"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "CommitmentSet"): EventFragment;
+  getEvent(
+    nameOrSignatureOrTopic: "OutgoingChannelClosureInitiated"
+  ): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "TicketRedeemed"): EventFragment;
 }
 
-export interface AnnouncementEventObject {
-  account: string
-  publicKey: string
-  multiaddr: string
+export interface ChannelBalanceDecreasedEventObject {
+  channelId: string;
+  newBalance: BigNumber;
 }
-export type AnnouncementEvent = TypedEvent<[string, string, string], AnnouncementEventObject>
+export type ChannelBalanceDecreasedEvent = TypedEvent<
+  [string, BigNumber],
+  ChannelBalanceDecreasedEventObject
+>;
 
-export type AnnouncementEventFilter = TypedEventFilter<AnnouncementEvent>
+export type ChannelBalanceDecreasedEventFilter =
+  TypedEventFilter<ChannelBalanceDecreasedEvent>;
 
-export interface ChannelBumpedEventObject {
-  source: string
-  destination: string
-  newCommitment: string
-  ticketEpoch: BigNumber
-  channelBalance: BigNumber
+export interface ChannelBalanceIncreasedEventObject {
+  channelId: string;
+  newBalance: BigNumber;
 }
-export type ChannelBumpedEvent = TypedEvent<[string, string, string, BigNumber, BigNumber], ChannelBumpedEventObject>
+export type ChannelBalanceIncreasedEvent = TypedEvent<
+  [string, BigNumber],
+  ChannelBalanceIncreasedEventObject
+>;
 
-export type ChannelBumpedEventFilter = TypedEventFilter<ChannelBumpedEvent>
+export type ChannelBalanceIncreasedEventFilter =
+  TypedEventFilter<ChannelBalanceIncreasedEvent>;
 
-export interface ChannelClosureFinalizedEventObject {
-  source: string
-  destination: string
-  closureFinalizationTime: number
-  channelBalance: BigNumber
+export interface ChannelClosedEventObject {
+  channelId: string;
 }
-export type ChannelClosureFinalizedEvent = TypedEvent<
-  [string, string, number, BigNumber],
-  ChannelClosureFinalizedEventObject
->
+export type ChannelClosedEvent = TypedEvent<[string], ChannelClosedEventObject>;
 
-export type ChannelClosureFinalizedEventFilter = TypedEventFilter<ChannelClosureFinalizedEvent>
-
-export interface ChannelClosureInitiatedEventObject {
-  source: string
-  destination: string
-  closureInitiationTime: number
-}
-export type ChannelClosureInitiatedEvent = TypedEvent<[string, string, number], ChannelClosureInitiatedEventObject>
-
-export type ChannelClosureInitiatedEventFilter = TypedEventFilter<ChannelClosureInitiatedEvent>
-
-export interface ChannelFundedEventObject {
-  funder: string
-  source: string
-  destination: string
-  amount: BigNumber
-}
-export type ChannelFundedEvent = TypedEvent<[string, string, string, BigNumber], ChannelFundedEventObject>
-
-export type ChannelFundedEventFilter = TypedEventFilter<ChannelFundedEvent>
+export type ChannelClosedEventFilter = TypedEventFilter<ChannelClosedEvent>;
 
 export interface ChannelOpenedEventObject {
-  source: string
-  destination: string
+  source: string;
+  destination: string;
+  amount: BigNumber;
 }
-export type ChannelOpenedEvent = TypedEvent<[string, string], ChannelOpenedEventObject>
+export type ChannelOpenedEvent = TypedEvent<
+  [string, string, BigNumber],
+  ChannelOpenedEventObject
+>;
 
-export type ChannelOpenedEventFilter = TypedEventFilter<ChannelOpenedEvent>
+export type ChannelOpenedEventFilter = TypedEventFilter<ChannelOpenedEvent>;
 
-export interface ChannelUpdatedEventObject {
-  source: string
-  destination: string
-  newState: HoprChannels.ChannelStructOutput
+export interface CommitmentSetEventObject {
+  channelId: string;
+  epoch: number;
 }
-export type ChannelUpdatedEvent = TypedEvent<
-  [string, string, HoprChannels.ChannelStructOutput],
-  ChannelUpdatedEventObject
->
+export type CommitmentSetEvent = TypedEvent<
+  [string, number],
+  CommitmentSetEventObject
+>;
 
-export type ChannelUpdatedEventFilter = TypedEventFilter<ChannelUpdatedEvent>
+export type CommitmentSetEventFilter = TypedEventFilter<CommitmentSetEvent>;
+
+export interface OutgoingChannelClosureInitiatedEventObject {
+  channelId: string;
+  closureInitiationTime: number;
+}
+export type OutgoingChannelClosureInitiatedEvent = TypedEvent<
+  [string, number],
+  OutgoingChannelClosureInitiatedEventObject
+>;
+
+export type OutgoingChannelClosureInitiatedEventFilter =
+  TypedEventFilter<OutgoingChannelClosureInitiatedEvent>;
 
 export interface TicketRedeemedEventObject {
-  source: string
-  destination: string
-  nextCommitment: string
-  ticketEpoch: BigNumber
-  ticketIndex: BigNumber
-  proofOfRelaySecret: string
-  amount: BigNumber
-  winProb: BigNumber
-  signature: string
+  channelId: string;
+  newTicketIndex: number;
 }
 export type TicketRedeemedEvent = TypedEvent<
-  [string, string, string, BigNumber, BigNumber, string, BigNumber, BigNumber, string],
+  [string, number],
   TicketRedeemedEventObject
->
+>;
 
-export type TicketRedeemedEventFilter = TypedEventFilter<TicketRedeemedEvent>
+export type TicketRedeemedEventFilter = TypedEventFilter<TicketRedeemedEvent>;
 
 export interface HoprChannels extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this
-  attach(addressOrName: string): this
-  deployed(): Promise<this>
+  connect(signerOrProvider: Signer | Provider | string): this;
+  attach(addressOrName: string): this;
+  deployed(): Promise<this>;
 
-  interface: HoprChannelsInterface
+  interface: HoprChannelsInterface;
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>
+  ): Promise<Array<TEvent>>;
 
-  listeners<TEvent extends TypedEvent>(eventFilter?: TypedEventFilter<TEvent>): Array<TypedListener<TEvent>>
-  listeners(eventName?: string): Array<Listener>
-  removeAllListeners<TEvent extends TypedEvent>(eventFilter: TypedEventFilter<TEvent>): this
-  removeAllListeners(eventName?: string): this
-  off: OnEvent<this>
-  on: OnEvent<this>
-  once: OnEvent<this>
-  removeListener: OnEvent<this>
+  listeners<TEvent extends TypedEvent>(
+    eventFilter?: TypedEventFilter<TEvent>
+  ): Array<TypedListener<TEvent>>;
+  listeners(eventName?: string): Array<Listener>;
+  removeAllListeners<TEvent extends TypedEvent>(
+    eventFilter: TypedEventFilter<TEvent>
+  ): this;
+  removeAllListeners(eventName?: string): this;
+  off: OnEvent<this>;
+  on: OnEvent<this>;
+  once: OnEvent<this>;
+  removeListener: OnEvent<this>;
 
   functions: {
-    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<[BigNumber]>
+    ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<[string]>
+    ERC777_HOOK_FUND_CHANNEL_SIZE(
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
-    announce(
-      publicKey: BytesLike,
-      multiaddr: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+    LEDGER_VERSION(overrides?: CallOverrides): Promise<[string]>;
 
-    bumpChannel(
+    MAX_USED_BALANCE(overrides?: CallOverrides): Promise<[BigNumber]>;
+
+    MIN_USED_BALANCE(overrides?: CallOverrides): Promise<[BigNumber]>;
+
+    TOKENS_RECIPIENT_INTERFACE_HASH(
+      overrides?: CallOverrides
+    ): Promise<[string]>;
+
+    VERSION(overrides?: CallOverrides): Promise<[string]>;
+
+    _currentBlockTimestamp(overrides?: CallOverrides): Promise<[number]>;
+
+    _getChannelId(
       source: string,
-      newCommitment: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      destination: string,
+      overrides?: CallOverrides
+    ): Promise<[string]>;
+
+    _getTicketHash(
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      overrides?: CallOverrides
+    ): Promise<[string]>;
+
+    _isWinningTicket(
+      ticketHash: BytesLike,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<[string]>
+    ): Promise<[string]>;
 
     channels(
       arg0: BytesLike,
       overrides?: CallOverrides
     ): Promise<
-      [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number] & {
-        balance: BigNumber
-        commitment: string
-        ticketEpoch: BigNumber
-        ticketIndex: BigNumber
-        status: number
-        channelEpoch: BigNumber
-        closureTime: number
+      [BigNumber, number, number, number, number] & {
+        balance: BigNumber;
+        ticketIndex: number;
+        closureTime: number;
+        epoch: number;
+        status: number;
       }
-    >
+    >;
 
-    finalizeChannelClosure(
+    closeIncomingChannel(
+      source: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    closeIncomingChannelSafe(
+      self: string,
+      source: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    domainSeparator(overrides?: CallOverrides): Promise<[string]>;
+
+    finalizeOutgoingChannelClosure(
       destination: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    fundChannelMulti(
-      account1: string,
-      account2: string,
-      amount1: BigNumberish,
-      amount2: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
-
-    initiateChannelClosure(
+    finalizeOutgoingChannelClosureSafe(
+      self: string,
       destination: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    fundChannel(
+      account: string,
+      amount: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    fundChannelSafe(
+      self: string,
+      account: string,
+      amount: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    initiateOutgoingChannelClosure(
+      destination: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    initiateOutgoingChannelClosureSafe(
+      self: string,
+      destination: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    ledgerDomainSeparator(overrides?: CallOverrides): Promise<[string]>;
 
     multicall(
       data: BytesLike[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    publicKeys(arg0: string, overrides?: CallOverrides): Promise<[string]>
+    noticePeriodChannelClosure(overrides?: CallOverrides): Promise<[number]>;
 
     redeemTicket(
-      source: string,
-      nextCommitment: BytesLike,
-      ticketEpoch: BigNumberish,
-      ticketIndex: BigNumberish,
-      proofOfRelaySecret: BytesLike,
-      amount: BigNumberish,
-      winProb: BigNumberish,
-      signature: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    secsClosure(overrides?: CallOverrides): Promise<[number]>
+    redeemTicketSafe(
+      self: string,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    token(overrides?: CallOverrides): Promise<[string]>
+    token(overrides?: CallOverrides): Promise<[string]>;
 
     tokensReceived(
-      operator: string,
+      arg0: string,
       from: string,
       to: string,
       amount: BigNumberish,
       userData: BytesLike,
-      operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
-  }
+      arg5: BytesLike,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+  };
 
-  FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>
+  ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
-  TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>
+  ERC777_HOOK_FUND_CHANNEL_SIZE(overrides?: CallOverrides): Promise<BigNumber>;
 
-  announce(
-    publicKey: BytesLike,
-    multiaddr: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+  LEDGER_VERSION(overrides?: CallOverrides): Promise<string>;
 
-  bumpChannel(
+  MAX_USED_BALANCE(overrides?: CallOverrides): Promise<BigNumber>;
+
+  MIN_USED_BALANCE(overrides?: CallOverrides): Promise<BigNumber>;
+
+  TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>;
+
+  VERSION(overrides?: CallOverrides): Promise<string>;
+
+  _currentBlockTimestamp(overrides?: CallOverrides): Promise<number>;
+
+  _getChannelId(
     source: string,
-    newCommitment: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    destination: string,
+    overrides?: CallOverrides
+  ): Promise<string>;
 
-  canImplementInterfaceForAddress(interfaceHash: BytesLike, account: string, overrides?: CallOverrides): Promise<string>
+  _getTicketHash(
+    redeemable: HoprChannels.RedeemableTicketStruct,
+    overrides?: CallOverrides
+  ): Promise<string>;
+
+  _isWinningTicket(
+    ticketHash: BytesLike,
+    redeemable: HoprChannels.RedeemableTicketStruct,
+    params: HoprCrypto.VRFParametersStruct,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  canImplementInterfaceForAddress(
+    interfaceHash: BytesLike,
+    account: string,
+    overrides?: CallOverrides
+  ): Promise<string>;
 
   channels(
     arg0: BytesLike,
     overrides?: CallOverrides
   ): Promise<
-    [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number] & {
-      balance: BigNumber
-      commitment: string
-      ticketEpoch: BigNumber
-      ticketIndex: BigNumber
-      status: number
-      channelEpoch: BigNumber
-      closureTime: number
+    [BigNumber, number, number, number, number] & {
+      balance: BigNumber;
+      ticketIndex: number;
+      closureTime: number;
+      epoch: number;
+      status: number;
     }
-  >
+  >;
 
-  finalizeChannelClosure(
+  closeIncomingChannel(
+    source: string,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  closeIncomingChannelSafe(
+    self: string,
+    source: string,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  domainSeparator(overrides?: CallOverrides): Promise<string>;
+
+  finalizeOutgoingChannelClosure(
     destination: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  fundChannelMulti(
-    account1: string,
-    account2: string,
-    amount1: BigNumberish,
-    amount2: BigNumberish,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
-
-  initiateChannelClosure(
+  finalizeOutgoingChannelClosureSafe(
+    self: string,
     destination: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  fundChannel(
+    account: string,
+    amount: BigNumberish,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  fundChannelSafe(
+    self: string,
+    account: string,
+    amount: BigNumberish,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  initiateOutgoingChannelClosure(
+    destination: string,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  initiateOutgoingChannelClosureSafe(
+    self: string,
+    destination: string,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  ledgerDomainSeparator(overrides?: CallOverrides): Promise<string>;
 
   multicall(
     data: BytesLike[],
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  publicKeys(arg0: string, overrides?: CallOverrides): Promise<string>
+  noticePeriodChannelClosure(overrides?: CallOverrides): Promise<number>;
 
   redeemTicket(
-    source: string,
-    nextCommitment: BytesLike,
-    ticketEpoch: BigNumberish,
-    ticketIndex: BigNumberish,
-    proofOfRelaySecret: BytesLike,
-    amount: BigNumberish,
-    winProb: BigNumberish,
-    signature: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    redeemable: HoprChannels.RedeemableTicketStruct,
+    params: HoprCrypto.VRFParametersStruct,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  secsClosure(overrides?: CallOverrides): Promise<number>
+  redeemTicketSafe(
+    self: string,
+    redeemable: HoprChannels.RedeemableTicketStruct,
+    params: HoprCrypto.VRFParametersStruct,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  token(overrides?: CallOverrides): Promise<string>
+  token(overrides?: CallOverrides): Promise<string>;
 
   tokensReceived(
-    operator: string,
+    arg0: string,
     from: string,
     to: string,
     amount: BigNumberish,
     userData: BytesLike,
-    operatorData: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    arg5: BytesLike,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   callStatic: {
-    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>
+    ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>
+    ERC777_HOOK_FUND_CHANNEL_SIZE(
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    announce(publicKey: BytesLike, multiaddr: BytesLike, overrides?: CallOverrides): Promise<void>
+    LEDGER_VERSION(overrides?: CallOverrides): Promise<string>;
 
-    bumpChannel(source: string, newCommitment: BytesLike, overrides?: CallOverrides): Promise<void>
+    MAX_USED_BALANCE(overrides?: CallOverrides): Promise<BigNumber>;
+
+    MIN_USED_BALANCE(overrides?: CallOverrides): Promise<BigNumber>;
+
+    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<string>;
+
+    VERSION(overrides?: CallOverrides): Promise<string>;
+
+    _currentBlockTimestamp(overrides?: CallOverrides): Promise<number>;
+
+    _getChannelId(
+      source: string,
+      destination: string,
+      overrides?: CallOverrides
+    ): Promise<string>;
+
+    _getTicketHash(
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      overrides?: CallOverrides
+    ): Promise<string>;
+
+    _isWinningTicket(
+      ticketHash: BytesLike,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<string>
+    ): Promise<string>;
 
     channels(
       arg0: BytesLike,
       overrides?: CallOverrides
     ): Promise<
-      [BigNumber, string, BigNumber, BigNumber, number, BigNumber, number] & {
-        balance: BigNumber
-        commitment: string
-        ticketEpoch: BigNumber
-        ticketIndex: BigNumber
-        status: number
-        channelEpoch: BigNumber
-        closureTime: number
+      [BigNumber, number, number, number, number] & {
+        balance: BigNumber;
+        ticketIndex: number;
+        closureTime: number;
+        epoch: number;
+        status: number;
       }
-    >
+    >;
 
-    finalizeChannelClosure(destination: string, overrides?: CallOverrides): Promise<void>
-
-    fundChannelMulti(
-      account1: string,
-      account2: string,
-      amount1: BigNumberish,
-      amount2: BigNumberish,
+    closeIncomingChannel(
+      source: string,
       overrides?: CallOverrides
-    ): Promise<void>
+    ): Promise<void>;
 
-    initiateChannelClosure(destination: string, overrides?: CallOverrides): Promise<void>
+    closeIncomingChannelSafe(
+      self: string,
+      source: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    multicall(data: BytesLike[], overrides?: CallOverrides): Promise<string[]>
+    domainSeparator(overrides?: CallOverrides): Promise<string>;
 
-    publicKeys(arg0: string, overrides?: CallOverrides): Promise<string>
+    finalizeOutgoingChannelClosure(
+      destination: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    finalizeOutgoingChannelClosureSafe(
+      self: string,
+      destination: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    fundChannel(
+      account: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    fundChannelSafe(
+      self: string,
+      account: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    initiateOutgoingChannelClosure(
+      destination: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    initiateOutgoingChannelClosureSafe(
+      self: string,
+      destination: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    ledgerDomainSeparator(overrides?: CallOverrides): Promise<string>;
+
+    multicall(data: BytesLike[], overrides?: CallOverrides): Promise<string[]>;
+
+    noticePeriodChannelClosure(overrides?: CallOverrides): Promise<number>;
 
     redeemTicket(
-      source: string,
-      nextCommitment: BytesLike,
-      ticketEpoch: BigNumberish,
-      ticketIndex: BigNumberish,
-      proofOfRelaySecret: BytesLike,
-      amount: BigNumberish,
-      winProb: BigNumberish,
-      signature: BytesLike,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
       overrides?: CallOverrides
-    ): Promise<void>
+    ): Promise<void>;
 
-    secsClosure(overrides?: CallOverrides): Promise<number>
+    redeemTicketSafe(
+      self: string,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    token(overrides?: CallOverrides): Promise<string>
+    token(overrides?: CallOverrides): Promise<string>;
 
     tokensReceived(
-      operator: string,
+      arg0: string,
       from: string,
       to: string,
       amount: BigNumberish,
       userData: BytesLike,
-      operatorData: BytesLike,
+      arg5: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>
-  }
+    ): Promise<void>;
+  };
 
   filters: {
-    'Announcement(address,bytes,bytes)'(
-      account?: string | null,
-      publicKey?: null,
-      multiaddr?: null
-    ): AnnouncementEventFilter
-    Announcement(account?: string | null, publicKey?: null, multiaddr?: null): AnnouncementEventFilter
+    "ChannelBalanceDecreased(bytes32,uint96)"(
+      channelId?: BytesLike | null,
+      newBalance?: null
+    ): ChannelBalanceDecreasedEventFilter;
+    ChannelBalanceDecreased(
+      channelId?: BytesLike | null,
+      newBalance?: null
+    ): ChannelBalanceDecreasedEventFilter;
 
-    'ChannelBumped(address,address,bytes32,uint256,uint256)'(
-      source?: string | null,
-      destination?: string | null,
-      newCommitment?: null,
-      ticketEpoch?: null,
-      channelBalance?: null
-    ): ChannelBumpedEventFilter
-    ChannelBumped(
-      source?: string | null,
-      destination?: string | null,
-      newCommitment?: null,
-      ticketEpoch?: null,
-      channelBalance?: null
-    ): ChannelBumpedEventFilter
+    "ChannelBalanceIncreased(bytes32,uint96)"(
+      channelId?: BytesLike | null,
+      newBalance?: null
+    ): ChannelBalanceIncreasedEventFilter;
+    ChannelBalanceIncreased(
+      channelId?: BytesLike | null,
+      newBalance?: null
+    ): ChannelBalanceIncreasedEventFilter;
 
-    'ChannelClosureFinalized(address,address,uint32,uint256)'(
-      source?: string | null,
-      destination?: string | null,
-      closureFinalizationTime?: null,
-      channelBalance?: null
-    ): ChannelClosureFinalizedEventFilter
-    ChannelClosureFinalized(
-      source?: string | null,
-      destination?: string | null,
-      closureFinalizationTime?: null,
-      channelBalance?: null
-    ): ChannelClosureFinalizedEventFilter
+    "ChannelClosed(bytes32)"(
+      channelId?: BytesLike | null
+    ): ChannelClosedEventFilter;
+    ChannelClosed(channelId?: BytesLike | null): ChannelClosedEventFilter;
 
-    'ChannelClosureInitiated(address,address,uint32)'(
-      source?: string | null,
-      destination?: string | null,
-      closureInitiationTime?: null
-    ): ChannelClosureInitiatedEventFilter
-    ChannelClosureInitiated(
-      source?: string | null,
-      destination?: string | null,
-      closureInitiationTime?: null
-    ): ChannelClosureInitiatedEventFilter
-
-    'ChannelFunded(address,address,address,uint256)'(
-      funder?: string | null,
+    "ChannelOpened(address,address,uint96)"(
       source?: string | null,
       destination?: string | null,
       amount?: null
-    ): ChannelFundedEventFilter
-    ChannelFunded(
-      funder?: string | null,
+    ): ChannelOpenedEventFilter;
+    ChannelOpened(
       source?: string | null,
       destination?: string | null,
       amount?: null
-    ): ChannelFundedEventFilter
+    ): ChannelOpenedEventFilter;
 
-    'ChannelOpened(address,address)'(source?: string | null, destination?: string | null): ChannelOpenedEventFilter
-    ChannelOpened(source?: string | null, destination?: string | null): ChannelOpenedEventFilter
+    "CommitmentSet(bytes32,uint24)"(
+      channelId?: BytesLike | null,
+      epoch?: null
+    ): CommitmentSetEventFilter;
+    CommitmentSet(
+      channelId?: BytesLike | null,
+      epoch?: null
+    ): CommitmentSetEventFilter;
 
-    'ChannelUpdated(address,address,tuple)'(
-      source?: string | null,
-      destination?: string | null,
-      newState?: null
-    ): ChannelUpdatedEventFilter
-    ChannelUpdated(source?: string | null, destination?: string | null, newState?: null): ChannelUpdatedEventFilter
+    "OutgoingChannelClosureInitiated(bytes32,uint32)"(
+      channelId?: BytesLike | null,
+      closureInitiationTime?: null
+    ): OutgoingChannelClosureInitiatedEventFilter;
+    OutgoingChannelClosureInitiated(
+      channelId?: BytesLike | null,
+      closureInitiationTime?: null
+    ): OutgoingChannelClosureInitiatedEventFilter;
 
-    'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)'(
-      source?: string | null,
-      destination?: string | null,
-      nextCommitment?: null,
-      ticketEpoch?: null,
-      ticketIndex?: null,
-      proofOfRelaySecret?: null,
-      amount?: null,
-      winProb?: null,
-      signature?: null
-    ): TicketRedeemedEventFilter
+    "TicketRedeemed(bytes32,uint48)"(
+      channelId?: BytesLike | null,
+      newTicketIndex?: null
+    ): TicketRedeemedEventFilter;
     TicketRedeemed(
-      source?: string | null,
-      destination?: string | null,
-      nextCommitment?: null,
-      ticketEpoch?: null,
-      ticketIndex?: null,
-      proofOfRelaySecret?: null,
-      amount?: null,
-      winProb?: null,
-      signature?: null
-    ): TicketRedeemedEventFilter
-  }
+      channelId?: BytesLike | null,
+      newTicketIndex?: null
+    ): TicketRedeemedEventFilter;
+  };
 
   estimateGas: {
-    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<BigNumber>
+    ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<BigNumber>
+    ERC777_HOOK_FUND_CHANNEL_SIZE(
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    announce(
-      publicKey: BytesLike,
-      multiaddr: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
+    LEDGER_VERSION(overrides?: CallOverrides): Promise<BigNumber>;
 
-    bumpChannel(
+    MAX_USED_BALANCE(overrides?: CallOverrides): Promise<BigNumber>;
+
+    MIN_USED_BALANCE(overrides?: CallOverrides): Promise<BigNumber>;
+
+    TOKENS_RECIPIENT_INTERFACE_HASH(
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    VERSION(overrides?: CallOverrides): Promise<BigNumber>;
+
+    _currentBlockTimestamp(overrides?: CallOverrides): Promise<BigNumber>;
+
+    _getChannelId(
       source: string,
-      newCommitment: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
+      destination: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    _getTicketHash(
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    _isWinningTicket(
+      ticketHash: BytesLike,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     canImplementInterfaceForAddress(
       interfaceHash: BytesLike,
       account: string,
       overrides?: CallOverrides
-    ): Promise<BigNumber>
+    ): Promise<BigNumber>;
 
-    channels(arg0: BytesLike, overrides?: CallOverrides): Promise<BigNumber>
+    channels(arg0: BytesLike, overrides?: CallOverrides): Promise<BigNumber>;
 
-    finalizeChannelClosure(
-      destination: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    fundChannelMulti(
-      account1: string,
-      account2: string,
-      amount1: BigNumberish,
-      amount2: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    initiateChannelClosure(
-      destination: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    multicall(data: BytesLike[], overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    publicKeys(arg0: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    redeemTicket(
+    closeIncomingChannel(
       source: string,
-      nextCommitment: BytesLike,
-      ticketEpoch: BigNumberish,
-      ticketIndex: BigNumberish,
-      proofOfRelaySecret: BytesLike,
-      amount: BigNumberish,
-      winProb: BigNumberish,
-      signature: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    secsClosure(overrides?: CallOverrides): Promise<BigNumber>
-
-    token(overrides?: CallOverrides): Promise<BigNumber>
-
-    tokensReceived(
-      operator: string,
-      from: string,
-      to: string,
-      amount: BigNumberish,
-      userData: BytesLike,
-      operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-  }
-
-  populateTransaction: {
-    FUND_CHANNEL_MULTI_SIZE(overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    TOKENS_RECIPIENT_INTERFACE_HASH(overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    announce(
-      publicKey: BytesLike,
-      multiaddr: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
-
-    bumpChannel(
+    closeIncomingChannelSafe(
+      self: string,
       source: string,
-      newCommitment: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    canImplementInterfaceForAddress(
-      interfaceHash: BytesLike,
+    domainSeparator(overrides?: CallOverrides): Promise<BigNumber>;
+
+    finalizeOutgoingChannelClosure(
+      destination: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    finalizeOutgoingChannelClosureSafe(
+      self: string,
+      destination: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    fundChannel(
       account: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>
+      amount: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    channels(arg0: BytesLike, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    fundChannelSafe(
+      self: string,
+      account: string,
+      amount: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    finalizeChannelClosure(
+    initiateOutgoingChannelClosure(
       destination: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    fundChannelMulti(
-      account1: string,
-      account2: string,
-      amount1: BigNumberish,
-      amount2: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
-
-    initiateChannelClosure(
+    initiateOutgoingChannelClosureSafe(
+      self: string,
       destination: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    ledgerDomainSeparator(overrides?: CallOverrides): Promise<BigNumber>;
 
     multicall(
       data: BytesLike[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    publicKeys(arg0: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    noticePeriodChannelClosure(overrides?: CallOverrides): Promise<BigNumber>;
 
     redeemTicket(
-      source: string,
-      nextCommitment: BytesLike,
-      ticketEpoch: BigNumberish,
-      ticketIndex: BigNumberish,
-      proofOfRelaySecret: BytesLike,
-      amount: BigNumberish,
-      winProb: BigNumberish,
-      signature: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    secsClosure(overrides?: CallOverrides): Promise<PopulatedTransaction>
+    redeemTicketSafe(
+      self: string,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    token(overrides?: CallOverrides): Promise<PopulatedTransaction>
+    token(overrides?: CallOverrides): Promise<BigNumber>;
 
     tokensReceived(
-      operator: string,
+      arg0: string,
       from: string,
       to: string,
       amount: BigNumberish,
       userData: BytesLike,
-      operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
-  }
+      arg5: BytesLike,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+  };
+
+  populateTransaction: {
+    ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    ERC777_HOOK_FUND_CHANNEL_SIZE(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    LEDGER_VERSION(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    MAX_USED_BALANCE(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    MIN_USED_BALANCE(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    TOKENS_RECIPIENT_INTERFACE_HASH(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    VERSION(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    _currentBlockTimestamp(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    _getChannelId(
+      source: string,
+      destination: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    _getTicketHash(
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    _isWinningTicket(
+      ticketHash: BytesLike,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    canImplementInterfaceForAddress(
+      interfaceHash: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    channels(
+      arg0: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    closeIncomingChannel(
+      source: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    closeIncomingChannelSafe(
+      self: string,
+      source: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    domainSeparator(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    finalizeOutgoingChannelClosure(
+      destination: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    finalizeOutgoingChannelClosureSafe(
+      self: string,
+      destination: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    fundChannel(
+      account: string,
+      amount: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    fundChannelSafe(
+      self: string,
+      account: string,
+      amount: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    initiateOutgoingChannelClosure(
+      destination: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    initiateOutgoingChannelClosureSafe(
+      self: string,
+      destination: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    ledgerDomainSeparator(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    multicall(
+      data: BytesLike[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    noticePeriodChannelClosure(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    redeemTicket(
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    redeemTicketSafe(
+      self: string,
+      redeemable: HoprChannels.RedeemableTicketStruct,
+      params: HoprCrypto.VRFParametersStruct,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    token(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    tokensReceived(
+      arg0: string,
+      from: string,
+      to: string,
+      amount: BigNumberish,
+      userData: BytesLike,
+      arg5: BytesLike,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+  };
 }

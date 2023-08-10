@@ -4,14 +4,18 @@
       "chain": "anvil",
       "environment_type": "local",
       "version_range": "*",
-      "indexer_start_block_number": 2,
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-      "stake_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "network_registry_proxy_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "network_registry_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+      "indexer_start_block_number": 6,
+      "addresses": {
+        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+        "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+        "ticket_price_oracle": "0x59b670e9fA9D0A427751Af201D676719a970857b",
+        "announcements": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
+        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+      },
       "tags": []
     },
     "anvil-localhost2": {
@@ -19,13 +23,17 @@
       "environment_type": "local",
       "version_range": "*",
       "indexer_start_block_number": 2,
-      "token_contract_address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "channels_contract_address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-      "stake_contract_address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "network_registry_proxy_contract_address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "network_registry_contract_address": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+      "addresses": {
+        "network_registry": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
+        "network_registry_proxy": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+        "channels": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
+        "token": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        "module_implementation": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "node_safe_registry": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "ticket_price_oracle": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+        "announcements": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+        "node_stake_v2_factory": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      },
       "tags": []
     },
     "rotsee": {
@@ -33,41 +41,57 @@
       "environment_type": "development",
       "version_range": "*",
       "indexer_start_block_number": 26356392,
-      "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-      "channels_contract_address": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
-      "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998",
-      "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
-      "stake_contract_address": "0x26d1CEC4Ba2F98Ff35ec549Fcd1b82A90bb32065",
-      "network_registry_proxy_contract_address": "0x628ED93eEBF1840bF26e8fB62BCe4F1BCCDE9e95",
-      "network_registry_contract_address": "0x278A44a487D2Ca9303c2B9Abe00605B075cBa69F",
-      "tags": ["etherscan"]
+      "addresses": {
+        "channels": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
+        "module_implementation": "0x1cf6329673e8A2F009b00883118b3d15E35be529",
+        "network_registry": "0x625D27594DF4564A52a0ea5667b0D0450a6f6685",
+        "network_registry_proxy": "0xaefC99476f9F04326a748B7E32364B10B8fF4158",
+        "node_safe_registry": "0xf5FD9e286662830672B720c21A7Ddc67a00da77a",
+        "node_stake_v2_factory": "0x060Cb76C6541bF28f94088e658E4167966E37eF9",
+        "token": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
+      "tags": [
+        "etherscan"
+      ]
     },
     "debug-staging": {
       "chain": "xdai",
       "environment_type": "staging",
       "version_range": "*",
       "indexer_start_block_number": 26356264,
-      "token_contract_address": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-      "channels_contract_address": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
-      "stake_contract_address": "0xcA7801A1C0Df0EFfC0031330EFE98daE40230d80",
-      "network_registry_contract_address": "0xED4977EBf25137d5E5e039A7a848149d67679F6c",
-      "xhopr_contract_address": "0x4DeCc7e6c63fF6c40630654A3b9C92b937369998",
-      "boost_contract_address": "0x2Fc87247085F4658ADB698cDbF4d732c704f1e06",
-      "network_registry_proxy_contract_address": "0x9937Fa1497bE80C473c14B944E213bb381F18C34",
-      "tags": ["development"]
+      "addresses": {
+        "channels": "0xd54eE5aDed3A4d2059A6f01DEbdb033BB5453433",
+        "network_registry": "0xED4977EBf25137d5E5e039A7a848149d67679F6c",
+        "network_registry_proxy": "0x9937Fa1497bE80C473c14B944E213bb381F18C34",
+        "token": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
+      "tags": [
+        "development"
+      ]
     },
     "tuttlingen": {
       "environment_type": "production",
       "chain": "xdai",
       "version_range": "1.83",
       "indexer_start_block_number": 0,
-      "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-      "channels_contract_address": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
-      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
+      "addresses": {
+        "channels": "0xd2229d5d54bE8ABC9A2b2d5cFdEd22B48FB8ce2c",
+        "network_registry": "0x0000000000000000000000000000000000000000",
+        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
+        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
       "tags": []
     },
     "prague": {
@@ -75,13 +99,17 @@
       "environment_type": "production",
       "version_range": "1.84",
       "indexer_start_block_number": 0,
-      "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-      "channels_contract_address": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
-      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
+      "addresses": {
+        "channels": "0x4f98F01cb02083eb5457CA0DDC6B37073ec5388a",
+        "network_registry": "0x0000000000000000000000000000000000000000",
+        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
+        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
       "tags": []
     },
     "budapest": {
@@ -89,13 +117,17 @@
       "environment_type": "production",
       "version_range": "1.85",
       "indexer_start_block_number": 0,
-      "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-      "channels_contract_address": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
-      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
+      "addresses": {
+        "channels": "0xEee8AB66b7169b3f9024676165fB1D2a25E472c5",
+        "network_registry": "0x0000000000000000000000000000000000000000",
+        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
+        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
       "tags": []
     },
     "athens": {
@@ -103,13 +135,17 @@
       "environment_type": "production",
       "version_range": "1.86",
       "indexer_start_block_number": 0,
-      "token_contract_address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-      "channels_contract_address": "0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
-      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
+      "addresses": {
+        "channels": "0xD2F008718EEdD7aF7E9a466F5D68bb77D03B8F7A",
+        "network_registry": "0x0000000000000000000000000000000000000000",
+        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
+        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
       "tags": []
     },
     "lisbon": {
@@ -117,13 +153,17 @@
       "environment_type": "production",
       "version_range": "1.87",
       "indexer_start_block_number": 0,
-      "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
-      "channels_contract_address": "0x1753C9eE656c54f443ce2Fe7248076f9bA4eC100",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x2cDD13ddB0346E0F620C8E5826Da5d7230341c6E",
-      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
+      "addresses": {
+        "channels": "0x1753C9eE656c54f443ce2Fe7248076f9bA4eC100",
+        "network_registry": "0x0000000000000000000000000000000000000000",
+        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
+        "token": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
       "tags": []
     },
     "ouagadougou": {
@@ -131,13 +171,17 @@
       "environment_type": "production",
       "version_range": "1.88",
       "indexer_start_block_number": 0,
-      "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
-      "channels_contract_address": "0x0BB1Ff7A9b3f2c87267626630aa0195cAE3ed5E3",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0xae933331ef0bE122f9499512d3ed4Fa3896DCf20",
-      "network_registry_contract_address": "${HARDHAT_REGISTRY_CONTACT_ADDRESS}",
-      "network_registry_proxy_contract_address": "${HARDHAT_REGISTRY_PROXY_CONTACT_ADDRESS}",
+      "addresses": {
+        "channels": "0x0BB1Ff7A9b3f2c87267626630aa0195cAE3ed5E3",
+        "network_registry": "0x0000000000000000000000000000000000000000",
+        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
+        "token": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
       "tags": []
     },
     "paleochora": {
@@ -145,28 +189,40 @@
       "environment_type": "production",
       "version_range": "1.89",
       "indexer_start_block_number": 0,
-      "token_contract_address": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
-      "channels_contract_address": "0xCe7209FD81ED129C2ea8369715c168419e4148Ef",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x5Bb7e435aDa333A6714e27962e4Bb6aFDE1cECd4",
-      "network_registry_contract_address": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
-      "network_registry_proxy_contract_address": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07",
-      "tags": ["etherscan"]
+      "addresses": {
+        "channels": "0xCe7209FD81ED129C2ea8369715c168419e4148Ef",
+        "network_registry": "0xf0D4D48866C4F9665212B29A64c14A1f0FEDFD4c",
+        "network_registry_proxy": "0x15e068Ef1f76319b1848b1fcB3e49D68724AEE07",
+        "token": "0x978D91ddFdb0c6eaCC22A258fE498957a79c5F4C",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
+      "tags": [
+        "etherscan"
+      ]
     },
     "monte_rosa": {
       "chain": "xdai",
       "environment_type": "production",
       "version_range": "1.89||1.90||1.91||1.92||1.93",
       "indexer_start_block_number": 24097267,
-      "token_contract_address": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
-      "channels_contract_address": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
-      "xhopr_contract_address": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
-      "boost_contract_address": "0x43d13D7B83607F14335cF2cB75E87dA369D056c7",
-      "stake_contract_address": "0x65c39e6BD97f80B5aE5d2120a47644578Fd2B8DC",
-      "network_registry_contract_address": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
-      "network_registry_proxy_contract_address": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
-      "tags": ["etherscan"]
+      "addresses": {
+        "channels": "0xFaBeE463f31E39eC8952bBfB4490C41103bf573e",
+        "network_registry": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
+        "network_registry_proxy": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
+        "token": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      },
+      "tags": [
+        "etherscan"
+      ]
     }
   },
   "chains": {

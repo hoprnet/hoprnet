@@ -426,6 +426,7 @@ class Hopr extends EventEmitter {
         log(`peer store: loaded peer ${peerId}`)
       })
 
+
     // react when network registry is enabled / disabled
     connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
       // If Network Registry got enabled, we might need to close existing connections,
@@ -1337,7 +1338,7 @@ class Hopr extends EventEmitter {
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
-    channelClosureSecs: number
+    noticePeriodChannelClosure: number
   } {
     return HoprCoreEthereum.getInstance().smartContractInfo()
   }

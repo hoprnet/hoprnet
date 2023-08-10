@@ -15,7 +15,9 @@ import {
   ChannelEntry,
   type DeferType,
   PublicKey,
-  create_counter
+  AccountEntry,
+  create_counter,
+  OffchainPublicKey
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -258,7 +260,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
-    channelClosureSecs: number
+    noticePeriodChannelClosure: number
   } {
     return this.chain.getInfo()
   }
@@ -498,7 +500,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return this.chain.initiateChannelClosure(dest, (txHash: string) =>
+    return this.chain.initiateOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
@@ -520,7 +522,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(dest, (txHash: string) =>
+    return await this.chain.finalizeOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
@@ -575,56 +577,56 @@ export default class HoprCoreEthereum extends EventEmitter {
     return await is_allowed_to_access_network(this.db, Ethereum_Address.deserialize(hoprNode.to_address().serialize()))
   }
 
-  // public static createMockInstance(peer: PeerId): HoprCoreEthereum {
-  //   const connectorLogger = debug(`hopr:mocks:connector`)
-  //   HoprCoreEthereum._instance = {
-  //     start: () => {
-  //       connectorLogger('starting connector called.')
-  //       return {} as unknown as HoprCoreEthereum
-  //     },
-  //     stop: () => {
-  //       connectorLogger('stopping connector called.')
-  //       return Promise.resolve()
-  //     },
-  //     getNativeBalance: () => {
-  //       connectorLogger('getNativeBalance method was called')
-  //       return Promise.resolve(new Balance('10000000000000000000', BalanceType.Native))
-  //     },
-  //     getPublicKey: () => {
-  //       connectorLogger('getPublicKey method was called')
-  //       return PublicKey.from_peerid_str(peer.toString())
-  //     },
-  //     getAccount: () => {
-  //       connectorLogger('getAccount method was called')
-  //       return Promise.resolve(
-  //         new AccountEntry(
-  //           OffchainPublicKey.from_peerid_str(peer.toString()),
+  public static createMockInstance(peer: PeerId): HoprCoreEthereum {
+    const connectorLogger = debug(`hopr:mocks:connector`)
+    HoprCoreEthereum._instance = {
+      start: () => {
+        connectorLogger('starting connector called.')
+        return {} as unknown as HoprCoreEthereum
+      },
+      stop: () => {
+        connectorLogger('stopping connector called.')
+        return Promise.resolve()
+      },
+      getNativeBalance: () => {
+        connectorLogger('getNativeBalance method was called')
+        return Promise.resolve(new Balance('10000000000000000000', BalanceType.Native))
+      },
+      getPublicKey: () => {
+        connectorLogger('getPublicKey method was called')
+        return PublicKey.from_peerid_str(peer.toString())
+      },
+      getAccount: () => {
+        connectorLogger('getAccount method was called')
+        return Promise.resolve(
+          new AccountEntry(
+            OffchainPublicKey.from_peerid_str(peer.toString()),
+            Address.from_string(""),  // FIXME: update dummy
+            `/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`,
+            1
+          )
+        )
+      },
+      waitForPublicNodes: () => {
+        connectorLogger('On-chain request for existing public nodes.')
+        return Promise.resolve([])
+      },
+      announce: () => {
+        connectorLogger('On-chain announce request sent')
+      },
+      on: (event: string) => {
+        connectorLogger(`On-chain signal for event "${event}"`)
+      },
+      indexer: {
+        on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
+        off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
+        getPublicNodes: () => Promise.resolve([])
+      },
+      isAllowedAccessToNetwork: () => Promise.resolve(true)
+    } as unknown as HoprCoreEthereum
 
-  //           `/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`,
-  //           1
-  //         )
-  //       )
-  //     },
-  //     waitForPublicNodes: () => {
-  //       connectorLogger('On-chain request for existing public nodes.')
-  //       return Promise.resolve([])
-  //     },
-  //     announce: () => {
-  //       connectorLogger('On-chain announce request sent')
-  //     },
-  //     on: (event: string) => {
-  //       connectorLogger(`On-chain signal for event "${event}"`)
-  //     },
-  //     indexer: {
-  //       on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
-  //       off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
-  //       getPublicNodes: () => Promise.resolve([])
-  //     },
-  //     isAllowedAccessToNetwork: () => Promise.resolve(true)
-  //   } as unknown as HoprCoreEthereum
-
-  //   return HoprCoreEthereum._instance
-  // }
+    return HoprCoreEthereum._instance
+  }
 }
 
 // export { useFixtures } from './indexer/index.mock.js'

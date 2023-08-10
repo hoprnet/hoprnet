@@ -18,8 +18,7 @@ contract NetworkConfig is Script {
         PRODUCTION
     }
 
-    struct NetworkDetail {
-        EnvironmentType environmentType;
+    struct Addresses {
         address tokenContractAddress;
         address channelsContractAddress;
         address nodeStakeV2FactoryAddress;
@@ -28,7 +27,13 @@ contract NetworkConfig is Script {
         address networkRegistryContractAddress;
         address networkRegistryProxyContractAddress;
         address ticketPriceOracleContractAddress;
+        address announcements;
+    }
+
+    struct NetworkDetail {
+        EnvironmentType environmentType;
         uint256 indexerStartBlockNumber;
+        Addresses addresses;
     }
 
     // Deployed contract addresses
@@ -61,33 +66,45 @@ contract NetworkConfig is Script {
         );
         uint256 indexerStartBlkNum =
             json.readUint(string(abi.encodePacked(levelToNetworkConfig, ".indexer_start_block_number")));
-        address tokenAddr = json.readAddress(string(abi.encodePacked(levelToNetworkConfig, ".token_contract_address")));
-        address channelAddr =
-            json.readAddress(string(abi.encodePacked(levelToNetworkConfig, ".channels_contract_address")));
-        address nodeStakeV2FactoryAddr =
-            json.readAddress(string(abi.encodePacked(levelToNetworkConfig, ".node_stake_v2_factory_address")));
-        address moduleImplementationAddr =
-            json.readAddress(string(abi.encodePacked(levelToNetworkConfig, ".module_implementation_address")));
-        address nodeSafeRegistryAddr =
-            json.readAddress(string(abi.encodePacked(levelToNetworkConfig, ".node_safe_registry_address")));
-        address networkRegistryProxyAddr =
-            json.readAddress(string(abi.encodePacked(levelToNetworkConfig, ".network_registry_proxy_contract_address")));
-        address networkRegistryAddr =
-            json.readAddress(string(abi.encodePacked(levelToNetworkConfig, ".network_registry_contract_address")));
-        address ticketPriceOracleAddress =
-            json.readAddress(string(abi.encodePacked(levelToNetworkConfig, ".ticket_price_oracle_contract_address")));
 
-        networkDetail = NetworkDetail({
-            environmentType: envType,
+        bytes memory addresses = abi.encodePacked(levelToNetworkConfig, ".addresses");
+
+        // console2.log_string(addresses);
+
+        address tokenAddr = json.readAddress(string(abi.encodePacked(addresses, ".token")));
+        address channelAddr =
+            json.readAddress(string(abi.encodePacked(addresses, ".channels")));
+        address nodeStakeV2FactoryAddr =
+            json.readAddress(string(abi.encodePacked(addresses, ".node_stake_v2_factory")));
+        address moduleImplementationAddr =
+            json.readAddress(string(abi.encodePacked(addresses, ".module_implementation")));
+        address nodeSafeRegistryAddr =
+            json.readAddress(string(abi.encodePacked(addresses, ".node_safe_registry")));
+        address networkRegistryProxyAddr =
+            json.readAddress(string(abi.encodePacked(addresses, ".network_registry_proxy")));
+        address networkRegistryAddr =
+            json.readAddress(string(abi.encodePacked(addresses, ".network_registry")));
+        address ticketPriceOracleAddress =
+            json.readAddress(string(abi.encodePacked(addresses, ".ticket_price_oracle")));
+        address announcementAdddress = 
+            json.readAddress(string(abi.encodePacked(addresses, ".announcements")));
+
+        Addresses memory addressStruct = Addresses({
             tokenContractAddress: tokenAddr,
             channelsContractAddress: channelAddr,
             nodeStakeV2FactoryAddress: nodeStakeV2FactoryAddr,
             moduleImplementationAddress: moduleImplementationAddr,
             nodeSafeRegistryAddress: nodeSafeRegistryAddr,
-            indexerStartBlockNumber: indexerStartBlkNum,
             networkRegistryContractAddress: networkRegistryAddr,
             networkRegistryProxyContractAddress: networkRegistryProxyAddr,
-            ticketPriceOracleContractAddress: ticketPriceOracleAddress
+            ticketPriceOracleContractAddress: ticketPriceOracleAddress,
+            announcements: announcementAdddress
+        });
+
+        networkDetail = NetworkDetail({
+            environmentType: envType,
+            indexerStartBlockNumber: indexerStartBlkNum,
+            addresses: addressStruct
         });
     }
 
@@ -96,13 +113,22 @@ contract NetworkConfig is Script {
     }
 
     function writeNetwork(string memory _networkName, NetworkDetail memory networkDetail) internal {
-        string memory parsedNewEnvDetail = parseNetworkDetailToString(networkDetail);
-
         // write parsedNewEnvDetail to corresponding key
         string memory configKey = string(abi.encodePacked(".networks.", _networkName));
 
-        // write to file;
-        vm.writeJson(parsedNewEnvDetail, pathToDeploymentFile, configKey);
+        // use vm.writeJson to preserve order of JSON properties
+        vm.writeJson(vm.toString(networkDetail.addresses.tokenContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.token")));
+        vm.writeJson(vm.toString(networkDetail.addresses.channelsContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.channels")));
+        vm.writeJson(vm.toString(networkDetail.addresses.nodeStakeV2FactoryAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.node_stake_v2_factory")));
+        vm.writeJson(vm.toString(networkDetail.addresses.moduleImplementationAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.module_implementation")));
+        vm.writeJson(vm.toString(networkDetail.addresses.nodeSafeRegistryAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.node_safe_registry")));
+        vm.writeJson(vm.toString(networkDetail.addresses.networkRegistryProxyContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.network_registry_proxy")));
+        vm.writeJson(vm.toString(networkDetail.addresses.ticketPriceOracleContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.ticket_price_oracle")));
+        vm.writeJson(vm.toString(networkDetail.addresses.announcements), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.announcements")));
+        vm.writeJson(vm.toString(networkDetail.addresses.networkRegistryContractAddress), pathToDeploymentFile, string(abi.encodePacked(configKey, ".addresses.network_registry")));
+
+        vm.writeJson(parseEnvironmentTypeToString(networkDetail.environmentType), pathToDeploymentFile, string(abi.encodePacked(configKey, ".environment_type")));
+        vm.writeJson(vm.toString(networkDetail.indexerStartBlockNumber), pathToDeploymentFile, string(abi.encodePacked(configKey, ".indexer_start_block_number")));
     }
 
     function writeCurrentNetwork() internal {
@@ -134,14 +160,14 @@ contract NetworkConfig is Script {
         vm.writeLine(
             filePath,
             string(
-                abi.encodePacked('"token_contract_address": "', vm.toString(networkDetail.tokenContractAddress), '",')
+                abi.encodePacked('"token_contract_address": "', vm.toString(networkDetail.addresses.tokenContractAddress), '",')
             )
         );
         vm.writeLine(
             filePath,
             string(
                 abi.encodePacked(
-                    '"channels_contract_address": "', vm.toString(networkDetail.channelsContractAddress), '",'
+                    '"channels_contract_address": "', vm.toString(networkDetail.addresses.channelsContractAddress), '",'
                 )
             )
         );
@@ -149,7 +175,7 @@ contract NetworkConfig is Script {
             filePath,
             string(
                 abi.encodePacked(
-                    '"node_stake_v2_factory_address": "', vm.toString(networkDetail.nodeStakeV2FactoryAddress), '"'
+                    '"node_stake_v2_factory_address": "', vm.toString(networkDetail.addresses.nodeStakeV2FactoryAddress), '"'
                 )
             )
         );
@@ -157,7 +183,7 @@ contract NetworkConfig is Script {
             filePath,
             string(
                 abi.encodePacked(
-                    '"module_implementation_address": "', vm.toString(networkDetail.moduleImplementationAddress), '"'
+                    '"module_implementation_address": "', vm.toString(networkDetail.addresses.moduleImplementationAddress), '"'
                 )
             )
         );
@@ -165,7 +191,7 @@ contract NetworkConfig is Script {
             filePath,
             string(
                 abi.encodePacked(
-                    '"node_safe_registry_address": "', vm.toString(networkDetail.nodeSafeRegistryAddress), '"'
+                    '"node_safe_registry_address": "', vm.toString(networkDetail.addresses.nodeSafeRegistryAddress), '"'
                 )
             )
         );
@@ -174,7 +200,7 @@ contract NetworkConfig is Script {
             string(
                 abi.encodePacked(
                     '"network_registry_proxy_contract_address": "',
-                    vm.toString(networkDetail.networkRegistryProxyContractAddress),
+                    vm.toString(networkDetail.addresses.networkRegistryProxyContractAddress),
                     '",'
                 )
             )
@@ -184,7 +210,7 @@ contract NetworkConfig is Script {
             string(
                 abi.encodePacked(
                     '"network_registry_contract_address": "',
-                    vm.toString(networkDetail.networkRegistryContractAddress),
+                    vm.toString(networkDetail.addresses.networkRegistryContractAddress),
                     '"'
                 )
             )
@@ -194,11 +220,19 @@ contract NetworkConfig is Script {
             string(
                 abi.encodePacked(
                     '"ticket_price_oracle_contract_address": "',
-                    vm.toString(networkDetail.ticketPriceOracleContractAddress),
+                    vm.toString(networkDetail.addresses.ticketPriceOracleContractAddress),
                     '",'
                 )
             )
         );
+        vm.writeLine(
+            filePath, string(
+                abi.encodePacked(
+                    '"announcements_contract_address": "',
+                    vm.toString(networkDetail.addresses.announcements),
+                    '",'
+                )
+            ));
     }
 
     // FIXME: remove this temporary method
@@ -232,20 +266,5 @@ contract NetworkConfig is Script {
         } else {
             return "local";
         }
-    }
-
-    function parseNetworkDetailToString(NetworkDetail memory networkDetail) internal returns (string memory) {
-        string memory json = "config";
-        json.serialize("environment_type", parseEnvironmentTypeToString(networkDetail.environmentType));
-        json.serialize("indexer_start_block_number", networkDetail.indexerStartBlockNumber);
-        json.serialize("token_contract_address", networkDetail.tokenContractAddress);
-        json.serialize("channels_contract_address", networkDetail.channelsContractAddress);
-        json.serialize("node_stake_v2_factory_address", networkDetail.nodeStakeV2FactoryAddress);
-        json.serialize("module_implementation_address", networkDetail.moduleImplementationAddress);
-        json.serialize("node_safe_registry_address", networkDetail.nodeSafeRegistryAddress);
-        json.serialize("network_registry_proxy_contract_address", networkDetail.networkRegistryProxyContractAddress);
-        json.serialize("ticket_price_oracle_contract_address", networkDetail.ticketPriceOracleContractAddress);
-        json = json.serialize("network_registry_contract_address", networkDetail.networkRegistryContractAddress);
-        return json;
     }
 }

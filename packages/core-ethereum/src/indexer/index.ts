@@ -7,7 +7,7 @@ import { EventEmitter } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
 import {
   defer,
-  stringToU8a,
+  // stringToU8a,
   ChannelStatus,
   Address,
   ChannelEntry,
@@ -21,15 +21,16 @@ import {
   u8aToHex,
   FIFO,
   type DeferType,
-  type Ticket,
+  // type Ticket,
   create_counter,
   create_multi_counter,
   create_gauge,
-  create_multi_gauge,
+  // create_multi_gauge,
   U256,
   random_integer,
-  Hash,
-  number_to_channel_status
+  OffchainPublicKey,
+  // Hash,
+  // number_to_channel_status
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -42,7 +43,9 @@ import {
   type RegistryEvent,
   type RegistryEventNames,
   type IndexerEventEmitter,
-  IndexerStatus
+  IndexerStatus,
+  AnnouncementsEvent,
+  AnnouncementsEventNames
 } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
@@ -51,9 +54,9 @@ import {
   CORE_ETHEREUM_CONSTANTS,
   Ethereum_Address,
   Ethereum_Balance,
-  Ethereum_ChannelEntry,
+  // Ethereum_ChannelEntry,
   Ethereum_Database,
-  Ethereum_Hash,
+  // Ethereum_Hash,
   Ethereum_PublicKey,
   Ethereum_Snapshot
 } from '../db.js'
@@ -61,7 +64,6 @@ import {
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
 import { on_announcement_event } from '../../lib/core_ethereum_indexer.js'
-import { OffchainPublicKey } from '../../lib/core_ethereum_misc.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
@@ -93,15 +95,15 @@ const metric_numAnnouncements = create_counter(
   'Number of processed announcements'
 )
 const metric_blockNumber = create_gauge('core_ethereum_gauge_indexer_block_number', 'Current block number')
-const metric_channelStatus = create_multi_gauge(
-  'core_ethereum_gauge_indexer_channel_status',
-  'Status of different channels',
-  ['channel']
-)
-const metric_ticketsRedeemed = create_counter(
-  'core_ethereum_counter_indexer_tickets_redeemed',
-  'Number of redeemed tickets'
-)
+// const metric_channelStatus = create_multi_gauge(
+//   'core_ethereum_gauge_indexer_channel_status',
+//   'Status of different channels',
+//   ['channel']
+// )
+// const metric_ticketsRedeemed = create_counter(
+//   'core_ethereum_counter_indexer_tickets_redeemed',
+//   'Number of redeemed tickets'
+// )
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -293,9 +295,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           topics: [
             [
               // Relevant channel events
-              this.chain.getChannels().interface.getEventTopic('Announcement'),
-              this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
-              this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
+              // this.chain.getChannels().interface.getEventTopic('Announcement'),
+              // this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
+              // this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
             ]
           ]
         }
@@ -307,12 +309,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           topics: [
             [
               // Relevant HoprNetworkRegistry events
-              this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
+              // this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
             ]
           ]
         }
@@ -752,7 +754,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
 
       // @TODO: fix type clash
-      const eventName = event.event as EventNames | TokenEventNames | RegistryEventNames
+      const eventName = event.event as EventNames | TokenEventNames | RegistryEventNames | AnnouncementsEventNames
 
       lastDatabaseSnapshot = new Snapshot(
         new U256(event.blockNumber.toString()),
@@ -762,29 +764,30 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       log('Event name %s and hash %s', eventName, event.transactionHash)
 
+      // TODO: update events
       switch (eventName) {
-        case 'Announcement':
-        case 'Announcement(address,bytes,bytes)':
+        case 'AddressAnnouncement':
+        // case 'Announcement(address,bytes,bytes)':
           await this.onAnnouncement(
-            event as Event<'Announcement'>,
-            blockNumber.toPrecision().toString(),
+            event as AnnouncementsEvent<'AddressAnnouncement'>,
+            blockNumber.toPrecision(),
             lastDatabaseSnapshot
           )
           break
-        case 'ChannelUpdated':
-        case 'ChannelUpdated(address,address,tuple)':
-          await this.onChannelUpdated(event as Event<'ChannelUpdated'>, lastDatabaseSnapshot)
-          break
+        // case 'ChannelUpdated':
+        // case 'ChannelUpdated(address,address,tuple)':
+        //   await this.onChannelUpdated(event as Event<'ChannelUpdated'>, lastDatabaseSnapshot)
+        //   break
         case 'Transfer':
         case 'Transfer(address,address,uint256)':
           // handle HOPR token transfer
           await this.onTransfer(event as TokenEvent<'Transfer'>, lastDatabaseSnapshot)
           break
-        case 'TicketRedeemed':
-        case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
-          // if unlock `outstandingTicketBalance`, if applicable
-          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>, lastDatabaseSnapshot)
-          break
+        // case 'TicketRedeemed':
+        // case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
+        //   // if unlock `outstandingTicketBalance`, if applicable
+        //   await this.onTicketRedeemed(event as Event<'TicketRedeemed'>, lastDatabaseSnapshot)
+        //   break
         case 'EligibilityUpdated':
         case 'EligibilityUpdated(address,bool)':
           await this.onEligibilityUpdated(event as RegistryEvent<'EligibilityUpdated'>, lastDatabaseSnapshot)
@@ -829,7 +832,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
   }
 
-  private async onAnnouncement(event: Event<'Announcement'>, blockNumber: string, lastSnapshot: Snapshot): Promise<void> {
+  private async onAnnouncement(event: AnnouncementsEvent<'AddressAnnouncement'>, blockNumber: string, lastSnapshot: Snapshot): Promise<void> {
     let account: AccountEntry
     try {
       account = await on_announcement_event(this.db, event.topics, event.data, blockNumber, lastSnapshot)
@@ -847,101 +850,107 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     })
   }
 
-  private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
-    const { source, destination, newState } = event.args
+  /**
+   * TODO: event update
+   */
+  // private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
+  //   const { source, destination, newState } = event.args
 
-    log('channel-updated for hash %s', event.transactionHash)
-    let channel = new ChannelEntry(
-      Address.from_string(source),
-      Address.from_string(destination),
-      new Balance(newState.balance.toString(), BalanceType.HOPR),
-      new Hash(stringToU8a(newState.commitment)),
-      new U256(newState.ticketEpoch.toString()),
-      new U256(newState.ticketIndex.toString()),
-      number_to_channel_status(newState.status),
-      new U256(newState.channelEpoch.toString()),
-      new U256(newState.closureTime.toString())
-    )
-    log(channel.to_string())
+  //   log('channel-updated for hash %s', event.transactionHash)
+  //   let channel = new ChannelEntry(
+  //     Address.from_string(source),
+  //     Address.from_string(destination),
+  //     new Balance(newState.balance.toString(), BalanceType.HOPR),
+  //     new Hash(stringToU8a(newState.commitment)),
+  //     new U256(newState.ticketEpoch.toString()),
+  //     new U256(newState.ticketIndex.toString()),
+  //     number_to_channel_status(newState.status),
+  //     new U256(newState.channelEpoch.toString()),
+  //     new U256(newState.closureTime.toString())
+  //   )
+  //   log(channel.to_string())
 
-    let prevState: ChannelEntry
-    let channel_entry = await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))
-    if (channel_entry !== undefined) {
-      prevState = ChannelEntry.deserialize(channel_entry.serialize())
-    }
+  //   let prevState: ChannelEntry
+  //   let channel_entry = await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))
+  //   if (channel_entry !== undefined) {
+  //     prevState = ChannelEntry.deserialize(channel_entry.serialize())
+  //   }
 
-    assert(lastSnapshot !== undefined)
-    await this.db.update_channel_and_snapshot(
-      Ethereum_Hash.deserialize(channel.get_id().serialize()),
-      Ethereum_ChannelEntry.deserialize(channel.serialize()),
-      Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-    )
+  //   assert(lastSnapshot !== undefined)
+  //   await this.db.update_channel_and_snapshot(
+  //     Ethereum_Hash.deserialize(channel.get_id().serialize()),
+  //     Ethereum_ChannelEntry.deserialize(channel.serialize()),
+  //     Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+  //   )
 
-    metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
+  //   metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
 
-    if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
-      log('channel was closed')
-      await this.onChannelClosed(channel)
-    }
+  //   if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
+  //     log('channel was closed')
+  //     await this.onChannelClosed(channel)
+  //   }
 
-    this.emit('channel-update', channel)
-    verbose(`channel-update for channel ${channel.get_id().to_hex()}`)
+  //   this.emit('channel-update', channel)
+  //   verbose(`channel-update for channel ${channel.get_id().to_hex()}`)
 
-    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
-      this.emit('own-channel-updated', channel)
+  //   if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
+  //     this.emit('own-channel-updated', channel)
 
-      if (channel.destination.eq(this.address)) {
-        // Channel _to_ us
-        if (channel.status === ChannelStatus.WaitingForCommitment) {
-          log('channel to us waiting for commitment')
-          log(channel.to_string())
-          this.emit('channel-waiting-for-commitment', channel)
-        }
-      }
-    }
-  }
+  //     if (channel.destination.eq(this.address)) {
+  //       // Channel _to_ us
+  //       if (channel.status === ChannelStatus.WaitingForCommitment) {
+  //         log('channel to us waiting for commitment')
+  //         log(channel.to_string())
+  //         this.emit('channel-waiting-for-commitment', channel)
+  //       }
+  //     }
+  //   }
+  // }
 
-  private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
-    if (Address.from_string(event.args.source).eq(this.address)) {
-      // the node used to lock outstandingTicketBalance
-      // rebuild part of the Ticket
-      const partialTicket: Partial<Ticket> = {
-        counterparty: Address.from_string(event.args.destination),
-        amount: new Balance(event.args.amount.toString(), BalanceType.HOPR)
-      }
-      const outstandingBalance = Balance.deserialize(
-        (
-          await this.db.get_pending_balance_to(Ethereum_Address.deserialize(partialTicket.counterparty.serialize()))
-        ).serialize_value(),
-        BalanceType.HOPR
-      )
+  /**
+   * TODO: event update
+   */
+  // private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
+  //   if (Address.from_string(event.args.source).eq(this.address)) {
+  //     // the node used to lock outstandingTicketBalance
+  //     // rebuild part of the Ticket
+  //     const partialTicket: Partial<Ticket> = {
+  //       counterparty: Address.from_string(event.args.destination),
+  //       amount: new Balance(event.args.amount.toString(), BalanceType.HOPR)
+  //     }
+  //     const outstandingBalance = Balance.deserialize(
+  //       (
+  //         await this.db.get_pending_balance_to(Ethereum_Address.deserialize(partialTicket.counterparty.serialize()))
+  //       ).serialize_value(),
+  //       BalanceType.HOPR
+  //     )
 
-      assert(lastSnapshot !== undefined)
-      try {
-        // Negative case:
-        // It falls into this case when db of sender gets erased while having tickets pending.
-        // TODO: handle this may allow sender to send arbitrary amount of tickets through open
-        // channels with positive balance, before the counterparty initiates closure.
-        const balance = outstandingBalance.lte(Balance.zero(BalanceType.HOPR))
-          ? Balance.zero(BalanceType.HOPR)
-          : outstandingBalance
-        await this.db.resolve_pending(
-          Ethereum_Address.deserialize(partialTicket.counterparty.serialize()),
-          Ethereum_Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
-          Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-        )
-        metric_ticketsRedeemed.increment()
-      } catch (error) {
-        log(`error in onTicketRedeemed ${error}`)
-        throw new Error(`error in onTicketRedeemed ${error}`)
-      }
-    }
-  }
+  //     assert(lastSnapshot !== undefined)
+  //     try {
+  //       // Negative case:
+  //       // It falls into this case when db of sender gets erased while having tickets pending.
+  //       // TODO: handle this may allow sender to send arbitrary amount of tickets through open
+  //       // channels with positive balance, before the counterparty initiates closure.
+  //       const balance = outstandingBalance.lte(Balance.zero(BalanceType.HOPR))
+  //         ? Balance.zero(BalanceType.HOPR)
+  //         : outstandingBalance
+  //       await this.db.resolve_pending(
+  //         Ethereum_Address.deserialize(partialTicket.counterparty.serialize()),
+  //         Ethereum_Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
+  //         Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+  //       )
+  //       metric_ticketsRedeemed.increment()
+  //     } catch (error) {
+  //       log(`error in onTicketRedeemed ${error}`)
+  //       throw new Error(`error in onTicketRedeemed ${error}`)
+  //     }
+  //   }
+  // }
 
-  private async onChannelClosed(channel: ChannelEntry) {
-    await this.db.delete_acknowledged_tickets_from(Ethereum_ChannelEntry.deserialize(channel.serialize()))
-    this.emit('channel-closed', channel)
-  }
+  // private async onChannelClosed(channel: ChannelEntry) {
+  //   await this.db.delete_acknowledged_tickets_from(Ethereum_ChannelEntry.deserialize(channel.serialize()))
+  //   this.emit('channel-closed', channel)
+  // }
 
   private async onEligibilityUpdated(
     event: RegistryEvent<'EligibilityUpdated'>,
@@ -1062,7 +1071,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public async getPublicKeyOf(address: Address): Promise<OffchainPublicKey> {
     const account = await this.getAccount(address)
     if (account !== undefined) {
-      return account.public_key
+      return OffchainPublicKey.from_peerid_str(account.public_key.to_peerid_str())
     }
     throw new Error('Could not find public key for address - have they announced? -' + address.to_hex())
   }
@@ -1077,18 +1086,19 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
     let out = `Known public nodes:\n`
-
+    
     let publicAccounts = await this.db.get_public_node_accounts()
+
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
-
+      
       out += `  - ${account.public_key.to_peerid_str()} ${account.get_multiaddr_str()}\n`
       result.push({
         id: peerIdFromString(account.public_key.to_peerid_str()),
         multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
       })
     }
-
+    
     // Remove last `\n`
     log(out.substring(0, out.length - 1))
 
