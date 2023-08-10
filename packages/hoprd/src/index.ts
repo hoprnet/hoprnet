@@ -132,7 +132,10 @@ export function parseCliArguments(args: string[]) {
   const mono_repo_path = new URL('../../../', import.meta.url).pathname
   let argv: CliArgs
   try {
+    console.log(`mono_repo_path ${mono_repo_path}`);
+    console.log(`parse_cli_arguments args ${JSON.stringify(args)}, ${JSON.stringify(process.env)}, ${process.env.HOME}`);
     argv = parse_cli_arguments(args, process.env, mono_repo_path, process.env.HOME) as CliArgs
+    console.log(`parse_cli_arguments argv`);
   } catch (err) {
     // both --version and --help are treated as errors, therefore we need some
     // special handling here to be able to return exit code 0 in such cases
@@ -244,10 +247,14 @@ async function main() {
     }
   }
 
+  logs.log('before parseCliArguments')
   const argv = parseCliArguments(process.argv.slice(1))
+  logs.log('after parseCliArguments')
   let cfg: HoprdConfig
   try {
+    logs.log('before fetch_configuration')
     cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
+    logs.log('after fetch_configuration')
   } catch (err) {
     console.error(err)
     process.exit(1)

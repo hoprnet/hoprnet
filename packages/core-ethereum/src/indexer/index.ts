@@ -870,7 +870,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     //   id: peerIdFromString(account.get_peer_id_str()),
     //   multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
     // })
-    return new Promise(() => {});
   }
 
   /**
