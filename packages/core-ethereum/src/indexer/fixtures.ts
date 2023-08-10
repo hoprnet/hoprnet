@@ -1,11 +1,11 @@
-import type { Event, TokenEvent, RegistryEvent } from './types.js'
+import type { Event, TokenEvent, RegistryEvent, AnnouncementsEvent } from './types.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
 import {
   Hash,
   AccountEntry,
   ChannelEntry,
-  // u8aToHex,
+  u8aToHex,
   Ticket,
   Challenge,
   stringToU8a,
@@ -14,7 +14,8 @@ import {
   BalanceType,
   Signature,
   SIGNATURE_LENGTH,
-  Address
+  Address,
+  generate_channel_id
 } from '@hoprnet/hopr-utils'
 import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR, ACCOUNT_A, ACCOUNT_B } from '../fixtures.js'
 
@@ -39,30 +40,28 @@ export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelE
 }
 
 export const PARTY_A_INITIALIZED_EVENT = {
-  event: 'Announcement',
+  event: 'AddressAnnouncement',
   transactionHash: '',
   blockNumber: 1,
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: ACCOUNT_A.address,
-    publicKey: PARTY_A().to_string(),
-    multiaddr: u8aToHex(PARTY_A_MULTIADDR.bytes)
+    node: ACCOUNT_A.address,
+    baseMultiaddr: u8aToHex(PARTY_A_MULTIADDR.bytes)
   }
-} as Event<'Announcement'>
+} as AnnouncementsEvent<'AddressAnnouncement'>
 
 export const PARTY_B_INITIALIZED_EVENT = {
-  event: 'Announcement',
+  event: 'AddressAnnouncement',
   transactionHash: '',
   blockNumber: 1,
   transactionIndex: 1,
   logIndex: 0,
   args: {
-    account: ACCOUNT_B.address,
-    publicKey: PARTY_B().to_string(),
-    multiaddr: u8aToHex(PARTY_B_MULTIADDR.bytes)
+    node: ACCOUNT_B.address,
+    baseMultiaddr: u8aToHex(PARTY_B_MULTIADDR.bytes)
   }
-} as Event<'Announcement'>
+} as AnnouncementsEvent<'AddressAnnouncement'>
 
 // TODO LP: Ensure clone here
 export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A(), Address.from_string(ACCOUNT_A.address), PARTY_A_MULTIADDR.toString(), 1)
@@ -70,7 +69,7 @@ export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A(), Address.f
 export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B(), Address.from_string(ACCOUNT_B.address), PARTY_B_MULTIADDR.toString(), 1)
 
 export const OPENED_EVENT = {
-  event: 'ChannelUpdated',
+  event: 'ChannelOpened',
   transactionHash: '',
   blockNumber: 2,
   transactionIndex: 0,
@@ -78,59 +77,41 @@ export const OPENED_EVENT = {
   args: {
     source: ACCOUNT_A.address,
     destination: ACCOUNT_B.address,
-    newState: {
-      balance: BigNumber.from('3'),
-      commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
-      ticketEpoch: BigNumber.from('0'),
-      ticketIndex: BigNumber.from('0'),
-      status: 1,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0')
-    }
+    amount: BigNumber.from('3')
+    // newState: {
+    //   balance: BigNumber.from('3'),
+    //   commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
+    //   ticketEpoch: BigNumber.from('0'),
+    //   ticketIndex: BigNumber.from('0'),
+    //   status: 1,
+    //   channelEpoch: BigNumber.from('0'),
+    //   closureTime: BigNumber.from('0')
+    // }
   } as any
-} // as Event<'ChannelUpdated'> FIXME:
-
-export const COMMITTED_EVENT = {
-  event: 'ChannelUpdated',
-  transactionHash: '',
-  blockNumber: 2,
-  transactionIndex: 0,
-  logIndex: 10,
-  args: {
-    source: ACCOUNT_A.address,
-    destination: ACCOUNT_B.address,
-    newState: {
-      balance: BigNumber.from('3'),
-      commitment: new Hash(new Uint8Array({ length: Hash.size() }).fill(1)).to_hex(),
-      ticketEpoch: BigNumber.from('0'),
-      ticketIndex: BigNumber.from('0'),
-      status: 2,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0')
-    }
-  } as any
-} // as Event<'ChannelUpdated'> FIXME:
+} as Event<'ChannelOpened'>
 
 export const UPDATED_WHEN_REDEEMED_EVENT = {
-  event: 'ChannelUpdated',
+  event: 'TicketRedeemed',
   transactionHash: '',
   blockNumber: 5,
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    source: ACCOUNT_A.address,
-    destination: ACCOUNT_B.address,
-    newState: {
-      balance: BigNumber.from('1'),
-      commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
-      ticketEpoch: BigNumber.from('0'),
-      ticketIndex: BigNumber.from('1'),
-      status: 2,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0')
-    }
+    channelId: generate_channel_id(Address.from_string(ACCOUNT_A.address), Address.from_string(ACCOUNT_B.address)),
+    newTicketIndex: BigNumber.from('1')
+    // source: ACCOUNT_A.address,
+    // destination: ACCOUNT_B.address,
+    // newState: {
+    //   balance: BigNumber.from('1'),
+    //   commitment: new Hash(new Uint8Array({ length: Hash.size() })).to_hex(),
+    //   ticketEpoch: BigNumber.from('0'),
+    //   ticketIndex: BigNumber.from('1'),
+    //   status: 2,
+    //   channelEpoch: BigNumber.from('0'),
+    //   closureTime: BigNumber.from('0')
+    // }
   } as any
-} // as Event<'ChannelUpdated'> FIXME:
+} as Event<'TicketRedeemed'> // FIXME:
 
 export const TICKET_REDEEMED_EVENT = {
   event: 'TicketRedeemed',

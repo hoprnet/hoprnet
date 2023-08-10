@@ -28,7 +28,7 @@ import {
   // create_multi_gauge,
   U256,
   random_integer,
-  PublicKey,
+  OffchainPublicKey,
   // Hash,
   // number_to_channel_status
 } from '@hoprnet/hopr-utils'
@@ -1068,10 +1068,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     return account
   }
 
-  public async getPublicKeyOf(address: Address): Promise<PublicKey> {
+  public async getPublicKeyOf(address: Address): Promise<OffchainPublicKey> {
     const account = await this.getAccount(address)
     if (account !== undefined) {
-      return PublicKey.from_peerid_str(account.public_key.to_peerid_str())
+      return OffchainPublicKey.from_peerid_str(account.public_key.to_peerid_str())
     }
     throw new Error('Could not find public key for address - have they announced? -' + address.to_hex())
   }
@@ -1084,20 +1084,29 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
+    log('[DEBUG] getPublicNodes starting...')
     const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
     let out = `Known public nodes:\n`
+    
+    let publicAccounts;
+    try {
+      publicAccounts = await this.db.get_public_node_accounts()
+      log(`[DEBUG] getPublicNodes ${publicAccounts.len()}`)
+    } catch (error) {
+      log(`[DEBUG] getPublicNodes error ${error}`)
+    }
 
-    let publicAccounts = await this.db.get_public_node_accounts()
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
-
+      
       out += `  - ${account.public_key.to_peerid_str()} ${account.get_multiaddr_str()}\n`
       result.push({
         id: peerIdFromString(account.public_key.to_peerid_str()),
         multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
       })
     }
-
+    
+    log(`[DEBUG] getPublicNodes before return`)
     // Remove last `\n`
     log(out.substring(0, out.length - 1))
 

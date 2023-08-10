@@ -352,16 +352,21 @@ class Hopr extends EventEmitter {
     if (this.options.announce) {
       this.knownPublicNodesCache.add(this.id.toString())
     }
+    verbose('Added known public nodes')
+    verbose(`__initialNodes ${JSON.stringify(__initialNodes, null, 2)}`)
 
     // Fetch previous announcements from database
     const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
+    verbose('fetched initial nodes')
 
     // Add all initial public nodes to public nodes cache
     initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toString()))
+    verbose('added initial nodes')
 
     // Fetch all nodes that will announces themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
+    verbose('pushToRecentlyAnnouncedNodes')
     connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
     // Initialize libp2p object and pass configuration
@@ -372,6 +377,7 @@ class Hopr extends EventEmitter {
       this.publicNodesEmitter,
       this.isAllowedAccessToNetwork.bind(this)
     )) as Libp2p
+    verbose('created Libp2pInstance')
 
     // Needed to stop libp2p instance
     this.stopLibp2p = libp2p.stop.bind(libp2p)
@@ -425,6 +431,8 @@ class Hopr extends EventEmitter {
         this.networkPeers.register(peerId, PeerOrigin.Initialization)
         log(`peer store: loaded peer ${peerId}`)
       })
+
+    verbose('got PeerStore')
 
     // react when network registry is enabled / disabled
     connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {

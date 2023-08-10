@@ -625,8 +625,8 @@ export default class HoprCoreEthereum extends EventEmitter {
       isAllowedAccessToNetwork: () => Promise.resolve(true)
     } as unknown as HoprCoreEthereum
 
-  //   return HoprCoreEthereum._instance
-  // }
+    return HoprCoreEthereum._instance
+  }
 }
 
 // export { useFixtures } from './indexer/index.mock.js'
