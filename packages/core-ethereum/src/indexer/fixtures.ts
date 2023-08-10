@@ -16,7 +16,7 @@ import {
   SIGNATURE_LENGTH,
   Address
 } from '@hoprnet/hopr-utils'
-import { PARTY_A, PARTY_B } from '../fixtures.js'
+import { ACCOUNT_A,ACCOUNT_B, PARTY_B } from '../fixtures.js'
 
 export * from '../fixtures.js'
 

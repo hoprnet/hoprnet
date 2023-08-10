@@ -314,7 +314,7 @@ export const useFixtures = async (
     newEvent,
     newTokenEvent,
     newRegistryEvent,
-    indexer: new TestingIndexer(id.to_address(), db, 1, 5),
+    indexer: new TestingIndexer(chain_key, db, 1, 5),
     chain
     // OPENED_CHANNEL: new ChannelEntry(
     //   Address.from_string(fixtures.OPENED_EVENT.args.source),

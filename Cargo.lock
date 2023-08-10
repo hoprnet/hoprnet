@@ -924,6 +924,7 @@ dependencies = [
  "hex",
  "js-sys",
  "multiaddr",
+ "rusty-leveldb",
  "thiserror",
  "utils-db",
  "utils-log",
