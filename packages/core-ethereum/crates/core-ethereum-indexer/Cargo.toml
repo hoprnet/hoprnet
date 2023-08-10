@@ -30,6 +30,12 @@ utils-log = { path = "../../../utils/crates/utils-log", default-features = false
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+rusty-leveldb = "1.0"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
+
 [features]
 default = ["console_error_panic_hook", "wasm"]
 wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
