@@ -31,7 +31,7 @@ hkdf = "0.12"
 hmac = "0.12"
 js-sys = { version = "0.3.63", optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
-libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid", "ed25519"] }
+libp2p-identity = { workspace = true, features = ["secp256k1", "peerid", "ed25519"] }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 sha3 = "0.10"

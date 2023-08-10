@@ -1,22 +1,19 @@
 use async_trait::async_trait;
 use libp2p_identity::PeerId;
 use futures::{
-    channel::mpsc,
     future::{
-        poll_fn,
         select,
         Either,
         FutureExt, // .fuse()
     },
     pin_mut,
-    stream::{FuturesUnordered, StreamExt},
 };
 use rand::Rng;
 
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use utils_log::{error,info};
+use utils_log::info;
 use utils_metrics::metrics::SimpleHistogram;
 use utils_metrics::histogram_start_measure;
 

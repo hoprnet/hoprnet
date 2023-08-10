@@ -16,13 +16,16 @@ async-std = "1.12.0"
 async-lock = "2.7.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 futures = "0.3"
+futures-lite = { workspace = true }
+futures-concurrency = { workspace = true }
 hex = "0.4.3"
 js-sys = { version = "0.3.63", optional = true }
 lazy_static = "1.4"
-libp2p-identity = { version = "0.1.1", features = ["secp256k1", "peerid"] }
+libp2p-identity = { workspace = true, features = ["secp256k1", "peerid"] }
 thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
+gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
 
 core-crypto = { path = "../core-crypto", default-features = false }
 core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
@@ -55,6 +58,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-mixer/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-misc/wasm" ]
+wasm = ["dep:wasm-bindgen", "dep:gloo-timers", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-mixer/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-misc/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 prometheus = ["dep:utils-metrics"]

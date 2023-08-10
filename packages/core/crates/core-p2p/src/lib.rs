@@ -13,11 +13,12 @@ use libp2p::noise as libp2p_noise;
 
 use libp2p_identity::PeerId;
 use libp2p_core::{upgrade, Transport};
-use libp2p_swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent};
+use libp2p_swarm::{NetworkBehaviour, SwarmBuilder};
 
 use serde::{Serialize, Deserialize};
 
 use core_network::messaging::ControlMessage;
+use core_types::acknowledgement::Acknowledgement;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(pub ControlMessage);
@@ -32,16 +33,26 @@ pub const HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0: &str = "/hopr/ack/0.1.0";
 const HOPR_HEARTBEAT_CONNECTION_KEEPALIVE_SECS: u64 = 15;
 const HOPR_HEARTBEAT_REQUEST_TIMEOUT_SECS: u64 = 30;
 
+const HOPR_MESSAGE_CONNECTION_KEEPALIVE_SECS: std::time::Duration = std::time::Duration::from_secs(3600);       // 1 hour
+const HOPR_MESSAGE_REQUEST_TIMEOUT_SECS: std::time::Duration = std::time::Duration::from_secs(15);
+
+const HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE_SECS: std::time::Duration = std::time::Duration::from_secs(3600);       // 1 hour
+const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT_SECS: std::time::Duration = std::time::Duration::from_secs(15);
+
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
     // TODO: consider including regular ipfs/ping/1.0.0 for socket keep alive
     pub heartbeat: libp2p_request_response::cbor::Behaviour<Ping, Pong>,
+    pub msg: libp2p_request_response::cbor::Behaviour<Box<[u8]>, ()>,
+    pub ack: libp2p_request_response::cbor::Behaviour<Acknowledgement, ()>,
     keep_alive: libp2p_swarm::keep_alive::Behaviour     // run the business logic loop indefinitely
 }
 
 pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p_request_response::Event<Ping,Pong>),
+    Message(libp2p_request_response::Event<Box<[u8]>,()>),
+    Acknowledgement(libp2p_request_response::Event<Acknowledgement,()>),
     KeepAlive(void::Void)
 }
 
@@ -57,6 +68,19 @@ impl From<libp2p_request_response::Event<Ping,Pong>> for HoprNetworkBehaviorEven
     }
 }
 
+impl From<libp2p_request_response::Event<Box<[u8]>,()>> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p_request_response::Event<Box<[u8]>,()>) -> Self {
+        Self::Message(event)
+    }
+}
+
+impl From<libp2p_request_response::Event<Acknowledgement,()>> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p_request_response::Event<Acknowledgement,()>) -> Self {
+        Self::Acknowledgement(event)
+    }
+}
+
+
 impl Default for HoprNetworkBehavior {
     fn default() -> Self {
         Self {
@@ -69,6 +93,30 @@ impl Default for HoprNetworkBehavior {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(std::time::Duration::from_secs(HOPR_HEARTBEAT_CONNECTION_KEEPALIVE_SECS));
                     cfg.set_request_timeout(std::time::Duration::from_secs(HOPR_HEARTBEAT_REQUEST_TIMEOUT_SECS));
+                    cfg
+                },
+            ),
+            msg: libp2p_request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
+                [(
+                    StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
+                    libp2p_request_response::ProtocolSupport::Full,
+                )],
+                {
+                    let mut cfg = libp2p_request_response::Config::default();
+                    cfg.set_connection_keep_alive(HOPR_MESSAGE_CONNECTION_KEEPALIVE_SECS);
+                    cfg.set_request_timeout(HOPR_MESSAGE_REQUEST_TIMEOUT_SECS);
+                    cfg
+                },
+            ),
+            ack: libp2p_request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
+                [(
+                    StreamProtocol::new(HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0),
+                    libp2p_request_response::ProtocolSupport::Full,
+                )],
+                {
+                    let mut cfg = libp2p_request_response::Config::default();
+                    cfg.set_connection_keep_alive(HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE_SECS);
+                    cfg.set_request_timeout(HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT_SECS);
                     cfg
                 },
             ),

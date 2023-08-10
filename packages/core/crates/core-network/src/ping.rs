@@ -1,17 +1,7 @@
-use std::{time::Duration, pin::Pin, result};
+use std::pin::Pin;
 
 use async_trait::async_trait;
-use futures::{
-    channel::mpsc,
-    future::{
-        poll_fn,
-        select,
-        Either,
-        FutureExt, // .fuse()
-    },
-    pin_mut,
-    stream::{FuturesUnordered, StreamExt},
-};
+use futures::{StreamExt, future::poll_fn};
 use libp2p_identity::PeerId;
 
 use utils_log::{debug, error, info};
@@ -19,19 +9,12 @@ use utils_metrics::histogram_start_measure;
 use utils_metrics::metrics::SimpleCounter;
 use utils_metrics::metrics::SimpleHistogram;
 use utils_metrics::metrics::SimpleTimer;
-use utils_types::traits::BinarySerializable;
 
-use crate::errors::NetworkingError::{DecodingError, Other, Timeout};
-use crate::messaging::{ControlMessage, PingMessage};
-
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
-use crate::messaging::ControlMessage::Pong;
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
+use crate::messaging::ControlMessage;
+
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
@@ -400,7 +383,7 @@ mod tests {
         let ideal_twice_usable_linearly_delaying_channel = async move {
             for i in 0..2 {
                 if let Some((peer, challenge)) = rx_ping.next().await {
-                    sleep(std::time::Duration::from_millis(ping_delay * i)).await;
+                    async_std::task::sleep(std::time::Duration::from_millis(ping_delay * i)).await;
                     let _ = tx_pong.start_send((peer, Ok(ControlMessage::generate_pong_response(&challenge).expect("valid challenge"))));
                 };
             }
