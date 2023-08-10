@@ -34,9 +34,6 @@ import {
   HOPR_CHANNELS_ABI,
   HOPR_NETWORK_REGISTRY_ABI,
   HOPR_TOKEN_ABI,
-  HoprChannels,
-  HoprNetworkRegistry,
-  HoprToken,
   DeploymentExtract
 } from './utils/index.js'
 
@@ -101,23 +98,23 @@ const provider = networkInfo.provider.startsWith('http')
 
   log(`[DEBUG] deploymentExtract ${JSON.stringify(deploymentExtract, null, 2)}`)
 
-  const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider) as any as HoprToken
+  const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
 
   const channels = new ethers.Contract(
     deploymentExtract.hoprChannelsAddress,
     HOPR_CHANNELS_ABI,
     provider
-  ) as any as HoprChannels
+  )
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
     HOPR_NETWORK_REGISTRY_ABI,
     provider
-  ) as any as HoprNetworkRegistry
+  )
 
   //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
   const genesisBlock = deploymentExtract.indexerStartBlockNumber
-  const channelClosureSecs = await channels.noticePeriodChannelClosure()
+  const noticePeriodChannelClosure = await channels.noticePeriodChannelClosure()
 
   const transactions = new TransactionManager()
 
@@ -889,7 +886,7 @@ const provider = networkInfo.provider.startsWith('http')
       hoprTokenAddress: deploymentExtract.hoprTokenAddress,
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,
-      channelClosureSecs
+      noticePeriodChannelClosure
     }),
     updateConfirmedTransaction: transactions.moveToConfirmed.bind(
       transactions

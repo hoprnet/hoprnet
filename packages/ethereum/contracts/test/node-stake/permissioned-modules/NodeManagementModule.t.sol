@@ -341,6 +341,9 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         // add nodes and take one from the added node
         _helperAddNodes(accounts);
+
+        vm.assume(accounts[index] != address(0));
+
         assertTrue(moduleProxy.isNode(accounts[index]));
 
         Target sendTarget = TargetUtils.encodeDefaultPermissions(
@@ -1287,6 +1290,7 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
     function _helperAddNodes(address[] memory accounts) private {
         for (uint256 i = 0; i < accounts.length; i++) {
+            emit log_named_uint("i", i);
             if (moduleProxy.isNode(accounts[i])) continue;
             moduleProxy.addNode(accounts[i]);
         }

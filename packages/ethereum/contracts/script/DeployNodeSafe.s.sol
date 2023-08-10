@@ -49,7 +49,7 @@ contract DeployNodeSafeScript is Script, Test, NetworkConfig {
         capabilityPermissions[8] = CapabilityPermission.SPECIFIC_FALLBACK_BLOCK;
 
         Target defaultChannelsTarget = TargetUtils.encodeDefaultPermissions(
-            currentNetworkDetail.channelsContractAddress,
+            currentNetworkDetail.addresses.channelsContractAddress,
             Clearance.FUNCTION,
             TargetType.CHANNELS,
             TargetPermission.SPECIFIC_FALLBACK_BLOCK,
@@ -58,14 +58,14 @@ contract DeployNodeSafeScript is Script, Test, NetworkConfig {
 
         bytes memory cloneCallData = abi.encodeWithSignature(
             "clone(address,address[],uint256,bytes32)",
-            address(currentNetworkDetail.moduleImplementationAddress),
+            address(currentNetworkDetail.addresses.moduleImplementationAddress),
             admins,
             nonce,
             bytes32(Target.unwrap(defaultChannelsTarget))
         );
         emit log_named_bytes32("defaultChannelsTarget", bytes32(Target.unwrap(defaultChannelsTarget)));
 
-        (bool success, bytes memory returnedData) = currentNetworkDetail.nodeStakeV2FactoryAddress.call(cloneCallData);
+        (bool success, bytes memory returnedData) = currentNetworkDetail.addresses.nodeStakeV2FactoryAddress.call(cloneCallData);
         require(success, "call node stake factory must succeed");
 
         (address module, address safe) = abi.decode(returnedData, (address, address));

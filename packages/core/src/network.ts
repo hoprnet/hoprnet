@@ -46,12 +46,13 @@ export function resolveNetwork(id: string, customProvider?: string): ResolvedNet
   return resolve_network(MONO_REPO_PATH, id, customProvider)
 }
 
-export const getContractData = (id: string): DeploymentExtract => {
+export function getContractData(id: string): DeploymentExtract {
   const resolvedNetwork = resolveNetwork(id)
+  
   return {
-    hoprTokenAddress: resolvedNetwork.token_contract_address,
-    hoprChannelsAddress: resolvedNetwork.channels_contract_address,
-    hoprNetworkRegistryAddress: resolvedNetwork.network_registry_contract_address,
+    hoprTokenAddress: resolvedNetwork.token,
+    hoprChannelsAddress: resolvedNetwork.channels,
+    hoprNetworkRegistryAddress: resolvedNetwork.network_registry,
     indexerStartBlockNumber: resolvedNetwork.channel_contract_deploy_block
   }
 }

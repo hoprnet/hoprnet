@@ -8,7 +8,7 @@ import { health_to_string } from '@hoprnet/hopr-core'
  */
 export const getInfo = async (node: Hopr) => {
   try {
-    const { chain, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
+    const { chain, hoprTokenAddress, hoprChannelsAddress, noticePeriodChannelClosure, hoprNetworkRegistryAddress } =
       node.smartContractInfo()
 
     return {
@@ -21,7 +21,7 @@ export const getInfo = async (node: Hopr) => {
       hoprNetworkRegistry: hoprNetworkRegistryAddress,
       isEligible: await node.isAllowedAccessToNetwork(node.getId()),
       connectivityStatus: health_to_string(node.getConnectivityHealth()),
-      channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
+      channelClosurePeriod: Math.ceil(noticePeriodChannelClosure / 60)
     }
   } catch (error) {
     // Make sure this doesn't throw
