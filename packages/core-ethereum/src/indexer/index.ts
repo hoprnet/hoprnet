@@ -295,9 +295,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           topics: [
             [
               // Relevant channel events
-              this.chain.getChannels().interface.getEventTopic('Announcement'),
-              this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
-              this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
+              // this.chain.getChannels().interface.getEventTopic('Announcement'),
+              // this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
+              // this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
             ]
           ]
         }
@@ -309,12 +309,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           topics: [
             [
               // Relevant HoprNetworkRegistry events
-              this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
-              this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
+              // this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
+              // this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
             ]
           ]
         }
