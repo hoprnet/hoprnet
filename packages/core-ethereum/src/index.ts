@@ -16,7 +16,8 @@ import {
   type DeferType,
   PublicKey,
   AccountEntry,
-  create_counter
+  create_counter,
+  OffchainPublicKey
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -599,7 +600,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         connectorLogger('getAccount method was called')
         return Promise.resolve(
           new AccountEntry(
-            PublicKey.from_peerid_str(peer.toString()),
+            OffchainPublicKey.from_peerid_str(peer.toString()),
+            Address.from_string(""),  // FIXME: update dummy
             `/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`,
             1
           )

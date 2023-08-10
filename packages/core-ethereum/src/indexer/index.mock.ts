@@ -13,6 +13,7 @@ import {
   AccountEntry,
   PublicKey,
   LevelDb,
+  OffchainPublicKey,
   // ChannelEntry,
   // U256,
   // stringToU8a,
@@ -264,7 +265,7 @@ const createChainMock = (
     getAccount: () => {
       chainLogger('getAccount method was called')
       return Promise.resolve(
-        new AccountEntry(fixtures.PARTY_A(), `/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A().to_peerid_str()}`, 1)
+        new AccountEntry(OffchainPublicKey.random(), fixtures.MOCK_ADDRESS(), `/ip4/127.0.0.1/tcp/124/p2p/${fixtures.PARTY_A().to_peerid_str()}`, 1)
       )
     },
     getPublicKey: () => fixtures.PARTY_A(),

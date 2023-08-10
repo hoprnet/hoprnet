@@ -15,7 +15,7 @@ import {
   Signature,
   SIGNATURE_LENGTH
 } from '@hoprnet/hopr-utils'
-import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtures.js'
+import { PARTY_A, PARTY_B } from '../fixtures.js'
 
 export * from '../fixtures.js'
 
@@ -64,9 +64,9 @@ export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelE
 // } as Event<'AddressAnnouncement'>
 
 // TODO LP: Ensure clone here
-export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A(), PARTY_A_MULTIADDR.toString(), 1)
+// export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A(), PARTY_A_MULTIADDR.toString(), 1)
 
-export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B(), PARTY_B_MULTIADDR.toString(), 1)
+// export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B(), PARTY_B_MULTIADDR.toString(), 1)
 
 export const OPENED_EVENT = {
   event: 'ChannelUpdated',

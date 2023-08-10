@@ -1,5 +1,6 @@
 use elliptic_curve::rand_core::OsRng;
 use elliptic_curve::{Group, NonZeroScalar, ProjectivePoint};
+use generic_array::{ArrayLength, GenericArray};
 use k256::Secp256k1;
 use rand::{Rng, RngCore};
 
@@ -51,6 +52,13 @@ pub fn random_fill(buffer: &mut [u8]) {
 /// Allocates array of the given size and fills it with random bytes
 pub fn random_bytes<const T: usize>() -> [u8; T] {
     let mut ret = [0u8; T];
+    random_fill(&mut ret);
+    ret
+}
+
+/// Allocates `GenericArray` of the given size and fills it with random bytes
+pub fn random_array<L: ArrayLength<u8>>() -> GenericArray<u8, L> {
+    let mut ret = GenericArray::default();
     random_fill(&mut ret);
     ret
 }

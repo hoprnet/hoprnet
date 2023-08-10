@@ -1284,7 +1284,7 @@ class Hopr extends EventEmitter {
     const ownAccount = await connector.getAccount(this.getEthereumAddress())
 
     // Do not announce if our last is equal to what we intend to announce
-    if (ownAccount?.get_multiaddress_str() === addrToAnnounce.toString()) {
+    if (ownAccount?.get_multiaddr_str() === addrToAnnounce.toString()) {
       log(`intended address has already been announced, nothing to do`)
       return
     }
