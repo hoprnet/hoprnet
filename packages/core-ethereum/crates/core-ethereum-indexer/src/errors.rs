@@ -2,7 +2,7 @@ use ethers::core::abi::Error as AbiError;
 use multiaddr::Error as MultiaddrError;
 use thiserror::Error;
 use utils_db::errors::DbError;
-use utils_types::errors::GeneralError;
+use utils_types::{errors::GeneralError, primitives::Address};
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumIndexerError {
@@ -32,6 +32,9 @@ pub enum CoreEthereumIndexerError {
 
     #[error("Received an event for a channel that is closed or for which we haven't seen an OPEN even.")]
     ChannelDoesNotExist,
+
+    #[error("Unknown smart contract. Received event from {0}")]
+    UnknownContract(Address),
 
     #[error(transparent)]
     MultiaddrParseError(#[from] MultiaddrError),

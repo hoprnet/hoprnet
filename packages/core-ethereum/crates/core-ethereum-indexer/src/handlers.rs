@@ -13,260 +13,297 @@ use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use ethnum::u256;
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
-pub async fn on_announcement_event<T>(
-    db: &mut T,
-    log: &RawLog,
-    block_number: u32,
-    snapshot: &Snapshot,
-) -> Result<AccountEntry>
-where
-    T: HoprCoreEthereumDbActions,
-{
-    Ok(match HoprAnnouncementsEvents::decode_log(log)? {
-        HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
-            let maybe_account = db.get_account(&address_announcement.node.try_into()?).await?;
-
-            if let Some(mut account) = maybe_account {
-                let new_entry_type = AccountType::Announced {
-                    multiaddr: address_announcement.base_multiaddr.try_into()?,
-                    updated_block: block_number,
-                };
-
-                account.update(new_entry_type);
-                db.update_account_and_snapshot(&account, snapshot).await?;
-
-                account
-            } else {
-                return Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding);
-            }
-        }
-        HoprAnnouncementsEvents::KeyBindingFilter(key_binding) => {
-            if db.get_account(&key_binding.chain_key.try_into()?).await?.is_some() {
-                return Err(CoreEthereumIndexerError::UnsupportedKeyRebinding);
-            }
-
-            let updated_account = AccountEntry::new(
-                key_binding.ed_25519_pub_key.try_into()?,
-                key_binding.chain_key.try_into()?,
-                AccountType::NotAnnounced,
-            );
-
-            let sig = AccountSignature {
-                signature: OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
-                pub_key: key_binding.ed_25519_pub_key.try_into()?,
-                chain_key: key_binding.chain_key.try_into()?,
-            };
-
-            if !sig.verify() {
-                return Err(CoreEthereumIndexerError::AccountEntrySignatureVerification);
-            }
-
-            db.update_account_and_snapshot(&updated_account, snapshot).await?;
-
-            updated_account
-        }
-        HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
-            let maybe_account = db.get_account(&revocation.node.try_into()?).await?;
-
-            if let Some(mut account) = maybe_account {
-                account.update(AccountType::NotAnnounced);
-                db.update_account_and_snapshot(&account, snapshot).await?;
-
-                account
-            } else {
-                return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
-            }
-        }
-    })
+struct DeploymentExtract {
+    channels: Address,
+    token: Address,
+    network_registry: Address,
+    announcements: Address,
 }
 
-pub async fn on_channel_event<T>(db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
-where
-    T: HoprCoreEthereumDbActions,
-{
-    Ok(match HoprChannelsEvents::decode_log(log)? {
-        HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
-            let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
+struct Handlers {
+    /// channels, announcements, network_registry, token: contract addresses
+    /// whose event we process
+    addresses: DeploymentExtract,
+    /// monitor the Hopr Token events, ignore rest
+    address_to_monitor: Address,
+}
 
-            if let Some(mut channel) = maybe_channel {
-                channel.balance = channel
-                    .balance
-                    .sub(&Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR));
+impl Handlers {
+    pub(super) async fn on_announcement_event<T>(
+        &self,
+        db: &mut T,
+        log: &RawLog,
+        block_number: u32,
+        snapshot: &Snapshot,
+    ) -> Result<AccountEntry>
+    where
+        T: HoprCoreEthereumDbActions,
+    {
+        Ok(match HoprAnnouncementsEvents::decode_log(log)? {
+            HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
+                let maybe_account = db.get_account(&address_announcement.node.try_into()?).await?;
 
-                db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
-                    .await?;
-            } else {
-                return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
+                if let Some(mut account) = maybe_account {
+                    let new_entry_type = AccountType::Announced {
+                        multiaddr: address_announcement.base_multiaddr.try_into()?,
+                        updated_block: block_number,
+                    };
+
+                    account.update(new_entry_type);
+                    db.update_account_and_snapshot(&account, snapshot).await?;
+
+                    account
+                } else {
+                    return Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding);
+                }
             }
-        }
-        HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
-            let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?).await?;
+            HoprAnnouncementsEvents::KeyBindingFilter(key_binding) => {
+                if db.get_account(&key_binding.chain_key.try_into()?).await?.is_some() {
+                    return Err(CoreEthereumIndexerError::UnsupportedKeyRebinding);
+                }
 
-            if let Some(mut channel) = maybe_channel {
-                channel.balance = channel
-                    .balance
-                    .add(&Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR));
-
-                db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
-                    .await?;
-            } else {
-                return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
-            }
-        }
-        HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
-            let maybe_channel = db.get_channel(&channel_closed.channel_id.try_into()?).await?;
-
-            if let Some(mut channel) = maybe_channel {
-                channel.status = ChannelStatus::Closed;
-
-                db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
-                    .await?;
-            } else {
-                return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
-            }
-        }
-        HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
-            let source: Address = channel_opened.source.0.try_into()?;
-            let destination: Address = channel_opened.destination.0.try_into()?;
-
-            let channel_id = generate_channel_id(&source, &destination);
-
-            let maybe_channel = db.get_channel(&channel_id).await?;
-
-            if let Some(mut channel) = maybe_channel {
-                channel.status = ChannelStatus::Open;
-
-                db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
-            } else {
-                let new_channel = ChannelEntry::new(
-                    source,
-                    destination,
-                    Balance::new(0u64.into(), utils_types::primitives::BalanceType::HOPR),
-                    0u64.into(),
-                    ChannelStatus::Open,
-                    1u64.into(),
-                    0u64.into(),
+                let updated_account = AccountEntry::new(
+                    key_binding.ed_25519_pub_key.try_into()?,
+                    key_binding.chain_key.try_into()?,
+                    AccountType::NotAnnounced,
                 );
 
-                db.update_channel_and_snapshot(&channel_id, &new_channel, snapshot)
-                    .await?;
+                let sig = AccountSignature {
+                    signature: OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
+                    pub_key: key_binding.ed_25519_pub_key.try_into()?,
+                    chain_key: key_binding.chain_key.try_into()?,
+                };
+
+                if !sig.verify() {
+                    return Err(CoreEthereumIndexerError::AccountEntrySignatureVerification);
+                }
+
+                db.update_account_and_snapshot(&updated_account, snapshot).await?;
+
+                updated_account
             }
-        }
-        HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
-            let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.try_into()?).await?;
+            HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
+                let maybe_account = db.get_account(&revocation.node.try_into()?).await?;
 
-            if let Some(mut channel) = maybe_channel {
-                channel.ticket_index = ticket_redeemed.new_ticket_index.into();
+                if let Some(mut account) = maybe_account {
+                    account.update(AccountType::NotAnnounced);
+                    db.update_account_and_snapshot(&account, snapshot).await?;
 
-                db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)
-                    .await?;
-            } else {
-                return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
+                    account
+                } else {
+                    return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
+                }
             }
-        }
-        HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
-            let maybe_channel = db.get_channel(&closure_initiated.channel_id.try_into()?).await?;
+        })
+    }
 
-            if let Some(mut channel) = maybe_channel {
-                channel.status = ChannelStatus::PendingToClose;
-                channel.closure_time = closure_initiated.closure_time.into();
+    pub(super) async fn on_channel_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    where
+        T: HoprCoreEthereumDbActions,
+    {
+        Ok(match HoprChannelsEvents::decode_log(log)? {
+            HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
+                let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
 
-                db.update_channel_and_snapshot(&closure_initiated.channel_id.try_into()?, &channel, snapshot)
-                    .await?;
-            } else {
-                return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
+                if let Some(mut channel) = maybe_channel {
+                    channel.balance = channel
+                        .balance
+                        .sub(&Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR));
+
+                    db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
+                        .await?;
+                } else {
+                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
+                }
             }
-        }
-    })
-}
+            HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
+                let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?).await?;
 
-pub async fn on_token_event<T>(
-    db: &mut T,
-    log: &RawLog,
-    address_to_monitor: &Address,
-    snapshot: &Snapshot,
-) -> Result<()>
-where
-    T: HoprCoreEthereumDbActions,
-{
-    Ok(match HoprTokenEvents::decode_log(log)? {
-        HoprTokenEvents::TransferFilter(transfered) => {
-            let from: Address = transfered.from.0.try_into()?;
-            let to: Address = transfered.to.0.try_into()?;
+                if let Some(mut channel) = maybe_channel {
+                    channel.balance = channel
+                        .balance
+                        .add(&Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR));
 
-            let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
-
-            if to.ne(address_to_monitor) && from.ne(address_to_monitor) {
-                return Ok(());
-            } else if to.eq(address_to_monitor) {
-                db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
-                    .await?;
-            } else if from.eq(address_to_monitor) {
-                db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
-                    .await?;
+                    db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
+                        .await?;
+                } else {
+                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
+                }
             }
-        }
-        _ => {
-            // don't care. Not important to HOPR
-        }
-    })
-}
+            HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
+                let maybe_channel = db.get_channel(&channel_closed.channel_id.try_into()?).await?;
 
-pub async fn on_network_registry_event<T>(db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
-where
-    T: HoprCoreEthereumDbActions,
-{
-    Ok(match HoprNetworkRegistryEvents::decode_log(log)? {
-        HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
-            db.remove_from_network_registry(
-                &deregistered.node_address.0.try_into()?,
-                &deregistered.staking_account.0.try_into()?,
-                snapshot,
-            )
-            .await?;
-        }
-        HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
-            db.remove_from_network_registry(
-                &deregistered.node_address.0.try_into()?,
-                &deregistered.staking_account.0.try_into()?,
-                snapshot,
-            )
-            .await?;
-        }
-        HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
-            db.set_eligible(
-                &eligibility_updated.staking_account.0.try_into()?,
-                eligibility_updated.eligibility,
-                snapshot,
-            )
-            .await?;
-        }
-        HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
-            db.set_network_registry(enabled.is_enabled, snapshot).await?;
-        }
-        HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
-            db.add_to_network_registry(
-                &registered.node_address.0.try_into()?,
-                &registered.staking_account.0.try_into()?,
-                snapshot,
-            )
-            .await?;
-        }
-        HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
-            db.add_to_network_registry(
-                &registered.node_address.0.try_into()?,
-                &registered.staking_account.0.try_into()?,
-                snapshot,
-            )
-            .await?;
-        }
-        HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
-            // TODO: implement this
-        }
-        _ => {
-            // don't care. Not important to HOPR
-        }
-    })
+                if let Some(mut channel) = maybe_channel {
+                    channel.status = ChannelStatus::Closed;
+
+                    db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
+                        .await?;
+                } else {
+                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
+                }
+            }
+            HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
+                let source: Address = channel_opened.source.0.try_into()?;
+                let destination: Address = channel_opened.destination.0.try_into()?;
+
+                let channel_id = generate_channel_id(&source, &destination);
+
+                let maybe_channel = db.get_channel(&channel_id).await?;
+
+                if let Some(mut channel) = maybe_channel {
+                    channel.status = ChannelStatus::Open;
+
+                    db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
+                } else {
+                    let new_channel = ChannelEntry::new(
+                        source,
+                        destination,
+                        Balance::new(0u64.into(), utils_types::primitives::BalanceType::HOPR),
+                        0u64.into(),
+                        ChannelStatus::Open,
+                        1u64.into(),
+                        0u64.into(),
+                    );
+
+                    db.update_channel_and_snapshot(&channel_id, &new_channel, snapshot)
+                        .await?;
+                }
+            }
+            HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
+                let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.try_into()?).await?;
+
+                if let Some(mut channel) = maybe_channel {
+                    channel.ticket_index = ticket_redeemed.new_ticket_index.into();
+
+                    db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)
+                        .await?;
+                } else {
+                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
+                }
+            }
+            HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
+                let maybe_channel = db.get_channel(&closure_initiated.channel_id.try_into()?).await?;
+
+                if let Some(mut channel) = maybe_channel {
+                    channel.status = ChannelStatus::PendingToClose;
+                    channel.closure_time = closure_initiated.closure_time.into();
+
+                    db.update_channel_and_snapshot(&closure_initiated.channel_id.try_into()?, &channel, snapshot)
+                        .await?;
+                } else {
+                    return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
+                }
+            }
+        })
+    }
+
+    pub(super) async fn on_token_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    where
+        T: HoprCoreEthereumDbActions,
+    {
+        Ok(match HoprTokenEvents::decode_log(log)? {
+            HoprTokenEvents::TransferFilter(transfered) => {
+                let from: Address = transfered.from.0.try_into()?;
+                let to: Address = transfered.to.0.try_into()?;
+
+                let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
+
+                if to.ne(&self.address_to_monitor) && from.ne(&self.address_to_monitor) {
+                    return Ok(());
+                } else if to.eq(&self.address_to_monitor) {
+                    db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
+                        .await?;
+                } else if from.eq(&self.address_to_monitor) {
+                    db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
+                        .await?;
+                }
+            }
+            _ => {
+                // don't care. Not important to HOPR
+            }
+        })
+    }
+
+    pub(super) async fn on_network_registry_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    where
+        T: HoprCoreEthereumDbActions,
+    {
+        Ok(match HoprNetworkRegistryEvents::decode_log(log)? {
+            HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
+                db.remove_from_network_registry(
+                    &deregistered.node_address.0.try_into()?,
+                    &deregistered.staking_account.0.try_into()?,
+                    snapshot,
+                )
+                .await?;
+            }
+            HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
+                db.remove_from_network_registry(
+                    &deregistered.node_address.0.try_into()?,
+                    &deregistered.staking_account.0.try_into()?,
+                    snapshot,
+                )
+                .await?;
+            }
+            HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
+                db.set_eligible(
+                    &eligibility_updated.staking_account.0.try_into()?,
+                    eligibility_updated.eligibility,
+                    snapshot,
+                )
+                .await?;
+            }
+            HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
+                db.set_network_registry(enabled.is_enabled, snapshot).await?;
+            }
+            HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
+                db.add_to_network_registry(
+                    &registered.node_address.0.try_into()?,
+                    &registered.staking_account.0.try_into()?,
+                    snapshot,
+                )
+                .await?;
+            }
+            HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
+                db.add_to_network_registry(
+                    &registered.node_address.0.try_into()?,
+                    &registered.staking_account.0.try_into()?,
+                    snapshot,
+                )
+                .await?;
+            }
+            HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
+                // TODO: implement this
+            }
+            _ => {
+                // don't care. Not important to HOPR
+            }
+        })
+    }
+
+    pub async fn on_event<T>(
+        &self,
+        db: &mut T,
+        address: &Address,
+        block_number: u32,
+        log: &RawLog,
+        snapshot: &Snapshot,
+    ) -> Result<()>
+    where
+        T: HoprCoreEthereumDbActions,
+    {
+        Ok(if address.eq(&self.addresses.announcements) {
+            self.on_announcement_event(db, log, block_number, snapshot).await?;
+        } else if address.eq(&self.addresses.channels) {
+            self.on_channel_event(db, log, snapshot).await?;
+        } else if address.eq(&self.addresses.network_registry) {
+            self.on_network_registry_event(db, log, snapshot).await?;
+        } else if address.eq(&self.addresses.token) {
+            self.on_token_event(db, log, snapshot).await?;
+        } else {
+            return Err(CoreEthereumIndexerError::UnknownContract(address.clone()));
+        })
+    }
 }
 
 #[cfg(test)]
@@ -306,10 +343,17 @@ pub mod tests {
         traits::BinarySerializable,
     };
 
+    use super::Handlers;
+
     const SELF_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const COUNTERPARTY_CHAIN_ADDRESS: [u8; 20] = hex!("f1a73ef496c45e260924a9279d2d9752ae378812");
     const SELF_CHAIN_ADDRESS: [u8; 20] = hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a");
     const STAKE_ADDRESS: [u8; 20] = hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3");
+
+    const CHANNELS_ADDR: [u8; 20] = hex!("bab20aea98368220baa4e3b7f151273ee71df93b"); // just a dummy
+    const TOKEN_ADDR: [u8; 20] = hex!("47d1677e018e79dcdd8a9c554466cb1556fa5007"); // just a dummy
+    const NETWORK_REGISTRY_ADDR: [u8; 20] = hex!("a469d0225f884fb989cbad4fe289f6fd2fb98051"); // just a dummy
+    const ANNOUNCEMENTS_ADDR: [u8; 20] = hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
         let opt = rusty_leveldb::in_memory();
@@ -321,8 +365,21 @@ pub mod tests {
         )
     }
 
+    fn init_handlers() -> Handlers {
+        Handlers {
+            addresses: super::DeploymentExtract {
+                channels: CHANNELS_ADDR.try_into().unwrap(),
+                token: TOKEN_ADDR.try_into().unwrap(),
+                network_registry: NETWORK_REGISTRY_ADDR.try_into().unwrap(),
+                announcements: ANNOUNCEMENTS_ADDR.try_into().unwrap(),
+            },
+            address_to_monitor: SELF_CHAIN_ADDRESS.try_into().unwrap(),
+        }
+    }
+
     #[async_std::test]
     async fn announce_keybinding() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let keypair = OffchainKeypair::from_secret(&SELF_PRIV_KEY).unwrap();
@@ -341,18 +398,23 @@ pub mod tests {
 
         let account_entry = AccountEntry::new(keypair.public().clone(), chain_key, AccountType::NotAnnounced);
 
-        assert_eq!(
-            super::on_announcement_event(&mut db, &keybinding_log, 0u32, &Snapshot::default())
-                .await
-                .unwrap(),
-            account_entry
-        );
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.announcements,
+                0u32,
+                &keybinding_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(db.get_account(&chain_key).await.unwrap().unwrap(), account_entry);
     }
 
     #[async_std::test]
     async fn announce_address_announcement() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let keypair = OffchainKeypair::from_secret(&SELF_PRIV_KEY).unwrap();
@@ -360,6 +422,7 @@ pub mod tests {
 
         // Assume that there is a keybinding
         let account_entry = AccountEntry::new(keypair.public().clone(), chain_key, AccountType::NotAnnounced);
+
         db.update_account_and_snapshot(&account_entry, &Snapshot::default())
             .await
             .unwrap();
@@ -383,12 +446,16 @@ pub mod tests {
             },
         );
 
-        assert_eq!(
-            super::on_announcement_event(&mut db, &address_announcement_log, 0u32, &Snapshot::default())
-                .await
-                .unwrap(),
-            announced_account_entry
-        );
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.announcements,
+                0u32,
+                &address_announcement_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(
             db.get_account(&chain_key).await.unwrap().unwrap(),
@@ -398,6 +465,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn announce_revoke() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let keypair = OffchainKeypair::from_secret(&SELF_PRIV_KEY).unwrap();
@@ -426,18 +494,23 @@ pub mod tests {
 
         let account_entry = AccountEntry::new(keypair.public().clone(), chain_key, AccountType::NotAnnounced);
 
-        assert_eq!(
-            super::on_announcement_event(&mut db, &revoke_announcement_log, 0u32, &Snapshot::default())
-                .await
-                .unwrap(),
-            account_entry
-        );
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.announcements,
+                0u32,
+                &revoke_announcement_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(db.get_account(&chain_key).await.unwrap().unwrap(), account_entry);
     }
 
     #[async_std::test]
     async fn on_token_transfer_to() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -453,11 +526,16 @@ pub mod tests {
             data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]),
         };
 
-        assert!(
-            super::on_token_event(&mut db, &transferred_log, &chain_key, &Snapshot::default())
-                .await
-                .is_ok()
-        );
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.token,
+                0u32,
+                &transferred_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(
             db.get_hopr_balance().await.unwrap(),
@@ -467,6 +545,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_token_transfer_from() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -486,11 +565,15 @@ pub mod tests {
             data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]),
         };
 
-        assert!(
-            super::on_token_event(&mut db, &transferred_log, &chain_key, &Snapshot::default())
-                .await
-                .is_ok()
-        );
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.token,
+                0u32,
+                &transferred_log,
+                &Snapshot::default(),
+            )
+            .await;
 
         assert_eq!(
             db.get_hopr_balance().await.unwrap(),
@@ -500,6 +583,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_registered() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -514,7 +598,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &registered_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.network_registry,
+                0u32,
+                &registered_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -528,6 +619,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_registered_by_manager() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -542,7 +634,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &registered_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.network_registry,
+                0u32,
+                &registered_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -556,6 +655,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_deregistered() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -574,7 +674,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &registered_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.network_registry,
+                0u32,
+                &registered_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -588,6 +695,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_deregistered_by_manager() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -606,7 +714,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &registered_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.network_registry,
+                0u32,
+                &registered_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -620,6 +735,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_enabled() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let nr_enabled = RawLog {
@@ -630,7 +746,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &nr_enabled, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.network_registry,
+                0u32,
+                &nr_enabled,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -639,6 +762,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_event_disabled() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         db.set_network_registry(true, &Snapshot::default()).await.unwrap();
@@ -651,7 +775,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &nr_disabled, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.network_registry,
+                0u32,
+                &nr_disabled,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -660,6 +791,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_set_eligible() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
@@ -673,7 +805,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &set_eligible, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.network_registry,
+                0u32,
+                &set_eligible,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -682,6 +821,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_network_registry_set_not_eligible() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
@@ -699,7 +839,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &set_eligible, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.network_registry,
+                0u32,
+                &set_eligible,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -708,6 +855,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_event_balance_increased() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -741,7 +889,14 @@ pub mod tests {
             data: Vec::from(solidity_balance.to_bytes()),
         };
 
-        super::on_channel_event(&mut db, &balance_increased_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &balance_increased_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -753,6 +908,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_event_balance_decreased() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -786,7 +942,14 @@ pub mod tests {
             data: Vec::from(solidity_balance.to_bytes()),
         };
 
-        super::on_channel_event(&mut db, &balance_increased_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &balance_increased_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -798,6 +961,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_closed() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -829,7 +993,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_channel_event(&mut db, &channel_closed_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &channel_closed_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -841,6 +1012,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_opened() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -857,7 +1029,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        super::on_channel_event(&mut db, &channel_opened_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &channel_opened_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -868,6 +1047,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_ticket_redeemed() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -901,7 +1081,14 @@ pub mod tests {
             data: Vec::from(ticket_index.to_bytes()),
         };
 
-        super::on_channel_event(&mut db, &ticket_redeemed_log, &Snapshot::default())
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &ticket_redeemed_log,
+                &Snapshot::default(),
+            )
             .await
             .unwrap();
 
@@ -912,6 +1099,7 @@ pub mod tests {
 
     #[async_std::test]
     async fn on_channel_closure_initiated() {
+        let handlers = init_handlers();
         let mut db = create_mock_db();
 
         let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
@@ -937,7 +1125,6 @@ pub mod tests {
 
         let timestamp = U256::from((1u64 << 32) - 1);
 
-
         let closure_initiated_log = RawLog {
             topics: vec![
                 OutgoingChannelClosureInitiatedFilter::signature(),
@@ -946,9 +1133,16 @@ pub mod tests {
             data: Vec::from(timestamp.to_bytes()),
         };
 
-        super::on_channel_event(&mut db, &closure_initiated_log, &Snapshot::default())
-        .await
-        .unwrap();
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &closure_initiated_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
 
         let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
 
@@ -956,56 +1150,92 @@ pub mod tests {
         assert_eq!(channel.closure_time, timestamp);
     }
 }
+
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use core_ethereum_db::db::wasm::Database;
-    use core_types::account::AccountEntry;
-    use ethers::core::abi::RawLog;
-    use ethers::types::H256;
+    use ethers::{core::abi::RawLog, types::H256};
     use hex::decode_to_slice;
     use js_sys::{Array, Uint8Array};
+    use std::str::FromStr;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
-    use utils_types::primitives::Snapshot;
+    use utils_types::primitives::{Address, Snapshot};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen_futures;
 
     #[wasm_bindgen]
-    pub async fn on_announcement_event(
-        db: &Database,
-        topics: Array,
-        data: &str,
-        block_number: &str,
-        snapshot: &Snapshot,
-    ) -> JsResult<AccountEntry> {
-        let mut decoded_data = Vec::with_capacity(data.len() * 2);
-        ok_or_jserr!(decode_to_slice(data, &mut decoded_data))?;
+    pub struct Handlers {
+        w: super::Handlers,
+    }
 
-        let val = db.as_ref_counted();
-        let mut g = val.write().await;
-
-        let mut decoded_topics: Vec<H256> = vec![];
-
-        for topic in topics.iter() {
-            let mut decoded: [u8; 32] = [0u8; 32];
-
-            ok_or_jserr!(decode_to_slice(
-                Uint8Array::from(topic.to_owned()).to_vec(),
-                &mut decoded
-            ))?;
-
-            decoded_topics.push(decoded.to_owned().into());
+    #[wasm_bindgen]
+    impl Handlers {
+        #[wasm_bindgen]
+        pub fn init(
+            address_to_monitor: &str,
+            channels: &str,
+            token: &str,
+            network_registry: &str,
+            announcements: &str,
+        ) -> Handlers {
+            Self {
+                w: super::Handlers {
+                    address_to_monitor: Address::from_str(address_to_monitor).unwrap(),
+                    addresses: super::DeploymentExtract {
+                        channels: Address::from_str(channels).unwrap(),
+                        token: Address::from_str(token).unwrap(),
+                        network_registry: Address::from_str(network_registry).unwrap(),
+                        announcements: Address::from_str(announcements).unwrap(),
+                    },
+                },
+            }
         }
 
-        super::on_announcement_event(
-            &mut *g,
-            &RawLog {
-                topics: decoded_topics,
-                data: decoded_data,
-            },
-            u32::from_str_radix(block_number, 10).map_err(|e| JsValue::from(e.to_string()))?,
-            snapshot,
-        )
-        .await
-        .map_err(|e| JsValue::from(e.to_string()))
+        #[wasm_bindgen]
+        pub async fn on_event(
+            &mut self,
+            db: &Database,
+            address: &str,
+            topics: Array,
+            data: &str,
+            block_number: &str,
+            snapshot: &Snapshot,
+        ) -> JsResult<()> {
+            let contract_address = Address::from_str(address).unwrap();
+            let u32_block_number = u32::from_str(block_number).unwrap();
+
+            let mut decoded_data = Vec::with_capacity(data.len() * 2);
+            ok_or_jserr!(decode_to_slice(data, &mut decoded_data))?;
+
+            let val = db.as_ref_counted();
+            let mut g = val.write().await;
+
+            let mut decoded_topics: Vec<H256> = vec![];
+
+            for topic in topics.iter() {
+                let mut decoded: [u8; 32] = [0u8; 32];
+
+                ok_or_jserr!(decode_to_slice(
+                    Uint8Array::from(topic.to_owned()).to_vec(),
+                    &mut decoded
+                ))?;
+
+                decoded_topics.push(decoded.to_owned().into());
+            }
+
+            self.w
+                .on_event(
+                    &mut *g,
+                    &contract_address,
+                    u32_block_number,
+                    &RawLog {
+                        topics: decoded_topics,
+                        data: decoded_data,
+                    },
+                    snapshot,
+                )
+                .await
+                .map_err(|e| JsValue::from(e.to_string()))
+        }
     }
 }

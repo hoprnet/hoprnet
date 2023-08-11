@@ -26,10 +26,7 @@ import {
   Ethereum_Balance,
   Ethereum_BalanceType,
   Ethereum_ChannelEntry,
-  Ethereum_U256,
   Ethereum_Hash,
-  initialize_commitment,
-  ChannelCommitmentInfo,
   CORE_ETHEREUM_CONSTANTS,
   is_allowed_to_access_network,
   redeem_ticket
@@ -269,27 +266,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     return await this.indexer.getPublicNodes()
   }
 
-  public async commitToChannel(c: ChannelEntry): Promise<void> {
-    log(`committing to channel ${c.get_id().to_hex()}`)
-    log(c.to_string())
-    const setCommitment = async (commitment: Hash) => {
-      return this.chain.setCommitment(c.source, commitment, (txHash: string) =>
-        this.setTxHandler(`channel-updated-${txHash}`, txHash)
-      )
-    }
-
-    // Get all channel information required to build the initial commitment
-    const cci = new ChannelCommitmentInfo(
-      this.options.chainId,
-      this.smartContractInfo().hoprChannelsAddress,
-      Ethereum_Hash.deserialize(c.get_id().serialize()),
-      Ethereum_U256.deserialize(c.channel_epoch.serialize())
-    )
-
-    log(`initializing commitment`)
-    await initialize_commitment(this.db, this.privateKey, cci, setCommitment)
-  }
-
   public async redeemAllTickets(): Promise<void> {
     if (this.redeemingAll) {
       log('skipping redeemAllTickets because another operation is still in progress')
@@ -497,7 +473,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       ).serialize()
     )
 
-    if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
+    if (c.status !== ChannelStatus.Open) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
     return this.chain.initiateOutgoingChannelClosure(dest, (txHash: string) =>
@@ -632,4 +608,4 @@ export default class HoprCoreEthereum extends EventEmitter {
 // export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
-export { ChannelEntry, ChannelCommitmentInfo, Indexer, ChainWrapper, createChainWrapper }
+export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper }
