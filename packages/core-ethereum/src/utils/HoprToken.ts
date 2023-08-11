@@ -11,368 +11,589 @@ import type {
   Overrides,
   PopulatedTransaction,
   Signer,
-  utils
-} from 'ethers'
-import type { FunctionFragment, Result, EventFragment } from '@ethersproject/abi'
-import type { Listener, Provider } from '@ethersproject/providers'
-import type { TypedEventFilter, TypedEvent, TypedListener, OnEvent } from './common.js'
+  utils,
+} from "ethers";
+import type {
+  FunctionFragment,
+  Result,
+  EventFragment,
+} from "@ethersproject/abi";
+import type { Listener, Provider } from "@ethersproject/providers";
+import type {
+  TypedEventFilter,
+  TypedEvent,
+  TypedListener,
+  OnEvent,
+} from "./common.js";
 
 export interface HoprTokenInterface extends utils.Interface {
   functions: {
-    'DEFAULT_ADMIN_ROLE()': FunctionFragment
-    'MINTER_ROLE()': FunctionFragment
-    'accountSnapshots(address,uint256)': FunctionFragment
-    'allowance(address,address)': FunctionFragment
-    'approve(address,uint256)': FunctionFragment
-    'authorizeOperator(address)': FunctionFragment
-    'balanceOf(address)': FunctionFragment
-    'balanceOfAt(address,uint128)': FunctionFragment
-    'burn(uint256,bytes)': FunctionFragment
-    'decimals()': FunctionFragment
-    'defaultOperators()': FunctionFragment
-    'getRoleAdmin(bytes32)': FunctionFragment
-    'getRoleMember(bytes32,uint256)': FunctionFragment
-    'getRoleMemberCount(bytes32)': FunctionFragment
-    'grantRole(bytes32,address)': FunctionFragment
-    'granularity()': FunctionFragment
-    'hasRole(bytes32,address)': FunctionFragment
-    'isOperatorFor(address,address)': FunctionFragment
-    'mint(address,uint256,bytes,bytes)': FunctionFragment
-    'name()': FunctionFragment
-    'operatorBurn(address,uint256,bytes,bytes)': FunctionFragment
-    'operatorSend(address,address,uint256,bytes,bytes)': FunctionFragment
-    'renounceRole(bytes32,address)': FunctionFragment
-    'revokeOperator(address)': FunctionFragment
-    'revokeRole(bytes32,address)': FunctionFragment
-    'send(address,uint256,bytes)': FunctionFragment
-    'symbol()': FunctionFragment
-    'totalSupply()': FunctionFragment
-    'totalSupplyAt(uint128)': FunctionFragment
-    'totalSupplySnapshots(uint256)': FunctionFragment
-    'transfer(address,uint256)': FunctionFragment
-    'transferFrom(address,address,uint256)': FunctionFragment
-  }
+    "DEFAULT_ADMIN_ROLE()": FunctionFragment;
+    "MINTER_ROLE()": FunctionFragment;
+    "accountSnapshots(address,uint256)": FunctionFragment;
+    "allowance(address,address)": FunctionFragment;
+    "approve(address,uint256)": FunctionFragment;
+    "authorizeOperator(address)": FunctionFragment;
+    "balanceOf(address)": FunctionFragment;
+    "balanceOfAt(address,uint128)": FunctionFragment;
+    "burn(uint256,bytes)": FunctionFragment;
+    "decimals()": FunctionFragment;
+    "defaultOperators()": FunctionFragment;
+    "getRoleAdmin(bytes32)": FunctionFragment;
+    "getRoleMember(bytes32,uint256)": FunctionFragment;
+    "getRoleMemberCount(bytes32)": FunctionFragment;
+    "grantRole(bytes32,address)": FunctionFragment;
+    "granularity()": FunctionFragment;
+    "hasRole(bytes32,address)": FunctionFragment;
+    "isOperatorFor(address,address)": FunctionFragment;
+    "mint(address,uint256,bytes,bytes)": FunctionFragment;
+    "name()": FunctionFragment;
+    "operatorBurn(address,uint256,bytes,bytes)": FunctionFragment;
+    "operatorSend(address,address,uint256,bytes,bytes)": FunctionFragment;
+    "renounceRole(bytes32,address)": FunctionFragment;
+    "revokeOperator(address)": FunctionFragment;
+    "revokeRole(bytes32,address)": FunctionFragment;
+    "send(address,uint256,bytes)": FunctionFragment;
+    "supportsInterface(bytes4)": FunctionFragment;
+    "symbol()": FunctionFragment;
+    "totalSupply()": FunctionFragment;
+    "totalSupplyAt(uint128)": FunctionFragment;
+    "totalSupplySnapshots(uint256)": FunctionFragment;
+    "transfer(address,uint256)": FunctionFragment;
+    "transferFrom(address,address,uint256)": FunctionFragment;
+  };
 
   getFunction(
     nameOrSignatureOrTopic:
-      | 'DEFAULT_ADMIN_ROLE'
-      | 'MINTER_ROLE'
-      | 'accountSnapshots'
-      | 'allowance'
-      | 'approve'
-      | 'authorizeOperator'
-      | 'balanceOf'
-      | 'balanceOfAt'
-      | 'burn'
-      | 'decimals'
-      | 'defaultOperators'
-      | 'getRoleAdmin'
-      | 'getRoleMember'
-      | 'getRoleMemberCount'
-      | 'grantRole'
-      | 'granularity'
-      | 'hasRole'
-      | 'isOperatorFor'
-      | 'mint'
-      | 'name'
-      | 'operatorBurn'
-      | 'operatorSend'
-      | 'renounceRole'
-      | 'revokeOperator'
-      | 'revokeRole'
-      | 'send'
-      | 'symbol'
-      | 'totalSupply'
-      | 'totalSupplyAt'
-      | 'totalSupplySnapshots'
-      | 'transfer'
-      | 'transferFrom'
-  ): FunctionFragment
+      | "DEFAULT_ADMIN_ROLE"
+      | "MINTER_ROLE"
+      | "accountSnapshots"
+      | "allowance"
+      | "approve"
+      | "authorizeOperator"
+      | "balanceOf"
+      | "balanceOfAt"
+      | "burn"
+      | "decimals"
+      | "defaultOperators"
+      | "getRoleAdmin"
+      | "getRoleMember"
+      | "getRoleMemberCount"
+      | "grantRole"
+      | "granularity"
+      | "hasRole"
+      | "isOperatorFor"
+      | "mint"
+      | "name"
+      | "operatorBurn"
+      | "operatorSend"
+      | "renounceRole"
+      | "revokeOperator"
+      | "revokeRole"
+      | "send"
+      | "supportsInterface"
+      | "symbol"
+      | "totalSupply"
+      | "totalSupplyAt"
+      | "totalSupplySnapshots"
+      | "transfer"
+      | "transferFrom"
+  ): FunctionFragment;
 
-  encodeFunctionData(functionFragment: 'DEFAULT_ADMIN_ROLE', values?: undefined): string
-  encodeFunctionData(functionFragment: 'MINTER_ROLE', values?: undefined): string
-  encodeFunctionData(functionFragment: 'accountSnapshots', values: [string, BigNumberish]): string
-  encodeFunctionData(functionFragment: 'allowance', values: [string, string]): string
-  encodeFunctionData(functionFragment: 'approve', values: [string, BigNumberish]): string
-  encodeFunctionData(functionFragment: 'authorizeOperator', values: [string]): string
-  encodeFunctionData(functionFragment: 'balanceOf', values: [string]): string
-  encodeFunctionData(functionFragment: 'balanceOfAt', values: [string, BigNumberish]): string
-  encodeFunctionData(functionFragment: 'burn', values: [BigNumberish, BytesLike]): string
-  encodeFunctionData(functionFragment: 'decimals', values?: undefined): string
-  encodeFunctionData(functionFragment: 'defaultOperators', values?: undefined): string
-  encodeFunctionData(functionFragment: 'getRoleAdmin', values: [BytesLike]): string
-  encodeFunctionData(functionFragment: 'getRoleMember', values: [BytesLike, BigNumberish]): string
-  encodeFunctionData(functionFragment: 'getRoleMemberCount', values: [BytesLike]): string
-  encodeFunctionData(functionFragment: 'grantRole', values: [BytesLike, string]): string
-  encodeFunctionData(functionFragment: 'granularity', values?: undefined): string
-  encodeFunctionData(functionFragment: 'hasRole', values: [BytesLike, string]): string
-  encodeFunctionData(functionFragment: 'isOperatorFor', values: [string, string]): string
-  encodeFunctionData(functionFragment: 'mint', values: [string, BigNumberish, BytesLike, BytesLike]): string
-  encodeFunctionData(functionFragment: 'name', values?: undefined): string
-  encodeFunctionData(functionFragment: 'operatorBurn', values: [string, BigNumberish, BytesLike, BytesLike]): string
   encodeFunctionData(
-    functionFragment: 'operatorSend',
+    functionFragment: "DEFAULT_ADMIN_ROLE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MINTER_ROLE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "accountSnapshots",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "allowance",
+    values: [string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "approve",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "authorizeOperator",
+    values: [string]
+  ): string;
+  encodeFunctionData(functionFragment: "balanceOf", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "balanceOfAt",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "burn",
+    values: [BigNumberish, BytesLike]
+  ): string;
+  encodeFunctionData(functionFragment: "decimals", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "defaultOperators",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getRoleAdmin",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getRoleMember",
+    values: [BytesLike, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getRoleMemberCount",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "grantRole",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "granularity",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "hasRole",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isOperatorFor",
+    values: [string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "mint",
+    values: [string, BigNumberish, BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(functionFragment: "name", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "operatorBurn",
+    values: [string, BigNumberish, BytesLike, BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "operatorSend",
     values: [string, string, BigNumberish, BytesLike, BytesLike]
-  ): string
-  encodeFunctionData(functionFragment: 'renounceRole', values: [BytesLike, string]): string
-  encodeFunctionData(functionFragment: 'revokeOperator', values: [string]): string
-  encodeFunctionData(functionFragment: 'revokeRole', values: [BytesLike, string]): string
-  encodeFunctionData(functionFragment: 'send', values: [string, BigNumberish, BytesLike]): string
-  encodeFunctionData(functionFragment: 'symbol', values?: undefined): string
-  encodeFunctionData(functionFragment: 'totalSupply', values?: undefined): string
-  encodeFunctionData(functionFragment: 'totalSupplyAt', values: [BigNumberish]): string
-  encodeFunctionData(functionFragment: 'totalSupplySnapshots', values: [BigNumberish]): string
-  encodeFunctionData(functionFragment: 'transfer', values: [string, BigNumberish]): string
-  encodeFunctionData(functionFragment: 'transferFrom', values: [string, string, BigNumberish]): string
+  ): string;
+  encodeFunctionData(
+    functionFragment: "renounceRole",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "revokeOperator",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "revokeRole",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "send",
+    values: [string, BigNumberish, BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "supportsInterface",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(functionFragment: "symbol", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "totalSupply",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "totalSupplyAt",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "totalSupplySnapshots",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transfer",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transferFrom",
+    values: [string, string, BigNumberish]
+  ): string;
 
-  decodeFunctionResult(functionFragment: 'DEFAULT_ADMIN_ROLE', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'MINTER_ROLE', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'accountSnapshots', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'allowance', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'approve', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'authorizeOperator', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'balanceOf', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'balanceOfAt', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'burn', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'decimals', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'defaultOperators', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'getRoleAdmin', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'getRoleMember', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'getRoleMemberCount', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'grantRole', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'granularity', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'hasRole', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'isOperatorFor', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'mint', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'name', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'operatorBurn', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'operatorSend', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'renounceRole', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'revokeOperator', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'revokeRole', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'send', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'symbol', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'totalSupply', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'totalSupplyAt', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'totalSupplySnapshots', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'transfer', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'transferFrom', data: BytesLike): Result
+  decodeFunctionResult(
+    functionFragment: "DEFAULT_ADMIN_ROLE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "MINTER_ROLE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "accountSnapshots",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "authorizeOperator",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "balanceOfAt",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "burn", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "decimals", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "defaultOperators",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getRoleAdmin",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getRoleMember",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getRoleMemberCount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "grantRole", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "granularity",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "hasRole", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "isOperatorFor",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "mint", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "operatorBurn",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "operatorSend",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "renounceRole",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "revokeOperator",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "revokeRole", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "send", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "supportsInterface",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "symbol", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "totalSupply",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "totalSupplyAt",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "totalSupplySnapshots",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "transfer", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "transferFrom",
+    data: BytesLike
+  ): Result;
 
   events: {
-    'Approval(address,address,uint256)': EventFragment
-    'AuthorizedOperator(address,address)': EventFragment
-    'Burned(address,address,uint256,bytes,bytes)': EventFragment
-    'Minted(address,address,uint256,bytes,bytes)': EventFragment
-    'RevokedOperator(address,address)': EventFragment
-    'RoleAdminChanged(bytes32,bytes32,bytes32)': EventFragment
-    'RoleGranted(bytes32,address,address)': EventFragment
-    'RoleRevoked(bytes32,address,address)': EventFragment
-    'Sent(address,address,address,uint256,bytes,bytes)': EventFragment
-    'Transfer(address,address,uint256)': EventFragment
-  }
+    "Approval(address,address,uint256)": EventFragment;
+    "AuthorizedOperator(address,address)": EventFragment;
+    "Burned(address,address,uint256,bytes,bytes)": EventFragment;
+    "Minted(address,address,uint256,bytes,bytes)": EventFragment;
+    "RevokedOperator(address,address)": EventFragment;
+    "RoleAdminChanged(bytes32,bytes32,bytes32)": EventFragment;
+    "RoleGranted(bytes32,address,address)": EventFragment;
+    "RoleRevoked(bytes32,address,address)": EventFragment;
+    "Sent(address,address,address,uint256,bytes,bytes)": EventFragment;
+    "Transfer(address,address,uint256)": EventFragment;
+  };
 
-  getEvent(nameOrSignatureOrTopic: 'Approval'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'AuthorizedOperator'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'Burned'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'Minted'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'RevokedOperator'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'RoleAdminChanged'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'RoleGranted'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'RoleRevoked'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'Sent'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'Transfer'): EventFragment
+  getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "AuthorizedOperator"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Burned"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Minted"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RevokedOperator"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RoleAdminChanged"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RoleGranted"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RoleRevoked"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Sent"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
 }
 
 export interface ApprovalEventObject {
-  owner: string
-  spender: string
-  value: BigNumber
+  owner: string;
+  spender: string;
+  value: BigNumber;
 }
-export type ApprovalEvent = TypedEvent<[string, string, BigNumber], ApprovalEventObject>
+export type ApprovalEvent = TypedEvent<
+  [string, string, BigNumber],
+  ApprovalEventObject
+>;
 
-export type ApprovalEventFilter = TypedEventFilter<ApprovalEvent>
+export type ApprovalEventFilter = TypedEventFilter<ApprovalEvent>;
 
 export interface AuthorizedOperatorEventObject {
-  operator: string
-  tokenHolder: string
+  operator: string;
+  tokenHolder: string;
 }
-export type AuthorizedOperatorEvent = TypedEvent<[string, string], AuthorizedOperatorEventObject>
+export type AuthorizedOperatorEvent = TypedEvent<
+  [string, string],
+  AuthorizedOperatorEventObject
+>;
 
-export type AuthorizedOperatorEventFilter = TypedEventFilter<AuthorizedOperatorEvent>
+export type AuthorizedOperatorEventFilter =
+  TypedEventFilter<AuthorizedOperatorEvent>;
 
 export interface BurnedEventObject {
-  operator: string
-  from: string
-  amount: BigNumber
-  data: string
-  operatorData: string
+  operator: string;
+  from: string;
+  amount: BigNumber;
+  data: string;
+  operatorData: string;
 }
-export type BurnedEvent = TypedEvent<[string, string, BigNumber, string, string], BurnedEventObject>
+export type BurnedEvent = TypedEvent<
+  [string, string, BigNumber, string, string],
+  BurnedEventObject
+>;
 
-export type BurnedEventFilter = TypedEventFilter<BurnedEvent>
+export type BurnedEventFilter = TypedEventFilter<BurnedEvent>;
 
 export interface MintedEventObject {
-  operator: string
-  to: string
-  amount: BigNumber
-  data: string
-  operatorData: string
+  operator: string;
+  to: string;
+  amount: BigNumber;
+  data: string;
+  operatorData: string;
 }
-export type MintedEvent = TypedEvent<[string, string, BigNumber, string, string], MintedEventObject>
+export type MintedEvent = TypedEvent<
+  [string, string, BigNumber, string, string],
+  MintedEventObject
+>;
 
-export type MintedEventFilter = TypedEventFilter<MintedEvent>
+export type MintedEventFilter = TypedEventFilter<MintedEvent>;
 
 export interface RevokedOperatorEventObject {
-  operator: string
-  tokenHolder: string
+  operator: string;
+  tokenHolder: string;
 }
-export type RevokedOperatorEvent = TypedEvent<[string, string], RevokedOperatorEventObject>
+export type RevokedOperatorEvent = TypedEvent<
+  [string, string],
+  RevokedOperatorEventObject
+>;
 
-export type RevokedOperatorEventFilter = TypedEventFilter<RevokedOperatorEvent>
+export type RevokedOperatorEventFilter = TypedEventFilter<RevokedOperatorEvent>;
 
 export interface RoleAdminChangedEventObject {
-  role: string
-  previousAdminRole: string
-  newAdminRole: string
+  role: string;
+  previousAdminRole: string;
+  newAdminRole: string;
 }
-export type RoleAdminChangedEvent = TypedEvent<[string, string, string], RoleAdminChangedEventObject>
+export type RoleAdminChangedEvent = TypedEvent<
+  [string, string, string],
+  RoleAdminChangedEventObject
+>;
 
-export type RoleAdminChangedEventFilter = TypedEventFilter<RoleAdminChangedEvent>
+export type RoleAdminChangedEventFilter =
+  TypedEventFilter<RoleAdminChangedEvent>;
 
 export interface RoleGrantedEventObject {
-  role: string
-  account: string
-  sender: string
+  role: string;
+  account: string;
+  sender: string;
 }
-export type RoleGrantedEvent = TypedEvent<[string, string, string], RoleGrantedEventObject>
+export type RoleGrantedEvent = TypedEvent<
+  [string, string, string],
+  RoleGrantedEventObject
+>;
 
-export type RoleGrantedEventFilter = TypedEventFilter<RoleGrantedEvent>
+export type RoleGrantedEventFilter = TypedEventFilter<RoleGrantedEvent>;
 
 export interface RoleRevokedEventObject {
-  role: string
-  account: string
-  sender: string
+  role: string;
+  account: string;
+  sender: string;
 }
-export type RoleRevokedEvent = TypedEvent<[string, string, string], RoleRevokedEventObject>
+export type RoleRevokedEvent = TypedEvent<
+  [string, string, string],
+  RoleRevokedEventObject
+>;
 
-export type RoleRevokedEventFilter = TypedEventFilter<RoleRevokedEvent>
+export type RoleRevokedEventFilter = TypedEventFilter<RoleRevokedEvent>;
 
 export interface SentEventObject {
-  operator: string
-  from: string
-  to: string
-  amount: BigNumber
-  data: string
-  operatorData: string
+  operator: string;
+  from: string;
+  to: string;
+  amount: BigNumber;
+  data: string;
+  operatorData: string;
 }
-export type SentEvent = TypedEvent<[string, string, string, BigNumber, string, string], SentEventObject>
+export type SentEvent = TypedEvent<
+  [string, string, string, BigNumber, string, string],
+  SentEventObject
+>;
 
-export type SentEventFilter = TypedEventFilter<SentEvent>
+export type SentEventFilter = TypedEventFilter<SentEvent>;
 
 export interface TransferEventObject {
-  from: string
-  to: string
-  value: BigNumber
+  from: string;
+  to: string;
+  value: BigNumber;
 }
-export type TransferEvent = TypedEvent<[string, string, BigNumber], TransferEventObject>
+export type TransferEvent = TypedEvent<
+  [string, string, BigNumber],
+  TransferEventObject
+>;
 
-export type TransferEventFilter = TypedEventFilter<TransferEvent>
+export type TransferEventFilter = TypedEventFilter<TransferEvent>;
 
 export interface HoprToken extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this
-  attach(addressOrName: string): this
-  deployed(): Promise<this>
+  connect(signerOrProvider: Signer | Provider | string): this;
+  attach(addressOrName: string): this;
+  deployed(): Promise<this>;
 
-  interface: HoprTokenInterface
+  interface: HoprTokenInterface;
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>
+  ): Promise<Array<TEvent>>;
 
-  listeners<TEvent extends TypedEvent>(eventFilter?: TypedEventFilter<TEvent>): Array<TypedListener<TEvent>>
-  listeners(eventName?: string): Array<Listener>
-  removeAllListeners<TEvent extends TypedEvent>(eventFilter: TypedEventFilter<TEvent>): this
-  removeAllListeners(eventName?: string): this
-  off: OnEvent<this>
-  on: OnEvent<this>
-  once: OnEvent<this>
-  removeListener: OnEvent<this>
+  listeners<TEvent extends TypedEvent>(
+    eventFilter?: TypedEventFilter<TEvent>
+  ): Array<TypedListener<TEvent>>;
+  listeners(eventName?: string): Array<Listener>;
+  removeAllListeners<TEvent extends TypedEvent>(
+    eventFilter: TypedEventFilter<TEvent>
+  ): this;
+  removeAllListeners(eventName?: string): this;
+  off: OnEvent<this>;
+  on: OnEvent<this>;
+  once: OnEvent<this>;
+  removeListener: OnEvent<this>;
 
   functions: {
-    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<[string]>
+    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<[string]>;
 
-    MINTER_ROLE(overrides?: CallOverrides): Promise<[string]>
+    MINTER_ROLE(overrides?: CallOverrides): Promise<[string]>;
 
     accountSnapshots(
       arg0: string,
       arg1: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<[BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }>
+    ): Promise<
+      [BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }
+    >;
 
-    allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<[BigNumber]>
+    allowance(
+      holder: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
     approve(
       spender: string,
       value: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     authorizeOperator(
       operator: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<[BigNumber]>
+    balanceOf(
+      tokenHolder: string,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
-    balanceOfAt(_owner: string, _blockNumber: BigNumberish, overrides?: CallOverrides): Promise<[BigNumber]>
+    balanceOfAt(
+      _owner: string,
+      _blockNumber: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
     burn(
       amount: BigNumberish,
       data: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    decimals(overrides?: CallOverrides): Promise<[number]>
+    decimals(overrides?: CallOverrides): Promise<[number]>;
 
-    defaultOperators(overrides?: CallOverrides): Promise<[string[]]>
+    defaultOperators(overrides?: CallOverrides): Promise<[string[]]>;
 
-    getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<[string]>
+    getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<[string]>;
 
-    getRoleMember(role: BytesLike, index: BigNumberish, overrides?: CallOverrides): Promise<[string]>
+    getRoleMember(
+      role: BytesLike,
+      index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<[string]>;
 
-    getRoleMemberCount(role: BytesLike, overrides?: CallOverrides): Promise<[BigNumber]>
+    getRoleMemberCount(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
     grantRole(
       role: BytesLike,
       account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    granularity(overrides?: CallOverrides): Promise<[BigNumber]>
+    granularity(overrides?: CallOverrides): Promise<[BigNumber]>;
 
-    hasRole(role: BytesLike, account: string, overrides?: CallOverrides): Promise<[boolean]>
+    hasRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
-    isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<[boolean]>
+    isOperatorFor(
+      operator: string,
+      tokenHolder: string,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
     mint(
       account: string,
       amount: BigNumberish,
       userData: BytesLike,
       operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    name(overrides?: CallOverrides): Promise<[string]>
+    name(overrides?: CallOverrides): Promise<[string]>;
 
     operatorBurn(
       account: string,
       amount: BigNumberish,
       data: BytesLike,
       operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     operatorSend(
       sender: string,
@@ -380,130 +601,165 @@ export interface HoprToken extends BaseContract {
       amount: BigNumberish,
       data: BytesLike,
       operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     renounceRole(
       role: BytesLike,
       account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     revokeOperator(
       operator: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     revokeRole(
       role: BytesLike,
       account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     send(
       recipient: string,
       amount: BigNumberish,
       data: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    symbol(overrides?: CallOverrides): Promise<[string]>
+    supportsInterface(
+      interfaceId: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
-    totalSupply(overrides?: CallOverrides): Promise<[BigNumber]>
+    symbol(overrides?: CallOverrides): Promise<[string]>;
 
-    totalSupplyAt(_blockNumber: BigNumberish, overrides?: CallOverrides): Promise<[BigNumber]>
+    totalSupply(overrides?: CallOverrides): Promise<[BigNumber]>;
+
+    totalSupplyAt(
+      _blockNumber: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
     totalSupplySnapshots(
       arg0: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<[BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }>
+    ): Promise<
+      [BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }
+    >;
 
     transfer(
       recipient: string,
       amount: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     transferFrom(
       holder: string,
       recipient: string,
       amount: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
-  }
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+  };
 
-  DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<string>
+  DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<string>;
 
-  MINTER_ROLE(overrides?: CallOverrides): Promise<string>
+  MINTER_ROLE(overrides?: CallOverrides): Promise<string>;
 
   accountSnapshots(
     arg0: string,
     arg1: BigNumberish,
     overrides?: CallOverrides
-  ): Promise<[BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }>
+  ): Promise<
+    [BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }
+  >;
 
-  allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<BigNumber>
+  allowance(
+    holder: string,
+    spender: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   approve(
     spender: string,
     value: BigNumberish,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   authorizeOperator(
     operator: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>
+  balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>;
 
-  balanceOfAt(_owner: string, _blockNumber: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
+  balanceOfAt(
+    _owner: string,
+    _blockNumber: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   burn(
     amount: BigNumberish,
     data: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  decimals(overrides?: CallOverrides): Promise<number>
+  decimals(overrides?: CallOverrides): Promise<number>;
 
-  defaultOperators(overrides?: CallOverrides): Promise<string[]>
+  defaultOperators(overrides?: CallOverrides): Promise<string[]>;
 
-  getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<string>
+  getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<string>;
 
-  getRoleMember(role: BytesLike, index: BigNumberish, overrides?: CallOverrides): Promise<string>
+  getRoleMember(
+    role: BytesLike,
+    index: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<string>;
 
-  getRoleMemberCount(role: BytesLike, overrides?: CallOverrides): Promise<BigNumber>
+  getRoleMemberCount(
+    role: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   grantRole(
     role: BytesLike,
     account: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  granularity(overrides?: CallOverrides): Promise<BigNumber>
+  granularity(overrides?: CallOverrides): Promise<BigNumber>;
 
-  hasRole(role: BytesLike, account: string, overrides?: CallOverrides): Promise<boolean>
+  hasRole(
+    role: BytesLike,
+    account: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
-  isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<boolean>
+  isOperatorFor(
+    operator: string,
+    tokenHolder: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   mint(
     account: string,
     amount: BigNumberish,
     userData: BytesLike,
     operatorData: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  name(overrides?: CallOverrides): Promise<string>
+  name(overrides?: CallOverrides): Promise<string>;
 
   operatorBurn(
     account: string,
     amount: BigNumberish,
     data: BytesLike,
     operatorData: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   operatorSend(
     sender: string,
@@ -511,97 +767,150 @@ export interface HoprToken extends BaseContract {
     amount: BigNumberish,
     data: BytesLike,
     operatorData: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   renounceRole(
     role: BytesLike,
     account: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   revokeOperator(
     operator: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   revokeRole(
     role: BytesLike,
     account: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   send(
     recipient: string,
     amount: BigNumberish,
     data: BytesLike,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  symbol(overrides?: CallOverrides): Promise<string>
+  supportsInterface(
+    interfaceId: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
-  totalSupply(overrides?: CallOverrides): Promise<BigNumber>
+  symbol(overrides?: CallOverrides): Promise<string>;
 
-  totalSupplyAt(_blockNumber: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
+  totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+  totalSupplyAt(
+    _blockNumber: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
   totalSupplySnapshots(
     arg0: BigNumberish,
     overrides?: CallOverrides
-  ): Promise<[BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }>
+  ): Promise<
+    [BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }
+  >;
 
   transfer(
     recipient: string,
     amount: BigNumberish,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   transferFrom(
     holder: string,
     recipient: string,
     amount: BigNumberish,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   callStatic: {
-    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<string>
+    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<string>;
 
-    MINTER_ROLE(overrides?: CallOverrides): Promise<string>
+    MINTER_ROLE(overrides?: CallOverrides): Promise<string>;
 
     accountSnapshots(
       arg0: string,
       arg1: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<[BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }>
+    ): Promise<
+      [BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }
+    >;
 
-    allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<BigNumber>
+    allowance(
+      holder: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    approve(spender: string, value: BigNumberish, overrides?: CallOverrides): Promise<boolean>
+    approve(
+      spender: string,
+      value: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
-    authorizeOperator(operator: string, overrides?: CallOverrides): Promise<void>
+    authorizeOperator(
+      operator: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>
+    balanceOf(
+      tokenHolder: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    balanceOfAt(_owner: string, _blockNumber: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
+    balanceOfAt(
+      _owner: string,
+      _blockNumber: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    burn(amount: BigNumberish, data: BytesLike, overrides?: CallOverrides): Promise<void>
+    burn(
+      amount: BigNumberish,
+      data: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    decimals(overrides?: CallOverrides): Promise<number>
+    decimals(overrides?: CallOverrides): Promise<number>;
 
-    defaultOperators(overrides?: CallOverrides): Promise<string[]>
+    defaultOperators(overrides?: CallOverrides): Promise<string[]>;
 
-    getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<string>
+    getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<string>;
 
-    getRoleMember(role: BytesLike, index: BigNumberish, overrides?: CallOverrides): Promise<string>
+    getRoleMember(
+      role: BytesLike,
+      index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<string>;
 
-    getRoleMemberCount(role: BytesLike, overrides?: CallOverrides): Promise<BigNumber>
+    getRoleMemberCount(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    grantRole(role: BytesLike, account: string, overrides?: CallOverrides): Promise<void>
+    grantRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    granularity(overrides?: CallOverrides): Promise<BigNumber>
+    granularity(overrides?: CallOverrides): Promise<BigNumber>;
 
-    hasRole(role: BytesLike, account: string, overrides?: CallOverrides): Promise<boolean>
+    hasRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
-    isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<boolean>
+    isOperatorFor(
+      operator: string,
+      tokenHolder: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     mint(
       account: string,
@@ -609,9 +918,9 @@ export interface HoprToken extends BaseContract {
       userData: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>
+    ): Promise<void>;
 
-    name(overrides?: CallOverrides): Promise<string>
+    name(overrides?: CallOverrides): Promise<string>;
 
     operatorBurn(
       account: string,
@@ -619,7 +928,7 @@ export interface HoprToken extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>
+    ): Promise<void>;
 
     operatorSend(
       sender: string,
@@ -628,115 +937,165 @@ export interface HoprToken extends BaseContract {
       data: BytesLike,
       operatorData: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>
+    ): Promise<void>;
 
-    renounceRole(role: BytesLike, account: string, overrides?: CallOverrides): Promise<void>
+    renounceRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    revokeOperator(operator: string, overrides?: CallOverrides): Promise<void>
+    revokeOperator(operator: string, overrides?: CallOverrides): Promise<void>;
 
-    revokeRole(role: BytesLike, account: string, overrides?: CallOverrides): Promise<void>
+    revokeRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    send(recipient: string, amount: BigNumberish, data: BytesLike, overrides?: CallOverrides): Promise<void>
+    send(
+      recipient: string,
+      amount: BigNumberish,
+      data: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    symbol(overrides?: CallOverrides): Promise<string>
+    supportsInterface(
+      interfaceId: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
-    totalSupply(overrides?: CallOverrides): Promise<BigNumber>
+    symbol(overrides?: CallOverrides): Promise<string>;
 
-    totalSupplyAt(_blockNumber: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
+    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+    totalSupplyAt(
+      _blockNumber: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     totalSupplySnapshots(
       arg0: BigNumberish,
       overrides?: CallOverrides
-    ): Promise<[BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }>
+    ): Promise<
+      [BigNumber, BigNumber] & { fromBlock: BigNumber; value: BigNumber }
+    >;
 
-    transfer(recipient: string, amount: BigNumberish, overrides?: CallOverrides): Promise<boolean>
+    transfer(
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
-    transferFrom(holder: string, recipient: string, amount: BigNumberish, overrides?: CallOverrides): Promise<boolean>
-  }
+    transferFrom(
+      holder: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
+  };
 
   filters: {
-    'Approval(address,address,uint256)'(
+    "Approval(address,address,uint256)"(
       owner?: string | null,
       spender?: string | null,
       value?: null
-    ): ApprovalEventFilter
-    Approval(owner?: string | null, spender?: string | null, value?: null): ApprovalEventFilter
+    ): ApprovalEventFilter;
+    Approval(
+      owner?: string | null,
+      spender?: string | null,
+      value?: null
+    ): ApprovalEventFilter;
 
-    'AuthorizedOperator(address,address)'(
+    "AuthorizedOperator(address,address)"(
       operator?: string | null,
       tokenHolder?: string | null
-    ): AuthorizedOperatorEventFilter
-    AuthorizedOperator(operator?: string | null, tokenHolder?: string | null): AuthorizedOperatorEventFilter
+    ): AuthorizedOperatorEventFilter;
+    AuthorizedOperator(
+      operator?: string | null,
+      tokenHolder?: string | null
+    ): AuthorizedOperatorEventFilter;
 
-    'Burned(address,address,uint256,bytes,bytes)'(
+    "Burned(address,address,uint256,bytes,bytes)"(
       operator?: string | null,
       from?: string | null,
       amount?: null,
       data?: null,
       operatorData?: null
-    ): BurnedEventFilter
+    ): BurnedEventFilter;
     Burned(
       operator?: string | null,
       from?: string | null,
       amount?: null,
       data?: null,
       operatorData?: null
-    ): BurnedEventFilter
+    ): BurnedEventFilter;
 
-    'Minted(address,address,uint256,bytes,bytes)'(
+    "Minted(address,address,uint256,bytes,bytes)"(
       operator?: string | null,
       to?: string | null,
       amount?: null,
       data?: null,
       operatorData?: null
-    ): MintedEventFilter
+    ): MintedEventFilter;
     Minted(
       operator?: string | null,
       to?: string | null,
       amount?: null,
       data?: null,
       operatorData?: null
-    ): MintedEventFilter
+    ): MintedEventFilter;
 
-    'RevokedOperator(address,address)'(
+    "RevokedOperator(address,address)"(
       operator?: string | null,
       tokenHolder?: string | null
-    ): RevokedOperatorEventFilter
-    RevokedOperator(operator?: string | null, tokenHolder?: string | null): RevokedOperatorEventFilter
+    ): RevokedOperatorEventFilter;
+    RevokedOperator(
+      operator?: string | null,
+      tokenHolder?: string | null
+    ): RevokedOperatorEventFilter;
 
-    'RoleAdminChanged(bytes32,bytes32,bytes32)'(
+    "RoleAdminChanged(bytes32,bytes32,bytes32)"(
       role?: BytesLike | null,
       previousAdminRole?: BytesLike | null,
       newAdminRole?: BytesLike | null
-    ): RoleAdminChangedEventFilter
+    ): RoleAdminChangedEventFilter;
     RoleAdminChanged(
       role?: BytesLike | null,
       previousAdminRole?: BytesLike | null,
       newAdminRole?: BytesLike | null
-    ): RoleAdminChangedEventFilter
+    ): RoleAdminChangedEventFilter;
 
-    'RoleGranted(bytes32,address,address)'(
+    "RoleGranted(bytes32,address,address)"(
       role?: BytesLike | null,
       account?: string | null,
       sender?: string | null
-    ): RoleGrantedEventFilter
-    RoleGranted(role?: BytesLike | null, account?: string | null, sender?: string | null): RoleGrantedEventFilter
-
-    'RoleRevoked(bytes32,address,address)'(
+    ): RoleGrantedEventFilter;
+    RoleGranted(
       role?: BytesLike | null,
       account?: string | null,
       sender?: string | null
-    ): RoleRevokedEventFilter
-    RoleRevoked(role?: BytesLike | null, account?: string | null, sender?: string | null): RoleRevokedEventFilter
+    ): RoleGrantedEventFilter;
 
-    'Sent(address,address,address,uint256,bytes,bytes)'(
+    "RoleRevoked(bytes32,address,address)"(
+      role?: BytesLike | null,
+      account?: string | null,
+      sender?: string | null
+    ): RoleRevokedEventFilter;
+    RoleRevoked(
+      role?: BytesLike | null,
+      account?: string | null,
+      sender?: string | null
+    ): RoleRevokedEventFilter;
+
+    "Sent(address,address,address,uint256,bytes,bytes)"(
       operator?: string | null,
       from?: string | null,
       to?: string | null,
       amount?: null,
       data?: null,
       operatorData?: null
-    ): SentEventFilter
+    ): SentEventFilter;
     Sent(
       operator?: string | null,
       from?: string | null,
@@ -744,200 +1103,122 @@ export interface HoprToken extends BaseContract {
       amount?: null,
       data?: null,
       operatorData?: null
-    ): SentEventFilter
+    ): SentEventFilter;
 
-    'Transfer(address,address,uint256)'(from?: string | null, to?: string | null, value?: null): TransferEventFilter
-    Transfer(from?: string | null, to?: string | null, value?: null): TransferEventFilter
-  }
+    "Transfer(address,address,uint256)"(
+      from?: string | null,
+      to?: string | null,
+      value?: null
+    ): TransferEventFilter;
+    Transfer(
+      from?: string | null,
+      to?: string | null,
+      value?: null
+    ): TransferEventFilter;
+  };
 
   estimateGas: {
-    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<BigNumber>
+    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<BigNumber>;
 
-    MINTER_ROLE(overrides?: CallOverrides): Promise<BigNumber>
+    MINTER_ROLE(overrides?: CallOverrides): Promise<BigNumber>;
 
-    accountSnapshots(arg0: string, arg1: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
+    accountSnapshots(
+      arg0: string,
+      arg1: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    approve(
-      spender: string,
-      value: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    authorizeOperator(operator: string, overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    balanceOfAt(_owner: string, _blockNumber: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
-
-    burn(
-      amount: BigNumberish,
-      data: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    decimals(overrides?: CallOverrides): Promise<BigNumber>
-
-    defaultOperators(overrides?: CallOverrides): Promise<BigNumber>
-
-    getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<BigNumber>
-
-    getRoleMember(role: BytesLike, index: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
-
-    getRoleMemberCount(role: BytesLike, overrides?: CallOverrides): Promise<BigNumber>
-
-    grantRole(
-      role: BytesLike,
-      account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    granularity(overrides?: CallOverrides): Promise<BigNumber>
-
-    hasRole(role: BytesLike, account: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    mint(
-      account: string,
-      amount: BigNumberish,
-      userData: BytesLike,
-      operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    name(overrides?: CallOverrides): Promise<BigNumber>
-
-    operatorBurn(
-      account: string,
-      amount: BigNumberish,
-      data: BytesLike,
-      operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    operatorSend(
-      sender: string,
-      recipient: string,
-      amount: BigNumberish,
-      data: BytesLike,
-      operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    renounceRole(
-      role: BytesLike,
-      account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    revokeOperator(operator: string, overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    revokeRole(
-      role: BytesLike,
-      account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    send(
-      recipient: string,
-      amount: BigNumberish,
-      data: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    symbol(overrides?: CallOverrides): Promise<BigNumber>
-
-    totalSupply(overrides?: CallOverrides): Promise<BigNumber>
-
-    totalSupplyAt(_blockNumber: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
-
-    totalSupplySnapshots(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>
-
-    transfer(
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    transferFrom(
+    allowance(
       holder: string,
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-  }
-
-  populateTransaction: {
-    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    MINTER_ROLE(overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    accountSnapshots(arg0: string, arg1: BigNumberish, overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    allowance(holder: string, spender: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     approve(
       spender: string,
       value: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
     authorizeOperator(
       operator: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    balanceOf(tokenHolder: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    balanceOf(
+      tokenHolder: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    balanceOfAt(_owner: string, _blockNumber: BigNumberish, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    balanceOfAt(
+      _owner: string,
+      _blockNumber: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     burn(
       amount: BigNumberish,
       data: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    decimals(overrides?: CallOverrides): Promise<PopulatedTransaction>
+    decimals(overrides?: CallOverrides): Promise<BigNumber>;
 
-    defaultOperators(overrides?: CallOverrides): Promise<PopulatedTransaction>
+    defaultOperators(overrides?: CallOverrides): Promise<BigNumber>;
 
-    getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    getRoleAdmin(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    getRoleMember(role: BytesLike, index: BigNumberish, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    getRoleMember(
+      role: BytesLike,
+      index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    getRoleMemberCount(role: BytesLike, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    getRoleMemberCount(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     grantRole(
       role: BytesLike,
       account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    granularity(overrides?: CallOverrides): Promise<PopulatedTransaction>
+    granularity(overrides?: CallOverrides): Promise<BigNumber>;
 
-    hasRole(role: BytesLike, account: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    hasRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    isOperatorFor(operator: string, tokenHolder: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    isOperatorFor(
+      operator: string,
+      tokenHolder: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     mint(
       account: string,
       amount: BigNumberish,
       userData: BytesLike,
       operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    name(overrides?: CallOverrides): Promise<PopulatedTransaction>
+    name(overrides?: CallOverrides): Promise<BigNumber>;
 
     operatorBurn(
       account: string,
       amount: BigNumberish,
       data: BytesLike,
       operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
     operatorSend(
       sender: string,
@@ -945,52 +1226,234 @@ export interface HoprToken extends BaseContract {
       amount: BigNumberish,
       data: BytesLike,
       operatorData: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
     renounceRole(
       role: BytesLike,
       account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
     revokeOperator(
       operator: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
     revokeRole(
       role: BytesLike,
       account: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
     send(
       recipient: string,
       amount: BigNumberish,
       data: BytesLike,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
-    symbol(overrides?: CallOverrides): Promise<PopulatedTransaction>
+    supportsInterface(
+      interfaceId: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>
+    symbol(overrides?: CallOverrides): Promise<BigNumber>;
 
-    totalSupplyAt(_blockNumber: BigNumberish, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
 
-    totalSupplySnapshots(arg0: BigNumberish, overrides?: CallOverrides): Promise<PopulatedTransaction>
+    totalSupplyAt(
+      _blockNumber: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    totalSupplySnapshots(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
     transfer(
       recipient: string,
       amount: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
 
     transferFrom(
       holder: string,
       recipient: string,
       amount: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
-  }
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+  };
+
+  populateTransaction: {
+    DEFAULT_ADMIN_ROLE(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    MINTER_ROLE(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    accountSnapshots(
+      arg0: string,
+      arg1: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    allowance(
+      holder: string,
+      spender: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    approve(
+      spender: string,
+      value: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    authorizeOperator(
+      operator: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    balanceOf(
+      tokenHolder: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    balanceOfAt(
+      _owner: string,
+      _blockNumber: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    burn(
+      amount: BigNumberish,
+      data: BytesLike,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    decimals(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    defaultOperators(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    getRoleAdmin(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getRoleMember(
+      role: BytesLike,
+      index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getRoleMemberCount(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    grantRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    granularity(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    hasRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    isOperatorFor(
+      operator: string,
+      tokenHolder: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    mint(
+      account: string,
+      amount: BigNumberish,
+      userData: BytesLike,
+      operatorData: BytesLike,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    name(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    operatorBurn(
+      account: string,
+      amount: BigNumberish,
+      data: BytesLike,
+      operatorData: BytesLike,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    operatorSend(
+      sender: string,
+      recipient: string,
+      amount: BigNumberish,
+      data: BytesLike,
+      operatorData: BytesLike,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    renounceRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    revokeOperator(
+      operator: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    revokeRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    send(
+      recipient: string,
+      amount: BigNumberish,
+      data: BytesLike,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    supportsInterface(
+      interfaceId: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    symbol(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    totalSupplyAt(
+      _blockNumber: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    totalSupplySnapshots(
+      arg0: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    transfer(
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    transferFrom(
+      holder: string,
+      recipient: string,
+      amount: BigNumberish,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+  };
 }

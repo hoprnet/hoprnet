@@ -793,20 +793,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           await this.onEligibilityUpdated(event as RegistryEvent<'EligibilityUpdated'>, lastDatabaseSnapshot)
           break
         case 'Registered':
-        case 'Registered(address,string)':
-        case 'RegisteredByOwner':
-        case 'RegisteredByOwner(address,string)':
+        // case 'Registered(address,string)':
+        // case 'RegisteredByOwner':
+        // case 'RegisteredByOwner(address,string)':
           await this.onRegistered(
-            event as RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+            event as RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByManager'>,
             lastDatabaseSnapshot
           )
           break
         case 'Deregistered':
-        case 'Deregistered(address,string)':
-        case 'DeregisteredByOwner':
-        case 'DeregisteredByOwner(address,string)':
+        // case 'Deregistered(address,string)':
+        // case 'DeregisteredByOwner':
+        // case 'DeregisteredByOwner(address,string)':
           await this.onDeregistered(
-            event as RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+            event as RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByManager'>,
             lastDatabaseSnapshot
           )
           break
@@ -958,7 +958,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   ): Promise<void> {
     assert(lastSnapshot !== undefined)
 
-    const account = Address.from_string(event.args.account)
+    const account = Address.from_string(event.args.stakingAccount)
     await this.db.set_eligible(
       Ethereum_Address.deserialize(account.serialize()),
       event.args.eligibility,
@@ -984,47 +984,47 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   private async onRegistered(
-    event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+    event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByManager'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
     let hoprNode: PeerId
     try {
-      hoprNode = peerIdFromString(event.args.hoprPeerId)
+      hoprNode = peerIdFromString(event.args.nodeAddress)
     } catch (error) {
-      log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onRegistered'`)
+      log(`Invalid peer Id '${event.args.nodeAddress}' given in event 'onRegistered'`)
       log(error)
       return
     }
 
     assert(lastSnapshot !== undefined)
-    const account = Address.from_string(event.args.account)
+    const account = Address.from_string(event.args.stakingAccount)
     await this.db.add_to_network_registry(
       Ethereum_PublicKey.from_peerid_str(hoprNode.toString()).to_address(),
       Ethereum_Address.deserialize(account.serialize()),
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
-    verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
+    verbose(`network-registry: node ${event.args.nodeAddress} is allowed to connect`)
   }
 
   private async onDeregistered(
-    event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+    event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByManager'>,
     lastSnapshot: Snapshot
   ): Promise<void> {
     let hoprNode: PeerId
     try {
-      hoprNode = peerIdFromString(event.args.hoprPeerId)
+      hoprNode = peerIdFromString(event.args.nodeAddress)
     } catch (error) {
-      log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onDeregistered'`)
+      log(`Invalid peer Id '${event.args.nodeAddress}' given in event 'onDeregistered'`)
       log(error)
       return
     }
     assert(lastSnapshot !== undefined)
     await this.db.remove_from_network_registry(
       Ethereum_PublicKey.from_peerid_str(hoprNode.toString()).to_address(),
-      Ethereum_Address.from_string(event.args.account),
+      Ethereum_Address.from_string(event.args.stakingAccount),
       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
     )
-    verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
+    verbose(`network-registry: node ${event.args.nodeAddress} is not allowed to connect`)
   }
 
   private async onEnabledNetworkRegistry(

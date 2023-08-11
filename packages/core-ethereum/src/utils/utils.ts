@@ -2,6 +2,7 @@ export type DeploymentExtract = {
   hoprTokenAddress: string
   hoprChannelsAddress: string
   hoprNetworkRegistryAddress: string
+  hoprNodeSafeRegistryAddress: string
   indexerStartBlockNumber: number
 }
 

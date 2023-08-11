@@ -4,514 +4,1216 @@
 import type {
   BaseContract,
   BigNumber,
+  BigNumberish,
   BytesLike,
   CallOverrides,
   ContractTransaction,
   Overrides,
   PopulatedTransaction,
   Signer,
-  utils
-} from 'ethers'
-import type { FunctionFragment, Result, EventFragment } from '@ethersproject/abi'
-import type { Listener, Provider } from '@ethersproject/providers'
-import type { TypedEventFilter, TypedEvent, TypedListener, OnEvent } from './common.js'
+  utils,
+} from "ethers";
+import type {
+  FunctionFragment,
+  Result,
+  EventFragment,
+} from "@ethersproject/abi";
+import type { Listener, Provider } from "@ethersproject/providers";
+import type {
+  TypedEventFilter,
+  TypedEvent,
+  TypedListener,
+  OnEvent,
+} from "./common.js";
 
 export interface HoprNetworkRegistryInterface extends utils.Interface {
   functions: {
-    'countRegisterdNodesPerAccount(address)': FunctionFragment
-    'disableRegistry()': FunctionFragment
-    'enableRegistry()': FunctionFragment
-    'enabled()': FunctionFragment
-    'isAccountRegisteredAndEligible(address)': FunctionFragment
-    'isNodeRegisteredAndEligible(string)': FunctionFragment
-    'nodePeerIdToAccount(string)': FunctionFragment
-    'owner()': FunctionFragment
-    'ownerDeregister(string[])': FunctionFragment
-    'ownerForceEligibility(address[],bool[])': FunctionFragment
-    'ownerRegister(address[],string[])': FunctionFragment
-    'renounceOwnership()': FunctionFragment
-    'requirementImplementation()': FunctionFragment
-    'selfDeregister(string[])': FunctionFragment
-    'selfRegister(string[])': FunctionFragment
-    'sync(string[])': FunctionFragment
-    'transferOwnership(address)': FunctionFragment
-    'updateRequirementImplementation(address)': FunctionFragment
-  }
+    "DEFAULT_ADMIN_ROLE()": FunctionFragment;
+    "MANAGER_ROLE()": FunctionFragment;
+    "countRegisterdNodesPerAccount(address)": FunctionFragment;
+    "disableRegistry()": FunctionFragment;
+    "enableRegistry()": FunctionFragment;
+    "enabled()": FunctionFragment;
+    "getRoleAdmin(bytes32)": FunctionFragment;
+    "getRoleMember(bytes32,uint256)": FunctionFragment;
+    "getRoleMemberCount(bytes32)": FunctionFragment;
+    "grantRole(bytes32,address)": FunctionFragment;
+    "hasRole(bytes32,address)": FunctionFragment;
+    "isAccountEligible(address)": FunctionFragment;
+    "isNodeRegisteredAndEligible(address)": FunctionFragment;
+    "isNodeRegisteredByAccount(address,address)": FunctionFragment;
+    "managerDeregister(address[])": FunctionFragment;
+    "managerForceSync(address[],bool[])": FunctionFragment;
+    "managerRegister(address[],address[])": FunctionFragment;
+    "managerSync(address[])": FunctionFragment;
+    "maxAdditionalRegistrations(address)": FunctionFragment;
+    "nodeRegisterdToAccount(address)": FunctionFragment;
+    "renounceRole(bytes32,address)": FunctionFragment;
+    "requirementImplementation()": FunctionFragment;
+    "revokeRole(bytes32,address)": FunctionFragment;
+    "selfDeregister(address[])": FunctionFragment;
+    "selfRegister(address[])": FunctionFragment;
+    "selfSync()": FunctionFragment;
+    "supportsInterface(bytes4)": FunctionFragment;
+    "updateRequirementImplementation(address)": FunctionFragment;
+  };
 
   getFunction(
     nameOrSignatureOrTopic:
-      | 'countRegisterdNodesPerAccount'
-      | 'disableRegistry'
-      | 'enableRegistry'
-      | 'enabled'
-      | 'isAccountRegisteredAndEligible'
-      | 'isNodeRegisteredAndEligible'
-      | 'nodePeerIdToAccount'
-      | 'owner'
-      | 'ownerDeregister'
-      | 'ownerForceEligibility'
-      | 'ownerRegister'
-      | 'renounceOwnership'
-      | 'requirementImplementation'
-      | 'selfDeregister'
-      | 'selfRegister'
-      | 'sync'
-      | 'transferOwnership'
-      | 'updateRequirementImplementation'
-  ): FunctionFragment
+      | "DEFAULT_ADMIN_ROLE"
+      | "MANAGER_ROLE"
+      | "countRegisterdNodesPerAccount"
+      | "disableRegistry"
+      | "enableRegistry"
+      | "enabled"
+      | "getRoleAdmin"
+      | "getRoleMember"
+      | "getRoleMemberCount"
+      | "grantRole"
+      | "hasRole"
+      | "isAccountEligible"
+      | "isNodeRegisteredAndEligible"
+      | "isNodeRegisteredByAccount"
+      | "managerDeregister"
+      | "managerForceSync"
+      | "managerRegister"
+      | "managerSync"
+      | "maxAdditionalRegistrations"
+      | "nodeRegisterdToAccount"
+      | "renounceRole"
+      | "requirementImplementation"
+      | "revokeRole"
+      | "selfDeregister"
+      | "selfRegister"
+      | "selfSync"
+      | "supportsInterface"
+      | "updateRequirementImplementation"
+  ): FunctionFragment;
 
-  encodeFunctionData(functionFragment: 'countRegisterdNodesPerAccount', values: [string]): string
-  encodeFunctionData(functionFragment: 'disableRegistry', values?: undefined): string
-  encodeFunctionData(functionFragment: 'enableRegistry', values?: undefined): string
-  encodeFunctionData(functionFragment: 'enabled', values?: undefined): string
-  encodeFunctionData(functionFragment: 'isAccountRegisteredAndEligible', values: [string]): string
-  encodeFunctionData(functionFragment: 'isNodeRegisteredAndEligible', values: [string]): string
-  encodeFunctionData(functionFragment: 'nodePeerIdToAccount', values: [string]): string
-  encodeFunctionData(functionFragment: 'owner', values?: undefined): string
-  encodeFunctionData(functionFragment: 'ownerDeregister', values: [string[]]): string
-  encodeFunctionData(functionFragment: 'ownerForceEligibility', values: [string[], boolean[]]): string
-  encodeFunctionData(functionFragment: 'ownerRegister', values: [string[], string[]]): string
-  encodeFunctionData(functionFragment: 'renounceOwnership', values?: undefined): string
-  encodeFunctionData(functionFragment: 'requirementImplementation', values?: undefined): string
-  encodeFunctionData(functionFragment: 'selfDeregister', values: [string[]]): string
-  encodeFunctionData(functionFragment: 'selfRegister', values: [string[]]): string
-  encodeFunctionData(functionFragment: 'sync', values: [string[]]): string
-  encodeFunctionData(functionFragment: 'transferOwnership', values: [string]): string
-  encodeFunctionData(functionFragment: 'updateRequirementImplementation', values: [string]): string
+  encodeFunctionData(
+    functionFragment: "DEFAULT_ADMIN_ROLE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MANAGER_ROLE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "countRegisterdNodesPerAccount",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "disableRegistry",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "enableRegistry",
+    values?: undefined
+  ): string;
+  encodeFunctionData(functionFragment: "enabled", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "getRoleAdmin",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getRoleMember",
+    values: [BytesLike, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getRoleMemberCount",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "grantRole",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "hasRole",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isAccountEligible",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isNodeRegisteredAndEligible",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isNodeRegisteredByAccount",
+    values: [string, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "managerDeregister",
+    values: [string[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "managerForceSync",
+    values: [string[], boolean[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "managerRegister",
+    values: [string[], string[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "managerSync",
+    values: [string[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "maxAdditionalRegistrations",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "nodeRegisterdToAccount",
+    values: [string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "renounceRole",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "requirementImplementation",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "revokeRole",
+    values: [BytesLike, string]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "selfDeregister",
+    values: [string[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "selfRegister",
+    values: [string[]]
+  ): string;
+  encodeFunctionData(functionFragment: "selfSync", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "supportsInterface",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "updateRequirementImplementation",
+    values: [string]
+  ): string;
 
-  decodeFunctionResult(functionFragment: 'countRegisterdNodesPerAccount', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'disableRegistry', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'enableRegistry', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'enabled', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'isAccountRegisteredAndEligible', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'isNodeRegisteredAndEligible', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'nodePeerIdToAccount', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'owner', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'ownerDeregister', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'ownerForceEligibility', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'ownerRegister', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'renounceOwnership', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'requirementImplementation', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'selfDeregister', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'selfRegister', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'sync', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'transferOwnership', data: BytesLike): Result
-  decodeFunctionResult(functionFragment: 'updateRequirementImplementation', data: BytesLike): Result
+  decodeFunctionResult(
+    functionFragment: "DEFAULT_ADMIN_ROLE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "MANAGER_ROLE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "countRegisterdNodesPerAccount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "disableRegistry",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "enableRegistry",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "enabled", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "getRoleAdmin",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getRoleMember",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getRoleMemberCount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "grantRole", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "hasRole", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "isAccountEligible",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "isNodeRegisteredAndEligible",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "isNodeRegisteredByAccount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "managerDeregister",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "managerForceSync",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "managerRegister",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "managerSync",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "maxAdditionalRegistrations",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "nodeRegisterdToAccount",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "renounceRole",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "requirementImplementation",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "revokeRole", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "selfDeregister",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "selfRegister",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "selfSync", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "supportsInterface",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "updateRequirementImplementation",
+    data: BytesLike
+  ): Result;
 
   events: {
-    'Deregistered(address,string)': EventFragment
-    'DeregisteredByOwner(address,string)': EventFragment
-    'EligibilityUpdated(address,bool)': EventFragment
-    'EnabledNetworkRegistry(bool)': EventFragment
-    'OwnershipTransferred(address,address)': EventFragment
-    'Registered(address,string)': EventFragment
-    'RegisteredByOwner(address,string)': EventFragment
-    'RequirementUpdated(address)': EventFragment
-  }
+    "Deregistered(address,address)": EventFragment;
+    "DeregisteredByManager(address,address)": EventFragment;
+    "EligibilityUpdated(address,bool)": EventFragment;
+    "EnabledNetworkRegistry(bool)": EventFragment;
+    "Registered(address,address)": EventFragment;
+    "RegisteredByManager(address,address)": EventFragment;
+    "RequirementUpdated(address)": EventFragment;
+    "RoleAdminChanged(bytes32,bytes32,bytes32)": EventFragment;
+    "RoleGranted(bytes32,address,address)": EventFragment;
+    "RoleRevoked(bytes32,address,address)": EventFragment;
+  };
 
-  getEvent(nameOrSignatureOrTopic: 'Deregistered'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'DeregisteredByOwner'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'EligibilityUpdated'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'EnabledNetworkRegistry'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'OwnershipTransferred'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'Registered'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'RegisteredByOwner'): EventFragment
-  getEvent(nameOrSignatureOrTopic: 'RequirementUpdated'): EventFragment
+  getEvent(nameOrSignatureOrTopic: "Deregistered"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "DeregisteredByManager"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "EligibilityUpdated"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "EnabledNetworkRegistry"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "Registered"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RegisteredByManager"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RequirementUpdated"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RoleAdminChanged"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RoleGranted"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "RoleRevoked"): EventFragment;
 }
 
 export interface DeregisteredEventObject {
-  account: string
-  hoprPeerId: string
+  stakingAccount: string;
+  nodeAddress: string;
 }
-export type DeregisteredEvent = TypedEvent<[string, string], DeregisteredEventObject>
+export type DeregisteredEvent = TypedEvent<
+  [string, string],
+  DeregisteredEventObject
+>;
 
-export type DeregisteredEventFilter = TypedEventFilter<DeregisteredEvent>
+export type DeregisteredEventFilter = TypedEventFilter<DeregisteredEvent>;
 
-export interface DeregisteredByOwnerEventObject {
-  account: string
-  hoprPeerId: string
+export interface DeregisteredByManagerEventObject {
+  stakingAccount: string;
+  nodeAddress: string;
 }
-export type DeregisteredByOwnerEvent = TypedEvent<[string, string], DeregisteredByOwnerEventObject>
+export type DeregisteredByManagerEvent = TypedEvent<
+  [string, string],
+  DeregisteredByManagerEventObject
+>;
 
-export type DeregisteredByOwnerEventFilter = TypedEventFilter<DeregisteredByOwnerEvent>
+export type DeregisteredByManagerEventFilter =
+  TypedEventFilter<DeregisteredByManagerEvent>;
 
 export interface EligibilityUpdatedEventObject {
-  account: string
-  eligibility: boolean
+  stakingAccount: string;
+  eligibility: boolean;
 }
-export type EligibilityUpdatedEvent = TypedEvent<[string, boolean], EligibilityUpdatedEventObject>
+export type EligibilityUpdatedEvent = TypedEvent<
+  [string, boolean],
+  EligibilityUpdatedEventObject
+>;
 
-export type EligibilityUpdatedEventFilter = TypedEventFilter<EligibilityUpdatedEvent>
+export type EligibilityUpdatedEventFilter =
+  TypedEventFilter<EligibilityUpdatedEvent>;
 
 export interface EnabledNetworkRegistryEventObject {
-  isEnabled: boolean
+  isEnabled: boolean;
 }
-export type EnabledNetworkRegistryEvent = TypedEvent<[boolean], EnabledNetworkRegistryEventObject>
+export type EnabledNetworkRegistryEvent = TypedEvent<
+  [boolean],
+  EnabledNetworkRegistryEventObject
+>;
 
-export type EnabledNetworkRegistryEventFilter = TypedEventFilter<EnabledNetworkRegistryEvent>
-
-export interface OwnershipTransferredEventObject {
-  previousOwner: string
-  newOwner: string
-}
-export type OwnershipTransferredEvent = TypedEvent<[string, string], OwnershipTransferredEventObject>
-
-export type OwnershipTransferredEventFilter = TypedEventFilter<OwnershipTransferredEvent>
+export type EnabledNetworkRegistryEventFilter =
+  TypedEventFilter<EnabledNetworkRegistryEvent>;
 
 export interface RegisteredEventObject {
-  account: string
-  hoprPeerId: string
+  stakingAccount: string;
+  nodeAddress: string;
 }
-export type RegisteredEvent = TypedEvent<[string, string], RegisteredEventObject>
+export type RegisteredEvent = TypedEvent<
+  [string, string],
+  RegisteredEventObject
+>;
 
-export type RegisteredEventFilter = TypedEventFilter<RegisteredEvent>
+export type RegisteredEventFilter = TypedEventFilter<RegisteredEvent>;
 
-export interface RegisteredByOwnerEventObject {
-  account: string
-  hoprPeerId: string
+export interface RegisteredByManagerEventObject {
+  stakingAccount: string;
+  nodeAddress: string;
 }
-export type RegisteredByOwnerEvent = TypedEvent<[string, string], RegisteredByOwnerEventObject>
+export type RegisteredByManagerEvent = TypedEvent<
+  [string, string],
+  RegisteredByManagerEventObject
+>;
 
-export type RegisteredByOwnerEventFilter = TypedEventFilter<RegisteredByOwnerEvent>
+export type RegisteredByManagerEventFilter =
+  TypedEventFilter<RegisteredByManagerEvent>;
 
 export interface RequirementUpdatedEventObject {
-  requirementImplementation: string
+  requirementImplementation: string;
 }
-export type RequirementUpdatedEvent = TypedEvent<[string], RequirementUpdatedEventObject>
+export type RequirementUpdatedEvent = TypedEvent<
+  [string],
+  RequirementUpdatedEventObject
+>;
 
-export type RequirementUpdatedEventFilter = TypedEventFilter<RequirementUpdatedEvent>
+export type RequirementUpdatedEventFilter =
+  TypedEventFilter<RequirementUpdatedEvent>;
+
+export interface RoleAdminChangedEventObject {
+  role: string;
+  previousAdminRole: string;
+  newAdminRole: string;
+}
+export type RoleAdminChangedEvent = TypedEvent<
+  [string, string, string],
+  RoleAdminChangedEventObject
+>;
+
+export type RoleAdminChangedEventFilter =
+  TypedEventFilter<RoleAdminChangedEvent>;
+
+export interface RoleGrantedEventObject {
+  role: string;
+  account: string;
+  sender: string;
+}
+export type RoleGrantedEvent = TypedEvent<
+  [string, string, string],
+  RoleGrantedEventObject
+>;
+
+export type RoleGrantedEventFilter = TypedEventFilter<RoleGrantedEvent>;
+
+export interface RoleRevokedEventObject {
+  role: string;
+  account: string;
+  sender: string;
+}
+export type RoleRevokedEvent = TypedEvent<
+  [string, string, string],
+  RoleRevokedEventObject
+>;
+
+export type RoleRevokedEventFilter = TypedEventFilter<RoleRevokedEvent>;
 
 export interface HoprNetworkRegistry extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this
-  attach(addressOrName: string): this
-  deployed(): Promise<this>
+  connect(signerOrProvider: Signer | Provider | string): this;
+  attach(addressOrName: string): this;
+  deployed(): Promise<this>;
 
-  interface: HoprNetworkRegistryInterface
+  interface: HoprNetworkRegistryInterface;
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>
+  ): Promise<Array<TEvent>>;
 
-  listeners<TEvent extends TypedEvent>(eventFilter?: TypedEventFilter<TEvent>): Array<TypedListener<TEvent>>
-  listeners(eventName?: string): Array<Listener>
-  removeAllListeners<TEvent extends TypedEvent>(eventFilter: TypedEventFilter<TEvent>): this
-  removeAllListeners(eventName?: string): this
-  off: OnEvent<this>
-  on: OnEvent<this>
-  once: OnEvent<this>
-  removeListener: OnEvent<this>
+  listeners<TEvent extends TypedEvent>(
+    eventFilter?: TypedEventFilter<TEvent>
+  ): Array<TypedListener<TEvent>>;
+  listeners(eventName?: string): Array<Listener>;
+  removeAllListeners<TEvent extends TypedEvent>(
+    eventFilter: TypedEventFilter<TEvent>
+  ): this;
+  removeAllListeners(eventName?: string): this;
+  off: OnEvent<this>;
+  on: OnEvent<this>;
+  once: OnEvent<this>;
+  removeListener: OnEvent<this>;
 
   functions: {
-    countRegisterdNodesPerAccount(arg0: string, overrides?: CallOverrides): Promise<[BigNumber]>
+    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<[string]>;
 
-    disableRegistry(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
+    MANAGER_ROLE(overrides?: CallOverrides): Promise<[string]>;
 
-    enableRegistry(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
+    countRegisterdNodesPerAccount(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
-    enabled(overrides?: CallOverrides): Promise<[boolean]>
+    disableRegistry(
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    isAccountRegisteredAndEligible(account: string, overrides?: CallOverrides): Promise<[boolean]>
+    enableRegistry(
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    isNodeRegisteredAndEligible(hoprPeerId: string, overrides?: CallOverrides): Promise<[boolean]>
+    enabled(overrides?: CallOverrides): Promise<[boolean]>;
 
-    nodePeerIdToAccount(arg0: string, overrides?: CallOverrides): Promise<[string]>
+    getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<[string]>;
 
-    owner(overrides?: CallOverrides): Promise<[string]>
+    getRoleMember(
+      role: BytesLike,
+      index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<[string]>;
 
-    ownerDeregister(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+    getRoleMemberCount(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
 
-    ownerForceEligibility(
-      accounts: string[],
-      eligibility: boolean[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+    grantRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    ownerRegister(
-      accounts: string[],
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+    hasRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
-    renounceOwnership(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
+    isAccountEligible(
+      stakingAccount: string,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
-    requirementImplementation(overrides?: CallOverrides): Promise<[string]>
+    isNodeRegisteredAndEligible(
+      nodeAddress: string,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
+
+    isNodeRegisteredByAccount(
+      nodeAddress: string,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
+
+    managerDeregister(
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    managerForceSync(
+      stakingAccounts: string[],
+      eligibilities: boolean[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    managerRegister(
+      stakingAccounts: string[],
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    managerSync(
+      stakingAccounts: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    maxAdditionalRegistrations(
+      stakingAccount: string,
+      overrides?: CallOverrides
+    ): Promise<[BigNumber]>;
+
+    nodeRegisterdToAccount(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<[string]>;
+
+    renounceRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+
+    requirementImplementation(overrides?: CallOverrides): Promise<[string]>;
+
+    revokeRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     selfDeregister(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
     selfRegister(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    sync(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+    selfSync(
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
 
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
+    supportsInterface(
+      interfaceId: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<[boolean]>;
 
     updateRequirementImplementation(
       _requirementImplementation: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>
-  }
+      overrides?: Overrides & { from?: string }
+    ): Promise<ContractTransaction>;
+  };
 
-  countRegisterdNodesPerAccount(arg0: string, overrides?: CallOverrides): Promise<BigNumber>
+  DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<string>;
 
-  disableRegistry(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
+  MANAGER_ROLE(overrides?: CallOverrides): Promise<string>;
 
-  enableRegistry(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
+  countRegisterdNodesPerAccount(
+    arg0: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
-  enabled(overrides?: CallOverrides): Promise<boolean>
+  disableRegistry(
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  isAccountRegisteredAndEligible(account: string, overrides?: CallOverrides): Promise<boolean>
+  enableRegistry(
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  isNodeRegisteredAndEligible(hoprPeerId: string, overrides?: CallOverrides): Promise<boolean>
+  enabled(overrides?: CallOverrides): Promise<boolean>;
 
-  nodePeerIdToAccount(arg0: string, overrides?: CallOverrides): Promise<string>
+  getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<string>;
 
-  owner(overrides?: CallOverrides): Promise<string>
+  getRoleMember(
+    role: BytesLike,
+    index: BigNumberish,
+    overrides?: CallOverrides
+  ): Promise<string>;
 
-  ownerDeregister(
-    hoprPeerIds: string[],
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+  getRoleMemberCount(
+    role: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
 
-  ownerForceEligibility(
-    accounts: string[],
-    eligibility: boolean[],
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+  grantRole(
+    role: BytesLike,
+    account: string,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  ownerRegister(
-    accounts: string[],
-    hoprPeerIds: string[],
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+  hasRole(
+    role: BytesLike,
+    account: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
-  renounceOwnership(overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
+  isAccountEligible(
+    stakingAccount: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
-  requirementImplementation(overrides?: CallOverrides): Promise<string>
+  isNodeRegisteredAndEligible(
+    nodeAddress: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  isNodeRegisteredByAccount(
+    nodeAddress: string,
+    account: string,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
+
+  managerDeregister(
+    nodeAddresses: string[],
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  managerForceSync(
+    stakingAccounts: string[],
+    eligibilities: boolean[],
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  managerRegister(
+    stakingAccounts: string[],
+    nodeAddresses: string[],
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  managerSync(
+    stakingAccounts: string[],
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  maxAdditionalRegistrations(
+    stakingAccount: string,
+    overrides?: CallOverrides
+  ): Promise<BigNumber>;
+
+  nodeRegisterdToAccount(
+    arg0: string,
+    overrides?: CallOverrides
+  ): Promise<string>;
+
+  renounceRole(
+    role: BytesLike,
+    account: string,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
+
+  requirementImplementation(overrides?: CallOverrides): Promise<string>;
+
+  revokeRole(
+    role: BytesLike,
+    account: string,
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   selfDeregister(
-    hoprPeerIds: string[],
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    nodeAddresses: string[],
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   selfRegister(
-    hoprPeerIds: string[],
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    nodeAddresses: string[],
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  sync(hoprPeerIds: string[], overrides?: Overrides & { from?: string | Promise<string> }): Promise<ContractTransaction>
+  selfSync(
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
-  transferOwnership(
-    newOwner: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+  supportsInterface(
+    interfaceId: BytesLike,
+    overrides?: CallOverrides
+  ): Promise<boolean>;
 
   updateRequirementImplementation(
     _requirementImplementation: string,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>
+    overrides?: Overrides & { from?: string }
+  ): Promise<ContractTransaction>;
 
   callStatic: {
-    countRegisterdNodesPerAccount(arg0: string, overrides?: CallOverrides): Promise<BigNumber>
+    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<string>;
 
-    disableRegistry(overrides?: CallOverrides): Promise<void>
+    MANAGER_ROLE(overrides?: CallOverrides): Promise<string>;
 
-    enableRegistry(overrides?: CallOverrides): Promise<void>
+    countRegisterdNodesPerAccount(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    enabled(overrides?: CallOverrides): Promise<boolean>
+    disableRegistry(overrides?: CallOverrides): Promise<void>;
 
-    isAccountRegisteredAndEligible(account: string, overrides?: CallOverrides): Promise<boolean>
+    enableRegistry(overrides?: CallOverrides): Promise<void>;
 
-    isNodeRegisteredAndEligible(hoprPeerId: string, overrides?: CallOverrides): Promise<boolean>
+    enabled(overrides?: CallOverrides): Promise<boolean>;
 
-    nodePeerIdToAccount(arg0: string, overrides?: CallOverrides): Promise<string>
+    getRoleAdmin(role: BytesLike, overrides?: CallOverrides): Promise<string>;
 
-    owner(overrides?: CallOverrides): Promise<string>
+    getRoleMember(
+      role: BytesLike,
+      index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<string>;
 
-    ownerDeregister(hoprPeerIds: string[], overrides?: CallOverrides): Promise<void>
+    getRoleMemberCount(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    ownerForceEligibility(accounts: string[], eligibility: boolean[], overrides?: CallOverrides): Promise<void>
+    grantRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    ownerRegister(accounts: string[], hoprPeerIds: string[], overrides?: CallOverrides): Promise<void>
+    hasRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
-    renounceOwnership(overrides?: CallOverrides): Promise<void>
+    isAccountEligible(
+      stakingAccount: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
-    requirementImplementation(overrides?: CallOverrides): Promise<string>
+    isNodeRegisteredAndEligible(
+      nodeAddress: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
-    selfDeregister(hoprPeerIds: string[], overrides?: CallOverrides): Promise<void>
+    isNodeRegisteredByAccount(
+      nodeAddress: string,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
-    selfRegister(hoprPeerIds: string[], overrides?: CallOverrides): Promise<void>
+    managerDeregister(
+      nodeAddresses: string[],
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    sync(hoprPeerIds: string[], overrides?: CallOverrides): Promise<void>
+    managerForceSync(
+      stakingAccounts: string[],
+      eligibilities: boolean[],
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    transferOwnership(newOwner: string, overrides?: CallOverrides): Promise<void>
+    managerRegister(
+      stakingAccounts: string[],
+      nodeAddresses: string[],
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    updateRequirementImplementation(_requirementImplementation: string, overrides?: CallOverrides): Promise<void>
-  }
+    managerSync(
+      stakingAccounts: string[],
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-  filters: {
-    'Deregistered(address,string)'(account?: string | null, hoprPeerId?: null): DeregisteredEventFilter
-    Deregistered(account?: string | null, hoprPeerId?: null): DeregisteredEventFilter
+    maxAdditionalRegistrations(
+      stakingAccount: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
 
-    'DeregisteredByOwner(address,string)'(account?: string | null, hoprPeerId?: null): DeregisteredByOwnerEventFilter
-    DeregisteredByOwner(account?: string | null, hoprPeerId?: null): DeregisteredByOwnerEventFilter
+    nodeRegisterdToAccount(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<string>;
 
-    'EligibilityUpdated(address,bool)'(
-      account?: string | null,
-      eligibility?: boolean | null
-    ): EligibilityUpdatedEventFilter
-    EligibilityUpdated(account?: string | null, eligibility?: boolean | null): EligibilityUpdatedEventFilter
+    renounceRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    'EnabledNetworkRegistry(bool)'(isEnabled?: boolean | null): EnabledNetworkRegistryEventFilter
-    EnabledNetworkRegistry(isEnabled?: boolean | null): EnabledNetworkRegistryEventFilter
+    requirementImplementation(overrides?: CallOverrides): Promise<string>;
 
-    'OwnershipTransferred(address,address)'(
-      previousOwner?: string | null,
-      newOwner?: string | null
-    ): OwnershipTransferredEventFilter
-    OwnershipTransferred(previousOwner?: string | null, newOwner?: string | null): OwnershipTransferredEventFilter
-
-    'Registered(address,string)'(account?: string | null, hoprPeerId?: null): RegisteredEventFilter
-    Registered(account?: string | null, hoprPeerId?: null): RegisteredEventFilter
-
-    'RegisteredByOwner(address,string)'(account?: string | null, hoprPeerId?: null): RegisteredByOwnerEventFilter
-    RegisteredByOwner(account?: string | null, hoprPeerId?: null): RegisteredByOwnerEventFilter
-
-    'RequirementUpdated(address)'(requirementImplementation?: string | null): RequirementUpdatedEventFilter
-    RequirementUpdated(requirementImplementation?: string | null): RequirementUpdatedEventFilter
-  }
-
-  estimateGas: {
-    countRegisterdNodesPerAccount(arg0: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    disableRegistry(overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    enableRegistry(overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    enabled(overrides?: CallOverrides): Promise<BigNumber>
-
-    isAccountRegisteredAndEligible(account: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    isNodeRegisteredAndEligible(hoprPeerId: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    nodePeerIdToAccount(arg0: string, overrides?: CallOverrides): Promise<BigNumber>
-
-    owner(overrides?: CallOverrides): Promise<BigNumber>
-
-    ownerDeregister(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    ownerForceEligibility(
-      accounts: string[],
-      eligibility: boolean[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    ownerRegister(
-      accounts: string[],
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    renounceOwnership(overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    requirementImplementation(overrides?: CallOverrides): Promise<BigNumber>
+    revokeRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     selfDeregister(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-
-    selfRegister(hoprPeerIds: string[], overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    sync(hoprPeerIds: string[], overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    transferOwnership(newOwner: string, overrides?: Overrides & { from?: string | Promise<string> }): Promise<BigNumber>
-
-    updateRequirementImplementation(
-      _requirementImplementation: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>
-  }
-
-  populateTransaction: {
-    countRegisterdNodesPerAccount(arg0: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    disableRegistry(overrides?: Overrides & { from?: string | Promise<string> }): Promise<PopulatedTransaction>
-
-    enableRegistry(overrides?: Overrides & { from?: string | Promise<string> }): Promise<PopulatedTransaction>
-
-    enabled(overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    isAccountRegisteredAndEligible(account: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    isNodeRegisteredAndEligible(hoprPeerId: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    nodePeerIdToAccount(arg0: string, overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    owner(overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    ownerDeregister(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
-
-    ownerForceEligibility(
-      accounts: string[],
-      eligibility: boolean[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
-
-    ownerRegister(
-      accounts: string[],
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
-
-    renounceOwnership(overrides?: Overrides & { from?: string | Promise<string> }): Promise<PopulatedTransaction>
-
-    requirementImplementation(overrides?: CallOverrides): Promise<PopulatedTransaction>
-
-    selfDeregister(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      nodeAddresses: string[],
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     selfRegister(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+      nodeAddresses: string[],
+      overrides?: CallOverrides
+    ): Promise<void>;
 
-    sync(
-      hoprPeerIds: string[],
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+    selfSync(overrides?: CallOverrides): Promise<void>;
 
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
+    supportsInterface(
+      interfaceId: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<boolean>;
 
     updateRequirementImplementation(
       _requirementImplementation: string,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>
-  }
+      overrides?: CallOverrides
+    ): Promise<void>;
+  };
+
+  filters: {
+    "Deregistered(address,address)"(
+      stakingAccount?: string | null,
+      nodeAddress?: string | null
+    ): DeregisteredEventFilter;
+    Deregistered(
+      stakingAccount?: string | null,
+      nodeAddress?: string | null
+    ): DeregisteredEventFilter;
+
+    "DeregisteredByManager(address,address)"(
+      stakingAccount?: string | null,
+      nodeAddress?: string | null
+    ): DeregisteredByManagerEventFilter;
+    DeregisteredByManager(
+      stakingAccount?: string | null,
+      nodeAddress?: string | null
+    ): DeregisteredByManagerEventFilter;
+
+    "EligibilityUpdated(address,bool)"(
+      stakingAccount?: string | null,
+      eligibility?: boolean | null
+    ): EligibilityUpdatedEventFilter;
+    EligibilityUpdated(
+      stakingAccount?: string | null,
+      eligibility?: boolean | null
+    ): EligibilityUpdatedEventFilter;
+
+    "EnabledNetworkRegistry(bool)"(
+      isEnabled?: boolean | null
+    ): EnabledNetworkRegistryEventFilter;
+    EnabledNetworkRegistry(
+      isEnabled?: boolean | null
+    ): EnabledNetworkRegistryEventFilter;
+
+    "Registered(address,address)"(
+      stakingAccount?: string | null,
+      nodeAddress?: string | null
+    ): RegisteredEventFilter;
+    Registered(
+      stakingAccount?: string | null,
+      nodeAddress?: string | null
+    ): RegisteredEventFilter;
+
+    "RegisteredByManager(address,address)"(
+      stakingAccount?: string | null,
+      nodeAddress?: string | null
+    ): RegisteredByManagerEventFilter;
+    RegisteredByManager(
+      stakingAccount?: string | null,
+      nodeAddress?: string | null
+    ): RegisteredByManagerEventFilter;
+
+    "RequirementUpdated(address)"(
+      requirementImplementation?: string | null
+    ): RequirementUpdatedEventFilter;
+    RequirementUpdated(
+      requirementImplementation?: string | null
+    ): RequirementUpdatedEventFilter;
+
+    "RoleAdminChanged(bytes32,bytes32,bytes32)"(
+      role?: BytesLike | null,
+      previousAdminRole?: BytesLike | null,
+      newAdminRole?: BytesLike | null
+    ): RoleAdminChangedEventFilter;
+    RoleAdminChanged(
+      role?: BytesLike | null,
+      previousAdminRole?: BytesLike | null,
+      newAdminRole?: BytesLike | null
+    ): RoleAdminChangedEventFilter;
+
+    "RoleGranted(bytes32,address,address)"(
+      role?: BytesLike | null,
+      account?: string | null,
+      sender?: string | null
+    ): RoleGrantedEventFilter;
+    RoleGranted(
+      role?: BytesLike | null,
+      account?: string | null,
+      sender?: string | null
+    ): RoleGrantedEventFilter;
+
+    "RoleRevoked(bytes32,address,address)"(
+      role?: BytesLike | null,
+      account?: string | null,
+      sender?: string | null
+    ): RoleRevokedEventFilter;
+    RoleRevoked(
+      role?: BytesLike | null,
+      account?: string | null,
+      sender?: string | null
+    ): RoleRevokedEventFilter;
+  };
+
+  estimateGas: {
+    DEFAULT_ADMIN_ROLE(overrides?: CallOverrides): Promise<BigNumber>;
+
+    MANAGER_ROLE(overrides?: CallOverrides): Promise<BigNumber>;
+
+    countRegisterdNodesPerAccount(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    disableRegistry(
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    enableRegistry(
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    enabled(overrides?: CallOverrides): Promise<BigNumber>;
+
+    getRoleAdmin(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    getRoleMember(
+      role: BytesLike,
+      index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    getRoleMemberCount(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    grantRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    hasRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    isAccountEligible(
+      stakingAccount: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    isNodeRegisteredAndEligible(
+      nodeAddress: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    isNodeRegisteredByAccount(
+      nodeAddress: string,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    managerDeregister(
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    managerForceSync(
+      stakingAccounts: string[],
+      eligibilities: boolean[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    managerRegister(
+      stakingAccounts: string[],
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    managerSync(
+      stakingAccounts: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    maxAdditionalRegistrations(
+      stakingAccount: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    nodeRegisterdToAccount(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    renounceRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    requirementImplementation(overrides?: CallOverrides): Promise<BigNumber>;
+
+    revokeRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    selfDeregister(
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    selfRegister(
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+
+    selfSync(overrides?: Overrides & { from?: string }): Promise<BigNumber>;
+
+    supportsInterface(
+      interfaceId: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
+    updateRequirementImplementation(
+      _requirementImplementation: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<BigNumber>;
+  };
+
+  populateTransaction: {
+    DEFAULT_ADMIN_ROLE(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    MANAGER_ROLE(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    countRegisterdNodesPerAccount(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    disableRegistry(
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    enableRegistry(
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    enabled(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    getRoleAdmin(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getRoleMember(
+      role: BytesLike,
+      index: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getRoleMemberCount(
+      role: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    grantRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    hasRole(
+      role: BytesLike,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    isAccountEligible(
+      stakingAccount: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    isNodeRegisteredAndEligible(
+      nodeAddress: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    isNodeRegisteredByAccount(
+      nodeAddress: string,
+      account: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    managerDeregister(
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    managerForceSync(
+      stakingAccounts: string[],
+      eligibilities: boolean[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    managerRegister(
+      stakingAccounts: string[],
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    managerSync(
+      stakingAccounts: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    maxAdditionalRegistrations(
+      stakingAccount: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    nodeRegisterdToAccount(
+      arg0: string,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    renounceRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    requirementImplementation(
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    revokeRole(
+      role: BytesLike,
+      account: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    selfDeregister(
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    selfRegister(
+      nodeAddresses: string[],
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    selfSync(
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+
+    supportsInterface(
+      interfaceId: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    updateRequirementImplementation(
+      _requirementImplementation: string,
+      overrides?: Overrides & { from?: string }
+    ): Promise<PopulatedTransaction>;
+  };
 }

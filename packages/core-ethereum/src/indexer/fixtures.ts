@@ -260,7 +260,7 @@ export const PARTY_A_DEREGISTERED = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: ACCOUNT_A.address,
-    hoprPeerId: PARTY_B().to_peerid_str()
+    stakingAccount: ACCOUNT_A.address,
+    nodeAddress: PARTY_B().to_peerid_str()
   } as any
-} as RegistryEvent<'DeregisteredByOwner'>
+} as RegistryEvent<'DeregisteredByManager'>
