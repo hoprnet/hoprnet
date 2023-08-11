@@ -1455,11 +1455,9 @@ mod tests {
             Address::random(),
             Address::random(),
             Balance::zero(BalanceType::HOPR),
-            Hash::default(),
-            U256::from(0u64),
             U256::from(0u64),
             ChannelStatus::Open,
-            U256::from(0u64),
+            U256::from(1u64),
             U256::from(0u64),
         );
 

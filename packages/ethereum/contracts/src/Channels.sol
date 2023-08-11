@@ -25,7 +25,7 @@ abstract contract HoprChannelsEvents {
      * Includes source and destination separately because mapping
      * (source, destination) -> channelId destroys information.
      */
-    event ChannelOpened(address indexed source, address indexed destination, HoprChannels.Balance amount);
+    event ChannelOpened(address indexed source, address indexed destination);
 
     /**
      * Emitted once balance of a channel is increased, e.g. after opening a
@@ -717,7 +717,7 @@ contract HoprChannels is
             channel.status = ChannelStatus.OPEN;
 
             indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
-            emit ChannelOpened(self, account, channel.balance);
+            emit ChannelOpened(self, account);
         } else {
             indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
             emit ChannelBalanceIncreased(channelId, channel.balance);

@@ -88,8 +88,8 @@ where
         HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
             let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
 
-            if let Some(channel) = maybe_channel {
-                channel
+            if let Some(mut channel) = maybe_channel {
+                channel.balance = channel
                     .balance
                     .sub(&Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR));
 
@@ -102,8 +102,8 @@ where
         HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
             let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?).await?;
 
-            if let Some(channel) = maybe_channel {
-                channel
+            if let Some(mut channel) = maybe_channel {
+                channel.balance = channel
                     .balance
                     .add(&Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR));
 
@@ -168,6 +168,7 @@ where
             let maybe_channel = db.get_channel(&closure_initiated.channel_id.try_into()?).await?;
 
             if let Some(mut channel) = maybe_channel {
+                channel.status = ChannelStatus::PendingToClose;
                 channel.closure_time = closure_initiated.closure_time.into();
 
                 db.update_channel_and_snapshot(&closure_initiated.channel_id.try_into()?, &channel, snapshot)
@@ -273,15 +274,22 @@ pub mod tests {
     use async_std;
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
+        hopr_channels::{
+            ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
+            OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
+        },
         hopr_network_registry::{
-            DeregisteredByManagerFilter, DeregisteredFilter, NetworkRegistryStatusUpdatedFilter,
-            RegisteredByManagerFilter, RegisteredFilter, EligibilityUpdatedFilter
+            DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter,
+            NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter,
         },
         hopr_token::TransferFilter,
     };
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-    use core_types::account::{AccountEntry, AccountSignature, AccountType};
+    use core_types::{
+        account::{AccountEntry, AccountSignature, AccountType},
+        channels::{generate_channel_id, ChannelEntry, ChannelStatus},
+    };
     use ethers::{
         abi::{encode, Address as EthereumAddress, RawLog, Token},
         prelude::*,
@@ -299,6 +307,7 @@ pub mod tests {
     };
 
     const SELF_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+    const COUNTERPARTY_CHAIN_ADDRESS: [u8; 20] = hex!("f1a73ef496c45e260924a9279d2d9752ae378812");
     const SELF_CHAIN_ADDRESS: [u8; 20] = hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a");
     const STAKE_ADDRESS: [u8; 20] = hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3");
 
@@ -614,7 +623,10 @@ pub mod tests {
         let mut db = create_mock_db();
 
         let nr_enabled = RawLog {
-            topics: vec![NetworkRegistryStatusUpdatedFilter::signature(), H256::from_low_u64_be(1)],
+            topics: vec![
+                NetworkRegistryStatusUpdatedFilter::signature(),
+                H256::from_low_u64_be(1),
+            ],
             data: encode(&[]),
         };
 
@@ -632,7 +644,10 @@ pub mod tests {
         db.set_network_registry(true, &Snapshot::default()).await.unwrap();
 
         let nr_disabled = RawLog {
-            topics: vec![NetworkRegistryStatusUpdatedFilter::signature(), H256::from_low_u64_be(0)],
+            topics: vec![
+                NetworkRegistryStatusUpdatedFilter::signature(),
+                H256::from_low_u64_be(0),
+            ],
             data: encode(&[]),
         };
 
@@ -650,11 +665,17 @@ pub mod tests {
         let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
 
         let set_eligible = RawLog {
-            topics: vec![EligibilityUpdatedFilter::signature(), H256::from_slice(&stake_address.to_bytes32()), H256::from_low_u64_be(1)],
+            topics: vec![
+                EligibilityUpdatedFilter::signature(),
+                H256::from_slice(&stake_address.to_bytes32()),
+                H256::from_low_u64_be(1),
+            ],
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &set_eligible, &Snapshot::default()).await.unwrap();
+        super::on_network_registry_event(&mut db, &set_eligible, &Snapshot::default())
+            .await
+            .unwrap();
 
         assert!(db.is_eligible(&stake_address).await.unwrap());
     }
@@ -665,16 +686,274 @@ pub mod tests {
 
         let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
 
-        db.set_eligible(&stake_address, false, &Snapshot::default()).await.unwrap();
+        db.set_eligible(&stake_address, false, &Snapshot::default())
+            .await
+            .unwrap();
 
         let set_eligible = RawLog {
-            topics: vec![EligibilityUpdatedFilter::signature(), H256::from_slice(&stake_address.to_bytes32()), H256::from_low_u64_be(0)],
+            topics: vec![
+                EligibilityUpdatedFilter::signature(),
+                H256::from_slice(&stake_address.to_bytes32()),
+                H256::from_low_u64_be(0),
+            ],
             data: encode(&[]),
         };
 
-        super::on_network_registry_event(&mut db, &set_eligible, &Snapshot::default()).await.unwrap();
+        super::on_network_registry_event(&mut db, &set_eligible, &Snapshot::default())
+            .await
+            .unwrap();
 
         assert!(!db.is_eligible(&stake_address).await.unwrap());
+    }
+
+    #[async_std::test]
+    async fn on_channel_event_balance_increased() {
+        let mut db = create_mock_db();
+
+        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
+
+        let channel_id = generate_channel_id(&source, &destination);
+
+        db.update_channel_and_snapshot(
+            &channel_id,
+            &ChannelEntry::new(
+                source,
+                destination,
+                Balance::new(U256::zero(), BalanceType::HOPR),
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::one(),
+                U256::zero(),
+            ),
+            &Snapshot::default(),
+        )
+        .await
+        .unwrap();
+
+        let solidity_balance = U256::from((1u128 << 96) - 1);
+
+        let balance_increased_log = RawLog {
+            topics: vec![
+                ChannelBalanceIncreasedFilter::signature(),
+                H256::from_slice(&channel_id.to_bytes()),
+            ],
+            data: Vec::from(solidity_balance.to_bytes()),
+        };
+
+        super::on_channel_event(&mut db, &balance_increased_log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            *db.get_channel(&channel_id).await.unwrap().unwrap().balance.value(),
+            solidity_balance
+        );
+    }
+
+    #[async_std::test]
+    async fn on_channel_event_balance_decreased() {
+        let mut db = create_mock_db();
+
+        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
+
+        let channel_id = generate_channel_id(&source, &destination);
+
+        db.update_channel_and_snapshot(
+            &channel_id,
+            &ChannelEntry::new(
+                source,
+                destination,
+                Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::one(),
+                U256::zero(),
+            ),
+            &Snapshot::default(),
+        )
+        .await
+        .unwrap();
+
+        let solidity_balance = U256::from((1u128 << 96) - 1);
+
+        let balance_increased_log = RawLog {
+            topics: vec![
+                ChannelBalanceDecreasedFilter::signature(),
+                H256::from_slice(&channel_id.to_bytes()),
+            ],
+            data: Vec::from(solidity_balance.to_bytes()),
+        };
+
+        super::on_channel_event(&mut db, &balance_increased_log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            *db.get_channel(&channel_id).await.unwrap().unwrap().balance.value(),
+            U256::zero()
+        );
+    }
+
+    #[async_std::test]
+    async fn on_channel_closed() {
+        let mut db = create_mock_db();
+
+        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
+
+        let channel_id = generate_channel_id(&source, &destination);
+
+        db.update_channel_and_snapshot(
+            &channel_id,
+            &ChannelEntry::new(
+                source,
+                destination,
+                Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::one(),
+                U256::zero(),
+            ),
+            &Snapshot::default(),
+        )
+        .await
+        .unwrap();
+
+        let channel_closed_log = RawLog {
+            topics: vec![
+                ChannelClosedFilter::signature(),
+                H256::from_slice(&channel_id.to_bytes()),
+            ],
+            data: encode(&[]),
+        };
+
+        super::on_channel_event(&mut db, &channel_closed_log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_channel(&channel_id).await.unwrap().unwrap().status,
+            ChannelStatus::Closed
+        );
+    }
+
+    #[async_std::test]
+    async fn on_channel_opened() {
+        let mut db = create_mock_db();
+
+        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
+
+        let channel_id = generate_channel_id(&source, &destination);
+
+        let channel_opened_log = RawLog {
+            topics: vec![
+                ChannelOpenedFilter::signature(),
+                H256::from_slice(&source.to_bytes32()),
+                H256::from_slice(&destination.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        super::on_channel_event(&mut db, &channel_opened_log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(channel.status, ChannelStatus::Open);
+    }
+
+    #[async_std::test]
+    async fn on_channel_ticket_redeemed() {
+        let mut db = create_mock_db();
+
+        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
+
+        let channel_id = generate_channel_id(&source, &destination);
+
+        db.update_channel_and_snapshot(
+            &channel_id,
+            &ChannelEntry::new(
+                source,
+                destination,
+                Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::one(),
+                U256::zero(),
+            ),
+            &Snapshot::default(),
+        )
+        .await
+        .unwrap();
+
+        let ticket_index = U256::from((1u128 << 48) - 1);
+
+        let ticket_redeemed_log = RawLog {
+            topics: vec![
+                TicketRedeemedFilter::signature(),
+                H256::from_slice(&channel_id.to_bytes()),
+            ],
+            data: Vec::from(ticket_index.to_bytes()),
+        };
+
+        super::on_channel_event(&mut db, &ticket_redeemed_log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(channel.ticket_index, ticket_index);
+    }
+
+    #[async_std::test]
+    async fn on_channel_closure_initiated() {
+        let mut db = create_mock_db();
+
+        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
+
+        let channel_id = generate_channel_id(&source, &destination);
+
+        db.update_channel_and_snapshot(
+            &channel_id,
+            &ChannelEntry::new(
+                source,
+                destination,
+                Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::one(),
+                U256::zero(),
+            ),
+            &Snapshot::default(),
+        )
+        .await
+        .unwrap();
+
+        let timestamp = U256::from((1u64 << 32) - 1);
+
+
+        let closure_initiated_log = RawLog {
+            topics: vec![
+                OutgoingChannelClosureInitiatedFilter::signature(),
+                H256::from_slice(&channel_id.to_bytes()),
+            ],
+            data: Vec::from(timestamp.to_bytes()),
+        };
+
+        super::on_channel_event(&mut db, &closure_initiated_log, &Snapshot::default())
+        .await
+        .unwrap();
+
+        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(channel.status, ChannelStatus::PendingToClose);
+        assert_eq!(channel.closure_time, timestamp);
     }
 }
 #[cfg(feature = "wasm")]

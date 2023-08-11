@@ -219,7 +219,6 @@ mod tests {
         Ticket::new(
             TARGET_ADDR.clone(),
             U256::one(),
-            U256::one(),
             Balance::new(U256::one(), BalanceType::HOPR),
             U256::from_inverse_probability(U256::one()).unwrap(),
             U256::one(),
@@ -232,8 +231,6 @@ mod tests {
             TARGET_ADDR.clone(),
             TARGET_ADDR.clone(),
             Balance::from_str("100", BalanceType::HOPR),
-            Hash::create(&[&hex!("deadbeef")]),
-            U256::one(),
             U256::zero(),
             ChannelStatus::Open,
             U256::one(),
@@ -377,7 +374,6 @@ mod tests {
 
         let ticket = create_valid_ticket();
         let mut channel = create_channel_entry();
-        channel.ticket_epoch = 2u32.into();
 
         let ret = validate_unacknowledged_ticket(
             &db,

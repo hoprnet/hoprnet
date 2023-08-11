@@ -11,7 +11,7 @@ pub use hopr_channels_events::*;
 )]
 pub mod hopr_channels_events {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceDecreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceIncreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelClosed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"amount\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelOpened\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"closureTime\",\"type\":\"uint32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"OutgoingChannelClosureInitiated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"newTicketIndex\",\"type\":\"uint48\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"TicketRedeemed\",\"outputs\":[],\"anonymous\":false}]";
+    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceDecreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceIncreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelClosed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelOpened\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"closureTime\",\"type\":\"uint32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"OutgoingChannelClosureInitiated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"newTicketIndex\",\"type\":\"uint48\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"TicketRedeemed\",\"outputs\":[],\"anonymous\":false}]";
     ///The parsed JSON ABI of the contract.
     pub static HOPRCHANNELSEVENTS_ABI: ::ethers::contract::Lazy<
         ::ethers::core::abi::Abi,
@@ -196,13 +196,12 @@ pub mod hopr_channels_events {
         Eq,
         Hash
     )]
-    #[ethevent(name = "ChannelOpened", abi = "ChannelOpened(address,address,uint96)")]
+    #[ethevent(name = "ChannelOpened", abi = "ChannelOpened(address,address)")]
     pub struct ChannelOpenedFilter {
         #[ethevent(indexed)]
         pub source: ::ethers::core::types::Address,
         #[ethevent(indexed)]
         pub destination: ::ethers::core::types::Address,
-        pub amount: u128,
     }
     #[derive(
         Clone,

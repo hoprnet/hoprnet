@@ -22,9 +22,8 @@ use utils_types::traits::{BinarySerializable, ToHex};
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelStatus {
     Closed = 0,
-    WaitingForCommitment = 1,
-    Open = 2,
-    PendingToClose = 3,
+    Open = 1,
+    PendingToClose = 2,
 }
 
 impl ChannelStatus {
@@ -39,7 +38,6 @@ impl ChannelStatus {
     pub fn to_string(&self) -> String {
         match self {
             ChannelStatus::Closed => "Closed",
-            ChannelStatus::WaitingForCommitment => "WaitingForCommitment",
             ChannelStatus::Open => "Open",
             ChannelStatus::PendingToClose => "PendingToClose",
         }
