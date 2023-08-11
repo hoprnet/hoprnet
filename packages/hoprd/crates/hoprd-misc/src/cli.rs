@@ -434,6 +434,30 @@ pub struct CliArgs {
         env = "HOPRD_CONFIGURATION_FILE_PATH"
     )]
     pub configuration_file_path: Option<String>,
+
+    #[arg(
+        long = "safeTransactionServiceProvider",
+        value_name = "SAFE_TX_SERVICE_PROVIDER",
+        help = "Base URL for safe transaction service",
+        env = "SAFE_TRANSACTION_SERVICE_PROVIDER"
+    )]
+    pub safe_transaction_service_provider : Option<String>,
+
+    #[arg(
+        long = "safeAddress",
+        value_name = "SAFE_ADDR",
+        help = "Address of Safe that safeguards tokens",
+        env = "SAFE_ADDRESS"
+    )]
+    pub safe_address : Option<String>,
+
+    #[arg(
+        long = "moduleAddress",
+        value_name = "MODULE_ADDR",
+        help = "Address of the node mangement module",
+        env = "MODULE_ADDRESS"
+    )]
+    pub module_address : Option<String>,
 }
 
 impl CliArgs {

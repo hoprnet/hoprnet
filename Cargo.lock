@@ -2503,6 +2503,7 @@ dependencies = [
  "thiserror",
  "utils-log",
  "utils-misc",
+ "utils-types",
  "validator",
  "wasm-bindgen",
  "wasm-opt",
