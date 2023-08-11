@@ -262,6 +262,11 @@ export async function createHoprNode(
       chain: options.network.chain.id,
       provider: options.network.chain.default_provider
     },
+    {
+      safeTransactionServiceProvider: options.safeModule.safeTransactionServiceProvider,
+      safeAddress: options.safeModule.safeAddress,
+      moduleAddress: options.safeModule.moduleAddress
+    },
     automaticChainCreation
   )
 

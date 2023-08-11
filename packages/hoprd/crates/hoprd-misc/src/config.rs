@@ -203,7 +203,7 @@ impl Default for Chain {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct SafeModule {
-    pub safe_transaction_service_provider: String,
+    pub safe_transaction_service_provider: Option<String>,
     pub safe_address: Option<Address>,
     pub module_address: Option<Address>,
 }
@@ -211,7 +211,7 @@ pub struct SafeModule {
 impl Default for SafeModule {
     fn default() -> Self {
         Self {
-            safe_transaction_service_provider: DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER.to_owned(),
+            safe_transaction_service_provider: None,
             safe_address: None,
             module_address: None,
         }
@@ -484,7 +484,7 @@ impl HoprdConfig {
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {
-            cfg.safe_module.safe_transaction_service_provider = x
+            cfg.safe_module.safe_transaction_service_provider = Some(x)
         };
         if let Some(x) = cli_args.safe_address {
             cfg.safe_module.safe_address = Some(Address::from_str(&x).unwrap())
@@ -659,7 +659,7 @@ chain:
   check_unrealized_balance: true
   on_chain_confirmations: 0
 safe_module:
-  safe_transaction_service_provider: null 
+  safe_transaction_service_provider: null
   safe_address: null
   module_address: null
 test:

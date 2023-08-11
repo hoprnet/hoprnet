@@ -67,6 +67,12 @@ export type ChainOptions = {
   network: string
 }
 
+export type SafeModuleOptions = {
+  safeTransactionServiceProvider?: string
+  safeAddress?: string
+  moduleAddress?: string
+}
+
 type ticketRedemtionInChannelOperations = Map<string, Promise<void>>
 
 // Exported from Rust
@@ -110,6 +116,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     publicKey: PublicKey,
     privateKey: Uint8Array,
     options: ChainOptions,
+    safeModuleOptions: SafeModuleOptions,
     automaticChainCreation = true
   ) {
     HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, automaticChainCreation)

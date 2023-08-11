@@ -228,6 +228,14 @@ export type HoprOptions = {
     // When using mocked libp2p instances
     mockedNetwork?: Libp2pEmitter<any>
   }
+  safeModule: {
+    // Base URL to interact with safe transaction service
+    safeTransactionServiceProvider: string,
+    // Address of node's safe proxy instance
+    safeAddress?: string,
+    // Address of node's safe-module proxy instance
+    moduleAddress?: string
+  }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
