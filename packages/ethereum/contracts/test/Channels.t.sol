@@ -3,7 +3,7 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC1820RegistryFixtureTest} from "./utils/ERC1820Registry.sol";
-import {HoprChannels} from "../src/Channels.sol";
+import {HoprChannels, HoprChannelsEvents} from "../src/Channels.sol";
 import {CryptoUtils} from "./utils/Crypto.sol";
 import {HoprMultiSig} from "../src/MultiSig.sol";
 import {ERC777} from "openzeppelin-contracts/token/ERC777/ERC777.sol";
@@ -59,16 +59,7 @@ contract MyHoprChannels is HoprChannels {
     {}
 }
 
-contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils {
-    // Copied from HoprChannels contract
-    event ChannelOpened(address indexed source, address indexed destination, HoprChannels.Balance amount);
-    event ChannelBalanceIncreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
-    event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
-    event CommitmentSet(bytes32 indexed channelId, HoprChannels.ChannelEpoch epoch);
-    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureInitiationTime);
-    event ChannelClosed(bytes32 indexed channelId);
-    event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTicketIndex);
-
+contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, HoprChannelsEvents {
     HoprChannels.Timestamp constant closureNoticePeriod = HoprChannels.Timestamp.wrap(15);
 
     bytes32 constant PROOF_OF_RELAY_SECRET_0 = keccak256(abi.encodePacked("PROOF_OF_RELAY_SECRET_0"));

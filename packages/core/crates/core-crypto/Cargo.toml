@@ -20,7 +20,7 @@ ctr = "0.9"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 curve25519-dalek = { version = "4.0.0-rc.2", features = ["serde", "rand_core"] }
 digest = "0.10"
-ed25519-dalek = "1.0.1"
+ed25519-dalek = { version = "1.0.1", features = ["serde"] } 
 elliptic-curve = { version = "0.13", features = ["serde"] }
 futures = "0.3.28"
 generic-array = "0.14.7"
@@ -40,6 +40,7 @@ typenum = "1.16"
 thiserror = "1.0"
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
+zeroize = { version = "1.6", features = ["zeroize_derive"] }
 
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }

@@ -16,7 +16,8 @@ import {
   type DeferType,
   PublicKey,
   AccountEntry,
-  create_counter
+  create_counter,
+  OffchainPublicKey
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -499,7 +500,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return this.chain.initiateChannelClosure(dest, (txHash: string) =>
+    return this.chain.initiateOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
@@ -521,7 +522,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(dest, (txHash: string) =>
+    return await this.chain.finalizeOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
@@ -599,7 +600,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         connectorLogger('getAccount method was called')
         return Promise.resolve(
           new AccountEntry(
-            PublicKey.from_peerid_str(peer.toString()),
+            OffchainPublicKey.from_peerid_str(peer.toString()),
+            Address.from_string(""),  // FIXME: update dummy
             `/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`,
             1
           )
@@ -627,7 +629,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 }
 
-export { useFixtures } from './indexer/index.mock.js'
+// export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
 export { ChannelEntry, ChannelCommitmentInfo, Indexer, ChainWrapper, createChainWrapper }

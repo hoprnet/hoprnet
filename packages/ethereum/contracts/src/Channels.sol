@@ -18,6 +18,51 @@ uint256 constant ONE_HOUR = 60 * 60 * 1000; // in milliseconds
 
 uint256 constant INDEX_SNAPSHOT_INTERVAL = ONE_HOUR;
 
+abstract contract HoprChannelsEvents {
+    /**
+     * Emitted once a channel is opened.
+     *
+     * Includes source and destination separately because mapping
+     * (source, destination) -> channelId destroys information.
+     */
+    event ChannelOpened(address indexed source, address indexed destination, HoprChannels.Balance amount);
+
+    /**
+     * Emitted once balance of a channel is increased, e.g. after opening a
+     * channel or redeeming a ticket.
+     */
+    event ChannelBalanceIncreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
+
+    /**
+     * Emitted once balance of a channel is decreased, e.g. when redeeming
+     * a ticket or closing a channel.
+     */
+    event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
+
+    /**
+     * Emitted once a commitment has been set for a channel. Includes
+     * the current epoch since this value is necessary for issuing tickets.
+     */
+    event CommitmentSet(bytes32 indexed channelId, HoprChannels.ChannelEpoch epoch);
+
+    /**
+     * Emitted once a party initiates the closure of an outgoing
+     * channel. Includes the timestamp when the notice period is due.
+     */
+    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureInitiationTime);
+
+    /**
+     * Emitted once a channel closure is finalized.
+     */
+    event ChannelClosed(bytes32 indexed channelId);
+
+    /**
+     * Emitted once a ticket is redeemed. Includes latest ticketIndex
+     * since this value is necessary for issuing and validating tickets.
+     */
+    event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTicketIndex);
+}
+
 /**
  *    &&&&
  *    &&&&
@@ -42,7 +87,8 @@ contract HoprChannels is
     Multicall,
     HoprLedger(INDEX_SNAPSHOT_INTERVAL),
     HoprMultiSig,
-    HoprCrypto
+    HoprCrypto,
+    HoprChannelsEvents
 {
     // required by ERC1820 spec
     IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
@@ -93,9 +139,9 @@ contract HoprChannels is
      * @dev Channel state machine
      *                                  redeemTicket()
      *                                     ┌──────┐
-     * finalizeChannelClosure()            v      │
+     * finalizeOutgoingChannelClosure()            v      │
      *  (after notice period), or  ┌──────────────────────┐
-     *  closeIncomingChannel()     │                      │ initiateChannelClosure()
+     *  closeIncomingChannel()     │                      │ initiateOutgoingChannelClosure()
      *            ┌────────────────│   Pending To Close   │<─────────────────┐
      *            │                │                      │                  │
      *            │                └──────────────────────┘                  │
@@ -184,49 +230,6 @@ contract HoprChannels is
      * Notice period before fund from an outgoing channel can be pulled out.
      */
     Timestamp public immutable noticePeriodChannelClosure; // in seconds
-
-    /**
-     * Emitted once a channel is opened.
-     *
-     * Includes source and destination separately because mapping
-     * (source, destination) -> channelId destroys information.
-     */
-    event ChannelOpened(address indexed source, address indexed destination, Balance amount);
-
-    /**
-     * Emitted once balance of a channel is increased, e.g. after opening a
-     * channel or redeeming a ticket.
-     */
-    event ChannelBalanceIncreased(bytes32 indexed channelId, Balance newBalance);
-
-    /**
-     * Emitted once balance of a channel is decreased, e.g. when redeeming
-     * a ticket or closing a channel.
-     */
-    event ChannelBalanceDecreased(bytes32 indexed channelId, Balance newBalance);
-
-    /**
-     * Emitted once a commitment has been set for a channel. Includes
-     * the current epoch since this value is necessary for issuing tickets.
-     */
-    event CommitmentSet(bytes32 indexed channelId, ChannelEpoch epoch);
-
-    /**
-     * Emitted once a party initiates the closure of an outgoing
-     * channel. Includes the timestamp when the notice period is due.
-     */
-    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, Timestamp closureInitiationTime);
-
-    /**
-     * Emitted once a channel closure is finalized.
-     */
-    event ChannelClosed(bytes32 indexed channelId);
-
-    /**
-     * Emitted once a ticket is redeemed. Includes latest ticketIndex
-     * since this value is necessary for issuing and validating tickets.
-     */
-    event TicketRedeemed(bytes32 indexed channelId, TicketIndex newTicketIndex);
 
     /**
      * @param _token HoprToken address

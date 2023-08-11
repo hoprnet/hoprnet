@@ -80,7 +80,7 @@ export async function createChainWrapper(
   txTimeout = constants.TX_CONFIRMATION_WAIT
 ) {
   log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`)
-  const provider = networkInfo.provider.startsWith('http')
+const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
   log(`[DEBUG] provider ${provider}`)
@@ -429,36 +429,38 @@ export async function createChainWrapper(
   }
 
   /**
+   * FIXME: annouce is in a separate contract
    * Initiates a transaction that announces nodes on-chain.
    * @param multiaddr the address to be announced
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+  const announce = async (multiaddr: Multiaddr, _txHandler: (tx: string) => DeferType<string>): Promise<string> => {
     log('Announcing on-chain with %s', multiaddr.toString())
-    let sendResult: SendTransactionReturn
-    let error: unknown
-    try {
-      const confirmationEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        channels,
-        'announce',
-        publicKey.to_hex(false),
-        multiaddr.bytes
-      )
-      sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
-    } catch (err) {
-      error = err
-    }
+    // let sendResult: SendTransactionReturn
+    // let error: unknown
+    // try {
+    //   const confirmationEssentialTxPayload = buildEssentialTxPayload(
+    //     0,
+    //     channels,
+    //     'announce',
+    //     publicKey.to_hex(false),
+    //     multiaddr.bytes
+    //   )
+    //   sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
+    // } catch (err) {
+    //   error = err
+    // }
 
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending announce transaction because transaction is a duplicate`)
-      default:
-        throw new Error(`Failed in sending announce transaction due to ${error}`)
-    }
+    // switch (sendResult.code) {
+    //   case SendTransactionStatus.SUCCESS:
+    //     return sendResult.tx.hash
+    //   case SendTransactionStatus.DUPLICATE:
+    //     throw new Error(`Failed in sending announce transaction because transaction is a duplicate`)
+    //   default:
+    //     throw new Error(`Failed in sending announce transaction due to ${error}`)
+    // }
+    return new Promise(() => "");
   }
 
   /**
@@ -563,7 +565,7 @@ export async function createChainWrapper(
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const initiateChannelClosure = async (
+  const initiateOutgoingChannelClosure = async (
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
@@ -572,13 +574,13 @@ export async function createChainWrapper(
     let error: unknown
 
     try {
-      const initiateChannelClosureEssentialTxPayload = buildEssentialTxPayload(
+      const initiateOutgoingChannelClosureEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
-        'initiateChannelClosure',
+        'initiateOutgoingChannelClosure',
         counterparty.to_hex()
       )
-      sendResult = await sendTransaction(checkDuplicate, initiateChannelClosureEssentialTxPayload, txHandler)
+      sendResult = await sendTransaction(checkDuplicate, initiateOutgoingChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
       error
     }
@@ -587,9 +589,9 @@ export async function createChainWrapper(
       case SendTransactionStatus.SUCCESS:
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending initiateChannelClosure transaction because transaction is a duplicate`)
+        throw new Error(`Failed in sending initiateOutgoingChannelClosure transaction because transaction is a duplicate`)
       default:
-        throw new Error(`Failed in sending initiateChannelClosure transaction due to ${error}`)
+        throw new Error(`Failed in sending initiateOutgoingChannelClosure transaction due to ${error}`)
     }
 
     // TODO: catch race-condition
@@ -602,7 +604,7 @@ export async function createChainWrapper(
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const finalizeChannelClosure = async (
+  const finalizeOutgoingChannelClosure = async (
     counterparty: Address,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
@@ -611,13 +613,13 @@ export async function createChainWrapper(
     let error: unknown
 
     try {
-      const finalizeChannelClosureEssentialTxPayload = buildEssentialTxPayload(
+      const finalizeOutgoingChannelClosureEssentialTxPayload = buildEssentialTxPayload(
         0,
         channels,
-        'finalizeChannelClosure',
+        'finalizeOutgoingChannelClosure',
         counterparty.to_hex()
       )
-      sendResult = await sendTransaction(checkDuplicate, finalizeChannelClosureEssentialTxPayload, txHandler)
+      sendResult = await sendTransaction(checkDuplicate, finalizeOutgoingChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
     }
@@ -626,9 +628,9 @@ export async function createChainWrapper(
       case SendTransactionStatus.SUCCESS:
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending finalizeChannelClosure transaction because transaction is a duplicate`)
+        throw new Error(`Failed in sending finalizeOutgoingChannelClosure transaction because transaction is a duplicate`)
       default:
-        throw new Error(`Failed in sending finalizeChannelClosure transaction due to ${error}`)
+        throw new Error(`Failed in sending finalizeOutgoingChannelClosure transaction due to ${error}`)
     }
     // TODO: catch race-condition
   }
@@ -656,14 +658,21 @@ export async function createChainWrapper(
         0,
         channels,
         'redeemTicket',
-        counterparty.to_hex(),
-        ackTicket.pre_image.to_hex(),
-        ackTicket.ticket.epoch.to_hex(),
-        ackTicket.ticket.index.to_hex(),
-        ackTicket.response.to_hex(),
-        ackTicket.ticket.amount.to_string(),
-        ackTicket.ticket.win_prob.to_string(),
-        ackTicket.ticket.signature.to_hex()
+        {
+          data: {
+            channelId: counterparty.to_hex(), // FIXME: build channelId with self and counterparty
+            amount: ackTicket.ticket.amount.to_string(),
+            ticketIndex: ackTicket.ticket.index.to_hex(),
+            indexOffset: 0, // FIXME:
+            epoch: ackTicket.ticket.epoch.to_hex(),
+            winProb: ackTicket.ticket.win_prob.to_string()
+          },
+          signature: {
+            r: ackTicket.ticket.signature.to_hex(), // FIXME: get v value
+            vs: ackTicket.ticket.signature.to_hex() // FIXME: get rs value
+          },
+          porSecret: ackTicket.response.to_hex() // FIXME: use POR secret
+        }
       )
       sendResult = await sendTransaction(checkDuplicate, redeemTicketEssentialTxPayload, txHandler)
     } catch (err) {
@@ -686,6 +695,7 @@ export async function createChainWrapper(
   }
 
   /**
+   * FIXME: remove this
    * Initiates a transaction that sets a commitment
    * @param counterparty second participant of the payment channel
    * @param commitment value to deposit on-chain
@@ -695,33 +705,34 @@ export async function createChainWrapper(
   const setCommitment = async (
     counterparty: Address,
     commitment: Hash,
-    txHandler: (tx: string) => DeferType<string>
+    _txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
     log('Setting commitment %s in channel to %s', commitment.to_hex(), counterparty.to_hex())
-    let sendResult: SendTransactionReturn
-    let error: unknown
+    // let sendResult: SendTransactionReturn
+    // let error: unknown
 
-    try {
-      const setCommitmentEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        channels,
-        'bumpChannel',
-        counterparty.to_hex(),
-        commitment.to_hex()
-      )
-      sendResult = await sendTransaction(checkDuplicate, setCommitmentEssentialTxPayload, txHandler)
-    } catch (err) {
-      error = err
-    }
+    // try {
+    //   const setCommitmentEssentialTxPayload = buildEssentialTxPayload(
+    //     0,
+    //     channels,
+    //     'bumpChannel',
+    //     counterparty.to_hex(),
+    //     commitment.to_hex()
+    //   )
+    //   sendResult = await sendTransaction(checkDuplicate, setCommitmentEssentialTxPayload, txHandler)
+    // } catch (err) {
+    //   error = err
+    // }
 
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending commitment transaction because transaction is a duplicate`)
-      default:
-        throw new Error(`Failed in sending commitment transaction due to ${error}`)
-    }
+    // switch (sendResult.code) {
+    //   case SendTransactionStatus.SUCCESS:
+    //     return sendResult.tx.hash
+    //   case SendTransactionStatus.DUPLICATE:
+    //     throw new Error(`Failed in sending commitment transaction because transaction is a duplicate`)
+    //   default:
+    //     throw new Error(`Failed in sending commitment transaction due to ${error}`)
+    // }
+    return new Promise(() => "");
   }
 
   /**
@@ -837,8 +848,8 @@ export async function createChainWrapper(
     announce,
     withdraw,
     fundChannel,
-    finalizeChannelClosure,
-    initiateChannelClosure,
+    finalizeOutgoingChannelClosure,
+    initiateOutgoingChannelClosure,
     redeemTicket,
     getGenesisBlock: () => genesisBlock,
     setCommitment,

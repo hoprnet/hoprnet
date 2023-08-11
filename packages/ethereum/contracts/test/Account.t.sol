@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import "./utils/Accounts.sol";
-import "forge-std/Test.sol";
+import {AccountsFixtureTest} from "./utils/Accounts.sol";
+import {Test} from "forge-std/Test.sol";
 
 contract AccountTest is Test, AccountsFixtureTest {
     function setUp() public {}
