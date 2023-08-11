@@ -6,7 +6,7 @@ use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
     Aes128,
 };
-use core_crypto::types::{OffchainPublicKey, PublicKey};
+use core_crypto::{types::{PublicKey, OffchainPublicKey}, keypairs::{Keypair, OffchainKeypair}};
 use getrandom::getrandom;
 use hex;
 use scrypt::{scrypt, Params as ScryptParams};
@@ -90,7 +90,7 @@ impl IdentityOptions {
 }
 
 pub struct HoprKeys {
-    pub packet_key: (PacketKey, OffchainPublicKey),
+    pub packet_key: OffchainKeypair,
     pub chain_key: (ChainKey, PublicKey),
     pub id: Uuid,
 }
@@ -102,7 +102,7 @@ impl Serialize for HoprKeys {
         S: Serializer,
     {
         let mut s = serializer.serialize_struct("HoprKeys", 3)?;
-        s.serialize_field("packet_key", self.packet_key.1.to_peerid_str().as_str())?;
+        s.serialize_field("packet_key", self.packet_key.public().to_peerid_str().as_str())?;
         s.serialize_field("chain_key", &self.chain_key.1.to_peerid_str().as_str())?;
         s.serialize_field("uuid", &self.id)?;
         s.end()
@@ -114,7 +114,7 @@ impl std::fmt::Display for HoprKeys {
         f.write_str(
             format!(
                 "packet_key: {}, chain_key: {} (Ethereum address: {})\nUUID: {}",
-                self.packet_key.1.to_peerid_str(),
+                self.packet_key.public().to_peerid_str(),
                 self.chain_key.1.to_peerid_str(),
                 self.chain_key.1.to_address(),
                 self.id.to_string()
@@ -200,7 +200,7 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
     /// ```
     fn try_from(value: ([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])) -> std::result::Result<Self, Self::Error> {
         Ok(HoprKeys {
-            packet_key: (value.0, OffchainPublicKey::from_privkey(&value.0[..])?),
+            packet_key: OffchainKeypair::from_secret(&value.0[..])?,
             chain_key: (value.1, PublicKey::from_privkey(&value.1[..])?),
             id: Uuid::new_v4(),
         })
@@ -209,14 +209,14 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
 
 impl PartialEq for HoprKeys {
     fn eq(&self, other: &Self) -> bool {
-        self.packet_key.eq(&other.packet_key) && self.chain_key.eq(&other.chain_key)
+        self.packet_key.public().eq(&other.packet_key.public()) && self.chain_key.eq(&other.chain_key)
     }
 }
 
 impl HoprKeys {
     pub fn new() -> Self {
         Self {
-            packet_key: OffchainPublicKey::random_keypair(),
+            packet_key: OffchainKeypair::random(),
             chain_key: PublicKey::random_keypair(),
             id: Uuid::new_v4(),
         }
@@ -346,7 +346,7 @@ impl HoprKeys {
 
                 Ok((
                     HoprKeys {
-                        packet_key: (packet_key, OffchainPublicKey::from_privkey(&packet_key[..]).unwrap()),
+                        packet_key: OffchainKeypair::from_secret(&packet_key[..]).unwrap(),
                         chain_key: (chain_key, PublicKey::from_privkey(&chain_key[..]).unwrap()),
                         id: keystore.id,
                     },
@@ -380,7 +380,7 @@ impl HoprKeys {
 
                 Ok((
                     HoprKeys {
-                        packet_key: (packet_key, OffchainPublicKey::from_privkey(&packet_key[..]).unwrap()),
+                        packet_key: OffchainKeypair::from_secret(&packet_key[..]).unwrap(),
                         // TODO: change this to off-chain privKey
                         chain_key: (chain_key, PublicKey::from_privkey(&chain_key[..]).unwrap()),
                         id: keystore.id,
@@ -427,7 +427,7 @@ impl HoprKeys {
 
         let private_keys = PrivateKeys {
             chain_key: self.chain_key.0.into(),
-            packet_key: self.packet_key.0.into(),
+            packet_key: self.packet_key.secret().as_ref().to_vec(),
             version: VERSION,
         };
 
@@ -468,7 +468,7 @@ impl Debug for HoprKeys {
         f.debug_struct("HoprKeys")
             .field(
                 "packet_key",
-                &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.packet_key.1.to_hex()),
+                &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.packet_key.public().to_hex()),
             )
             .field(
                 "chain_key",
@@ -481,8 +481,9 @@ impl Debug for HoprKeys {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::IdentityOptions;
+    use core_crypto::keypairs::Keypair;
     use js_sys::{Promise, Uint8Array};
-    use utils_types::traits::PeerIdLike;
+    use utils_types::traits::{PeerIdLike, BinarySerializable};
     use wasm_bindgen::prelude::*;
 
     const SECP256K1_PEERID_LENGTH: usize = 37;
@@ -520,8 +521,8 @@ pub mod wasm {
         #[wasm_bindgen(getter, js_name = "packetKeyPeerId")]
         pub fn get_packet_key_peer_id(&self) -> Promise {
             let mut sliced = [0u8; ED25519_PEERID_LENGTH];
-            sliced.copy_from_slice(&self.w.packet_key.1.to_peerid().to_bytes()[2..]);
-            peer_id_from_keys(Box::new(sliced), Box::new(self.w.packet_key.0))
+            sliced.copy_from_slice(&self.w.packet_key.public().to_peerid().to_bytes()[2..]);
+            peer_id_from_keys(Box::new(sliced), self.w.packet_key.public().to_bytes())
         }
 
         #[wasm_bindgen(getter, js_name = "chainKeyPeerId")]
