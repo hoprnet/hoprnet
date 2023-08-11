@@ -54,8 +54,6 @@ pub struct ChannelEntry {
     pub source: Address,
     pub destination: Address,
     pub balance: Balance,
-    pub commitment: Hash,
-    pub ticket_epoch: U256,
     pub ticket_index: U256,
     pub status: ChannelStatus,
     pub channel_epoch: U256,
@@ -69,8 +67,6 @@ impl ChannelEntry {
         source: Address,
         destination: Address,
         balance: Balance,
-        commitment: Hash,
-        ticket_epoch: U256,
         ticket_index: U256,
         status: ChannelStatus,
         channel_epoch: U256,
@@ -81,8 +77,6 @@ impl ChannelEntry {
             source,
             destination,
             balance,
-            commitment,
-            ticket_epoch,
             ticket_index,
             status,
             channel_epoch,
@@ -126,8 +120,6 @@ impl std::fmt::Display for ChannelEntry {
             .field("source", &self.source.to_string())
             .field("destination", &self.destination.to_string())
             .field("balance", &format!("{}", self.balance))
-            .field("commitment", &self.commitment.to_string())
-            .field("ticket_epoch", &self.ticket_epoch.to_string())
             .field("ticket_index", &self.ticket_index.to_string())
             .field("status", &self.status.to_string())
             .field("channel_epoch", &self.channel_epoch.to_string())
@@ -137,15 +129,7 @@ impl std::fmt::Display for ChannelEntry {
 }
 
 impl BinarySerializable for ChannelEntry {
-    const SIZE: usize = Address::SIZE
-        + Address::SIZE
-        + Balance::SIZE
-        + Hash::SIZE
-        + U256::SIZE
-        + U256::SIZE
-        + 1
-        + U256::SIZE
-        + U256::SIZE;
+    const SIZE: usize = Address::SIZE + Address::SIZE + Balance::SIZE + U256::SIZE + 1 + U256::SIZE + U256::SIZE;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
@@ -153,8 +137,6 @@ impl BinarySerializable for ChannelEntry {
             let source = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
             let destination = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
             let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
-            let commitment = Hash::from_bytes(b.drain(0..Hash::SIZE).as_ref())?;
-            let ticket_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let ticket_index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let status = ChannelStatus::from_byte(b.drain(0..1).as_ref()[0]).ok_or(ParseError)?;
             let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
@@ -163,8 +145,6 @@ impl BinarySerializable for ChannelEntry {
                 source,
                 destination,
                 balance,
-                commitment,
-                ticket_epoch,
                 ticket_index,
                 status,
                 channel_epoch,
@@ -180,8 +160,6 @@ impl BinarySerializable for ChannelEntry {
         ret.extend_from_slice(self.source.to_bytes().as_ref());
         ret.extend_from_slice(self.destination.to_bytes().as_ref());
         ret.extend_from_slice(self.balance.serialize_value().as_ref());
-        ret.extend_from_slice(self.commitment.to_bytes().as_ref());
-        ret.extend_from_slice(self.ticket_epoch.to_bytes().as_ref());
         ret.extend_from_slice(self.ticket_index.to_bytes().as_ref());
         ret.push(self.status as u8);
         ret.extend_from_slice(self.channel_epoch.to_bytes().as_ref());
@@ -201,7 +179,6 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 pub struct Ticket {
     pub counterparty: Address,
     pub challenge: EthereumChallenge,
-    pub epoch: U256,
     pub index: U256,
     pub amount: Balance,
     pub win_prob: U256,
@@ -214,7 +191,6 @@ impl Default for Ticket {
         Self {
             counterparty: Address::default(),
             challenge: EthereumChallenge::default(),
-            epoch: U256::zero(),
             index: U256::zero(),
             amount: Balance::new(U256::zero(), BalanceType::HOPR),
             win_prob: U256::max(),
@@ -229,7 +205,6 @@ impl std::fmt::Display for Ticket {
         f.debug_struct("Ticket")
             .field("counterparty", &self.counterparty)
             .field("challenge", &self.challenge)
-            .field("epoch", &self.epoch)
             .field("index", &self.index)
             .field("amount", &self.amount)
             .field("channel_epoch", &self.channel_epoch)
@@ -260,7 +235,6 @@ impl Ticket {
     fn serialize_unsigned_aux(
         counterparty: &Address,
         challenge: &EthereumChallenge,
-        epoch: &U256,
         amount: &Balance,
         win_prob: &U256,
         index: &U256,
@@ -270,7 +244,6 @@ impl Ticket {
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
         ret.extend_from_slice(&counterparty.to_bytes());
         ret.extend_from_slice(&challenge.to_bytes());
-        ret.extend_from_slice(&epoch.to_bytes());
         ret.extend_from_slice(&amount.serialize_value());
         ret.extend_from_slice(&win_prob.to_bytes());
         ret.extend_from_slice(&index.to_bytes());
@@ -281,7 +254,6 @@ impl Ticket {
     /// Creates a new Ticket given the raw Challenge and signs it using the given key.
     pub fn new(
         counterparty: Address,
-        epoch: U256,
         index: U256,
         amount: Balance,
         win_prob: U256,
@@ -291,7 +263,6 @@ impl Ticket {
         let mut ret = Self {
             counterparty,
             challenge: EthereumChallenge::default(),
-            epoch,
             index,
             amount,
             win_prob,
@@ -317,7 +288,6 @@ impl Ticket {
         Self::new(
             destination,
             U256::zero(),
-            U256::zero(),
             Balance::new(0u32.into(), BalanceType::HOPR),
             U256::zero(),
             U256::zero(),
@@ -330,7 +300,6 @@ impl Ticket {
         Self::serialize_unsigned_aux(
             &self.counterparty,
             &self.challenge,
-            &self.epoch,
             &self.amount,
             &self.win_prob,
             &self.index,
@@ -375,14 +344,13 @@ impl Ticket {
 
 impl BinarySerializable for Ticket {
     const SIZE: usize =
-        Address::SIZE + EthereumChallenge::SIZE + 2 * U256::SIZE + Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
+        Address::SIZE + EthereumChallenge::SIZE + U256::SIZE + Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = data.to_vec();
             let counterparty = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
             let challenge = EthereumChallenge::from_bytes(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
-            let epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let amount = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
             let win_prob = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
@@ -392,7 +360,6 @@ impl BinarySerializable for Ticket {
             Ok(Self {
                 counterparty,
                 challenge,
-                epoch,
                 index,
                 amount,
                 win_prob,
@@ -445,7 +412,6 @@ pub mod tests {
 
     const ADDRESS_1: [u8; 20] = hex!("3829b806aea42200c623c4d6b9311670577480ed");
     const ADDRESS_2: [u8; 20] = hex!("1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1");
-    const COMMITMENT: [u8; 32] = hex!("ffab46f058090de082a086ea87c535d34525a48871c5a2024f80d0ac850f81ef");
 
     const SGN_PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
 
@@ -464,9 +430,7 @@ pub mod tests {
             Address::from_bytes(&ADDRESS_1).unwrap(),
             Address::from_bytes(&ADDRESS_2).unwrap(),
             Balance::new(u256::from(10u8).into(), BalanceType::HOPR),
-            Hash::new(&COMMITMENT),
             U256::new("0"),
-            U256::new("1"),
             ChannelStatus::PendingToClose,
             U256::new("3"),
             U256::new("4"),
@@ -494,7 +458,6 @@ pub mod tests {
         let ticket1 = Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
             U256::new("1"),
-            U256::new("2"),
             Balance::new(
                 (inverse_win_prob * price_per_packet * path_pos as u128).into(),
                 BalanceType::HOPR,
@@ -595,7 +558,6 @@ pub mod wasm {
         pub fn _new(
             counterparty: Address,
             challenge: EthereumChallenge,
-            epoch: U256,
             index: U256,
             amount: Balance,
             win_prob: U256,
@@ -605,7 +567,6 @@ pub mod wasm {
             Ticket {
                 counterparty,
                 challenge,
-                epoch,
                 index,
                 amount,
                 win_prob,

@@ -1,9 +1,6 @@
-use crate::{
-    commitment::{bump_commitment, find_commitment_preimage},
-    errors::{
-        CoreEthereumError::{InvalidResponseToAcknowledgement, NotAWinningTicket},
-        Result,
-    },
+use crate::errors::{
+    CoreEthereumError::{InvalidResponseToAcknowledgement, NotAWinningTicket},
+    Result,
 };
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -24,9 +21,9 @@ where
         .verify(counterparty)
         .map_err(|e| InvalidResponseToAcknowledgement(e.to_string()))?;
 
-    let pre_image = find_commitment_preimage(db, channel_id).await?;
-
-    acked_ticket.set_preimage(&pre_image);
+    todo!("Rewrite acked ticket");
+    let pre_image = Hash::default();
+    acked_ticket.set_preimage(&Hash::default());
     debug!(
         "Set preImage {pre_image} for ticket {} in channel to {counterparty}",
         acked_ticket.response
@@ -56,9 +53,6 @@ pub async fn after_redeem_ticket<T>(
 where
     T: HoprCoreEthereumDbActions,
 {
-    // bump commitment when on-chain ticket redemption is successful
-    // FIXME: bump commitment can fail if channel runs out of commitments
-    bump_commitment(db, channel_id, &pre_image).await?;
     debug!("Successfully bumped local commitment after {pre_image} for channel {channel_id}");
 
     db.mark_redeemed(&acked_ticket).await?;

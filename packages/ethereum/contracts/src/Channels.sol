@@ -43,7 +43,7 @@ abstract contract HoprChannelsEvents {
      * Emitted once a party initiates the closure of an outgoing
      * channel. Includes the timestamp when the notice period is due.
      */
-    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureInitiationTime);
+    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureTime);
 
     /**
      * Emitted once a channel closure is finalized.

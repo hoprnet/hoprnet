@@ -452,7 +452,6 @@ where
 
         let ticket = Ticket::new(
             destination,
-            channel.ticket_epoch,
             current_index,
             amount,
             U256::from_inverse_probability(U256::new(INVERSE_TICKET_WIN_PROB))?,

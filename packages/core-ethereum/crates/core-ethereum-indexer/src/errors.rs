@@ -30,6 +30,9 @@ pub enum CoreEthereumIndexerError {
     #[error("Could not verify account entry signature. Maybe a cross-signing issue?")]
     AccountEntrySignatureVerification,
 
+    #[error("Received an event for a channel that is closed or for which we haven't seen an OPEN even.")]
+    ChannelDoesNotExist,
+
     #[error(transparent)]
     MultiaddrParseError(#[from] MultiaddrError),
 }

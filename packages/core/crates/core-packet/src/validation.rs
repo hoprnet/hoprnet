@@ -47,16 +47,6 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
         )));
     }
 
-    // ticket's epoch MUST match our channel's epoch
-    if !ticket.epoch.eq(&channel.ticket_epoch) {
-        return Err(TicketValidation(format!(
-            "ticket epoch {} does not match our account epoch {} of channel {}",
-            ticket.epoch,
-            channel.ticket_epoch,
-            channel.get_id()
-        )));
-    }
-
     // ticket's channelEpoch MUST match the current channel's epoch
     if !ticket.channel_epoch.eq(&channel.channel_epoch) {
         return Err(TicketValidation(format!(
@@ -74,7 +64,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
             .get_tickets(Some(sender.clone()))
             .await? // all tickets from sender
             .into_iter()
-            .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
+            .filter(|t| t.channel_epoch.eq(&channel.channel_epoch))
             .fold(Some(channel.balance), |result, t| {
                 result
                     .and_then(|b| b.value().value().checked_sub(t.amount.value().value().clone()))
