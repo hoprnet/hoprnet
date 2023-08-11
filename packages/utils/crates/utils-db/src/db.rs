@@ -201,7 +201,7 @@ mod tests {
         v: u8,
     }
 
-    impl BinarySerializable<'_> for TestKey {
+    impl BinarySerializable for TestKey {
         const SIZE: usize = 1;
 
         /// Deserializes the type from a binary blob.
