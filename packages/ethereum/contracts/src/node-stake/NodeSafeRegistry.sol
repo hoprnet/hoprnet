@@ -91,9 +91,14 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     }
 
     /**
-     * @dev checks whether a NodeSafe combination has been registered before.
+     * @dev checks whether a NodeSafe combination is registered
      */
     function isNodeSafeRegistered(NodeSafe memory nodeSafe) external view returns (bool) {
+        // node is not registered to any safe
+        if (nodeToSafe[nodeSafe.nodeChainKeyAddress] == address(0)) {
+            return false;
+        }
+
         return nodeToSafe[nodeSafe.nodeChainKeyAddress] == nodeSafe.safeAddress;
     }
 
