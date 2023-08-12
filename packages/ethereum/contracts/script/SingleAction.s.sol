@@ -166,9 +166,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
       emit log_string(
         string(
           abi.encodePacked(
-            "--safe-address ", 
+            "--safeAddress ", 
             vm.toString(safe), 
-            " --module-address ", 
+            " --moduleAddress ", 
             vm.toString(module)
           )
         )
