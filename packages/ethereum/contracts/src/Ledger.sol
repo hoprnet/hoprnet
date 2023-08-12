@@ -94,6 +94,7 @@ abstract contract HoprLedger {
 
         if (createSnapshot) {
             latestSnapshotRoot = latestRoot;
+            latestRoot.timestamp = uint32(block.timestamp);
         }
     }
 }
