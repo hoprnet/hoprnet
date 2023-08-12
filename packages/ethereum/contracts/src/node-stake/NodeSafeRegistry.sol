@@ -38,7 +38,7 @@ contract HoprNodeSafeRegistry {
     // Currently deployed version, starting with 1.0.0
     string public constant VERSION = "1.0.0";
 
-    bytes32 public immutable domainSeparator;
+    bytes32 public domainSeparator;
     mapping(address => address) public nodeToSafe;
     // NodeSafe struct type hash.
     // keccak256("NodeSafe(address safeAddress,address nodeChainKeyAddress)");
@@ -52,16 +52,8 @@ contract HoprNodeSafeRegistry {
     event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
 
     constructor() {
-        // following encoding guidelines of EIP712
-        domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("NodeStakeRegistry")),
-                keccak256(bytes(VERSION)),
-                block.chainid,
-                address(this)
-            )
-        );
+        // compute the domain separator on deployment
+        updateDomainSeparator();
     }
 
     /**
@@ -117,6 +109,22 @@ contract HoprNodeSafeRegistry {
      */
     function registerSafeByNode(address safeAddr) external {
         addNodeSafe(NodeSafe({safeAddress: safeAddr, nodeChainKeyAddress: msg.sender}));
+    }
+
+    /**
+     * @dev recompute the domain seperator in case of a fork
+     */
+    function updateDomainSeparator() public {
+        // following encoding guidelines of EIP712
+        domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("NodeStakeRegistry")),
+                keccak256(bytes(VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     /**
