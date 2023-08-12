@@ -50,7 +50,7 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
                     HoprChannels.redeemTicket.selector, keccak256(abi.encode(ticketData, vm.addr(args.porSecret)))
                 )
             );
-            ticketHash = keccak256(abi.encode(bytes1(0x19), bytes1(0x01), dstHash, pre_ticketHash));
+            ticketHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), dstHash, pre_ticketHash));
         }
 
         CompactSignature memory sig;
