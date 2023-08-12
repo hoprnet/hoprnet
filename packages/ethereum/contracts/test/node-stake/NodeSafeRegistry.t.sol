@@ -49,16 +49,44 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         // verify the registration is not known beforehand
         assertFalse(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
 
-        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, nodeSafe);
+        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeSafe.nodeChainKeyAddress);
+        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, nodeSafe, nodeSigNonce);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
-        // vm.prank(nodeAddress);
+
         vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
         emit RegisteredNodeSafe(safeAddress, nodeAddress);
         nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
 
         // verify the registration worked
         assertTrue(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev signature cannot be re-used
+     */
+    function testRevert_RegisterSafeWithNodeSigNonceReused(uint256 nodePrivateKey, address safeAddress) public {
+        nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
+        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+
+        HoprNodeSafeRegistry.NodeSafe memory nodeSafe =
+            HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
+
+        // verify the registration is not known beforehand
+        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+
+        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeSafe.nodeChainKeyAddress);
+        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, nodeSafe, nodeSigNonce);
+
+        _helperMockSafe(safeAddress, nodeAddress, true, true);
+
+        nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
+
+        // fail to re-use the signature
+        vm.expectRevert(NotValidSignatureFromNode.selector);
+        nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
 
         vm.clearMockedCalls();
     }
@@ -227,11 +255,16 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     /**
      * @dev Build a registration signature for node
      */
-    function _helperBuildSig(uint256 mockNodePrivateKey, HoprNodeSafeRegistry.NodeSafe memory nodeSafe)
+    function _helperBuildSig(uint256 mockNodePrivateKey, HoprNodeSafeRegistry.NodeSafe memory nodeSafe, uint256 nonce)
         private
         returns (address, bytes memory)
     {
-        bytes32 hashStruct = keccak256(abi.encode(nodeSafeRegistry.NODE_SAFE_TYPEHASH(), nodeSafe));
+        HoprNodeSafeRegistry.NodeSafeNonce memory nodeSafeNonce = HoprNodeSafeRegistry.NodeSafeNonce({
+            safeAddress: nodeSafe.safeAddress,
+            nodeChainKeyAddress: nodeSafe.nodeChainKeyAddress,
+            nodeSigNonce: nonce
+        });
+        bytes32 hashStruct = keccak256(abi.encode(nodeSafeRegistry.NODE_SAFE_TYPEHASH(), nodeSafeNonce));
         // build typed digest
         bytes32 registerHash =
             keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), nodeSafeRegistry.domainSeparator(), hashStruct));
