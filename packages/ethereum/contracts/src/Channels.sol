@@ -127,7 +127,7 @@ contract HoprChannels is
 
     string public constant VERSION = "2.0.0";
 
-    bytes32 public immutable domainSeparator; // depends on chainId
+    bytes32 public domainSeparator; // depends on chainId
 
     /**
      * @dev Channel state machine
@@ -243,15 +243,7 @@ contract HoprChannels is
         noticePeriodChannelClosure = _noticePeriodChannelClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
 
-        domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("HoprChannels")),
-                keccak256(bytes(VERSION)),
-                block.chainid,
-                address(this)
-            )
-        );
+        updateDomainSeparator();
     }
 
     /**
@@ -278,6 +270,22 @@ contract HoprChannels is
             revert BalanceExceedsGlobalPerChannelAllowance();
         }
         _;
+    }
+
+    /**
+     * @dev recompute the domain seperator in case of a fork
+     */
+    function updateDomainSeparator() public {
+        // following encoding guidelines of EIP712
+        domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("HoprChannels")),
+                keccak256(bytes(VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     /**

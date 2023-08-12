@@ -189,6 +189,21 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         vm.clearMockedCalls();
     }
 
+    function testFuzz_DomainSeparator(uint256 newChaidId) public {
+        newChaidId = bound(newChaidId, 1, 1e18);
+        vm.assume(newChaidId != block.chainid);
+        bytes32 domainSeparatorOnDeployment = nodeSafeRegistry.domainSeparator();
+
+        // call updateDomainSeparator when chainid is the same
+        nodeSafeRegistry.updateDomainSeparator();
+        assertEq(nodeSafeRegistry.domainSeparator(), domainSeparatorOnDeployment);
+
+        // call updateDomainSeparator when chainid is different
+        vm.chainId(newChaidId);
+        nodeSafeRegistry.updateDomainSeparator();
+        assertTrue(nodeSafeRegistry.domainSeparator() != domainSeparatorOnDeployment);
+    }
+
     // ================== helper functions ==================
     /**
      * @dev mock return of module

@@ -1571,6 +1571,36 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
+    function testFuzz_DomainSeparator(uint256 newChaidId) public {
+        newChaidId = bound(newChaidId, 1, 1e18);
+        vm.assume(newChaidId != block.chainid);
+        bytes32 domainSeparatorOnDeployment = hoprChannels.domainSeparator();
+
+        // call updateDomainSeparator when chainid is the same
+        hoprChannels.updateDomainSeparator();
+        assertEq(hoprChannels.domainSeparator(), domainSeparatorOnDeployment);
+
+        // call updateDomainSeparator when chainid is different
+        vm.chainId(newChaidId);
+        hoprChannels.updateDomainSeparator();
+        assertTrue(hoprChannels.domainSeparator() != domainSeparatorOnDeployment);
+    }
+
+    function testFuzz_LedgerDomainSeparator(uint256 newChaidId) public {
+        newChaidId = bound(newChaidId, 1, 1e18);
+        vm.assume(newChaidId != block.chainid);
+        bytes32 ledgerDomainSeparatorOnDeployment = hoprChannels.ledgerDomainSeparator();
+
+        // call updateLedgerDomainSeparator when chainid is the same
+        hoprChannels.updateLedgerDomainSeparator();
+        assertEq(hoprChannels.ledgerDomainSeparator(), ledgerDomainSeparatorOnDeployment);
+
+        // call updateLedgerDomainSeparator when chainid is different
+        vm.chainId(newChaidId);
+        hoprChannels.updateLedgerDomainSeparator();
+        assertTrue(hoprChannels.ledgerDomainSeparator() != ledgerDomainSeparatorOnDeployment);
+    }
+
     /**
      * @dev mock a return of safe registered to node
      */
