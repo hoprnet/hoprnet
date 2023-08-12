@@ -90,8 +90,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * nonce is the current nonce of deployer account
      * Default fallback permission for module is to allow all except for node sending xDAI from safe
      * Include a node to the safe module
+     * @param nodeAddresses array of node addresses to be added to the module
      */
-    function expressSetupSafeModule(address nodeAddress) external returns (address safe, address module) {
+    function expressSetupSafeModule(address[] memory nodeAddresses) external returns (address safe, address module) {
       // 1. get environment and msg.sender
       getNetworkAndMsgSender();
 
@@ -143,13 +144,16 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
       for (uint256 i = 0; i < nodeDefaultPermission.length; i++) {
         nodeDefaultPermission[i] = CapabilityPermission.NONE;
       }
-      Target defaultNodeTarget = TargetUtils.encodeDefaultPermissions(
-        nodeAddress,
-        Clearance.FUNCTION,
-        TargetType.SEND,
-        TargetPermission.SPECIFIC_FALLBACK_BLOCK,
-        nodeDefaultPermission
-      );
+      Target[] memory defaultNodeTargets = new Target[](nodeAddresses.length);
+      for (uint256 j = 0; j < nodeAddresses.length; j++) {
+        defaultNodeTargets[j] = TargetUtils.encodeDefaultPermissions(
+          nodeAddresses[j],
+          Clearance.FUNCTION,
+          TargetType.SEND,
+          TargetPermission.SPECIFIC_FALLBACK_BLOCK,
+          nodeDefaultPermission
+        );
+      }
 
       // 3. deploy two proxy instances
       (module, safe) = IFactory(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress).clone(
@@ -171,10 +175,12 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
       );
 
       // 4. include node to the module, as an owner of safe
-      bytes memory includeNodeData =
-        abi.encodeWithSignature("includeNode(uint256)", Target.unwrap(defaultNodeTarget));
-      uint256 safeNonce = ISafe(safe).nonce();
-      _helperSignSafeTxAsOwner(ISafe(safe), module, safeNonce, includeNodeData);
+      for (uint256 k = 0; k < nodeAddresses.length; k++) {
+        bytes memory includeNodeData =
+          abi.encodeWithSignature("includeNode(uint256)", Target.unwrap(defaultNodeTargets[k]));
+        uint256 safeNonce = ISafe(safe).nonce();
+        _helperSignSafeTxAsOwner(ISafe(safe), module, safeNonce, includeNodeData);
+      }
     }
 
     /**
