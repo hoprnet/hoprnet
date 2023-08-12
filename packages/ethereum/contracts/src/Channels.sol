@@ -402,6 +402,10 @@ contract HoprChannels is
         bytes32 outgoingChannelId = _getChannelId(self, source);
         Channel storage earningChannel = channels[outgoingChannelId];
 
+        // Informs about new ticketIndex
+        indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, spendingChannel.ticketIndex));
+        emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
+
         if (earningChannel.status == ChannelStatus.CLOSED) {
             // The other channel does not exist, so we need to transfer funds directly
             if (token.transfer(msg.sender, Balance.unwrap(redeemable.data.amount)) != true) {
@@ -413,10 +417,6 @@ contract HoprChannels is
             indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, outgoingChannelId, earningChannel.balance));
             emit ChannelBalanceIncreased(outgoingChannelId, earningChannel.balance);
         }
-
-        // Informs about new ticketIndex
-        indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, spendingChannel.ticketIndex));
-        emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
     }
 
     /**
@@ -495,22 +495,23 @@ contract HoprChannels is
             revert WrongChannelState({reason: "channel must have state OPEN or PENDING_TO_CLOSE"});
         }
 
+        uint256 balance = Balance.unwrap(channel.balance);
+
         channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
         channel.closureTime = Timestamp.wrap(0);
         channel.ticketIndex = TicketIndex.wrap(0);
+        channel.balance = Balance.wrap(0);
 
         // channel.epoch must be kept
-
-        if (Balance.unwrap(channel.balance) > 0) {
-            if (token.transfer(source, Balance.unwrap(channel.balance)) != true) {
-                revert TokenTransferFailed();
-            }
-        }
 
         indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
         emit ChannelClosed(channelId);
 
-        channel.balance = Balance.wrap(0);
+        if (balance > 0) {
+            if (token.transfer(source, balance) != true) {
+                revert TokenTransferFailed();
+            }
+        }
     }
 
     /**
@@ -549,22 +550,23 @@ contract HoprChannels is
             revert NoticePeriodNotDue();
         }
 
+        uint256 balance = Balance.unwrap(channel.balance);
+
         channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
         channel.closureTime = Timestamp.wrap(0);
         channel.ticketIndex = TicketIndex.wrap(0);
+        channel.balance = Balance.wrap(0);
 
         // channel.epoch must be kept
 
-        if (Balance.unwrap(channel.balance) > 0) {
-            if (token.transfer(msg.sender, Balance.unwrap(channel.balance)) != true) {
+        indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
+        emit ChannelClosed(channelId);
+        
+        if (balance > 0) {
+            if (token.transfer(msg.sender, balance) != true) {
                 revert TokenTransferFailed();
             }
         }
-
-        channel.balance = Balance.wrap(0);
-
-        indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
-        emit ChannelClosed(channelId);
     }
 
     /**
