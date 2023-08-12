@@ -668,16 +668,14 @@ contract HoprChannels is
     function fundChannelSafe(address self, address account, Balance amount)
         external
         HoprMultiSig.onlySafe(self)
-        validateBalance(amount)
-        validateChannelParties(self, account)
     {
+        _fundChannelInternal(self, account, amount);
+
         // pull tokens from Safe and handle result
         if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
             // sth. went wrong, we need to revert here
             revert TokenTransferFailed();
         }
-
-        _fundChannelInternal(self, account, amount);
     }
 
     /**
@@ -688,16 +686,14 @@ contract HoprChannels is
     function fundChannel(address account, Balance amount)
         external
         HoprMultiSig.noSafeSet()
-        validateBalance(amount)
-        validateChannelParties(msg.sender, account)
     {
+        _fundChannelInternal(msg.sender, account, amount);
+
         // pull tokens from funder and handle result
         if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
             // sth. went wrong, we need to revert here
             revert TokenTransferFailed();
         }
-
-        _fundChannelInternal(msg.sender, account, amount);
     }
 
     /**
@@ -708,7 +704,14 @@ contract HoprChannels is
      * @param account destination address
      * @param amount token amount
      */
-    function _fundChannelInternal(address self, address account, Balance amount) internal {
+    function _fundChannelInternal(
+        address self, 
+        address account,
+        Balance amount
+    ) internal 
+        validateBalance(amount)
+        validateChannelParties(self, account)
+    {
         bytes32 channelId = _getChannelId(self, account);
         Channel storage channel = channels[channelId];
 
