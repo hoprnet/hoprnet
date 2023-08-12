@@ -90,7 +90,7 @@ library TargetUtils {
         pure
         returns (CapabilityPermission)
     {
-        if (position > NUM_CAPABILITY_PERMISSIONS) {
+        if (position >= NUM_CAPABILITY_PERMISSIONS) {
             revert TooManyCapabilities();
         }
         // left shift 160 + 8 + 8 + 8 + 8 * pos bits then right shift 256 - 8 bits
