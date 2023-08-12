@@ -561,7 +561,7 @@ contract HoprChannels is
 
         indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
         emit ChannelClosed(channelId);
-        
+
         if (balance > 0) {
             if (token.transfer(msg.sender, balance) != true) {
                 revert TokenTransferFailed();
@@ -769,7 +769,7 @@ contract HoprChannels is
             )
         );
 
-        return keccak256(abi.encode(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
+        return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
     }
 
     /**

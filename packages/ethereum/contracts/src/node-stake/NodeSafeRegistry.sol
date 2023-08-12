@@ -75,7 +75,7 @@ contract HoprNodeSafeRegistry {
         bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe));
 
         // build typed digest
-        bytes32 registerHash = keccak256(abi.encode(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
+        bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
 
         // verify that signatures is from nodeChainKeyAddress. This signature can only be
         (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(registerHash, sig);

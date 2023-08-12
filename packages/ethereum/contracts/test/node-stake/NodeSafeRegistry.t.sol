@@ -225,7 +225,7 @@ contract HoprNodeSafeRegistryTest is Test {
         bytes32 hashStruct = keccak256(abi.encode(nodeSafeRegistry.NODE_SAFE_TYPEHASH(), nodeSafe));
         // build typed digest
         bytes32 registerHash =
-            keccak256(abi.encode(bytes1(0x19), bytes1(0x01), nodeSafeRegistry.domainSeparator(), hashStruct));
+            keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), nodeSafeRegistry.domainSeparator(), hashStruct));
 
         address nodeAddress = vm.addr(mockNodePrivateKey);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(mockNodePrivateKey, registerHash);
