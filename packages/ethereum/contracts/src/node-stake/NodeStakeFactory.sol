@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "openzeppelin-contracts/utils/Address.sol";
-import "../../script/utils/SafeSuiteLib.sol";
+import "../utils/SafeSuiteLib.sol";
 import "safe-contracts/proxies/SafeProxy.sol";
 import "safe-contracts/proxies/SafeProxyFactory.sol";
 import "safe-contracts/Safe.sol";

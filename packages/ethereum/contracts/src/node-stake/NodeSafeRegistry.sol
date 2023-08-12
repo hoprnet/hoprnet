@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
-import "../interfaces/IAvatar.sol";
-import "../interfaces/INodeManagementModule.sol";
+import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import {IAvatar} from "../interfaces/IAvatar.sol";
+import {IHoprNodeManagementModule} from "../interfaces/INodeManagementModule.sol";
 
 // Node already has mapped to Safe
 error NodeHasSafe();
