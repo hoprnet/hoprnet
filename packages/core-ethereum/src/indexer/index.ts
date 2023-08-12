@@ -804,9 +804,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   //     if (channel.destination.eq(this.address)) {
   //       // Channel _to_ us
   //       if (channel.status === ChannelStatus.WaitingForCommitment) {
-  //         log('channel to us waiting for commitment')
-  //         log(channel.to_string())
-  //         this.emit('channel-waiting-for-commitment', channel)
   //       }
   //     }
   //   }

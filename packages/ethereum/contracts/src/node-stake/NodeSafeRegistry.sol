@@ -5,23 +5,10 @@ import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import "../interfaces/IAvatar.sol";
 import "../interfaces/INodeManagementModule.sol";
 
-// Node already has mapped to Safe
-error NodeHasSafe();
-
-// Not a valid Safe address;
-error NotValidSafe();
-
-// Not a valid signature from node;
-error NotValidSignatureFromNode();
-
-// Safe address is zero
-error SafeAddressZero();
-
-// Node address is zero
-error NodeAddressZero();
-
-// Provided address is neither an owner of Safe nor a member of an enabled NodeManagementModule
-error NotSafeOwnerNorNode();
+abstract contract HoprNodeSafeRegistryEvents {
+    event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+}
 
 /**
  * @title Node safe must prove that the Safe is the only authorized controller of
@@ -29,7 +16,25 @@ error NotSafeOwnerNorNode();
  * should be registered upon successful verification
  * This contract is meant to be deployed as a standalone contract
  */
-contract HoprNodeSafeRegistry {
+contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
+    // Node already has mapped to Safe
+    error NodeHasSafe();
+
+    // Not a valid Safe address;
+    error NotValidSafe();
+
+    // Not a valid signature from node;
+    error NotValidSignatureFromNode();
+
+    // Safe address is zero
+    error SafeAddressZero();
+
+    // Node address is zero
+    error NodeAddressZero();
+
+    // Provided address is neither an owner of Safe nor a member of an enabled NodeManagementModule
+    error NotSafeOwnerNorNode();
+
     struct NodeSafe {
         address safeAddress;
         address nodeChainKeyAddress;
@@ -47,9 +52,6 @@ contract HoprNodeSafeRegistry {
     address private constant SENTINEL_MODULES = address(0x1);
     // page size of querying modules
     uint256 private constant pageSize = 100;
-
-    event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
-    event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
 
     constructor() {
         // following encoding guidelines of EIP712

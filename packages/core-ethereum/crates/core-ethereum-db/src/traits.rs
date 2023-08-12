@@ -198,6 +198,15 @@ pub trait HoprCoreEthereumDbActions {
     /// Set address as eligible to be operating in the network.
     async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()>;
 
+    /// Check if account is protected by a MFA module (e.g. Gnosis Safe)
+    /// returns MFA module address
+    async fn is_mfa_protected(&self) -> Result<Option<Address>>;
+
+    /// Marks this account as being protected by a MFA module (e.g. Gnosis Safe) or removes it
+    /// `Some(Address)` -> MFA present
+    /// `None` -> no MFA
+    async fn set_mfa_protected_and_update_snapshot(&mut self, maybe_mfa_address: Option<Address>, snapshot: &Snapshot) -> Result<()>;
+
     /// Stores the REST API token.
     async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;
 

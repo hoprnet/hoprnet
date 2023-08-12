@@ -33,6 +33,9 @@ pub enum CoreEthereumIndexerError {
     #[error("Received an event for a channel that is closed or for which we haven't seen an OPEN even.")]
     ChannelDoesNotExist,
 
+    #[error("Cannot deregister inexistent MFA module")]
+    MFAModuleDoesNotExist,
+
     #[error("Unknown smart contract. Received event from {0}")]
     UnknownContract(Address),
 

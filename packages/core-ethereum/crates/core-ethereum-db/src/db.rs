@@ -772,6 +772,33 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
+    async fn is_mfa_protected(&self) -> Result<Option<Address>> {
+        let key = utils_db::db::Key::new_from_str(MFA_MODULE_PREFIX)?;
+        self.db.get_or_none::<Address>(key).await
+    }
+
+    async fn set_mfa_protected_and_update_snapshot(&mut self, maybe_mfa_address: Option<Address>, snapshot: &Snapshot) -> Result<()> {
+        let mfa_key = utils_db::db::Key::new_from_str(MFA_MODULE_PREFIX)?;
+        let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
+
+        match maybe_mfa_address {
+            Some(mfa_address) => {
+                let mut batch_ops = utils_db::db::Batch::new();
+                batch_ops.put(mfa_key, mfa_address);
+                batch_ops.put(snapshot_key, snapshot);
+        
+                self.db.batch(batch_ops, true).await
+            }
+            None => {
+                let mut batch_ops = utils_db::db::Batch::new();
+                batch_ops.del(mfa_key);
+                batch_ops.put(snapshot_key, snapshot);
+        
+                self.db.batch(batch_ops, true).await
+            }
+        }
+
+    }
     async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>> {
         let tid = Hash::create(&[id.as_bytes()]);
         let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;

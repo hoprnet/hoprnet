@@ -19,6 +19,7 @@ pub mod hopr_network_registry;
 pub mod hopr_network_registry_events;
 pub mod hopr_node_management_module;
 pub mod hopr_node_safe_registry;
+pub mod hopr_node_safe_registry_events;
 pub mod hopr_node_stake_factory;
 pub mod hopr_safe_proxy_for_network_registry;
 pub mod hopr_stake;

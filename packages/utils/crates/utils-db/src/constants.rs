@@ -20,4 +20,6 @@ pub const NETWORK_REGISTRY_HOPR_NODE_PREFIX: &str = "networkRegistry:hopr-node-"
 pub const NETWORK_REGISTRY_ENABLED_PREFIX: &str = "networkRegistry:enabled";
 pub const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: &str = "networkRegistry:addressEligible-";
 pub const NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
+/// some Multi-Factor Authorization module, e.g. Gnosis Safe
+pub const MFA_MODULE_PREFIX: &str = "mfaModule:enabled";
 pub const API_AUTHORIZATION_TOKEN_KEY_PREFIX: &str = "api:authenticationTokens";
