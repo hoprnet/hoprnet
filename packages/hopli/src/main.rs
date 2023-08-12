@@ -1,6 +1,7 @@
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
 use crate::initialize_node::InitializeNodeArgs;
+use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::network_registry::RegisterInNetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
@@ -9,6 +10,7 @@ pub mod faucet;
 pub mod identity;
 pub mod identity_input;
 pub mod initialize_node;
+pub mod create_safe_module;
 pub mod key_pair;
 pub mod network_registry;
 pub mod password;
@@ -38,6 +40,8 @@ enum Commands {
     RegisterInNetworkRegistry(RegisterInNetworkRegistryArgs),
     #[clap(about = "Necessary steps to initiate a node (network registery, stake, fund)")]
     InitializeNode(InitializeNodeArgs),
+    #[clap(about = "Create a safe instance and a node management instance, configure default permissions")]
+    CreateSafeModule(CreateSafeModuleArgs),
 }
 
 fn main() -> Result<(), HelperErrors> {
@@ -54,6 +58,9 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::InitializeNode(opt) => {
+            opt.run()?;
+        }
+        Commands::CreateSafeModule(opt) => {
             opt.run()?;
         }
     }
