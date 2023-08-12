@@ -34,15 +34,21 @@ contract HoprNodeSafeRegistry {
         address safeAddress;
         address nodeChainKeyAddress;
     }
+    struct NodeSafeNonce {
+        address safeAddress;
+        address nodeChainKeyAddress;
+        uint256 nodeSigNonce;
+    }
 
     // Currently deployed version, starting with 1.0.0
     string public constant VERSION = "1.0.0";
 
     bytes32 public domainSeparator;
     mapping(address => address) public nodeToSafe;
+    mapping(address => uint256) public nodeSigNonce;
     // NodeSafe struct type hash.
-    // keccak256("NodeSafe(address safeAddress,address nodeChainKeyAddress)");
-    bytes32 public constant NODE_SAFE_TYPEHASH = hex"6e9a9ee91e0fce141f0eeaf47e1bfe3af5b5f40e5baf2a86acc37a075199c16d";
+    // keccak256("NodeSafeNonce(address safeAddress,address nodeChainKeyAddress,uint256 nodeSigNonce)");
+    bytes32 public constant NODE_SAFE_TYPEHASH = hex"a8ac7aed128d1a2da0773fecc80b6265d15f7e62bf4401eb23bd46c3fcf5d2f8";
     // start and end point for linked list of modules
     address private constant SENTINEL_MODULES = address(0x1);
     // page size of querying modules
@@ -64,7 +70,7 @@ contract HoprNodeSafeRegistry {
         // check adminKeyAddress has added HOPR tokens to the staking contract.
 
         // following encoding guidelines of EIP712
-        bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe));
+        bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe, nodeSigNonce[nodeSafe.nodeChainKeyAddress]));
 
         // build typed digest
         bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
@@ -77,6 +83,9 @@ contract HoprNodeSafeRegistry {
 
         // store those state, emit events etc.
         addNodeSafe(nodeSafe);
+
+        // update nonce
+        nodeSigNonce[nodeSafe.nodeChainKeyAddress] ++;
     }
 
     /**
