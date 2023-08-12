@@ -6,7 +6,7 @@
  */
 pragma solidity ^0.8.0;
 
-import "safe-contracts/common/Enum.sol";
+import {Enum} from "safe-contracts/common/Enum.sol";
 
 interface IAvatar {
     function getOwners() external view returns (address[] memory);

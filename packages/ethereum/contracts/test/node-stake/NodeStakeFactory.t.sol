@@ -7,7 +7,7 @@ import {HoprNodeManagementModule} from "../../src/node-stake/permissioned-module
 import {HoprCapabilityPermissions} from "../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
 import {HoprNodeStakeFactory} from "../../src/node-stake/NodeStakeFactory.sol";
 import {Safe} from "safe-contracts/Safe.sol";
-import {SafeSuiteLib} from "../../script/utils/SafeSuiteLib.sol";
+import {SafeSuiteLib} from "../../src/utils/SafeSuiteLib.sol";
 import {SafeSingletonFixtureTest} from "../utils/SafeSingleton.sol";
 import {ClonesUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 

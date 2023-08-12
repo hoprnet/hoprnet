@@ -4,7 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
 import "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
 import "../../utils/CapabilityLibrary.sol";
-import "../../../script/utils/SafeSuiteLib.sol";
+import "../../../src/utils/SafeSuiteLib.sol";
 import "../../utils/SafeSingleton.sol";
 import "../../../src/interfaces/IAvatar.sol";
 import "../../../src/Crypto.sol";
