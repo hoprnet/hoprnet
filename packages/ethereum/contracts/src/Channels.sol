@@ -8,7 +8,6 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC777Recipient} from "openzeppelin-contracts/token/ERC777/IERC777Recipient.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 
-import {IHoprNodeSafeRegistry} from "./interfaces/INodeSafeRegistry.sol";
 import {HoprCrypto} from "./Crypto.sol";
 import {HoprLedger} from "./Ledger.sol";
 import {HoprMultiSig} from "./MultiSig.sol";
