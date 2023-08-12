@@ -917,12 +917,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelABAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+
+        vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceIncreased(
             hoprChannels._getChannelId(dest, src), HoprChannels.Balance.wrap(channelBAAmount + amount)
         );
-
-        vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
 
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
