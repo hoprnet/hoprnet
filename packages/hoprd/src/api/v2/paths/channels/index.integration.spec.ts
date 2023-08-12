@@ -10,7 +10,7 @@ import {
   INVALID_PEER_ID,
   channelEntryCreateMock
 } from '../../fixtures.js'
-import { Balance, ChannelEntry, BalanceType, PublicKey, U256, Hash, ChannelStatus } from '@hoprnet/hopr-utils'
+import { Balance, ChannelEntry, BalanceType, PublicKey, U256, ChannelStatus } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../utils.js'
 
@@ -32,8 +32,6 @@ describe('GET /channels', function () {
     PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address(),
     PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
     new Balance('1', BalanceType.HOPR),
-    Hash.create([]),
-    U256.one(),
     U256.one(),
     ChannelStatus.Closed,
     U256.one(),
@@ -43,8 +41,6 @@ describe('GET /channels', function () {
     PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
     PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address(),
     new Balance('2', BalanceType.HOPR),
-    Hash.create([]),
-    new U256('2'),
     new U256('2'),
     ChannelStatus.Closed,
     new U256('2'),
@@ -54,10 +50,8 @@ describe('GET /channels', function () {
     PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
     PublicKey.from_peerid_str(CHARLIE_PEER_ID.toString()).to_address(),
     new Balance('3', BalanceType.HOPR),
-    Hash.create([]),
     new U256('3'),
-    new U256('3'),
-    ChannelStatus.WaitingForCommitment,
+    ChannelStatus.Open,
     new U256('3'),
     new U256('3')
   )

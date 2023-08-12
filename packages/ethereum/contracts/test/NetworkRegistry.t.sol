@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import {IHoprNetworkRegistryRequirement,HoprNetworkRegistry} from "../src/NetworkRegistry.sol";
+import {IHoprNetworkRegistryRequirement,HoprNetworkRegistry,HoprNetworkRegistryEvents} from "../src/NetworkRegistry.sol";
 import {Test,stdStorage,StdStorage} from "forge-std/Test.sol";
 
-contract HoprNetworkRegistryTest is Test {
+contract HoprNetworkRegistryTest is Test, HoprNetworkRegistryEvents {
     // to alter the storage
     using stdStorage for StdStorage;
 
@@ -14,17 +14,6 @@ contract HoprNetworkRegistryTest is Test {
     address[] public stakingAccounts;
     uint256 public constant STAKING_ACCOUNTS_SIZE = 5;
     // uint256[] public allowances;
-
-    /**
-     * Manually import the errors and events
-     */
-    event EnabledNetworkRegistry(bool indexed isEnabled); // Global toggle of the network registry
-    event RequirementUpdated(address indexed requirementImplementation); // Emit when the network registry proxy is updated
-    event Registered(address indexed stakingAccount, address indexed nodeAddress); // Emit when a node is included in the registry
-    event Deregistered(address indexed stakingAccount, address indexed nodeAddress); // Emit when a node is removed from the registry
-    event RegisteredByManager(address indexed stakingAccount, address indexed nodeAddress); // Emit when the contract owner register a node for an account
-    event DeregisteredByManager(address indexed stakingAccount, address indexed nodeAddress); // Emit when the contract owner removes a node from the registry
-    event EligibilityUpdated(address indexed stakingAccount, bool indexed eligibility); // Emit when the eligibility of an account is updated
 
     function setUp() public {
         proxy = vm.addr(100); // make vm.addr(100) requirementImplementation
@@ -175,7 +164,7 @@ contract HoprNetworkRegistryTest is Test {
     function test_OwnerDisableRegistry() public {
         vm.prank(owner);
         vm.expectEmit(true, false, false, false, address(hoprNetworkRegistry));
-        emit EnabledNetworkRegistry(false);
+        emit NetworkRegistryStatusUpdated(false);
         hoprNetworkRegistry.disableRegistry();
     }
 
@@ -199,7 +188,7 @@ contract HoprNetworkRegistryTest is Test {
         hoprNetworkRegistry.disableRegistry();
 
         vm.expectEmit(true, false, false, false, address(hoprNetworkRegistry));
-        emit EnabledNetworkRegistry(true);
+        emit NetworkRegistryStatusUpdated(true);
         hoprNetworkRegistry.enableRegistry();
     }
 

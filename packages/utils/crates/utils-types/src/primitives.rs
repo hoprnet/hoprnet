@@ -1,9 +1,9 @@
 use ethnum::{u256, AsU256};
 use getrandom::getrandom;
+use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul};
-use primitive_types::H160;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};

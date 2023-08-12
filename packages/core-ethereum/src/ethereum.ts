@@ -664,7 +664,7 @@ const provider = networkInfo.provider.startsWith('http')
             amount: ackTicket.ticket.amount.to_string(),
             ticketIndex: ackTicket.ticket.index.to_hex(),
             indexOffset: 0, // FIXME:
-            epoch: ackTicket.ticket.epoch.to_hex(),
+            epoch: ackTicket.ticket.channel_epoch.to_hex(),
             winProb: ackTicket.ticket.win_prob.to_string()
           },
           signature: {
@@ -883,6 +883,7 @@ const provider = networkInfo.provider.startsWith('http')
     getPublicKey: () => publicKey,
     getInfo: () => ({
       chain: networkInfo.chain,
+      hoprAnnouncementsAddress: deploymentExtract.hoprAnnouncementsAddress,
       hoprTokenAddress: deploymentExtract.hoprTokenAddress,
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,

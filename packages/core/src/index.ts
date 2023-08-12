@@ -565,8 +565,6 @@ class Hopr extends EventEmitter {
       await this.onPeerAnnouncement(announcedNode)
     }
 
-    connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
-
     try {
       await this.announce(this.options.announce)
     } catch (err) {
@@ -697,18 +695,6 @@ class Hopr extends EventEmitter {
       if ([AddressClass.Public, AddressClass.Public6].includes(maToClass(addr))) {
         await dht.setMode('server')
         break
-      }
-    }
-  }
-
-  private async onChannelWaitingForCommitment(c: ChannelEntry): Promise<void> {
-    if (this.strategy.shouldCommitToChannel(c)) {
-      log(`Found channel ${c.get_id().to_hex()} to us with unset commitment. Setting commitment`)
-      try {
-        await retryWithBackoffThenThrow(() => HoprCoreEthereum.getInstance().commitToChannel(c))
-      } catch (err) {
-        // @TODO what to do here? E.g. delete channel from db?
-        error(`Couldn't set commitment in channel to ${c.destination.to_string()} (channelId ${c.get_id().to_hex()})`)
       }
     }
   }
@@ -1465,7 +1451,7 @@ class Hopr extends EventEmitter {
 
     let txHash: string
     try {
-      if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
+      if (channel.status === ChannelStatus.Open) {
         log('initiating closure of channel', channel.get_id().to_hex())
         txHash = await connector.initializeClosure(channel.source, channel.destination)
       } else {

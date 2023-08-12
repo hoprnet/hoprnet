@@ -181,7 +181,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperTokenTransferFromMock(src, amount1);
 
         vm.expectEmit(true, true, false, true, address(hoprChannels));
-        emit ChannelOpened(src, dest, HoprChannels.Balance.wrap(amount1));
+        emit ChannelOpened(src, dest);
 
         vm.startPrank(src);
         hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount1));
@@ -220,7 +220,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperTokenTransferFromMock(safeContract, amount1);
 
         vm.expectEmit(true, true, false, true, address(hoprChannels));
-        emit ChannelOpened(src, dest, HoprChannels.Balance.wrap(amount1));
+        emit ChannelOpened(src, dest);
 
         vm.startPrank(safeContract);
         hoprChannels.fundChannelSafe(src, dest, HoprChannels.Balance.wrap(amount1));

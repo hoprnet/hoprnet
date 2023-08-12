@@ -685,7 +685,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     /// - `snapshot`: latest chain snapshot
     async fn remove_from_network_registry(
         &mut self,
-        address: &Address,
+        node_address: &Address,
         stake_account: &Address,
         snapshot: &Snapshot,
     ) -> Result<()> {
@@ -693,12 +693,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .find_hopr_node_using_account_in_network_registry(stake_account)
             .await?
             .into_iter()
-            .filter(|addr| !addr.eq(address))
+            .filter(|addr| !addr.eq(node_address))
             .collect::<Vec<_>>();
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(utils_db::db::Key::new_with_prefix(
-            address,
+            node_address,
             NETWORK_REGISTRY_HOPR_NODE_PREFIX,
         )?);
         batch_ops.put(
@@ -1455,11 +1455,9 @@ mod tests {
             Address::random(),
             Address::random(),
             Balance::zero(BalanceType::HOPR),
-            Hash::default(),
-            U256::from(0u64),
             U256::from(0u64),
             ChannelStatus::Open,
-            U256::from(0u64),
+            U256::from(1u64),
             U256::from(0u64),
         );
 

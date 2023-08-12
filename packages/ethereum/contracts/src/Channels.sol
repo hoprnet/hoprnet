@@ -25,7 +25,7 @@ abstract contract HoprChannelsEvents {
      * Includes source and destination separately because mapping
      * (source, destination) -> channelId destroys information.
      */
-    event ChannelOpened(address indexed source, address indexed destination, HoprChannels.Balance amount);
+    event ChannelOpened(address indexed source, address indexed destination);
 
     /**
      * Emitted once balance of a channel is increased, e.g. after opening a
@@ -40,16 +40,10 @@ abstract contract HoprChannelsEvents {
     event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
 
     /**
-     * Emitted once a commitment has been set for a channel. Includes
-     * the current epoch since this value is necessary for issuing tickets.
-     */
-    event CommitmentSet(bytes32 indexed channelId, HoprChannels.ChannelEpoch epoch);
-
-    /**
      * Emitted once a party initiates the closure of an outgoing
      * channel. Includes the timestamp when the notice period is due.
      */
-    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureInitiationTime);
+    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureTime);
 
     /**
      * Emitted once a channel closure is finalized.
@@ -723,7 +717,7 @@ contract HoprChannels is
             channel.status = ChannelStatus.OPEN;
 
             indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
-            emit ChannelOpened(self, account, channel.balance);
+            emit ChannelOpened(self, account);
         } else {
             indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
             emit ChannelBalanceIncreased(channelId, channel.balance);

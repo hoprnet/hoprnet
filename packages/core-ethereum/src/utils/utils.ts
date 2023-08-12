@@ -1,4 +1,5 @@
 export type DeploymentExtract = {
+  hoprAnnouncementsAddress: string,
   hoprTokenAddress: string
   hoprChannelsAddress: string
   hoprNetworkRegistryAddress: string

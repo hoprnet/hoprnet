@@ -11,7 +11,7 @@ pub use hopr_channels_events::*;
 )]
 pub mod hopr_channels_events {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceDecreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceIncreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelClosed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"amount\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelOpened\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.ChannelEpoch\",\"name\":\"epoch\",\"type\":\"uint24\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"CommitmentSet\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"closureInitiationTime\",\"type\":\"uint32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"OutgoingChannelClosureInitiated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"newTicketIndex\",\"type\":\"uint48\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"TicketRedeemed\",\"outputs\":[],\"anonymous\":false}]";
+    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceDecreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceIncreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelClosed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelOpened\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"closureTime\",\"type\":\"uint32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"OutgoingChannelClosureInitiated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"newTicketIndex\",\"type\":\"uint48\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"TicketRedeemed\",\"outputs\":[],\"anonymous\":false}]";
     ///The parsed JSON ABI of the contract.
     pub static HOPRCHANNELSEVENTS_ABI: ::ethers::contract::Lazy<
         ::ethers::core::abi::Abi,
@@ -93,16 +93,6 @@ pub mod hopr_channels_events {
             ::std::sync::Arc<M>,
             M,
             ChannelOpenedFilter,
-        > {
-            self.0.event()
-        }
-        ///Gets the contract's `CommitmentSet` event
-        pub fn commitment_set_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            CommitmentSetFilter,
         > {
             self.0.event()
         }
@@ -206,29 +196,12 @@ pub mod hopr_channels_events {
         Eq,
         Hash
     )]
-    #[ethevent(name = "ChannelOpened", abi = "ChannelOpened(address,address,uint96)")]
+    #[ethevent(name = "ChannelOpened", abi = "ChannelOpened(address,address)")]
     pub struct ChannelOpenedFilter {
         #[ethevent(indexed)]
         pub source: ::ethers::core::types::Address,
         #[ethevent(indexed)]
         pub destination: ::ethers::core::types::Address,
-        pub amount: u128,
-    }
-    #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
-    )]
-    #[ethevent(name = "CommitmentSet", abi = "CommitmentSet(bytes32,uint24)")]
-    pub struct CommitmentSetFilter {
-        #[ethevent(indexed)]
-        pub channel_id: [u8; 32],
-        pub epoch: u32,
     }
     #[derive(
         Clone,
@@ -247,7 +220,7 @@ pub mod hopr_channels_events {
     pub struct OutgoingChannelClosureInitiatedFilter {
         #[ethevent(indexed)]
         pub channel_id: [u8; 32],
-        pub closure_initiation_time: u32,
+        pub closure_time: u32,
     }
     #[derive(
         Clone,
@@ -272,7 +245,6 @@ pub mod hopr_channels_events {
         ChannelBalanceIncreasedFilter(ChannelBalanceIncreasedFilter),
         ChannelClosedFilter(ChannelClosedFilter),
         ChannelOpenedFilter(ChannelOpenedFilter),
-        CommitmentSetFilter(CommitmentSetFilter),
         OutgoingChannelClosureInitiatedFilter(OutgoingChannelClosureInitiatedFilter),
         TicketRedeemedFilter(TicketRedeemedFilter),
     }
@@ -295,9 +267,6 @@ pub mod hopr_channels_events {
             }
             if let Ok(decoded) = ChannelOpenedFilter::decode_log(log) {
                 return Ok(HoprChannelsEventsEvents::ChannelOpenedFilter(decoded));
-            }
-            if let Ok(decoded) = CommitmentSetFilter::decode_log(log) {
-                return Ok(HoprChannelsEventsEvents::CommitmentSetFilter(decoded));
             }
             if let Ok(decoded) = OutgoingChannelClosureInitiatedFilter::decode_log(log) {
                 return Ok(
@@ -325,9 +294,6 @@ pub mod hopr_channels_events {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::ChannelOpenedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::CommitmentSetFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::OutgoingChannelClosureInitiatedFilter(element) => {
@@ -359,11 +325,6 @@ pub mod hopr_channels_events {
     impl ::core::convert::From<ChannelOpenedFilter> for HoprChannelsEventsEvents {
         fn from(value: ChannelOpenedFilter) -> Self {
             Self::ChannelOpenedFilter(value)
-        }
-    }
-    impl ::core::convert::From<CommitmentSetFilter> for HoprChannelsEventsEvents {
-        fn from(value: CommitmentSetFilter) -> Self {
-            Self::CommitmentSetFilter(value)
         }
     }
     impl ::core::convert::From<OutgoingChannelClosureInitiatedFilter>
