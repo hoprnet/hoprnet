@@ -50,6 +50,7 @@ export function getContractData(id: string): DeploymentExtract {
   const resolvedNetwork = resolveNetwork(id)
   
   return {
+    hoprAnnouncementsAddress: resolvedNetwork.announcements,
     hoprTokenAddress: resolvedNetwork.token,
     hoprChannelsAddress: resolvedNetwork.channels,
     hoprNetworkRegistryAddress: resolvedNetwork.network_registry,

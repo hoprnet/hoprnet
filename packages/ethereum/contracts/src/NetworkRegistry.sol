@@ -4,6 +4,16 @@ pragma solidity ^0.8.0;
 import {AccessControlEnumerable} from "openzeppelin-contracts/access/AccessControlEnumerable.sol";
 import {IHoprNetworkRegistryRequirement} from "./interfaces/INetworkRegistryRequirement.sol";
 
+abstract contract HoprNetworkRegistryEvents {
+    event NetworkRegistryStatusUpdated(bool indexed isEnabled); // Global toggle of the network registry
+    event RequirementUpdated(address indexed requirementImplementation); // Emit when the network registry proxy is updated
+    event Registered(address indexed stakingAccount, address indexed nodeAddress); // Emit when a node is included in the registry
+    event Deregistered(address indexed stakingAccount, address indexed nodeAddress); // Emit when a node is removed from the registry
+    event RegisteredByManager(address indexed stakingAccount, address indexed nodeAddress); // Emit when the contract owner register a node for an account
+    event DeregisteredByManager(address indexed stakingAccount, address indexed nodeAddress); // Emit when the contract owner removes a node from the registry
+    event EligibilityUpdated(address indexed stakingAccount, bool indexed eligibility); // Emit when the eligibility of an account is updated
+}
+
 /**
  *    &&&&
  *    &&&&
@@ -37,7 +47,7 @@ import {IHoprNetworkRegistryRequirement} from "./interfaces/INetworkRegistryRequ
  *
  * Manager has the power to overwrite the registration
  */
-contract HoprNetworkRegistry is AccessControlEnumerable {
+contract HoprNetworkRegistry is AccessControlEnumerable, HoprNetworkRegistryEvents {
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     // Implementation of network registry proxy
@@ -56,14 +66,6 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
     error NotEnoughAllowanceToRegisterNode();
     error CannotOperateForNode(address nodeAddress);
     error ArrayLengthNotMatch();
-
-    event EnabledNetworkRegistry(bool indexed isEnabled); // Global toggle of the network registry
-    event RequirementUpdated(address indexed requirementImplementation); // Emit when the network registry proxy is updated
-    event Registered(address indexed stakingAccount, address indexed nodeAddress); // Emit when a node is included in the registry
-    event Deregistered(address indexed stakingAccount, address indexed nodeAddress); // Emit when a node is removed from the registry
-    event RegisteredByManager(address indexed stakingAccount, address indexed nodeAddress); // Emit when the contract owner register a node for an account
-    event DeregisteredByManager(address indexed stakingAccount, address indexed nodeAddress); // Emit when the contract owner removes a node from the registry
-    event EligibilityUpdated(address indexed stakingAccount, bool indexed eligibility); // Emit when the eligibility of an account is updated
 
     /**
      * @dev Network registry can be globally toggled. If `enabled === true`, only nodes registered
@@ -92,7 +94,7 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
         requirementImplementation = IHoprNetworkRegistryRequirement(_requirementImplementation);
         enabled = true;
         emit RequirementUpdated(_requirementImplementation);
-        emit EnabledNetworkRegistry(true);
+        emit NetworkRegistryStatusUpdated(true);
     }
 
     /**
@@ -112,7 +114,7 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
             revert GloballyEnabledRegistry();
         }
         enabled = true;
-        emit EnabledNetworkRegistry(true);
+        emit NetworkRegistryStatusUpdated(true);
     }
 
     /**
@@ -120,7 +122,7 @@ contract HoprNetworkRegistry is AccessControlEnumerable {
      */
     function disableRegistry() external onlyRole(MANAGER_ROLE) mustBeEnabled {
         enabled = false;
-        emit EnabledNetworkRegistry(false);
+        emit NetworkRegistryStatusUpdated(false);
     }
 
     /**

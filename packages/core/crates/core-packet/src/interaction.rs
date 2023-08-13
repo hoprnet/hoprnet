@@ -452,7 +452,6 @@ where
 
         let ticket = Ticket::new(
             destination,
-            channel.ticket_epoch,
             current_index,
             amount,
             U256::from_inverse_probability(U256::new(INVERSE_TICKET_WIN_PROB))?,
@@ -798,7 +797,6 @@ mod tests {
     use core_crypto::types::{Hash, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_ethereum_misc::commitment::{initialize_commitment, ChannelCommitmentInfo};
     use core_mixer::mixer::MixerConfig;
     use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement};
     use core_types::channels::{ChannelEntry, ChannelStatus};
@@ -889,8 +887,6 @@ mod tests {
             from.to_owned(),
             to.to_owned(),
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
-            Hash::new(&random_bytes::<32>()),
-            U256::zero(),
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
@@ -953,17 +949,6 @@ mod tests {
                     &testing_snapshot,
                 )
                 .await?;
-
-                let channel_info = ChannelCommitmentInfo {
-                    chain_id: 1,
-                    contract_address: "fakeaddress".to_string(),
-                    channel_id: previous_channel.clone().unwrap().get_id().clone(),
-                    channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
-                };
-
-                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info)
-                    .await
-                    .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }
 
             previous_channel = channel;

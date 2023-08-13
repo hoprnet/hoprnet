@@ -1,5 +1,6 @@
 use ethnum::{u256, AsU256};
 use getrandom::getrandom;
+use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul};

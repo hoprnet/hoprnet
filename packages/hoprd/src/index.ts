@@ -249,10 +249,14 @@ async function main() {
     }
   }
 
+  logs.log('before parseCliArguments')
   const argv = parseCliArguments(process.argv.slice(1))
+  logs.log('after parseCliArguments')
   let cfg: HoprdConfig
   try {
+    logs.log('before fetch_configuration')
     cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
+    logs.log('after fetch_configuration')
   } catch (err) {
     console.error(err)
     process.exit(1)

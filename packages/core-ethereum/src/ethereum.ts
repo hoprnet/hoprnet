@@ -84,7 +84,7 @@ export async function createChainWrapper(
   txTimeout = constants.TX_CONFIRMATION_WAIT
 ) {
   log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`)
-  const provider = networkInfo.provider.startsWith('http')
+const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
   log(`[DEBUG] provider ${provider}`)
@@ -680,7 +680,7 @@ export async function createChainWrapper(
             amount: ackTicket.ticket.amount.to_string(),
             ticketIndex: ackTicket.ticket.index.to_hex(),
             indexOffset: 0, // FIXME:
-            epoch: ackTicket.ticket.epoch.to_hex(),
+            epoch: ackTicket.ticket.channel_epoch.to_hex(),
             winProb: ackTicket.ticket.win_prob.to_string()
           },
           signature: {
@@ -989,6 +989,7 @@ export async function createChainWrapper(
     getPublicKey: () => publicKey,
     getInfo: () => ({
       chain: networkInfo.chain,
+      hoprAnnouncementsAddress: deploymentExtract.hoprAnnouncementsAddress,
       hoprTokenAddress: deploymentExtract.hoprTokenAddress,
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,

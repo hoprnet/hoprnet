@@ -492,6 +492,14 @@ impl Hash {
     }
 }
 
+impl TryFrom<[u8; 32]> for Hash {
+    type Error = GeneralError;
+
+    fn try_from(value: [u8; 32]) -> std::result::Result<Self, Self::Error> {
+        Hash::from_bytes(&value)
+    }
+}
+
 /// Represents an Ed25519 public key.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]

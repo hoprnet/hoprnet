@@ -181,7 +181,7 @@ pub trait HoprCoreEthereumDbActions {
     /// Unlink Hopr public key to an ETH address by removing the entry.
     async fn remove_from_network_registry(
         &mut self,
-        public_key: &Address,
+        node_address: &Address,
         account: &Address,
         snapshot: &Snapshot,
     ) -> Result<()>;

@@ -7,7 +7,6 @@ export var formatTicket = (ticket: Ticket) => {
   return {
     counterparty: ticket.counterparty.to_hex(),
     challenge: ticket.challenge.to_hex(),
-    epoch: ticket.epoch.to_string(),
     index: ticket.index.to_string(),
     amount: ticket.amount.to_string(),
     winProb: ticket.win_prob.to_string(),
