@@ -25,7 +25,7 @@ export type PeerInfo = {
  * @param multiaddr
  * @returns PeerInfo
  */
-function toPeerInfoFormat(info: ReturnType<Hopr['getConnectionInfo']>, multiaddr?: Multiaddr): PeerInfo {
+export function toPeerInfoFormat(info: ReturnType<Hopr['getConnectionInfo']>, multiaddr?: Multiaddr): PeerInfo {
   return {
     peerId: info.peer_id(),
     multiAddr: multiaddr ? multiaddr.toString() : undefined,

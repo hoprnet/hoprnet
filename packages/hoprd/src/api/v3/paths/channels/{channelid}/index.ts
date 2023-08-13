@@ -1,28 +1,23 @@
+import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum/src/db.js'
+import { channel_status_to_string, ChannelStatus, defer, type DeferType } from '@hoprnet/hopr-utils'
+
+import { STATUS_CODES } from '../../../utils.js'
+import { ChannelTopologyInfo, formatChannelTopologyInfo } from '../index.js'
+
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../../../utils.js'
-import { ChannelInfo, formatIncomingChannel, formatOutgoingChannel } from '../../index.js'
-import {
-  channel_status_to_string,
-  ChannelStatus,
-  defer,
-  generate_channel_id,
-  PublicKey,
-  type DeferType,
-  Address
-} from '@hoprnet/hopr-utils'
+
 import { log } from 'debug'
 
 const closingRequests = new Map<string, DeferType<void>>()
 
 /**
- * Closes a channel with provided peerId.
+ * Closes a channel with channel id.
  * @returns Channel status and receipt.
  */
 export async function closeChannel(
   node: Hopr,
-  peerIdStr: string,
-  direction: ChannelInfo['type']
+  channelIdStr: string
 ): Promise<
   | {
       success: false
@@ -34,9 +29,8 @@ export async function closeChannel(
       receipt: string
     }
 > {
-  const counterpartyAddress = PublicKey.from_peerid_str(peerIdStr).to_address()
-
-  const channelId = generate_channel_id(node.getEthereumAddress(), counterpartyAddress)
+  const channel = await node.db.get_channel(Ethereum_Hash.deserialize(new TextEncoder().encode(channelIdStr)))
+  const channelId = channel.get_id()
 
   let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {
@@ -44,6 +38,19 @@ export async function closeChannel(
     closingRequests.set(channelId.to_hex(), closingRequest)
   } else {
     await closingRequest.promise
+  }
+
+  // incoming if destination is me, outgoing if source is me
+  let direction
+  let counterpartyAddress
+  if (channel.source == node.getEthereumAddress()) {
+    direction = 'outgoing'
+    counterpartyAddress = channel.destination
+  } else if (channel.destination == node.getEthereumAddress()) {
+    direction = 'incoming'
+    counterpartyAddress = channel.source
+  } else {
+    return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }
   }
 
   try {
@@ -70,9 +77,9 @@ export async function closeChannel(
 const DELETE: Operation = [
   async (req, res, _next) => {
     const { node }: { node: Hopr } = req.context
-    const { peerid, direction } = req.params
+    const { channelid } = req.params
 
-    const closingResult = await closeChannel(node, peerid, direction as any)
+    const closingResult = await closeChannel(node, channelid)
 
     if (closingResult.success == true) {
       res
@@ -92,23 +99,10 @@ DELETE.apiDoc = {
   parameters: [
     {
       in: 'path',
-      name: 'peerid',
+      name: 'channelid',
       required: true,
       schema: {
-        format: 'peerId',
-        type: 'string',
-        description: 'PeerId attached to the channel that we want to close.',
-        example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
-      }
-    },
-    {
-      in: 'path',
-      name: 'direction',
-      description: 'Specify which channel should be fetched, incoming or outgoing.',
-      required: true,
-      schema: {
-        type: 'string',
-        enum: ['incoming', 'outgoing'] as ChannelInfo['type'][]
+        $ref: '#/components/schemas/ChannelId'
       }
     }
   ],
@@ -132,14 +126,14 @@ DELETE.apiDoc = {
       }
     },
     '400': {
-      description: 'Invalid peerId.',
+      description: 'Invalid channel id.',
       content: {
         'application/json': {
           schema: {
             $ref: '#/components/schemas/RequestStatus'
           },
           example: {
-            status: STATUS_CODES.INVALID_PEERID
+            status: STATUS_CODES.INVALID_CHANNELID
           }
         }
       }
@@ -169,25 +163,14 @@ DELETE.apiDoc = {
 }
 
 /**
- * Fetches channel between node and counterparty in the direction provided.
- * @returns the channel between node and counterparty
+ * Fetches channel information by channel id.
+ * @returns the channel information
  */
-export const getChannel = async (
-  node: Hopr,
-  counterparty: string,
-  direction: ChannelInfo['type']
-): Promise<ChannelInfo> => {
-  let counterpartyAddress: Address
+export const getChannel = async (node: Hopr, channelIdStr: string): Promise<ChannelTopologyInfo> => {
   try {
-    counterpartyAddress = PublicKey.from_peerid_str(counterparty).to_address()
-  } catch (err) {
-    throw Error(STATUS_CODES.INVALID_PEERID)
-  }
+    const channel = await node.db.get_channel(Ethereum_Hash.deserialize(new TextEncoder().encode(channelIdStr)))
 
-  try {
-    return direction === 'outgoing'
-      ? await node.getChannel(node.getEthereumAddress(), counterpartyAddress).then(formatOutgoingChannel)
-      : await node.getChannel(counterpartyAddress, node.getEthereumAddress()).then(formatIncomingChannel)
+    return formatChannelTopologyInfo(node, channel)
   } catch {
     throw Error(STATUS_CODES.CHANNEL_NOT_FOUND)
   }
@@ -196,23 +179,17 @@ export const getChannel = async (
 const GET: Operation = [
   async (req, res, _next) => {
     const { node }: { node: Hopr } = req.context
-    const { peerid, direction } = req.params
-
-    if (!['incoming', 'outgoing'].includes(direction)) {
-      return res
-        .status(404)
-        .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: 'Method not supported. Use "incoming" or "outgoing"' })
-    }
+    const { channelid } = req.params
 
     try {
-      const channel = await getChannel(node, peerid, direction as any)
+      const channel = await getChannel(node, channelid)
       return res.status(200).send(channel)
     } catch (err) {
       const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
 
       switch (errString) {
-        case STATUS_CODES.INVALID_PEERID:
-          return res.status(400).send({ status: STATUS_CODES.INVALID_PEERID })
+        case STATUS_CODES.INVALID_CHANNELID:
+          return res.status(400).send({ status: STATUS_CODES.INVALID_CHANNELID })
         case STATUS_CODES.CHANNEL_NOT_FOUND:
           return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
         default:
@@ -223,27 +200,16 @@ const GET: Operation = [
 ]
 
 GET.apiDoc = {
-  description: 'Returns information about the channel between this node and provided peerId.',
+  description: 'Returns information about the channel.',
   tags: ['Channels'],
   operationId: 'channelsGetChannel',
   parameters: [
     {
       in: 'path',
-      name: 'peerid',
-      description: 'Counterparty peerId assigned to the channel you want to fetch.',
+      name: 'channelid',
       required: true,
       schema: {
-        $ref: '#/components/schemas/HoprAddress'
-      }
-    },
-    {
-      in: 'path',
-      name: 'direction',
-      description: 'Specify which channel should be fetched, incoming or outgoing.',
-      required: true,
-      schema: {
-        type: 'string',
-        enum: ['incoming', 'outgoing'] as ChannelInfo['type'][]
+        $ref: '#/components/schemas/ChannelId'
       }
     }
   ],
@@ -254,21 +220,21 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             items: {
-              $ref: '#/components/schemas/Channel'
+              $ref: '#/components/schemas/ChannelTopology'
             }
           }
         }
       }
     },
     '400': {
-      description: 'Invalid peerId.',
+      description: 'Invalid channel id.',
       content: {
         'application/json': {
           schema: {
             $ref: '#/components/schemas/RequestStatus'
           },
           example: {
-            status: STATUS_CODES.INVALID_PEERID
+            status: STATUS_CODES.INVALID_CHANNELID
           }
         }
       }
@@ -280,7 +246,7 @@ GET.apiDoc = {
       $ref: '#/components/responses/Forbidden'
     },
     '404': {
-      description: 'Channel with that peerId was not found. You can list all channels using /channels/ endpoint.',
+      description: 'Channel with that channel id was not found. You can list all channels using /channels/ endpoint.',
       content: {
         'application/json': {
           schema: {

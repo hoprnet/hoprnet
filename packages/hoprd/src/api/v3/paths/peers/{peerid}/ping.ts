@@ -1,12 +1,13 @@
-import type Hopr from '@hoprnet/hopr-core'
+import { peerIdFromString } from '@libp2p/peer-id'
+import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
+import { STATUS_CODES } from '../../../utils.js'
+
 import type { Operation } from 'express-openapi'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { peerIdFromString } from '@libp2p/peer-id'
-import { STATUS_CODES } from '../../utils.js'
-import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
+import type Hopr from '@hoprnet/hopr-core'
 
 /**
- * Pings another node to check its availability.
+ * Pings another peer to check its availability.
  * @returns Latency and HOPR protocol version (once known) if ping was successful.
  */
 export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => {
@@ -43,7 +44,7 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
 const POST: Operation = [
   async (req, res, _next) => {
     const { node }: { node: Hopr } = req.context
-    const { peerId } = req.body
+    const { peerId } = req.params
 
     try {
       const pingRes = await ping({ peerId, node })
@@ -62,28 +63,19 @@ const POST: Operation = [
 
 POST.apiDoc = {
   description: 'Pings another node to check its availability.',
-  tags: ['Node'],
-  operationId: 'nodePing',
-  requestBody: {
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object',
-          required: ['peerId'],
-          properties: {
-            peerId: {
-              format: 'peerId',
-              type: 'string',
-              description: 'PeerId associated to the other node that we want to ping.'
-            }
-          },
-          example: {
-            peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
-          }
-        }
+  tags: ['Peers'],
+  operationId: 'peersPingPeer',
+  parameters: [
+    {
+      name: 'peerId',
+      in: 'path',
+      description: 'Peer id that should be pinged',
+      required: true,
+      schema: {
+        $ref: '#/components/schemas/HoprAddress'
       }
     }
-  },
+  ],
   responses: {
     '200': {
       description: 'Ping successful.',

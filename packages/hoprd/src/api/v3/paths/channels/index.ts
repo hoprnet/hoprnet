@@ -15,8 +15,8 @@ import { STATUS_CODES } from '../../utils.js'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
-  channelId: string
-  address: string
+  id: string
+  peerId: string
   status: string
   balance: string
 }
@@ -25,6 +25,8 @@ export interface ChannelTopologyInfo {
   channelId: string
   sourceAddress: string
   destinationAddress: string
+  sourcePeerId: string
+  destinationPeerId: string
   balance: string
   status: string
   ticketIndex: string
@@ -37,11 +39,16 @@ export interface ChannelTopologyInfo {
  * @param channel channelEntry entity saved in the database
  * @returns stringified fields from ChannelEntry and both peer id and address for source/destination
  */
-export const formatChannelTopologyInfo = (channel: ChannelEntry): ChannelTopologyInfo => {
+export const formatChannelTopologyInfo = async (node: Hopr, channel: ChannelEntry): Promise<ChannelTopologyInfo> => {
+  const sourcePeerId = (await node.db.get_account(channel.source)).get_multiaddr_str()
+  const destinationPeerId = (await node.db.get_account(channel.destination)).get_multiaddr_str()
+
   return {
     channelId: channel.get_id().to_hex(),
     sourceAddress: channel.source.to_hex(),
     destinationAddress: channel.destination.to_hex(),
+    sourcePeerId,
+    destinationPeerId,
     balance: channel.balance.to_string(),
     status: channel_status_to_string(channel.status),
     ticketIndex: channel.ticket_index.to_string(),
@@ -53,8 +60,8 @@ export const formatChannelTopologyInfo = (channel: ChannelEntry): ChannelTopolog
 export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
-    channelId: channel.get_id().to_hex(),
-    address: channel.destination.to_string(),
+    id: channel.get_id().to_hex(),
+    peerId: channel.destination.to_string(),
     status: channel_status_to_string(channel.status),
     balance: channel.balance.to_string()
   }
@@ -63,8 +70,8 @@ export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
 export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'incoming',
-    channelId: channel.get_id().to_hex(),
-    address: channel.source.to_string(),
+    id: channel.get_id().to_hex(),
+    peerId: channel.source.to_string(),
     status: channel_status_to_string(channel.status),
     balance: channel.balance.to_string()
   }
@@ -95,7 +102,9 @@ export const getChannels = async (node: Hopr, includingClosed: boolean) => {
  */
 export const getAllChannels = async (node: Hopr) => {
   const channels = await node.getAllChannels()
-  const channelTopology: ChannelTopologyInfo[] = channels.map(formatChannelTopologyInfo)
+  const channelTopology: ChannelTopologyInfo[] = await Promise.all(
+    channels.map((e) => formatChannelTopologyInfo(node, e))
+  )
 
   return { incoming: [], outgoing: [], all: channelTopology }
 }
@@ -315,7 +324,7 @@ const POST: Operation = [
     const openingResult = await openChannel(node, peerId, amount)
 
     if (openingResult.success == true) {
-      res.status(201).send({ channelId: openingResult.channelId, receipt: openingResult.receipt })
+      res.status(201).send({ channelId: openingResult.channelId, transactionReceipt: openingResult.receipt })
     } else {
       switch (openingResult.reason) {
         case STATUS_CODES.NOT_ENOUGH_BALANCE:
@@ -358,7 +367,7 @@ POST.apiDoc = {
             }
           },
           example: {
-            peerId: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12',
+            peerId: '12Diu2HAmUsJwbECMroQUC29LQZZWsYpYZx1',
             amount: '1000000'
           }
         }
@@ -374,15 +383,10 @@ POST.apiDoc = {
             type: 'object',
             properties: {
               channelId: {
-                type: 'string',
-                example: '0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5',
-                description: 'Channel ID that can be used in other calls, not to confuse with transaction hash.'
+                $ref: '#/components/schemas/ChannelId'
               },
-              receipt: {
-                type: 'string',
-                example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e',
-                description:
-                  'Receipt for open channel transaction. Can be used to check status of the smart contract call on blockchain.'
+              transactionReceipt: {
+                $ref: '#/components/schemas/TransactionReceipt'
               }
             }
           }

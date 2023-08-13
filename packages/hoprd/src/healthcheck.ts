@@ -1,7 +1,7 @@
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
-import { debug } from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 import type Hopr from '@hoprnet/hopr-core'
 

@@ -1,7 +1,7 @@
 import sinon from 'sinon'
 import assert from 'assert'
-import { getPeerInfo } from './{peerid}.js'
-import { ALICE_MULTI_ADDR, BOB_MULTI_ADDR, CHARLIE_PEER_ID } from '../../fixtures.js'
+import { getPeerInfo } from './index.js'
+import { ALICE_MULTI_ADDR, BOB_MULTI_ADDR, CHARLIE_PEER_ID } from '../../../fixtures.js'
 
 let node = sinon.fake() as any
 node.getAddressesAnnouncedToDHT = sinon.fake.resolves([ALICE_MULTI_ADDR, BOB_MULTI_ADDR])

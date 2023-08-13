@@ -1,10 +1,10 @@
 openapi: 3.0.3
 servers:
-  - url: /api/v2
+  - url: /api/v3
 info:
   description: This Rest API enables developers to interact with a hoprd node programatically.
-  version: 2.0.0
-  title: HOPRd Rest API v2
+  version: 3.0.0
+  title: HOPRd Rest API v3
   contact:
     email: tech@hoprnet.org
   license:
@@ -272,12 +272,6 @@ components:
           $ref: '#/components/schemas/HoprBalance'
         status:
           $ref: '#/components/schemas/ChannelStatus'
-        commitment:
-          type: string
-          description: Redeemed commitment
-        ticketEpoch:
-          type: string
-          description: Ticket redemption relies on providing the value opening to a series of commitments that have previously been stored on-chain by the ticket recipient.
         ticketIndex:
           type: string
           description: Each ticket is labeled by an ongoing serial number named ticket index i and its current value is stored in the smart contract.

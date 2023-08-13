@@ -1,5 +1,5 @@
 import path from 'path'
-import { debug } from 'debug'
+import { debug } from '@hoprnet/hopr-utils'
 
 import {
   create_gauge,
