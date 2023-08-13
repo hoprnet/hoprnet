@@ -993,6 +993,7 @@ const provider = networkInfo.provider.startsWith('http')
       hoprTokenAddress: deploymentExtract.hoprTokenAddress,
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,
+      hoprNodeSafeRegistryAddress: deploymentExtract.hoprNodeSafeRegistryAddress,
       noticePeriodChannelClosure
     }),
     updateConfirmedTransaction: transactions.moveToConfirmed.bind(

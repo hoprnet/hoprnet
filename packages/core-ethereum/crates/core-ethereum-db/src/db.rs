@@ -765,6 +765,110 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
+    /// Associate node address to a safe address
+    ///
+    /// - `node_address`: node ethereum address
+    /// - `safe_address`: safe address that holds tokens for node
+    /// - `snapshot`: the latest chain snapshot
+    async fn add_to_node_safe_registry(
+        &mut self,
+        node_address: &Address,
+        safe_address: &Address,
+        snapshot: &Snapshot,
+    ) -> Result<()> {
+        let mut addresses = self
+            .find_hopr_node_using_safe_in_node_safe_registry(&safe_address)
+            .await?;
+
+        for addr in addresses.iter() {
+            if node_address == addr {
+                let _ = self
+                    .db
+                    .set(
+                        utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
+                        snapshot,
+                    )
+                    .await?;
+                return Ok(());
+            }
+        }
+
+        addresses.push(node_address.clone());
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        // node chain address to safe address (N->1)
+        batch_ops.put(
+            utils_db::db::Key::new_with_prefix(node_address, NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX)?,
+            safe_address,
+        );
+        // safe address to node chain address (1->M)
+        batch_ops.put(
+            utils_db::db::Key::new_with_prefix(safe_address, NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX)?,
+            addresses,
+        );
+        batch_ops.put(
+            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
+            snapshot,
+        );
+
+        self.db.batch(batch_ops, true).await
+    }
+
+    /// Removes a node from the node safe registry
+    ///
+    /// - `node_address`: the address to remove
+    /// - `safe_address`: the safe account from which the node_address should be removed
+    /// - `snapshot`: latest chain snapshot
+    async fn remove_from_node_safe_registry(
+        &mut self,
+        node_address: &Address,
+        safe_address: &Address,
+        snapshot: &Snapshot,
+    ) -> Result<()> {
+        let registered_nodes = self
+            .find_hopr_node_using_safe_in_node_safe_registry(safe_address)
+            .await?
+            .into_iter()
+            .filter(|addr| !addr.eq(node_address))
+            .collect::<Vec<_>>();
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.del(utils_db::db::Key::new_with_prefix(
+            node_address,
+            NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX,
+        )?);
+        batch_ops.put(
+            utils_db::db::Key::new_with_prefix(safe_address, NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX)?,
+            &registered_nodes,
+        );
+        batch_ops.put(
+            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
+            &snapshot,
+        );
+
+        self.db.batch(batch_ops, true).await
+    }
+
+    /// Gets the safe address that is associated with this node
+    ///
+    /// - `node_address`: the node's chain address
+    async fn get_safe_from_node_safe_registry(&self, node_address: &Address) -> Result<Option<Address>> {
+        let key = utils_db::db::Key::new_with_prefix(node_address, NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX)?;
+
+        self.db.get_or_none::<Address>(key).await
+    }
+
+    /// Gets the registered node addresses associated to the safe address
+    ///
+    /// - `safe_address`: the safe address
+    async fn find_hopr_node_using_safe_in_node_safe_registry(&self, safe_address: &Address) -> Result<Vec<Address>> {
+        // NOTE: behavioral change, this method does not panic, when no results are found,
+        // its returns an empty Vec instead
+
+        let key = utils_db::db::Key::new_with_prefix(safe_address, NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX)?;
+        Ok(self.db.get_or_none::<Vec<Address>>(key).await?.unwrap_or(vec![]))
+    }
+
     async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()> {
         let tid = Hash::create(&[token.id().as_bytes()]);
         let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
@@ -1347,6 +1451,56 @@ pub mod wasm {
             //check_lock_read! {
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.find_hopr_node_using_account_in_network_registry(account).await)
+                .map(|v| WasmVecAddress::from(v))
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn add_to_node_safe_registry(
+            &self,
+            node_address: &Address,
+            safe_address: &Address,
+            snapshot: &Snapshot,
+        ) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.add_to_node_safe_registry(node_address, safe_address, snapshot).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn remove_from_node_safe_registry(
+            &self,
+            node_address: &Address,
+            safe_address: &Address,
+            snapshot: &Snapshot,
+        ) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.remove_from_node_safe_registry(node_address, safe_address, snapshot).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_safe_from_node_safe_registry(&self, node_address: &Address) -> Result<Option<Address>, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_safe_from_node_safe_registry(node_address).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn find_hopr_node_using_safe_in_node_safe_registry(
+            &self,
+            safe_address: &Address,
+        ) -> Result<WasmVecAddress, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.find_hopr_node_using_safe_in_node_safe_registry(safe_address).await)
                 .map(|v| WasmVecAddress::from(v))
             //}
         }

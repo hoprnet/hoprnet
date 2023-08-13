@@ -20,4 +20,6 @@ pub const NETWORK_REGISTRY_HOPR_NODE_PREFIX: &str = "networkRegistry:hopr-node-"
 pub const NETWORK_REGISTRY_ENABLED_PREFIX: &str = "networkRegistry:enabled";
 pub const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: &str = "networkRegistry:addressEligible-";
 pub const NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
+pub const NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX: &str = "nodeSafeRegistry:hopr-node-";
+pub const NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX: &str = "nodeSafeRegistry:addressSafe-";
 pub const API_AUTHORIZATION_TOKEN_KEY_PREFIX: &str = "api:authenticationTokens";

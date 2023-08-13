@@ -127,6 +127,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       chain.getInfo().hoprChannelsAddress,
       chain.getInfo().hoprTokenAddress,
       chain.getInfo().hoprNetworkRegistryAddress,
+      chain.getInfo().hoprNodeSafeRegistryAddress,
       chain.getInfo().hoprAnnouncementsAddress
     )
 
