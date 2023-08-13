@@ -25,7 +25,7 @@ describe('POST /account/withdraw', () => {
   })
 
   it('should withdraw NATIVE successfuly', async () => {
-    const res = await request(service).post('/api/v2/account/withdraw').send({
+    const res = await request(service).post('/api/v3/account/withdraw').send({
       currency: 'NATIVE',
       amount: '1',
       recipient: ALICE_ETH_ADDRESS().to_string()
@@ -37,7 +37,7 @@ describe('POST /account/withdraw', () => {
     })
   })
   it('should withdraw HOPR successfuly', async () => {
-    const res = await request(service).post('/api/v2/account/withdraw').send({
+    const res = await request(service).post('/api/v3/account/withdraw').send({
       currency: 'HOPR',
       amount: '1',
       recipient: ALICE_ETH_ADDRESS().to_string()
@@ -49,7 +49,7 @@ describe('POST /account/withdraw', () => {
     })
   })
   it('should return 400 on incorrect currency in body', async () => {
-    const res = await request(service).post('/api/v2/account/withdraw').send({
+    const res = await request(service).post('/api/v3/account/withdraw').send({
       currency: 'invalidCurrency',
       amount: '1',
       recipient: ALICE_ETH_ADDRESS().to_string()
@@ -61,7 +61,7 @@ describe('POST /account/withdraw', () => {
     })
   })
   it('should return 400 on incorrect amount in body', async () => {
-    const res = await request(service).post('/api/v2/account/withdraw').send({
+    const res = await request(service).post('/api/v3/account/withdraw').send({
       currency: 'NATIVE',
       amount: 'invalidAmount',
       recipient: ALICE_ETH_ADDRESS().to_string()
@@ -73,7 +73,7 @@ describe('POST /account/withdraw', () => {
     })
   })
   it('should return 400 on incorrect address in body', async () => {
-    const res = await request(service).post('/api/v2/account/withdraw').send({
+    const res = await request(service).post('/api/v3/account/withdraw').send({
       currency: 'NATIVE',
       amount: '1',
       recipient: 'invalidAddress'
@@ -86,7 +86,7 @@ describe('POST /account/withdraw', () => {
   })
 
   it('should return 422 when withdrawing more than current balance', async () => {
-    const res = await request(service).post('/api/v2/account/withdraw').send({
+    const res = await request(service).post('/api/v3/account/withdraw').send({
       currency: 'NATIVE',
       amount: '100000000000000000000000000000000000000000000000000000000000000',
       recipient: ALICE_ETH_ADDRESS().to_string()

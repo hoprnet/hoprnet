@@ -39,7 +39,7 @@ describe('POST /tokens', function () {
       capabilities: [{ endpoint: 'tokensCreate' }]
     }
     res = await request(service)
-      .post('/api/v2/tokens')
+      .post('/api/v3/tokens')
       .set('x-auth-token', 'superuser')
       .send(parametersWrongDescription)
     expect(res.status).to.equal(400)
@@ -50,7 +50,7 @@ describe('POST /tokens', function () {
       lifetime: 0,
       capabilities: [{ endpoint: 'tokensCreate' }]
     }
-    res = await request(service).post('/api/v2/tokens').set('x-auth-token', 'superuser').send(parametersWrongLifetime)
+    res = await request(service).post('/api/v3/tokens').set('x-auth-token', 'superuser').send(parametersWrongLifetime)
     expect(res.status).to.equal(400)
     expect(res.body.status).to.equal(STATUS_CODES.INVALID_INPUT)
     expect(res).to.satisfyApiSpec
@@ -59,7 +59,7 @@ describe('POST /tokens', function () {
       lifetime: 0
     }
     res = await request(service)
-      .post('/api/v2/tokens')
+      .post('/api/v3/tokens')
       .set('x-auth-token', 'superuser')
       .send(parametersWrongCapabilitiesMissing)
     expect(res.status).to.equal(400)
@@ -70,7 +70,7 @@ describe('POST /tokens', function () {
       capabilities: []
     }
     res = await request(service)
-      .post('/api/v2/tokens')
+      .post('/api/v3/tokens')
       .set('x-auth-token', 'superuser')
       .send(parametersWrongCapabilitiesEmpty)
     expect(res.status).to.equal(400)
@@ -81,7 +81,7 @@ describe('POST /tokens', function () {
       capabilities: [{ limits: [{ type: 'calls', conditions: { max: 1 } }] }]
     }
     res = await request(service)
-      .post('/api/v2/tokens')
+      .post('/api/v3/tokens')
       .set('x-auth-token', 'superuser')
       .send(parametersWrongCapabilitiesEndpointMissing)
     expect(res.status).to.equal(400)
@@ -96,7 +96,7 @@ describe('POST /tokens', function () {
       capabilities: [{ endpoint: 'tokensCreate' }]
     }
     res = await request(service)
-      .post('/api/v2/tokens')
+      .post('/api/v3/tokens')
       .set('x-auth-token', 'superuser')
       .send(parametersOnlyCapabilities)
     expect(res.status).to.equal(201)
@@ -108,7 +108,7 @@ describe('POST /tokens', function () {
       description: 'todo',
       capabilities: [{ endpoint: 'tokensCreate' }]
     }
-    res = await request(service).post('/api/v2/tokens').set('x-auth-token', 'superuser').send(parametersFull)
+    res = await request(service).post('/api/v3/tokens').set('x-auth-token', 'superuser').send(parametersFull)
     expect(res.status).to.equal(201)
     expect(res.body.token).to.not.be.empty
     expect(res).to.satisfyApiSpec

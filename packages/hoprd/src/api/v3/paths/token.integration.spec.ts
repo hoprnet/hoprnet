@@ -33,13 +33,13 @@ describe('GET /token', function () {
   })
 
   it('should fail with not found error when using superuser token', async function () {
-    const res = await request(service).get('/api/v2/token').set('x-auth-token', 'superuser')
+    const res = await request(service).get('/api/v3/token').set('x-auth-token', 'superuser')
     expect(res.status).to.equal(404)
     expect(res).to.satisfyApiSpec
   })
 
   it('should fail with unauthenticated error when using no token', async function () {
-    const res = await request(service).get('/api/v2/token')
+    const res = await request(service).get('/api/v3/token')
     expect(res.status).to.equal(401)
     expect(res).to.satisfyApiSpec
   })
@@ -50,7 +50,7 @@ describe('GET /token', function () {
     const token = await createToken(node.db, undefined, caps)
     await storeToken(node.db, token)
 
-    const res = await request(service).get('/api/v2/token').set('x-auth-token', token.id)
+    const res = await request(service).get('/api/v3/token').set('x-auth-token', token.id)
     expect(res.status).to.equal(403)
     expect(res).to.satisfyApiSpec
   })
@@ -61,7 +61,7 @@ describe('GET /token', function () {
     const token = await createToken(node.db, undefined, caps)
     await storeToken(node.db, token)
 
-    const res = await request(service).get('/api/v2/token').set('x-auth-token', token.id)
+    const res = await request(service).get('/api/v3/token').set('x-auth-token', token.id)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
   })

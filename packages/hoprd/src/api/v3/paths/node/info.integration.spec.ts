@@ -51,7 +51,7 @@ describe('GET /node/info', () => {
     node.isAllowedAccessToNetwork = sinon.fake.returns(Promise.resolve(true))
     node.getConnectivityHealth = sinon.fake.returns(Health.Green)
 
-    const res = await request(service).get(`/api/v2/node/info`)
+    const res = await request(service).get(`/api/v3/node/info`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({

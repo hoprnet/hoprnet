@@ -123,28 +123,28 @@ describe('GET /node/peers', function () {
   })
 
   it('should return invalid quality when quality is not a number', async function () {
-    const res = await request(service).get(`/api/v2/node/peers?quality=abc`).send()
+    const res = await request(service).get(`/api/v3/node/peers?quality=abc`).send()
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
     expect(res.body.status).to.equal(STATUS_CODES.INVALID_QUALITY)
   })
 
   it('should return invalid quality when quality is greater than 1', async function () {
-    const res = await request(service).get(`/api/v2/node/peers?quality=2`).send()
+    const res = await request(service).get(`/api/v3/node/peers?quality=2`).send()
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
     expect(res.body.status).to.equal(STATUS_CODES.INVALID_QUALITY)
   })
 
   it('should return invalid quality when quality is less than 0', async function () {
-    const res = await request(service).get(`/api/v2/node/peers?quality=-1`).send()
+    const res = await request(service).get(`/api/v3/node/peers?quality=-1`).send()
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
     expect(res.body.status).to.equal(STATUS_CODES.INVALID_QUALITY)
   })
 
   it('should resolve with all data', async function () {
-    const res = await request(service).get(`/api/v2/node/peers`).send()
+    const res = await request(service).get(`/api/v3/node/peers`).send()
 
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
@@ -155,7 +155,7 @@ describe('GET /node/peers', function () {
   })
 
   it('should resolve with active nodes', async function () {
-    const res = await request(service).get(`/api/v2/node/peers?quality=0.5`).send()
+    const res = await request(service).get(`/api/v3/node/peers?quality=0.5`).send()
 
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec

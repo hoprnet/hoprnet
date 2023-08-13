@@ -40,7 +40,7 @@ describe('GET /node/entryNodes', function () {
 
   it('should return invalid quality when quality is not a number', async function () {
     node.getEntryNodes = sinon.fake.resolves([ALICE_ENTRY_INFO, BOB_ENTRY_INFO])
-    const res = await request(service).get(`/api/v2/node/entryNodes`).send()
+    const res = await request(service).get(`/api/v3/node/entryNodes`).send()
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
@@ -60,7 +60,7 @@ describe('GET /node/entryNodes', function () {
       throw Error(`boom`)
     }
 
-    const res = await request(service).get(`/api/v2/node/entryNodes`).send()
+    const res = await request(service).get(`/api/v3/node/entryNodes`).send()
     expect(res.status).to.equal(422)
     expect(res.body.status).to.equal(STATUS_CODES.UNKNOWN_FAILURE)
   })

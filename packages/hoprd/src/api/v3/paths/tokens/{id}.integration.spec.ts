@@ -41,13 +41,13 @@ describe('DELETE /tokens/{id}', function () {
   })
 
   it('should fail with not found error when using superuser token but incorrect token id', async function () {
-    const res = await request(service).delete(`/api/v2/tokens/${token.id}wrong`).set('x-auth-token', 'superuser')
+    const res = await request(service).delete(`/api/v3/tokens/${token.id}wrong`).set('x-auth-token', 'superuser')
     expect(res.status).to.equal(404)
     expect(res).to.satisfyApiSpec
   })
 
   it('should succeed when using superuser token', async function () {
-    const res = await request(service).delete(`/api/v2/tokens/${token.id}`).set('x-auth-token', 'superuser')
+    const res = await request(service).delete(`/api/v3/tokens/${token.id}`).set('x-auth-token', 'superuser')
     expect(res.status).to.equal(204)
     expect(res).to.satisfyApiSpec
 
@@ -56,7 +56,7 @@ describe('DELETE /tokens/{id}', function () {
   })
 
   it('should fail with unauthenticated error when using no token', async function () {
-    const res = await request(service).delete(`/api/v2/tokens/${token.id}`)
+    const res = await request(service).delete(`/api/v3/tokens/${token.id}`)
     expect(res.status).to.equal(401)
     expect(res).to.satisfyApiSpec
   })
@@ -67,7 +67,7 @@ describe('DELETE /tokens/{id}', function () {
     const wrongToken = await createToken(node.db, undefined, caps)
     await storeToken(node.db, wrongToken)
 
-    const res = await request(service).delete(`/api/v2/tokens/${token.id}`).set('x-auth-token', wrongToken.id)
+    const res = await request(service).delete(`/api/v3/tokens/${token.id}`).set('x-auth-token', wrongToken.id)
     expect(res.status).to.equal(403)
     expect(res).to.satisfyApiSpec
   })
@@ -78,7 +78,7 @@ describe('DELETE /tokens/{id}', function () {
     const correctToken = await createToken(node.db, undefined, caps)
     await storeToken(node.db, correctToken)
 
-    const res = await request(service).delete(`/api/v2/tokens/${token.id}`).set('x-auth-token', correctToken.id)
+    const res = await request(service).delete(`/api/v3/tokens/${token.id}`).set('x-auth-token', correctToken.id)
     expect(res.status).to.equal(204)
     expect(res).to.satisfyApiSpec
 

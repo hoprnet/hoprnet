@@ -19,7 +19,7 @@ describe('GET /settings', () => {
   })
 
   it('should return all settings', async () => {
-    const res = await request(service).get(`/api/v2/settings`)
+    const res = await request(service).get(`/api/v3/settings`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
   })

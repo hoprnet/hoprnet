@@ -70,7 +70,7 @@ describe('GET /channels', function () {
   })
 
   it('should get channels list including closed', async function () {
-    const res = await request(service).get('/api/v2/channels?includingClosed=true')
+    const res = await request(service).get('/api/v3/channels?includingClosed=true')
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body.incoming.length).to.be.equal(1)
@@ -80,7 +80,7 @@ describe('GET /channels', function () {
     expect(res.body.outgoing[0].channelId).to.deep.equal(outgoing.get_id().to_hex())
   })
   it('should get channels list excluding closed', async function () {
-    const res = await request(service).get('/api/v2/channels')
+    const res = await request(service).get('/api/v3/channels')
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body.incoming.length).to.be.equal(0)
@@ -88,7 +88,7 @@ describe('GET /channels', function () {
     // expect(res.body.all.length).to.be.equal(0)
   })
   it('should get all the channels', async function () {
-    const res = await request(service).get('/api/v2/channels?fullTopology=true')
+    const res = await request(service).get('/api/v3/channels?fullTopology=true')
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body.incoming.length).to.be.equal(0)
@@ -109,7 +109,7 @@ describe('POST /channels', () => {
   })
 
   it('should open channel', async () => {
-    const res = await request(service).post('/api/v2/channels').send({
+    const res = await request(service).post('/api/v3/channels').send({
       peerId: ALICE_PEER_ID.toString(),
       amount: '1'
     })
@@ -122,7 +122,7 @@ describe('POST /channels', () => {
   })
 
   it('should fail on invalid peerId', async () => {
-    const res = await request(service).post('/api/v2/channels').send({
+    const res = await request(service).post('/api/v3/channels').send({
       peerId: INVALID_PEER_ID,
       amount: '1'
     })
@@ -134,7 +134,7 @@ describe('POST /channels', () => {
   })
 
   it('should fail on invalid amountToFund', async () => {
-    const res = await request(service).post('/api/v2/channels').send({
+    const res = await request(service).post('/api/v3/channels').send({
       peerId: ALICE_PEER_ID.toString(),
       amount: 'abc'
     })
@@ -146,7 +146,7 @@ describe('POST /channels', () => {
   })
 
   it('should fail when out of balance', async () => {
-    const res = await request(service).post('/api/v2/channels').send({
+    const res = await request(service).post('/api/v3/channels').send({
       peerId: ALICE_PEER_ID.toString(),
       amount: '10000000'
     })
@@ -162,7 +162,7 @@ describe('POST /channels', () => {
       throw Error('Channel is already opened')
     }
 
-    const res = await request(service).post('/api/v2/channels').send({
+    const res = await request(service).post('/api/v3/channels').send({
       peerId: ALICE_PEER_ID.toString(),
       amount: '1'
     })

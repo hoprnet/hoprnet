@@ -24,7 +24,7 @@ describe('GET /account/addresses', () => {
     node.getEthereumAddress = sinon.fake.returns(ALICE_ETH_ADDRESS())
     node.getId = sinon.fake.returns(ALICE_PEER_ID)
 
-    const res = await request(service).get('/api/v2/account/addresses')
+    const res = await request(service).get('/api/v3/account/addresses')
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({

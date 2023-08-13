@@ -102,7 +102,7 @@ describe('GET /channels/{peerId}/{direction}', () => {
         return Promise.resolve(outgoingMock)
       }
     }
-    const res = await request(service).get(`/api/v2/channels/${BOB_PEER_ID.toString()}/outgoing`)
+    const res = await request(service).get(`/api/v3/channels/${BOB_PEER_ID.toString()}/outgoing`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
   })
@@ -113,14 +113,14 @@ describe('GET /channels/{peerId}/{direction}', () => {
         return Promise.resolve(incomingMock)
       }
     }
-    const res = await request(service).get(`/api/v2/channels/${BOB_PEER_ID.toString()}/incoming`)
+    const res = await request(service).get(`/api/v3/channels/${BOB_PEER_ID.toString()}/incoming`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
   })
 
   it('should fail for unsupported param', async () => {
     node.getChannel = sinon.stub()
-    const res = await request(service).get(`/api/v2/channels/${BOB_PEER_ID.toString()}/unsupported`)
+    const res = await request(service).get(`/api/v3/channels/${BOB_PEER_ID.toString()}/unsupported`)
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
   })
@@ -141,21 +141,21 @@ describe('DELETE /channels/{peerId}/{direction}', () => {
     const expectedStatus = { channelStatus: 2, receipt: 'receipt' }
     node.closeChannel = sinon.fake.returns({ status: expectedStatus.channelStatus, receipt: expectedStatus.receipt })
 
-    const res = await request(service).delete(`/api/v2/channels/${BOB_PEER_ID.toString()}/outgoing`)
+    const res = await request(service).delete(`/api/v3/channels/${BOB_PEER_ID.toString()}/outgoing`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
   })
 
   it('should fail while closing incoming channels', async () => {
     node.closeChannel = sinon.fake.throws('unknown error')
-    const res = await request(service).delete(`/api/v2/channels/${BOB_PEER_ID.toString()}/incoming`)
+    const res = await request(service).delete(`/api/v3/channels/${BOB_PEER_ID.toString()}/incoming`)
     expect(res.status).to.equal(422)
     expect(res).to.satisfyApiSpec
   })
 
   it('should fail for unsupported param', async () => {
     node.closeChannel = sinon.fake.throws('unknown error')
-    const res = await request(service).delete(`/api/v2/channels/${BOB_PEER_ID.toString()}/unsupported`)
+    const res = await request(service).delete(`/api/v3/channels/${BOB_PEER_ID.toString()}/unsupported`)
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
   })

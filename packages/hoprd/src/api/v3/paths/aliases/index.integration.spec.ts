@@ -21,12 +21,12 @@ describe('GET /aliases', () => {
   })
 
   it('should successfuly get aliases', async () => {
-    await request(service).post('/api/v2/aliases').send({
+    await request(service).post('/api/v3/aliases').send({
       peerId: ALICE_PEER_ID.toString(),
       alias: ALIAS
     })
 
-    const res = await request(service).get(`/api/v2/aliases`)
+    const res = await request(service).get(`/api/v3/aliases`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
@@ -43,7 +43,7 @@ describe('POST /aliases', () => {
     service = loaded.service
   })
   it('should set alias successfuly', async () => {
-    const res = await request(service).post('/api/v2/aliases').send({
+    const res = await request(service).post('/api/v3/aliases').send({
       peerId: ALICE_PEER_ID.toString(),
       alias: ALIAS
     })
@@ -52,7 +52,7 @@ describe('POST /aliases', () => {
     expect(res.body).to.be.empty
   })
   it('should return 400 error on invalid peerId', async () => {
-    const res = await request(service).post('/api/v2/aliases').send({
+    const res = await request(service).post('/api/v3/aliases').send({
       peerId: INVALID_PEER_ID,
       alias: ALIAS
     })

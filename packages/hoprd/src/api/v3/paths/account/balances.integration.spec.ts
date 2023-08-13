@@ -24,7 +24,7 @@ describe('GET /account/balances', () => {
     node.getNativeBalance = sinon.fake.returns(nativeBalance)
     node.getBalance = sinon.fake.returns(balance)
 
-    const res = await request(service).get('/api/v2/account/balances')
+    const res = await request(service).get('/api/v3/account/balances')
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
@@ -36,14 +36,14 @@ describe('GET /account/balances', () => {
   it('should return 422 when either of balances node calls fail', async () => {
     node.getBalance = sinon.fake.throws('')
     node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.HOPR))
-    const res = await request(service).get('/api/v2/account/balances')
+    const res = await request(service).get('/api/v3/account/balances')
     expect(res.status).to.equal(422)
     expect(res).to.satisfyApiSpec
 
     node.getBalance = sinon.fake.returns(new Balance('10', BalanceType.HOPR))
     node.getNativeBalance = sinon.fake.throws('')
 
-    const res2 = await request(service).get('/api/v2/account/balances')
+    const res2 = await request(service).get('/api/v3/account/balances')
     expect(res2.status).to.equal(422)
     expect(res2).to.satisfyApiSpec
   })

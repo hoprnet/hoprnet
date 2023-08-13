@@ -30,7 +30,7 @@ describe('POST /fundmulti', () => {
   })
 
   it('should fund two channels', async () => {
-    const res = await request(service).post('/api/v2/fundmulti').send({
+    const res = await request(service).post('/api/v3/fundmulti').send({
       peerId: BOB_PEER_ID.toString(),
       outgoingAmount: '3',
       incomingAmount: '2'
@@ -43,7 +43,7 @@ describe('POST /fundmulti', () => {
   })
 
   it('should fail on invalid peerId', async () => {
-    const res = await request(service).post('/api/v2/fundmulti').send({
+    const res = await request(service).post('/api/v3/fundmulti').send({
       peerId: INVALID_PEER_ID,
       outgoingAmount: '3',
       incomingAmount: '2'
@@ -56,7 +56,7 @@ describe('POST /fundmulti', () => {
   })
 
   it('should fail on invalid amount', async () => {
-    const res = await request(service).post('/api/v2/fundmulti').send({
+    const res = await request(service).post('/api/v3/fundmulti').send({
       peerId: BOB_PEER_ID.toString(),
       outgoingAmount: '3',
       incomingAmount: 'abc'
@@ -69,7 +69,7 @@ describe('POST /fundmulti', () => {
   })
 
   it('should fail when out of balance', async () => {
-    const res = await request(service).post('/api/v2/fundmulti').send({
+    const res = await request(service).post('/api/v3/fundmulti').send({
       peerId: BOB_PEER_ID.toString(),
       outgoingAmount: '8',
       incomingAmount: '3'

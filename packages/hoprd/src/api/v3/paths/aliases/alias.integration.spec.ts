@@ -21,12 +21,12 @@ describe('GET /aliases/{alias}', () => {
   })
 
   it('should successfuly get alias', async () => {
-    await request(service).post('/api/v2/aliases').send({
+    await request(service).post('/api/v3/aliases').send({
       peerId: ALICE_PEER_ID.toString(),
       alias: ALIAS
     })
 
-    const res = await request(service).get(`/api/v2/aliases/${ALIAS}`)
+    const res = await request(service).get(`/api/v3/aliases/${ALIAS}`)
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
@@ -34,7 +34,7 @@ describe('GET /aliases/{alias}', () => {
     })
   })
   it('should return 404 on invalid peerId', async () => {
-    const res = await request(service).get(`/api/v2/aliases/nonExistingAlias`)
+    const res = await request(service).get(`/api/v3/aliases/nonExistingAlias`)
 
     expect(res.status).to.equal(404)
     expect(res).to.satisfyApiSpec
@@ -54,24 +54,24 @@ describe('DELETE /aliases/{alias}', () => {
   })
 
   it('should remove alias successfuly', async () => {
-    await request(service).post('/api/v2/aliases').send({
+    await request(service).post('/api/v3/aliases').send({
       peerId: ALICE_PEER_ID.toString(),
       alias: ALIAS
     })
 
-    const res = await request(service).delete(`/api/v2/aliases/${ALIAS}`)
+    const res = await request(service).delete(`/api/v3/aliases/${ALIAS}`)
 
     expect(res.status).to.equal(204)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.be.empty
   })
   it("should return 204 even if the alias doesn't exist", async () => {
-    await request(service).post('/api/v2/aliases').send({
+    await request(service).post('/api/v3/aliases').send({
       peerId: ALICE_PEER_ID.toString(),
       alias: 'nonExistingAlias'
     })
 
-    const res = await request(service).delete(`/api/v2/aliases/${ALIAS}`)
+    const res = await request(service).delete(`/api/v3/aliases/${ALIAS}`)
 
     expect(res.status).to.equal(204)
     expect(res).to.satisfyApiSpec
