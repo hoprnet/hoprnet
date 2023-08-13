@@ -48,7 +48,7 @@ export function resolveNetwork(id: string, customProvider?: string): ResolvedNet
 
 export function getContractData(id: string): DeploymentExtract {
   const resolvedNetwork = resolveNetwork(id)
-  
+
   return {
     hoprAnnouncementsAddress: resolvedNetwork.announcements,
     hoprTokenAddress: resolvedNetwork.token,

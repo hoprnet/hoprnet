@@ -7,18 +7,16 @@ pub use hopr_safe_proxy_for_network_registry::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_safe_proxy_for_network_registry {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_manager\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"_stakeThreshold\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"_snapshotBlockNumber\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_nodeSafeRegistry\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"SameValue\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleAdminChanged\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleGranted\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleRevoked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint128\",\"name\":\"blockNumber\",\"type\":\"uint128\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"SnapshotUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"threshold\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ThresholdUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeSafeRegistry\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"TokenAndRegistryUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"MANAGER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakingAccount\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"canOperateFor\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"eligiblity\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleMember\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleMemberCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"grantRole\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"maxAllowedRegistrations\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"nodeSafeRegistry\",\"outputs\":[{\"internalType\":\"contract IHoprNodeSafeRegistry\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceRole\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"revokeRole\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"snapshotBlockNumber\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"stakeThreshold\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"token\",\"outputs\":[{\"internalType\":\"contract IERC777Snapshot\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint128\",\"name\":\"newSnapshotBlock\",\"type\":\"uint128\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateSnapshotBlockNumber\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"newThreshold\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateStakeThreshold\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRSAFEPROXYFORNETWORKREGISTRY_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI)
-            .expect("ABI is always valid")
-    });
+    pub static HOPRSAFEPROXYFORNETWORKREGISTRY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -4765,9 +4763,8 @@ pub mod hopr_safe_proxy_for_network_registry {
         8,
     ];
     ///The bytecode of the contract.
-    pub static HOPRSAFEPROXYFORNETWORKREGISTRY_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRSAFEPROXYFORNETWORKREGISTRY_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -8602,9 +8599,8 @@ pub mod hopr_safe_proxy_for_network_registry {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRSAFEPROXYFORNETWORKREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRSAFEPROXYFORNETWORKREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprSafeProxyForNetworkRegistry<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprSafeProxyForNetworkRegistry<M> {
         fn clone(&self) -> Self {
@@ -8632,17 +8628,12 @@ pub mod hopr_safe_proxy_for_network_registry {
     impl<M: ::ethers::providers::Middleware> HoprSafeProxyForNetworkRegistry<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRSAFEPROXYFORNETWORKREGISTRY_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRSAFEPROXYFORNETWORKREGISTRY_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -8684,17 +8675,13 @@ pub mod hopr_safe_proxy_for_network_registry {
             Ok(deployer)
         }
         ///Calls the contract's `DEFAULT_ADMIN_ROLE` (0xa217fddf) function
-        pub fn default_admin_role(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn default_admin_role(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([162, 23, 253, 223], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `MANAGER_ROLE` (0xec87621c) function
-        pub fn manager_role(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn manager_role(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([236, 135, 98, 28], ())
                 .expect("method not found (this should never happen)")
@@ -8710,10 +8697,7 @@ pub mod hopr_safe_proxy_for_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getRoleAdmin` (0x248a9ca3) function
-        pub fn get_role_admin(
-            &self,
-            role: [u8; 32],
-        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn get_role_admin(&self, role: [u8; 32]) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([36, 138, 156, 163], role)
                 .expect("method not found (this should never happen)")
@@ -8723,10 +8707,7 @@ pub mod hopr_safe_proxy_for_network_registry {
             &self,
             role: [u8; 32],
             index: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([144, 16, 208, 124], (role, index))
                 .expect("method not found (this should never happen)")
@@ -8772,10 +8753,7 @@ pub mod hopr_safe_proxy_for_network_registry {
         ///Calls the contract's `nodeSafeRegistry` (0x6a4a4041) function
         pub fn node_safe_registry(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([106, 74, 64, 65], ())
                 .expect("method not found (this should never happen)")
@@ -8801,37 +8779,25 @@ pub mod hopr_safe_proxy_for_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `snapshotBlockNumber` (0xf25e7108) function
-        pub fn snapshot_block_number(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, u128> {
+        pub fn snapshot_block_number(&self) -> ::ethers::contract::builders::ContractCall<M, u128> {
             self.0
                 .method_hash([242, 94, 113, 8], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `stakeThreshold` (0xf11f77f9) function
-        pub fn stake_threshold(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn stake_threshold(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([241, 31, 119, 249], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `supportsInterface` (0x01ffc9a7) function
-        pub fn supports_interface(
-            &self,
-            interface_id: [u8; 4],
-        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
+        pub fn supports_interface(&self, interface_id: [u8; 4]) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
                 .method_hash([1, 255, 201, 167], interface_id)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `token` (0xfc0c546a) function
-        pub fn token(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn token(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([252, 12, 84, 106], ())
                 .expect("method not found (this should never happen)")
@@ -8857,107 +8823,62 @@ pub mod hopr_safe_proxy_for_network_registry {
         ///Gets the contract's `RoleAdminChanged` event
         pub fn role_admin_changed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RoleAdminChangedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleAdminChangedFilter> {
             self.0.event()
         }
         ///Gets the contract's `RoleGranted` event
         pub fn role_granted_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RoleGrantedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleGrantedFilter> {
             self.0.event()
         }
         ///Gets the contract's `RoleRevoked` event
         pub fn role_revoked_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RoleRevokedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleRevokedFilter> {
             self.0.event()
         }
         ///Gets the contract's `SnapshotUpdated` event
         pub fn snapshot_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            SnapshotUpdatedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SnapshotUpdatedFilter> {
             self.0.event()
         }
         ///Gets the contract's `ThresholdUpdated` event
         pub fn threshold_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            ThresholdUpdatedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ThresholdUpdatedFilter> {
             self.0.event()
         }
         ///Gets the contract's `TokenAndRegistryUpdated` event
         pub fn token_and_registry_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            TokenAndRegistryUpdatedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, TokenAndRegistryUpdatedFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            HoprSafeProxyForNetworkRegistryEvents,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprSafeProxyForNetworkRegistryEvents>
+        {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprSafeProxyForNetworkRegistry<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprSafeProxyForNetworkRegistry<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `SameValue` with signature `SameValue()` and selector `0xc23f6ccb`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "SameValue", abi = "SameValue()")]
     pub struct SameValue;
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "RoleAdminChanged",
-        abi = "RoleAdminChanged(bytes32,bytes32,bytes32)"
-    )]
+    #[ethevent(name = "RoleAdminChanged", abi = "RoleAdminChanged(bytes32,bytes32,bytes32)")]
     pub struct RoleAdminChangedFilter {
         #[ethevent(indexed)]
         pub role: [u8; 32],
@@ -8967,14 +8888,7 @@ pub mod hopr_safe_proxy_for_network_registry {
         pub new_admin_role: [u8; 32],
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "RoleGranted", abi = "RoleGranted(bytes32,address,address)")]
     pub struct RoleGrantedFilter {
@@ -8986,14 +8900,7 @@ pub mod hopr_safe_proxy_for_network_registry {
         pub sender: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "RoleRevoked", abi = "RoleRevoked(bytes32,address,address)")]
     pub struct RoleRevokedFilter {
@@ -9005,14 +8912,7 @@ pub mod hopr_safe_proxy_for_network_registry {
         pub sender: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "SnapshotUpdated", abi = "SnapshotUpdated(uint128)")]
     pub struct SnapshotUpdatedFilter {
@@ -9020,14 +8920,7 @@ pub mod hopr_safe_proxy_for_network_registry {
         pub block_number: u128,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "ThresholdUpdated", abi = "ThresholdUpdated(uint256)")]
     pub struct ThresholdUpdatedFilter {
@@ -9035,19 +8928,9 @@ pub mod hopr_safe_proxy_for_network_registry {
         pub threshold: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "TokenAndRegistryUpdated",
-        abi = "TokenAndRegistryUpdated(address,address)"
-    )]
+    #[ethevent(name = "TokenAndRegistryUpdated", abi = "TokenAndRegistryUpdated(address,address)")]
     pub struct TokenAndRegistryUpdatedFilter {
         #[ethevent(indexed)]
         pub token: ::ethers::core::types::Address,
@@ -9065,44 +8948,26 @@ pub mod hopr_safe_proxy_for_network_registry {
         TokenAndRegistryUpdatedFilter(TokenAndRegistryUpdatedFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprSafeProxyForNetworkRegistryEvents {
-        fn decode_log(
-            log: &::ethers::core::abi::RawLog,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = RoleAdminChangedFilter::decode_log(log) {
-                return Ok(
-                    HoprSafeProxyForNetworkRegistryEvents::RoleAdminChangedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprSafeProxyForNetworkRegistryEvents::RoleAdminChangedFilter(decoded));
             }
             if let Ok(decoded) = RoleGrantedFilter::decode_log(log) {
-                return Ok(
-                    HoprSafeProxyForNetworkRegistryEvents::RoleGrantedFilter(decoded),
-                );
+                return Ok(HoprSafeProxyForNetworkRegistryEvents::RoleGrantedFilter(decoded));
             }
             if let Ok(decoded) = RoleRevokedFilter::decode_log(log) {
-                return Ok(
-                    HoprSafeProxyForNetworkRegistryEvents::RoleRevokedFilter(decoded),
-                );
+                return Ok(HoprSafeProxyForNetworkRegistryEvents::RoleRevokedFilter(decoded));
             }
             if let Ok(decoded) = SnapshotUpdatedFilter::decode_log(log) {
-                return Ok(
-                    HoprSafeProxyForNetworkRegistryEvents::SnapshotUpdatedFilter(decoded),
-                );
+                return Ok(HoprSafeProxyForNetworkRegistryEvents::SnapshotUpdatedFilter(decoded));
             }
             if let Ok(decoded) = ThresholdUpdatedFilter::decode_log(log) {
-                return Ok(
-                    HoprSafeProxyForNetworkRegistryEvents::ThresholdUpdatedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprSafeProxyForNetworkRegistryEvents::ThresholdUpdatedFilter(decoded));
             }
             if let Ok(decoded) = TokenAndRegistryUpdatedFilter::decode_log(log) {
-                return Ok(
-                    HoprSafeProxyForNetworkRegistryEvents::TokenAndRegistryUpdatedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprSafeProxyForNetworkRegistryEvents::TokenAndRegistryUpdatedFilter(
+                    decoded,
+                ));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -9110,95 +8975,60 @@ pub mod hopr_safe_proxy_for_network_registry {
     impl ::core::fmt::Display for HoprSafeProxyForNetworkRegistryEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::RoleAdminChangedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::RoleAdminChangedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RoleGrantedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RoleRevokedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SnapshotUpdatedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ThresholdUpdatedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::TokenAndRegistryUpdatedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::SnapshotUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ThresholdUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::TokenAndRegistryUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<RoleAdminChangedFilter>
-    for HoprSafeProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<RoleAdminChangedFilter> for HoprSafeProxyForNetworkRegistryEvents {
         fn from(value: RoleAdminChangedFilter) -> Self {
             Self::RoleAdminChangedFilter(value)
         }
     }
-    impl ::core::convert::From<RoleGrantedFilter>
-    for HoprSafeProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<RoleGrantedFilter> for HoprSafeProxyForNetworkRegistryEvents {
         fn from(value: RoleGrantedFilter) -> Self {
             Self::RoleGrantedFilter(value)
         }
     }
-    impl ::core::convert::From<RoleRevokedFilter>
-    for HoprSafeProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<RoleRevokedFilter> for HoprSafeProxyForNetworkRegistryEvents {
         fn from(value: RoleRevokedFilter) -> Self {
             Self::RoleRevokedFilter(value)
         }
     }
-    impl ::core::convert::From<SnapshotUpdatedFilter>
-    for HoprSafeProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<SnapshotUpdatedFilter> for HoprSafeProxyForNetworkRegistryEvents {
         fn from(value: SnapshotUpdatedFilter) -> Self {
             Self::SnapshotUpdatedFilter(value)
         }
     }
-    impl ::core::convert::From<ThresholdUpdatedFilter>
-    for HoprSafeProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<ThresholdUpdatedFilter> for HoprSafeProxyForNetworkRegistryEvents {
         fn from(value: ThresholdUpdatedFilter) -> Self {
             Self::ThresholdUpdatedFilter(value)
         }
     }
-    impl ::core::convert::From<TokenAndRegistryUpdatedFilter>
-    for HoprSafeProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<TokenAndRegistryUpdatedFilter> for HoprSafeProxyForNetworkRegistryEvents {
         fn from(value: TokenAndRegistryUpdatedFilter) -> Self {
             Self::TokenAndRegistryUpdatedFilter(value)
         }
     }
     ///Container type for all input parameters for the `DEFAULT_ADMIN_ROLE` function with signature `DEFAULT_ADMIN_ROLE()` and selector `0xa217fddf`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "DEFAULT_ADMIN_ROLE", abi = "DEFAULT_ADMIN_ROLE()")]
     pub struct DefaultAdminRoleCall;
     ///Container type for all input parameters for the `MANAGER_ROLE` function with signature `MANAGER_ROLE()` and selector `0xec87621c`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "MANAGER_ROLE", abi = "MANAGER_ROLE()")]
     pub struct ManagerRoleCall;
     ///Container type for all input parameters for the `canOperateFor` function with signature `canOperateFor(address,address)` and selector `0xd85ad044`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "canOperateFor", abi = "canOperateFor(address,address)")]
     pub struct CanOperateForCall {
@@ -9207,14 +9037,7 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `getRoleAdmin` function with signature `getRoleAdmin(bytes32)` and selector `0x248a9ca3`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "getRoleAdmin", abi = "getRoleAdmin(bytes32)")]
     pub struct GetRoleAdminCall {
@@ -9222,14 +9045,7 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `getRoleMember` function with signature `getRoleMember(bytes32,uint256)` and selector `0x9010d07c`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "getRoleMember", abi = "getRoleMember(bytes32,uint256)")]
     pub struct GetRoleMemberCall {
@@ -9238,14 +9054,7 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `getRoleMemberCount` function with signature `getRoleMemberCount(bytes32)` and selector `0xca15c873`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "getRoleMemberCount", abi = "getRoleMemberCount(bytes32)")]
     pub struct GetRoleMemberCountCall {
@@ -9253,14 +9062,7 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `grantRole` function with signature `grantRole(bytes32,address)` and selector `0x2f2ff15d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "grantRole", abi = "grantRole(bytes32,address)")]
     pub struct GrantRoleCall {
@@ -9269,14 +9071,7 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `hasRole` function with signature `hasRole(bytes32,address)` and selector `0x91d14854`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "hasRole", abi = "hasRole(bytes32,address)")]
     pub struct HasRoleCall {
@@ -9285,45 +9080,21 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `maxAllowedRegistrations` function with signature `maxAllowedRegistrations(address)` and selector `0xb3544e82`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "maxAllowedRegistrations",
-        abi = "maxAllowedRegistrations(address)"
-    )]
+    #[ethcall(name = "maxAllowedRegistrations", abi = "maxAllowedRegistrations(address)")]
     pub struct MaxAllowedRegistrationsCall {
         pub safe_address: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `nodeSafeRegistry` function with signature `nodeSafeRegistry()` and selector `0x6a4a4041`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "nodeSafeRegistry", abi = "nodeSafeRegistry()")]
     pub struct NodeSafeRegistryCall;
     ///Container type for all input parameters for the `renounceRole` function with signature `renounceRole(bytes32,address)` and selector `0x36568abe`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "renounceRole", abi = "renounceRole(bytes32,address)")]
     pub struct RenounceRoleCall {
@@ -9332,14 +9103,7 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `revokeRole` function with signature `revokeRole(bytes32,address)` and selector `0xd547741f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "revokeRole", abi = "revokeRole(bytes32,address)")]
     pub struct RevokeRoleCall {
@@ -9348,40 +9112,19 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `snapshotBlockNumber` function with signature `snapshotBlockNumber()` and selector `0xf25e7108`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "snapshotBlockNumber", abi = "snapshotBlockNumber()")]
     pub struct SnapshotBlockNumberCall;
     ///Container type for all input parameters for the `stakeThreshold` function with signature `stakeThreshold()` and selector `0xf11f77f9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "stakeThreshold", abi = "stakeThreshold()")]
     pub struct StakeThresholdCall;
     ///Container type for all input parameters for the `supportsInterface` function with signature `supportsInterface(bytes4)` and selector `0x01ffc9a7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "supportsInterface", abi = "supportsInterface(bytes4)")]
     pub struct SupportsInterfaceCall {
@@ -9389,45 +9132,21 @@ pub mod hopr_safe_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `token` function with signature `token()` and selector `0xfc0c546a`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "token", abi = "token()")]
     pub struct TokenCall;
     ///Container type for all input parameters for the `updateSnapshotBlockNumber` function with signature `updateSnapshotBlockNumber(uint128)` and selector `0x5abe5308`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "updateSnapshotBlockNumber",
-        abi = "updateSnapshotBlockNumber(uint128)"
-    )]
+    #[ethcall(name = "updateSnapshotBlockNumber", abi = "updateSnapshotBlockNumber(uint128)")]
     pub struct UpdateSnapshotBlockNumberCall {
         pub new_snapshot_block: u128,
     }
     ///Container type for all input parameters for the `updateStakeThreshold` function with signature `updateStakeThreshold(uint256)` and selector `0x5ef53329`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "updateStakeThreshold", abi = "updateStakeThreshold(uint256)")]
     pub struct UpdateStakeThresholdCall {
@@ -9456,96 +9175,60 @@ pub mod hopr_safe_proxy_for_network_registry {
         UpdateStakeThreshold(UpdateStakeThresholdCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprSafeProxyForNetworkRegistryCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <DefaultAdminRoleCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <DefaultAdminRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::DefaultAdminRole(decoded));
             }
-            if let Ok(decoded)
-                = <ManagerRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ManagerRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ManagerRole(decoded));
             }
-            if let Ok(decoded)
-                = <CanOperateForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CanOperateForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CanOperateFor(decoded));
             }
-            if let Ok(decoded)
-                = <GetRoleAdminCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetRoleAdminCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetRoleAdmin(decoded));
             }
-            if let Ok(decoded)
-                = <GetRoleMemberCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetRoleMemberCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetRoleMember(decoded));
             }
-            if let Ok(decoded)
-                = <GetRoleMemberCountCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetRoleMemberCountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetRoleMemberCount(decoded));
             }
-            if let Ok(decoded)
-                = <GrantRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GrantRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GrantRole(decoded));
             }
-            if let Ok(decoded)
-                = <HasRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <HasRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::HasRole(decoded));
             }
-            if let Ok(decoded)
-                = <MaxAllowedRegistrationsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MaxAllowedRegistrationsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MaxAllowedRegistrations(decoded));
             }
-            if let Ok(decoded)
-                = <NodeSafeRegistryCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <NodeSafeRegistryCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NodeSafeRegistry(decoded));
             }
-            if let Ok(decoded)
-                = <RenounceRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RenounceRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RenounceRole(decoded));
             }
-            if let Ok(decoded)
-                = <RevokeRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RevokeRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevokeRole(decoded));
             }
-            if let Ok(decoded)
-                = <SnapshotBlockNumberCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <SnapshotBlockNumberCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SnapshotBlockNumber(decoded));
             }
-            if let Ok(decoded)
-                = <StakeThresholdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <StakeThresholdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::StakeThreshold(decoded));
             }
-            if let Ok(decoded)
-                = <SupportsInterfaceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <SupportsInterfaceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SupportsInterface(decoded));
             }
-            if let Ok(decoded)
-                = <TokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Token(decoded));
             }
-            if let Ok(decoded)
-                = <UpdateSnapshotBlockNumberCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <UpdateSnapshotBlockNumberCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UpdateSnapshotBlockNumber(decoded));
             }
-            if let Ok(decoded)
-                = <UpdateStakeThresholdCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <UpdateStakeThresholdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UpdateStakeThreshold(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -9554,56 +9237,24 @@ pub mod hopr_safe_proxy_for_network_registry {
     impl ::ethers::core::abi::AbiEncode for HoprSafeProxyForNetworkRegistryCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::DefaultAdminRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ManagerRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::CanOperateFor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetRoleAdmin(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetRoleMember(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetRoleMemberCount(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GrantRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::DefaultAdminRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ManagerRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::CanOperateFor(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetRoleAdmin(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetRoleMember(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetRoleMemberCount(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GrantRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::HasRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MaxAllowedRegistrations(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NodeSafeRegistry(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RenounceRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RevokeRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SnapshotBlockNumber(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::StakeThreshold(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SupportsInterface(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::MaxAllowedRegistrations(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NodeSafeRegistry(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RenounceRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RevokeRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SnapshotBlockNumber(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::StakeThreshold(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SupportsInterface(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Token(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::UpdateSnapshotBlockNumber(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::UpdateStakeThreshold(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::UpdateSnapshotBlockNumber(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::UpdateStakeThreshold(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -9615,64 +9266,48 @@ pub mod hopr_safe_proxy_for_network_registry {
                 Self::CanOperateFor(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRoleAdmin(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRoleMember(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetRoleMemberCount(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::GetRoleMemberCount(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GrantRole(element) => ::core::fmt::Display::fmt(element, f),
                 Self::HasRole(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MaxAllowedRegistrations(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::MaxAllowedRegistrations(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NodeSafeRegistry(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RenounceRole(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevokeRole(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SnapshotBlockNumber(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::SnapshotBlockNumber(element) => ::core::fmt::Display::fmt(element, f),
                 Self::StakeThreshold(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SupportsInterface(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Token(element) => ::core::fmt::Display::fmt(element, f),
-                Self::UpdateSnapshotBlockNumber(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::UpdateStakeThreshold(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::UpdateSnapshotBlockNumber(element) => ::core::fmt::Display::fmt(element, f),
+                Self::UpdateStakeThreshold(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<DefaultAdminRoleCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<DefaultAdminRoleCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: DefaultAdminRoleCall) -> Self {
             Self::DefaultAdminRole(value)
         }
     }
-    impl ::core::convert::From<ManagerRoleCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<ManagerRoleCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: ManagerRoleCall) -> Self {
             Self::ManagerRole(value)
         }
     }
-    impl ::core::convert::From<CanOperateForCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<CanOperateForCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: CanOperateForCall) -> Self {
             Self::CanOperateFor(value)
         }
     }
-    impl ::core::convert::From<GetRoleAdminCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<GetRoleAdminCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: GetRoleAdminCall) -> Self {
             Self::GetRoleAdmin(value)
         }
     }
-    impl ::core::convert::From<GetRoleMemberCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<GetRoleMemberCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: GetRoleMemberCall) -> Self {
             Self::GetRoleMember(value)
         }
     }
-    impl ::core::convert::From<GetRoleMemberCountCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<GetRoleMemberCountCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: GetRoleMemberCountCall) -> Self {
             Self::GetRoleMemberCount(value)
         }
@@ -9687,20 +9322,17 @@ pub mod hopr_safe_proxy_for_network_registry {
             Self::HasRole(value)
         }
     }
-    impl ::core::convert::From<MaxAllowedRegistrationsCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<MaxAllowedRegistrationsCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: MaxAllowedRegistrationsCall) -> Self {
             Self::MaxAllowedRegistrations(value)
         }
     }
-    impl ::core::convert::From<NodeSafeRegistryCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<NodeSafeRegistryCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: NodeSafeRegistryCall) -> Self {
             Self::NodeSafeRegistry(value)
         }
     }
-    impl ::core::convert::From<RenounceRoleCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<RenounceRoleCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: RenounceRoleCall) -> Self {
             Self::RenounceRole(value)
         }
@@ -9710,20 +9342,17 @@ pub mod hopr_safe_proxy_for_network_registry {
             Self::RevokeRole(value)
         }
     }
-    impl ::core::convert::From<SnapshotBlockNumberCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<SnapshotBlockNumberCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: SnapshotBlockNumberCall) -> Self {
             Self::SnapshotBlockNumber(value)
         }
     }
-    impl ::core::convert::From<StakeThresholdCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<StakeThresholdCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: StakeThresholdCall) -> Self {
             Self::StakeThreshold(value)
         }
     }
-    impl ::core::convert::From<SupportsInterfaceCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<SupportsInterfaceCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: SupportsInterfaceCall) -> Self {
             Self::SupportsInterface(value)
         }
@@ -9733,174 +9362,81 @@ pub mod hopr_safe_proxy_for_network_registry {
             Self::Token(value)
         }
     }
-    impl ::core::convert::From<UpdateSnapshotBlockNumberCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<UpdateSnapshotBlockNumberCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: UpdateSnapshotBlockNumberCall) -> Self {
             Self::UpdateSnapshotBlockNumber(value)
         }
     }
-    impl ::core::convert::From<UpdateStakeThresholdCall>
-    for HoprSafeProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<UpdateStakeThresholdCall> for HoprSafeProxyForNetworkRegistryCalls {
         fn from(value: UpdateStakeThresholdCall) -> Self {
             Self::UpdateStakeThreshold(value)
         }
     }
     ///Container type for all return fields from the `DEFAULT_ADMIN_ROLE` function with signature `DEFAULT_ADMIN_ROLE()` and selector `0xa217fddf`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct DefaultAdminRoleReturn(pub [u8; 32]);
     ///Container type for all return fields from the `MANAGER_ROLE` function with signature `MANAGER_ROLE()` and selector `0xec87621c`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct ManagerRoleReturn(pub [u8; 32]);
     ///Container type for all return fields from the `canOperateFor` function with signature `canOperateFor(address,address)` and selector `0xd85ad044`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct CanOperateForReturn {
         pub eligiblity: bool,
     }
     ///Container type for all return fields from the `getRoleAdmin` function with signature `getRoleAdmin(bytes32)` and selector `0x248a9ca3`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct GetRoleAdminReturn(pub [u8; 32]);
     ///Container type for all return fields from the `getRoleMember` function with signature `getRoleMember(bytes32,uint256)` and selector `0x9010d07c`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct GetRoleMemberReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `getRoleMemberCount` function with signature `getRoleMemberCount(bytes32)` and selector `0xca15c873`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct GetRoleMemberCountReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `hasRole` function with signature `hasRole(bytes32,address)` and selector `0x91d14854`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct HasRoleReturn(pub bool);
     ///Container type for all return fields from the `maxAllowedRegistrations` function with signature `maxAllowedRegistrations(address)` and selector `0xb3544e82`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MaxAllowedRegistrationsReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `nodeSafeRegistry` function with signature `nodeSafeRegistry()` and selector `0x6a4a4041`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct NodeSafeRegistryReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `snapshotBlockNumber` function with signature `snapshotBlockNumber()` and selector `0xf25e7108`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct SnapshotBlockNumberReturn(pub u128);
     ///Container type for all return fields from the `stakeThreshold` function with signature `stakeThreshold()` and selector `0xf11f77f9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct StakeThresholdReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `supportsInterface` function with signature `supportsInterface(bytes4)` and selector `0x01ffc9a7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct SupportsInterfaceReturn(pub bool);
     ///Container type for all return fields from the `token` function with signature `token()` and selector `0xfc0c546a`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct TokenReturn(pub ::ethers::core::types::Address);
 }

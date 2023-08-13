@@ -518,6 +518,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bs58"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5353f36341f7451062466f0b755b96ac3a9547e4d7f6b70d603fc721a7d7896"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "build_const"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -746,7 +755,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b30a84aab436fcb256a2ab3c80663d8aec686e6bae12827bb05fef3e1e439c9f"
 dependencies = [
  "bincode",
- "bs58",
+ "bs58 0.4.0",
  "coins-core",
  "digest 0.10.7",
  "getrandom 0.2.10",
@@ -783,7 +792,7 @@ checksum = "9b949a1c63fb7eb591eb7ba438746326aedf0ae843e51ec92ba6bec5bb382c4f"
 dependencies = [
  "base64 0.21.2",
  "bech32",
- "bs58",
+ "bs58 0.4.0",
  "digest 0.10.7",
  "generic-array",
  "hex",
@@ -1078,6 +1087,9 @@ dependencies = [
  "mockall",
  "parameterized",
  "rusty-leveldb",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_bytes",
  "serial_test",
  "thiserror",
  "utils-db",
@@ -2457,6 +2469,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "hoprd-inbox"
+version = "0.1.0"
+dependencies = [
+ "async-lock",
+ "async-std",
+ "async-trait",
+ "console_error_panic_hook",
+ "core-packet",
+ "gloo-timers",
+ "hex",
+ "js-sys",
+ "ringbuffer",
+ "serde-wasm-bindgen",
+ "tempfile",
+ "utils-log",
+ "utils-misc",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "hoprd-keypair"
 version = "0.1.0"
 dependencies = [
@@ -2877,19 +2912,19 @@ checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 
 [[package]]
 name = "libp2p-identity"
-version = "0.1.2"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e2d584751cecb2aabaa56106be6be91338a60a0f4e420cf2af639204f596fc1"
+checksum = "a38d6012784fe4cc14e6d443eb415b11fc7c456dc15d9f0d90d9b70bc7ac3ec1"
 dependencies = [
  "asn1_der",
- "bs58",
+ "bs58 0.5.0",
  "ed25519-dalek",
  "libsecp256k1",
  "log",
- "multiaddr",
- "multihash",
+ "multihash 0.19.0",
  "quick-protobuf",
  "rand 0.8.5",
+ "serde",
  "sha2 0.10.7",
  "thiserror",
  "zeroize",
@@ -3077,7 +3112,7 @@ dependencies = [
  "data-encoding",
  "log",
  "multibase",
- "multihash",
+ "multihash 0.17.0",
  "percent-encoding",
  "serde",
  "static_assertions",
@@ -3104,6 +3139,16 @@ checksum = "835d6ff01d610179fbce3de1694d007e500bf33a7f29689838941d6bf783ae40"
 dependencies = [
  "core2",
  "multihash-derive",
+ "unsigned-varint",
+]
+
+[[package]]
+name = "multihash"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fd59dcc2bbe70baabeac52cd22ae52c55eefe6c38ff11a9439f16a350a939f2"
+dependencies = [
+ "core2",
  "unsigned-varint",
 ]
 
@@ -3901,6 +3946,12 @@ dependencies = [
  "web-sys",
  "winapi",
 ]
+
+[[package]]
+name = "ringbuffer"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4eba9638e96ac5a324654f8d47fb71c5e21abef0f072740ed9c1d4b0801faa37"
 
 [[package]]
 name = "ripemd"

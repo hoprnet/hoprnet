@@ -10,9 +10,9 @@ pub mod wasm {
 
     // Temporarily re-export core-ethereum-misc commitments
     #[allow(unused_imports)]
-    use core_ethereum_misc::constants::wasm::*;
-    #[allow(unused_imports)]
     use core_ethereum_misc::chain::wasm::*;
+    #[allow(unused_imports)]
+    use core_ethereum_misc::constants::wasm::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]

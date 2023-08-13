@@ -39,51 +39,39 @@
 // }
 
 describe('hopr core (instance)', function () {
-// TODO: keying material has changed
-//   it('start and stop Hopr node', async function () {
-//     const stunServers = await Promise.all(Array.from({ length: 2 }, (_) => startStunServer()))
-
-//     this.timeout(15000)
-//     log('Clean up data folder from previous attempts')
-//     await rm(sampleOptions.dataPath, { recursive: true, force: true })
-
-//     const opts: HoprOptions = {
-//       ...sampleOptions,
-
-//       testing: {
-//         preferLocalAddresses: true,
-//         localModeStun: true
-//       }
-//     } as HoprOptions
-
-//     log('Creating hopr node...')
-//     HoprCoreEthereum.createMockInstance(peerId)
-//     const db = new LevelDb()
-//     await db.backend.open()
-
-//     const node = new Hopr(
-//       peerId,
-//       new Database(db, PublicKey.from_peerid_str(peerId.toString()).to_address()),
-//       opts as HoprOptions
-//     )
-
-//     log('Node created with Id', node.getId().toString())
-//     assert(node instanceof Hopr)
-
-//     log('Starting node')
-//     await node.start(stunServerToAddress(stunServers))
-
-//     // Give libp2p some time to initialize
-//     await setTimeout(8000)
-
-//     await node.stop()
-//     await HoprCoreEthereum.getInstance().stop()
-
-//     await setTimeout(100)
-
-//     log('Clean up data folder')
-//     await rm(sampleOptions.dataPath, { recursive: true, force: true })
-
-//     await Promise.all(stunServers.map((s) => s.close()))
-//   })
+  // TODO: keying material has changed
+  //   it('start and stop Hopr node', async function () {
+  //     const stunServers = await Promise.all(Array.from({ length: 2 }, (_) => startStunServer()))
+  //     this.timeout(15000)
+  //     log('Clean up data folder from previous attempts')
+  //     await rm(sampleOptions.dataPath, { recursive: true, force: true })
+  //     const opts: HoprOptions = {
+  //       ...sampleOptions,
+  //       testing: {
+  //         preferLocalAddresses: true,
+  //         localModeStun: true
+  //       }
+  //     } as HoprOptions
+  //     log('Creating hopr node...')
+  //     HoprCoreEthereum.createMockInstance(peerId)
+  //     const db = new LevelDb()
+  //     await db.backend.open()
+  //     const node = new Hopr(
+  //       peerId,
+  //       new Database(db, PublicKey.from_peerid_str(peerId.toString()).to_address()),
+  //       opts as HoprOptions
+  //     )
+  //     log('Node created with Id', node.getId().toString())
+  //     assert(node instanceof Hopr)
+  //     log('Starting node')
+  //     await node.start(stunServerToAddress(stunServers))
+  //     // Give libp2p some time to initialize
+  //     await setTimeout(8000)
+  //     await node.stop()
+  //     await HoprCoreEthereum.getInstance().stop()
+  //     await setTimeout(100)
+  //     log('Clean up data folder')
+  //     await rm(sampleOptions.dataPath, { recursive: true, force: true })
+  //     await Promise.all(stunServers.map((s) => s.close()))
+  //   })
 })

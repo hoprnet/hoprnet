@@ -27,6 +27,7 @@ import { SettingKey, StateOps } from '../types.js'
 import type { LogStream } from './../logs.js'
 import type { Token } from './token.js'
 import { Database } from '../../../core/lib/core_hopr.js'
+import { ApplicationData, MessageInbox } from '../../lib/hoprd_inbox.js'
 
 const debugLog = debug('hoprd:api:v2')
 
@@ -103,6 +104,7 @@ export async function setupRestApi(
   service: Application,
   urlPath: string,
   node: Hopr,
+  inbox: MessageInbox,
   stateOps: StateOps,
   options: {
     apiToken?: string
@@ -120,12 +122,12 @@ export async function setupRestApi(
   service.use(
     urlPath,
     function addNodeContext(req, _res, next) {
-      req.context = { node, stateOps }
+      req.context = { node, inbox, stateOps }
       next()
     }
       // Need to explicitly bind the instances to the function
       // to make sure the right instances are present
-      .bind({ node, stateOps })
+      .bind({ node, inbox, stateOps })
   )
   // because express-openapi uses relative paths we need to figure out where
   // we are exactly
@@ -345,11 +347,11 @@ export function setupWsApi(
     })
 
     if (path === WS_PATHS.MESSAGES) {
-      node.on('hopr:message', (msg: Uint8Array) => {
+      node.on('hopr:message', (data: ApplicationData) => {
         // FIXME: change this to send an actual string with a proper prefix in
         // Providence instead of the string representation of an rlp-encoded
         // value
-        socket.send(msg.toString())
+        socket.send(data.plain_text.toString())
       })
       node.on('hopr:message-ack-challenge', (ackChallenge: string) => {
         socket.send(`ack-challenge:${ackChallenge}`)

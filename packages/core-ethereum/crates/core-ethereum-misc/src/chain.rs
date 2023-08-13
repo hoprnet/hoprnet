@@ -11,7 +11,7 @@ use utils_types::primitives::Address;
 pub async fn prepare_redeem_ticket<T>(
     db: &T,
     counterparty: &Address,
-    channel_id: &Hash,
+    _channel_id: &Hash,
     acked_ticket: &mut AcknowledgedTicket,
 ) -> Result<Hash>
 where
