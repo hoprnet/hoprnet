@@ -1,26 +1,16 @@
-pub mod errors;
-pub mod interaction;
-pub mod packet;
-pub mod path;
-pub mod por;
-pub mod validation;
+pub mod inbox;
+pub mod ring;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-
     use utils_log::logger::JsLogger;
-    use wasm_bindgen::prelude::*;
-
-    // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
-    #[cfg(feature = "wee_alloc")]
-    #[global_allocator]
-    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     static LOGGER: JsLogger = JsLogger {};
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn core_packet_initialize_crate() {
+    pub fn hoprd_inbox_initialize_crate() {
         let _ = JsLogger::install(&LOGGER, None);
 
         // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -33,9 +23,8 @@ pub mod wasm {
         console_error_panic_hook::set_once();
     }
 
-    #[cfg(feature = "prometheus")]
-    #[wasm_bindgen]
-    pub fn core_packet_gather_metrics() -> utils_misc::utils::wasm::JsResult<String> {
-        utils_metrics::metrics::wasm::gather_all_metrics()
-    }
+    // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
+    #[cfg(feature = "wee_alloc")]
+    #[global_allocator]
+    static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 }
