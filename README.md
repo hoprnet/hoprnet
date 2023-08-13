@@ -288,6 +288,32 @@ make fund-local-all
 make run-hopr-admin &
 ```
 
+Running one node in test mode, with safe and module attached
+```sh
+# build deps and HOPRd code
+make -j deps && make -j build
+
+# starting network
+make run-anvil
+
+# update protocol-config
+scripts/update-protocol-config.sh -n anvil-localhost
+
+# create identity files
+make create-local-identity
+
+# create a safe and a node management module instance,
+# and passing the created safe and module as argument to 
+# run a test node local (separate terminal)
+make run-local-with-safe
+
+# fund all your nodes to get started
+make fund-local-all id_dir=`pwd`
+
+# start local HOPR admin in a container (and put into background)
+make run-hopr-admin &
+```
+
 ## Local cluster
 
 The best way to test with multiple HOPR nodes is by using a local cluster of interconnected nodes.
