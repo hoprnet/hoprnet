@@ -1,10 +1,12 @@
 import type { Operation } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { create_counter, OffchainPublicKey } from '@hoprnet/hopr-utils'
+import { create_counter, OffchainPublicKey, debug } from '@hoprnet/hopr-utils'
+
 import { STATUS_CODES } from '../../utils.js'
 import { encodeMessage } from '../../../utils.js'
-import { RPCH_MESSAGE_REGEXP } from '../../../v2.js'
-import { log } from 'debug'
+import { RPCH_MESSAGE_REGEXP } from '../../../v3.js'
+
+const log = debug('hoprd:api:v3:messages')
 
 const metric_successfulSendApiCalls = create_counter(
   'hoprd_counter_api_successful_send_msg',
@@ -15,8 +17,21 @@ const metric_failedSendApiCalls = create_counter(
   'Number of failed API calls to POST message endpoint'
 )
 
+const DELETE: Operation = [
+  async (req, res, _next) => {
+    const tag = req.body.tag
+
+    // the popped messages are ignored
+    // @ts-ignore unused-variable
+    const _messages = await req.context.inbox.pop_all(tag)
+
+    return res.status(204).send()
+  }
+]
+
 const POST: Operation = [
   async (req, res, _next) => {
+    const tag = req.body.tag
     const message = encodeMessage(req.body.body)
     const recipient = peerIdFromString(req.body.recipient)
     const hops = req.body.hops
@@ -28,7 +43,7 @@ const POST: Operation = [
     }
 
     try {
-      let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops)
+      let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops, tag)
       log(`after sending message`)
       metric_successfulSendApiCalls.increment()
       return res.status(202).json(ackChallenge)
@@ -46,6 +61,33 @@ const POST: Operation = [
   }
 ]
 
+DELETE.apiDoc = {
+  description: 'Delete messages from nodes message inbox. Does not return any data.',
+  tags: ['Messages'],
+  operationId: 'messagesDeleteMessages',
+  parameters: [
+    {
+      in: 'query',
+      name: 'tag',
+      description: 'Tag used to filter target messages.',
+      schema: {
+        $ref: '#/components/schemas/MessageTag'
+      }
+    }
+  ],
+  responses: {
+    '204': {
+      description: 'Messages successfully deleted.'
+    },
+    '401': {
+      $ref: '#/components/responses/Unauthorized'
+    },
+    '403': {
+      $ref: '#/components/responses/Forbidden'
+    }
+  }
+}
+
 POST.apiDoc = {
   description:
     'Send a message to another peer using a given path (list of node addresses that should relay our message through network). If no path is given, HOPR will attempt to find a path.',
@@ -56,18 +98,19 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['body', 'recipient'],
+          required: ['tag', 'body', 'recipient'],
           properties: {
+            tag: {
+              $ref: '#/components/schemas/MessageTag'
+            },
             body: {
-              description: 'The message body which should be sent.',
-              type: 'string',
-              example: 'Hello'
+              $ref: '#/components/schemas/MessageBody'
             },
             recipient: {
               description: 'The recipient HOPR peer id, to which the message is sent.',
               type: 'string',
               format: 'peerId',
-              example: '16Uiu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF7dizh32QFTNWMic2b'
+              example: '12Diu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF'
             },
             path: {
               description:
@@ -79,7 +122,7 @@ POST.apiDoc = {
                 format: 'peerId',
                 minItems: 1,
                 maxItems: 3,
-                example: '16Uiu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMfj8zFypBRACmrJc16n'
+                example: '12Diu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMf'
               }
             },
             hops: {
@@ -131,4 +174,4 @@ POST.apiDoc = {
   }
 }
 
-export default { POST }
+export default { DELETE, POST }

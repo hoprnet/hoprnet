@@ -17,19 +17,18 @@ import {
   encodeMessage
 } from './utils.js'
 import { authenticateToken, authorizeToken, validateTokenCapabilities } from './token.js'
-import { STATUS_CODES } from './v2/utils.js'
+import { STATUS_CODES } from './v3/utils.js'
 
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocket, WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
 import { SettingKey, StateOps } from '../types.js'
-import type { LogStream } from './../logs.js'
 import type { Token } from './token.js'
 import { Database } from '../../../core/lib/core_hopr.js'
 import { ApplicationData, MessageInbox } from '../../lib/hoprd_inbox.js'
 
-const debugLog = debug('hoprd:api:v2')
+const debugLog = debug('hoprd:api:v3')
 
 enum AuthResult {
   Failed,
@@ -97,9 +96,9 @@ async function authenticateAndAuthorize(
 
 export const RPCH_MESSAGE_REGEXP = /^(\d+)\|\d+\|\d+\|[\w\W]+$/
 
-// The Rest API v2 is uses JSON for input and output, is validated through a
+// The Rest API v3 is uses JSON for input and output, is validated through a
 // Swagger schema which is also accessible for testing at:
-// http://localhost:3001/api/v2/_swagger
+// http://localhost:3001/api/v3/_swagger
 export async function setupRestApi(
   service: Application,
   urlPath: string,
@@ -134,9 +133,9 @@ export async function setupRestApi(
   const cwd = process.cwd()
   const packagePath = path.dirname(new URL('../../package.json', import.meta.url).pathname)
   const relPath = path.relative(cwd, packagePath)
-  const apiBaseSpecPath = path.join(relPath, 'rest-api-v2-spec.yaml')
-  const apiFullSpecPath = path.join(relPath, 'rest-api-v2-full-spec.json')
-  const apiPathsPath = path.join(relPath, 'lib/api/v2/paths')
+  const apiBaseSpecPath = path.join(relPath, 'rest-api-v3-spec.yaml')
+  const apiFullSpecPath = path.join(relPath, 'rest-api-v3-full-spec.json')
+  const apiPathsPath = path.join(relPath, 'lib/api/v3/paths')
   const encodedApiToken = encodeURIComponent(options.apiToken)
 
   // useful documentation for the configuration of express-openapi can be found at:
@@ -250,13 +249,13 @@ export async function setupRestApi(
     try {
       fs.writeFile(apiFullSpecPath, JSON.stringify(apiInstance.apiDoc), (err) => {
         if (err) {
-          debugLog(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
+          debugLog(`Error: Could not write full Rest API v3 spec file to ${apiFullSpecPath}: ${err}`)
           return
         }
-        debugLog(`Written full Rest API v2 spec file to ${apiFullSpecPath}`)
+        debugLog(`Written full Rest API v3 spec file to ${apiFullSpecPath}`)
       })
     } catch (err) {
-      debugLog(`Error: Could not write full Rest API v2 spec file to ${apiFullSpecPath}: ${err}`)
+      debugLog(`Error: Could not write full Rest API v3 spec file to ${apiFullSpecPath}: ${err}`)
     }
   }
 
@@ -269,17 +268,10 @@ export async function setupRestApi(
 
 const WS_PATHS = {
   NONE: '', // used for testing
-  MESSAGES: '/api/v2/messages/websocket',
-  LEGACY_STREAM: '/api/v2/node/stream/websocket'
+  MESSAGES: '/api/v3/messages/websocket'
 }
 
-export function setupWsApi(
-  server: Server,
-  wss: WebSocketServer,
-  node: Hopr,
-  logStream: LogStream,
-  options: { apiToken?: string }
-) {
+export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, options: { apiToken?: string }) {
   // before upgrade to WS, we perform various checks
   server.on('upgrade', function upgrade(req, socket, head) {
     debugLog('WS client attempt to upgrade')
@@ -348,9 +340,6 @@ export function setupWsApi(
 
     if (path === WS_PATHS.MESSAGES) {
       node.on('hopr:message', (data: ApplicationData) => {
-        // FIXME: change this to send an actual string with a proper prefix in
-        // Providence instead of the string representation of an rlp-encoded
-        // value
         socket.send(data.plain_text.toString())
       })
       node.on('hopr:message-ack-challenge', (ackChallenge: string) => {
@@ -359,8 +348,6 @@ export function setupWsApi(
       node.on('hopr:message-acknowledged', (ackChallenge: string) => {
         socket.send(`ack:'${ackChallenge}'`)
       })
-    } else if (path === WS_PATHS.LEGACY_STREAM) {
-      logStream.subscribe(socket)
     } else {
       // close connection on unsupported paths
       socket.close(1000)
@@ -374,7 +361,7 @@ export class Context {
   public token: Token
   public authResult: AuthResult
 
-  constructor(public node: Hopr, public stateOps: StateOps) {}
+  constructor(public node: Hopr, public inbox: MessageInbox, public stateOps: StateOps) {}
 }
 
 declare global {
@@ -385,6 +372,7 @@ declare global {
         stateOps: StateOps
         token: Token
         authResult: AuthResult
+        inbox: MessageInbox
       }
     }
   }

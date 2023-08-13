@@ -183,24 +183,51 @@ components:
         - HOPR
       description: Supported currencies, NATIVE used for the interacting with blockchain or HOPR used to fund channels.
       example: NATIVE
+    MessageTag:
+      type: integer
+      minimum: 0
+      maximum: 65536
+      description: The message tag which can be used to filter messages between apps.
+      example: 12
+    MessageBody:
+      type: string
+      example: This is a HOPR message.
+    ReceivedMessage:
+      type: object
+      required:
+        - body
+        - tag
+        - receivedAt
+      properties:
+        tag:
+          $ref: '#/components/schemas/MessageTag'
+        body:
+          $ref: '#/components/schemas/MessageBody'
+        receivedAt:
+          type: integer
+          example: 1324284684614
+          description: Timestamp when the message was received in seconds since epoch.
     NativeAddress:
       type: string
       format: address
       description: Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.
-      example: 0xEA9eDAE5CfC794B75C45c8fa89b605508A03742a
+      example: 1.339446426793328e+48
     HoprAddress:
       format: peerId
       type: string
       description: HOPR account address, also called a PeerId. Used to send / receive messages, open / close payment channels.
-      example: 16Uiu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQxTWDcmUX5847roBar
+      example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
+    ChannelId:
+      format: string
+      description: The unique identifier of a unidirectional HOPR channel.
+      example: 0x3c9756a1e37751345e8f958cf84d5c73178e64d75ca7ef93823eace5bfcba65a
     ChannelStatus:
       type: string
       enum:
-        - WaitingForCommitment
         - Open
         - PendingToClose
         - Closed
-      description: 'Status of the channel can be: WaitingForCommitment, Open, PendingToClose, or Closed.'
+      description: 'Status of the channel can be: Open, PendingToClose, or Closed.'
       example: Open
     NativeBalance:
       type: string
@@ -220,10 +247,8 @@ components:
             - outgoing
           description: Channel can be either incomming or outgoing. Incomming means that other node can send messages using this node as relay. Outgoing means that this node can use other node to send message as realy.
           example: incoming
-        channelId:
-          type: string
-          description: Channel ID that can be used in other calls, not to confuse with transaction hash.
-          example: 0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5
+        id:
+          $ref: '#/components/schemas/ChannelId'
         peerId:
           $ref: '#/components/schemas/HoprAddress'
         status:
@@ -234,9 +259,7 @@ components:
       type: object
       properties:
         channelId:
-          type: string
-          description: Channel ID that can be used in other calls, not to confuse with transaction hash.
-          example: 0x04e50b7ddce9770f58cebe51f33b472c92d1c40384759f5a0b1025220bf15ec5
+          $ref: '#/components/schemas/ChannelId'
         sourcePeerId:
           $ref: '#/components/schemas/HoprAddress'
         destinationPeerId:
@@ -267,14 +290,11 @@ components:
     Ticket:
       type: object
       properties:
-        counterparty:
-          $ref: '#/components/schemas/HoprAddress'
+        channelId:
+          $ref: '#/components/schemas/ChannelId'
         challenge:
           type: string
           description: The ticket's challenge which needs to be solved before being able to claim the embedded incentive.
-        epoch:
-          type: string
-          description: Ticket redemption relies on providing the value opening to a series of commitments that have previously been stored on-chain by the ticket recipient.
         index:
           type: string
           description: Each ticket is labeled by an ongoing serial number named ticket index i and its current value is stored in the smart contract.
@@ -304,6 +324,10 @@ components:
             - promiscuous
           example: passive
           description: By default, hoprd runs in **passive** mode, this means that your node will not attempt to open or close any channels automatically. When you set your strategy to **promiscuous** mode, your node will attempt to open channels to a _randomly_ selected group of nodes which you have a healthy connection to. At the same time, your node will also attempt to close channels that are running low on balance or are unhealthy.
+    TransactionReceipt:
+      type: string
+      description: Receipt identifier for an Ethereum transaction.
+      example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e'
   securitySchemes:
     keyScheme:
       type: apiKey

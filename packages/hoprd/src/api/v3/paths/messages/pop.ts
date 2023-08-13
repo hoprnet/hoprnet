@@ -1,35 +1,31 @@
 import type { Operation } from 'express-openapi'
-import { u8aToHex } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
 const POST: Operation = [
   async (req, res, _next) => {
-    try {
-      const signature = req.context.node.signMessage(new TextEncoder().encode(req.body.message))
-      return res.status(200).send({ signature: u8aToHex(signature) })
-    } catch (err) {
-      return res
-        .status(422)
-        .json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
+    const tag = req.body.tag
+    const msg = await req.context.inbox.pop(tag)
+
+    if (msg) {
+      return res.status(200).send({ tag: msg.application_tag, body: msg.plain_text.toString() })
     }
+    return res.status(404).send()
   }
 ]
 
 POST.apiDoc = {
   description:
-    'Signs a message given using the node’s private key. Prefixes messsage with “HOPR Signed Message: ” before signing.',
+    'Get oldest message currently present in the nodes message inbox. The message is removed from the inbox.',
   tags: ['Messages'],
-  operationId: 'messagesSign',
+  operationId: 'messagesPopMessage',
   requestBody: {
     content: {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['message'],
           properties: {
-            message: {
-              description: 'The message to be signed.',
-              type: 'string'
+            tag: {
+              $ref: '#/components/schemas/MessageTag'
             }
           }
         }
@@ -38,16 +34,11 @@ POST.apiDoc = {
   },
   responses: {
     '200': {
-      description: 'The message was signed successfully.',
+      description: 'Returns a message.',
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {
-              signature: {
-                $ref: '#/components/schemas/Signature'
-              }
-            }
+            $ref: '#/components/schemas/ReceivedMessage'
           }
         }
       }
@@ -57,6 +48,9 @@ POST.apiDoc = {
     },
     '403': {
       $ref: '#/components/responses/Forbidden'
+    },
+    '404': {
+      $ref: '#/components/responses/NotFound'
     },
     '422': {
       description: 'Unknown failure.',

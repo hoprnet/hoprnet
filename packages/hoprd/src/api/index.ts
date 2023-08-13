@@ -1,19 +1,18 @@
-import type { default as Hopr } from '@hoprnet/hopr-core'
-import type { LogStream } from '../logs.js'
-import type { StateOps } from '../types.js'
+import { WebSocketServer } from 'ws'
 import express from 'express'
 import http from 'http'
 import { debug } from '@hoprnet/hopr-utils'
-import * as apiV2 from './v2.js'
-import { WebSocketServer } from 'ws'
+import * as api from './v3.js'
 import { MessageInbox } from '../../lib/hoprd_inbox.js'
+
+import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { StateOps } from '../types.js'
 
 const debugLog = debug('hoprd:api')
 
 export default function setupAPI(
   node: Hopr,
   inbox: MessageInbox,
-  logs: LogStream,
   stateOps: StateOps,
   options: {
     disableApiAuthentication: boolean
@@ -22,20 +21,20 @@ export default function setupAPI(
     apiToken?: string
   }
 ): () => void {
-  debugLog('Enabling Rest API v2 and WS API v2')
+  debugLog('Enabling Rest API v3 and WS API v3')
   const service = express()
   const server = http.createServer(service)
 
-  apiV2.setupRestApi(service, '/api/v2', node, inbox, stateOps, options)
-  apiV2.setupWsApi(server, new WebSocketServer({ noServer: true }), node, logs, options)
+  api.setupRestApi(service, '/api/v3', node, inbox, stateOps, options)
+  api.setupWsApi(server, new WebSocketServer({ noServer: true }), node, options)
 
   return function listen() {
     server
       .listen(options.apiPort, options.apiHost, () => {
-        logs.log(`API server on ${options.apiHost} listening on port ${options.apiPort}`)
+        debugLog(`API server on ${options.apiHost} listening on port ${options.apiPort}`)
       })
       .on('error', (err: any) => {
-        logs.log(`Failed to start API server: ${err}`)
+        debugLog(`Failed to start API server: ${err}`)
 
         // bail out, fail hard because we cannot proceed with the overall
         // startup

@@ -1016,6 +1016,7 @@ class Hopr extends EventEmitter {
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
    * @param hops optional number of required intermediate nodes
+   * @param applicationTag optional tag identifying the sending application
    * @returns hex representation of ack challenge
    */
   public async sendMessage(
@@ -1023,7 +1024,7 @@ class Hopr extends EventEmitter {
     destination: PeerId,
     intermediatePath?: OffchainPublicKey[],
     hops?: number,
-    application_tag?: number
+    applicationTag?: number
   ): Promise<string> {
     if (this.status != 'RUNNING') {
       metric_sentMessageFailCount.increment()
@@ -1069,7 +1070,7 @@ class Hopr extends EventEmitter {
 
     metric_pathLength.observe(path.length())
 
-    return (await this.forward.send_packet(msg, application_tag, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
+    return (await this.forward.send_packet(msg, applicationTag, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
   }
 
   /**
