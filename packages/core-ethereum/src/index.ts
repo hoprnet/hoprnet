@@ -17,8 +17,7 @@ import {
   PublicKey,
   AccountEntry,
   create_counter,
-  OffchainPublicKey,
-  defer
+  OffchainPublicKey
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -183,12 +182,12 @@ export default class HoprCoreEthereum extends EventEmitter {
         )
         log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
         
+        // indexer starts
+        await this.indexer.start(this.chain, this.chain.getGenesisBlock())
+
         // register node-safe pair to NodeSafeRegistry
         log(`check node-safe registry`)
         await this.registerSafeByNode(this.publicKey.to_address(), this.safeModuleOptions.safeAddress)
-
-        // indexer starts
-        await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.publicKey.to_address().to_hex()}`)
@@ -565,7 +564,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
   
-  public async registerSafeByNode(nodeAddress: Address, safeAddress: Address) {
+  public async registerSafeByNode(nodeAddress: Address, safeAddress: Address): Promise<Receipt>  {
     log(`====> registerSafeByNode nodeAddress: ${nodeAddress.to_hex()} safeAddress  ${safeAddress.to_hex()}`)
 
     const targetAddress = await this.chain.getModuleTargetAddress()
@@ -580,7 +579,9 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
       // if the node is not associated with any safe address, register it
-      await this.chain.registerSafeByNode(safeAddress, (_txHash: string) => defer())
+      return this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
+        this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
+      )
     }
     
     if (!registeredAddress.eq(Address.from_string(safeAddress.to_string()))) {
@@ -590,6 +591,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     // the node has been associated with the provided safe address
     log(`====> registerSafeByNode registeredAddress: is safeAddress`)
+    return undefined;
   }
 
   /**

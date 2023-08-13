@@ -535,6 +535,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
               this.indexEvent(`announce-${txHash}`)
             } else if (this.listeners(`channel-updated-${txHash}`).length > 0) {
               this.indexEvent(`channel-updated-${txHash}`)
+            } else if (this.listeners(`node-safe-registered-${txHash}`).length > 0) {
+              this.indexEvent(`node-safe-registered-${txHash}`)
             }
 
             // update transaction manager
