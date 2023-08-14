@@ -11,15 +11,12 @@ env:
 
 on:
   pull_request:
-    # branches:
-    #   - master
-    #   - release/*
     types:
       - synchronize
+      - ready_for_review
     paths-ignore:
       - '.processes/**/*'
       - 'docs/**/*'
-      - 'packages/*/docs/**/*'
 concurrency:
   group: ${{ github.head_ref }}-test
   cancel-in-progress: true
@@ -96,12 +93,18 @@ jobs:
 
   e2e_testing:
     name: End to end
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-8-core
     if: github.event.pull_request.draft == false
-    timeout-minutes: 90
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
@@ -157,19 +160,34 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
+      - name: Setup Hoprd Runtime
+        run: |
+          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
+
       - name: Build application
         run: nix develop -c make -j build
 
       - name: Test with pytest
         run: |
           nix develop -c make smoke-test
-        env:
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
+        timeout-minutes: 60
 
-      - name: Upload node logs (Linux)
-        uses: actions/upload-artifact@v3
-        if: ${{ always() && runner.os == 'Linux' }}
+      - name: Compress test logs
+        if: always()
+        run: |
+          # Copy all the logs to a directory to avoid log file changes and simplify tar command
+          test_path=/tmp/test-e2e-${{ github.run_id }}-${{ github.run_number }}
+          mkdir -p ${test_path}
+          cp -r /tmp/hopr-smoke-test* ${test_path}
+          cd ${test_path}
+          tar -czvf ${test_path}.tgz ${test_path}
+        working-directory: "/tmp"
+
+      - name: Upload test logs
+        uses: 'google-github-actions/upload-cloud-storage@v1'
+        if: always()
         with:
-          name: hopr-linux-smoke-test-logs
-          path: |
-            /tmp/hopr-smoke-test*.log
+          path: /tmp/
+          glob: 'test-e2e-*'
+          parent: false
+          destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}

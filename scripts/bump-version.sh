@@ -42,10 +42,10 @@ declare current_version
 current_version="$("${mydir}/get-package-version.sh")"
 
 declare pre_release
-if [ "${base_branch_name}" == "master" ]; then
-  pre_release="alpha"
-else
+if [[ "${base_branch_name}" == release* ]]; then 
   pre_release="beta"
+else
+  pre_release="alpha"
 fi
 
 declare new_version

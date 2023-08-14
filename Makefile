@@ -325,7 +325,7 @@ fund-local-all: id_dir=/tmp/
 fund-local-all: id_password=local
 fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
-	IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
@@ -493,14 +493,19 @@ endif
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-funds
 	PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=$(shell eval ./scripts/get-hopr-address.sh "$(api_token)" "$(endpoint)")
 
-ensure-environment-and-network-are-set:
+# These targets needs to be splitted in macOs systems
+ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set
+
+ensure-network-is-set:
 ifeq ($(network),)
 	echo "parameter <network> missing" >&2 && exit 1
 else
 environment_type != jq '.networks."$(network)".environment_type // empty' packages/ethereum/contracts/contracts-addresses.json
-ifeq ($(environment_type),)
-	echo "could not read environment type info from contracts-addresses.json" >&2 && exit 1
 endif
+
+ensure-environment-is-set:
+ifeq ($(environment_type),)
+	echo "could not read environment info from packages/ethereum/contracts/contracts-addresses.json" >&2 && exit 1
 endif
 
 .PHONY: run-docker-dev

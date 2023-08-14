@@ -53,7 +53,7 @@ PRIVATE_KEY="${dev_bank_privkey}" make request-nrnft \
 
 # Stake NFT
 PRIVATE_KEY="${account_privkey}" make stake-nrnft \
-    network=rotsee \ 
+    network=rotsee \
     environment_type=development \
     nftrank=developer
 
@@ -61,4 +61,4 @@ PRIVATE_KEY="${account_privkey}" make stake-nrnft \
 PRIVATE_KEY="${account_privkey}" make self-register-node \
     network=rotsee \
     environment_type=development \
-    peer_ids=${peer_id}"
+    peer_ids=${peer_id}

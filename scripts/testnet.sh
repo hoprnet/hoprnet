@@ -184,8 +184,8 @@ fund_if_empty() {
 # $1=vm name
 # Run a VM with an anvil instance
 start_chain_provider(){
-  gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
+  gcloud compute instances create-with-container "$1"-provider "$GCLOUD_DEFAULTS" \
+      --create-disk name=$(disk_name "$1"),size=10GB,type=pd-standard,mode=rw \
       --container-image='hopr-provider'
 
   #hardhat node --config packages/ethereum/hardhat.config.ts
@@ -195,7 +195,7 @@ start_chain_provider(){
 add_keys() {
   if test -f "$1"; then
     log "Reading keys from $1"
-    cat $1 | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
+    cat "$1" | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
   else
     echo "Authorized keys file not found"
   fi

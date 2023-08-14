@@ -12,27 +12,28 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-aes = "0.8"
+aes = "0.8.3"
 async-std = { version = "1.12.0", features = ["attributes"] }
 blake2 = { version = "0.10", features = ["reset"] }
 chacha20 = { version = "0.9", features = ["zeroize"] }
 ctr = "0.9"
-curve25519-dalek = { version = "3", features = ["serde"] }
+curve25519-dalek = { version = "4.0.0-rc.1", features = ["serde"] } # must use 4.0.0-rc.1 due to rs-libp2p (snow)
 digest = "0.10"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 elliptic-curve = { version = "0.13", features = ["serde"] }
 futures = "0.3.28"
 generic-array = { version = "0.14.7", features = ["zeroize"] }
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { workspace = true, features = ["js"] }
 hex = "0.4"
 hex-literal = "0.4"
 hkdf = "0.12"
 hmac = "0.12"
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
 libp2p-identity = { workspace = true }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
+sha2 = "0.10"
 sha3 = "0.10"
 subtle = "2"
 typenum = "1.16"

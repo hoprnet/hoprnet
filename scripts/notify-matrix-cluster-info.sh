@@ -40,9 +40,9 @@ usage() {
 which curl > /dev/null || { msg "Required binary 'curl' not found in PATH"; exit 1; }
 which jq > /dev/null || { msg "Required binary 'jq' not found in PATH"; exit 1; }
 
-: ${HOPRD_API_TOKEN:?"env var missing"}
-: ${MATRIX_ROOM:?"env var missing"}
-: ${MATRIX_ACCESS_TOKEN:?"env var missing"}
+: "${HOPRD_API_TOKEN:?"env var missing"}"
+: "${MATRIX_ROOM:?"env var missing"}"
+: "${MATRIX_ACCESS_TOKEN:?"env var missing"}"
 
 declare cluster_tag=${1:-} # optional cluster tag
 declare room="${MATRIX_ROOM}"
@@ -74,7 +74,7 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
         cluster_name="${cluster_name}-${version_maj_min//./-}"
       fi
 
-      msg="$("${mydir}/get-gcloud-instances-accounts-info.sh" ${cluster_name})"
+      msg="$("${mydir}/get-gcloud-instances-accounts-info.sh" "${cluster_name}")"
 
       # create a table out of the info
       msg="<table>$(echo "${msg}" | sed 's/\(.*\)$/<tr><td>\1<\/td><\/tr>/g' | sed 's/\s\{2,\}/<\/td><td>/g' | tr -d '\n')</table>"

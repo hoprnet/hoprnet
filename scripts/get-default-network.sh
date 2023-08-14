@@ -38,8 +38,8 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
   fi
 done
 
-: ${network:?"Could not read value for default network id"}
+: "${network:?"Could not read value for default network id"}"
 
 log "found default network: ${network}"
 
-echo ${network}
+echo "${network}"

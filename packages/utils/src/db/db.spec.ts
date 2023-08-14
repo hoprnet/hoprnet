@@ -67,10 +67,7 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, ba
     U256.one(),
     chainKp
   )
-  tkt.set_challenge(
-    new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(),
-    chainKp
-  )
+  tkt.set_challenge(new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(), chainKp)
   return tkt
 }
 

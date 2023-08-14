@@ -21,7 +21,7 @@ export * from '../fixtures.js'
 
 export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountEntry) => {
   assert(actual, 'account is null')
-  assert(actual.public_key.eq(expected.public_key), 'publicKey')
+  assert(actual.eq(expected), 'should be equal')
 }
 
 export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {

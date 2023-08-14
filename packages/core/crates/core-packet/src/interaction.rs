@@ -1,12 +1,9 @@
 use async_lock::RwLock;
 use std::fmt::{Display, Formatter};
 
-use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError,
-    PacketDecodingError, PathError, Retry, TagReplay,Timeout, TransportError,
-};
+use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError, Retry, TagReplay, Timeout, TransportError};
 use crate::errors::Result;
-use crate::packet::{Packet, PacketState};
+use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
 use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
@@ -19,6 +16,7 @@ use core_types::channels::Ticket;
 use futures::future::{select, Either};
 use futures::pin_mut;
 use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
 use std::ops::Mul;
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,6 +27,7 @@ use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 use crate::validation::validate_unacknowledged_ticket;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
+use utils_types::errors::GeneralError::ParseError;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -65,7 +64,7 @@ const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
 
 /// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Payload {
     remote_peer: PeerId,
     data: Box<[u8]>,
@@ -77,6 +76,66 @@ impl Display for Payload {
             .field("remote_peer", &self.remote_peer)
             .field("data", &hex::encode(&self.data))
             .finish()
+    }
+}
+
+/// Tags are currently 16-bit unsigned integers
+pub type Tag = u16;
+
+/// Represent a default application tag if none is specified in `send_packet`.
+pub const DEFAULT_APPLICATION_TAG: Tag = 0;
+
+/// Represents the received decrypted packet carrying the application-layer data.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ApplicationData {
+    pub application_tag: Option<Tag>,
+    #[serde(with = "serde_bytes")]
+    pub plain_text: Box<[u8]>,
+}
+
+impl Display for ApplicationData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "({}): {}",
+            self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG),
+            hex::encode(&self.plain_text)
+        )
+    }
+}
+
+impl AsRef<[u8]> for ApplicationData {
+    fn as_ref(&self) -> &[u8] {
+        &self.plain_text
+    }
+}
+
+impl BinarySerializable for ApplicationData {
+    const SIZE: usize = 2; // minimum size
+
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+        if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
+            let tag = u16::from_be_bytes(data[0..2].try_into().map_err(|_| ParseError)?);
+            Ok(Self {
+                application_tag: if tag != DEFAULT_APPLICATION_TAG {
+                    Some(tag)
+                } else {
+                    None
+                },
+                plain_text: (&data[2..]).into(),
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn to_bytes(&self) -> Box<[u8]> {
+        let mut buf = Vec::with_capacity(Self::SIZE + self.plain_text.len());
+        let tag = self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG);
+        buf.extend_from_slice(&tag.to_be_bytes());
+        buf.extend_from_slice(&self.plain_text);
+        buf.into_boxed_slice()
     }
 }
 
@@ -381,7 +440,7 @@ where
     db: Arc<RwLock<Db>>,
     incoming_packets: (Sender<Payload>, Receiver<Payload>),
     outgoing_packets: (Sender<Payload>, Receiver<Payload>),
-    pub on_final_packet: Option<Sender<Box<[u8]>>>,
+    pub on_final_packet: Option<Sender<ApplicationData>>,
     pub mixer: Mixer<Payload>,
     cfg: PacketInteractionConfig,
 }
@@ -391,7 +450,11 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new(
+        db: Arc<RwLock<Db>>,
+        on_final_packet: Option<Sender<ApplicationData>>,
+        cfg: PacketInteractionConfig,
+    ) -> Self {
         Self {
             db,
             incoming_packets: bounded(PACKET_RX_QUEUE_SIZE),
@@ -482,10 +545,18 @@ where
     }
 
     /// Pushes the packet with the given payload for sending via the given valid path.
+    /// The application tag acts as an optional distinguisher for different application level protocols.
+    /// If no `app_tag` is specified, the `DEFAULT_APPLICATION_TAG` is used.
     /// If `timeout` is given, the method waits the given time if the TX queue is full until there's space.
     /// If `timeout` is zero, the method waits indefinitely.
     /// If `timeout` is `None` and the TX queue is full, the method fails with `Err(Retry)`
-    pub async fn send_packet(&self, msg: &[u8], path: Path, timeout: Option<Duration>) -> Result<HalfKeyChallenge> {
+    pub async fn send_packet(
+        &self,
+        msg: &[u8],
+        app_tag: Option<Tag>,
+        path: Path,
+        timeout: Option<Duration>,
+    ) -> Result<HalfKeyChallenge> {
         // Check if the path is valid
         if !path.valid() {
             return Err(PathError(PathNotValid));
@@ -495,20 +566,24 @@ where
             .db
             .read()
             .await
-            .get_channel_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
+            .get_chain_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
             .await?
             .ok_or(PacketConstructionError)?;
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(next_peer.to_address(), &self.cfg.chain_keypair)
+            Ticket::new_zero_hop(next_peer, &self.cfg.chain_keypair)
         } else {
-            self.create_multihop_ticket(next_peer.to_address(), path.length() as u8)
-                .await?
+            self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
 
-        // Create the packet
-        let packet = Packet::new(msg, &path, &self.cfg.chain_keypair, next_ticket)?;
+        // Create the packet with application tag
+        let app_data = ApplicationData {
+            application_tag: app_tag,
+            plain_text: msg.into(),
+        };
+
+        let packet = Packet::new(&app_data.to_bytes(), &path, &self.cfg.chain_keypair, next_ticket)?;
         debug!("packet state {}", packet.state());
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
@@ -595,9 +670,12 @@ where
 
                 // We're the destination of the packet, so emit the packet contents
                 if let Some(emitter) = &self.on_final_packet {
-                    // Can we avoid cloning plain_text here ?
-                    debug!("emitting final packet: {}", hex::encode(plain_text));
-                    if let Err(e) = emitter.try_send(plain_text.clone()) {
+                    let fd = ApplicationData::from_bytes(&plain_text).map_err(|_| {
+                        PacketDecodingError(format!("final plaintext is malformed: {}", hex::encode(&plain_text)))
+                    })?;
+                    debug!("emitting final packet: {fd}");
+
+                    if let Err(e) = emitter.try_send(fd) {
                         error!("failed to emit received final packet: {e}");
                     }
                 }
@@ -634,25 +712,25 @@ where
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
-                let previous_hop_channel_key =
+                let previous_hop_addr =
                     self.db
                         .read()
                         .await
-                        .get_channel_key(previous_hop)
+                        .get_chain_key(previous_hop)
                         .await?
                         .ok_or(PacketDecodingError(format!(
                             "failed to find channel key for packet key {previous_hop} on previous hop"
                         )))?;
 
-                let next_hop_channel_key =
-                    self.db
-                        .read()
-                        .await
-                        .get_channel_key(next_hop)
-                        .await?
-                        .ok_or(PacketDecodingError(format!(
-                            "failed to find channel key for packet key {next_hop} on next hop"
-                        )))?;
+                let next_hop_addr = self
+                    .db
+                    .read()
+                    .await
+                    .get_chain_key(next_hop)
+                    .await?
+                    .ok_or(PacketDecodingError(format!(
+                        "failed to find channel key for packet key {next_hop} on next hop"
+                    )))?;
 
                 // Find the corresponding channel
                 debug!("looking for channel with {previous_hop}");
@@ -660,7 +738,7 @@ where
                     .db
                     .read()
                     .await
-                    .get_channel_from(&previous_hop_channel_key.to_address())
+                    .get_channel_from(&previous_hop_addr)
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
@@ -669,7 +747,7 @@ where
                     &*self.db.read().await,
                     &packet.ticket,
                     &channel,
-                    &previous_hop_channel_key.to_address(),
+                    &previous_hop_addr,
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                     inverse_win_prob,
                     self.cfg.check_unrealized_balance,
@@ -697,7 +775,7 @@ where
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             packet.ticket.clone(),
                             own_key.clone(),
-                            previous_hop_channel_key.to_address(),
+                            previous_hop_addr,
                         )),
                     )
                     .await?;
@@ -710,9 +788,9 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop_channel_key.to_address(), &self.cfg.chain_keypair)
+                    Ticket::new_zero_hop(next_hop_addr, &self.cfg.chain_keypair)
                 } else {
-                    self.create_multihop_ticket(next_hop_channel_key.to_address(), path_pos).await?
+                    self.create_multihop_ticket(next_hop_addr, path_pos).await?
                 };
                 previous_peer = previous_hop.to_peerid();
                 next_peer = next_hop.to_peerid();
@@ -819,7 +897,8 @@ where
 mod tests {
     use crate::errors::PacketError::PacketDbError;
     use crate::interaction::{
-        AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload, PRICE_PER_PACKET,
+        AcknowledgementInteraction, ApplicationData, PacketInteraction, PacketInteractionConfig, Payload,
+        PRICE_PER_PACKET,
     };
     use crate::por::ProofOfRelayValues;
     use async_std::sync::RwLock;
@@ -851,7 +930,7 @@ mod tests {
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
-    use utils_types::traits::{PeerIdLike, ToHex};
+    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
@@ -919,19 +998,19 @@ mod tests {
 
     async fn create_dummy_channel(db: &CoreEthereumDb<RustyLevelDbShim>, from: &PeerId, to: &PeerId) -> ChannelEntry {
         let source = db
-            .get_channel_key(&OffchainPublicKey::from_peerid(from).unwrap())
+            .get_chain_key(&OffchainPublicKey::from_peerid(from).unwrap())
             .await
             .unwrap()
             .expect("failed to retrieve source address");
         let destination = db
-            .get_channel_key(&OffchainPublicKey::from_peerid(to).unwrap())
+            .get_chain_key(&OffchainPublicKey::from_peerid(to).unwrap())
             .await
             .unwrap()
             .expect("failed to retrieve destination address");
 
         ChannelEntry::new(
-            source.to_address(),
-            destination.to_address(),
+            source,
+            destination,
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
             Hash::new(&random_bytes::<32>()),
             U256::zero(),
@@ -965,7 +1044,7 @@ mod tests {
     }
 
     async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
-        let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
+        let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
         for (index, peer_key) in PEERS_PRIVS.iter().enumerate().take(dbs.len()) {
@@ -978,7 +1057,8 @@ mod tests {
             for peer_key in PEERS_PRIVS {
                 let node_key = OffchainPublicKey::from_privkey(&peer_key)?;
                 let chain_key = PublicKey::from_privkey(&peer_key)?;
-                db.link_packet_and_channel_keys(&chain_key, &node_key).await?;
+                db.link_chain_and_packet_keys(&chain_key.to_address(), &node_key, &Snapshot::default())
+                    .await?;
             }
 
             let mut channel: Option<ChannelEntry> = None;
@@ -1295,7 +1375,7 @@ mod tests {
         // Peer 1: start sending out packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_packet(&TEST_MESSAGE, packet_path.clone(), None)
+                .send_packet(&TEST_MESSAGE, Some(42), packet_path.clone(), None)
                 .await
                 .unwrap();
         }
@@ -1313,7 +1393,7 @@ mod tests {
                     }
                     Either::Right((pkt, _)) => {
                         let msg = pkt.unwrap();
-                        debug!("received message: {}", hex::encode(msg.clone()));
+                        debug!("received message: {}", hex::encode(&msg.plain_text));
                         assert_eq!(TEST_MESSAGE, msg.as_ref(), "received packet payload must match");
                         pkts += 1;
                     }
@@ -1479,7 +1559,12 @@ mod tests {
         // Start sending packets
         for _ in 0..PENDING_PACKETS {
             packet_sender
-                .send_packet(&TEST_MESSAGE, packet_path.clone(), Some(Duration::from_secs(10)))
+                .send_packet(
+                    &TEST_MESSAGE,
+                    Some(42),
+                    packet_path.clone(),
+                    Some(Duration::from_secs(10)),
+                )
                 .await
                 .unwrap();
         }
@@ -1489,7 +1574,7 @@ mod tests {
             for _ in 1..PENDING_PACKETS + 1 {
                 let data = pkt_rx.recv().await.expect("failed finalize packet");
                 assert_eq!(TEST_MESSAGE, data.as_ref(), "message body mismatch");
-                debug!("received packet at the recipient: {}", hex::encode(data));
+                debug!("received packet at the recipient: {}", hex::encode(&data.plain_text));
             }
         };
 
@@ -1510,6 +1595,25 @@ mod tests {
         async_std::task::sleep(Duration::from_secs(1)).await; // Let everything shutdown
 
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
+    }
+
+    #[test]
+    fn test_final_data() {
+        let fd_1 = ApplicationData {
+            application_tag: Some(65535),
+            plain_text: (*b"test msg").into(),
+        };
+        let fd_2 = ApplicationData::from_bytes(&fd_1.to_bytes()).expect("should be able to deserialize");
+        assert_eq!(fd_1, fd_2, "should be deserialized equal");
+        assert!(fd_2.application_tag.is_some_and(|t| t == 65535));
+
+        let fd_1 = ApplicationData {
+            application_tag: None,
+            plain_text: (*b"test msg").into(),
+        };
+        let fd_2 = ApplicationData::from_bytes(&fd_1.to_bytes()).expect("should be able to deserialize");
+        assert_eq!(fd_1, fd_2, "should be deserialized equal");
+        assert!(fd_2.application_tag.is_none());
     }
 }
 
@@ -1687,7 +1791,10 @@ pub mod wasm {
     impl WasmPacketInteraction {
         #[wasm_bindgen(constructor)]
         pub fn new(db: Database, on_final_packet: Option<js_sys::Function>, cfg: PacketInteractionConfig) -> Self {
-            let on_msg = on_final_packet.is_some().then(unbounded::<Box<[u8]>>).unzip();
+            let on_msg = on_final_packet
+                .is_some()
+                .then(unbounded::<super::ApplicationData>)
+                .unzip();
 
             // For WASM we need to create mixer with gloo-timers
             let gloo_mixer = Mixer::new_with_gloo_timers(cfg.mixer);
@@ -1700,11 +1807,17 @@ pub mod wasm {
                 wasm_bindgen_futures::spawn_local(async move {
                     let this = JsValue::null();
                     let cb = on_final_packet.unwrap();
-                    while let Ok(ack) = on_msg_recv.recv().await {
-                        debug!("wasm packet interaction loop iteration {}", hex::encode(&ack));
-                        let param: JsValue = Uint8Array::from(ack.as_ref()).into();
-                        if let Err(e) = cb.call1(&this, &param) {
-                            error!("failed to call on_msg closure: {:?}", e.as_string());
+                    while let Ok(pkt) = on_msg_recv.recv().await {
+                        debug!(
+                            "wasm packet interaction loop iteration {}",
+                            hex::encode(&pkt.plain_text)
+                        );
+                        if let Ok(param) = serde_wasm_bindgen::to_value(&pkt) {
+                            if let Err(e) = cb.call1(&this, &param) {
+                                error!("failed to call on_msg closure: {:?}", e.as_string());
+                            }
+                        } else {
+                            error!("failed to serialize application data")
                         }
                     }
                 });
@@ -1717,10 +1830,16 @@ pub mod wasm {
             ok_or_jserr!(self.w.received_packet(payload, false).await)
         }
 
-        pub async fn send_packet(&self, msg: &[u8], path: Path, timeout_secs: u64) -> JsResult<HalfKeyChallenge> {
+        pub async fn send_packet(
+            &self,
+            msg: &[u8],
+            app_tag: Option<u16>,
+            path: Path,
+            timeout_secs: u64,
+        ) -> JsResult<HalfKeyChallenge> {
             ok_or_jserr!(
                 self.w
-                    .send_packet(msg, path, Some(Duration::from_secs(timeout_secs)))
+                    .send_packet(msg, app_tag, path, Some(Duration::from_secs(timeout_secs)))
                     .await
             )
         }

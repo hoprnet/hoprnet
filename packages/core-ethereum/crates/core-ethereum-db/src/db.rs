@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use core_crypto::types::{OffchainPublicKey, PublicKey};
+use core_crypto::types::OffchainPublicKey;
 use core_crypto::{
     iterated_hash::{Intermediate, IteratedHash},
     types::{HalfKeyChallenge, Hash},
@@ -240,29 +240,32 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
-    async fn get_packet_key(&self, channel_key: &PublicKey) -> Result<Option<OffchainPublicKey>> {
-        let key =
-            utils_db::db::Key::new_with_prefix(&Hash::create(&[&channel_key.to_bytes(true)]), CHANNEL_KEY_PREFIX)?;
+    async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>> {
+        let key = utils_db::db::Key::new_with_prefix(chain_key, CHAIN_KEY_PREFIX)?;
         self.db.get_or_none(key).await
     }
 
-    async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>> {
+    async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<Address>> {
         let key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&packet_key.to_bytes()]), PACKET_KEY_PREFIX)?;
         self.db.get_or_none(key).await
     }
 
-    async fn link_packet_and_channel_keys(
+    async fn link_chain_and_packet_keys(
         &mut self,
-        channel_key: &PublicKey,
+        chain_key: &Address,
         packet_key: &OffchainPublicKey,
+        snapshot: &Snapshot,
     ) -> Result<()> {
         let mut batch = Batch::new();
-        let ck_key =
-            utils_db::db::Key::new_with_prefix(&Hash::create(&[&channel_key.to_bytes(true)]), CHANNEL_KEY_PREFIX)?;
+        let ck_key = utils_db::db::Key::new_with_prefix(chain_key, CHAIN_KEY_PREFIX)?;
         let pk_key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&packet_key.to_bytes()]), PACKET_KEY_PREFIX)?;
 
         batch.put(ck_key, packet_key);
-        batch.put(pk_key, channel_key);
+        batch.put(pk_key, chain_key);
+        batch.put(
+            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
+            snapshot,
+        );
 
         self.db.batch(batch, true).await
     }
@@ -393,7 +396,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> Result<()> {
-        let address_key = utils_db::db::Key::new_with_prefix(&account.get_address(), ACCOUNT_PREFIX)?;
+        let address_key = utils_db::db::Key::new_with_prefix(&account.chain_key, ACCOUNT_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
@@ -817,7 +820,7 @@ pub mod wasm {
     use super::{CoreEthereumDb, HoprCoreEthereumDbActions, DB};
     use async_lock::RwLock;
     use core_crypto::iterated_hash::IteratedHash;
-    use core_crypto::types::{Hash, PublicKey, OffchainPublicKey};
+    use core_crypto::types::{Hash, OffchainPublicKey};
     use core_types::account::AccountEntry;
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::{ChannelEntry, Ticket};
@@ -938,8 +941,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_acknowledged_tickets(filter).await)
-                .map(WasmVecAcknowledgedTicket::from)
+            utils_misc::ok_or_jserr!(db.get_acknowledged_tickets(filter).await).map(WasmVecAcknowledgedTicket::from)
             //}
         }
 
@@ -1151,33 +1153,34 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_packet_key(&self, channel_key: &PublicKey) -> Result<Option<OffchainPublicKey>, JsValue> {
+        pub async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_packet_key(channel_key).await)
+            utils_misc::ok_or_jserr!(db.get_packet_key(chain_key).await)
             //}
         }
 
         #[wasm_bindgen]
-        pub async fn get_channel_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<PublicKey>, JsValue> {
+        pub async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<Address>, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_channel_key(packet_key).await)
+            utils_misc::ok_or_jserr!(db.get_chain_key(packet_key).await)
             //}
         }
 
         #[wasm_bindgen]
-        pub async fn link_packet_and_channel_keys(
+        pub async fn link_chain_and_packet_keys(
             &self,
-            channel_key: &PublicKey,
+            chain_key: &Address,
             packet_key: &OffchainPublicKey,
+            snapshot: &Snapshot,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.link_packet_and_channel_keys(channel_key, packet_key).await)
+            utils_misc::ok_or_jserr!(db.link_chain_and_packet_keys(chain_key, packet_key, snapshot).await)
             //}
         }
 

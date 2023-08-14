@@ -73,17 +73,16 @@ pub mod tests {
         commitment::{initialize_commitment, ChannelCommitmentInfo},
     };
     use async_std;
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::{Hash, PublicKey, Response};
-    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use core_ethereum_db::db::CoreEthereumDb;
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::{generate_channel_id, Ticket};
     use hex_literal::hex;
     use std::sync::{Arc, Mutex};
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
     use utils_types::primitives::BalanceType;
-    use utils_types::primitives::{Address, Balance, BalanceType::HOPR, Snapshot, U256};
-    use utils_types::traits::BinarySerializable;
+    use utils_types::primitives::{Address, Balance, U256};
 
     const SELF_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const COUNTERPARTY_PRIV_KEY: [u8; 32] = hex!("6517e3d3245d7a111ba7be5b911adcdec7078ca5191e114e5d087a3ec936a146");
@@ -134,9 +133,14 @@ pub mod tests {
             .ticket
             .set_challenge(challenge.into(), &counterparty_keypair);
 
-        let pre_image = prepare_redeem_ticket(&db, &counterparty_keypair.public().to_address(), &channel_id, &mut acked_ticket)
-            .await
-            .expect("preparing ticket redemption must not fail");
+        let pre_image = prepare_redeem_ticket(
+            &db,
+            &counterparty_keypair.public().to_address(),
+            &channel_id,
+            &mut acked_ticket,
+        )
+        .await
+        .expect("preparing ticket redemption must not fail");
 
         assert!(after_redeem_ticket(&mut db, &channel_id, &pre_image, &acked_ticket)
             .await

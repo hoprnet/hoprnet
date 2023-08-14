@@ -22,5 +22,5 @@ pub const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: &str = "networkRegistry:addr
 pub const NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
 pub const NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
 pub const API_AUTHORIZATION_TOKEN_KEY_PREFIX: &str = "api:authenticationTokens";
-pub const CHANNEL_KEY_PREFIX: &str = "keys:channel-";
+pub const CHAIN_KEY_PREFIX: &str = "keys:chain-";
 pub const PACKET_KEY_PREFIX: &str = "keys:packet-";

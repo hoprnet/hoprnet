@@ -5,7 +5,7 @@
 #$1 command
 #$2 admin host
 cmd() {
-  curl --data $1 $2/api/v1/command
+  curl --data "$1" "$2"/api/v1/command
   echo ''
 }
 

@@ -20,8 +20,8 @@ thiserror = "1.0"
 validator = { version = "0.16.0", features = ["derive"] }
 gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
 console_error_panic_hook = { version = "0.1.7", optional = true }
-getrandom = "0.2.8"
-js-sys = { version = "0.3.63", optional = true }
+getrandom = { workspace = true }
+js-sys = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
 

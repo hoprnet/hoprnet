@@ -11,8 +11,8 @@ use core_path::path::Path;
 use core_types::acknowledgement::Acknowledgement;
 use core_types::channels::Ticket;
 use libp2p_identity::PeerId;
-use typenum::Unsigned;
 use std::fmt::{Display, Formatter};
+use typenum::Unsigned;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 

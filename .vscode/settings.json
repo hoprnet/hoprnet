@@ -2,21 +2,5 @@
   "solidity.compileUsingRemoteVersion": "v0.8.19+commit.7dd6d404",
   "typescript.tsdk": "node_modules/typescript/lib",
   "editor.formatOnSave": false,
-  "git.ignoreLimitWarning": true,
-  "rust-analyzer.server.extraEnv": {
-    "CARGO": "/nix/store/j71mwp60ca314dq7f6yaq257r4sj5033-rust-default-1.70.0/bin/cargo",
-    "RUSTC": "/nix/store/j71mwp60ca314dq7f6yaq257r4sj5033-rust-default-1.70.0/bin/rustc"
-  },
-  "rust-analyzer.runnableEnv": {
-    "CARGO": "/nix/store/j71mwp60ca314dq7f6yaq257r4sj5033-rust-default-1.70.0/bin/cargo",
-    "RUSTC": "/nix/store/j71mwp60ca314dq7f6yaq257r4sj5033-rust-default-1.70.0/bin/rustc"
-  },
-  "rust-analyzer.cargo.extraEnv": {
-    "CARGO": "/nix/store/j71mwp60ca314dq7f6yaq257r4sj5033-rust-default-1.70.0/bin/cargo",
-    "RUSTC": "/nix/store/j71mwp60ca314dq7f6yaq257r4sj5033-rust-default-1.70.0/bin/rustc"
-  },
-  "rust-analyzer.runnables.command": "/nix/store/j71mwp60ca314dq7f6yaq257r4sj5033-rust-default-1.70.0/bin/cargo",
-  "rust-analyzer.rustfmt.overrideCommand": [
-    "/nix/store/j71mwp60ca314dq7f6yaq257r4sj5033-rust-default-1.70.0/bin/rustfmt"
-  ]
+  "git.ignoreLimitWarning": true
 }
