@@ -1,14 +1,18 @@
 use crate::errors::CryptoError::{CalculationError, InvalidParameterSize};
 use blake2::Blake2s256;
 use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
+use elliptic_curve::ScalarPrimitive;
+use elliptic_curve::sec1::ToEncodedPoint;
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
-use k256::Secp256k1;
+use k256::{AffinePoint, Scalar, Secp256k1};
+use utils_types::primitives::Address;
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE};
 use crate::primitives::{DigestLike, SecretKey, SimpleDigest, SimpleMac};
-use crate::random::random_fill;
+use crate::random::{random_bytes, random_fill};
 use crate::types::HalfKey;
 
 // Module-specific constants
@@ -230,23 +234,22 @@ pub fn derive_vrf_parameters<const T: usize>(
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     pub fn derive_packet_tag(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_packet_tag(secret))
+        Ok(super::derive_packet_tag(&secret.try_into()?).into())
     }
 
     #[wasm_bindgen]
-    pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_commitment_seed(private_key, channel_info))
+    pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Box<[u8]> {
+        super::derive_commitment_seed(private_key, channel_info).into()
     }
 
     #[wasm_bindgen]
     pub fn derive_mac_key(secret: &[u8]) -> JsResult<Box<[u8]>> {
-        ok_or_jserr!(super::derive_mac_key(secret))
+        Ok(super::derive_mac_key(&secret.try_into()?).into())
     }
 }
 
