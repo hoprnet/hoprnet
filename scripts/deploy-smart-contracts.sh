@@ -34,7 +34,7 @@ while (( "$#" )); do
       ;;
     -b|--branch)
       branch="${2}"
-      : ${branch?"parameter <branch> must not be empty"}
+      : "${branch?"parameter <branch> must not be empty"}"
       shift 2
       ;;
     -*|--*=)

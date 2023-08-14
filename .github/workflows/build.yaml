@@ -3,11 +3,9 @@ name: Build
 
 on:
   pull_request:
-    # branches:
-    #   - master
-    #   - release/*
     types:
       - synchronize
+      - ready_for_review
 concurrency:
   group: ${{ github.head_ref }}-build
   cancel-in-progress: true

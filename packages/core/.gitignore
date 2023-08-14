@@ -17,3 +17,6 @@ log.txt
 # Exclude coverage
 /.nyc_output
 /coverage
+
+# Exclude auto-generated docs
+/docs

@@ -11,13 +11,18 @@ use k256::elliptic_curve::CurveArithmetic;
 use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
 use libp2p_identity::{PeerId, PublicKey as lp2p_PublicKey};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::ops::Add;
-use std::str::FromStr;
+use std::{
+    fmt::{Display, Formatter},
+    ops::Add,
+    str::FromStr,
+};
 
 use utils_log::warn;
-use utils_types::errors::GeneralError;
-use utils_types::errors::GeneralError::ParseError;
+use utils_types::{
+    errors::{GeneralError, GeneralError::ParseError},
+    primitives::{Address, EthereumChallenge},
+    traits::{BinarySerializable, PeerIdLike, ToHex},
+};
 
 use utils_types::primitives::{Address, EthereumChallenge};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
@@ -171,7 +176,7 @@ impl CurvePoint {
 
     /// Converts the curve point to a representation suitable for calculations.
     pub fn to_projective_point(&self) -> ProjectivePoint<Secp256k1> {
-        ProjectivePoint::<Secp256k1>::from(&self.affine)
+        self.affine.into()
     }
 
     /// Serializes the curve point into a compressed form. This is a cheap operation.
@@ -512,7 +517,7 @@ impl PeerIdLike for OffchainPublicKey {
 
     fn to_peerid(&self) -> PeerId {
         let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(self.compressed.as_bytes()).unwrap();
-        PeerId::from_public_key(&lp2p_PublicKey::from(k))
+        PeerId::from_public_key(&k.into())
     }
 }
 
@@ -608,40 +613,48 @@ impl PublicKey {
     /// Size of the compressed public key in bytes
     pub const SIZE_COMPRESSED: usize = 33;
 
+    pub const SIZE_UNCOMPRESSED_PLAIN: usize = 64;
+
     /// Size of the uncompressed public key in bytes
     pub const SIZE_UNCOMPRESSED: usize = 65;
 
     /// Generates new random keypair (private key, public key)
     pub fn random_keypair() -> ([u8; 32], PublicKey) {
         let (private, cp) = random_group_element();
-        (private, PublicKey::try_from(cp).unwrap())
+        (private, cp.try_into().unwrap())
     }
 
     pub fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if [
-            Self::SIZE_UNCOMPRESSED,
-            Self::SIZE_UNCOMPRESSED - 1,
-            Self::SIZE_COMPRESSED,
-        ]
-        .contains(&data.len())
-        {
-            let key = if data.len() == Self::SIZE_UNCOMPRESSED - 1 {
-                elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], data].concat())
-                    .map_err(|_| ParseError)?
-            } else {
-                elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?
-            };
+        match data.len() {
+            Self::SIZE_UNCOMPRESSED => {
+                // already has 0x04 prefix
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?;
 
-            Ok(PublicKey {
-                key,
-                compressed: if data.len() == Self::SIZE_COMPRESSED {
-                    EncodedPoint::<Secp256k1>::from_bytes(data).map_err(|_| ParseError)?
-                } else {
-                    key.to_encoded_point(true)
-                },
-            })
-        } else {
-            Err(ParseError)
+                Ok(PublicKey {
+                    key,
+                    compressed: key.to_encoded_point(true).to_bytes(),
+                })
+            }
+            Self::SIZE_UNCOMPRESSED_PLAIN => {
+                // add 0x04 prefix
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], &data[..]].concat())
+                    .map_err(|_| ParseError)?;
+
+                Ok(PublicKey {
+                    key,
+                    compressed: key.to_encoded_point(true).to_bytes(),
+                })
+            }
+            Self::SIZE_COMPRESSED => {
+                // has either 0x02 or 0x03 prefix
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(data).map_err(|_| ParseError)?;
+
+                Ok(PublicKey {
+                    key,
+                    compressed: key.to_encoded_point(true).to_bytes(),
+                })
+            }
+            _ => Err(ParseError),
         }
     }
 
@@ -1058,6 +1071,8 @@ pub mod tests {
     };
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
+    const PUBLIC_KEY_UNCOMPRESSED_PLAIN: [u8; 64] = hex!("1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");
+    const PUBLIC_KEY_UNCOMPRESSED: [u8; 65] = hex!("041464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
 
     #[test]
@@ -1213,6 +1228,13 @@ pub mod tests {
 
         assert_eq!(pk1, pk2, "pub keys 1 2 don't match");
         assert_eq!(pk2, pk3, "pub keys 2 3 don't match");
+
+        let pk1 = PublicKey::from_bytes(&PUBLIC_KEY).expect("failed to deserialize");
+        let pk2 = PublicKey::from_bytes(&PUBLIC_KEY_UNCOMPRESSED).expect("failed to deserialize");
+        let pk3 = PublicKey::from_bytes(&PUBLIC_KEY_UNCOMPRESSED_PLAIN).expect("failed to deserialize");
+
+        assert_eq!(pk1, pk2, "pubkeys don't match");
+        assert_eq!(pk2, pk3, "pubkeys don't match");
 
         assert_eq!(PublicKey::SIZE_COMPRESSED, pk1.to_bytes(true).len());
         assert_eq!(PublicKey::SIZE_UNCOMPRESSED, pk1.to_bytes(false).len());

@@ -33,6 +33,6 @@ pkg_path="${mydir}/../packages/${pkg}/package.json"
 log "Get package version for ${pkg} from ${pkg_path}"
 
 # get full version info from package description
-version=$(jq -r '.version' ${pkg_path})
+version=$(jq -r '.version' "${pkg_path}")
 
 echo "${version}"

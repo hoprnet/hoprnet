@@ -45,7 +45,7 @@ mv "${caps_file_path}.merged" "${caps_file_path}"
 rm "${caps_file_path}.base"
 
 # get list of endpoints from newly updated caps file
-endpoints="$(jq -r "to_entries | map(.key)" ${caps_file_path})"
+endpoints="$(jq -r "to_entries | map(.key)" "${caps_file_path}")"
 
 # update list in API documentation
 yq e -o=json '.' "${partial_spec_file_path}" | \

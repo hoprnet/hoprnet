@@ -43,4 +43,4 @@ declare branch
 branch=$(git rev-parse --abbrev-ref HEAD)
 declare msg="Github workflow ${workflow} failed on branch ${branch}, see ${url}"
 
-${mydir}/notify-matrix.sh "${room}" "${msg}"
+"${mydir}"/notify-matrix.sh "${room}" "${msg}"

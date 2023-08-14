@@ -90,6 +90,19 @@
       "args": ["test"],
       "cwd": "${workspaceFolder}/packages/ethereum",
       "outFiles": ["${workspaceFolder}/packages/ethereum/**/*.{ts,js}"]
+    },
+    {
+      "name": "Run Tests - E2E",
+      "request": "launch",
+      "type": "python",
+      "module": "pytest",
+      "justMyCode": true,
+      "args": ["${workspaceFolder}/tests"],
+      "console": "integratedTerminal",
+      "env": {
+        "environment_name": "local",
+        "ETHERSCAN_API_KEY": "someDummyKey"
+      }
     }
   ]
 }

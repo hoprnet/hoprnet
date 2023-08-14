@@ -117,6 +117,7 @@ import {
   core_hopr_gather_metrics,
   Database,
   OffchainPublicKey as Ethereum_OffchainPublicKey,
+  ApplicationData,
   Address as Packet_Address,
   PacketInteractionConfig,
   OffchainKeypair as Packet_OffchainKeypair,
@@ -545,7 +546,7 @@ class Hopr extends EventEmitter {
     )
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
-    const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
+    const onMessage = (data: ApplicationData) => this.emit('hopr:message', data)
     this.forward = new WasmPacketInteraction(this.db.clone(), onMessage, packetCfg)
 
     let packetProtocols = [
@@ -1046,7 +1047,8 @@ class Hopr extends EventEmitter {
     msg: Uint8Array,
     destination: PeerId,
     intermediatePath?: OffchainPublicKey[],
-    hops?: number
+    hops?: number,
+    application_tag?: number
   ): Promise<string> {
     if (this.status != 'RUNNING') {
       metric_sentMessageFailCount.increment()
@@ -1092,7 +1094,7 @@ class Hopr extends EventEmitter {
 
     metric_pathLength.observe(path.length())
 
-    return (await this.forward.send_packet(msg, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
+    return (await this.forward.send_packet(msg, application_tag, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
   }
 
   /**
