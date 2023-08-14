@@ -7,18 +7,16 @@ pub use hopr_ticket_price_oracle::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_ticket_price_oracle {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_newOwner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"_initialTicketPrice\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TicketPriceMustNotBeSame\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TicketPriceMustNotBeZero\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"TicketPriceUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"currentTicketPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_newTicketPrice\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"setTicketPrice\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRTICKETPRICEORACLE_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI)
-            .expect("ABI is always valid")
-    });
+    pub static HOPRTICKETPRICEORACLE_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -1402,9 +1400,8 @@ pub mod hopr_ticket_price_oracle {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRTICKETPRICEORACLE_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRTICKETPRICEORACLE_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -2200,9 +2197,8 @@ pub mod hopr_ticket_price_oracle {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRTICKETPRICEORACLE_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRTICKETPRICEORACLE_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprTicketPriceOracle<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprTicketPriceOracle<M> {
         fn clone(&self) -> Self {
@@ -2230,17 +2226,12 @@ pub mod hopr_ticket_price_oracle {
     impl<M: ::ethers::providers::Middleware> HoprTicketPriceOracle<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRTICKETPRICEORACLE_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRTICKETPRICEORACLE_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -2290,20 +2281,13 @@ pub mod hopr_ticket_price_oracle {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `owner` (0x8da5cb5b) function
-        pub fn owner(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn owner(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([141, 165, 203, 91], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `renounceOwnership` (0x715018a6) function
-        pub fn renounce_ownership(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn renounce_ownership(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([113, 80, 24, 166], ())
                 .expect("method not found (this should never happen)")
@@ -2329,63 +2313,36 @@ pub mod hopr_ticket_price_oracle {
         ///Gets the contract's `OwnershipTransferred` event
         pub fn ownership_transferred_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            OwnershipTransferredFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OwnershipTransferredFilter> {
             self.0.event()
         }
         ///Gets the contract's `TicketPriceUpdated` event
         pub fn ticket_price_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            TicketPriceUpdatedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, TicketPriceUpdatedFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            HoprTicketPriceOracleEvents,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprTicketPriceOracleEvents> {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprTicketPriceOracle<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprTicketPriceOracle<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `TicketPriceMustNotBeSame` with signature `TicketPriceMustNotBeSame()` and selector `0x9b24e939`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "TicketPriceMustNotBeSame", abi = "TicketPriceMustNotBeSame()")]
     pub struct TicketPriceMustNotBeSame;
     ///Custom Error type `TicketPriceMustNotBeZero` with signature `TicketPriceMustNotBeZero()` and selector `0x45b257ef`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "TicketPriceMustNotBeZero", abi = "TicketPriceMustNotBeZero()")]
     pub struct TicketPriceMustNotBeZero;
@@ -2399,26 +2356,15 @@ pub mod hopr_ticket_price_oracle {
         RevertString(::std::string::String),
     }
     impl ::ethers::core::abi::AbiDecode for HoprTicketPriceOracleErrors {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded)
-                = <TicketPriceMustNotBeSame as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TicketPriceMustNotBeSame as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TicketPriceMustNotBeSame(decoded));
             }
-            if let Ok(decoded)
-                = <TicketPriceMustNotBeZero as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TicketPriceMustNotBeZero as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TicketPriceMustNotBeZero(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -2427,12 +2373,8 @@ pub mod hopr_ticket_price_oracle {
     impl ::ethers::core::abi::AbiEncode for HoprTicketPriceOracleErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::TicketPriceMustNotBeSame(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TicketPriceMustNotBeZero(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::TicketPriceMustNotBeSame(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TicketPriceMustNotBeZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -2441,14 +2383,8 @@ pub mod hopr_ticket_price_oracle {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector
-                    == <TicketPriceMustNotBeSame as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <TicketPriceMustNotBeZero as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
+                _ if selector == <TicketPriceMustNotBeSame as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <TicketPriceMustNotBeZero as ::ethers::contract::EthError>::selector() => true,
                 _ => false,
             }
         }
@@ -2456,12 +2392,8 @@ pub mod hopr_ticket_price_oracle {
     impl ::core::fmt::Display for HoprTicketPriceOracleErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::TicketPriceMustNotBeSame(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::TicketPriceMustNotBeZero(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::TicketPriceMustNotBeSame(element) => ::core::fmt::Display::fmt(element, f),
+                Self::TicketPriceMustNotBeZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -2471,32 +2403,20 @@ pub mod hopr_ticket_price_oracle {
             Self::RevertString(value)
         }
     }
-    impl ::core::convert::From<TicketPriceMustNotBeSame>
-    for HoprTicketPriceOracleErrors {
+    impl ::core::convert::From<TicketPriceMustNotBeSame> for HoprTicketPriceOracleErrors {
         fn from(value: TicketPriceMustNotBeSame) -> Self {
             Self::TicketPriceMustNotBeSame(value)
         }
     }
-    impl ::core::convert::From<TicketPriceMustNotBeZero>
-    for HoprTicketPriceOracleErrors {
+    impl ::core::convert::From<TicketPriceMustNotBeZero> for HoprTicketPriceOracleErrors {
         fn from(value: TicketPriceMustNotBeZero) -> Self {
             Self::TicketPriceMustNotBeZero(value)
         }
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "OwnershipTransferred",
-        abi = "OwnershipTransferred(address,address)"
-    )]
+    #[ethevent(name = "OwnershipTransferred", abi = "OwnershipTransferred(address,address)")]
     pub struct OwnershipTransferredFilter {
         #[ethevent(indexed)]
         pub previous_owner: ::ethers::core::types::Address,
@@ -2504,20 +2424,10 @@ pub mod hopr_ticket_price_oracle {
         pub new_owner: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "TicketPriceUpdated", abi = "TicketPriceUpdated(uint256,uint256)")]
-    pub struct TicketPriceUpdatedFilter(
-        pub ::ethers::core::types::U256,
-        pub ::ethers::core::types::U256,
-    );
+    pub struct TicketPriceUpdatedFilter(pub ::ethers::core::types::U256, pub ::ethers::core::types::U256);
     ///Container type for all of the contract's events
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum HoprTicketPriceOracleEvents {
@@ -2525,18 +2435,12 @@ pub mod hopr_ticket_price_oracle {
         TicketPriceUpdatedFilter(TicketPriceUpdatedFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprTicketPriceOracleEvents {
-        fn decode_log(
-            log: &::ethers::core::abi::RawLog,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = OwnershipTransferredFilter::decode_log(log) {
-                return Ok(
-                    HoprTicketPriceOracleEvents::OwnershipTransferredFilter(decoded),
-                );
+                return Ok(HoprTicketPriceOracleEvents::OwnershipTransferredFilter(decoded));
             }
             if let Ok(decoded) = TicketPriceUpdatedFilter::decode_log(log) {
-                return Ok(
-                    HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(decoded),
-                );
+                return Ok(HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -2544,76 +2448,42 @@ pub mod hopr_ticket_price_oracle {
     impl ::core::fmt::Display for HoprTicketPriceOracleEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::OwnershipTransferredFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::TicketPriceUpdatedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::OwnershipTransferredFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::TicketPriceUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<OwnershipTransferredFilter>
-    for HoprTicketPriceOracleEvents {
+    impl ::core::convert::From<OwnershipTransferredFilter> for HoprTicketPriceOracleEvents {
         fn from(value: OwnershipTransferredFilter) -> Self {
             Self::OwnershipTransferredFilter(value)
         }
     }
-    impl ::core::convert::From<TicketPriceUpdatedFilter>
-    for HoprTicketPriceOracleEvents {
+    impl ::core::convert::From<TicketPriceUpdatedFilter> for HoprTicketPriceOracleEvents {
         fn from(value: TicketPriceUpdatedFilter) -> Self {
             Self::TicketPriceUpdatedFilter(value)
         }
     }
     ///Container type for all input parameters for the `currentTicketPrice` function with signature `currentTicketPrice()` and selector `0xe0159106`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "currentTicketPrice", abi = "currentTicketPrice()")]
     pub struct CurrentTicketPriceCall;
     ///Container type for all input parameters for the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "owner", abi = "owner()")]
     pub struct OwnerCall;
     ///Container type for all input parameters for the `renounceOwnership` function with signature `renounceOwnership()` and selector `0x715018a6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "renounceOwnership", abi = "renounceOwnership()")]
     pub struct RenounceOwnershipCall;
     ///Container type for all input parameters for the `setTicketPrice` function with signature `setTicketPrice(uint256)` and selector `0x15981650`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "setTicketPrice", abi = "setTicketPrice(uint256)")]
     pub struct SetTicketPriceCall {
@@ -2621,14 +2491,7 @@ pub mod hopr_ticket_price_oracle {
     }
     ///Container type for all input parameters for the `transferOwnership` function with signature `transferOwnership(address)` and selector `0xf2fde38b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "transferOwnership", abi = "transferOwnership(address)")]
     pub struct TransferOwnershipCall {
@@ -2644,34 +2507,21 @@ pub mod hopr_ticket_price_oracle {
         TransferOwnership(TransferOwnershipCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprTicketPriceOracleCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <CurrentTicketPriceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <CurrentTicketPriceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CurrentTicketPrice(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Owner(decoded));
             }
-            if let Ok(decoded)
-                = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RenounceOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <SetTicketPriceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SetTicketPriceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SetTicketPrice(decoded));
             }
-            if let Ok(decoded)
-                = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TransferOwnership(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -2680,28 +2530,18 @@ pub mod hopr_ticket_price_oracle {
     impl ::ethers::core::abi::AbiEncode for HoprTicketPriceOracleCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::CurrentTicketPrice(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::CurrentTicketPrice(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Owner(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RenounceOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SetTicketPrice(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TransferOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::RenounceOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SetTicketPrice(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TransferOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
     impl ::core::fmt::Display for HoprTicketPriceOracleCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::CurrentTicketPrice(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::CurrentTicketPrice(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Owner(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RenounceOwnership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SetTicketPrice(element) => ::core::fmt::Display::fmt(element, f),
@@ -2736,26 +2576,12 @@ pub mod hopr_ticket_price_oracle {
     }
     ///Container type for all return fields from the `currentTicketPrice` function with signature `currentTicketPrice()` and selector `0xe0159106`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct CurrentTicketPriceReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct OwnerReturn(pub ::ethers::core::types::Address);
 }

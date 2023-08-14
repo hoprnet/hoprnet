@@ -7,14 +7,16 @@ pub use hopr_token::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_token {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Approval\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"tokenHolder\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"AuthorizedOperator\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Burned\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Minted\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"tokenHolder\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RevokedOperator\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleAdminChanged\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleGranted\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleRevoked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Sent\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Transfer\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"MINTER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"accountSnapshots\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"fromBlock\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"value\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"holder\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"allowance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"approve\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"authorizeOperator\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenHolder\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"balanceOf\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"_blockNumber\",\"type\":\"uint128\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"balanceOfAt\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"burn\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"decimals\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"defaultOperators\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleMember\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleMemberCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"grantRole\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"granularity\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"tokenHolder\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isOperatorFor\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"mint\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"name\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"operatorBurn\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"operatorSend\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceRole\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"revokeOperator\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"revokeRole\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"send\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"symbol\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"totalSupply\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint128\",\"name\":\"_blockNumber\",\"type\":\"uint128\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"totalSupplyAt\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"totalSupplySnapshots\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"fromBlock\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"value\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"holder\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"recipient\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferFrom\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRTOKEN_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
+    pub static HOPRTOKEN_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -11993,9 +11995,7 @@ pub mod hopr_token {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRTOKEN_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRTOKEN_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -22481,9 +22481,8 @@ pub mod hopr_token {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRTOKEN_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRTOKEN_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprToken<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprToken<M> {
         fn clone(&self) -> Self {
@@ -22509,17 +22508,12 @@ pub mod hopr_token {
     impl<M: ::ethers::providers::Middleware> HoprToken<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRTOKEN_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRTOKEN_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -22561,17 +22555,13 @@ pub mod hopr_token {
             Ok(deployer)
         }
         ///Calls the contract's `DEFAULT_ADMIN_ROLE` (0xa217fddf) function
-        pub fn default_admin_role(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn default_admin_role(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([162, 23, 253, 223], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `MINTER_ROLE` (0xd5391393) function
-        pub fn minter_role(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn minter_role(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([213, 57, 19, 147], ())
                 .expect("method not found (this should never happen)")
@@ -22653,19 +22643,13 @@ pub mod hopr_token {
         ///Calls the contract's `defaultOperators` (0x06e48538) function
         pub fn default_operators(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::std::vec::Vec<::ethers::core::types::Address>,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<::ethers::core::types::Address>> {
             self.0
                 .method_hash([6, 228, 133, 56], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getRoleAdmin` (0x248a9ca3) function
-        pub fn get_role_admin(
-            &self,
-            role: [u8; 32],
-        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn get_role_admin(&self, role: [u8; 32]) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([36, 138, 156, 163], role)
                 .expect("method not found (this should never happen)")
@@ -22675,10 +22659,7 @@ pub mod hopr_token {
             &self,
             role: [u8; 32],
             index: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([144, 16, 208, 124], (role, index))
                 .expect("method not found (this should never happen)")
@@ -22703,9 +22684,7 @@ pub mod hopr_token {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `granularity` (0x556f0dc7) function
-        pub fn granularity(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn granularity(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([85, 111, 13, 199], ())
                 .expect("method not found (this should never happen)")
@@ -22739,16 +22718,11 @@ pub mod hopr_token {
             operator_data: ::ethers::core::types::Bytes,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash(
-                    [220, 220, 125, 208],
-                    (account, amount, user_data, operator_data),
-                )
+                .method_hash([220, 220, 125, 208], (account, amount, user_data, operator_data))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `name` (0x06fdde03) function
-        pub fn name(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
+        pub fn name(&self) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
             self.0
                 .method_hash([6, 253, 222, 3], ())
                 .expect("method not found (this should never happen)")
@@ -22775,10 +22749,7 @@ pub mod hopr_token {
             operator_data: ::ethers::core::types::Bytes,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash(
-                    [98, 173, 27, 131],
-                    (sender, recipient, amount, data, operator_data),
-                )
+                .method_hash([98, 173, 27, 131], (sender, recipient, amount, data, operator_data))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `renounceRole` (0x36568abe) function
@@ -22822,26 +22793,19 @@ pub mod hopr_token {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `supportsInterface` (0x01ffc9a7) function
-        pub fn supports_interface(
-            &self,
-            interface_id: [u8; 4],
-        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
+        pub fn supports_interface(&self, interface_id: [u8; 4]) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
                 .method_hash([1, 255, 201, 167], interface_id)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `symbol` (0x95d89b41) function
-        pub fn symbol(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
+        pub fn symbol(&self) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
             self.0
                 .method_hash([149, 216, 155, 65], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `totalSupply` (0x18160ddd) function
-        pub fn total_supply(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn total_supply(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([24, 22, 13, 221], ())
                 .expect("method not found (this should never happen)")
@@ -22886,119 +22850,67 @@ pub mod hopr_token {
                 .expect("method not found (this should never happen)")
         }
         ///Gets the contract's `Approval` event
-        pub fn approval_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            ApprovalFilter,
-        > {
+        pub fn approval_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ApprovalFilter> {
             self.0.event()
         }
         ///Gets the contract's `AuthorizedOperator` event
         pub fn authorized_operator_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            AuthorizedOperatorFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, AuthorizedOperatorFilter> {
             self.0.event()
         }
         ///Gets the contract's `Burned` event
-        pub fn burned_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, BurnedFilter> {
+        pub fn burned_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, BurnedFilter> {
             self.0.event()
         }
         ///Gets the contract's `Minted` event
-        pub fn minted_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, MintedFilter> {
+        pub fn minted_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, MintedFilter> {
             self.0.event()
         }
         ///Gets the contract's `RevokedOperator` event
         pub fn revoked_operator_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RevokedOperatorFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RevokedOperatorFilter> {
             self.0.event()
         }
         ///Gets the contract's `RoleAdminChanged` event
         pub fn role_admin_changed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RoleAdminChangedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleAdminChangedFilter> {
             self.0.event()
         }
         ///Gets the contract's `RoleGranted` event
         pub fn role_granted_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RoleGrantedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleGrantedFilter> {
             self.0.event()
         }
         ///Gets the contract's `RoleRevoked` event
         pub fn role_revoked_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RoleRevokedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleRevokedFilter> {
             self.0.event()
         }
         ///Gets the contract's `Sent` event
-        pub fn sent_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SentFilter> {
+        pub fn sent_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SentFilter> {
             self.0.event()
         }
         ///Gets the contract's `Transfer` event
-        pub fn transfer_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            TransferFilter,
-        > {
+        pub fn transfer_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, TransferFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
-        pub fn events(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            HoprTokenEvents,
-        > {
+        pub fn events(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprTokenEvents> {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprToken<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprToken<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Approval", abi = "Approval(address,address,uint256)")]
     pub struct ApprovalFilter {
@@ -23009,14 +22921,7 @@ pub mod hopr_token {
         pub value: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "AuthorizedOperator", abi = "AuthorizedOperator(address,address)")]
     pub struct AuthorizedOperatorFilter {
@@ -23026,14 +22931,7 @@ pub mod hopr_token {
         pub token_holder: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Burned", abi = "Burned(address,address,uint256,bytes,bytes)")]
     pub struct BurnedFilter {
@@ -23046,14 +22944,7 @@ pub mod hopr_token {
         pub operator_data: ::ethers::core::types::Bytes,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Minted", abi = "Minted(address,address,uint256,bytes,bytes)")]
     pub struct MintedFilter {
@@ -23066,14 +22957,7 @@ pub mod hopr_token {
         pub operator_data: ::ethers::core::types::Bytes,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "RevokedOperator", abi = "RevokedOperator(address,address)")]
     pub struct RevokedOperatorFilter {
@@ -23083,19 +22967,9 @@ pub mod hopr_token {
         pub token_holder: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "RoleAdminChanged",
-        abi = "RoleAdminChanged(bytes32,bytes32,bytes32)"
-    )]
+    #[ethevent(name = "RoleAdminChanged", abi = "RoleAdminChanged(bytes32,bytes32,bytes32)")]
     pub struct RoleAdminChangedFilter {
         #[ethevent(indexed)]
         pub role: [u8; 32],
@@ -23105,14 +22979,7 @@ pub mod hopr_token {
         pub new_admin_role: [u8; 32],
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "RoleGranted", abi = "RoleGranted(bytes32,address,address)")]
     pub struct RoleGrantedFilter {
@@ -23124,14 +22991,7 @@ pub mod hopr_token {
         pub sender: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "RoleRevoked", abi = "RoleRevoked(bytes32,address,address)")]
     pub struct RoleRevokedFilter {
@@ -23143,14 +23003,7 @@ pub mod hopr_token {
         pub sender: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Sent", abi = "Sent(address,address,address,uint256,bytes,bytes)")]
     pub struct SentFilter {
@@ -23165,14 +23018,7 @@ pub mod hopr_token {
         pub operator_data: ::ethers::core::types::Bytes,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Transfer", abi = "Transfer(address,address,uint256)")]
     pub struct TransferFilter {
@@ -23197,9 +23043,7 @@ pub mod hopr_token {
         TransferFilter(TransferFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprTokenEvents {
-        fn decode_log(
-            log: &::ethers::core::abi::RawLog,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = ApprovalFilter::decode_log(log) {
                 return Ok(HoprTokenEvents::ApprovalFilter(decoded));
             }
@@ -23237,17 +23081,11 @@ pub mod hopr_token {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::ApprovalFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AuthorizedOperatorFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AuthorizedOperatorFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BurnedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MintedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RevokedOperatorFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::RoleAdminChangedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::RevokedOperatorFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::RoleAdminChangedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RoleGrantedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RoleRevokedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SentFilter(element) => ::core::fmt::Display::fmt(element, f),
@@ -23307,56 +23145,25 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `DEFAULT_ADMIN_ROLE` function with signature `DEFAULT_ADMIN_ROLE()` and selector `0xa217fddf`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "DEFAULT_ADMIN_ROLE", abi = "DEFAULT_ADMIN_ROLE()")]
     pub struct DefaultAdminRoleCall;
     ///Container type for all input parameters for the `MINTER_ROLE` function with signature `MINTER_ROLE()` and selector `0xd5391393`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "MINTER_ROLE", abi = "MINTER_ROLE()")]
     pub struct MinterRoleCall;
     ///Container type for all input parameters for the `accountSnapshots` function with signature `accountSnapshots(address,uint256)` and selector `0x2497aee6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "accountSnapshots", abi = "accountSnapshots(address,uint256)")]
-    pub struct AccountSnapshotsCall(
-        pub ::ethers::core::types::Address,
-        pub ::ethers::core::types::U256,
-    );
+    pub struct AccountSnapshotsCall(pub ::ethers::core::types::Address, pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `allowance` function with signature `allowance(address,address)` and selector `0xdd62ed3e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "allowance", abi = "allowance(address,address)")]
     pub struct AllowanceCall {
@@ -23365,14 +23172,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `approve` function with signature `approve(address,uint256)` and selector `0x095ea7b3`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "approve", abi = "approve(address,uint256)")]
     pub struct ApproveCall {
@@ -23381,14 +23181,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `authorizeOperator` function with signature `authorizeOperator(address)` and selector `0x959b8c3f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "authorizeOperator", abi = "authorizeOperator(address)")]
     pub struct AuthorizeOperatorCall {
@@ -23396,14 +23189,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `balanceOf` function with signature `balanceOf(address)` and selector `0x70a08231`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "balanceOf", abi = "balanceOf(address)")]
     pub struct BalanceOfCall {
@@ -23411,14 +23197,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `balanceOfAt` function with signature `balanceOfAt(address,uint128)` and selector `0xf772a092`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "balanceOfAt", abi = "balanceOfAt(address,uint128)")]
     pub struct BalanceOfAtCall {
@@ -23427,14 +23206,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `burn` function with signature `burn(uint256,bytes)` and selector `0xfe9d9303`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "burn", abi = "burn(uint256,bytes)")]
     pub struct BurnCall {
@@ -23443,40 +23215,19 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `decimals` function with signature `decimals()` and selector `0x313ce567`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "decimals", abi = "decimals()")]
     pub struct DecimalsCall;
     ///Container type for all input parameters for the `defaultOperators` function with signature `defaultOperators()` and selector `0x06e48538`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "defaultOperators", abi = "defaultOperators()")]
     pub struct DefaultOperatorsCall;
     ///Container type for all input parameters for the `getRoleAdmin` function with signature `getRoleAdmin(bytes32)` and selector `0x248a9ca3`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "getRoleAdmin", abi = "getRoleAdmin(bytes32)")]
     pub struct GetRoleAdminCall {
@@ -23484,14 +23235,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `getRoleMember` function with signature `getRoleMember(bytes32,uint256)` and selector `0x9010d07c`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "getRoleMember", abi = "getRoleMember(bytes32,uint256)")]
     pub struct GetRoleMemberCall {
@@ -23500,14 +23244,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `getRoleMemberCount` function with signature `getRoleMemberCount(bytes32)` and selector `0xca15c873`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "getRoleMemberCount", abi = "getRoleMemberCount(bytes32)")]
     pub struct GetRoleMemberCountCall {
@@ -23515,14 +23252,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `grantRole` function with signature `grantRole(bytes32,address)` and selector `0x2f2ff15d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "grantRole", abi = "grantRole(bytes32,address)")]
     pub struct GrantRoleCall {
@@ -23531,27 +23261,13 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `granularity` function with signature `granularity()` and selector `0x556f0dc7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "granularity", abi = "granularity()")]
     pub struct GranularityCall;
     ///Container type for all input parameters for the `hasRole` function with signature `hasRole(bytes32,address)` and selector `0x91d14854`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "hasRole", abi = "hasRole(bytes32,address)")]
     pub struct HasRoleCall {
@@ -23560,14 +23276,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `isOperatorFor` function with signature `isOperatorFor(address,address)` and selector `0xd95b6371`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "isOperatorFor", abi = "isOperatorFor(address,address)")]
     pub struct IsOperatorForCall {
@@ -23576,14 +23285,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `mint` function with signature `mint(address,uint256,bytes,bytes)` and selector `0xdcdc7dd0`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "mint", abi = "mint(address,uint256,bytes,bytes)")]
     pub struct MintCall {
@@ -23594,27 +23296,13 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `name` function with signature `name()` and selector `0x06fdde03`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "name", abi = "name()")]
     pub struct NameCall;
     ///Container type for all input parameters for the `operatorBurn` function with signature `operatorBurn(address,uint256,bytes,bytes)` and selector `0xfc673c4f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "operatorBurn", abi = "operatorBurn(address,uint256,bytes,bytes)")]
     pub struct OperatorBurnCall {
@@ -23625,19 +23313,9 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `operatorSend` function with signature `operatorSend(address,address,uint256,bytes,bytes)` and selector `0x62ad1b83`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "operatorSend",
-        abi = "operatorSend(address,address,uint256,bytes,bytes)"
-    )]
+    #[ethcall(name = "operatorSend", abi = "operatorSend(address,address,uint256,bytes,bytes)")]
     pub struct OperatorSendCall {
         pub sender: ::ethers::core::types::Address,
         pub recipient: ::ethers::core::types::Address,
@@ -23647,14 +23325,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `renounceRole` function with signature `renounceRole(bytes32,address)` and selector `0x36568abe`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "renounceRole", abi = "renounceRole(bytes32,address)")]
     pub struct RenounceRoleCall {
@@ -23663,14 +23334,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `revokeOperator` function with signature `revokeOperator(address)` and selector `0xfad8b32a`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "revokeOperator", abi = "revokeOperator(address)")]
     pub struct RevokeOperatorCall {
@@ -23678,14 +23342,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `revokeRole` function with signature `revokeRole(bytes32,address)` and selector `0xd547741f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "revokeRole", abi = "revokeRole(bytes32,address)")]
     pub struct RevokeRoleCall {
@@ -23694,14 +23351,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `send` function with signature `send(address,uint256,bytes)` and selector `0x9bd9bbc6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "send", abi = "send(address,uint256,bytes)")]
     pub struct SendCall {
@@ -23711,14 +23361,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `supportsInterface` function with signature `supportsInterface(bytes4)` and selector `0x01ffc9a7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "supportsInterface", abi = "supportsInterface(bytes4)")]
     pub struct SupportsInterfaceCall {
@@ -23726,40 +23369,19 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `symbol` function with signature `symbol()` and selector `0x95d89b41`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "symbol", abi = "symbol()")]
     pub struct SymbolCall;
     ///Container type for all input parameters for the `totalSupply` function with signature `totalSupply()` and selector `0x18160ddd`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "totalSupply", abi = "totalSupply()")]
     pub struct TotalSupplyCall;
     ///Container type for all input parameters for the `totalSupplyAt` function with signature `totalSupplyAt(uint128)` and selector `0x947975d9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "totalSupplyAt", abi = "totalSupplyAt(uint128)")]
     pub struct TotalSupplyAtCall {
@@ -23767,27 +23389,13 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `totalSupplySnapshots` function with signature `totalSupplySnapshots(uint256)` and selector `0xb7d78b1a`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "totalSupplySnapshots", abi = "totalSupplySnapshots(uint256)")]
     pub struct TotalSupplySnapshotsCall(pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `transfer` function with signature `transfer(address,uint256)` and selector `0xa9059cbb`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "transfer", abi = "transfer(address,uint256)")]
     pub struct TransferCall {
@@ -23796,14 +23404,7 @@ pub mod hopr_token {
     }
     ///Container type for all input parameters for the `transferFrom` function with signature `transferFrom(address,address,uint256)` and selector `0x23b872dd`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "transferFrom", abi = "transferFrom(address,address,uint256)")]
     pub struct TransferFromCall {
@@ -23849,154 +23450,105 @@ pub mod hopr_token {
         TransferFrom(TransferFromCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprTokenCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <DefaultAdminRoleCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <DefaultAdminRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::DefaultAdminRole(decoded));
             }
-            if let Ok(decoded)
-                = <MinterRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <MinterRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MinterRole(decoded));
             }
-            if let Ok(decoded)
-                = <AccountSnapshotsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AccountSnapshotsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AccountSnapshots(decoded));
             }
-            if let Ok(decoded)
-                = <AllowanceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AllowanceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Allowance(decoded));
             }
-            if let Ok(decoded)
-                = <ApproveCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ApproveCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Approve(decoded));
             }
-            if let Ok(decoded)
-                = <AuthorizeOperatorCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AuthorizeOperatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AuthorizeOperator(decoded));
             }
-            if let Ok(decoded)
-                = <BalanceOfCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <BalanceOfCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BalanceOf(decoded));
             }
-            if let Ok(decoded)
-                = <BalanceOfAtCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <BalanceOfAtCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BalanceOfAt(decoded));
             }
-            if let Ok(decoded)
-                = <BurnCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <BurnCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Burn(decoded));
             }
-            if let Ok(decoded)
-                = <DecimalsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <DecimalsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Decimals(decoded));
             }
-            if let Ok(decoded)
-                = <DefaultOperatorsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <DefaultOperatorsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::DefaultOperators(decoded));
             }
-            if let Ok(decoded)
-                = <GetRoleAdminCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetRoleAdminCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetRoleAdmin(decoded));
             }
-            if let Ok(decoded)
-                = <GetRoleMemberCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GetRoleMemberCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetRoleMember(decoded));
             }
-            if let Ok(decoded)
-                = <GetRoleMemberCountCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetRoleMemberCountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetRoleMemberCount(decoded));
             }
-            if let Ok(decoded)
-                = <GrantRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GrantRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GrantRole(decoded));
             }
-            if let Ok(decoded)
-                = <GranularityCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <GranularityCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Granularity(decoded));
             }
-            if let Ok(decoded)
-                = <HasRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <HasRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::HasRole(decoded));
             }
-            if let Ok(decoded)
-                = <IsOperatorForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <IsOperatorForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsOperatorFor(decoded));
             }
-            if let Ok(decoded)
-                = <MintCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <MintCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Mint(decoded));
             }
-            if let Ok(decoded)
-                = <NameCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NameCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Name(decoded));
             }
-            if let Ok(decoded)
-                = <OperatorBurnCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OperatorBurnCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OperatorBurn(decoded));
             }
-            if let Ok(decoded)
-                = <OperatorSendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OperatorSendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OperatorSend(decoded));
             }
-            if let Ok(decoded)
-                = <RenounceRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RenounceRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RenounceRole(decoded));
             }
-            if let Ok(decoded)
-                = <RevokeOperatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RevokeOperatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevokeOperator(decoded));
             }
-            if let Ok(decoded)
-                = <RevokeRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RevokeRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevokeRole(decoded));
             }
-            if let Ok(decoded)
-                = <SendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Send(decoded));
             }
-            if let Ok(decoded)
-                = <SupportsInterfaceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <SupportsInterfaceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SupportsInterface(decoded));
             }
-            if let Ok(decoded)
-                = <SymbolCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SymbolCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Symbol(decoded));
             }
-            if let Ok(decoded)
-                = <TotalSupplyCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TotalSupplyCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalSupply(decoded));
             }
-            if let Ok(decoded)
-                = <TotalSupplyAtCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TotalSupplyAtCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalSupplyAt(decoded));
             }
-            if let Ok(decoded)
-                = <TotalSupplySnapshotsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TotalSupplySnapshotsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalSupplySnapshots(decoded));
             }
-            if let Ok(decoded)
-                = <TransferCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TransferCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Transfer(decoded));
             }
-            if let Ok(decoded)
-                = <TransferFromCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TransferFromCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TransferFrom(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -24005,91 +23557,39 @@ pub mod hopr_token {
     impl ::ethers::core::abi::AbiEncode for HoprTokenCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::DefaultAdminRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::MinterRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::AccountSnapshots(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::Allowance(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::DefaultAdminRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::MinterRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AccountSnapshots(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Allowance(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Approve(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::AuthorizeOperator(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::BalanceOf(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::BalanceOfAt(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::AuthorizeOperator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BalanceOf(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BalanceOfAt(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Burn(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Decimals(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::DefaultOperators(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetRoleAdmin(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetRoleMember(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetRoleMemberCount(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GrantRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::Granularity(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::Decimals(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::DefaultOperators(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetRoleAdmin(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetRoleMember(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetRoleMemberCount(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GrantRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Granularity(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::HasRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::IsOperatorFor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::IsOperatorFor(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Mint(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Name(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::OperatorBurn(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OperatorSend(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RenounceRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RevokeOperator(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RevokeRole(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::OperatorBurn(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OperatorSend(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RenounceRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RevokeOperator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RevokeRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Send(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SupportsInterface(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::SupportsInterface(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Symbol(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TotalSupply(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TotalSupplyAt(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TotalSupplySnapshots(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::Transfer(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TransferFrom(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::TotalSupply(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TotalSupplyAt(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TotalSupplySnapshots(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Transfer(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TransferFrom(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -24109,9 +23609,7 @@ pub mod hopr_token {
                 Self::DefaultOperators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRoleAdmin(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRoleMember(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetRoleMemberCount(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::GetRoleMemberCount(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GrantRole(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Granularity(element) => ::core::fmt::Display::fmt(element, f),
                 Self::HasRole(element) => ::core::fmt::Display::fmt(element, f),
@@ -24128,9 +23626,7 @@ pub mod hopr_token {
                 Self::Symbol(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalSupply(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalSupplyAt(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TotalSupplySnapshots(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::TotalSupplySnapshots(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Transfer(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TransferFrom(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -24303,38 +23799,17 @@ pub mod hopr_token {
     }
     ///Container type for all return fields from the `DEFAULT_ADMIN_ROLE` function with signature `DEFAULT_ADMIN_ROLE()` and selector `0xa217fddf`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct DefaultAdminRoleReturn(pub [u8; 32]);
     ///Container type for all return fields from the `MINTER_ROLE` function with signature `MINTER_ROLE()` and selector `0xd5391393`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MinterRoleReturn(pub [u8; 32]);
     ///Container type for all return fields from the `accountSnapshots` function with signature `accountSnapshots(address,uint256)` and selector `0x2497aee6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct AccountSnapshotsReturn {
         pub from_block: u128,
@@ -24342,220 +23817,92 @@ pub mod hopr_token {
     }
     ///Container type for all return fields from the `allowance` function with signature `allowance(address,address)` and selector `0xdd62ed3e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct AllowanceReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `approve` function with signature `approve(address,uint256)` and selector `0x095ea7b3`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct ApproveReturn(pub bool);
     ///Container type for all return fields from the `balanceOf` function with signature `balanceOf(address)` and selector `0x70a08231`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct BalanceOfReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `balanceOfAt` function with signature `balanceOfAt(address,uint128)` and selector `0xf772a092`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct BalanceOfAtReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `decimals` function with signature `decimals()` and selector `0x313ce567`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct DecimalsReturn(pub u8);
     ///Container type for all return fields from the `defaultOperators` function with signature `defaultOperators()` and selector `0x06e48538`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
-    pub struct DefaultOperatorsReturn(
-        pub ::std::vec::Vec<::ethers::core::types::Address>,
-    );
+    pub struct DefaultOperatorsReturn(pub ::std::vec::Vec<::ethers::core::types::Address>);
     ///Container type for all return fields from the `getRoleAdmin` function with signature `getRoleAdmin(bytes32)` and selector `0x248a9ca3`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct GetRoleAdminReturn(pub [u8; 32]);
     ///Container type for all return fields from the `getRoleMember` function with signature `getRoleMember(bytes32,uint256)` and selector `0x9010d07c`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct GetRoleMemberReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `getRoleMemberCount` function with signature `getRoleMemberCount(bytes32)` and selector `0xca15c873`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct GetRoleMemberCountReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `granularity` function with signature `granularity()` and selector `0x556f0dc7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct GranularityReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `hasRole` function with signature `hasRole(bytes32,address)` and selector `0x91d14854`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct HasRoleReturn(pub bool);
     ///Container type for all return fields from the `isOperatorFor` function with signature `isOperatorFor(address,address)` and selector `0xd95b6371`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsOperatorForReturn(pub bool);
     ///Container type for all return fields from the `name` function with signature `name()` and selector `0x06fdde03`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct NameReturn(pub ::std::string::String);
     ///Container type for all return fields from the `supportsInterface` function with signature `supportsInterface(bytes4)` and selector `0x01ffc9a7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct SupportsInterfaceReturn(pub bool);
     ///Container type for all return fields from the `symbol` function with signature `symbol()` and selector `0x95d89b41`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct SymbolReturn(pub ::std::string::String);
     ///Container type for all return fields from the `totalSupply` function with signature `totalSupply()` and selector `0x18160ddd`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct TotalSupplyReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `totalSupplyAt` function with signature `totalSupplyAt(uint128)` and selector `0x947975d9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct TotalSupplyAtReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `totalSupplySnapshots` function with signature `totalSupplySnapshots(uint256)` and selector `0xb7d78b1a`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct TotalSupplySnapshotsReturn {
         pub from_block: u128,
@@ -24563,26 +23910,12 @@ pub mod hopr_token {
     }
     ///Container type for all return fields from the `transfer` function with signature `transfer(address,uint256)` and selector `0xa9059cbb`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct TransferReturn(pub bool);
     ///Container type for all return fields from the `transferFrom` function with signature `transferFrom(address,address,uint256)` and selector `0x23b872dd`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct TransferFromReturn(pub bool);
 }

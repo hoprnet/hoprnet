@@ -637,7 +637,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         return Promise.resolve(
           new AccountEntry(
             OffchainPublicKey.from_peerid_str(peer.toString()),
-            Address.from_string(""),  // FIXME: update dummy
+            Address.from_string(''), // FIXME: update dummy
             `/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`,
             1
           )

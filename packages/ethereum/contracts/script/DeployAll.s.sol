@@ -98,7 +98,8 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 || !isValidAddress(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress)
         ) {
             // deploy HoprNodeStakeFactory contract
-            currentNetworkDetail.addresses.nodeStakeV2FactoryAddress = deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory");
+            currentNetworkDetail.addresses.nodeStakeV2FactoryAddress =
+                deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory");
         }
     }
 
@@ -125,7 +126,8 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 || !isValidAddress(currentNetworkDetail.addresses.nodeSafeRegistryAddress)
         ) {
             // deploy HoprNodeManagementModule contract
-            currentNetworkDetail.addresses.nodeSafeRegistryAddress = deployCode("NodeSafeRegistry.sol:HoprNodeSafeRegistry");
+            currentNetworkDetail.addresses.nodeSafeRegistryAddress =
+                deployCode("NodeSafeRegistry.sol:HoprNodeSafeRegistry");
         }
     }
 
@@ -162,7 +164,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * @dev Deploy HoprChannels smart contract and registers NodeSafeRegistry
      */
     function _deployHoprChannels() internal {
-                if (
+        if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.addresses.channelsContractAddress)
         ) {
@@ -171,7 +173,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             currentNetworkDetail.addresses.channelsContractAddress = deployCode(
                 "Channels.sol:HoprChannels",
                 abi.encode(
-                    currentNetworkDetail.addresses.tokenContractAddress, noticePeriodChannelClosure, currentNetworkDetail.addresses.nodeSafeRegistryAddress
+                    currentNetworkDetail.addresses.tokenContractAddress,
+                    noticePeriodChannelClosure,
+                    currentNetworkDetail.addresses.nodeSafeRegistryAddress
                 )
             );
             isHoprChannelsDeployed = true;
@@ -219,7 +223,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             currentNetworkDetail.addresses.networkRegistryContractAddress = deployCode(
                 "NetworkRegistry.sol:HoprNetworkRegistry",
                 abi.encode(
-                    currentNetworkDetail.addresses.networkRegistryProxyContractAddress, COMM_MULTISIG_ADDRESS, deployerAddress
+                    currentNetworkDetail.addresses.networkRegistryProxyContractAddress,
+                    COMM_MULTISIG_ADDRESS,
+                    deployerAddress
                 )
             );
             // NetworkRegistry should be enabled (default behavior) in staging/production, and disabled in development
@@ -252,13 +258,15 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * @dev deploy Announcments smart contract and register NodeSafeRegistry
      */
     function _deployHoprAnnouncements() internal {
-                if (
+        if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.addresses.ticketPriceOracleContractAddress)
         ) {
             // deploy HoprAnnouncements contract and register with current NodeSafeRegistry
-            currentNetworkDetail.addresses.announcements =
-                deployCode("Announcements.sol:HoprAnnouncements", abi.encode(currentNetworkDetail.addresses.nodeSafeRegistryAddress));
+            currentNetworkDetail.addresses.announcements = deployCode(
+                "Announcements.sol:HoprAnnouncements",
+                abi.encode(currentNetworkDetail.addresses.nodeSafeRegistryAddress)
+            );
         }
     }
 }

@@ -100,6 +100,7 @@ import {
   core_hopr_initialize_crate,
   core_hopr_gather_metrics,
   Database,
+  ApplicationData,
   Address as Packet_Address,
   PacketInteractionConfig,
   Path,
@@ -435,7 +436,6 @@ class Hopr extends EventEmitter {
         log(`peer store: loaded peer ${peerId}`)
       })
 
-
     // react when network registry is enabled / disabled
     connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
       // If Network Registry got enabled, we might need to close existing connections,
@@ -540,7 +540,7 @@ class Hopr extends EventEmitter {
     let packetCfg = new PacketInteractionConfig(privateKeyFromPeer(this.id))
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
-    const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
+    const onMessage = (data: ApplicationData) => this.emit('hopr:message', data)
     this.forward = new WasmPacketInteraction(this.db.clone(), onMessage, packetCfg)
 
     let packetProtocols = [
@@ -1075,7 +1075,8 @@ class Hopr extends EventEmitter {
     msg: Uint8Array,
     destination: PeerId,
     intermediatePath?: OffchainPublicKey[],
-    hops?: number
+    hops?: number,
+    application_tag?: number
   ): Promise<string> {
     if (this.status != 'RUNNING') {
       metric_sentMessageFailCount.increment()
@@ -1109,7 +1110,7 @@ class Hopr extends EventEmitter {
     const path = new Path([...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()])
     metric_pathLength.observe(path.length())
 
-    return (await this.forward.send_packet(msg, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
+    return (await this.forward.send_packet(msg, application_tag, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
   }
 
   /**

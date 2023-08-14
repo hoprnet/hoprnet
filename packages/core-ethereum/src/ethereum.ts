@@ -85,7 +85,7 @@ export async function createChainWrapper(
   txTimeout = constants.TX_CONFIRMATION_WAIT
 ) {
   log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`)
-const provider = networkInfo.provider.startsWith('http')
+  const provider = networkInfo.provider.startsWith('http')
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
   log(`[DEBUG] provider ${provider}`)
@@ -107,11 +107,7 @@ const provider = networkInfo.provider.startsWith('http')
 
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
 
-  const channels = new ethers.Contract(
-    deploymentExtract.hoprChannelsAddress,
-    HOPR_CHANNELS_ABI,
-    provider
-  )
+  const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -479,7 +475,7 @@ const provider = networkInfo.provider.startsWith('http')
     //   default:
     //     throw new Error(`Failed in sending announce transaction due to ${error}`)
     // }
-    return new Promise(() => "");
+    return new Promise(() => '')
   }
 
   /**
@@ -608,7 +604,9 @@ const provider = networkInfo.provider.startsWith('http')
       case SendTransactionStatus.SUCCESS:
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending initiateOutgoingChannelClosure transaction because transaction is a duplicate`)
+        throw new Error(
+          `Failed in sending initiateOutgoingChannelClosure transaction because transaction is a duplicate`
+        )
       default:
         throw new Error(`Failed in sending initiateOutgoingChannelClosure transaction due to ${error}`)
     }
@@ -647,7 +645,9 @@ const provider = networkInfo.provider.startsWith('http')
       case SendTransactionStatus.SUCCESS:
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending finalizeOutgoingChannelClosure transaction because transaction is a duplicate`)
+        throw new Error(
+          `Failed in sending finalizeOutgoingChannelClosure transaction because transaction is a duplicate`
+        )
       default:
         throw new Error(`Failed in sending finalizeOutgoingChannelClosure transaction due to ${error}`)
     }
@@ -673,26 +673,21 @@ const provider = networkInfo.provider.startsWith('http')
     let sendResult: SendTransactionReturn
     let error: unknown
     try {
-      const redeemTicketEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        channels,
-        'redeemTicket',
-        {
-          data: {
-            channelId: counterparty.to_hex(), // FIXME: build channelId with self and counterparty
-            amount: ackTicket.ticket.amount.to_string(),
-            ticketIndex: ackTicket.ticket.index.to_hex(),
-            indexOffset: 0, // FIXME:
-            epoch: ackTicket.ticket.channel_epoch.to_hex(),
-            winProb: ackTicket.ticket.win_prob.to_string()
-          },
-          signature: {
-            r: ackTicket.ticket.signature.to_hex(), // FIXME: get v value
-            vs: ackTicket.ticket.signature.to_hex() // FIXME: get rs value
-          },
-          porSecret: ackTicket.response.to_hex() // FIXME: use POR secret
-        }
-      )
+      const redeemTicketEssentialTxPayload = buildEssentialTxPayload(0, channels, 'redeemTicket', {
+        data: {
+          channelId: counterparty.to_hex(), // FIXME: build channelId with self and counterparty
+          amount: ackTicket.ticket.amount.to_string(),
+          ticketIndex: ackTicket.ticket.index.to_hex(),
+          indexOffset: 0, // FIXME:
+          epoch: ackTicket.ticket.channel_epoch.to_hex(),
+          winProb: ackTicket.ticket.win_prob.to_string()
+        },
+        signature: {
+          r: ackTicket.ticket.signature.to_hex(), // FIXME: get v value
+          vs: ackTicket.ticket.signature.to_hex() // FIXME: get rs value
+        },
+        porSecret: ackTicket.response.to_hex() // FIXME: use POR secret
+      })
       sendResult = await sendTransaction(checkDuplicate, redeemTicketEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
@@ -751,7 +746,7 @@ const provider = networkInfo.provider.startsWith('http')
     //   default:
     //     throw new Error(`Failed in sending commitment transaction due to ${error}`)
     // }
-    return new Promise(() => "");
+    return new Promise(() => '')
   }
 
   /**

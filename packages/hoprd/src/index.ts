@@ -36,6 +36,14 @@ import {
 } from '../lib/hoprd_misc.js'
 hoprd_misc_initialize_crate()
 
+import {
+  MessageInbox,
+  hoprd_inbox_initialize_crate,
+  ApplicationData,
+  MessageInboxConfiguration
+} from '../lib/hoprd_inbox.js'
+hoprd_inbox_initialize_crate()
+
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
@@ -192,6 +200,7 @@ async function main() {
   const metric_startupTimer = metric_nodeStartupTime.start_measure()
 
   let node: Hopr
+  let inbox: MessageInbox
   let logs = new LogStream()
   let state: State = {
     aliases: new Map(),
@@ -237,11 +246,12 @@ async function main() {
     }
   }
 
-  const logMessageToNode = (msg: Uint8Array): void => {
+  const logMessageToNode = async (data: ApplicationData) => {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
-      let decodedMsg = decodeMessage(msg)
+      let decodedMsg = decodeMessage(data.plain_text)
       logs.log(`Message: ${decodedMsg.msg}`)
+      logs.log(`App tag: ${data.application_tag ?? 0}`)
       logs.log(`Latency: ${decodedMsg.latency} ms`)
       metric_latency.observe(decodedMsg.latency)
 
@@ -251,9 +261,15 @@ async function main() {
 
       // also send it tagged as message for apps to use
       logs.logMessage(decodedMsg.msg)
+
+      // Needs to be created new, because the incoming `data` is from serde_wasmbindgen and not a Rust WASM object
+      let appData = new ApplicationData()
+      appData.application_tag = data.application_tag
+      appData.plain_text = data.plain_text
+      await inbox.push(appData)
     } catch (err) {
       logs.log('Could not decode message', err instanceof Error ? err.message : 'Unknown error')
-      logs.log(msg.toString())
+      logs.log(data.plain_text.toString())
     }
   }
 
@@ -342,10 +358,16 @@ async function main() {
 
     // 3. start all monitoring services, and continue with the rest of the setup.
 
+    let inboxCfg = new MessageInboxConfiguration()
+    // TODO: pass configuration parameters for the inbox
+
+    inbox = new MessageInbox(inboxCfg)
+
     let api = cfg.api as Api
     console.log(JSON.stringify(api, null, 2))
     const startApiListen = setupAPI(
       node,
+      inbox,
       logs,
       { getState, setState },
       {
