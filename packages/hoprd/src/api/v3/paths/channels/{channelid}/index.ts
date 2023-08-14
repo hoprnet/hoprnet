@@ -1,4 +1,4 @@
-import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum/src/db.js'
+import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum/lib/db.js'
 import { channel_status_to_string, ChannelStatus, defer, type DeferType } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'

@@ -10,13 +10,19 @@ hoprd_inbox_initialize_crate()
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { State } from '../../types.js'
 
-export const ALICE_PEER_ID: PeerId = peerIdFromString('16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz')
+console.log("ALICE")
+export const ALICE_PEER_ID: PeerId = peerIdFromString('12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs')
+console.log("ALICE 2")
 export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID.toString()}`)
+console.log("ALICE 3", ALICE_MULTI_ADDR)
+console.log(PublicKey.from_peerid_str('12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs'))
+console.log(PublicKey.from_peerid_str(ALICE_PEER_ID.toString())
 export const ALICE_NATIVE_ADDR = PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address()
-export const BOB_PEER_ID: PeerId = peerIdFromString('16Uiu2HAm29vyHEGNm6ebghEs1tm92UxfaNtj8Rc1Y4qV4TAN5xyQ')
+console.log("ALICE 4")
+export const BOB_PEER_ID: PeerId = peerIdFromString('12D3KooWRNw2pJC9748Fmq4WNV27HoSTcX3r37132FLkQMrbKAiC')
 export const BOB_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${BOB_PEER_ID.toString()}`)
 export const BOB_NATIVE_ADDR = PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address()
-export const CHARLIE_PEER_ID: PeerId = peerIdFromString('16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12')
+export const CHARLIE_PEER_ID: PeerId = peerIdFromString('12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF')
 export const INVALID_PEER_ID = 'definetly not a valid peerId'
 
 export const TICKET_MOCK = {
@@ -50,7 +56,10 @@ export function channelEntryCreateMock(): ChannelEntry {
  */
 export const createTestApiInstance = async (node: any) => {
   const service = express()
-  let inbox = new MessageInbox(new MessageInboxConfiguration())
+  // set max to 2 msgs
+  let cfg = new MessageInboxConfiguration()
+  cfg.capacity = 2
+  let inbox = new MessageInbox(cfg)
   return {
     api: await setupRestApi(service, '/api/v3', node, inbox, createTestMocks(), {
       disableApiAuthentication: true
