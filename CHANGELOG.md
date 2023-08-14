@@ -18,6 +18,7 @@
 - Add support for logs in wasm environment Rust tests ([#5108](https://github.com/hoprnet/hoprnet/pull/5108))
 - Migrate Packet and Acknowledgement interactions to Rust ([#5074](https://github.com/hoprnet/hoprnet/pull/5074))
 - Change keystore to hold `chain_key` and `packet_key` ([#5175](https://github.com/hoprnet/hoprnet/pull/5175))
+- Switch to Curve25519 to generate Sphinx keys, use Ed25519 PeerIDs for transport ([#5069](https://github.com/hoprnet/hoprnet/pull/5069))
 - Remove Avado build support ([#5181](https://github.com/hoprnet/hoprnet/pull/5181))
 - Upgrade to Node v18 as default runtime ([#5184](https://github.com/hoprnet/hoprnet/pull/5184))
 - Use transitive Rust build features and fix various build issues ([#5187](https://github.com/hoprnet/hoprnet/pull/5187))

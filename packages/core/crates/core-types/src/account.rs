@@ -1,17 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 use crate::account::AccountType::{Announced, NotAnnounced};
-use core_crypto::{
-    keypairs::{Keypair, OffchainKeypair},
-    types::{OffchainPublicKey, OffchainSignature},
-};
+use core_crypto::keypairs::{Keypair, OffchainKeypair};
+use core_crypto::types::{OffchainPublicKey, OffchainSignature};
 use multiaddr::Multiaddr;
 use std::fmt::{Display, Formatter};
-use utils_types::{
-    errors::GeneralError::ParseError,
-    primitives::Address,
-    traits::{BinarySerializable, PeerIdLike, ToHex},
-};
+use utils_types::errors::GeneralError::ParseError;
+use utils_types::primitives::Address;
+use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 /// Type of the node account.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -20,6 +16,24 @@ pub enum AccountType {
     NotAnnounced,
     /// Node is announced with a multi-address
     Announced { multiaddr: Multiaddr, updated_block: u32 },
+}
+
+impl Display for AccountType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            NotAnnounced => {
+                write!(f, "Not announced")
+            }
+            Announced {
+                multiaddr,
+                updated_block,
+            } => f
+                .debug_struct("AccountType")
+                .field("MultiAddr", multiaddr)
+                .field("UpdatedAt", updated_block)
+                .finish(),
+        }
+    }
 }
 
 /// Represents a node announcement entry on the block chain.
@@ -60,11 +74,8 @@ impl AccountEntry {
         match &self.entry_type {
             NotAnnounced => false,
             Announced { multiaddr, .. } => {
-                multiaddr
-                    .protocol_stack()
-                    .find(|p| p == &"ip4" || p == &"ip6")
-                    .is_some()
-                    && multiaddr.protocol_stack().find(|p| p == &"tcp").is_some()
+                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "ip6")
+                    && multiaddr.protocol_stack().any(|p| p == "tcp")
             }
         }
     }
@@ -163,9 +174,9 @@ impl BinarySerializable for AccountEntry {
 
         match &self.entry_type {
             NotAnnounced => {
-                ret.extend_from_slice(&(0 as u32).to_be_bytes());
+                ret.extend_from_slice(&(0_u32).to_be_bytes());
                 ret.extend_from_slice(&[0u8; Self::MAX_MULTI_ADDR_LENGTH]);
-                ret.extend_from_slice(&(0 as u32).to_be_bytes());
+                ret.extend_from_slice(&(0_u32).to_be_bytes());
             }
             Announced {
                 multiaddr,
@@ -356,6 +367,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<AccountEntry> {
             ok_or_jserr!(Self::from_bytes(data))
+        }
+
+        #[wasm_bindgen(js_name = "eq")]
+        pub fn _eq(&self, other: &AccountEntry) -> bool {
+            self.eq(other)
         }
 
         #[wasm_bindgen(js_name = "clone")]

@@ -8,8 +8,14 @@ import { health_to_string } from '@hoprnet/hopr-core'
  */
 export const getInfo = async (node: Hopr) => {
   try {
-    const { chain, hoprTokenAddress, hoprChannelsAddress, noticePeriodChannelClosure, hoprNetworkRegistryAddress, hoprNodeSafeRegistryAddress } =
-      node.smartContractInfo()
+    const {
+      chain,
+      hoprTokenAddress,
+      hoprChannelsAddress,
+      noticePeriodChannelClosure,
+      hoprNetworkRegistryAddress,
+      hoprNodeSafeRegistryAddress
+    } = node.smartContractInfo()
 
     return {
       network: node.network.id,
@@ -111,8 +117,7 @@ GET.apiDoc = {
               hoprNodeSafeRegistryAddress: {
                 type: 'string',
                 example: '0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82',
-                description:
-                  'Contract address of the contract that register node and safe pairs'
+                description: 'Contract address of the contract that register node and safe pairs'
               },
               connectivityStatus: {
                 type: 'string',

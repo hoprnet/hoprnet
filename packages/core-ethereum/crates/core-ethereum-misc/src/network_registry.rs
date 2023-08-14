@@ -2,7 +2,7 @@ use crate::errors::Result;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use utils_types::primitives::Address;
 
-async fn is_allowed_to_access_network<T>(db: &T, chain_address: &Address) -> Result<bool>
+pub async fn is_allowed_to_access_network<T>(db: &T, chain_address: &Address) -> Result<bool>
 where
     T: HoprCoreEthereumDbActions,
 {

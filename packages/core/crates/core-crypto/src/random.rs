@@ -105,36 +105,10 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::types::CurvePoint;
     use js_sys::Uint8Array;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    pub struct GroupElement {
-        coeff: Box<[u8]>,
-        element: CurvePoint,
-    }
-
-    #[wasm_bindgen]
-    impl GroupElement {
-        pub fn random() -> GroupElement {
-            let (coeff, element) = crate::random::random_group_element();
-            Self {
-                coeff: Box::new(coeff),
-                element,
-            }
-        }
-
-        pub fn coefficient(&self) -> Uint8Array {
-            self.coeff.as_ref().into()
-        }
-
-        pub fn element(&self) -> CurvePoint {
-            self.element.clone()
-        }
-    }
 
     #[wasm_bindgen]
     pub fn random_float() -> f64 {

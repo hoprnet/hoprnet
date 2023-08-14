@@ -53,7 +53,7 @@ where
     }
 }
 
-impl<'a, T> ToHex for T
+impl<T> ToHex for T
 where
     T: BinarySerializable,
 {

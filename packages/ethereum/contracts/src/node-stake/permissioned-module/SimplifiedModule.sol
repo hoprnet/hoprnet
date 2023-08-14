@@ -19,7 +19,7 @@ abstract contract SimplifiedModuleEvents {
  *  , which * was audited https://github.com/gnosis/zodiac/tree/master/audits
  * This module removes target attribute, removes guard, and uses UUPS proxy.
  */
-abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable, SimplifiedModuleEvents{
+abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable, SimplifiedModuleEvents {
     /**
      * @dev Passes a transaction to be executed by the avatar.
      * @notice Can only be called by this contract.
@@ -28,7 +28,10 @@ abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable, Simpl
      * @param data Data payload of module transaction.
      * @param operation Operation type of module transaction: 0 == call, 1 == delegate call.
      */
-    function exec(address to, uint256 value, bytes memory data, Enum.Operation operation) internal returns (bool success) {
+    function exec(address to, uint256 value, bytes memory data, Enum.Operation operation)
+        internal
+        returns (bool success)
+    {
         success = IAvatar(owner()).execTransactionFromModule(to, value, data, operation);
         if (success) {
             emit ExecutionSuccess();

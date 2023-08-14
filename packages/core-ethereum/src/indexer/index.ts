@@ -23,8 +23,11 @@ import {
   // create_multi_gauge,
   U256,
   random_integer,
-  OffchainPublicKey
-  // number_to_channel_status
+  Hash,
+  number_to_channel_status,
+  KeyBinding,
+  OffchainSignature,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -32,7 +35,17 @@ import { type IndexerEventEmitter, IndexerStatus, type IndexerEvents } from './t
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 
-import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database } from '../db.js'
+import {
+  CORE_ETHEREUM_CONSTANTS,
+  Ethereum_AccountEntry,
+  Ethereum_Address,
+  Ethereum_Balance,
+  Ethereum_ChannelEntry,
+  Ethereum_Database,
+  Ethereum_Hash,
+  Ethereum_OffchainPublicKey,
+  Ethereum_Snapshot
+} from '../db.js'
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
@@ -40,6 +53,8 @@ import { Handlers } from '../../lib/core_ethereum_indexer.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
+import assert from 'assert'
+import { OffchainPublicKey } from '../../crates/core-ethereum-db/pkg/core_ethereum_db.js'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -742,6 +757,209 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       log('Event name %s and hash %s', event.event, event.transactionHash)
 
+<<<<<<< HEAD
+=======
+      switch (eventName) {
+        case 'AddressAnnouncement':
+        case 'AddressAnnouncement(address,string)':
+          await this.onAddressAnnouncement(
+            event as Event<'AddressAnnouncement'>,
+            new BN(blockNumber.toPrecision()),
+            lastDatabaseSnapshot
+          )
+          break
+        case 'KeyBinding':
+        case 'KeyBinding(bytes32,bytes32,bytes32,address)':
+          await this.onKeyBinding(event as Event<'KeyBinding'>, lastDatabaseSnapshot)
+          break
+        case 'ChannelUpdated':
+        case 'ChannelUpdated(address,address,tuple)':
+          await this.onChannelUpdated(event as Event<'ChannelUpdated'>, lastDatabaseSnapshot)
+          break
+        case 'Transfer':
+        case 'Transfer(address,address,uint256)':
+          // handle HOPR token transfer
+          await this.onTransfer(event as TokenEvent<'Transfer'>, lastDatabaseSnapshot)
+          break
+        case 'TicketRedeemed':
+        case 'TicketRedeemed(address,address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)':
+          // if unlock `outstandingTicketBalance`, if applicable
+          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>, lastDatabaseSnapshot)
+          break
+        case 'EligibilityUpdated':
+        case 'EligibilityUpdated(address,bool)':
+          await this.onEligibilityUpdated(event as RegistryEvent<'EligibilityUpdated'>, lastDatabaseSnapshot)
+          break
+        case 'Registered':
+        case 'Registered(address,string)':
+        case 'RegisteredByOwner':
+        case 'RegisteredByOwner(address,string)':
+          await this.onRegistered(
+            event as RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+            lastDatabaseSnapshot
+          )
+          break
+        case 'Deregistered':
+        case 'Deregistered(address,string)':
+        case 'DeregisteredByOwner':
+        case 'DeregisteredByOwner(address,string)':
+          await this.onDeregistered(
+            event as RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+            lastDatabaseSnapshot
+          )
+          break
+        case 'EnabledNetworkRegistry':
+        case 'EnabledNetworkRegistry(bool)':
+          await this.onEnabledNetworkRegistry(event as RegistryEvent<'EnabledNetworkRegistry'>, lastDatabaseSnapshot)
+          break
+        default:
+          log(`ignoring event '${String(eventName)}'`)
+      }
+
+      metric_unconfirmedBlocks.increment()
+
+      if (
+        !blocking &&
+        this.unconfirmedEvents.size() > 0 &&
+        isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
+      ) {
+        // Give other tasks CPU time to happen
+        // Wait until end of next event loop iteration before starting next db write-back
+        await setImmediatePromise()
+      }
+    }
+  }
+
+  private async onKeyBinding(event: Event<'KeyBinding'>, lastSnapshot: Snapshot): Promise<void> {
+    try {
+      let keyBinding = KeyBinding.from_parts(
+        Address.deserialize(event.args.chain_key),
+        OffchainPublicKey.deserialize(event.args.ed25519_pub_key),
+        OffchainSignature.deserialize(u8aConcat(event.args.ed25519_sig_0, event.args.ed25519_sig_1))
+      )
+
+      // Establish linkage between packet and chain keys
+      await this.db.link_chain_and_packet_keys(
+        Ethereum_Address.deserialize(keyBinding.chain_key.serialize()),
+        Ethereum_OffchainPublicKey.deserialize(keyBinding.packet_key.serialize()),
+        Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+      )
+    } catch (e) {
+      log(`failed to link packet key with chain key: ${e}`)
+    }
+  }
+
+  private async onAddressAnnouncement(
+    event: Event<'AddressAnnouncement'>,
+    blockNumber: BN,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    let chainKey = event.args.node
+    let multiAddrPrefix = event.args.baseMultiaddr
+    try {
+      let packetKey = await this.getPacketKeyOf(chainKey)
+      if (!packetKey) {
+        log(`could not fetch packet key of ${chainKey}`)
+        return
+      }
+
+      const peerId = packetKey.to_peerid_str()
+      const account = new AccountEntry(
+        chainKey,
+        new Multiaddr(`${multiAddrPrefix}/p2p/${peerId}`).toString(),
+        blockNumber.toNumber()
+      )
+
+      log('New node announced', peerId, account.get_multiaddress_str())
+      metric_numAnnouncements.increment()
+
+      assert(lastSnapshot !== undefined)
+      await this.db.update_account_and_snapshot(
+        Ethereum_AccountEntry.deserialize(account.serialize()),
+        Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+      )
+
+      this.emit('peer', {
+        id: peerIdFromString(peerId),
+        multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
+      })
+    } catch (e) {
+      log(`Failed to process announcement of ${chainKey.to_string()}`)
+      log(e)
+    }
+  }
+
+  private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
+    const { source, destination, newState } = event.args
+
+    log('channel-updated for hash %s', event.transactionHash)
+    let channel = new ChannelEntry(
+      Address.from_string(source),
+      Address.from_string(destination),
+      new Balance(newState.balance.toString(), BalanceType.HOPR),
+      new Hash(stringToU8a(newState.commitment)),
+      new U256(newState.ticketEpoch.toString()),
+      new U256(newState.ticketIndex.toString()),
+      number_to_channel_status(newState.status),
+      new U256(newState.channelEpoch.toString()),
+      new U256(newState.closureTime.toString())
+    )
+    log(channel.to_string())
+
+    let prevState: ChannelEntry
+    let channel_entry = await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))
+    if (channel_entry !== undefined) {
+      prevState = ChannelEntry.deserialize(channel_entry.serialize())
+    }
+
+    assert(lastSnapshot !== undefined)
+    await this.db.update_channel_and_snapshot(
+      Ethereum_Hash.deserialize(channel.get_id().serialize()),
+      Ethereum_ChannelEntry.deserialize(channel.serialize()),
+      Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+    )
+
+    metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
+
+    if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
+      log('channel was closed')
+      await this.onChannelClosed(channel)
+    }
+
+    this.emit('channel-update', channel)
+    verbose(`channel-update for channel ${channel.get_id().to_hex()}`)
+
+    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
+      this.emit('own-channel-updated', channel)
+
+      if (channel.destination.eq(this.address)) {
+        // Channel _to_ us
+        if (channel.status === ChannelStatus.WaitingForCommitment) {
+          log('channel to us waiting for commitment')
+          log(channel.to_string())
+          this.emit('channel-waiting-for-commitment', channel)
+        }
+      }
+    }
+  }
+
+  private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
+    if (Address.from_string(event.args.source).eq(this.address)) {
+      // the node used to lock outstandingTicketBalance
+      // rebuild part of the Ticket
+      const partialTicket: Partial<Ticket> = {
+        counterparty: Address.from_string(event.args.destination),
+        amount: new Balance(event.args.amount.toString(), BalanceType.HOPR)
+      }
+      const outstandingBalance = Balance.deserialize(
+        (
+          await this.db.get_pending_balance_to(Ethereum_Address.deserialize(partialTicket.counterparty.serialize()))
+        ).serialize_value(),
+        BalanceType.HOPR
+      )
+
+      assert(lastSnapshot !== undefined)
+>>>>>>> origin/master
       try {
         await this.handlers.on_event(
           this.db,
@@ -790,6 +1008,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   //     Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
   //   )
 
+<<<<<<< HEAD
   //   metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
 
   //   if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
@@ -799,6 +1018,55 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
   //   this.emit('channel-update', channel)
   //   verbose(`channel-update for channel ${channel.get_id().to_hex()}`)
+=======
+  private async onRegistered(
+    event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    let hoprNode: Ethereum_Address
+    //let nodeAddrStr = event.args.nodeAddress
+    let nodeAddrStr = '' // TODO: read the actual node chain-key address from the event
+    try {
+      hoprNode = Ethereum_Address.from_string(nodeAddrStr)
+    } catch (error) {
+      log(`Invalid address '${nodeAddrStr}' given in event 'onRegistered'`)
+      log(error)
+      return
+    }
+
+    assert(lastSnapshot !== undefined)
+    const account = Address.from_string(event.args.account)
+    await this.db.add_to_network_registry(
+      hoprNode,
+      Ethereum_Address.deserialize(account.serialize()),
+      Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+    )
+    verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
+  }
+
+  private async onDeregistered(
+    event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
+    lastSnapshot: Snapshot
+  ): Promise<void> {
+    let hoprNode: Ethereum_Address
+    //let nodeAddrStr = event.args.nodeAddress
+    let nodeAddrStr = '' // TODO: read the actual node chain-key address from the event
+    try {
+      hoprNode = Ethereum_Address.from_string(nodeAddrStr)
+    } catch (error) {
+      log(`Invalid address '${nodeAddrStr}' given in event 'onRegistered'`)
+      log(error)
+      return
+    }
+    assert(lastSnapshot !== undefined)
+    await this.db.remove_from_network_registry(
+      hoprNode,
+      Ethereum_Address.from_string(event.args.account),
+      Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+    )
+    verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
+  }
+>>>>>>> origin/master
 
   //   if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
   //     this.emit('own-channel-updated', channel)
@@ -975,12 +1243,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     return account
   }
 
-  public async getPublicKeyOf(address: Address): Promise<OffchainPublicKey> {
+  public async getChainKeyOf(address: Address): Promise<Address> {
     const account = await this.getAccount(address)
     if (account !== undefined) {
-      return OffchainPublicKey.from_peerid_str(account.public_key.to_peerid_str())
+      return account.chain_key
     }
-    throw new Error('Could not find public key for address - have they announced? -' + address.to_hex())
+    throw new Error('Could not find chain key for address - have they announced? -' + address.to_hex())
+  }
+
+  public async getPacketKeyOf(address: Address): Promise<OffchainPublicKey> {
+    const pk = await this.db.get_packet_key(Ethereum_Address.deserialize(address.serialize()))
+    if (pk !== undefined) {
+      return pk
+    }
+    throw new Error('Could not find packet key for address - have they announced? -' + address.to_hex())
   }
 
   public async *getAddressesAnnouncedOnChain() {
@@ -998,12 +1274,18 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
-
-      out += `  - ${account.public_key.to_peerid_str()} ${account.get_multiaddr_str()}\n`
-      result.push({
-        id: peerIdFromString(account.public_key.to_peerid_str()),
-        multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
-      })
+      if (account) {
+        let packetKey = await this.db.get_packet_key(account.chain_key)
+        if (packetKey) {
+          out += `  - ${packetKey.to_peerid_str()} (on-chain ${account.chain_key.to_string()}) ${account.get_multiaddress_str()}\n`
+          result.push({
+            id: peerIdFromString(packetKey.to_peerid_str()),
+            multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
+          })
+        } else {
+          log(`could not retrieve packet key for address ${account.chain_key.to_string()}`)
+        }
+      }
     }
     
     // Remove last `\n`

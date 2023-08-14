@@ -289,6 +289,7 @@ make run-hopr-admin &
 ```
 
 Running one node in test mode, with safe and module attached
+
 ```sh
 # build deps and HOPRd code
 make -j deps && make -j build
@@ -303,7 +304,7 @@ scripts/update-protocol-config.sh -n anvil-localhost
 make create-local-identity
 
 # create a safe and a node management module instance,
-# and passing the created safe and module as argument to 
+# and passing the created safe and module as argument to
 # run a test node local (separate terminal)
 make run-local-with-safe
 # or to restart a node and use the same id, safe and module

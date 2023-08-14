@@ -25,3 +25,5 @@ pub const NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX: &str = "networkRegistry:add
 pub const NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX: &str = "nodeSafeRegistry:hopr-node-";
 pub const NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX: &str = "nodeSafeRegistry:addressSafe-";
 pub const API_AUTHORIZATION_TOKEN_KEY_PREFIX: &str = "api:authenticationTokens";
+pub const CHAIN_KEY_PREFIX: &str = "keys:chain-";
+pub const PACKET_KEY_PREFIX: &str = "keys:packet-";

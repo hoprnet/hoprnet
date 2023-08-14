@@ -76,7 +76,7 @@ where
     async fn count(&self, tag: Option<T>) -> usize {
         match tag {
             // Count across all the tags
-            None => self.buffers.iter().map(|(_, buf)| buf.len()).sum(),
+            None => self.buffers.values().map(|buf| buf.len()).sum(),
             // Count messages with a specific tag only
             Some(specific_tag) => self.buffers.get(&specific_tag).map(|buf| buf.len()).unwrap_or(0),
         }
