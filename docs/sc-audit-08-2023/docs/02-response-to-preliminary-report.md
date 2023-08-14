@@ -168,3 +168,9 @@ All relevant test files have been appropriately updated in alignment with the fi
 - Renamed `closureInitiationTime` to `closureTime` in `OutgoingChannelClosureInitiated` event.
 - Split event definition of “HoprNetworkRegistry” contract into an abstract contract `HoprNetworkRegistryEvents`. The abstract event contract is inherited by the “HoprNetworkRegistry” contract.
 - Renamed `EnabledNetworkRegistry` event to `NetworkRegistryStatusUpdated`.
+
+#### 2. Add more event in Simplified 
+**Description of Changes:**
+- Added `ExecutionSuccess` and `ExecutionFailure` events in `SimplifiedModuleEvents`, which is inherited by `SimplifiedModule`. This allows HOPR daemon to listen to update in transaction execution results from the node management module proxy in addition to safe proxy.
+
+**Commit Hash:** [c647548f63380e80a3253439fb7b91150cea59fe](https://github.com/hoprnet/hoprnet/commit/c647548f63380e80a3253439fb7b91150cea59fe)
