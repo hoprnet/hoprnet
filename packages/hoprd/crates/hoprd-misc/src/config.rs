@@ -7,8 +7,8 @@ use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
     DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
-use utils_types::primitives::Address;
 use std::str::FromStr;
+use utils_types::primitives::Address;
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -204,8 +204,8 @@ impl Default for Chain {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct SafeModule {
     pub safe_transaction_service_provider: Option<String>,
-    pub safe_address:  Option<Address>,
-    pub module_address:  Option<Address>,
+    pub safe_address: Option<Address>,
+    pub module_address: Option<Address>,
 }
 
 impl Default for SafeModule {
@@ -601,10 +601,10 @@ mod tests {
                 check_unrealized_balance: true,
                 on_chain_confirmations: 0,
             },
-            safe_module: SafeModule { 
-                safe_transaction_service_provider: None, 
-                safe_address: None, 
-                module_address: None 
+            safe_module: SafeModule {
+                safe_transaction_service_provider: None,
+                safe_address: None,
+                module_address: None,
             },
             test: Testing {
                 announce_local_addresses: false,

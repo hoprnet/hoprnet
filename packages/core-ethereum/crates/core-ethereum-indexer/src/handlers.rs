@@ -1,11 +1,8 @@
-use std::str::FromStr;
 use crate::errors::{CoreEthereumIndexerError, Result};
 use bindings::{
-    hopr_announcements::HoprAnnouncementsEvents,
-    hopr_channels::HoprChannelsEvents,
-    hopr_network_registry::HoprNetworkRegistryEvents,
+    hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
+    hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_safe_registry::HoprNodeSafeRegistryEvents,
     hopr_token::HoprTokenEvents,
-    hopr_node_safe_registry::HoprNodeSafeRegistryEvents,
 };
 use core_crypto::types::OffchainSignature;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -16,6 +13,7 @@ use core_types::{
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use ethnum::u256;
 use multiaddr::Multiaddr;
+use std::str::FromStr;
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 struct DeploymentExtract {
@@ -287,7 +285,12 @@ impl Handlers {
         })
     }
 
-    pub(super) async fn on_node_safe_registry_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    pub(super) async fn on_node_safe_registry_event<T>(
+        &self,
+        db: &mut T,
+        log: &RawLog,
+        snapshot: &Snapshot,
+    ) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
@@ -351,9 +354,7 @@ pub mod tests {
             DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter,
             NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter,
         },
-        hopr_node_safe_registry::{
-            RegisteredNodeSafeFilter, DergisteredNodeSafeFilter,
-        },
+        hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
         hopr_token::TransferFilter,
     };
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
@@ -611,7 +612,8 @@ pub mod tests {
                 &transferred_log,
                 &Snapshot::default(),
             )
-            .await.unwrap();
+            .await
+            .unwrap();
 
         assert_eq!(
             db.get_hopr_balance().await.unwrap(),

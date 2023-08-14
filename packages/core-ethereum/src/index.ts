@@ -120,7 +120,13 @@ export default class HoprCoreEthereum extends EventEmitter {
     deploymentAddresses: DeploymentExtract,
     automaticChainCreation = true
   ) {
-    HoprCoreEthereum._instance = new HoprCoreEthereum(db, chainKeypair, options, safeModuleOptions, automaticChainCreation)
+    HoprCoreEthereum._instance = new HoprCoreEthereum(
+      db,
+      chainKeypair,
+      options,
+      safeModuleOptions,
+      automaticChainCreation
+    )
     // Initialize connection to the blockchain
     await HoprCoreEthereum._instance.initializeChainWrapper(deploymentAddresses)
     return HoprCoreEthereum._instance
@@ -160,7 +166,13 @@ export default class HoprCoreEthereum extends EventEmitter {
           2
         )} `
       )
-      this.chain = await createChainWrapper(deploymentAddresses, this.safeModuleOptions, this.options, this.chainKeypair.secret(), true)
+      this.chain = await createChainWrapper(
+        deploymentAddresses,
+        this.safeModuleOptions,
+        this.options,
+        this.chainKeypair.secret(),
+        true
+      )
     } catch (err) {
       const errMsg = 'failed to create provider chain wrapper'
       log(`error: ${errMsg}`, err)
@@ -186,7 +198,7 @@ export default class HoprCoreEthereum extends EventEmitter {
           Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
         )
         log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
-        
+
         // indexer starts
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
@@ -568,13 +580,13 @@ export default class HoprCoreEthereum extends EventEmitter {
     log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
 
     return this.chain.fundChannel(this.chainKeypair.to_address(), dest, myFund, counterpartyFund, (txHash: string) =>
-    this.setTxHandler(`channel-updated-${txHash}`, txHash)
+      this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
-  
-  public async registerSafeByNode(): Promise<Receipt>  {
-    const nodeAddress = this.chainKeypair.to_address();
-    const safeAddress = this.safeModuleOptions.safeAddress;
+
+  public async registerSafeByNode(): Promise<Receipt> {
+    const nodeAddress = this.chainKeypair.to_address()
+    const safeAddress = this.safeModuleOptions.safeAddress
     log(`====> registerSafeByNode nodeAddress: ${nodeAddress.to_hex()} safeAddress ${safeAddress.to_hex()}`)
 
     const targetAddress = await this.chain.getModuleTargetAddress()
@@ -585,14 +597,14 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
 
-    let receipt = undefined;
+    let receipt = undefined
     if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
       // if the node is not associated with any safe address, register it
       receipt = await this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
         this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
       )
     }
-    
+
     if (!registeredAddress.eq(Address.from_string(safeAddress.to_string()))) {
       // the node has been associated with a differnt safe address
       throw Error('Node has been registered with a different safe')
@@ -603,12 +615,14 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     // update safe and module address
     log(`>> should update safe and module address`)
-    await this.db.set_staking_safe_address(Ethereum_Address.deserialize(safeAddress.serialize()));
+    await this.db.set_staking_safe_address(Ethereum_Address.deserialize(safeAddress.serialize()))
     log(`>> set staking safe address`)
-    await this.db.set_staking_module_address(Ethereum_Address.deserialize(this.safeModuleOptions.moduleAddress.serialize()));
+    await this.db.set_staking_module_address(
+      Ethereum_Address.deserialize(this.safeModuleOptions.moduleAddress.serialize())
+    )
     log(`>> set staking module address`)
 
-    return receipt;
+    return receipt
   }
 
   /**
@@ -647,7 +661,10 @@ export default class HoprCoreEthereum extends EventEmitter {
         return Promise.resolve(
           new AccountEntry(
             OffchainPublicKey.from_peerid_str(peerId.toString()),
-            chainKeypair.public().to_address(), `/ip4/127.0.0.1/tcp/124/p2p/${peerId.toString()}`, 1)
+            chainKeypair.public().to_address(),
+            `/ip4/127.0.0.1/tcp/124/p2p/${peerId.toString()}`,
+            1
+          )
         )
       },
       waitForPublicNodes: () => {

@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::account::AccountType::{Announced, NotAnnounced};
-use multiaddr::Multiaddr;
-use std::fmt::{Display, Formatter};
 use core_crypto::keypairs::{Keypair, OffchainKeypair};
 use core_crypto::types::{OffchainPublicKey, OffchainSignature};
+use multiaddr::Multiaddr;
+use std::fmt::{Display, Formatter};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};

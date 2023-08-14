@@ -38,7 +38,7 @@ import {
   HOPR_TOKEN_ABI,
   DeploymentExtract,
   HOPR_NODE_SAFE_REGISTRY_ABI,
-  HOPR_MODULE_ABI,
+  HOPR_MODULE_ABI
 } from './utils/index.js'
 
 import { SafeModuleOptions } from './index.js'
@@ -117,11 +117,7 @@ export async function createChainWrapper(
     provider
   )
 
-  const nodeManagementModule = new ethers.Contract(
-    safeModuleOptions.moduleAddress.to_hex(),
-    HOPR_MODULE_ABI,
-    provider
-  )
+  const nodeManagementModule = new ethers.Contract(safeModuleOptions.moduleAddress.to_hex(), HOPR_MODULE_ABI, provider)
 
   const nodeSafeRegistry = new ethers.Contract(
     deploymentExtract.hoprNodeSafeRegistryAddress,
@@ -427,11 +423,11 @@ export async function createChainWrapper(
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', populatedTx.nonce, transaction.hash)
     metric_countSendTransaction.increment()
     nonceLock.releaseLock()
-    
+
     // wait for the tx to be mined - mininal and scheduled implementation
     // only fails if tx does not get mined within the specified timeout
     await waitForTransaction(transaction.hash, deferredListener.reject.bind(deferredListener))
-    
+
     try {
       await deferredListener.promise
       transactions.moveFromMinedToConfirmed(transaction.hash)

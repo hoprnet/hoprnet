@@ -181,7 +181,7 @@ pub trait HoprCoreEthereumDbActions {
 
     /// Sets the staking safe address
     async fn set_staking_safe_address(&mut self, safe_address: &Address) -> Result<()>;
-    
+
     /// Get the staking module address
     async fn get_staking_module_address(&self) -> Result<Option<Address>>;
 
@@ -243,7 +243,7 @@ pub trait HoprCoreEthereumDbActions {
 
     /// Find HOPR node based on its associated safe address.
     async fn find_hopr_node_using_safe_in_node_safe_registry(&self, account: &Address) -> Result<Vec<Address>>;
-    
+
     /// Stores the REST API token.
     async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;
 

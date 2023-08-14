@@ -1,8 +1,8 @@
 use crate::errors::CryptoError::{CalculationError, InvalidParameterSize};
 use blake2::Blake2s256;
 use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
-use elliptic_curve::ScalarPrimitive;
 use elliptic_curve::sec1::ToEncodedPoint;
+use elliptic_curve::ScalarPrimitive;
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
 use k256::{AffinePoint, Scalar, Secp256k1};
