@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use core_crypto::types::{HalfKeyChallenge, Hash};
+use core_crypto::types::{OffchainPublicKey, HalfKeyChallenge, Hash};
 use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
@@ -875,7 +875,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 pub mod wasm {
     use super::{CoreEthereumDb, HoprCoreEthereumDbActions, DB};
     use async_lock::RwLock;
-    use core_crypto::types::Hash;
+    use core_crypto::types::{OffchainPublicKey, Hash};
     use core_types::{
         account::AccountEntry,
         acknowledgement::AcknowledgedTicket,
