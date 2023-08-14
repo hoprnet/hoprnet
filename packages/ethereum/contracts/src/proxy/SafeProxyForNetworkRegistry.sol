@@ -77,8 +77,7 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
      * @param nodeAddress node address
      */
     function canOperateFor(address stakingAccount, address nodeAddress) external view returns (bool eligiblity) {
-        address safeAddress = nodeSafeRegistry.nodeToSafe(nodeAddress);
-        return safeAddress == stakingAccount;
+        return nodeSafeRegistry.nodeToSafe(nodeAddress) == stakingAccount;
     }
 
     /**
