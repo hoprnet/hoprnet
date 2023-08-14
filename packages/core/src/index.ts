@@ -100,6 +100,7 @@ import {
   core_hopr_initialize_crate,
   core_hopr_gather_metrics,
   Database,
+  ApplicationData,
   Address as Packet_Address,
   PacketInteractionConfig,
   Path,
@@ -228,6 +229,14 @@ export type HoprOptions = {
     // When using mocked libp2p instances
     mockedNetwork?: Libp2pEmitter<any>
   }
+  safeModule: {
+    // Base URL to interact with safe transaction service
+    safeTransactionServiceProvider?: string,
+    // Address of node's safe proxy instance
+    safeAddress?: Address,
+    // Address of node's safe-module proxy instance
+    moduleAddress?: Address
+  }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -344,6 +353,7 @@ class Hopr extends EventEmitter {
       throw new Error('Cannot start node without a funded wallet')
     }
     log('Node has enough to get started, continuing starting payment channels')
+
     verbose('Starting HoprEthereum, which will trigger the indexer')
     await connector.start()
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
@@ -425,7 +435,6 @@ class Hopr extends EventEmitter {
         this.networkPeers.register(peerId, PeerOrigin.Initialization)
         log(`peer store: loaded peer ${peerId}`)
       })
-
 
     // react when network registry is enabled / disabled
     connector.indexer.on('network-registry-status-changed', async (enabled: boolean) => {
@@ -531,7 +540,7 @@ class Hopr extends EventEmitter {
     let packetCfg = new PacketInteractionConfig(privateKeyFromPeer(this.id))
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
-    const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
+    const onMessage = (data: ApplicationData) => this.emit('hopr:message', data)
     this.forward = new WasmPacketInteraction(this.db.clone(), onMessage, packetCfg)
 
     let packetProtocols = [
@@ -563,6 +572,16 @@ class Hopr extends EventEmitter {
     connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
     for (const announcedNode of recentlyAnnouncedNodes) {
       await this.onPeerAnnouncement(announcedNode)
+    }
+
+    try {
+      // register node-safe pair to NodeSafeRegistry
+      log(`check node-safe registry`)
+      await this.registerSafeByNode()
+    } catch (err) {
+      console.error(`Could not register node with safe`)
+      console.error(`Observed error:`, err)
+      process.exit(1)
     }
 
     try {
@@ -1056,7 +1075,8 @@ class Hopr extends EventEmitter {
     msg: Uint8Array,
     destination: PeerId,
     intermediatePath?: OffchainPublicKey[],
-    hops?: number
+    hops?: number,
+    application_tag?: number
   ): Promise<string> {
     if (this.status != 'RUNNING') {
       metric_sentMessageFailCount.increment()
@@ -1090,7 +1110,7 @@ class Hopr extends EventEmitter {
     const path = new Path([...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()])
     metric_pathLength.observe(path.length())
 
-    return (await this.forward.send_packet(msg, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
+    return (await this.forward.send_packet(msg, application_tag, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
   }
 
   /**
@@ -1223,6 +1243,25 @@ class Hopr extends EventEmitter {
   }
 
   /**
+   * Register node with safe in HoprNodeSaferegistry if needed
+   * @dev Promise resolves before own announcement appears in the indexer
+   * @returns a Promise that resolves once announce transaction has been published
+   */
+  private async registerSafeByNode(): Promise<void> {
+    const connector = HoprCoreEthereum.getInstance()
+
+    try {
+      log('registering node safe on-chain... ')
+      const registryTxHash = await connector.registerSafeByNode()
+      log('registering node safe on-chain done in tx %s', registryTxHash)
+    } catch (err) {
+      log('registering node safe on-chain failed')
+      this.maybeEmitFundsEmptyEvent(err)
+      throw new Error(`Failed to register node safe: ${err}`)
+    }
+  }
+
+  /**
    * Announces address of node on-chain to be reachable by other nodes.
    * @dev Promise resolves before own announcement appears in the indexer
    * @param announceRoutableAddress publish routable address if true
@@ -1324,6 +1363,7 @@ class Hopr extends EventEmitter {
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
+    hoprNodeSafeRegistryAddress: string
     noticePeriodChannelClosure: number
   } {
     return HoprCoreEthereum.getInstance().smartContractInfo()

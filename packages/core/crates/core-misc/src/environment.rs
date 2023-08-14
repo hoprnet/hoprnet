@@ -287,7 +287,7 @@ impl ResolvedNetwork {
                 node_safe_registry: network.addresses.node_safe_registry.to_owned(),
                 ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
                 announcements: network.addresses.announcements.to_owned(),
-                node_stake_v2_factory: network.addresses.node_stake_v2_factory.to_owned()
+                node_stake_v2_factory: network.addresses.node_stake_v2_factory.to_owned(),
             }),
             Ok(false) => protocol_config.supported_networks(mono_repo_path).and_then(|envs| {
                 Err(format!(

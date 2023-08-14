@@ -17,7 +17,7 @@ import {
   PublicKey,
   AccountEntry,
   create_counter,
-  OffchainPublicKey
+  OffchainPublicKey,
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -64,6 +64,12 @@ export type ChainOptions = {
   network: string
 }
 
+export type SafeModuleOptions = {
+  safeTransactionServiceProvider?: string
+  safeAddress: Address
+  moduleAddress: Address
+}
+
 type ticketRedemtionInChannelOperations = Map<string, Promise<void>>
 
 // Exported from Rust
@@ -88,6 +94,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     private publicKey: PublicKey,
     private privateKey: Uint8Array,
     private options: ChainOptions,
+    private safeModuleOptions: SafeModuleOptions,
     private automaticChainCreation: boolean
   ) {
     super()
@@ -102,14 +109,18 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public static createInstance(
+  public static async createInstance(
     db: Ethereum_Database,
     publicKey: PublicKey,
     privateKey: Uint8Array,
     options: ChainOptions,
+    safeModuleOptions: SafeModuleOptions,
+    deploymentAddresses: DeploymentExtract,
     automaticChainCreation = true
   ) {
-    HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, automaticChainCreation)
+    HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, safeModuleOptions, automaticChainCreation)
+    // Initialize connection to the blockchain
+    await HoprCoreEthereum._instance.initializeChainWrapper(deploymentAddresses)
     return HoprCoreEthereum._instance
   }
 
@@ -140,7 +151,14 @@ export default class HoprCoreEthereum extends EventEmitter {
           2
         )} `
       )
-      this.chain = await createChainWrapper(deploymentAddresses, this.options, this.privateKey, true)
+      log(
+        `[DEBUG] createChain createChainWrapper starting with safeModuleOptions... ${JSON.stringify(
+          this.safeModuleOptions,
+          null,
+          2
+        )} `
+      )
+      this.chain = await createChainWrapper(deploymentAddresses, this.safeModuleOptions, this.options, this.privateKey, true)
     } catch (err) {
       const errMsg = 'failed to create provider chain wrapper'
       log(`error: ${errMsg}`, err)
@@ -160,12 +178,14 @@ export default class HoprCoreEthereum extends EventEmitter {
       try {
         await this.chain.waitUntilReady()
 
+        // update token balance
         const hoprBalance = await this.chain.getBalance(this.publicKey.to_address())
         await this.db.set_hopr_balance(
           Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
         )
         log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
-
+        
+        // indexer starts
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
         // Debug log used in e2e integration tests, please don't change
@@ -257,6 +277,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
+    hoprNodeSafeRegistryAddress: string
     noticePeriodChannelClosure: number
   } {
     return this.chain.getInfo()
@@ -536,10 +557,49 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('We do not have enough balance to fund the channel')
     }
     log(`====> fundChannel: src: ${this.publicKey.to_address().to_string()} dest: ${dest.to_string()}`)
-
+    
     return this.chain.fundChannel(this.publicKey.to_address(), dest, myFund, counterpartyFund, (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
+    this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
+  }
+  
+  public async registerSafeByNode(): Promise<Receipt>  {
+    const nodeAddress = this.publicKey.to_address();
+    const safeAddress = this.safeModuleOptions.safeAddress;
+    log(`====> registerSafeByNode nodeAddress: ${nodeAddress.to_hex()} safeAddress ${safeAddress.to_hex()}`)
+
+    const targetAddress = await this.chain.getModuleTargetAddress()
+    if (!targetAddress.eq(Address.from_string(safeAddress.to_string()))) {
+      // cannot proceed when the safe address is not the target/owner of given module
+      throw Error('Safe is not a target of module.')
+    }
+
+    const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
+
+    let receipt = undefined;
+    if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
+      // if the node is not associated with any safe address, register it
+      receipt = await this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
+        this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
+      )
+    }
+    
+    if (!registeredAddress.eq(Address.from_string(safeAddress.to_string()))) {
+      // the node has been associated with a differnt safe address
+      throw Error('Node has been registered with a different safe')
+    }
+
+    // the node has been associated with the provided safe address
+    log(`====> registerSafeByNode registeredAddress: is safeAddress`)
+
+    // update safe and module address
+    log(`>> should update safe and module address`)
+    await this.db.set_staking_safe_address(Ethereum_Address.deserialize(safeAddress.serialize()));
+    log(`>> set staking safe address`)
+    await this.db.set_staking_module_address(Ethereum_Address.deserialize(this.safeModuleOptions.moduleAddress.serialize()));
+    log(`>> set staking module address`)
+
+    return receipt;
   }
 
   /**
@@ -577,7 +637,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         return Promise.resolve(
           new AccountEntry(
             OffchainPublicKey.from_peerid_str(peer.toString()),
-            Address.from_string(""),  // FIXME: update dummy
+            Address.from_string(''), // FIXME: update dummy
             `/ip4/127.0.0.1/tcp/124/p2p/${peer.toString()}`,
             1
           )

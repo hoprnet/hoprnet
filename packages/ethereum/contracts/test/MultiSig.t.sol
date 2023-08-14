@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import {Test} from "forge-std/Test.sol";
-import {AccountsFixtureTest} from  "./utils/Accounts.sol";
+import {AccountsFixtureTest} from "./utils/Accounts.sol";
 
 import {HoprMultiSig} from "../src/MultiSig.sol";
 import {HoprNodeSafeRegistry} from "../src/node-stake/NodeSafeRegistry.sol";

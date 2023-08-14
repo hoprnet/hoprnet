@@ -5,6 +5,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { setupRestApi } from '../v2.js'
 import { Balance, BalanceType, U256, ChannelEntry, PublicKey, ChannelStatus, Address } from '@hoprnet/hopr-utils'
+import { MessageInbox, MessageInboxConfiguration } from '../../../lib/hoprd_inbox.js'
 
 export const ALICE_PEER_ID: PeerId = peerIdFromString('16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz')
 export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID.toString()}`)
@@ -46,8 +47,9 @@ export function channelEntryCreateMock(): ChannelEntry {
  */
 export const createTestApiInstance = async (node: any) => {
   const service = express()
+  let inbox = new MessageInbox(new MessageInboxConfiguration())
   return {
-    api: await setupRestApi(service, '/api/v2', node, createTestMocks(), {
+    api: await setupRestApi(service, '/api/v2', node, inbox, createTestMocks(), {
       disableApiAuthentication: true
     }),
     service
@@ -60,8 +62,9 @@ export const createTestApiInstance = async (node: any) => {
  */
 export const createAuthenticatedTestApiInstance = async (node: any) => {
   const service = express()
+  let inbox = new MessageInbox(new MessageInboxConfiguration())
   return {
-    api: await setupRestApi(service, '/api/v2', node, createTestMocks(), {
+    api: await setupRestApi(service, '/api/v2', node, inbox, createTestMocks(), {
       apiToken: 'superuser'
     }),
     service

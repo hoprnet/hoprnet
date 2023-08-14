@@ -11,11 +11,12 @@ import "../../../src/Crypto.sol";
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import {SimplifiedModuleEvents} from "../../../src/node-stake/permissioned-module/SimplifiedModule.sol";
 
 /**
  * @dev This files tests both HoprNodeManagementModule and the CapabilityPermissions.sol
  */
-contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest {
+contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest, SimplifiedModuleEvents {
     using stdStorage for StdStorage;
     using TargetUtils for Target;
     using ClonesUpgradeable for address;
@@ -885,6 +886,8 @@ contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTe
 
         // execute function
         vm.prank(msgSender);
+        vm.expectEmit(true, false, false, false, address(moduleProxy));
+        emit SimplifiedModuleEvents.ExecutionSuccess();
         bool result = moduleProxy.execTransactionFromModule(token, 0, data, Enum.Operation.Call);
         assertTrue(result);
         vm.clearMockedCalls();

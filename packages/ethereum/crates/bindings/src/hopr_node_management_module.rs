@@ -7,18 +7,16 @@ pub use hopr_node_management_module::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_node_management_module {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"AddressIsZero\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"AlreadyInitialized\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ArrayTooLong\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ArraysDifferentLength\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"CalldataOutOfBounds\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"CannotChangeOwner\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"DefaultPermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"DelegateCallNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"FunctionSignatureTooShort\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"GranularPermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NoMembership\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NodePermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NonExistentKey\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ParameterNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"PermissionNotConfigured\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"PermissionNotFound\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"SafeMultisendSameAddress\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"SendNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetAddressNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetIsNotScoped\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetIsScoped\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TooManyCapabilities\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"UnacceptableMultiSendOffset\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"WithMembership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousAdmin\",\"type\":\"address\",\"components\":[],\"indexed\":false},{\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"AdminChanged\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"beacon\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"BeaconUpgraded\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"version\",\"type\":\"uint8\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Initialized\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"node\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NodeAdded\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"node\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NodeRemoved\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"multisendAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"SetMultisendAddress\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Upgraded\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"Target\",\"name\":\"defaultTarget\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"addChannelsAndTokenTarget\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"addNode\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"encoded\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"length\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"decodeFunctionSigsAndPermissions\",\"outputs\":[{\"internalType\":\"bytes4[]\",\"name\":\"functionSigs\",\"type\":\"bytes4[]\",\"components\":[]},{\"internalType\":\"enum GranularPermission[]\",\"name\":\"permissions\",\"type\":\"uint8[]\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes4[]\",\"name\":\"functionSigs\",\"type\":\"bytes4[]\",\"components\":[]},{\"internalType\":\"enum GranularPermission[]\",\"name\":\"permissions\",\"type\":\"uint8[]\",\"components\":[]}],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"encodeFunctionSigsAndPermissions\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"encoded\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"length\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"enum Enum.Operation\",\"name\":\"operation\",\"type\":\"uint8\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"execTransactionFromModule\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"enum Enum.Operation\",\"name\":\"operation\",\"type\":\"uint8\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"execTransactionFromModuleReturnData\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"Target\",\"name\":\"nodeDefaultTarget\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"includeNode\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"initParams\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"initialize\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isHoprNodeManagementModule\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNode\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"multisend\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"proxiableUUID\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"removeNode\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"revokeTarget\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"encodedSigsPermissions\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"scopeChannelsCapabilities\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"beneficiary\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"enum GranularPermission\",\"name\":\"permission\",\"type\":\"uint8\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"scopeSendCapability\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"Target\",\"name\":\"defaultTarget\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"scopeTargetChannels\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"Target\",\"name\":\"defaultTarget\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"scopeTargetSend\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"Target\",\"name\":\"defaultTarget\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"scopeTargetToken\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"beneficiary\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"encodedSigsPermissions\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"scopeTokenCapabilities\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_multisend\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"setMultisend\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"upgradeTo\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"payable\",\"type\":\"function\",\"name\":\"upgradeToAndCall\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRNODEMANAGEMENTMODULE_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI)
-            .expect("ABI is always valid")
-    });
+    pub static HOPRNODEMANAGEMENTMODULE_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -13542,9 +13540,8 @@ pub mod hopr_node_management_module {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRNODEMANAGEMENTMODULE_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRNODEMANAGEMENTMODULE_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -26781,9 +26778,8 @@ pub mod hopr_node_management_module {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRNODEMANAGEMENTMODULE_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRNODEMANAGEMENTMODULE_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprNodeManagementModule<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprNodeManagementModule<M> {
         fn clone(&self) -> Self {
@@ -26811,17 +26807,12 @@ pub mod hopr_node_management_module {
     impl<M: ::ethers::providers::Middleware> HoprNodeManagementModule<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRNODEMANAGEMENTMODULE_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRNODEMANAGEMENTMODULE_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -26885,10 +26876,7 @@ pub mod hopr_node_management_module {
             &self,
             encoded: [u8; 32],
             length: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            (::std::vec::Vec<[u8; 4]>, ::std::vec::Vec<u8>),
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, (::std::vec::Vec<[u8; 4]>, ::std::vec::Vec<u8>)> {
             self.0
                 .method_hash([96, 151, 108, 75], (encoded, length))
                 .expect("method not found (this should never happen)")
@@ -26898,10 +26886,7 @@ pub mod hopr_node_management_module {
             &self,
             function_sigs: ::std::vec::Vec<[u8; 4]>,
             permissions: ::std::vec::Vec<u8>,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ([u8; 32], ::ethers::core::types::U256),
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ([u8; 32], ::ethers::core::types::U256)> {
             self.0
                 .method_hash([86, 245, 81, 23], (function_sigs, permissions))
                 .expect("method not found (this should never happen)")
@@ -26925,10 +26910,7 @@ pub mod hopr_node_management_module {
             value: ::ethers::core::types::U256,
             data: ::ethers::core::types::Bytes,
             operation: u8,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            (bool, ::ethers::core::types::Bytes),
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, (bool, ::ethers::core::types::Bytes)> {
             self.0
                 .method_hash([82, 41, 7, 63], (to, value, data, operation))
                 .expect("method not found (this should never happen)")
@@ -26952,9 +26934,7 @@ pub mod hopr_node_management_module {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `isHoprNodeManagementModule` (0x4a1ba408) function
-        pub fn is_hopr_node_management_module(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
+        pub fn is_hopr_node_management_module(&self) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
                 .method_hash([74, 27, 164, 8], ())
                 .expect("method not found (this should never happen)")
@@ -26969,31 +26949,19 @@ pub mod hopr_node_management_module {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `multisend` (0x294402cc) function
-        pub fn multisend(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn multisend(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([41, 68, 2, 204], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `owner` (0x8da5cb5b) function
-        pub fn owner(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn owner(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([141, 165, 203, 91], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `proxiableUUID` (0x52d1902d) function
-        pub fn proxiable_uuid(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn proxiable_uuid(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([82, 209, 144, 45], ())
                 .expect("method not found (this should never happen)")
@@ -27008,9 +26976,7 @@ pub mod hopr_node_management_module {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `renounceOwnership` (0x715018a6) function
-        pub fn renounce_ownership(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn renounce_ownership(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([113, 80, 24, 166], ())
                 .expect("method not found (this should never happen)")
@@ -27046,10 +27012,7 @@ pub mod hopr_node_management_module {
             permission: u8,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash(
-                    [198, 140, 58, 131],
-                    (node_address, beneficiary, permission),
-                )
+                .method_hash([198, 140, 58, 131], (node_address, beneficiary, permission))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `scopeTargetChannels` (0x739c4b08) function
@@ -27134,415 +27097,202 @@ pub mod hopr_node_management_module {
         ///Gets the contract's `AdminChanged` event
         pub fn admin_changed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            AdminChangedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, AdminChangedFilter> {
             self.0.event()
         }
         ///Gets the contract's `BeaconUpgraded` event
         pub fn beacon_upgraded_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            BeaconUpgradedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, BeaconUpgradedFilter> {
             self.0.event()
         }
         ///Gets the contract's `Initialized` event
         pub fn initialized_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            InitializedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, InitializedFilter> {
             self.0.event()
         }
         ///Gets the contract's `NodeAdded` event
         pub fn node_added_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            NodeAddedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NodeAddedFilter> {
             self.0.event()
         }
         ///Gets the contract's `NodeRemoved` event
         pub fn node_removed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            NodeRemovedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NodeRemovedFilter> {
             self.0.event()
         }
         ///Gets the contract's `OwnershipTransferred` event
         pub fn ownership_transferred_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            OwnershipTransferredFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OwnershipTransferredFilter> {
             self.0.event()
         }
         ///Gets the contract's `SetMultisendAddress` event
         pub fn set_multisend_address_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            SetMultisendAddressFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SetMultisendAddressFilter> {
             self.0.event()
         }
         ///Gets the contract's `Upgraded` event
-        pub fn upgraded_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            UpgradedFilter,
-        > {
+        pub fn upgraded_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, UpgradedFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            HoprNodeManagementModuleEvents,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprNodeManagementModuleEvents> {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprNodeManagementModule<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprNodeManagementModule<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `AddressIsZero` with signature `AddressIsZero()` and selector `0x867915ab`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "AddressIsZero", abi = "AddressIsZero()")]
     pub struct AddressIsZero;
     ///Custom Error type `AlreadyInitialized` with signature `AlreadyInitialized()` and selector `0x0dc149f0`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "AlreadyInitialized", abi = "AlreadyInitialized()")]
     pub struct AlreadyInitialized;
     ///Custom Error type `ArrayTooLong` with signature `ArrayTooLong()` and selector `0xbd26cc38`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "ArrayTooLong", abi = "ArrayTooLong()")]
     pub struct ArrayTooLong;
     ///Custom Error type `ArraysDifferentLength` with signature `ArraysDifferentLength()` and selector `0x74f4d537`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "ArraysDifferentLength", abi = "ArraysDifferentLength()")]
     pub struct ArraysDifferentLength;
     ///Custom Error type `CalldataOutOfBounds` with signature `CalldataOutOfBounds()` and selector `0x742638b4`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "CalldataOutOfBounds", abi = "CalldataOutOfBounds()")]
     pub struct CalldataOutOfBounds;
     ///Custom Error type `CannotChangeOwner` with signature `CannotChangeOwner()` and selector `0xfd670ebe`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "CannotChangeOwner", abi = "CannotChangeOwner()")]
     pub struct CannotChangeOwner;
     ///Custom Error type `DefaultPermissionRejected` with signature `DefaultPermissionRejected()` and selector `0x58723037`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "DefaultPermissionRejected", abi = "DefaultPermissionRejected()")]
     pub struct DefaultPermissionRejected;
     ///Custom Error type `DelegateCallNotAllowed` with signature `DelegateCallNotAllowed()` and selector `0x0d89438e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "DelegateCallNotAllowed", abi = "DelegateCallNotAllowed()")]
     pub struct DelegateCallNotAllowed;
     ///Custom Error type `FunctionSignatureTooShort` with signature `FunctionSignatureTooShort()` and selector `0x4684c122`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "FunctionSignatureTooShort", abi = "FunctionSignatureTooShort()")]
     pub struct FunctionSignatureTooShort;
     ///Custom Error type `GranularPermissionRejected` with signature `GranularPermissionRejected()` and selector `0x864dd1e7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[etherror(
-        name = "GranularPermissionRejected",
-        abi = "GranularPermissionRejected()"
-    )]
+    #[etherror(name = "GranularPermissionRejected", abi = "GranularPermissionRejected()")]
     pub struct GranularPermissionRejected;
     ///Custom Error type `NoMembership` with signature `NoMembership()` and selector `0xfd8e9f28`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "NoMembership", abi = "NoMembership()")]
     pub struct NoMembership;
     ///Custom Error type `NodePermissionRejected` with signature `NodePermissionRejected()` and selector `0x6eb0315f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "NodePermissionRejected", abi = "NodePermissionRejected()")]
     pub struct NodePermissionRejected;
     ///Custom Error type `NonExistentKey` with signature `NonExistentKey()` and selector `0x2d0519ad`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "NonExistentKey", abi = "NonExistentKey()")]
     pub struct NonExistentKey;
     ///Custom Error type `ParameterNotAllowed` with signature `ParameterNotAllowed()` and selector `0x31e98246`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "ParameterNotAllowed", abi = "ParameterNotAllowed()")]
     pub struct ParameterNotAllowed;
     ///Custom Error type `PermissionNotConfigured` with signature `PermissionNotConfigured()` and selector `0x46ad4588`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "PermissionNotConfigured", abi = "PermissionNotConfigured()")]
     pub struct PermissionNotConfigured;
     ///Custom Error type `PermissionNotFound` with signature `PermissionNotFound()` and selector `0xd8455a13`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "PermissionNotFound", abi = "PermissionNotFound()")]
     pub struct PermissionNotFound;
     ///Custom Error type `SafeMultisendSameAddress` with signature `SafeMultisendSameAddress()` and selector `0x598a0e21`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "SafeMultisendSameAddress", abi = "SafeMultisendSameAddress()")]
     pub struct SafeMultisendSameAddress;
     ///Custom Error type `SendNotAllowed` with signature `SendNotAllowed()` and selector `0x09e9cd49`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "SendNotAllowed", abi = "SendNotAllowed()")]
     pub struct SendNotAllowed;
     ///Custom Error type `TargetAddressNotAllowed` with signature `TargetAddressNotAllowed()` and selector `0xef3440ac`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "TargetAddressNotAllowed", abi = "TargetAddressNotAllowed()")]
     pub struct TargetAddressNotAllowed;
     ///Custom Error type `TargetIsNotScoped` with signature `TargetIsNotScoped()` and selector `0x4a890321`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "TargetIsNotScoped", abi = "TargetIsNotScoped()")]
     pub struct TargetIsNotScoped;
     ///Custom Error type `TargetIsScoped` with signature `TargetIsScoped()` and selector `0xe8c07d2a`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "TargetIsScoped", abi = "TargetIsScoped()")]
     pub struct TargetIsScoped;
     ///Custom Error type `TooManyCapabilities` with signature `TooManyCapabilities()` and selector `0xb44af9af`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "TooManyCapabilities", abi = "TooManyCapabilities()")]
     pub struct TooManyCapabilities;
     ///Custom Error type `UnacceptableMultiSendOffset` with signature `UnacceptableMultiSendOffset()` and selector `0x7ed11137`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[etherror(
-        name = "UnacceptableMultiSendOffset",
-        abi = "UnacceptableMultiSendOffset()"
-    )]
+    #[etherror(name = "UnacceptableMultiSendOffset", abi = "UnacceptableMultiSendOffset()")]
     pub struct UnacceptableMultiSendOffset;
     ///Custom Error type `WithMembership` with signature `WithMembership()` and selector `0xe3a05a94`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "WithMembership", abi = "WithMembership()")]
     pub struct WithMembership;
@@ -27578,130 +27328,81 @@ pub mod hopr_node_management_module {
         RevertString(::std::string::String),
     }
     impl ::ethers::core::abi::AbiDecode for HoprNodeManagementModuleErrors {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded)
-                = <AddressIsZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AddressIsZero as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AddressIsZero(decoded));
             }
-            if let Ok(decoded)
-                = <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AlreadyInitialized(decoded));
             }
-            if let Ok(decoded)
-                = <ArrayTooLong as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ArrayTooLong as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ArrayTooLong(decoded));
             }
-            if let Ok(decoded)
-                = <ArraysDifferentLength as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ArraysDifferentLength as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ArraysDifferentLength(decoded));
             }
-            if let Ok(decoded)
-                = <CalldataOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CalldataOutOfBounds as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CalldataOutOfBounds(decoded));
             }
-            if let Ok(decoded)
-                = <CannotChangeOwner as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CannotChangeOwner as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CannotChangeOwner(decoded));
             }
-            if let Ok(decoded)
-                = <DefaultPermissionRejected as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <DefaultPermissionRejected as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::DefaultPermissionRejected(decoded));
             }
-            if let Ok(decoded)
-                = <DelegateCallNotAllowed as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <DelegateCallNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::DelegateCallNotAllowed(decoded));
             }
-            if let Ok(decoded)
-                = <FunctionSignatureTooShort as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <FunctionSignatureTooShort as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::FunctionSignatureTooShort(decoded));
             }
-            if let Ok(decoded)
-                = <GranularPermissionRejected as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GranularPermissionRejected as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GranularPermissionRejected(decoded));
             }
-            if let Ok(decoded)
-                = <NoMembership as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NoMembership as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NoMembership(decoded));
             }
-            if let Ok(decoded)
-                = <NodePermissionRejected as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <NodePermissionRejected as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NodePermissionRejected(decoded));
             }
-            if let Ok(decoded)
-                = <NonExistentKey as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NonExistentKey as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NonExistentKey(decoded));
             }
-            if let Ok(decoded)
-                = <ParameterNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ParameterNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ParameterNotAllowed(decoded));
             }
-            if let Ok(decoded)
-                = <PermissionNotConfigured as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <PermissionNotConfigured as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::PermissionNotConfigured(decoded));
             }
-            if let Ok(decoded)
-                = <PermissionNotFound as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <PermissionNotFound as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::PermissionNotFound(decoded));
             }
-            if let Ok(decoded)
-                = <SafeMultisendSameAddress as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <SafeMultisendSameAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SafeMultisendSameAddress(decoded));
             }
-            if let Ok(decoded)
-                = <SendNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SendNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SendNotAllowed(decoded));
             }
-            if let Ok(decoded)
-                = <TargetAddressNotAllowed as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TargetAddressNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TargetAddressNotAllowed(decoded));
             }
-            if let Ok(decoded)
-                = <TargetIsNotScoped as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TargetIsNotScoped as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TargetIsNotScoped(decoded));
             }
-            if let Ok(decoded)
-                = <TargetIsScoped as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TargetIsScoped as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TargetIsScoped(decoded));
             }
-            if let Ok(decoded)
-                = <TooManyCapabilities as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TooManyCapabilities as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TooManyCapabilities(decoded));
             }
-            if let Ok(decoded)
-                = <UnacceptableMultiSendOffset as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <UnacceptableMultiSendOffset as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UnacceptableMultiSendOffset(decoded));
             }
-            if let Ok(decoded)
-                = <WithMembership as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <WithMembership as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::WithMembership(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -27710,78 +27411,30 @@ pub mod hopr_node_management_module {
     impl ::ethers::core::abi::AbiEncode for HoprNodeManagementModuleErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AddressIsZero(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::AlreadyInitialized(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ArrayTooLong(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ArraysDifferentLength(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::CalldataOutOfBounds(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::CannotChangeOwner(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::DefaultPermissionRejected(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::DelegateCallNotAllowed(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::FunctionSignatureTooShort(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GranularPermissionRejected(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NoMembership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NodePermissionRejected(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NonExistentKey(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ParameterNotAllowed(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::PermissionNotConfigured(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::PermissionNotFound(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SafeMultisendSameAddress(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SendNotAllowed(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TargetAddressNotAllowed(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TargetIsNotScoped(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TargetIsScoped(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TooManyCapabilities(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::UnacceptableMultiSendOffset(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::WithMembership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::AddressIsZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AlreadyInitialized(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ArrayTooLong(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ArraysDifferentLength(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::CalldataOutOfBounds(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::CannotChangeOwner(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::DefaultPermissionRejected(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::DelegateCallNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::FunctionSignatureTooShort(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GranularPermissionRejected(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NoMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NodePermissionRejected(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NonExistentKey(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ParameterNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::PermissionNotConfigured(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::PermissionNotFound(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SafeMultisendSameAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SendNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TargetAddressNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TargetIsNotScoped(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TargetIsScoped(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TooManyCapabilities(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::UnacceptableMultiSendOffset(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::WithMembership(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -27790,98 +27443,30 @@ pub mod hopr_node_management_module {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector
-                    == <AddressIsZero as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <AlreadyInitialized as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <ArrayTooLong as ::ethers::contract::EthError>::selector() => true,
-                _ if selector
-                    == <ArraysDifferentLength as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <CalldataOutOfBounds as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <CannotChangeOwner as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <DefaultPermissionRejected as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <DelegateCallNotAllowed as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <FunctionSignatureTooShort as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <GranularPermissionRejected as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <NoMembership as ::ethers::contract::EthError>::selector() => true,
-                _ if selector
-                    == <NodePermissionRejected as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <NonExistentKey as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <ParameterNotAllowed as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <PermissionNotConfigured as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <PermissionNotFound as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <SafeMultisendSameAddress as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <SendNotAllowed as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <TargetAddressNotAllowed as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <TargetIsNotScoped as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <TargetIsScoped as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <TooManyCapabilities as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <UnacceptableMultiSendOffset as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <WithMembership as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
+                _ if selector == <AddressIsZero as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <AlreadyInitialized as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <ArrayTooLong as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <ArraysDifferentLength as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <CalldataOutOfBounds as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <CannotChangeOwner as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <DefaultPermissionRejected as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <DelegateCallNotAllowed as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <FunctionSignatureTooShort as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <GranularPermissionRejected as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <NoMembership as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <NodePermissionRejected as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <NonExistentKey as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <ParameterNotAllowed as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <PermissionNotConfigured as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <PermissionNotFound as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <SafeMultisendSameAddress as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <SendNotAllowed as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <TargetAddressNotAllowed as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <TargetIsNotScoped as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <TargetIsScoped as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <TooManyCapabilities as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <UnacceptableMultiSendOffset as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <WithMembership as ::ethers::contract::EthError>::selector() => true,
                 _ => false,
             }
         }
@@ -27890,65 +27475,34 @@ pub mod hopr_node_management_module {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::AddressIsZero(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AlreadyInitialized(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AlreadyInitialized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ArrayTooLong(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ArraysDifferentLength(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::CalldataOutOfBounds(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::ArraysDifferentLength(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CalldataOutOfBounds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CannotChangeOwner(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DefaultPermissionRejected(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::DelegateCallNotAllowed(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::FunctionSignatureTooShort(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::GranularPermissionRejected(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::DefaultPermissionRejected(element) => ::core::fmt::Display::fmt(element, f),
+                Self::DelegateCallNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FunctionSignatureTooShort(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GranularPermissionRejected(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NoMembership(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NodePermissionRejected(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::NodePermissionRejected(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NonExistentKey(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ParameterNotAllowed(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::PermissionNotConfigured(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::PermissionNotFound(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::SafeMultisendSameAddress(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::ParameterNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PermissionNotConfigured(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PermissionNotFound(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SafeMultisendSameAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SendNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TargetAddressNotAllowed(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::TargetAddressNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TargetIsNotScoped(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TargetIsScoped(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TooManyCapabilities(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::UnacceptableMultiSendOffset(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::TooManyCapabilities(element) => ::core::fmt::Display::fmt(element, f),
+                Self::UnacceptableMultiSendOffset(element) => ::core::fmt::Display::fmt(element, f),
                 Self::WithMembership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
     }
-    impl ::core::convert::From<::std::string::String>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<::std::string::String> for HoprNodeManagementModuleErrors {
         fn from(value: String) -> Self {
             Self::RevertString(value)
         }
@@ -27968,8 +27522,7 @@ pub mod hopr_node_management_module {
             Self::ArrayTooLong(value)
         }
     }
-    impl ::core::convert::From<ArraysDifferentLength>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<ArraysDifferentLength> for HoprNodeManagementModuleErrors {
         fn from(value: ArraysDifferentLength) -> Self {
             Self::ArraysDifferentLength(value)
         }
@@ -27984,26 +27537,22 @@ pub mod hopr_node_management_module {
             Self::CannotChangeOwner(value)
         }
     }
-    impl ::core::convert::From<DefaultPermissionRejected>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<DefaultPermissionRejected> for HoprNodeManagementModuleErrors {
         fn from(value: DefaultPermissionRejected) -> Self {
             Self::DefaultPermissionRejected(value)
         }
     }
-    impl ::core::convert::From<DelegateCallNotAllowed>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<DelegateCallNotAllowed> for HoprNodeManagementModuleErrors {
         fn from(value: DelegateCallNotAllowed) -> Self {
             Self::DelegateCallNotAllowed(value)
         }
     }
-    impl ::core::convert::From<FunctionSignatureTooShort>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<FunctionSignatureTooShort> for HoprNodeManagementModuleErrors {
         fn from(value: FunctionSignatureTooShort) -> Self {
             Self::FunctionSignatureTooShort(value)
         }
     }
-    impl ::core::convert::From<GranularPermissionRejected>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<GranularPermissionRejected> for HoprNodeManagementModuleErrors {
         fn from(value: GranularPermissionRejected) -> Self {
             Self::GranularPermissionRejected(value)
         }
@@ -28013,8 +27562,7 @@ pub mod hopr_node_management_module {
             Self::NoMembership(value)
         }
     }
-    impl ::core::convert::From<NodePermissionRejected>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<NodePermissionRejected> for HoprNodeManagementModuleErrors {
         fn from(value: NodePermissionRejected) -> Self {
             Self::NodePermissionRejected(value)
         }
@@ -28029,8 +27577,7 @@ pub mod hopr_node_management_module {
             Self::ParameterNotAllowed(value)
         }
     }
-    impl ::core::convert::From<PermissionNotConfigured>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<PermissionNotConfigured> for HoprNodeManagementModuleErrors {
         fn from(value: PermissionNotConfigured) -> Self {
             Self::PermissionNotConfigured(value)
         }
@@ -28040,8 +27587,7 @@ pub mod hopr_node_management_module {
             Self::PermissionNotFound(value)
         }
     }
-    impl ::core::convert::From<SafeMultisendSameAddress>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<SafeMultisendSameAddress> for HoprNodeManagementModuleErrors {
         fn from(value: SafeMultisendSameAddress) -> Self {
             Self::SafeMultisendSameAddress(value)
         }
@@ -28051,8 +27597,7 @@ pub mod hopr_node_management_module {
             Self::SendNotAllowed(value)
         }
     }
-    impl ::core::convert::From<TargetAddressNotAllowed>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<TargetAddressNotAllowed> for HoprNodeManagementModuleErrors {
         fn from(value: TargetAddressNotAllowed) -> Self {
             Self::TargetAddressNotAllowed(value)
         }
@@ -28072,8 +27617,7 @@ pub mod hopr_node_management_module {
             Self::TooManyCapabilities(value)
         }
     }
-    impl ::core::convert::From<UnacceptableMultiSendOffset>
-    for HoprNodeManagementModuleErrors {
+    impl ::core::convert::From<UnacceptableMultiSendOffset> for HoprNodeManagementModuleErrors {
         fn from(value: UnacceptableMultiSendOffset) -> Self {
             Self::UnacceptableMultiSendOffset(value)
         }
@@ -28084,14 +27628,7 @@ pub mod hopr_node_management_module {
         }
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "AdminChanged", abi = "AdminChanged(address,address)")]
     pub struct AdminChangedFilter {
@@ -28099,14 +27636,7 @@ pub mod hopr_node_management_module {
         pub new_admin: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "BeaconUpgraded", abi = "BeaconUpgraded(address)")]
     pub struct BeaconUpgradedFilter {
@@ -28114,28 +27644,14 @@ pub mod hopr_node_management_module {
         pub beacon: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Initialized", abi = "Initialized(uint8)")]
     pub struct InitializedFilter {
         pub version: u8,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "NodeAdded", abi = "NodeAdded(address)")]
     pub struct NodeAddedFilter {
@@ -28143,14 +27659,7 @@ pub mod hopr_node_management_module {
         pub node: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "NodeRemoved", abi = "NodeRemoved(address)")]
     pub struct NodeRemovedFilter {
@@ -28158,19 +27667,9 @@ pub mod hopr_node_management_module {
         pub node: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "OwnershipTransferred",
-        abi = "OwnershipTransferred(address,address)"
-    )]
+    #[ethevent(name = "OwnershipTransferred", abi = "OwnershipTransferred(address,address)")]
     pub struct OwnershipTransferredFilter {
         #[ethevent(indexed)]
         pub previous_owner: ::ethers::core::types::Address,
@@ -28178,14 +27677,7 @@ pub mod hopr_node_management_module {
         pub new_owner: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "SetMultisendAddress", abi = "SetMultisendAddress(address)")]
     pub struct SetMultisendAddressFilter {
@@ -28193,14 +27685,7 @@ pub mod hopr_node_management_module {
         pub multisend_address: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Upgraded", abi = "Upgraded(address)")]
     pub struct UpgradedFilter {
@@ -28220,9 +27705,7 @@ pub mod hopr_node_management_module {
         UpgradedFilter(UpgradedFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprNodeManagementModuleEvents {
-        fn decode_log(
-            log: &::ethers::core::abi::RawLog,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = AdminChangedFilter::decode_log(log) {
                 return Ok(HoprNodeManagementModuleEvents::AdminChangedFilter(decoded));
             }
@@ -28239,14 +27722,10 @@ pub mod hopr_node_management_module {
                 return Ok(HoprNodeManagementModuleEvents::NodeRemovedFilter(decoded));
             }
             if let Ok(decoded) = OwnershipTransferredFilter::decode_log(log) {
-                return Ok(
-                    HoprNodeManagementModuleEvents::OwnershipTransferredFilter(decoded),
-                );
+                return Ok(HoprNodeManagementModuleEvents::OwnershipTransferredFilter(decoded));
             }
             if let Ok(decoded) = SetMultisendAddressFilter::decode_log(log) {
-                return Ok(
-                    HoprNodeManagementModuleEvents::SetMultisendAddressFilter(decoded),
-                );
+                return Ok(HoprNodeManagementModuleEvents::SetMultisendAddressFilter(decoded));
             }
             if let Ok(decoded) = UpgradedFilter::decode_log(log) {
                 return Ok(HoprNodeManagementModuleEvents::UpgradedFilter(decoded));
@@ -28257,21 +27736,13 @@ pub mod hopr_node_management_module {
     impl ::core::fmt::Display for HoprNodeManagementModuleEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AdminChangedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::BeaconUpgradedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AdminChangedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::BeaconUpgradedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InitializedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NodeAddedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NodeRemovedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OwnershipTransferredFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::SetMultisendAddressFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::OwnershipTransferredFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SetMultisendAddressFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::UpgradedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
@@ -28301,14 +27772,12 @@ pub mod hopr_node_management_module {
             Self::NodeRemovedFilter(value)
         }
     }
-    impl ::core::convert::From<OwnershipTransferredFilter>
-    for HoprNodeManagementModuleEvents {
+    impl ::core::convert::From<OwnershipTransferredFilter> for HoprNodeManagementModuleEvents {
         fn from(value: OwnershipTransferredFilter) -> Self {
             Self::OwnershipTransferredFilter(value)
         }
     }
-    impl ::core::convert::From<SetMultisendAddressFilter>
-    for HoprNodeManagementModuleEvents {
+    impl ::core::convert::From<SetMultisendAddressFilter> for HoprNodeManagementModuleEvents {
         fn from(value: SetMultisendAddressFilter) -> Self {
             Self::SetMultisendAddressFilter(value)
         }
@@ -28320,32 +27789,15 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `addChannelsAndTokenTarget` function with signature `addChannelsAndTokenTarget(uint256)` and selector `0xa2450f89`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "addChannelsAndTokenTarget",
-        abi = "addChannelsAndTokenTarget(uint256)"
-    )]
+    #[ethcall(name = "addChannelsAndTokenTarget", abi = "addChannelsAndTokenTarget(uint256)")]
     pub struct AddChannelsAndTokenTargetCall {
         pub default_target: ::ethers::core::types::U256,
     }
     ///Container type for all input parameters for the `addNode` function with signature `addNode(address)` and selector `0x9d95f1cc`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "addNode", abi = "addNode(address)")]
     pub struct AddNodeCall {
@@ -28353,14 +27805,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `decodeFunctionSigsAndPermissions` function with signature `decodeFunctionSigsAndPermissions(bytes32,uint256)` and selector `0x60976c4b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "decodeFunctionSigsAndPermissions",
@@ -28372,14 +27817,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `encodeFunctionSigsAndPermissions` function with signature `encodeFunctionSigsAndPermissions(bytes4[],uint8[])` and selector `0x56f55117`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "encodeFunctionSigsAndPermissions",
@@ -28391,14 +27829,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `execTransactionFromModule` function with signature `execTransactionFromModule(address,uint256,bytes,uint8)` and selector `0x468721a7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "execTransactionFromModule",
@@ -28412,14 +27843,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `execTransactionFromModuleReturnData` function with signature `execTransactionFromModuleReturnData(address,uint256,bytes,uint8)` and selector `0x5229073f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "execTransactionFromModuleReturnData",
@@ -28433,14 +27857,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `includeNode` function with signature `includeNode(uint256)` and selector `0xb5736962`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "includeNode", abi = "includeNode(uint256)")]
     pub struct IncludeNodeCall {
@@ -28448,14 +27865,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `initialize` function with signature `initialize(bytes)` and selector `0x439fab91`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "initialize", abi = "initialize(bytes)")]
     pub struct InitializeCall {
@@ -28463,27 +27873,13 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `isHoprNodeManagementModule` function with signature `isHoprNodeManagementModule()` and selector `0x4a1ba408`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "isHoprNodeManagementModule", abi = "isHoprNodeManagementModule()")]
     pub struct IsHoprNodeManagementModuleCall;
     ///Container type for all input parameters for the `isNode` function with signature `isNode(address)` and selector `0x01750152`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "isNode", abi = "isNode(address)")]
     pub struct IsNodeCall {
@@ -28491,53 +27887,25 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `multisend` function with signature `multisend()` and selector `0x294402cc`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "multisend", abi = "multisend()")]
     pub struct MultisendCall;
     ///Container type for all input parameters for the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "owner", abi = "owner()")]
     pub struct OwnerCall;
     ///Container type for all input parameters for the `proxiableUUID` function with signature `proxiableUUID()` and selector `0x52d1902d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "proxiableUUID", abi = "proxiableUUID()")]
     pub struct ProxiableUUIDCall;
     ///Container type for all input parameters for the `removeNode` function with signature `removeNode(address)` and selector `0xb2b99ec9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "removeNode", abi = "removeNode(address)")]
     pub struct RemoveNodeCall {
@@ -28545,27 +27913,13 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `renounceOwnership` function with signature `renounceOwnership()` and selector `0x715018a6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "renounceOwnership", abi = "renounceOwnership()")]
     pub struct RenounceOwnershipCall;
     ///Container type for all input parameters for the `revokeTarget` function with signature `revokeTarget(address)` and selector `0x3401cde8`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "revokeTarget", abi = "revokeTarget(address)")]
     pub struct RevokeTargetCall {
@@ -28573,14 +27927,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `scopeChannelsCapabilities` function with signature `scopeChannelsCapabilities(address,bytes32,bytes32)` and selector `0xfa19501d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "scopeChannelsCapabilities",
@@ -28593,19 +27940,9 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `scopeSendCapability` function with signature `scopeSendCapability(address,address,uint8)` and selector `0xc68c3a83`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "scopeSendCapability",
-        abi = "scopeSendCapability(address,address,uint8)"
-    )]
+    #[ethcall(name = "scopeSendCapability", abi = "scopeSendCapability(address,address,uint8)")]
     pub struct ScopeSendCapabilityCall {
         pub node_address: ::ethers::core::types::Address,
         pub beneficiary: ::ethers::core::types::Address,
@@ -28613,14 +27950,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `scopeTargetChannels` function with signature `scopeTargetChannels(uint256)` and selector `0x739c4b08`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "scopeTargetChannels", abi = "scopeTargetChannels(uint256)")]
     pub struct ScopeTargetChannelsCall {
@@ -28628,14 +27958,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `scopeTargetSend` function with signature `scopeTargetSend(uint256)` and selector `0xdc06109d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "scopeTargetSend", abi = "scopeTargetSend(uint256)")]
     pub struct ScopeTargetSendCall {
@@ -28643,14 +27966,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `scopeTargetToken` function with signature `scopeTargetToken(uint256)` and selector `0xa76c9a2f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "scopeTargetToken", abi = "scopeTargetToken(uint256)")]
     pub struct ScopeTargetTokenCall {
@@ -28658,14 +27974,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `scopeTokenCapabilities` function with signature `scopeTokenCapabilities(address,address,address,bytes32)` and selector `0xc68605c8`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "scopeTokenCapabilities",
@@ -28679,14 +27988,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `setMultisend` function with signature `setMultisend(address)` and selector `0x8b95eccd`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "setMultisend", abi = "setMultisend(address)")]
     pub struct SetMultisendCall {
@@ -28694,14 +27996,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `transferOwnership` function with signature `transferOwnership(address)` and selector `0xf2fde38b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "transferOwnership", abi = "transferOwnership(address)")]
     pub struct TransferOwnershipCall {
@@ -28709,14 +28004,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `upgradeTo` function with signature `upgradeTo(address)` and selector `0x3659cfe6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "upgradeTo", abi = "upgradeTo(address)")]
     pub struct UpgradeToCall {
@@ -28724,14 +28012,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all input parameters for the `upgradeToAndCall` function with signature `upgradeToAndCall(address,bytes)` and selector `0x4f1ef286`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "upgradeToAndCall", abi = "upgradeToAndCall(address,bytes)")]
     pub struct UpgradeToAndCallCall {
@@ -28769,140 +28050,88 @@ pub mod hopr_node_management_module {
         UpgradeToAndCall(UpgradeToAndCallCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprNodeManagementModuleCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <AddChannelsAndTokenTargetCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <AddChannelsAndTokenTargetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AddChannelsAndTokenTarget(decoded));
             }
-            if let Ok(decoded)
-                = <AddNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AddNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AddNode(decoded));
             }
-            if let Ok(decoded)
-                = <DecodeFunctionSigsAndPermissionsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <DecodeFunctionSigsAndPermissionsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::DecodeFunctionSigsAndPermissions(decoded));
             }
-            if let Ok(decoded)
-                = <EncodeFunctionSigsAndPermissionsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <EncodeFunctionSigsAndPermissionsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::EncodeFunctionSigsAndPermissions(decoded));
             }
-            if let Ok(decoded)
-                = <ExecTransactionFromModuleCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ExecTransactionFromModuleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ExecTransactionFromModule(decoded));
             }
-            if let Ok(decoded)
-                = <ExecTransactionFromModuleReturnDataCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) =
+                <ExecTransactionFromModuleReturnDataCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::ExecTransactionFromModuleReturnData(decoded));
             }
-            if let Ok(decoded)
-                = <IncludeNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <IncludeNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IncludeNode(decoded));
             }
-            if let Ok(decoded)
-                = <InitializeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InitializeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Initialize(decoded));
             }
-            if let Ok(decoded)
-                = <IsHoprNodeManagementModuleCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <IsHoprNodeManagementModuleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsHoprNodeManagementModule(decoded));
             }
-            if let Ok(decoded)
-                = <IsNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <IsNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsNode(decoded));
             }
-            if let Ok(decoded)
-                = <MultisendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <MultisendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Multisend(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Owner(decoded));
             }
-            if let Ok(decoded)
-                = <ProxiableUUIDCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ProxiableUUIDCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ProxiableUUID(decoded));
             }
-            if let Ok(decoded)
-                = <RemoveNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RemoveNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RemoveNode(decoded));
             }
-            if let Ok(decoded)
-                = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RenounceOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <RevokeTargetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RevokeTargetCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevokeTarget(decoded));
             }
-            if let Ok(decoded)
-                = <ScopeChannelsCapabilitiesCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ScopeChannelsCapabilitiesCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ScopeChannelsCapabilities(decoded));
             }
-            if let Ok(decoded)
-                = <ScopeSendCapabilityCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ScopeSendCapabilityCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ScopeSendCapability(decoded));
             }
-            if let Ok(decoded)
-                = <ScopeTargetChannelsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ScopeTargetChannelsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ScopeTargetChannels(decoded));
             }
-            if let Ok(decoded)
-                = <ScopeTargetSendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ScopeTargetSendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ScopeTargetSend(decoded));
             }
-            if let Ok(decoded)
-                = <ScopeTargetTokenCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ScopeTargetTokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ScopeTargetToken(decoded));
             }
-            if let Ok(decoded)
-                = <ScopeTokenCapabilitiesCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ScopeTokenCapabilitiesCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ScopeTokenCapabilities(decoded));
             }
-            if let Ok(decoded)
-                = <SetMultisendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SetMultisendCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SetMultisend(decoded));
             }
-            if let Ok(decoded)
-                = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TransferOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <UpgradeToCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <UpgradeToCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UpgradeTo(decoded));
             }
-            if let Ok(decoded)
-                = <UpgradeToAndCallCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <UpgradeToAndCallCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UpgradeToAndCall(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -28911,105 +28140,47 @@ pub mod hopr_node_management_module {
     impl ::ethers::core::abi::AbiEncode for HoprNodeManagementModuleCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::AddChannelsAndTokenTarget(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::AddChannelsAndTokenTarget(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::AddNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::DecodeFunctionSigsAndPermissions(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::EncodeFunctionSigsAndPermissions(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ExecTransactionFromModule(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ExecTransactionFromModuleReturnData(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IncludeNode(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::Initialize(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IsHoprNodeManagementModule(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::DecodeFunctionSigsAndPermissions(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::EncodeFunctionSigsAndPermissions(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ExecTransactionFromModule(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ExecTransactionFromModuleReturnData(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IncludeNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Initialize(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsHoprNodeManagementModule(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::IsNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Multisend(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::Multisend(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Owner(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ProxiableUUID(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RemoveNode(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RenounceOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RevokeTarget(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ScopeChannelsCapabilities(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ScopeSendCapability(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ScopeTargetChannels(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ScopeTargetSend(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ScopeTargetToken(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ScopeTokenCapabilities(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SetMultisend(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TransferOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::UpgradeTo(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::UpgradeToAndCall(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::ProxiableUUID(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RemoveNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RenounceOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RevokeTarget(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ScopeChannelsCapabilities(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ScopeSendCapability(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ScopeTargetChannels(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ScopeTargetSend(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ScopeTargetToken(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ScopeTokenCapabilities(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SetMultisend(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TransferOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::UpgradeTo(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::UpgradeToAndCall(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
     impl ::core::fmt::Display for HoprNodeManagementModuleCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AddChannelsAndTokenTarget(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AddChannelsAndTokenTarget(element) => ::core::fmt::Display::fmt(element, f),
                 Self::AddNode(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DecodeFunctionSigsAndPermissions(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::EncodeFunctionSigsAndPermissions(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ExecTransactionFromModule(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ExecTransactionFromModuleReturnData(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::DecodeFunctionSigsAndPermissions(element) => ::core::fmt::Display::fmt(element, f),
+                Self::EncodeFunctionSigsAndPermissions(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ExecTransactionFromModule(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ExecTransactionFromModuleReturnData(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IncludeNode(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Initialize(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IsHoprNodeManagementModule(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::IsHoprNodeManagementModule(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsNode(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Multisend(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Owner(element) => ::core::fmt::Display::fmt(element, f),
@@ -29017,20 +28188,12 @@ pub mod hopr_node_management_module {
                 Self::RemoveNode(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RenounceOwnership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevokeTarget(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ScopeChannelsCapabilities(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ScopeSendCapability(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ScopeTargetChannels(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::ScopeChannelsCapabilities(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ScopeSendCapability(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ScopeTargetChannels(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ScopeTargetSend(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ScopeTargetToken(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ScopeTokenCapabilities(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::ScopeTokenCapabilities(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SetMultisend(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TransferOwnership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::UpgradeTo(element) => ::core::fmt::Display::fmt(element, f),
@@ -29038,8 +28201,7 @@ pub mod hopr_node_management_module {
             }
         }
     }
-    impl ::core::convert::From<AddChannelsAndTokenTargetCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<AddChannelsAndTokenTargetCall> for HoprNodeManagementModuleCalls {
         fn from(value: AddChannelsAndTokenTargetCall) -> Self {
             Self::AddChannelsAndTokenTarget(value)
         }
@@ -29049,26 +28211,22 @@ pub mod hopr_node_management_module {
             Self::AddNode(value)
         }
     }
-    impl ::core::convert::From<DecodeFunctionSigsAndPermissionsCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<DecodeFunctionSigsAndPermissionsCall> for HoprNodeManagementModuleCalls {
         fn from(value: DecodeFunctionSigsAndPermissionsCall) -> Self {
             Self::DecodeFunctionSigsAndPermissions(value)
         }
     }
-    impl ::core::convert::From<EncodeFunctionSigsAndPermissionsCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<EncodeFunctionSigsAndPermissionsCall> for HoprNodeManagementModuleCalls {
         fn from(value: EncodeFunctionSigsAndPermissionsCall) -> Self {
             Self::EncodeFunctionSigsAndPermissions(value)
         }
     }
-    impl ::core::convert::From<ExecTransactionFromModuleCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<ExecTransactionFromModuleCall> for HoprNodeManagementModuleCalls {
         fn from(value: ExecTransactionFromModuleCall) -> Self {
             Self::ExecTransactionFromModule(value)
         }
     }
-    impl ::core::convert::From<ExecTransactionFromModuleReturnDataCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<ExecTransactionFromModuleReturnDataCall> for HoprNodeManagementModuleCalls {
         fn from(value: ExecTransactionFromModuleReturnDataCall) -> Self {
             Self::ExecTransactionFromModuleReturnData(value)
         }
@@ -29083,8 +28241,7 @@ pub mod hopr_node_management_module {
             Self::Initialize(value)
         }
     }
-    impl ::core::convert::From<IsHoprNodeManagementModuleCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<IsHoprNodeManagementModuleCall> for HoprNodeManagementModuleCalls {
         fn from(value: IsHoprNodeManagementModuleCall) -> Self {
             Self::IsHoprNodeManagementModule(value)
         }
@@ -29124,20 +28281,17 @@ pub mod hopr_node_management_module {
             Self::RevokeTarget(value)
         }
     }
-    impl ::core::convert::From<ScopeChannelsCapabilitiesCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<ScopeChannelsCapabilitiesCall> for HoprNodeManagementModuleCalls {
         fn from(value: ScopeChannelsCapabilitiesCall) -> Self {
             Self::ScopeChannelsCapabilities(value)
         }
     }
-    impl ::core::convert::From<ScopeSendCapabilityCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<ScopeSendCapabilityCall> for HoprNodeManagementModuleCalls {
         fn from(value: ScopeSendCapabilityCall) -> Self {
             Self::ScopeSendCapability(value)
         }
     }
-    impl ::core::convert::From<ScopeTargetChannelsCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<ScopeTargetChannelsCall> for HoprNodeManagementModuleCalls {
         fn from(value: ScopeTargetChannelsCall) -> Self {
             Self::ScopeTargetChannels(value)
         }
@@ -29152,8 +28306,7 @@ pub mod hopr_node_management_module {
             Self::ScopeTargetToken(value)
         }
     }
-    impl ::core::convert::From<ScopeTokenCapabilitiesCall>
-    for HoprNodeManagementModuleCalls {
+    impl ::core::convert::From<ScopeTokenCapabilitiesCall> for HoprNodeManagementModuleCalls {
         fn from(value: ScopeTokenCapabilitiesCall) -> Self {
             Self::ScopeTokenCapabilities(value)
         }
@@ -29180,14 +28333,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all return fields from the `decodeFunctionSigsAndPermissions` function with signature `decodeFunctionSigsAndPermissions(bytes32,uint256)` and selector `0x60976c4b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct DecodeFunctionSigsAndPermissionsReturn {
         pub function_sigs: ::std::vec::Vec<[u8; 4]>,
@@ -29195,14 +28341,7 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all return fields from the `encodeFunctionSigsAndPermissions` function with signature `encodeFunctionSigsAndPermissions(bytes4[],uint8[])` and selector `0x56f55117`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct EncodeFunctionSigsAndPermissionsReturn {
         pub encoded: [u8; 32],
@@ -29210,91 +28349,39 @@ pub mod hopr_node_management_module {
     }
     ///Container type for all return fields from the `execTransactionFromModule` function with signature `execTransactionFromModule(address,uint256,bytes,uint8)` and selector `0x468721a7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct ExecTransactionFromModuleReturn {
         pub success: bool,
     }
     ///Container type for all return fields from the `execTransactionFromModuleReturnData` function with signature `execTransactionFromModuleReturnData(address,uint256,bytes,uint8)` and selector `0x5229073f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
-    pub struct ExecTransactionFromModuleReturnDataReturn(
-        pub bool,
-        pub ::ethers::core::types::Bytes,
-    );
+    pub struct ExecTransactionFromModuleReturnDataReturn(pub bool, pub ::ethers::core::types::Bytes);
     ///Container type for all return fields from the `isHoprNodeManagementModule` function with signature `isHoprNodeManagementModule()` and selector `0x4a1ba408`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsHoprNodeManagementModuleReturn(pub bool);
     ///Container type for all return fields from the `isNode` function with signature `isNode(address)` and selector `0x01750152`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsNodeReturn(pub bool);
     ///Container type for all return fields from the `multisend` function with signature `multisend()` and selector `0x294402cc`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MultisendReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct OwnerReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `proxiableUUID` function with signature `proxiableUUID()` and selector `0x52d1902d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct ProxiableUUIDReturn(pub [u8; 32]);
 }

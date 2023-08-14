@@ -264,7 +264,7 @@
 //     },
 //     getPublicKey: () => fixtures.PARTY_A(),
 //     // setCommitment: (counterparty: Address, commitment: Hash) =>
-//     //   hoprChannels.bumpChannel(counterparty.to_hex(), commitment.to_hex()), // FIXME: 
+//     //   hoprChannels.bumpChannel(counterparty.to_hex(), commitment.to_hex()), // FIXME:
 //     getAllQueuingTransactionRequests: () => [txRequest],
 //     getAllUnconfirmedHash: () => [fixtures.OPENED_EVENT.transactionHash]
 //   } as unknown as ChainWrapper

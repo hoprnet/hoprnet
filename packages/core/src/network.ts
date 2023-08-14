@@ -48,12 +48,13 @@ export function resolveNetwork(id: string, customProvider?: string): ResolvedNet
 
 export function getContractData(id: string): DeploymentExtract {
   const resolvedNetwork = resolveNetwork(id)
-  
+
   return {
     hoprAnnouncementsAddress: resolvedNetwork.announcements,
     hoprTokenAddress: resolvedNetwork.token,
     hoprChannelsAddress: resolvedNetwork.channels,
     hoprNetworkRegistryAddress: resolvedNetwork.network_registry,
+    hoprNodeSafeRegistryAddress: resolvedNetwork.node_safe_registry,
     indexerStartBlockNumber: resolvedNetwork.channel_contract_deploy_block
   }
 }

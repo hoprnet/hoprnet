@@ -7,18 +7,16 @@ pub use hopr_staking_proxy_for_network_registry::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_staking_proxy_for_network_registry {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_stakeContract\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_newOwner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"_minStake\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"MaxRegistrationsMismatch\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NftRanksMismatch\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"SameStakingThreshold\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftType\",\"type\":\"uint256\",\"components\":[],\"indexed\":true},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"NftTypeAndRankAdded\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftType\",\"type\":\"uint256\",\"components\":[],\"indexed\":true},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"NftTypeAndRankRemoved\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftType\",\"type\":\"uint256\",\"components\":[],\"indexed\":true},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"maxRegistration\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"SpecialNftTypeAndRankAdded\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftType\",\"type\":\"uint256\",\"components\":[],\"indexed\":true},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"SpecialNftTypeAndRankRemoved\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakeContract\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"StakeContractUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"threshold\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ThresholdUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"canOperateFor\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"eligiblity\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"eligibleNftTypeAndRank\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"nftType\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"maxAllowedRegistrations\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"maxRegistrationsPerSpecialNft\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftType\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerAddNftTypeAndRank\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"nftTypes\",\"type\":\"uint256[]\",\"components\":[]},{\"internalType\":\"string[]\",\"name\":\"nftRanks\",\"type\":\"string[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBatchAddNftTypeAndRank\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"nftTypes\",\"type\":\"uint256[]\",\"components\":[]},{\"internalType\":\"string[]\",\"name\":\"nftRanks\",\"type\":\"string[]\",\"components\":[]},{\"internalType\":\"uint256[]\",\"name\":\"maxRegistrations\",\"type\":\"uint256[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBatchAddSpecialNftTypeAndRank\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"nftTypes\",\"type\":\"uint256[]\",\"components\":[]},{\"internalType\":\"string[]\",\"name\":\"nftRanks\",\"type\":\"string[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBatchRemoveNftTypeAndRank\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"nftTypes\",\"type\":\"uint256[]\",\"components\":[]},{\"internalType\":\"string[]\",\"name\":\"nftRanks\",\"type\":\"string[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBatchRemoveSpecialNftTypeAndRank\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftType\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerRemoveNftTypeAndRank\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"newThreshold\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerUpdateThreshold\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"specialNftTypeAndRank\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"nftType\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"stakeContract\",\"outputs\":[{\"internalType\":\"contract IHoprStake\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"stakeThreshold\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_stakeContract\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateStakeContract\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRSTAKINGPROXYFORNETWORKREGISTRY_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI)
-            .expect("ABI is always valid")
-    });
+    pub static HOPRSTAKINGPROXYFORNETWORKREGISTRY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -7303,9 +7301,8 @@ pub mod hopr_staking_proxy_for_network_registry {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRSTAKINGPROXYFORNETWORKREGISTRY_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRSTAKINGPROXYFORNETWORKREGISTRY_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -14184,9 +14181,8 @@ pub mod hopr_staking_proxy_for_network_registry {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRSTAKINGPROXYFORNETWORKREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRSTAKINGPROXYFORNETWORKREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprStakingProxyForNetworkRegistry<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprStakingProxyForNetworkRegistry<M> {
         fn clone(&self) -> Self {
@@ -14214,17 +14210,12 @@ pub mod hopr_staking_proxy_for_network_registry {
     impl<M: ::ethers::providers::Middleware> HoprStakingProxyForNetworkRegistry<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRSTAKINGPROXYFORNETWORKREGISTRY_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRSTAKINGPROXYFORNETWORKREGISTRY_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -14279,10 +14270,8 @@ pub mod hopr_staking_proxy_for_network_registry {
         pub fn eligible_nft_type_and_rank(
             &self,
             p0: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            (::ethers::core::types::U256, ::std::string::String),
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, (::ethers::core::types::U256, ::std::string::String)>
+        {
             self.0
                 .method_hash([222, 98, 108, 14], p0)
                 .expect("method not found (this should never happen)")
@@ -14306,12 +14295,7 @@ pub mod hopr_staking_proxy_for_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `owner` (0x8da5cb5b) function
-        pub fn owner(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn owner(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([141, 165, 203, 91], ())
                 .expect("method not found (this should never happen)")
@@ -14344,10 +14328,7 @@ pub mod hopr_staking_proxy_for_network_registry {
             max_registrations: ::std::vec::Vec<::ethers::core::types::U256>,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash(
-                    [106, 59, 100, 182],
-                    (nft_types, nft_ranks, max_registrations),
-                )
+                .method_hash([106, 59, 100, 182], (nft_types, nft_ranks, max_registrations))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `ownerBatchRemoveNftTypeAndRank` (0xfb66ac57) function
@@ -14390,9 +14371,7 @@ pub mod hopr_staking_proxy_for_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `renounceOwnership` (0x715018a6) function
-        pub fn renounce_ownership(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn renounce_ownership(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([113, 80, 24, 166], ())
                 .expect("method not found (this should never happen)")
@@ -14401,29 +14380,20 @@ pub mod hopr_staking_proxy_for_network_registry {
         pub fn special_nft_type_and_rank(
             &self,
             p0: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            (::ethers::core::types::U256, ::std::string::String),
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, (::ethers::core::types::U256, ::std::string::String)>
+        {
             self.0
                 .method_hash([44, 62, 200, 11], p0)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `stakeContract` (0x1a186227) function
-        pub fn stake_contract(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn stake_contract(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([26, 24, 98, 39], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `stakeThreshold` (0xf11f77f9) function
-        pub fn stake_threshold(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn stake_threshold(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([241, 31, 119, 249], ())
                 .expect("method not found (this should never happen)")
@@ -14449,126 +14419,75 @@ pub mod hopr_staking_proxy_for_network_registry {
         ///Gets the contract's `NftTypeAndRankAdded` event
         pub fn nft_type_and_rank_added_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            NftTypeAndRankAddedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NftTypeAndRankAddedFilter> {
             self.0.event()
         }
         ///Gets the contract's `NftTypeAndRankRemoved` event
         pub fn nft_type_and_rank_removed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            NftTypeAndRankRemovedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NftTypeAndRankRemovedFilter> {
             self.0.event()
         }
         ///Gets the contract's `OwnershipTransferred` event
         pub fn ownership_transferred_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            OwnershipTransferredFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OwnershipTransferredFilter> {
             self.0.event()
         }
         ///Gets the contract's `SpecialNftTypeAndRankAdded` event
         pub fn special_nft_type_and_rank_added_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            SpecialNftTypeAndRankAddedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SpecialNftTypeAndRankAddedFilter> {
             self.0.event()
         }
         ///Gets the contract's `SpecialNftTypeAndRankRemoved` event
         pub fn special_nft_type_and_rank_removed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            SpecialNftTypeAndRankRemovedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SpecialNftTypeAndRankRemovedFilter> {
             self.0.event()
         }
         ///Gets the contract's `StakeContractUpdated` event
         pub fn stake_contract_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            StakeContractUpdatedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, StakeContractUpdatedFilter> {
             self.0.event()
         }
         ///Gets the contract's `ThresholdUpdated` event
         pub fn threshold_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            ThresholdUpdatedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ThresholdUpdatedFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            HoprStakingProxyForNetworkRegistryEvents,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprStakingProxyForNetworkRegistryEvents>
+        {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprStakingProxyForNetworkRegistry<M> {
+        for HoprStakingProxyForNetworkRegistry<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `MaxRegistrationsMismatch` with signature `MaxRegistrationsMismatch()` and selector `0x197910e9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "MaxRegistrationsMismatch", abi = "MaxRegistrationsMismatch()")]
     pub struct MaxRegistrationsMismatch;
     ///Custom Error type `NftRanksMismatch` with signature `NftRanksMismatch()` and selector `0x4885f59b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "NftRanksMismatch", abi = "NftRanksMismatch()")]
     pub struct NftRanksMismatch;
     ///Custom Error type `SameStakingThreshold` with signature `SameStakingThreshold()` and selector `0x20e47b13`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "SameStakingThreshold", abi = "SameStakingThreshold()")]
     pub struct SameStakingThreshold;
@@ -14583,30 +14502,18 @@ pub mod hopr_staking_proxy_for_network_registry {
         RevertString(::std::string::String),
     }
     impl ::ethers::core::abi::AbiDecode for HoprStakingProxyForNetworkRegistryErrors {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded)
-                = <MaxRegistrationsMismatch as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MaxRegistrationsMismatch as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MaxRegistrationsMismatch(decoded));
             }
-            if let Ok(decoded)
-                = <NftRanksMismatch as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NftRanksMismatch as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NftRanksMismatch(decoded));
             }
-            if let Ok(decoded)
-                = <SameStakingThreshold as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <SameStakingThreshold as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SameStakingThreshold(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -14615,36 +14522,20 @@ pub mod hopr_staking_proxy_for_network_registry {
     impl ::ethers::core::abi::AbiEncode for HoprStakingProxyForNetworkRegistryErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::MaxRegistrationsMismatch(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NftRanksMismatch(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SameStakingThreshold(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::MaxRegistrationsMismatch(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NftRanksMismatch(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SameStakingThreshold(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
     }
-    impl ::ethers::contract::ContractRevert
-    for HoprStakingProxyForNetworkRegistryErrors {
+    impl ::ethers::contract::ContractRevert for HoprStakingProxyForNetworkRegistryErrors {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector
-                    == <MaxRegistrationsMismatch as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <NftRanksMismatch as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <SameStakingThreshold as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
+                _ if selector == <MaxRegistrationsMismatch as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <NftRanksMismatch as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <SameStakingThreshold as ::ethers::contract::EthError>::selector() => true,
                 _ => false,
             }
         }
@@ -14652,93 +14543,55 @@ pub mod hopr_staking_proxy_for_network_registry {
     impl ::core::fmt::Display for HoprStakingProxyForNetworkRegistryErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::MaxRegistrationsMismatch(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::MaxRegistrationsMismatch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NftRanksMismatch(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SameStakingThreshold(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::SameStakingThreshold(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
     }
-    impl ::core::convert::From<::std::string::String>
-    for HoprStakingProxyForNetworkRegistryErrors {
+    impl ::core::convert::From<::std::string::String> for HoprStakingProxyForNetworkRegistryErrors {
         fn from(value: String) -> Self {
             Self::RevertString(value)
         }
     }
-    impl ::core::convert::From<MaxRegistrationsMismatch>
-    for HoprStakingProxyForNetworkRegistryErrors {
+    impl ::core::convert::From<MaxRegistrationsMismatch> for HoprStakingProxyForNetworkRegistryErrors {
         fn from(value: MaxRegistrationsMismatch) -> Self {
             Self::MaxRegistrationsMismatch(value)
         }
     }
-    impl ::core::convert::From<NftRanksMismatch>
-    for HoprStakingProxyForNetworkRegistryErrors {
+    impl ::core::convert::From<NftRanksMismatch> for HoprStakingProxyForNetworkRegistryErrors {
         fn from(value: NftRanksMismatch) -> Self {
             Self::NftRanksMismatch(value)
         }
     }
-    impl ::core::convert::From<SameStakingThreshold>
-    for HoprStakingProxyForNetworkRegistryErrors {
+    impl ::core::convert::From<SameStakingThreshold> for HoprStakingProxyForNetworkRegistryErrors {
         fn from(value: SameStakingThreshold) -> Self {
             Self::SameStakingThreshold(value)
         }
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "NftTypeAndRankAdded",
-        abi = "NftTypeAndRankAdded(uint256,string)"
-    )]
+    #[ethevent(name = "NftTypeAndRankAdded", abi = "NftTypeAndRankAdded(uint256,string)")]
     pub struct NftTypeAndRankAddedFilter {
         #[ethevent(indexed)]
         pub nft_type: ::ethers::core::types::U256,
         pub nft_rank: ::std::string::String,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "NftTypeAndRankRemoved",
-        abi = "NftTypeAndRankRemoved(uint256,string)"
-    )]
+    #[ethevent(name = "NftTypeAndRankRemoved", abi = "NftTypeAndRankRemoved(uint256,string)")]
     pub struct NftTypeAndRankRemovedFilter {
         #[ethevent(indexed)]
         pub nft_type: ::ethers::core::types::U256,
         pub nft_rank: ::std::string::String,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "OwnershipTransferred",
-        abi = "OwnershipTransferred(address,address)"
-    )]
+    #[ethevent(name = "OwnershipTransferred", abi = "OwnershipTransferred(address,address)")]
     pub struct OwnershipTransferredFilter {
         #[ethevent(indexed)]
         pub previous_owner: ::ethers::core::types::Address,
@@ -14746,14 +14599,7 @@ pub mod hopr_staking_proxy_for_network_registry {
         pub new_owner: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(
         name = "SpecialNftTypeAndRankAdded",
@@ -14767,14 +14613,7 @@ pub mod hopr_staking_proxy_for_network_registry {
         pub max_registration: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(
         name = "SpecialNftTypeAndRankRemoved",
@@ -14786,14 +14625,7 @@ pub mod hopr_staking_proxy_for_network_registry {
         pub nft_rank: ::std::string::String,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "StakeContractUpdated", abi = "StakeContractUpdated(address)")]
     pub struct StakeContractUpdatedFilter {
@@ -14801,14 +14633,7 @@ pub mod hopr_staking_proxy_for_network_registry {
         pub stake_contract: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "ThresholdUpdated", abi = "ThresholdUpdated(uint256)")]
     pub struct ThresholdUpdatedFilter {
@@ -14827,57 +14652,37 @@ pub mod hopr_staking_proxy_for_network_registry {
         ThresholdUpdatedFilter(ThresholdUpdatedFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprStakingProxyForNetworkRegistryEvents {
-        fn decode_log(
-            log: &::ethers::core::abi::RawLog,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = NftTypeAndRankAddedFilter::decode_log(log) {
-                return Ok(
-                    HoprStakingProxyForNetworkRegistryEvents::NftTypeAndRankAddedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprStakingProxyForNetworkRegistryEvents::NftTypeAndRankAddedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = NftTypeAndRankRemovedFilter::decode_log(log) {
-                return Ok(
-                    HoprStakingProxyForNetworkRegistryEvents::NftTypeAndRankRemovedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprStakingProxyForNetworkRegistryEvents::NftTypeAndRankRemovedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = OwnershipTransferredFilter::decode_log(log) {
-                return Ok(
-                    HoprStakingProxyForNetworkRegistryEvents::OwnershipTransferredFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprStakingProxyForNetworkRegistryEvents::OwnershipTransferredFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = SpecialNftTypeAndRankAddedFilter::decode_log(log) {
-                return Ok(
-                    HoprStakingProxyForNetworkRegistryEvents::SpecialNftTypeAndRankAddedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprStakingProxyForNetworkRegistryEvents::SpecialNftTypeAndRankAddedFilter(decoded));
             }
             if let Ok(decoded) = SpecialNftTypeAndRankRemovedFilter::decode_log(log) {
-                return Ok(
-                    HoprStakingProxyForNetworkRegistryEvents::SpecialNftTypeAndRankRemovedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprStakingProxyForNetworkRegistryEvents::SpecialNftTypeAndRankRemovedFilter(decoded));
             }
             if let Ok(decoded) = StakeContractUpdatedFilter::decode_log(log) {
-                return Ok(
-                    HoprStakingProxyForNetworkRegistryEvents::StakeContractUpdatedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprStakingProxyForNetworkRegistryEvents::StakeContractUpdatedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = ThresholdUpdatedFilter::decode_log(log) {
-                return Ok(
-                    HoprStakingProxyForNetworkRegistryEvents::ThresholdUpdatedFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprStakingProxyForNetworkRegistryEvents::ThresholdUpdatedFilter(
+                    decoded,
+                ));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -14885,129 +14690,74 @@ pub mod hopr_staking_proxy_for_network_registry {
     impl ::core::fmt::Display for HoprStakingProxyForNetworkRegistryEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::NftTypeAndRankAddedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::NftTypeAndRankRemovedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnershipTransferredFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::SpecialNftTypeAndRankAddedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::SpecialNftTypeAndRankRemovedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::StakeContractUpdatedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ThresholdUpdatedFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::NftTypeAndRankAddedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NftTypeAndRankRemovedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnershipTransferredFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SpecialNftTypeAndRankAddedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SpecialNftTypeAndRankRemovedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::StakeContractUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ThresholdUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<NftTypeAndRankAddedFilter>
-    for HoprStakingProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<NftTypeAndRankAddedFilter> for HoprStakingProxyForNetworkRegistryEvents {
         fn from(value: NftTypeAndRankAddedFilter) -> Self {
             Self::NftTypeAndRankAddedFilter(value)
         }
     }
-    impl ::core::convert::From<NftTypeAndRankRemovedFilter>
-    for HoprStakingProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<NftTypeAndRankRemovedFilter> for HoprStakingProxyForNetworkRegistryEvents {
         fn from(value: NftTypeAndRankRemovedFilter) -> Self {
             Self::NftTypeAndRankRemovedFilter(value)
         }
     }
-    impl ::core::convert::From<OwnershipTransferredFilter>
-    for HoprStakingProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<OwnershipTransferredFilter> for HoprStakingProxyForNetworkRegistryEvents {
         fn from(value: OwnershipTransferredFilter) -> Self {
             Self::OwnershipTransferredFilter(value)
         }
     }
-    impl ::core::convert::From<SpecialNftTypeAndRankAddedFilter>
-    for HoprStakingProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<SpecialNftTypeAndRankAddedFilter> for HoprStakingProxyForNetworkRegistryEvents {
         fn from(value: SpecialNftTypeAndRankAddedFilter) -> Self {
             Self::SpecialNftTypeAndRankAddedFilter(value)
         }
     }
-    impl ::core::convert::From<SpecialNftTypeAndRankRemovedFilter>
-    for HoprStakingProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<SpecialNftTypeAndRankRemovedFilter> for HoprStakingProxyForNetworkRegistryEvents {
         fn from(value: SpecialNftTypeAndRankRemovedFilter) -> Self {
             Self::SpecialNftTypeAndRankRemovedFilter(value)
         }
     }
-    impl ::core::convert::From<StakeContractUpdatedFilter>
-    for HoprStakingProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<StakeContractUpdatedFilter> for HoprStakingProxyForNetworkRegistryEvents {
         fn from(value: StakeContractUpdatedFilter) -> Self {
             Self::StakeContractUpdatedFilter(value)
         }
     }
-    impl ::core::convert::From<ThresholdUpdatedFilter>
-    for HoprStakingProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<ThresholdUpdatedFilter> for HoprStakingProxyForNetworkRegistryEvents {
         fn from(value: ThresholdUpdatedFilter) -> Self {
             Self::ThresholdUpdatedFilter(value)
         }
     }
     ///Container type for all input parameters for the `canOperateFor` function with signature `canOperateFor(address,address)` and selector `0xd85ad044`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "canOperateFor", abi = "canOperateFor(address,address)")]
-    pub struct CanOperateForCall(
-        pub ::ethers::core::types::Address,
-        pub ::ethers::core::types::Address,
-    );
+    pub struct CanOperateForCall(pub ::ethers::core::types::Address, pub ::ethers::core::types::Address);
     ///Container type for all input parameters for the `eligibleNftTypeAndRank` function with signature `eligibleNftTypeAndRank(uint256)` and selector `0xde626c0e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "eligibleNftTypeAndRank", abi = "eligibleNftTypeAndRank(uint256)")]
     pub struct EligibleNftTypeAndRankCall(pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `maxAllowedRegistrations` function with signature `maxAllowedRegistrations(address)` and selector `0xb3544e82`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "maxAllowedRegistrations",
-        abi = "maxAllowedRegistrations(address)"
-    )]
+    #[ethcall(name = "maxAllowedRegistrations", abi = "maxAllowedRegistrations(address)")]
     pub struct MaxAllowedRegistrationsCall {
         pub account: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `maxRegistrationsPerSpecialNft` function with signature `maxRegistrationsPerSpecialNft(uint256)` and selector `0xba1cef23`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "maxRegistrationsPerSpecialNft",
@@ -15016,46 +14766,22 @@ pub mod hopr_staking_proxy_for_network_registry {
     pub struct MaxRegistrationsPerSpecialNftCall(pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "owner", abi = "owner()")]
     pub struct OwnerCall;
     ///Container type for all input parameters for the `ownerAddNftTypeAndRank` function with signature `ownerAddNftTypeAndRank(uint256,string)` and selector `0x9b97076f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "ownerAddNftTypeAndRank",
-        abi = "ownerAddNftTypeAndRank(uint256,string)"
-    )]
+    #[ethcall(name = "ownerAddNftTypeAndRank", abi = "ownerAddNftTypeAndRank(uint256,string)")]
     pub struct OwnerAddNftTypeAndRankCall {
         pub nft_type: ::ethers::core::types::U256,
         pub nft_rank: ::std::string::String,
     }
     ///Container type for all input parameters for the `ownerBatchAddNftTypeAndRank` function with signature `ownerBatchAddNftTypeAndRank(uint256[],string[])` and selector `0x506472cc`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "ownerBatchAddNftTypeAndRank",
@@ -15067,14 +14793,7 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `ownerBatchAddSpecialNftTypeAndRank` function with signature `ownerBatchAddSpecialNftTypeAndRank(uint256[],string[],uint256[])` and selector `0x6a3b64b6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "ownerBatchAddSpecialNftTypeAndRank",
@@ -15087,14 +14806,7 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `ownerBatchRemoveNftTypeAndRank` function with signature `ownerBatchRemoveNftTypeAndRank(uint256[],string[])` and selector `0xfb66ac57`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "ownerBatchRemoveNftTypeAndRank",
@@ -15106,14 +14818,7 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `ownerBatchRemoveSpecialNftTypeAndRank` function with signature `ownerBatchRemoveSpecialNftTypeAndRank(uint256[],string[])` and selector `0xb05e8ba9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "ownerBatchRemoveSpecialNftTypeAndRank",
@@ -15125,14 +14830,7 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `ownerRemoveNftTypeAndRank` function with signature `ownerRemoveNftTypeAndRank(uint256,string)` and selector `0x654251eb`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "ownerRemoveNftTypeAndRank",
@@ -15144,14 +14842,7 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `ownerUpdateThreshold` function with signature `ownerUpdateThreshold(uint256)` and selector `0xee50c7c4`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "ownerUpdateThreshold", abi = "ownerUpdateThreshold(uint256)")]
     pub struct OwnerUpdateThresholdCall {
@@ -15159,66 +14850,31 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `renounceOwnership` function with signature `renounceOwnership()` and selector `0x715018a6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "renounceOwnership", abi = "renounceOwnership()")]
     pub struct RenounceOwnershipCall;
     ///Container type for all input parameters for the `specialNftTypeAndRank` function with signature `specialNftTypeAndRank(uint256)` and selector `0x2c3ec80b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "specialNftTypeAndRank", abi = "specialNftTypeAndRank(uint256)")]
     pub struct SpecialNftTypeAndRankCall(pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `stakeContract` function with signature `stakeContract()` and selector `0x1a186227`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "stakeContract", abi = "stakeContract()")]
     pub struct StakeContractCall;
     ///Container type for all input parameters for the `stakeThreshold` function with signature `stakeThreshold()` and selector `0xf11f77f9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "stakeThreshold", abi = "stakeThreshold()")]
     pub struct StakeThresholdCall;
     ///Container type for all input parameters for the `transferOwnership` function with signature `transferOwnership(address)` and selector `0xf2fde38b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "transferOwnership", abi = "transferOwnership(address)")]
     pub struct TransferOwnershipCall {
@@ -15226,14 +14882,7 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `updateStakeContract` function with signature `updateStakeContract(address)` and selector `0x830c6cc2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "updateStakeContract", abi = "updateStakeContract(address)")]
     pub struct UpdateStakeContractCall {
@@ -15262,108 +14911,64 @@ pub mod hopr_staking_proxy_for_network_registry {
         UpdateStakeContract(UpdateStakeContractCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprStakingProxyForNetworkRegistryCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <CanOperateForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CanOperateForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CanOperateFor(decoded));
             }
-            if let Ok(decoded)
-                = <EligibleNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <EligibleNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::EligibleNftTypeAndRank(decoded));
             }
-            if let Ok(decoded)
-                = <MaxAllowedRegistrationsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MaxAllowedRegistrationsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MaxAllowedRegistrations(decoded));
             }
-            if let Ok(decoded)
-                = <MaxRegistrationsPerSpecialNftCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MaxRegistrationsPerSpecialNftCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MaxRegistrationsPerSpecialNft(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Owner(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerAddNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerAddNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerAddNftTypeAndRank(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerBatchAddNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerBatchAddNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerBatchAddNftTypeAndRank(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerBatchAddSpecialNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) =
+                <OwnerBatchAddSpecialNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::OwnerBatchAddSpecialNftTypeAndRank(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerBatchRemoveNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerBatchRemoveNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerBatchRemoveNftTypeAndRank(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerBatchRemoveSpecialNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) =
+                <OwnerBatchRemoveSpecialNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
                 return Ok(Self::OwnerBatchRemoveSpecialNftTypeAndRank(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerRemoveNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerRemoveNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerRemoveNftTypeAndRank(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerUpdateThresholdCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerUpdateThresholdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerUpdateThreshold(decoded));
             }
-            if let Ok(decoded)
-                = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RenounceOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <SpecialNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <SpecialNftTypeAndRankCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SpecialNftTypeAndRank(decoded));
             }
-            if let Ok(decoded)
-                = <StakeContractCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <StakeContractCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::StakeContract(decoded));
             }
-            if let Ok(decoded)
-                = <StakeThresholdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <StakeThresholdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::StakeThreshold(decoded));
             }
-            if let Ok(decoded)
-                = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TransferOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <UpdateStakeContractCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <UpdateStakeContractCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UpdateStakeContract(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -15372,58 +14977,24 @@ pub mod hopr_staking_proxy_for_network_registry {
     impl ::ethers::core::abi::AbiEncode for HoprStakingProxyForNetworkRegistryCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::CanOperateFor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::EligibleNftTypeAndRank(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::MaxAllowedRegistrations(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::MaxRegistrationsPerSpecialNft(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::CanOperateFor(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::EligibleNftTypeAndRank(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::MaxAllowedRegistrations(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::MaxRegistrationsPerSpecialNft(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Owner(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::OwnerAddNftTypeAndRank(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerBatchAddNftTypeAndRank(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerBatchAddSpecialNftTypeAndRank(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerBatchRemoveNftTypeAndRank(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerBatchRemoveSpecialNftTypeAndRank(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerRemoveNftTypeAndRank(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerUpdateThreshold(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RenounceOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::SpecialNftTypeAndRank(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::StakeContract(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::StakeThreshold(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TransferOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::UpdateStakeContract(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::OwnerAddNftTypeAndRank(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerBatchAddNftTypeAndRank(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerBatchAddSpecialNftTypeAndRank(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerBatchRemoveNftTypeAndRank(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerBatchRemoveSpecialNftTypeAndRank(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerRemoveNftTypeAndRank(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerUpdateThreshold(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RenounceOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SpecialNftTypeAndRank(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::StakeContract(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::StakeThreshold(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TransferOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::UpdateStakeContract(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -15431,70 +15002,42 @@ pub mod hopr_staking_proxy_for_network_registry {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::CanOperateFor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EligibleNftTypeAndRank(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::MaxAllowedRegistrations(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::MaxRegistrationsPerSpecialNft(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::EligibleNftTypeAndRank(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MaxAllowedRegistrations(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MaxRegistrationsPerSpecialNft(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Owner(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OwnerAddNftTypeAndRank(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnerBatchAddNftTypeAndRank(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnerBatchAddSpecialNftTypeAndRank(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnerBatchRemoveNftTypeAndRank(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnerBatchRemoveSpecialNftTypeAndRank(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnerRemoveNftTypeAndRank(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnerUpdateThreshold(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::OwnerAddNftTypeAndRank(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnerBatchAddNftTypeAndRank(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnerBatchAddSpecialNftTypeAndRank(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnerBatchRemoveNftTypeAndRank(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnerBatchRemoveSpecialNftTypeAndRank(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnerRemoveNftTypeAndRank(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnerUpdateThreshold(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RenounceOwnership(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SpecialNftTypeAndRank(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::SpecialNftTypeAndRank(element) => ::core::fmt::Display::fmt(element, f),
                 Self::StakeContract(element) => ::core::fmt::Display::fmt(element, f),
                 Self::StakeThreshold(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TransferOwnership(element) => ::core::fmt::Display::fmt(element, f),
-                Self::UpdateStakeContract(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::UpdateStakeContract(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<CanOperateForCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<CanOperateForCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: CanOperateForCall) -> Self {
             Self::CanOperateFor(value)
         }
     }
-    impl ::core::convert::From<EligibleNftTypeAndRankCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<EligibleNftTypeAndRankCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: EligibleNftTypeAndRankCall) -> Self {
             Self::EligibleNftTypeAndRank(value)
         }
     }
-    impl ::core::convert::From<MaxAllowedRegistrationsCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<MaxAllowedRegistrationsCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: MaxAllowedRegistrationsCall) -> Self {
             Self::MaxAllowedRegistrations(value)
         }
     }
-    impl ::core::convert::From<MaxRegistrationsPerSpecialNftCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<MaxRegistrationsPerSpecialNftCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: MaxRegistrationsPerSpecialNftCall) -> Self {
             Self::MaxRegistrationsPerSpecialNft(value)
         }
@@ -15504,108 +15047,81 @@ pub mod hopr_staking_proxy_for_network_registry {
             Self::Owner(value)
         }
     }
-    impl ::core::convert::From<OwnerAddNftTypeAndRankCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerAddNftTypeAndRankCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: OwnerAddNftTypeAndRankCall) -> Self {
             Self::OwnerAddNftTypeAndRank(value)
         }
     }
-    impl ::core::convert::From<OwnerBatchAddNftTypeAndRankCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerBatchAddNftTypeAndRankCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: OwnerBatchAddNftTypeAndRankCall) -> Self {
             Self::OwnerBatchAddNftTypeAndRank(value)
         }
     }
-    impl ::core::convert::From<OwnerBatchAddSpecialNftTypeAndRankCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerBatchAddSpecialNftTypeAndRankCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: OwnerBatchAddSpecialNftTypeAndRankCall) -> Self {
             Self::OwnerBatchAddSpecialNftTypeAndRank(value)
         }
     }
-    impl ::core::convert::From<OwnerBatchRemoveNftTypeAndRankCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerBatchRemoveNftTypeAndRankCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: OwnerBatchRemoveNftTypeAndRankCall) -> Self {
             Self::OwnerBatchRemoveNftTypeAndRank(value)
         }
     }
-    impl ::core::convert::From<OwnerBatchRemoveSpecialNftTypeAndRankCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerBatchRemoveSpecialNftTypeAndRankCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: OwnerBatchRemoveSpecialNftTypeAndRankCall) -> Self {
             Self::OwnerBatchRemoveSpecialNftTypeAndRank(value)
         }
     }
-    impl ::core::convert::From<OwnerRemoveNftTypeAndRankCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerRemoveNftTypeAndRankCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: OwnerRemoveNftTypeAndRankCall) -> Self {
             Self::OwnerRemoveNftTypeAndRank(value)
         }
     }
-    impl ::core::convert::From<OwnerUpdateThresholdCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerUpdateThresholdCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: OwnerUpdateThresholdCall) -> Self {
             Self::OwnerUpdateThreshold(value)
         }
     }
-    impl ::core::convert::From<RenounceOwnershipCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<RenounceOwnershipCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: RenounceOwnershipCall) -> Self {
             Self::RenounceOwnership(value)
         }
     }
-    impl ::core::convert::From<SpecialNftTypeAndRankCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<SpecialNftTypeAndRankCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: SpecialNftTypeAndRankCall) -> Self {
             Self::SpecialNftTypeAndRank(value)
         }
     }
-    impl ::core::convert::From<StakeContractCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<StakeContractCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: StakeContractCall) -> Self {
             Self::StakeContract(value)
         }
     }
-    impl ::core::convert::From<StakeThresholdCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<StakeThresholdCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: StakeThresholdCall) -> Self {
             Self::StakeThreshold(value)
         }
     }
-    impl ::core::convert::From<TransferOwnershipCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<TransferOwnershipCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: TransferOwnershipCall) -> Self {
             Self::TransferOwnership(value)
         }
     }
-    impl ::core::convert::From<UpdateStakeContractCall>
-    for HoprStakingProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<UpdateStakeContractCall> for HoprStakingProxyForNetworkRegistryCalls {
         fn from(value: UpdateStakeContractCall) -> Self {
             Self::UpdateStakeContract(value)
         }
     }
     ///Container type for all return fields from the `canOperateFor` function with signature `canOperateFor(address,address)` and selector `0xd85ad044`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct CanOperateForReturn {
         pub eligiblity: bool,
     }
     ///Container type for all return fields from the `eligibleNftTypeAndRank` function with signature `eligibleNftTypeAndRank(uint256)` and selector `0xde626c0e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct EligibleNftTypeAndRankReturn {
         pub nft_type: ::ethers::core::types::U256,
@@ -15613,50 +15129,22 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all return fields from the `maxAllowedRegistrations` function with signature `maxAllowedRegistrations(address)` and selector `0xb3544e82`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MaxAllowedRegistrationsReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `maxRegistrationsPerSpecialNft` function with signature `maxRegistrationsPerSpecialNft(uint256)` and selector `0xba1cef23`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MaxRegistrationsPerSpecialNftReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct OwnerReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `specialNftTypeAndRank` function with signature `specialNftTypeAndRank(uint256)` and selector `0x2c3ec80b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct SpecialNftTypeAndRankReturn {
         pub nft_type: ::ethers::core::types::U256,
@@ -15664,26 +15152,12 @@ pub mod hopr_staking_proxy_for_network_registry {
     }
     ///Container type for all return fields from the `stakeContract` function with signature `stakeContract()` and selector `0x1a186227`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct StakeContractReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `stakeThreshold` function with signature `stakeThreshold()` and selector `0xf11f77f9`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct StakeThresholdReturn(pub ::ethers::core::types::U256);
 }

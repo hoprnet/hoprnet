@@ -7,18 +7,16 @@ pub use hopr_stake_season_3::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_stake_season_3 {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_nftAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_newOwner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_lockToken\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_rewardToken\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"rewardAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Claimed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NftAllowed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NftBlocked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"boostTokenId\",\"type\":\"uint256\",\"components\":[],\"indexed\":true},{\"internalType\":\"bool\",\"name\":\"factorRegistered\",\"type\":\"bool\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Redeemed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"actualAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Released\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RewardFueled\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"actualAmount\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Staked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"increment\",\"type\":\"uint256\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Sync\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"BASIC_FACTOR_NUMERATOR\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"BOOST_CAP\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"FACTOR_DENOMINATOR\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LOCK_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"NFT_CONTRACT\",\"outputs\":[{\"internalType\":\"contract IHoprBoost\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"PROGRAM_END\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"PROGRAM_START\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"REWARD_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"accounts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"actualLockedTokenAmount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"lastSyncTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"cumulatedRewards\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"claimedRewards\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"availableReward\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"claimRewards\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getCumulatedRewardsIncrement\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isBlockedNft\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"nftType\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed1\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftTypeIndex\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"nftRank\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed2\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"nftTypeIndex\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"boostNumerator\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed3\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"nftType\",\"type\":\"string\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"boostNumerator\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"hodler\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNftTypeAndRankRedeemed4\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onERC721Received\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"_value\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onTokenTransfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBlockNftType\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"typeIndex\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerUnblockNftType\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"reclaimErc20Tokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"tokenId\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"reclaimErc721Tokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedFactor\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedFactorIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedNft\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"redeemedNftIndex\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"stakedHoprTokens\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"sync\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"tokensReceived\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"totalLocked\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"unlock\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"unlockFor\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRSTAKESEASON3_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI)
-            .expect("ABI is always valid")
-    });
+    pub static HOPRSTAKESEASON3_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -11468,9 +11466,8 @@ pub mod hopr_stake_season_3 {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRSTAKESEASON3_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRSTAKESEASON3_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -22000,9 +21997,8 @@ pub mod hopr_stake_season_3 {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRSTAKESEASON3_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRSTAKESEASON3_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprStakeSeason3<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprStakeSeason3<M> {
         fn clone(&self) -> Self {
@@ -22022,23 +22018,20 @@ pub mod hopr_stake_season_3 {
     }
     impl<M> ::core::fmt::Debug for HoprStakeSeason3<M> {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-            f.debug_tuple(stringify!(HoprStakeSeason3)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(HoprStakeSeason3))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> HoprStakeSeason3<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRSTAKESEASON3_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRSTAKESEASON3_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -22088,66 +22081,43 @@ pub mod hopr_stake_season_3 {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `BOOST_CAP` (0xef0526a2) function
-        pub fn boost_cap(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn boost_cap(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([239, 5, 38, 162], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `FACTOR_DENOMINATOR` (0x5ef73d58) function
-        pub fn factor_denominator(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn factor_denominator(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([94, 247, 61, 88], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `LOCK_TOKEN` (0xd0da6801) function
-        pub fn lock_token(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn lock_token(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([208, 218, 104, 1], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `NFT_CONTRACT` (0x1fda9a02) function
-        pub fn nft_contract(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn nft_contract(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([31, 218, 154, 2], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `PROGRAM_END` (0xcbffa3c7) function
-        pub fn program_end(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn program_end(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([203, 255, 163, 199], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `PROGRAM_START` (0x5bbb63a6) function
-        pub fn program_start(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn program_start(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([91, 187, 99, 166], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `REWARD_TOKEN` (0x99248ea7) function
-        pub fn reward_token(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn reward_token(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([153, 36, 142, 167], ())
                 .expect("method not found (this should never happen)")
@@ -22170,9 +22140,7 @@ pub mod hopr_stake_season_3 {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `availableReward` (0x4ad84b34) function
-        pub fn available_reward(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn available_reward(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([74, 216, 75, 52], ())
                 .expect("method not found (this should never happen)")
@@ -22234,10 +22202,7 @@ pub mod hopr_stake_season_3 {
             hodler: ::ethers::core::types::Address,
         ) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
-                .method_hash(
-                    [168, 61, 30, 214],
-                    (nft_type_index, boost_numerator, hodler),
-                )
+                .method_hash([168, 61, 30, 214], (nft_type_index, boost_numerator, hodler))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `isNftTypeAndRankRedeemed4` (0x8c24add4) function
@@ -22275,12 +22240,7 @@ pub mod hopr_stake_season_3 {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `owner` (0x8da5cb5b) function
-        pub fn owner(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn owner(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([141, 165, 203, 91], ())
                 .expect("method not found (this should never happen)")
@@ -22361,9 +22321,7 @@ pub mod hopr_stake_season_3 {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `renounceOwnership` (0x715018a6) function
-        pub fn renounce_ownership(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn renounce_ownership(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([113, 80, 24, 166], ())
                 .expect("method not found (this should never happen)")
@@ -22401,9 +22359,7 @@ pub mod hopr_stake_season_3 {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `totalLocked` (0x56891412) function
-        pub fn total_locked(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn total_locked(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([86, 137, 20, 18], ())
                 .expect("method not found (this should never happen)")
@@ -22433,109 +22389,61 @@ pub mod hopr_stake_season_3 {
                 .expect("method not found (this should never happen)")
         }
         ///Gets the contract's `Claimed` event
-        pub fn claimed_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ClaimedFilter> {
+        pub fn claimed_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ClaimedFilter> {
             self.0.event()
         }
         ///Gets the contract's `NftAllowed` event
         pub fn nft_allowed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            NftAllowedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NftAllowedFilter> {
             self.0.event()
         }
         ///Gets the contract's `NftBlocked` event
         pub fn nft_blocked_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            NftBlockedFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NftBlockedFilter> {
             self.0.event()
         }
         ///Gets the contract's `OwnershipTransferred` event
         pub fn ownership_transferred_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            OwnershipTransferredFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OwnershipTransferredFilter> {
             self.0.event()
         }
         ///Gets the contract's `Redeemed` event
-        pub fn redeemed_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RedeemedFilter,
-        > {
+        pub fn redeemed_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RedeemedFilter> {
             self.0.event()
         }
         ///Gets the contract's `Released` event
-        pub fn released_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            ReleasedFilter,
-        > {
+        pub fn released_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ReleasedFilter> {
             self.0.event()
         }
         ///Gets the contract's `RewardFueled` event
         pub fn reward_fueled_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RewardFueledFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RewardFueledFilter> {
             self.0.event()
         }
         ///Gets the contract's `Staked` event
-        pub fn staked_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, StakedFilter> {
+        pub fn staked_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, StakedFilter> {
             self.0.event()
         }
         ///Gets the contract's `Sync` event
-        pub fn sync_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SyncFilter> {
+        pub fn sync_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SyncFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
-        pub fn events(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            HoprStakeSeason3Events,
-        > {
+        pub fn events(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprStakeSeason3Events> {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprStakeSeason3<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprStakeSeason3<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Claimed", abi = "Claimed(address,uint256)")]
     pub struct ClaimedFilter {
@@ -22545,14 +22453,7 @@ pub mod hopr_stake_season_3 {
         pub reward_amount: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "NftAllowed", abi = "NftAllowed(uint256)")]
     pub struct NftAllowedFilter {
@@ -22560,14 +22461,7 @@ pub mod hopr_stake_season_3 {
         pub type_index: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "NftBlocked", abi = "NftBlocked(uint256)")]
     pub struct NftBlockedFilter {
@@ -22575,19 +22469,9 @@ pub mod hopr_stake_season_3 {
         pub type_index: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "OwnershipTransferred",
-        abi = "OwnershipTransferred(address,address)"
-    )]
+    #[ethevent(name = "OwnershipTransferred", abi = "OwnershipTransferred(address,address)")]
     pub struct OwnershipTransferredFilter {
         #[ethevent(indexed)]
         pub previous_owner: ::ethers::core::types::Address,
@@ -22595,14 +22479,7 @@ pub mod hopr_stake_season_3 {
         pub new_owner: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Redeemed", abi = "Redeemed(address,uint256,bool)")]
     pub struct RedeemedFilter {
@@ -22614,14 +22491,7 @@ pub mod hopr_stake_season_3 {
         pub factor_registered: bool,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Released", abi = "Released(address,uint256)")]
     pub struct ReleasedFilter {
@@ -22631,14 +22501,7 @@ pub mod hopr_stake_season_3 {
         pub actual_amount: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "RewardFueled", abi = "RewardFueled(uint256)")]
     pub struct RewardFueledFilter {
@@ -22646,14 +22509,7 @@ pub mod hopr_stake_season_3 {
         pub amount: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Staked", abi = "Staked(address,uint256)")]
     pub struct StakedFilter {
@@ -22663,14 +22519,7 @@ pub mod hopr_stake_season_3 {
         pub actual_amount: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "Sync", abi = "Sync(address,uint256)")]
     pub struct SyncFilter {
@@ -22693,9 +22542,7 @@ pub mod hopr_stake_season_3 {
         SyncFilter(SyncFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprStakeSeason3Events {
-        fn decode_log(
-            log: &::ethers::core::abi::RawLog,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = ClaimedFilter::decode_log(log) {
                 return Ok(HoprStakeSeason3Events::ClaimedFilter(decoded));
             }
@@ -22732,14 +22579,10 @@ pub mod hopr_stake_season_3 {
                 Self::ClaimedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NftAllowedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NftBlockedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OwnershipTransferredFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::OwnershipTransferredFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RedeemedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReleasedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RewardFueledFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::RewardFueledFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::StakedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SyncFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -22792,144 +22635,67 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `BASIC_FACTOR_NUMERATOR` function with signature `BASIC_FACTOR_NUMERATOR()` and selector `0x6aa8d4cf`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "BASIC_FACTOR_NUMERATOR", abi = "BASIC_FACTOR_NUMERATOR()")]
     pub struct BasicFactorNumeratorCall;
     ///Container type for all input parameters for the `BOOST_CAP` function with signature `BOOST_CAP()` and selector `0xef0526a2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "BOOST_CAP", abi = "BOOST_CAP()")]
     pub struct BoostCapCall;
     ///Container type for all input parameters for the `FACTOR_DENOMINATOR` function with signature `FACTOR_DENOMINATOR()` and selector `0x5ef73d58`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "FACTOR_DENOMINATOR", abi = "FACTOR_DENOMINATOR()")]
     pub struct FactorDenominatorCall;
     ///Container type for all input parameters for the `LOCK_TOKEN` function with signature `LOCK_TOKEN()` and selector `0xd0da6801`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "LOCK_TOKEN", abi = "LOCK_TOKEN()")]
     pub struct LockTokenCall;
     ///Container type for all input parameters for the `NFT_CONTRACT` function with signature `NFT_CONTRACT()` and selector `0x1fda9a02`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "NFT_CONTRACT", abi = "NFT_CONTRACT()")]
     pub struct NftContractCall;
     ///Container type for all input parameters for the `PROGRAM_END` function with signature `PROGRAM_END()` and selector `0xcbffa3c7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "PROGRAM_END", abi = "PROGRAM_END()")]
     pub struct ProgramEndCall;
     ///Container type for all input parameters for the `PROGRAM_START` function with signature `PROGRAM_START()` and selector `0x5bbb63a6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "PROGRAM_START", abi = "PROGRAM_START()")]
     pub struct ProgramStartCall;
     ///Container type for all input parameters for the `REWARD_TOKEN` function with signature `REWARD_TOKEN()` and selector `0x99248ea7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "REWARD_TOKEN", abi = "REWARD_TOKEN()")]
     pub struct RewardTokenCall;
     ///Container type for all input parameters for the `accounts` function with signature `accounts(address)` and selector `0x5e5c06e2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "accounts", abi = "accounts(address)")]
     pub struct AccountsCall(pub ::ethers::core::types::Address);
     ///Container type for all input parameters for the `availableReward` function with signature `availableReward()` and selector `0x4ad84b34`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "availableReward", abi = "availableReward()")]
     pub struct AvailableRewardCall;
     ///Container type for all input parameters for the `claimRewards` function with signature `claimRewards(address)` and selector `0xef5cfb8c`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "claimRewards", abi = "claimRewards(address)")]
     pub struct ClaimRewardsCall {
@@ -22937,45 +22703,21 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `getCumulatedRewardsIncrement` function with signature `getCumulatedRewardsIncrement(address)` and selector `0x70af0934`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "getCumulatedRewardsIncrement",
-        abi = "getCumulatedRewardsIncrement(address)"
-    )]
+    #[ethcall(name = "getCumulatedRewardsIncrement", abi = "getCumulatedRewardsIncrement(address)")]
     pub struct GetCumulatedRewardsIncrementCall {
         pub account: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `isBlockedNft` function with signature `isBlockedNft(uint256)` and selector `0x42c93361`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "isBlockedNft", abi = "isBlockedNft(uint256)")]
     pub struct IsBlockedNftCall(pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `isNftTypeAndRankRedeemed1` function with signature `isNftTypeAndRankRedeemed1(string,string,address)` and selector `0xce23177e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "isNftTypeAndRankRedeemed1",
@@ -22988,14 +22730,7 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `isNftTypeAndRankRedeemed2` function with signature `isNftTypeAndRankRedeemed2(uint256,string,address)` and selector `0x96a9cd7d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "isNftTypeAndRankRedeemed2",
@@ -23008,14 +22743,7 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `isNftTypeAndRankRedeemed3` function with signature `isNftTypeAndRankRedeemed3(uint256,uint256,address)` and selector `0xa83d1ed6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "isNftTypeAndRankRedeemed3",
@@ -23028,14 +22756,7 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `isNftTypeAndRankRedeemed4` function with signature `isNftTypeAndRankRedeemed4(string,uint256,address)` and selector `0x8c24add4`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "isNftTypeAndRankRedeemed4",
@@ -23048,19 +22769,9 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `onERC721Received` function with signature `onERC721Received(address,address,uint256,bytes)` and selector `0x150b7a02`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "onERC721Received",
-        abi = "onERC721Received(address,address,uint256,bytes)"
-    )]
+    #[ethcall(name = "onERC721Received", abi = "onERC721Received(address,address,uint256,bytes)")]
     pub struct OnERC721ReceivedCall {
         pub p0: ::ethers::core::types::Address,
         pub from: ::ethers::core::types::Address,
@@ -23069,14 +22780,7 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `onTokenTransfer` function with signature `onTokenTransfer(address,uint256,bytes)` and selector `0xa4c0ed36`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "onTokenTransfer", abi = "onTokenTransfer(address,uint256,bytes)")]
     pub struct OnTokenTransferCall {
@@ -23086,27 +22790,13 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "owner", abi = "owner()")]
     pub struct OwnerCall;
     ///Container type for all input parameters for the `ownerBlockNftType` function with signature `ownerBlockNftType(uint256)` and selector `0x5e4c0e15`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "ownerBlockNftType", abi = "ownerBlockNftType(uint256)")]
     pub struct OwnerBlockNftTypeCall {
@@ -23114,14 +22804,7 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `ownerUnblockNftType` function with signature `ownerUnblockNftType(uint256)` and selector `0x21cf85ba`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "ownerUnblockNftType", abi = "ownerUnblockNftType(uint256)")]
     pub struct OwnerUnblockNftTypeCall {
@@ -23129,14 +22812,7 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `reclaimErc20Tokens` function with signature `reclaimErc20Tokens(address)` and selector `0x6067bc15`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "reclaimErc20Tokens", abi = "reclaimErc20Tokens(address)")]
     pub struct ReclaimErc20TokensCall {
@@ -23144,104 +22820,46 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `reclaimErc721Tokens` function with signature `reclaimErc721Tokens(address,uint256)` and selector `0x48c64e41`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "reclaimErc721Tokens",
-        abi = "reclaimErc721Tokens(address,uint256)"
-    )]
+    #[ethcall(name = "reclaimErc721Tokens", abi = "reclaimErc721Tokens(address,uint256)")]
     pub struct ReclaimErc721TokensCall {
         pub token_address: ::ethers::core::types::Address,
         pub token_id: ::ethers::core::types::U256,
     }
     ///Container type for all input parameters for the `redeemedFactor` function with signature `redeemedFactor(address,uint256)` and selector `0x81128c1d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "redeemedFactor", abi = "redeemedFactor(address,uint256)")]
-    pub struct RedeemedFactorCall(
-        pub ::ethers::core::types::Address,
-        pub ::ethers::core::types::U256,
-    );
+    pub struct RedeemedFactorCall(pub ::ethers::core::types::Address, pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `redeemedFactorIndex` function with signature `redeemedFactorIndex(address)` and selector `0x1f014d83`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "redeemedFactorIndex", abi = "redeemedFactorIndex(address)")]
     pub struct RedeemedFactorIndexCall(pub ::ethers::core::types::Address);
     ///Container type for all input parameters for the `redeemedNft` function with signature `redeemedNft(address,uint256)` and selector `0x0a1a257a`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "redeemedNft", abi = "redeemedNft(address,uint256)")]
-    pub struct RedeemedNftCall(
-        pub ::ethers::core::types::Address,
-        pub ::ethers::core::types::U256,
-    );
+    pub struct RedeemedNftCall(pub ::ethers::core::types::Address, pub ::ethers::core::types::U256);
     ///Container type for all input parameters for the `redeemedNftIndex` function with signature `redeemedNftIndex(address)` and selector `0xd0c02d63`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "redeemedNftIndex", abi = "redeemedNftIndex(address)")]
     pub struct RedeemedNftIndexCall(pub ::ethers::core::types::Address);
     ///Container type for all input parameters for the `renounceOwnership` function with signature `renounceOwnership()` and selector `0x715018a6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "renounceOwnership", abi = "renounceOwnership()")]
     pub struct RenounceOwnershipCall;
     ///Container type for all input parameters for the `stakedHoprTokens` function with signature `stakedHoprTokens(address)` and selector `0xf978fff1`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "stakedHoprTokens", abi = "stakedHoprTokens(address)")]
     pub struct StakedHoprTokensCall {
@@ -23249,14 +22867,7 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `sync` function with signature `sync(address)` and selector `0xa5841194`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "sync", abi = "sync(address)")]
     pub struct SyncCall {
@@ -23264,14 +22875,7 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `tokensReceived` function with signature `tokensReceived(address,address,address,uint256,bytes,bytes)` and selector `0x0023de29`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "tokensReceived",
@@ -23287,27 +22891,13 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `totalLocked` function with signature `totalLocked()` and selector `0x56891412`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "totalLocked", abi = "totalLocked()")]
     pub struct TotalLockedCall;
     ///Container type for all input parameters for the `transferOwnership` function with signature `transferOwnership(address)` and selector `0xf2fde38b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "transferOwnership", abi = "transferOwnership(address)")]
     pub struct TransferOwnershipCall {
@@ -23315,27 +22905,13 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all input parameters for the `unlock` function with signature `unlock()` and selector `0xa69df4b5`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "unlock", abi = "unlock()")]
     pub struct UnlockCall;
     ///Container type for all input parameters for the `unlockFor` function with signature `unlockFor(address)` and selector `0xdde49979`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "unlockFor", abi = "unlockFor(address)")]
     pub struct UnlockForCall {
@@ -23382,186 +22958,114 @@ pub mod hopr_stake_season_3 {
         UnlockFor(UnlockForCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprStakeSeason3Calls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <BasicFactorNumeratorCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <BasicFactorNumeratorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BasicFactorNumerator(decoded));
             }
-            if let Ok(decoded)
-                = <BoostCapCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <BoostCapCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BoostCap(decoded));
             }
-            if let Ok(decoded)
-                = <FactorDenominatorCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <FactorDenominatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::FactorDenominator(decoded));
             }
-            if let Ok(decoded)
-                = <LockTokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <LockTokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::LockToken(decoded));
             }
-            if let Ok(decoded)
-                = <NftContractCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NftContractCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NftContract(decoded));
             }
-            if let Ok(decoded)
-                = <ProgramEndCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ProgramEndCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ProgramEnd(decoded));
             }
-            if let Ok(decoded)
-                = <ProgramStartCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ProgramStartCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ProgramStart(decoded));
             }
-            if let Ok(decoded)
-                = <RewardTokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RewardTokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RewardToken(decoded));
             }
-            if let Ok(decoded)
-                = <AccountsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AccountsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Accounts(decoded));
             }
-            if let Ok(decoded)
-                = <AvailableRewardCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AvailableRewardCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AvailableReward(decoded));
             }
-            if let Ok(decoded)
-                = <ClaimRewardsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ClaimRewardsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ClaimRewards(decoded));
             }
-            if let Ok(decoded)
-                = <GetCumulatedRewardsIncrementCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <GetCumulatedRewardsIncrementCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetCumulatedRewardsIncrement(decoded));
             }
-            if let Ok(decoded)
-                = <IsBlockedNftCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <IsBlockedNftCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsBlockedNft(decoded));
             }
-            if let Ok(decoded)
-                = <IsNftTypeAndRankRedeemed1Call as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <IsNftTypeAndRankRedeemed1Call as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsNftTypeAndRankRedeemed1(decoded));
             }
-            if let Ok(decoded)
-                = <IsNftTypeAndRankRedeemed2Call as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <IsNftTypeAndRankRedeemed2Call as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsNftTypeAndRankRedeemed2(decoded));
             }
-            if let Ok(decoded)
-                = <IsNftTypeAndRankRedeemed3Call as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <IsNftTypeAndRankRedeemed3Call as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsNftTypeAndRankRedeemed3(decoded));
             }
-            if let Ok(decoded)
-                = <IsNftTypeAndRankRedeemed4Call as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <IsNftTypeAndRankRedeemed4Call as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsNftTypeAndRankRedeemed4(decoded));
             }
-            if let Ok(decoded)
-                = <OnERC721ReceivedCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OnERC721ReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OnERC721Received(decoded));
             }
-            if let Ok(decoded)
-                = <OnTokenTransferCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OnTokenTransferCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OnTokenTransfer(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Owner(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerBlockNftTypeCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerBlockNftTypeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerBlockNftType(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerUnblockNftTypeCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerUnblockNftTypeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerUnblockNftType(decoded));
             }
-            if let Ok(decoded)
-                = <ReclaimErc20TokensCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ReclaimErc20TokensCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ReclaimErc20Tokens(decoded));
             }
-            if let Ok(decoded)
-                = <ReclaimErc721TokensCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ReclaimErc721TokensCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ReclaimErc721Tokens(decoded));
             }
-            if let Ok(decoded)
-                = <RedeemedFactorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RedeemedFactorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RedeemedFactor(decoded));
             }
-            if let Ok(decoded)
-                = <RedeemedFactorIndexCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <RedeemedFactorIndexCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RedeemedFactorIndex(decoded));
             }
-            if let Ok(decoded)
-                = <RedeemedNftCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RedeemedNftCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RedeemedNft(decoded));
             }
-            if let Ok(decoded)
-                = <RedeemedNftIndexCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <RedeemedNftIndexCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RedeemedNftIndex(decoded));
             }
-            if let Ok(decoded)
-                = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RenounceOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <StakedHoprTokensCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <StakedHoprTokensCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::StakedHoprTokens(decoded));
             }
-            if let Ok(decoded)
-                = <SyncCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SyncCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Sync(decoded));
             }
-            if let Ok(decoded)
-                = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TokensReceived(decoded));
             }
-            if let Ok(decoded)
-                = <TotalLockedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TotalLockedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalLocked(decoded));
             }
-            if let Ok(decoded)
-                = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TransferOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <UnlockCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <UnlockCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Unlock(decoded));
             }
-            if let Ok(decoded)
-                = <UnlockForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <UnlockForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UnlockFor(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -23570,117 +23074,49 @@ pub mod hopr_stake_season_3 {
     impl ::ethers::core::abi::AbiEncode for HoprStakeSeason3Calls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::BasicFactorNumerator(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::BoostCap(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::FactorDenominator(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::LockToken(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NftContract(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ProgramEnd(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ProgramStart(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RewardToken(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::Accounts(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::AvailableReward(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ClaimRewards(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::GetCumulatedRewardsIncrement(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IsBlockedNft(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IsNftTypeAndRankRedeemed1(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IsNftTypeAndRankRedeemed2(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IsNftTypeAndRankRedeemed3(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IsNftTypeAndRankRedeemed4(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OnERC721Received(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OnTokenTransfer(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::BasicFactorNumerator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BoostCap(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::FactorDenominator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::LockToken(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NftContract(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ProgramEnd(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ProgramStart(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RewardToken(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Accounts(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AvailableReward(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ClaimRewards(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetCumulatedRewardsIncrement(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsBlockedNft(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsNftTypeAndRankRedeemed1(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsNftTypeAndRankRedeemed2(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsNftTypeAndRankRedeemed3(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsNftTypeAndRankRedeemed4(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OnERC721Received(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OnTokenTransfer(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Owner(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::OwnerBlockNftType(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerUnblockNftType(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ReclaimErc20Tokens(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ReclaimErc721Tokens(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RedeemedFactor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RedeemedFactorIndex(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RedeemedNft(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RedeemedNftIndex(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RenounceOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::StakedHoprTokens(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::OwnerBlockNftType(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerUnblockNftType(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ReclaimErc20Tokens(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ReclaimErc721Tokens(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RedeemedFactor(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RedeemedFactorIndex(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RedeemedNft(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RedeemedNftIndex(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RenounceOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::StakedHoprTokens(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Sync(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TokensReceived(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TotalLocked(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TransferOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::TokensReceived(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TotalLocked(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TransferOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Unlock(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::UnlockFor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::UnlockFor(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
     impl ::core::fmt::Display for HoprStakeSeason3Calls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::BasicFactorNumerator(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::BasicFactorNumerator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BoostCap(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FactorDenominator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::LockToken(element) => ::core::fmt::Display::fmt(element, f),
@@ -23691,39 +23127,21 @@ pub mod hopr_stake_season_3 {
                 Self::Accounts(element) => ::core::fmt::Display::fmt(element, f),
                 Self::AvailableReward(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ClaimRewards(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetCumulatedRewardsIncrement(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::GetCumulatedRewardsIncrement(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsBlockedNft(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IsNftTypeAndRankRedeemed1(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::IsNftTypeAndRankRedeemed2(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::IsNftTypeAndRankRedeemed3(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::IsNftTypeAndRankRedeemed4(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::IsNftTypeAndRankRedeemed1(element) => ::core::fmt::Display::fmt(element, f),
+                Self::IsNftTypeAndRankRedeemed2(element) => ::core::fmt::Display::fmt(element, f),
+                Self::IsNftTypeAndRankRedeemed3(element) => ::core::fmt::Display::fmt(element, f),
+                Self::IsNftTypeAndRankRedeemed4(element) => ::core::fmt::Display::fmt(element, f),
                 Self::OnERC721Received(element) => ::core::fmt::Display::fmt(element, f),
                 Self::OnTokenTransfer(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Owner(element) => ::core::fmt::Display::fmt(element, f),
                 Self::OwnerBlockNftType(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OwnerUnblockNftType(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ReclaimErc20Tokens(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ReclaimErc721Tokens(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::OwnerUnblockNftType(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ReclaimErc20Tokens(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ReclaimErc721Tokens(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RedeemedFactor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RedeemedFactorIndex(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::RedeemedFactorIndex(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RedeemedNft(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RedeemedNftIndex(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RenounceOwnership(element) => ::core::fmt::Display::fmt(element, f),
@@ -23792,8 +23210,7 @@ pub mod hopr_stake_season_3 {
             Self::ClaimRewards(value)
         }
     }
-    impl ::core::convert::From<GetCumulatedRewardsIncrementCall>
-    for HoprStakeSeason3Calls {
+    impl ::core::convert::From<GetCumulatedRewardsIncrementCall> for HoprStakeSeason3Calls {
         fn from(value: GetCumulatedRewardsIncrementCall) -> Self {
             Self::GetCumulatedRewardsIncrement(value)
         }
@@ -23920,110 +23337,47 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all return fields from the `BASIC_FACTOR_NUMERATOR` function with signature `BASIC_FACTOR_NUMERATOR()` and selector `0x6aa8d4cf`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct BasicFactorNumeratorReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `BOOST_CAP` function with signature `BOOST_CAP()` and selector `0xef0526a2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct BoostCapReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `FACTOR_DENOMINATOR` function with signature `FACTOR_DENOMINATOR()` and selector `0x5ef73d58`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct FactorDenominatorReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `LOCK_TOKEN` function with signature `LOCK_TOKEN()` and selector `0xd0da6801`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct LockTokenReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `NFT_CONTRACT` function with signature `NFT_CONTRACT()` and selector `0x1fda9a02`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct NftContractReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `PROGRAM_END` function with signature `PROGRAM_END()` and selector `0xcbffa3c7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct ProgramEndReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `PROGRAM_START` function with signature `PROGRAM_START()` and selector `0x5bbb63a6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct ProgramStartReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `REWARD_TOKEN` function with signature `REWARD_TOKEN()` and selector `0x99248ea7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct RewardTokenReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `accounts` function with signature `accounts(address)` and selector `0x5e5c06e2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct AccountsReturn {
         pub actual_locked_token_amount: ::ethers::core::types::U256,
@@ -24033,194 +23387,82 @@ pub mod hopr_stake_season_3 {
     }
     ///Container type for all return fields from the `availableReward` function with signature `availableReward()` and selector `0x4ad84b34`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct AvailableRewardReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getCumulatedRewardsIncrement` function with signature `getCumulatedRewardsIncrement(address)` and selector `0x70af0934`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct GetCumulatedRewardsIncrementReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `isBlockedNft` function with signature `isBlockedNft(uint256)` and selector `0x42c93361`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsBlockedNftReturn(pub bool);
     ///Container type for all return fields from the `isNftTypeAndRankRedeemed1` function with signature `isNftTypeAndRankRedeemed1(string,string,address)` and selector `0xce23177e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsNftTypeAndRankRedeemed1Return(pub bool);
     ///Container type for all return fields from the `isNftTypeAndRankRedeemed2` function with signature `isNftTypeAndRankRedeemed2(uint256,string,address)` and selector `0x96a9cd7d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsNftTypeAndRankRedeemed2Return(pub bool);
     ///Container type for all return fields from the `isNftTypeAndRankRedeemed3` function with signature `isNftTypeAndRankRedeemed3(uint256,uint256,address)` and selector `0xa83d1ed6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsNftTypeAndRankRedeemed3Return(pub bool);
     ///Container type for all return fields from the `isNftTypeAndRankRedeemed4` function with signature `isNftTypeAndRankRedeemed4(string,uint256,address)` and selector `0x8c24add4`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsNftTypeAndRankRedeemed4Return(pub bool);
     ///Container type for all return fields from the `onERC721Received` function with signature `onERC721Received(address,address,uint256,bytes)` and selector `0x150b7a02`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct OnERC721ReceivedReturn(pub [u8; 4]);
     ///Container type for all return fields from the `onTokenTransfer` function with signature `onTokenTransfer(address,uint256,bytes)` and selector `0xa4c0ed36`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct OnTokenTransferReturn(pub bool);
     ///Container type for all return fields from the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct OwnerReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `redeemedFactor` function with signature `redeemedFactor(address,uint256)` and selector `0x81128c1d`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct RedeemedFactorReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `redeemedFactorIndex` function with signature `redeemedFactorIndex(address)` and selector `0x1f014d83`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct RedeemedFactorIndexReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `redeemedNft` function with signature `redeemedNft(address,uint256)` and selector `0x0a1a257a`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct RedeemedNftReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `redeemedNftIndex` function with signature `redeemedNftIndex(address)` and selector `0xd0c02d63`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct RedeemedNftIndexReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `stakedHoprTokens` function with signature `stakedHoprTokens(address)` and selector `0xf978fff1`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct StakedHoprTokensReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `totalLocked` function with signature `totalLocked()` and selector `0x56891412`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct TotalLockedReturn(pub ::ethers::core::types::U256);
 }

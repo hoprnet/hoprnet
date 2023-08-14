@@ -5,6 +5,53 @@ import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "./utils/NetworkConfig.s.sol";
 import "./utils/BoostUtilsLib.sol";
+import "../src/utils/TargetUtils.sol";
+
+abstract contract Enum {
+    enum Operation {
+        Call,
+        DelegateCall
+    }
+}
+
+abstract contract ISafe {
+  function getTransactionHash(
+      address to,
+      uint256 value,
+      bytes calldata data,
+      Enum.Operation operation,
+      uint256 safeTxGas,
+      uint256 baseGas,
+      uint256 gasPrice,
+      address gasToken,
+      address refundReceiver,
+      uint256 _nonce
+  ) public view virtual returns (bytes32);
+  
+  function execTransaction(
+      address to,
+      uint256 value,
+      bytes calldata data,
+      Enum.Operation operation,
+      uint256 safeTxGas,
+      uint256 baseGas,
+      uint256 gasPrice,
+      address gasToken,
+      address payable refundReceiver,
+      bytes memory signatures
+  ) public payable virtual returns (bool success);
+
+  function nonce() public virtual returns (uint256);
+}
+
+abstract contract IFactory {
+   function clone(
+    address moduleSingletonAddress, 
+    address[] memory admins, 
+    uint256 nonce, 
+    bytes32 defaultTarget
+  ) public virtual returns (address, address payable);
+}
 
 /// Failed to read balance of a token contract
 /// @param token token address.
@@ -18,6 +65,7 @@ error FailureInReadBalance(address token);
 contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     using stdJson for string;
     using BoostUtilsLib for address;
+    using TargetUtils for Target;
 
     address msgSender;
     string[] private unregisteredIds;
@@ -34,6 +82,130 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         msgSender = vm.addr(privateKey);
         vm.startBroadcast(privateKey);
     }
+
+
+    /**
+     * @dev create a safe proxy and moodule proxy 
+     * @notice Deployer is the single owner of safe
+     * nonce is the current nonce of deployer account
+     * Default fallback permission for module is to allow all except for node sending xDAI from safe
+     * Include a node to the safe module
+     * @param nodeAddresses array of node addresses to be added to the module
+     */
+    function expressSetupSafeModule(address[] memory nodeAddresses) external returns (address safe, address module) {
+      // 1. get environment and msg.sender
+      getNetworkAndMsgSender();
+
+      // 2. prepare parameters for proxy deployment
+      address[] memory admins = new address[](1);
+      admins[0] = msgSender;
+      /**
+       * Array of capability permissions
+        [
+          CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
+          CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // RESERVED
+          CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultCloseIncomingChannelSafeFunctionPermisson
+          CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+          CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+          CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
+          CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
+          CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultApproveFunctionPermisson
+          CapabilityPermission.SPECIFIC_FALLBACK_BLOCK  // defaultSendFunctionPermisson
+        ]
+       */
+      CapabilityPermission[] memory defaultChannelsCapabilityPermissions = new CapabilityPermission[](9);
+      for (uint256 i = 0; i < defaultChannelsCapabilityPermissions.length; i++) {
+        defaultChannelsCapabilityPermissions[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+      }
+      defaultChannelsCapabilityPermissions[8] = CapabilityPermission.SPECIFIC_FALLBACK_BLOCK;
+      Target defaultModulePermission = TargetUtils.encodeDefaultPermissions(
+        currentNetworkDetail.addresses.channelsContractAddress,
+        Clearance.FUNCTION,
+        TargetType.CHANNELS,
+        TargetPermission.SPECIFIC_FALLBACK_BLOCK,
+        defaultChannelsCapabilityPermissions
+      );
+
+      /**
+       * Array of node permissions, where nothing is specified and falls back to the default
+        [
+          CapabilityPermission.NONE,
+          CapabilityPermission.NONE,
+          CapabilityPermission.NONE,
+          CapabilityPermission.NONE,
+          CapabilityPermission.NONE,
+          CapabilityPermission.NONE,
+          CapabilityPermission.NONE,
+          CapabilityPermission.NONE,
+          CapabilityPermission.NONE
+        ]
+       */
+      CapabilityPermission[] memory nodeDefaultPermission = new CapabilityPermission[](9);
+      for (uint256 i = 0; i < nodeDefaultPermission.length; i++) {
+        nodeDefaultPermission[i] = CapabilityPermission.NONE;
+      }
+      Target[] memory defaultNodeTargets = new Target[](nodeAddresses.length);
+      for (uint256 j = 0; j < nodeAddresses.length; j++) {
+        defaultNodeTargets[j] = TargetUtils.encodeDefaultPermissions(
+          nodeAddresses[j],
+          Clearance.FUNCTION,
+          TargetType.SEND,
+          TargetPermission.SPECIFIC_FALLBACK_BLOCK,
+          nodeDefaultPermission
+        );
+      }
+
+      // 3. deploy two proxy instances
+      (module, safe) = IFactory(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress).clone(
+        currentNetworkDetail.addresses.moduleImplementationAddress,
+        admins,
+        vm.getNonce(msgSender),
+        bytes32(Target.unwrap(defaultModulePermission))
+      );
+      
+      emit log_string(
+        string(
+          abi.encodePacked(
+            "--safeAddress ", 
+            vm.toString(safe), 
+            " --moduleAddress ", 
+            vm.toString(module)
+          )
+        )
+      );
+
+      // 4. include node to the module, as an owner of safe
+      for (uint256 k = 0; k < nodeAddresses.length; k++) {
+        bytes memory includeNodeData =
+          abi.encodeWithSignature("includeNode(uint256)", Target.unwrap(defaultNodeTargets[k]));
+        uint256 safeNonce = ISafe(safe).nonce();
+        _helperSignSafeTxAsOwner(ISafe(safe), module, safeNonce, includeNodeData);
+      }
+    }
+
+    /**
+     * @dev when caller is owner of safe instance, prepare a signature and execute the transaction
+     */
+    function _helperSignSafeTxAsOwner(ISafe safe, address target, uint256 nonce, bytes memory data) private {
+        bytes32 dataHash =
+          safe.getTransactionHash(target, 0, data, Enum.Operation.Call, 0, 0, 0, address(0), msgSender, nonce);
+        
+        // sign dataHash
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(vm.envUint("PRIVATE_KEY"), dataHash);
+        safe.execTransaction(
+            target,
+            0,
+            data,
+            Enum.Operation.Call,
+            0,
+            0,
+            0,
+            address(0),
+            payable(address(msgSender)),
+            abi.encodePacked(r, s, v)
+        );
+    }
+
 
     // TODO: reimplement single actions
     // /**
@@ -485,22 +657,24 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * @param nativeTokenAmountInWei The amount of native tokens that recipient is desired to receive
      */
     function transferOrMintHoprAndSendNativeToAmount(
-      address recipient,
-      uint256 hoprTokenAmountInWei,
-      uint256 nativeTokenAmountInWei
+        address recipient,
+        uint256 hoprTokenAmountInWei,
+        uint256 nativeTokenAmountInWei
     ) external payable {
-      // 1. get environment and msg.sender
-      getNetworkAndMsgSender();
+        // 1. get environment and msg.sender
+        getNetworkAndMsgSender();
 
-      // 2. transfer or mint hopr tokens
-      _transferOrMintHoprToAmount(currentNetworkDetail.addresses.tokenContractAddress, recipient, hoprTokenAmountInWei);
+        // 2. transfer or mint hopr tokens
+        _transferOrMintHoprToAmount(
+            currentNetworkDetail.addresses.tokenContractAddress, recipient, hoprTokenAmountInWei
+        );
 
-      // 3. transfer native balance to the recipient
-      if (nativeTokenAmountInWei > recipient.balance) {
-        (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}('');
-        require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
-      }
-      vm.stopBroadcast();
+        // 3. transfer native balance to the recipient
+        if (nativeTokenAmountInWei > recipient.balance) {
+            (bool nativeTokenTransferSuccess,) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}("");
+            require(nativeTokenTransferSuccess, "Cannot send native tokens to the recipient");
+        }
+        vm.stopBroadcast();
     }
 
     // /**
@@ -548,13 +722,12 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * Get the token balance of a wallet
      */
     function _getTokenBalanceOf(address tokenAddress, address wallet) internal view returns (uint256) {
-      (bool successReadOwnedTokens, bytes memory returndataReadOwnedTokens) = tokenAddress.staticcall(
-        abi.encodeWithSignature('balanceOf(address)', wallet)
-      );
-      if (!successReadOwnedTokens) {
-        revert FailureInReadBalance(tokenAddress);
-      }
-      return abi.decode(returndataReadOwnedTokens, (uint256));
+        (bool successReadOwnedTokens, bytes memory returndataReadOwnedTokens) =
+            tokenAddress.staticcall(abi.encodeWithSignature("balanceOf(address)", wallet));
+        if (!successReadOwnedTokens) {
+            revert FailureInReadBalance(tokenAddress);
+        }
+        return abi.decode(returndataReadOwnedTokens, (uint256));
     }
 
     // /**
@@ -641,47 +814,49 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     // }
 
     function _transferOrMintHoprToAmount(
-      address hoprTokenContractAddress,
-      address recipient,
-      uint256 hoprTokenAmountInWei
+        address hoprTokenContractAddress,
+        address recipient,
+        uint256 hoprTokenAmountInWei
     ) private {
-      // 1. get recipient balance
-      uint256 recipientTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, recipient);
+        // 1. get recipient balance
+        uint256 recipientTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, recipient);
 
-      // 2. transfer some Hopr tokens to the recipient, or mint tokens
-      if (hoprTokenAmountInWei > recipientTokenBalance) {
-        // get the difference to transfer
-        uint256 hoprTokenToTransfer = hoprTokenAmountInWei - recipientTokenBalance;
-        // check the hopr token balance
-        uint256 senderHoprTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, msgSender);
+        // 2. transfer some Hopr tokens to the recipient, or mint tokens
+        if (hoprTokenAmountInWei > recipientTokenBalance) {
+            // get the difference to transfer
+            uint256 hoprTokenToTransfer = hoprTokenAmountInWei - recipientTokenBalance;
+            // check the hopr token balance
+            uint256 senderHoprTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, msgSender);
 
-        if (senderHoprTokenBalance >= hoprTokenToTransfer) {
-          // call transfer
-          (bool successTransfserTokens, ) = hoprTokenContractAddress.call(
-            abi.encodeWithSignature('transfer(address,uint256)', recipient, hoprTokenToTransfer)
-          );
-          if (!successTransfserTokens) {
-            emit log_string('Cannot transfer HOPR tokens to the recipient');
-          }
-        } else {
-          // if transfer cannot be called, try minting token as a minter
-          bytes32 MINTER_ROLE = keccak256('MINTER_ROLE');
-          (bool successHasRole, bytes memory returndataHasRole) = hoprTokenContractAddress.staticcall(
-            abi.encodeWithSignature('hasRole(bytes32,address)', MINTER_ROLE, msgSender)
-          );
-          if (!successHasRole) {
-            revert('Cannot check role for Hopr token.');
-          }
-          bool isMinter = abi.decode(returndataHasRole, (bool));
-          require(isMinter, 'Caller is not a minter');
+            if (senderHoprTokenBalance >= hoprTokenToTransfer) {
+                // call transfer
+                (bool successTransfserTokens,) = hoprTokenContractAddress.call(
+                    abi.encodeWithSignature("transfer(address,uint256)", recipient, hoprTokenToTransfer)
+                );
+                if (!successTransfserTokens) {
+                    emit log_string("Cannot transfer HOPR tokens to the recipient");
+                }
+            } else {
+                // if transfer cannot be called, try minting token as a minter
+                bytes32 MINTER_ROLE = keccak256("MINTER_ROLE");
+                (bool successHasRole, bytes memory returndataHasRole) = hoprTokenContractAddress.staticcall(
+                    abi.encodeWithSignature("hasRole(bytes32,address)", MINTER_ROLE, msgSender)
+                );
+                if (!successHasRole) {
+                    revert("Cannot check role for Hopr token.");
+                }
+                bool isMinter = abi.decode(returndataHasRole, (bool));
+                require(isMinter, "Caller is not a minter");
 
-          (bool successMintTokens, ) = hoprTokenContractAddress.call(
-            abi.encodeWithSignature('mint(address,uint256,bytes,bytes)', recipient, hoprTokenToTransfer, hex'00', hex'00')
-          );
-          if (!successMintTokens) {
-            emit log_string('Cannot mint HOPR tokens to the recipient');
-          }
+                (bool successMintTokens,) = hoprTokenContractAddress.call(
+                    abi.encodeWithSignature(
+                        "mint(address,uint256,bytes,bytes)", recipient, hoprTokenToTransfer, hex"00", hex"00"
+                    )
+                );
+                if (!successMintTokens) {
+                    emit log_string("Cannot mint HOPR tokens to the recipient");
+                }
+            }
         }
-      }
     }
 }

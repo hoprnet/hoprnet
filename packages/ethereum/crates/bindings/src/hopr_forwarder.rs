@@ -7,14 +7,16 @@ pub use hopr_forwarder::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_forwarder {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ERC1820_REGISTRY\",\"outputs\":[{\"internalType\":\"contract IERC1820Registry\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"HOPR_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"MULTISIG\",\"outputs\":[{\"internalType\":\"address payable\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"TOKENS_RECIPIENT_INTERFACE_HASH\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"recoverTokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"tokensReceived\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRFORWARDER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
+    pub static HOPRFORWARDER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -2343,9 +2345,8 @@ pub mod hopr_forwarder {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRFORWARDER_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRFORWARDER_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -4497,9 +4498,8 @@ pub mod hopr_forwarder {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRFORWARDER_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRFORWARDER_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprForwarder<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprForwarder<M> {
         fn clone(&self) -> Self {
@@ -4525,17 +4525,12 @@ pub mod hopr_forwarder {
     impl<M: ::ethers::providers::Middleware> HoprForwarder<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRFORWARDER_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRFORWARDER_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -4579,40 +4574,25 @@ pub mod hopr_forwarder {
         ///Calls the contract's `ERC1820_REGISTRY` (0x013eb177) function
         pub fn erc1820_registry(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([1, 62, 177, 119], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `HOPR_TOKEN` (0x1ba6bac2) function
-        pub fn hopr_token(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn hopr_token(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([27, 166, 186, 194], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `MULTISIG` (0x2530b145) function
-        pub fn multisig(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn multisig(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([37, 48, 177, 69], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `TOKENS_RECIPIENT_INTERFACE_HASH` (0x72581cc0) function
-        pub fn tokens_recipient_interface_hash(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn tokens_recipient_interface_hash(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([114, 88, 28, 192], ())
                 .expect("method not found (this should never happen)")
@@ -4641,77 +4621,38 @@ pub mod hopr_forwarder {
                 .expect("method not found (this should never happen)")
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprForwarder<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprForwarder<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Container type for all input parameters for the `ERC1820_REGISTRY` function with signature `ERC1820_REGISTRY()` and selector `0x013eb177`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "ERC1820_REGISTRY", abi = "ERC1820_REGISTRY()")]
     pub struct Erc1820RegistryCall;
     ///Container type for all input parameters for the `HOPR_TOKEN` function with signature `HOPR_TOKEN()` and selector `0x1ba6bac2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "HOPR_TOKEN", abi = "HOPR_TOKEN()")]
     pub struct HoprTokenCall;
     ///Container type for all input parameters for the `MULTISIG` function with signature `MULTISIG()` and selector `0x2530b145`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "MULTISIG", abi = "MULTISIG()")]
     pub struct MultisigCall;
     ///Container type for all input parameters for the `TOKENS_RECIPIENT_INTERFACE_HASH` function with signature `TOKENS_RECIPIENT_INTERFACE_HASH()` and selector `0x72581cc0`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "TOKENS_RECIPIENT_INTERFACE_HASH",
-        abi = "TOKENS_RECIPIENT_INTERFACE_HASH()"
-    )]
+    #[ethcall(name = "TOKENS_RECIPIENT_INTERFACE_HASH", abi = "TOKENS_RECIPIENT_INTERFACE_HASH()")]
     pub struct TokensRecipientInterfaceHashCall;
     ///Container type for all input parameters for the `recoverTokens` function with signature `recoverTokens(address)` and selector `0x16114acd`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "recoverTokens", abi = "recoverTokens(address)")]
     pub struct RecoverTokensCall {
@@ -4719,14 +4660,7 @@ pub mod hopr_forwarder {
     }
     ///Container type for all input parameters for the `tokensReceived` function with signature `tokensReceived(address,address,address,uint256,bytes,bytes)` and selector `0x0023de29`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "tokensReceived",
@@ -4751,34 +4685,24 @@ pub mod hopr_forwarder {
         TokensReceived(TokensReceivedCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprForwarderCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <Erc1820RegistryCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <Erc1820RegistryCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Erc1820Registry(decoded));
             }
-            if let Ok(decoded)
-                = <HoprTokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <HoprTokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::HoprToken(decoded));
             }
-            if let Ok(decoded)
-                = <MultisigCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <MultisigCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Multisig(decoded));
             }
-            if let Ok(decoded)
-                = <TokensRecipientInterfaceHashCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TokensRecipientInterfaceHashCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TokensRecipientInterfaceHash(decoded));
             }
-            if let Ok(decoded)
-                = <RecoverTokensCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RecoverTokensCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RecoverTokens(decoded));
             }
-            if let Ok(decoded)
-                = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TokensReceived(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -4787,24 +4711,12 @@ pub mod hopr_forwarder {
     impl ::ethers::core::abi::AbiEncode for HoprForwarderCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::Erc1820Registry(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::HoprToken(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::Multisig(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TokensRecipientInterfaceHash(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RecoverTokens(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TokensReceived(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::Erc1820Registry(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::HoprToken(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Multisig(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TokensRecipientInterfaceHash(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RecoverTokens(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TokensReceived(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -4814,9 +4726,7 @@ pub mod hopr_forwarder {
                 Self::Erc1820Registry(element) => ::core::fmt::Display::fmt(element, f),
                 Self::HoprToken(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Multisig(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TokensRecipientInterfaceHash(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::TokensRecipientInterfaceHash(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RecoverTokens(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TokensReceived(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -4854,50 +4764,22 @@ pub mod hopr_forwarder {
     }
     ///Container type for all return fields from the `ERC1820_REGISTRY` function with signature `ERC1820_REGISTRY()` and selector `0x013eb177`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct Erc1820RegistryReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `HOPR_TOKEN` function with signature `HOPR_TOKEN()` and selector `0x1ba6bac2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct HoprTokenReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `MULTISIG` function with signature `MULTISIG()` and selector `0x2530b145`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MultisigReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `TOKENS_RECIPIENT_INTERFACE_HASH` function with signature `TOKENS_RECIPIENT_INTERFACE_HASH()` and selector `0x72581cc0`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct TokensRecipientInterfaceHashReturn(pub [u8; 32]);
 }

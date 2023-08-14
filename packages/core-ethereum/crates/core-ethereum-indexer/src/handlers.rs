@@ -357,6 +357,8 @@ where
             self.on_channel_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.network_registry) {
             self.on_network_registry_event(db, log, snapshot).await?;
+        } else if address.eq(&self.addresses.node_safe_registry) {
+            self.on_node_safe_registry_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.token) {
             self.on_token_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.node_safe_registry) {
@@ -412,10 +414,12 @@ pub mod tests {
     const COUNTERPARTY_CHAIN_ADDRESS: [u8; 20] = hex!("f1a73ef496c45e260924a9279d2d9752ae378812");
     const SELF_CHAIN_ADDRESS: [u8; 20] = hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a");
     const STAKE_ADDRESS: [u8; 20] = hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3");
+    const SAFE_ADDRESS: [u8; 20] = hex!("295026fd99ecbabef94940e229f6e022823f1774");
 
     const CHANNELS_ADDR: [u8; 20] = hex!("bab20aea98368220baa4e3b7f151273ee71df93b"); // just a dummy
     const TOKEN_ADDR: [u8; 20] = hex!("47d1677e018e79dcdd8a9c554466cb1556fa5007"); // just a dummy
     const NETWORK_REGISTRY_ADDR: [u8; 20] = hex!("a469d0225f884fb989cbad4fe289f6fd2fb98051"); // just a dummy
+    const NODE_SAFE_REGISTRY_ADDR: [u8; 20] = hex!("0dcd1bf9a1b36ce34237eeafef220932846bcd82"); // just a dummy
     const ANNOUNCEMENTS_ADDR: [u8; 20] = hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
     const NODE_SAFE_REGISTRY_ADDR: [u8; 20] = hex!("157e8439b2316ac87fdd4eca2b2cec43743b5cc8"); // just a dummy
     const SAFE_MANAGEMENT_MODULE_ADDR: [u8; 20] = hex!("9b91245a65ad469163a86e32b2281af7a25f38ce"); // just a dummy
@@ -447,6 +451,7 @@ pub mod tests {
                 channels: CHANNELS_ADDR.try_into().unwrap(),
                 token: TOKEN_ADDR.try_into().unwrap(),
                 network_registry: NETWORK_REGISTRY_ADDR.try_into().unwrap(),
+                node_safe_registry: NODE_SAFE_REGISTRY_ADDR.try_into().unwrap(),
                 announcements: ANNOUNCEMENTS_ADDR.try_into().unwrap(),
                 node_safe_registry: NODE_SAFE_REGISTRY_ADDR.try_into().unwrap(),
                 node_management_module: SAFE_MANAGEMENT_MODULE_ADDR.try_into().unwrap(),
@@ -1359,6 +1364,12 @@ pub mod wasm {
 
         #[wasm_bindgen(method, getter)]
         pub fn announcements(this: &ContractAddresses) -> String;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn node_safe_registry(this: &ContractAddresses) -> String;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn node_management_module(this: &ContractAddresses) -> String;
     }
 
     #[wasm_bindgen]
@@ -1381,7 +1392,9 @@ pub mod wasm {
                         channels: Address::from_str(contract_addresses.channels().as_str()).unwrap(),
                         token: Address::from_str(contract_addresses.token().as_str()).unwrap(),
                         network_registry: Address::from_str(contract_addresses.network_registry().as_str()).unwrap(),
+                        node_safe_registry: Address::from_str(contract_addresses.node_safe_registry().as_str()).unwrap(),
                         announcements: Address::from_str(contract_addresses.announcements().as_str()).unwrap(),
+                        node_management_module: Address::from_str(contract_addresses.node_management_module().as_str()).unwrap()
                     },
                     cbs: callbacks,
                 },

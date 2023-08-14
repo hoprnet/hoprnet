@@ -1,27 +1,6 @@
-import type { HoprToken, HoprChannels, HoprNetworkRegistry, HoprAnnouncements, TypedEventFilter } from '../utils/index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Address, ChannelEntry } from '@hoprnet/hopr-utils'
-
-/**
- * Typechain does not provide us with clean event types, in the lines below we infer
- * the generic type from the 'HoprChannels.filters'.
- * This allows us to retrieve HoprChannel's events.
- */
-type extractEventArgs<Type> = Type extends TypedEventFilter<infer A> ? A : null
-
-export type EventNames = keyof HoprChannels['filters']
-export type Event<T extends EventNames> = extractEventArgs<ReturnType<Pick<HoprChannels['filters'], T>[T]>>
-export type TokenEventNames = keyof HoprToken['filters']
-export type TokenEvent<T extends TokenEventNames> = extractEventArgs<ReturnType<Pick<HoprToken['filters'], T>[T]>>
-export type RegistryEventNames = keyof HoprNetworkRegistry['filters']
-export type RegistryEvent<T extends RegistryEventNames> = extractEventArgs<
-  ReturnType<Pick<HoprNetworkRegistry['filters'], T>[T]>
->
-export type AnnouncementsEventNames = keyof HoprAnnouncements['filters']
-export type AnnouncementsEvent<T extends AnnouncementsEventNames> = extractEventArgs<
-  ReturnType<Pick<HoprAnnouncements['filters'], T>[T]>
->
 
 export enum IndexerStatus {
   STARTING = 'starting',
@@ -39,6 +18,7 @@ export type IndexerEvents =
   | `channel-updated-${string}`
   | `on-provider-error-${string}`
   | `on-new-block-${string}`
+  | `node-safe-registered-${string}`
 
 type BlockEventName = 'block'
 type BlockProcessedEventName = 'block-processed'

@@ -73,8 +73,8 @@ impl ConstantTimeEq for OffchainKeypair {
 
 impl From<&OffchainKeypair> for libp2p_identity::Keypair {
     fn from(value: &OffchainKeypair) -> Self {
-        libp2p_identity::Keypair::ed25519_from_bytes(value.0.clone())
-            .expect("invalid offchain keypair") // must not happen
+        libp2p_identity::Keypair::ed25519_from_bytes(value.0.clone()).expect("invalid offchain keypair")
+        // must not happen
     }
 }
 
@@ -151,7 +151,11 @@ mod tests {
         let kp_1 = OffchainKeypair::random();
 
         let p2p_kp: libp2p_identity::Keypair = (&kp_1).into();
-        assert_eq!(kp_1.public().to_peerid(), p2p_kp.public().to_peer_id(), "peer ids must be equal");
+        assert_eq!(
+            kp_1.public().to_peerid(),
+            p2p_kp.public().to_peer_id(),
+            "peer ids must be equal"
+        );
     }
 
     #[test]
