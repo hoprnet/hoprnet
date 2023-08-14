@@ -22,7 +22,7 @@ import {
   LevelDb,
   ChainKeypair,
   OffchainKeypair,
-  Address as Packet_Address
+  Address as Packet_Address,
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 

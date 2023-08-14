@@ -1637,7 +1637,7 @@ pub mod wasm {
             //check_lock_read! {
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.find_hopr_node_using_safe_in_node_safe_registry(safe_address).await)
-                .map(|v| WasmVecAddress::from(v))
+                .map(WasmVecAddress::from)
             //}
         }
 

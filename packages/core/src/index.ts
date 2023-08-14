@@ -49,7 +49,6 @@ import {
   AcknowledgedTicket,
   ChannelStatus,
   ChannelEntry,
-  OffchainPublicKey,
   PublicKey,
   Ticket,
   Hash,
@@ -57,25 +56,10 @@ import {
   Balance,
   BalanceType,
   pickVersion,
-  OffchainPublicKey
+  OffchainPublicKey,
   OffchainKeypair,
   ChainKeypair
 } from '@hoprnet/hopr-utils'
-
-import {
-  Address,
-  AcknowledgedTicket,
-  ChannelStatus,
-  ChannelEntry,
-  PublicKey,
-  Ticket,
-  Hash,
-  HalfKeyChallenge,
-  Balance,
-  BalanceType
-} from '@hoprnet/hopr-utils'
-
-import { type HoprDB } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
@@ -1625,10 +1609,6 @@ class Hopr extends EventEmitter {
       ret.push(ChannelEntry.deserialize(list.at(i).serialize()))
     }
     return ret
-  }
-
-  public async getPublicKeyOf(addr: Address): Promise<OffchainPublicKey> {
-    return await HoprCoreEthereum.getInstance().getPublicKeyOf(addr)
   }
 
   public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
