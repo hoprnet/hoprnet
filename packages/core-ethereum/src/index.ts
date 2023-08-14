@@ -17,7 +17,7 @@ import {
   PublicKey,
   AccountEntry,
   create_counter,
-  OffchainPublicKey
+  OffchainPublicKey,
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -563,9 +563,10 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
   
-  public async registerSafeByNode(nodeAddress: Address, safeAddress: Address): Promise<Receipt>  {
-    // log(`====> registerSafeByNode nodeAddress: ${this.publicKey.to_address())} safeAddress  ${this.safeModuleOptions.safeAddress.to_hex()}`)
-    log(`====> registerSafeByNode nodeAddress: ${nodeAddress.to_hex()} safeAddress  ${safeAddress.to_hex()}`)
+  public async registerSafeByNode(): Promise<Receipt>  {
+    const nodeAddress = this.publicKey.to_address();
+    const safeAddress = this.safeModuleOptions.safeAddress;
+    log(`====> registerSafeByNode nodeAddress: ${nodeAddress.to_hex()} safeAddress ${safeAddress.to_hex()}`)
 
     const targetAddress = await this.chain.getModuleTargetAddress()
     if (!targetAddress.eq(Address.from_string(safeAddress.to_string()))) {
@@ -575,9 +576,10 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
 
+    let receipt = undefined;
     if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
       // if the node is not associated with any safe address, register it
-      return this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
+      receipt = await this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
         this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
       )
     }
@@ -589,7 +591,15 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     // the node has been associated with the provided safe address
     log(`====> registerSafeByNode registeredAddress: is safeAddress`)
-    return undefined;
+
+    // update safe and module address
+    log(`>> should update safe and module address`)
+    await this.db.set_staking_safe_address(Ethereum_Address.deserialize(safeAddress.serialize()));
+    log(`>> set staking safe address`)
+    await this.db.set_staking_module_address(Ethereum_Address.deserialize(this.safeModuleOptions.moduleAddress.serialize()));
+    log(`>> set staking module address`)
+
+    return receipt;
   }
 
   /**

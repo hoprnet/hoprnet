@@ -577,13 +577,7 @@ class Hopr extends EventEmitter {
     try {
       // register node-safe pair to NodeSafeRegistry
       log(`check node-safe registry`)
-      await this.registerSafeByNode(this.options.safeModule.safeAddress)
-      log(`>> should update safe and module address`)
-      // update safe and module address
-      await this.db.set_staking_safe_address(Packet_Address.deserialize(this.options.safeModule.safeAddress.serialize()));
-      log(`>> set staking safe address`)
-      await this.db.set_staking_module_address(Packet_Address.deserialize(this.options.safeModule.moduleAddress.serialize()));
-      log(`>> set staking module address`)
+      await this.registerSafeByNode()
     } catch (err) {
       console.error(`Could not register node with safe`)
       console.error(`Observed error:`, err)
@@ -1252,13 +1246,12 @@ class Hopr extends EventEmitter {
    * @dev Promise resolves before own announcement appears in the indexer
    * @returns a Promise that resolves once announce transaction has been published
    */
-  private async registerSafeByNode(safeAddress: Address): Promise<void> {
-    const nodeAddress = this.getEthereumAddress()
+  private async registerSafeByNode(): Promise<void> {
     const connector = HoprCoreEthereum.getInstance()
 
     try {
       log('registering node safe on-chain... ')
-      const registryTxHash = await connector.registerSafeByNode(nodeAddress, safeAddress)
+      const registryTxHash = await connector.registerSafeByNode()
       log('registering node safe on-chain done in tx %s', registryTxHash)
     } catch (err) {
       log('registering node safe on-chain failed')
