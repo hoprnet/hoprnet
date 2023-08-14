@@ -9,7 +9,6 @@ pub mod validation;
 pub mod wasm {
 
     use utils_log::logger::JsLogger;
-    use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
@@ -36,7 +35,7 @@ pub mod wasm {
 
     #[cfg(feature = "prometheus")]
     #[wasm_bindgen]
-    pub fn core_packet_gather_metrics() -> JsResult<String> {
+    pub fn core_packet_gather_metrics() -> utils_misc::utils::wasm::JsResult<String> {
         utils_metrics::metrics::wasm::gather_all_metrics()
     }
 }

@@ -7,18 +7,16 @@ pub use hopr_announcements::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_announcements {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"contract HoprNodeSafeRegistry\",\"name\":\"safeRegistry\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"AlreadyInitialized\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ContractNotResponsible\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidSafeAddress\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"MultiSigUninitialized\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"node\",\"type\":\"address\",\"components\":[],\"indexed\":false},{\"internalType\":\"string\",\"name\":\"baseMultiaddr\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"AddressAnnouncement\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_0\",\"type\":\"bytes32\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_1\",\"type\":\"bytes32\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes32\",\"name\":\"ed25519_pub_key\",\"type\":\"bytes32\",\"components\":[],\"indexed\":false},{\"internalType\":\"address\",\"name\":\"chain_key\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"KeyBinding\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"node\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"RevokeAnnouncement\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"baseMultiaddr\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"announce\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"baseMultiaddr\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"announceSafe\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_0\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_1\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_pub_key\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"bindKeys\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_0\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_1\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_pub_key\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"baseMultiaddr\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"bindKeysAnnounce\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_0\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_1\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_pub_key\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"baseMultiaddr\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"bindKeysAnnounceSafe\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_0\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_sig_1\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"ed25519_pub_key\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"bindKeysSafe\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"data\",\"type\":\"bytes[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"multicall\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"results\",\"type\":\"bytes[]\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"revoke\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"revokeSafe\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRANNOUNCEMENTS_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI)
-            .expect("ABI is always valid")
-    });
+    pub static HOPRANNOUNCEMENTS_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -4366,9 +4364,8 @@ pub mod hopr_announcements {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRANNOUNCEMENTS_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRANNOUNCEMENTS_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -8456,9 +8453,8 @@ pub mod hopr_announcements {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRANNOUNCEMENTS_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRANNOUNCEMENTS_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprAnnouncements<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprAnnouncements<M> {
         fn clone(&self) -> Self {
@@ -8478,23 +8474,20 @@ pub mod hopr_announcements {
     }
     impl<M> ::core::fmt::Debug for HoprAnnouncements<M> {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-            f.debug_tuple(stringify!(HoprAnnouncements)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(HoprAnnouncements))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> HoprAnnouncements<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRANNOUNCEMENTS_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRANNOUNCEMENTS_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -8562,10 +8555,7 @@ pub mod hopr_announcements {
             ed_25519_pub_key: [u8; 32],
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash(
-                    [219, 185, 141, 145],
-                    (ed_25519_sig_0, ed_25519_sig_1, ed_25519_pub_key),
-                )
+                .method_hash([219, 185, 141, 145], (ed_25519_sig_0, ed_25519_sig_1, ed_25519_pub_key))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `bindKeysAnnounce` (0xf884a9cb) function
@@ -8595,13 +8585,7 @@ pub mod hopr_announcements {
             self.0
                 .method_hash(
                     [221, 185, 223, 193],
-                    (
-                        self_,
-                        ed_25519_sig_0,
-                        ed_25519_sig_1,
-                        ed_25519_pub_key,
-                        base_multiaddr,
-                    ),
+                    (self_, ed_25519_sig_0, ed_25519_sig_1, ed_25519_pub_key, base_multiaddr),
                 )
                 .expect("method not found (this should never happen)")
         }
@@ -8624,10 +8608,7 @@ pub mod hopr_announcements {
         pub fn multicall(
             &self,
             data: ::std::vec::Vec<::ethers::core::types::Bytes>,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::std::vec::Vec<::ethers::core::types::Bytes>,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<::ethers::core::types::Bytes>> {
             self.0
                 .method_hash([172, 150, 80, 216], data)
                 .expect("method not found (this should never happen)")
@@ -8650,99 +8631,52 @@ pub mod hopr_announcements {
         ///Gets the contract's `AddressAnnouncement` event
         pub fn address_announcement_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            AddressAnnouncementFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, AddressAnnouncementFilter> {
             self.0.event()
         }
         ///Gets the contract's `KeyBinding` event
         pub fn key_binding_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            KeyBindingFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, KeyBindingFilter> {
             self.0.event()
         }
         ///Gets the contract's `RevokeAnnouncement` event
         pub fn revoke_announcement_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            RevokeAnnouncementFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RevokeAnnouncementFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
-        pub fn events(
-            &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            HoprAnnouncementsEvents,
-        > {
+        pub fn events(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprAnnouncementsEvents> {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprAnnouncements<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprAnnouncements<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `AlreadyInitialized` with signature `AlreadyInitialized()` and selector `0x0dc149f0`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "AlreadyInitialized", abi = "AlreadyInitialized()")]
     pub struct AlreadyInitialized;
     ///Custom Error type `ContractNotResponsible` with signature `ContractNotResponsible()` and selector `0xacd5a823`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "ContractNotResponsible", abi = "ContractNotResponsible()")]
     pub struct ContractNotResponsible;
     ///Custom Error type `InvalidSafeAddress` with signature `InvalidSafeAddress()` and selector `0x8e9d7c5e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "InvalidSafeAddress", abi = "InvalidSafeAddress()")]
     pub struct InvalidSafeAddress;
     ///Custom Error type `MultiSigUninitialized` with signature `MultiSigUninitialized()` and selector `0x454a20c8`
     #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[etherror(name = "MultiSigUninitialized", abi = "MultiSigUninitialized()")]
     pub struct MultiSigUninitialized;
@@ -8758,34 +8692,21 @@ pub mod hopr_announcements {
         RevertString(::std::string::String),
     }
     impl ::ethers::core::abi::AbiDecode for HoprAnnouncementsErrors {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded)
-                = <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AlreadyInitialized(decoded));
             }
-            if let Ok(decoded)
-                = <ContractNotResponsible as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <ContractNotResponsible as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ContractNotResponsible(decoded));
             }
-            if let Ok(decoded)
-                = <InvalidSafeAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InvalidSafeAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidSafeAddress(decoded));
             }
-            if let Ok(decoded)
-                = <MultiSigUninitialized as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MultiSigUninitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MultiSigUninitialized(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -8794,18 +8715,10 @@ pub mod hopr_announcements {
     impl ::ethers::core::abi::AbiEncode for HoprAnnouncementsErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AlreadyInitialized(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::ContractNotResponsible(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::InvalidSafeAddress(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::MultiSigUninitialized(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::AlreadyInitialized(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ContractNotResponsible(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::InvalidSafeAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::MultiSigUninitialized(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -8814,22 +8727,10 @@ pub mod hopr_announcements {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector
-                    == <AlreadyInitialized as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <ContractNotResponsible as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <InvalidSafeAddress as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector
-                    == <MultiSigUninitialized as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
+                _ if selector == <AlreadyInitialized as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <ContractNotResponsible as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <InvalidSafeAddress as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <MultiSigUninitialized as ::ethers::contract::EthError>::selector() => true,
                 _ => false,
             }
         }
@@ -8837,18 +8738,10 @@ pub mod hopr_announcements {
     impl ::core::fmt::Display for HoprAnnouncementsErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AlreadyInitialized(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::ContractNotResponsible(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::InvalidSafeAddress(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::MultiSigUninitialized(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AlreadyInitialized(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ContractNotResponsible(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidSafeAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MultiSigUninitialized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -8879,32 +8772,15 @@ pub mod hopr_announcements {
         }
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "AddressAnnouncement",
-        abi = "AddressAnnouncement(address,string)"
-    )]
+    #[ethevent(name = "AddressAnnouncement", abi = "AddressAnnouncement(address,string)")]
     pub struct AddressAnnouncementFilter {
         pub node: ::ethers::core::types::Address,
         pub base_multiaddr: ::std::string::String,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "KeyBinding", abi = "KeyBinding(bytes32,bytes32,bytes32,address)")]
     pub struct KeyBindingFilter {
@@ -8914,14 +8790,7 @@ pub mod hopr_announcements {
         pub chain_key: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "RevokeAnnouncement", abi = "RevokeAnnouncement(address)")]
     pub struct RevokeAnnouncementFilter {
@@ -8935,9 +8804,7 @@ pub mod hopr_announcements {
         RevokeAnnouncementFilter(RevokeAnnouncementFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprAnnouncementsEvents {
-        fn decode_log(
-            log: &::ethers::core::abi::RawLog,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = AddressAnnouncementFilter::decode_log(log) {
                 return Ok(HoprAnnouncementsEvents::AddressAnnouncementFilter(decoded));
             }
@@ -8953,13 +8820,9 @@ pub mod hopr_announcements {
     impl ::core::fmt::Display for HoprAnnouncementsEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AddressAnnouncementFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AddressAnnouncementFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::KeyBindingFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RevokeAnnouncementFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::RevokeAnnouncementFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -8980,14 +8843,7 @@ pub mod hopr_announcements {
     }
     ///Container type for all input parameters for the `announce` function with signature `announce(string)` and selector `0xea0a5237`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "announce", abi = "announce(string)")]
     pub struct AnnounceCall {
@@ -8995,14 +8851,7 @@ pub mod hopr_announcements {
     }
     ///Container type for all input parameters for the `announceSafe` function with signature `announceSafe(address,string)` and selector `0xfad0e5a2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "announceSafe", abi = "announceSafe(address,string)")]
     pub struct AnnounceSafeCall {
@@ -9011,14 +8860,7 @@ pub mod hopr_announcements {
     }
     ///Container type for all input parameters for the `bindKeys` function with signature `bindKeys(bytes32,bytes32,bytes32)` and selector `0xdbb98d91`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "bindKeys", abi = "bindKeys(bytes32,bytes32,bytes32)")]
     pub struct BindKeysCall {
@@ -9028,19 +8870,9 @@ pub mod hopr_announcements {
     }
     ///Container type for all input parameters for the `bindKeysAnnounce` function with signature `bindKeysAnnounce(bytes32,bytes32,bytes32,string)` and selector `0xf884a9cb`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "bindKeysAnnounce",
-        abi = "bindKeysAnnounce(bytes32,bytes32,bytes32,string)"
-    )]
+    #[ethcall(name = "bindKeysAnnounce", abi = "bindKeysAnnounce(bytes32,bytes32,bytes32,string)")]
     pub struct BindKeysAnnounceCall {
         pub ed_25519_sig_0: [u8; 32],
         pub ed_25519_sig_1: [u8; 32],
@@ -9049,14 +8881,7 @@ pub mod hopr_announcements {
     }
     ///Container type for all input parameters for the `bindKeysAnnounceSafe` function with signature `bindKeysAnnounceSafe(address,bytes32,bytes32,bytes32,string)` and selector `0xddb9dfc1`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(
         name = "bindKeysAnnounceSafe",
@@ -9071,19 +8896,9 @@ pub mod hopr_announcements {
     }
     ///Container type for all input parameters for the `bindKeysSafe` function with signature `bindKeysSafe(address,bytes32,bytes32,bytes32)` and selector `0xcae2b434`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "bindKeysSafe",
-        abi = "bindKeysSafe(address,bytes32,bytes32,bytes32)"
-    )]
+    #[ethcall(name = "bindKeysSafe", abi = "bindKeysSafe(address,bytes32,bytes32,bytes32)")]
     pub struct BindKeysSafeCall {
         pub self_: ::ethers::core::types::Address,
         pub ed_25519_sig_0: [u8; 32],
@@ -9092,14 +8907,7 @@ pub mod hopr_announcements {
     }
     ///Container type for all input parameters for the `multicall` function with signature `multicall(bytes[])` and selector `0xac9650d8`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "multicall", abi = "multicall(bytes[])")]
     pub struct MulticallCall {
@@ -9107,27 +8915,13 @@ pub mod hopr_announcements {
     }
     ///Container type for all input parameters for the `revoke` function with signature `revoke()` and selector `0xb6549f75`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "revoke", abi = "revoke()")]
     pub struct RevokeCall;
     ///Container type for all input parameters for the `revokeSafe` function with signature `revokeSafe(address)` and selector `0x308c712e`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "revokeSafe", abi = "revokeSafe(address)")]
     pub struct RevokeSafeCall {
@@ -9147,48 +8941,33 @@ pub mod hopr_announcements {
         RevokeSafe(RevokeSafeCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprAnnouncementsCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <AnnounceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AnnounceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Announce(decoded));
             }
-            if let Ok(decoded)
-                = <AnnounceSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <AnnounceSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AnnounceSafe(decoded));
             }
-            if let Ok(decoded)
-                = <BindKeysCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <BindKeysCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BindKeys(decoded));
             }
-            if let Ok(decoded)
-                = <BindKeysAnnounceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <BindKeysAnnounceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BindKeysAnnounce(decoded));
             }
-            if let Ok(decoded)
-                = <BindKeysAnnounceSafeCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <BindKeysAnnounceSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BindKeysAnnounceSafe(decoded));
             }
-            if let Ok(decoded)
-                = <BindKeysSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <BindKeysSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::BindKeysSafe(decoded));
             }
-            if let Ok(decoded)
-                = <MulticallCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <MulticallCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Multicall(decoded));
             }
-            if let Ok(decoded)
-                = <RevokeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RevokeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Revoke(decoded));
             }
-            if let Ok(decoded)
-                = <RevokeSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <RevokeSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevokeSafe(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -9197,31 +8976,15 @@ pub mod hopr_announcements {
     impl ::ethers::core::abi::AbiEncode for HoprAnnouncementsCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::Announce(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::AnnounceSafe(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::BindKeys(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::BindKeysAnnounce(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::BindKeysAnnounceSafe(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::BindKeysSafe(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::Multicall(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::Announce(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AnnounceSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BindKeys(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BindKeysAnnounce(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BindKeysAnnounceSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BindKeysSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Multicall(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Revoke(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RevokeSafe(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::RevokeSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
@@ -9232,9 +8995,7 @@ pub mod hopr_announcements {
                 Self::AnnounceSafe(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BindKeys(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BindKeysAnnounce(element) => ::core::fmt::Display::fmt(element, f),
-                Self::BindKeysAnnounceSafe(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::BindKeysAnnounceSafe(element) => ::core::fmt::Display::fmt(element, f),
                 Self::BindKeysSafe(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Multicall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Revoke(element) => ::core::fmt::Display::fmt(element, f),
@@ -9289,14 +9050,7 @@ pub mod hopr_announcements {
     }
     ///Container type for all return fields from the `multicall` function with signature `multicall(bytes[])` and selector `0xac9650d8`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MulticallReturn {
         pub results: ::std::vec::Vec<::ethers::core::types::Bytes>,

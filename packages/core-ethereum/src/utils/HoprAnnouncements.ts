@@ -10,188 +10,134 @@ import type {
   Overrides,
   PopulatedTransaction,
   Signer,
-  utils,
-} from "ethers";
-import type {
-  FunctionFragment,
-  Result,
-  EventFragment,
-} from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
-import type {
-  TypedEventFilter,
-  TypedEvent,
-  TypedListener,
-  OnEvent,
-} from "./common.js";
+  utils
+} from 'ethers'
+import type { FunctionFragment, Result, EventFragment } from '@ethersproject/abi'
+import type { Listener, Provider } from '@ethersproject/providers'
+import type { TypedEventFilter, TypedEvent, TypedListener, OnEvent } from './common.js'
 
 export interface HoprAnnouncementsInterface extends utils.Interface {
   functions: {
-    "announce(string)": FunctionFragment;
-    "announceSafe(address,string)": FunctionFragment;
-    "bindKeys(bytes32,bytes32,bytes32)": FunctionFragment;
-    "bindKeysAnnounce(bytes32,bytes32,bytes32,string)": FunctionFragment;
-    "bindKeysAnnounceSafe(address,bytes32,bytes32,bytes32,string)": FunctionFragment;
-    "bindKeysSafe(address,bytes32,bytes32,bytes32)": FunctionFragment;
-    "multicall(bytes[])": FunctionFragment;
-    "revoke()": FunctionFragment;
-    "revokeSafe(address)": FunctionFragment;
-  };
+    'announce(string)': FunctionFragment
+    'announceSafe(address,string)': FunctionFragment
+    'bindKeys(bytes32,bytes32,bytes32)': FunctionFragment
+    'bindKeysAnnounce(bytes32,bytes32,bytes32,string)': FunctionFragment
+    'bindKeysAnnounceSafe(address,bytes32,bytes32,bytes32,string)': FunctionFragment
+    'bindKeysSafe(address,bytes32,bytes32,bytes32)': FunctionFragment
+    'multicall(bytes[])': FunctionFragment
+    'revoke()': FunctionFragment
+    'revokeSafe(address)': FunctionFragment
+  }
 
   getFunction(
     nameOrSignatureOrTopic:
-      | "announce"
-      | "announceSafe"
-      | "bindKeys"
-      | "bindKeysAnnounce"
-      | "bindKeysAnnounceSafe"
-      | "bindKeysSafe"
-      | "multicall"
-      | "revoke"
-      | "revokeSafe"
-  ): FunctionFragment;
+      | 'announce'
+      | 'announceSafe'
+      | 'bindKeys'
+      | 'bindKeysAnnounce'
+      | 'bindKeysAnnounceSafe'
+      | 'bindKeysSafe'
+      | 'multicall'
+      | 'revoke'
+      | 'revokeSafe'
+  ): FunctionFragment
 
-  encodeFunctionData(functionFragment: "announce", values: [string]): string;
+  encodeFunctionData(functionFragment: 'announce', values: [string]): string
+  encodeFunctionData(functionFragment: 'announceSafe', values: [string, string]): string
+  encodeFunctionData(functionFragment: 'bindKeys', values: [BytesLike, BytesLike, BytesLike]): string
+  encodeFunctionData(functionFragment: 'bindKeysAnnounce', values: [BytesLike, BytesLike, BytesLike, string]): string
   encodeFunctionData(
-    functionFragment: "announceSafe",
-    values: [string, string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "bindKeys",
-    values: [BytesLike, BytesLike, BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "bindKeysAnnounce",
-    values: [BytesLike, BytesLike, BytesLike, string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "bindKeysAnnounceSafe",
+    functionFragment: 'bindKeysAnnounceSafe',
     values: [string, BytesLike, BytesLike, BytesLike, string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "bindKeysSafe",
-    values: [string, BytesLike, BytesLike, BytesLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "multicall",
-    values: [BytesLike[]]
-  ): string;
-  encodeFunctionData(functionFragment: "revoke", values?: undefined): string;
-  encodeFunctionData(functionFragment: "revokeSafe", values: [string]): string;
+  ): string
+  encodeFunctionData(functionFragment: 'bindKeysSafe', values: [string, BytesLike, BytesLike, BytesLike]): string
+  encodeFunctionData(functionFragment: 'multicall', values: [BytesLike[]]): string
+  encodeFunctionData(functionFragment: 'revoke', values?: undefined): string
+  encodeFunctionData(functionFragment: 'revokeSafe', values: [string]): string
 
-  decodeFunctionResult(functionFragment: "announce", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "announceSafe",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "bindKeys", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "bindKeysAnnounce",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "bindKeysAnnounceSafe",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "bindKeysSafe",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "multicall", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "revoke", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "revokeSafe", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: 'announce', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'announceSafe', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'bindKeys', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'bindKeysAnnounce', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'bindKeysAnnounceSafe', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'bindKeysSafe', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'multicall', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'revoke', data: BytesLike): Result
+  decodeFunctionResult(functionFragment: 'revokeSafe', data: BytesLike): Result
 
   events: {
-    "AddressAnnouncement(address,string)": EventFragment;
-    "KeyBinding(bytes32,bytes32,bytes32,address)": EventFragment;
-    "RevokeAnnouncement(address)": EventFragment;
-  };
+    'AddressAnnouncement(address,string)': EventFragment
+    'KeyBinding(bytes32,bytes32,bytes32,address)': EventFragment
+    'RevokeAnnouncement(address)': EventFragment
+  }
 
-  getEvent(nameOrSignatureOrTopic: "AddressAnnouncement"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "KeyBinding"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "RevokeAnnouncement"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: 'AddressAnnouncement'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'KeyBinding'): EventFragment
+  getEvent(nameOrSignatureOrTopic: 'RevokeAnnouncement'): EventFragment
 }
 
 export interface AddressAnnouncementEventObject {
-  node: string;
-  baseMultiaddr: string;
+  node: string
+  baseMultiaddr: string
 }
-export type AddressAnnouncementEvent = TypedEvent<
-  [string, string],
-  AddressAnnouncementEventObject
->;
+export type AddressAnnouncementEvent = TypedEvent<[string, string], AddressAnnouncementEventObject>
 
-export type AddressAnnouncementEventFilter =
-  TypedEventFilter<AddressAnnouncementEvent>;
+export type AddressAnnouncementEventFilter = TypedEventFilter<AddressAnnouncementEvent>
 
 export interface KeyBindingEventObject {
-  ed25519_sig_0: string;
-  ed25519_sig_1: string;
-  ed25519_pub_key: string;
-  chain_key: string;
+  ed25519_sig_0: string
+  ed25519_sig_1: string
+  ed25519_pub_key: string
+  chain_key: string
 }
-export type KeyBindingEvent = TypedEvent<
-  [string, string, string, string],
-  KeyBindingEventObject
->;
+export type KeyBindingEvent = TypedEvent<[string, string, string, string], KeyBindingEventObject>
 
-export type KeyBindingEventFilter = TypedEventFilter<KeyBindingEvent>;
+export type KeyBindingEventFilter = TypedEventFilter<KeyBindingEvent>
 
 export interface RevokeAnnouncementEventObject {
-  node: string;
+  node: string
 }
-export type RevokeAnnouncementEvent = TypedEvent<
-  [string],
-  RevokeAnnouncementEventObject
->;
+export type RevokeAnnouncementEvent = TypedEvent<[string], RevokeAnnouncementEventObject>
 
-export type RevokeAnnouncementEventFilter =
-  TypedEventFilter<RevokeAnnouncementEvent>;
+export type RevokeAnnouncementEventFilter = TypedEventFilter<RevokeAnnouncementEvent>
 
 export interface HoprAnnouncements extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(signerOrProvider: Signer | Provider | string): this
+  attach(addressOrName: string): this
+  deployed(): Promise<this>
 
-  interface: HoprAnnouncementsInterface;
+  interface: HoprAnnouncementsInterface
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>;
+  ): Promise<Array<TEvent>>
 
-  listeners<TEvent extends TypedEvent>(
-    eventFilter?: TypedEventFilter<TEvent>
-  ): Array<TypedListener<TEvent>>;
-  listeners(eventName?: string): Array<Listener>;
-  removeAllListeners<TEvent extends TypedEvent>(
-    eventFilter: TypedEventFilter<TEvent>
-  ): this;
-  removeAllListeners(eventName?: string): this;
-  off: OnEvent<this>;
-  on: OnEvent<this>;
-  once: OnEvent<this>;
-  removeListener: OnEvent<this>;
+  listeners<TEvent extends TypedEvent>(eventFilter?: TypedEventFilter<TEvent>): Array<TypedListener<TEvent>>
+  listeners(eventName?: string): Array<Listener>
+  removeAllListeners<TEvent extends TypedEvent>(eventFilter: TypedEventFilter<TEvent>): this
+  removeAllListeners(eventName?: string): this
+  off: OnEvent<this>
+  on: OnEvent<this>
+  once: OnEvent<this>
+  removeListener: OnEvent<this>
 
   functions: {
-    announce(
-      baseMultiaddr: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+    announce(baseMultiaddr: string, overrides?: Overrides & { from?: string }): Promise<ContractTransaction>
 
     announceSafe(
       self: string,
       baseMultiaddr: string,
       overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     bindKeys(
       ed25519_sig_0: BytesLike,
       ed25519_sig_1: BytesLike,
       ed25519_pub_key: BytesLike,
       overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     bindKeysAnnounce(
       ed25519_sig_0: BytesLike,
@@ -199,7 +145,7 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_pub_key: BytesLike,
       baseMultiaddr: string,
       overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     bindKeysAnnounceSafe(
       self: string,
@@ -208,7 +154,7 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_pub_key: BytesLike,
       baseMultiaddr: string,
       overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
     bindKeysSafe(
       self: string,
@@ -216,40 +162,29 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_sig_1: BytesLike,
       ed25519_pub_key: BytesLike,
       overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+    ): Promise<ContractTransaction>
 
-    multicall(
-      data: BytesLike[],
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+    multicall(data: BytesLike[], overrides?: Overrides & { from?: string }): Promise<ContractTransaction>
 
-    revoke(
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+    revoke(overrides?: Overrides & { from?: string }): Promise<ContractTransaction>
 
-    revokeSafe(
-      self: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-  };
+    revokeSafe(self: string, overrides?: Overrides & { from?: string }): Promise<ContractTransaction>
+  }
 
-  announce(
-    baseMultiaddr: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  announce(baseMultiaddr: string, overrides?: Overrides & { from?: string }): Promise<ContractTransaction>
 
   announceSafe(
     self: string,
     baseMultiaddr: string,
     overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   bindKeys(
     ed25519_sig_0: BytesLike,
     ed25519_sig_1: BytesLike,
     ed25519_pub_key: BytesLike,
     overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   bindKeysAnnounce(
     ed25519_sig_0: BytesLike,
@@ -257,7 +192,7 @@ export interface HoprAnnouncements extends BaseContract {
     ed25519_pub_key: BytesLike,
     baseMultiaddr: string,
     overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   bindKeysAnnounceSafe(
     self: string,
@@ -266,7 +201,7 @@ export interface HoprAnnouncements extends BaseContract {
     ed25519_pub_key: BytesLike,
     baseMultiaddr: string,
     overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
   bindKeysSafe(
     self: string,
@@ -274,37 +209,25 @@ export interface HoprAnnouncements extends BaseContract {
     ed25519_sig_1: BytesLike,
     ed25519_pub_key: BytesLike,
     overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  ): Promise<ContractTransaction>
 
-  multicall(
-    data: BytesLike[],
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  multicall(data: BytesLike[], overrides?: Overrides & { from?: string }): Promise<ContractTransaction>
 
-  revoke(
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  revoke(overrides?: Overrides & { from?: string }): Promise<ContractTransaction>
 
-  revokeSafe(
-    self: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  revokeSafe(self: string, overrides?: Overrides & { from?: string }): Promise<ContractTransaction>
 
   callStatic: {
-    announce(baseMultiaddr: string, overrides?: CallOverrides): Promise<void>;
+    announce(baseMultiaddr: string, overrides?: CallOverrides): Promise<void>
 
-    announceSafe(
-      self: string,
-      baseMultiaddr: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    announceSafe(self: string, baseMultiaddr: string, overrides?: CallOverrides): Promise<void>
 
     bindKeys(
       ed25519_sig_0: BytesLike,
       ed25519_sig_1: BytesLike,
       ed25519_pub_key: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
     bindKeysAnnounce(
       ed25519_sig_0: BytesLike,
@@ -312,7 +235,7 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_pub_key: BytesLike,
       baseMultiaddr: string,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
     bindKeysAnnounceSafe(
       self: string,
@@ -321,7 +244,7 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_pub_key: BytesLike,
       baseMultiaddr: string,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
     bindKeysSafe(
       self: string,
@@ -329,60 +252,47 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_sig_1: BytesLike,
       ed25519_pub_key: BytesLike,
       overrides?: CallOverrides
-    ): Promise<void>;
+    ): Promise<void>
 
-    multicall(data: BytesLike[], overrides?: CallOverrides): Promise<string[]>;
+    multicall(data: BytesLike[], overrides?: CallOverrides): Promise<string[]>
 
-    revoke(overrides?: CallOverrides): Promise<void>;
+    revoke(overrides?: CallOverrides): Promise<void>
 
-    revokeSafe(self: string, overrides?: CallOverrides): Promise<void>;
-  };
+    revokeSafe(self: string, overrides?: CallOverrides): Promise<void>
+  }
 
   filters: {
-    "AddressAnnouncement(address,string)"(
-      node?: null,
-      baseMultiaddr?: null
-    ): AddressAnnouncementEventFilter;
-    AddressAnnouncement(
-      node?: null,
-      baseMultiaddr?: null
-    ): AddressAnnouncementEventFilter;
+    'AddressAnnouncement(address,string)'(node?: null, baseMultiaddr?: null): AddressAnnouncementEventFilter
+    AddressAnnouncement(node?: null, baseMultiaddr?: null): AddressAnnouncementEventFilter
 
-    "KeyBinding(bytes32,bytes32,bytes32,address)"(
+    'KeyBinding(bytes32,bytes32,bytes32,address)'(
       ed25519_sig_0?: null,
       ed25519_sig_1?: null,
       ed25519_pub_key?: null,
       chain_key?: null
-    ): KeyBindingEventFilter;
+    ): KeyBindingEventFilter
     KeyBinding(
       ed25519_sig_0?: null,
       ed25519_sig_1?: null,
       ed25519_pub_key?: null,
       chain_key?: null
-    ): KeyBindingEventFilter;
+    ): KeyBindingEventFilter
 
-    "RevokeAnnouncement(address)"(node?: null): RevokeAnnouncementEventFilter;
-    RevokeAnnouncement(node?: null): RevokeAnnouncementEventFilter;
-  };
+    'RevokeAnnouncement(address)'(node?: null): RevokeAnnouncementEventFilter
+    RevokeAnnouncement(node?: null): RevokeAnnouncementEventFilter
+  }
 
   estimateGas: {
-    announce(
-      baseMultiaddr: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
+    announce(baseMultiaddr: string, overrides?: Overrides & { from?: string }): Promise<BigNumber>
 
-    announceSafe(
-      self: string,
-      baseMultiaddr: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
+    announceSafe(self: string, baseMultiaddr: string, overrides?: Overrides & { from?: string }): Promise<BigNumber>
 
     bindKeys(
       ed25519_sig_0: BytesLike,
       ed25519_sig_1: BytesLike,
       ed25519_pub_key: BytesLike,
       overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     bindKeysAnnounce(
       ed25519_sig_0: BytesLike,
@@ -390,7 +300,7 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_pub_key: BytesLike,
       baseMultiaddr: string,
       overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     bindKeysAnnounceSafe(
       self: string,
@@ -399,7 +309,7 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_pub_key: BytesLike,
       baseMultiaddr: string,
       overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
     bindKeysSafe(
       self: string,
@@ -407,39 +317,30 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_sig_1: BytesLike,
       ed25519_pub_key: BytesLike,
       overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
+    ): Promise<BigNumber>
 
-    multicall(
-      data: BytesLike[],
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
+    multicall(data: BytesLike[], overrides?: Overrides & { from?: string }): Promise<BigNumber>
 
-    revoke(overrides?: Overrides & { from?: string }): Promise<BigNumber>;
+    revoke(overrides?: Overrides & { from?: string }): Promise<BigNumber>
 
-    revokeSafe(
-      self: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-  };
+    revokeSafe(self: string, overrides?: Overrides & { from?: string }): Promise<BigNumber>
+  }
 
   populateTransaction: {
-    announce(
-      baseMultiaddr: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    announce(baseMultiaddr: string, overrides?: Overrides & { from?: string }): Promise<PopulatedTransaction>
 
     announceSafe(
       self: string,
       baseMultiaddr: string,
       overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     bindKeys(
       ed25519_sig_0: BytesLike,
       ed25519_sig_1: BytesLike,
       ed25519_pub_key: BytesLike,
       overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     bindKeysAnnounce(
       ed25519_sig_0: BytesLike,
@@ -447,7 +348,7 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_pub_key: BytesLike,
       baseMultiaddr: string,
       overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     bindKeysAnnounceSafe(
       self: string,
@@ -456,7 +357,7 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_pub_key: BytesLike,
       baseMultiaddr: string,
       overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
     bindKeysSafe(
       self: string,
@@ -464,20 +365,12 @@ export interface HoprAnnouncements extends BaseContract {
       ed25519_sig_1: BytesLike,
       ed25519_pub_key: BytesLike,
       overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    ): Promise<PopulatedTransaction>
 
-    multicall(
-      data: BytesLike[],
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    multicall(data: BytesLike[], overrides?: Overrides & { from?: string }): Promise<PopulatedTransaction>
 
-    revoke(
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    revoke(overrides?: Overrides & { from?: string }): Promise<PopulatedTransaction>
 
-    revokeSafe(
-      self: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-  };
+    revokeSafe(self: string, overrides?: Overrides & { from?: string }): Promise<PopulatedTransaction>
+  }
 }

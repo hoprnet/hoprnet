@@ -6,7 +6,10 @@ use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
     Aes128,
 };
-use core_crypto::{types::{PublicKey, OffchainPublicKey}, keypairs::{Keypair, OffchainKeypair}};
+use core_crypto::{
+    keypairs::{Keypair, OffchainKeypair},
+    types::PublicKey,
+};
 use getrandom::getrandom;
 use hex;
 use scrypt::{scrypt, Params as ScryptParams};
@@ -483,7 +486,7 @@ pub mod wasm {
     use super::IdentityOptions;
     use core_crypto::keypairs::Keypair;
     use js_sys::{Promise, Uint8Array};
-    use utils_types::traits::{PeerIdLike, BinarySerializable};
+    use utils_types::traits::{BinarySerializable, PeerIdLike};
     use wasm_bindgen::prelude::*;
 
     const SECP256K1_PEERID_LENGTH: usize = 37;

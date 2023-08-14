@@ -7,18 +7,16 @@ pub use hopr_dummy_proxy_for_network_registry::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types,
+    non_camel_case_types
 )]
 pub mod hopr_dummy_proxy_for_network_registry {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"AccountDeregistered\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"AccountRegistered\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"isAllowed\",\"type\":\"bool\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"AllowAllAccountsEligible\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"MAX_REGISTRATION_PER_ACCOUNT\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"canOperateFor\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"eligiblity\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isAllAllowed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"maxAllowedRegistrations\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerAddAccount\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"accounts\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBatchAddAccounts\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"accounts\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerBatchRemoveAccounts\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"ownerRemoveAccount\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"_updatedAllow\",\"type\":\"bool\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateAllowAll\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRDUMMYPROXYFORNETWORKREGISTRY_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI)
-            .expect("ABI is always valid")
-    });
+    pub static HOPRDUMMYPROXYFORNETWORKREGISTRY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
+        });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -2011,9 +2009,8 @@ pub mod hopr_dummy_proxy_for_network_registry {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRDUMMYPROXYFORNETWORKREGISTRY_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __BYTECODE,
-    );
+    pub static HOPRDUMMYPROXYFORNETWORKREGISTRY_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -3730,9 +3727,8 @@ pub mod hopr_dummy_proxy_for_network_registry {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRDUMMYPROXYFORNETWORKREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
-        __DEPLOYED_BYTECODE,
-    );
+    pub static HOPRDUMMYPROXYFORNETWORKREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
+        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
     pub struct HoprDummyProxyForNetworkRegistry<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprDummyProxyForNetworkRegistry<M> {
         fn clone(&self) -> Self {
@@ -3760,17 +3756,12 @@ pub mod hopr_dummy_proxy_for_network_registry {
     impl<M: ::ethers::providers::Middleware> HoprDummyProxyForNetworkRegistry<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(
-            address: T,
-            client: ::std::sync::Arc<M>,
-        ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HOPRDUMMYPROXYFORNETWORKREGISTRY_ABI.clone(),
-                    client,
-                ),
-            )
+        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HOPRDUMMYPROXYFORNETWORKREGISTRY_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -3830,9 +3821,7 @@ pub mod hopr_dummy_proxy_for_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `isAllAllowed` (0xf67f5e6f) function
-        pub fn is_all_allowed(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
+        pub fn is_all_allowed(&self) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
                 .method_hash([246, 127, 94, 111], ())
                 .expect("method not found (this should never happen)")
@@ -3847,12 +3836,7 @@ pub mod hopr_dummy_proxy_for_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `owner` (0x8da5cb5b) function
-        pub fn owner(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        pub fn owner(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([141, 165, 203, 91], ())
                 .expect("method not found (this should never happen)")
@@ -3894,9 +3878,7 @@ pub mod hopr_dummy_proxy_for_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `renounceOwnership` (0x715018a6) function
-        pub fn renounce_ownership(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn renounce_ownership(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([113, 80, 24, 166], ())
                 .expect("method not found (this should never happen)")
@@ -3911,10 +3893,7 @@ pub mod hopr_dummy_proxy_for_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `updateAllowAll` (0x089ffa47) function
-        pub fn update_allow_all(
-            &self,
-            updated_allow: bool,
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn update_allow_all(&self, updated_allow: bool) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([8, 159, 250, 71], updated_allow)
                 .expect("method not found (this should never happen)")
@@ -3922,69 +3901,42 @@ pub mod hopr_dummy_proxy_for_network_registry {
         ///Gets the contract's `AccountDeregistered` event
         pub fn account_deregistered_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            AccountDeregisteredFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, AccountDeregisteredFilter> {
             self.0.event()
         }
         ///Gets the contract's `AccountRegistered` event
         pub fn account_registered_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            AccountRegisteredFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, AccountRegisteredFilter> {
             self.0.event()
         }
         ///Gets the contract's `AllowAllAccountsEligible` event
         pub fn allow_all_accounts_eligible_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            AllowAllAccountsEligibleFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, AllowAllAccountsEligibleFilter> {
             self.0.event()
         }
         ///Gets the contract's `OwnershipTransferred` event
         pub fn ownership_transferred_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            OwnershipTransferredFilter,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OwnershipTransferredFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<
-            ::std::sync::Arc<M>,
-            M,
-            HoprDummyProxyForNetworkRegistryEvents,
-        > {
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprDummyProxyForNetworkRegistryEvents>
+        {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HoprDummyProxyForNetworkRegistry<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprDummyProxyForNetworkRegistry<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "AccountDeregistered", abi = "AccountDeregistered(address)")]
     pub struct AccountDeregisteredFilter {
@@ -3992,14 +3944,7 @@ pub mod hopr_dummy_proxy_for_network_registry {
         pub account: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethevent(name = "AccountRegistered", abi = "AccountRegistered(address)")]
     pub struct AccountRegisteredFilter {
@@ -4007,36 +3952,16 @@ pub mod hopr_dummy_proxy_for_network_registry {
         pub account: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "AllowAllAccountsEligible",
-        abi = "AllowAllAccountsEligible(bool)"
-    )]
+    #[ethevent(name = "AllowAllAccountsEligible", abi = "AllowAllAccountsEligible(bool)")]
     pub struct AllowAllAccountsEligibleFilter {
         pub is_allowed: bool,
     }
     #[derive(
-        Clone,
-        ::ethers::contract::EthEvent,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethevent(
-        name = "OwnershipTransferred",
-        abi = "OwnershipTransferred(address,address)"
-    )]
+    #[ethevent(name = "OwnershipTransferred", abi = "OwnershipTransferred(address,address)")]
     pub struct OwnershipTransferredFilter {
         #[ethevent(indexed)]
         pub previous_owner: ::ethers::core::types::Address,
@@ -4052,36 +3977,24 @@ pub mod hopr_dummy_proxy_for_network_registry {
         OwnershipTransferredFilter(OwnershipTransferredFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprDummyProxyForNetworkRegistryEvents {
-        fn decode_log(
-            log: &::ethers::core::abi::RawLog,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = AccountDeregisteredFilter::decode_log(log) {
-                return Ok(
-                    HoprDummyProxyForNetworkRegistryEvents::AccountDeregisteredFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprDummyProxyForNetworkRegistryEvents::AccountDeregisteredFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = AccountRegisteredFilter::decode_log(log) {
-                return Ok(
-                    HoprDummyProxyForNetworkRegistryEvents::AccountRegisteredFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprDummyProxyForNetworkRegistryEvents::AccountRegisteredFilter(decoded));
             }
             if let Ok(decoded) = AllowAllAccountsEligibleFilter::decode_log(log) {
-                return Ok(
-                    HoprDummyProxyForNetworkRegistryEvents::AllowAllAccountsEligibleFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprDummyProxyForNetworkRegistryEvents::AllowAllAccountsEligibleFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = OwnershipTransferredFilter::decode_log(log) {
-                return Ok(
-                    HoprDummyProxyForNetworkRegistryEvents::OwnershipTransferredFilter(
-                        decoded,
-                    ),
-                );
+                return Ok(HoprDummyProxyForNetworkRegistryEvents::OwnershipTransferredFilter(
+                    decoded,
+                ));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -4089,131 +4002,68 @@ pub mod hopr_dummy_proxy_for_network_registry {
     impl ::core::fmt::Display for HoprDummyProxyForNetworkRegistryEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AccountDeregisteredFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::AccountRegisteredFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::AllowAllAccountsEligibleFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnershipTransferredFilter(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::AccountDeregisteredFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AccountRegisteredFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AllowAllAccountsEligibleFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnershipTransferredFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<AccountDeregisteredFilter>
-    for HoprDummyProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<AccountDeregisteredFilter> for HoprDummyProxyForNetworkRegistryEvents {
         fn from(value: AccountDeregisteredFilter) -> Self {
             Self::AccountDeregisteredFilter(value)
         }
     }
-    impl ::core::convert::From<AccountRegisteredFilter>
-    for HoprDummyProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<AccountRegisteredFilter> for HoprDummyProxyForNetworkRegistryEvents {
         fn from(value: AccountRegisteredFilter) -> Self {
             Self::AccountRegisteredFilter(value)
         }
     }
-    impl ::core::convert::From<AllowAllAccountsEligibleFilter>
-    for HoprDummyProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<AllowAllAccountsEligibleFilter> for HoprDummyProxyForNetworkRegistryEvents {
         fn from(value: AllowAllAccountsEligibleFilter) -> Self {
             Self::AllowAllAccountsEligibleFilter(value)
         }
     }
-    impl ::core::convert::From<OwnershipTransferredFilter>
-    for HoprDummyProxyForNetworkRegistryEvents {
+    impl ::core::convert::From<OwnershipTransferredFilter> for HoprDummyProxyForNetworkRegistryEvents {
         fn from(value: OwnershipTransferredFilter) -> Self {
             Self::OwnershipTransferredFilter(value)
         }
     }
     ///Container type for all input parameters for the `MAX_REGISTRATION_PER_ACCOUNT` function with signature `MAX_REGISTRATION_PER_ACCOUNT()` and selector `0xf46c84b8`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "MAX_REGISTRATION_PER_ACCOUNT",
-        abi = "MAX_REGISTRATION_PER_ACCOUNT()"
-    )]
+    #[ethcall(name = "MAX_REGISTRATION_PER_ACCOUNT", abi = "MAX_REGISTRATION_PER_ACCOUNT()")]
     pub struct MaxRegistrationPerAccountCall;
     ///Container type for all input parameters for the `canOperateFor` function with signature `canOperateFor(address,address)` and selector `0xd85ad044`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "canOperateFor", abi = "canOperateFor(address,address)")]
-    pub struct CanOperateForCall(
-        pub ::ethers::core::types::Address,
-        pub ::ethers::core::types::Address,
-    );
+    pub struct CanOperateForCall(pub ::ethers::core::types::Address, pub ::ethers::core::types::Address);
     ///Container type for all input parameters for the `isAllAllowed` function with signature `isAllAllowed()` and selector `0xf67f5e6f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "isAllAllowed", abi = "isAllAllowed()")]
     pub struct IsAllAllowedCall;
     ///Container type for all input parameters for the `maxAllowedRegistrations` function with signature `maxAllowedRegistrations(address)` and selector `0xb3544e82`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "maxAllowedRegistrations",
-        abi = "maxAllowedRegistrations(address)"
-    )]
+    #[ethcall(name = "maxAllowedRegistrations", abi = "maxAllowedRegistrations(address)")]
     pub struct MaxAllowedRegistrationsCall {
         pub account: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "owner", abi = "owner()")]
     pub struct OwnerCall;
     ///Container type for all input parameters for the `ownerAddAccount` function with signature `ownerAddAccount(address)` and selector `0xa71b1b74`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "ownerAddAccount", abi = "ownerAddAccount(address)")]
     pub struct OwnerAddAccountCall {
@@ -4221,14 +4071,7 @@ pub mod hopr_dummy_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `ownerBatchAddAccounts` function with signature `ownerBatchAddAccounts(address[])` and selector `0x486354e2`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "ownerBatchAddAccounts", abi = "ownerBatchAddAccounts(address[])")]
     pub struct OwnerBatchAddAccountsCall {
@@ -4236,32 +4079,15 @@ pub mod hopr_dummy_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `ownerBatchRemoveAccounts` function with signature `ownerBatchRemoveAccounts(address[])` and selector `0x5c5471e7`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
-    #[ethcall(
-        name = "ownerBatchRemoveAccounts",
-        abi = "ownerBatchRemoveAccounts(address[])"
-    )]
+    #[ethcall(name = "ownerBatchRemoveAccounts", abi = "ownerBatchRemoveAccounts(address[])")]
     pub struct OwnerBatchRemoveAccountsCall {
         pub accounts: ::std::vec::Vec<::ethers::core::types::Address>,
     }
     ///Container type for all input parameters for the `ownerRemoveAccount` function with signature `ownerRemoveAccount(address)` and selector `0x4051f257`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "ownerRemoveAccount", abi = "ownerRemoveAccount(address)")]
     pub struct OwnerRemoveAccountCall {
@@ -4269,27 +4095,13 @@ pub mod hopr_dummy_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `renounceOwnership` function with signature `renounceOwnership()` and selector `0x715018a6`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "renounceOwnership", abi = "renounceOwnership()")]
     pub struct RenounceOwnershipCall;
     ///Container type for all input parameters for the `transferOwnership` function with signature `transferOwnership(address)` and selector `0xf2fde38b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "transferOwnership", abi = "transferOwnership(address)")]
     pub struct TransferOwnershipCall {
@@ -4297,14 +4109,7 @@ pub mod hopr_dummy_proxy_for_network_registry {
     }
     ///Container type for all input parameters for the `updateAllowAll` function with signature `updateAllowAll(bool)` and selector `0x089ffa47`
     #[derive(
-        Clone,
-        ::ethers::contract::EthCall,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
     )]
     #[ethcall(name = "updateAllowAll", abi = "updateAllowAll(bool)")]
     pub struct UpdateAllowAllCall {
@@ -4327,70 +4132,42 @@ pub mod hopr_dummy_proxy_for_network_registry {
         UpdateAllowAll(UpdateAllowAllCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprDummyProxyForNetworkRegistryCalls {
-        fn decode(
-            data: impl AsRef<[u8]>,
-        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded)
-                = <MaxRegistrationPerAccountCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MaxRegistrationPerAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MaxRegistrationPerAccount(decoded));
             }
-            if let Ok(decoded)
-                = <CanOperateForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <CanOperateForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CanOperateFor(decoded));
             }
-            if let Ok(decoded)
-                = <IsAllAllowedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <IsAllAllowedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsAllAllowed(decoded));
             }
-            if let Ok(decoded)
-                = <MaxAllowedRegistrationsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <MaxAllowedRegistrationsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MaxAllowedRegistrations(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Owner(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerAddAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <OwnerAddAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerAddAccount(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerBatchAddAccountsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerBatchAddAccountsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerBatchAddAccounts(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerBatchRemoveAccountsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerBatchRemoveAccountsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerBatchRemoveAccounts(decoded));
             }
-            if let Ok(decoded)
-                = <OwnerRemoveAccountCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <OwnerRemoveAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OwnerRemoveAccount(decoded));
             }
-            if let Ok(decoded)
-                = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RenounceOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                ) {
+            if let Ok(decoded) = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TransferOwnership(decoded));
             }
-            if let Ok(decoded)
-                = <UpdateAllowAllCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <UpdateAllowAllCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UpdateAllowAll(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -4399,91 +4176,55 @@ pub mod hopr_dummy_proxy_for_network_registry {
     impl ::ethers::core::abi::AbiEncode for HoprDummyProxyForNetworkRegistryCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::MaxRegistrationPerAccount(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::CanOperateFor(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::IsAllAllowed(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::MaxAllowedRegistrations(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::MaxRegistrationPerAccount(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::CanOperateFor(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsAllAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::MaxAllowedRegistrations(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Owner(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::OwnerAddAccount(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerBatchAddAccounts(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerBatchRemoveAccounts(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::OwnerRemoveAccount(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::RenounceOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::TransferOwnership(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::UpdateAllowAll(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::OwnerAddAccount(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerBatchAddAccounts(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerBatchRemoveAccounts(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::OwnerRemoveAccount(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RenounceOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TransferOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::UpdateAllowAll(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
     }
     impl ::core::fmt::Display for HoprDummyProxyForNetworkRegistryCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::MaxRegistrationPerAccount(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::MaxRegistrationPerAccount(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CanOperateFor(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsAllAllowed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MaxAllowedRegistrations(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::MaxAllowedRegistrations(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Owner(element) => ::core::fmt::Display::fmt(element, f),
                 Self::OwnerAddAccount(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OwnerBatchAddAccounts(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnerBatchRemoveAccounts(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
-                Self::OwnerRemoveAccount(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::OwnerBatchAddAccounts(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnerBatchRemoveAccounts(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnerRemoveAccount(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RenounceOwnership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TransferOwnership(element) => ::core::fmt::Display::fmt(element, f),
                 Self::UpdateAllowAll(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<MaxRegistrationPerAccountCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<MaxRegistrationPerAccountCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: MaxRegistrationPerAccountCall) -> Self {
             Self::MaxRegistrationPerAccount(value)
         }
     }
-    impl ::core::convert::From<CanOperateForCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<CanOperateForCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: CanOperateForCall) -> Self {
             Self::CanOperateFor(value)
         }
     }
-    impl ::core::convert::From<IsAllAllowedCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<IsAllAllowedCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: IsAllAllowedCall) -> Self {
             Self::IsAllAllowed(value)
         }
     }
-    impl ::core::convert::From<MaxAllowedRegistrationsCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<MaxAllowedRegistrationsCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: MaxAllowedRegistrationsCall) -> Self {
             Self::MaxAllowedRegistrations(value)
         }
@@ -4493,108 +4234,66 @@ pub mod hopr_dummy_proxy_for_network_registry {
             Self::Owner(value)
         }
     }
-    impl ::core::convert::From<OwnerAddAccountCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerAddAccountCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: OwnerAddAccountCall) -> Self {
             Self::OwnerAddAccount(value)
         }
     }
-    impl ::core::convert::From<OwnerBatchAddAccountsCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerBatchAddAccountsCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: OwnerBatchAddAccountsCall) -> Self {
             Self::OwnerBatchAddAccounts(value)
         }
     }
-    impl ::core::convert::From<OwnerBatchRemoveAccountsCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerBatchRemoveAccountsCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: OwnerBatchRemoveAccountsCall) -> Self {
             Self::OwnerBatchRemoveAccounts(value)
         }
     }
-    impl ::core::convert::From<OwnerRemoveAccountCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<OwnerRemoveAccountCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: OwnerRemoveAccountCall) -> Self {
             Self::OwnerRemoveAccount(value)
         }
     }
-    impl ::core::convert::From<RenounceOwnershipCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<RenounceOwnershipCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: RenounceOwnershipCall) -> Self {
             Self::RenounceOwnership(value)
         }
     }
-    impl ::core::convert::From<TransferOwnershipCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<TransferOwnershipCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: TransferOwnershipCall) -> Self {
             Self::TransferOwnership(value)
         }
     }
-    impl ::core::convert::From<UpdateAllowAllCall>
-    for HoprDummyProxyForNetworkRegistryCalls {
+    impl ::core::convert::From<UpdateAllowAllCall> for HoprDummyProxyForNetworkRegistryCalls {
         fn from(value: UpdateAllowAllCall) -> Self {
             Self::UpdateAllowAll(value)
         }
     }
     ///Container type for all return fields from the `MAX_REGISTRATION_PER_ACCOUNT` function with signature `MAX_REGISTRATION_PER_ACCOUNT()` and selector `0xf46c84b8`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MaxRegistrationPerAccountReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `canOperateFor` function with signature `canOperateFor(address,address)` and selector `0xd85ad044`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct CanOperateForReturn {
         pub eligiblity: bool,
     }
     ///Container type for all return fields from the `isAllAllowed` function with signature `isAllAllowed()` and selector `0xf67f5e6f`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct IsAllAllowedReturn(pub bool);
     ///Container type for all return fields from the `maxAllowedRegistrations` function with signature `maxAllowedRegistrations(address)` and selector `0xb3544e82`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct MaxAllowedRegistrationsReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone,
-        ::ethers::contract::EthAbiType,
-        ::ethers::contract::EthAbiCodec,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash
+        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
     )]
     pub struct OwnerReturn(pub ::ethers::core::types::Address);
 }

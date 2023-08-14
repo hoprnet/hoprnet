@@ -1,4 +1,10 @@
-import type { HoprToken, HoprChannels, HoprNetworkRegistry, HoprAnnouncements, TypedEventFilter } from '../utils/index.js'
+import type {
+  HoprToken,
+  HoprChannels,
+  HoprNetworkRegistry,
+  HoprAnnouncements,
+  TypedEventFilter
+} from '../utils/index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Address, ChannelEntry } from '@hoprnet/hopr-utils'

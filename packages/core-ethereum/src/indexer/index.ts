@@ -28,8 +28,7 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
-import { type IndexerEventEmitter, IndexerStatus,  type IndexerEvents,
-} from './types.js'
+import { type IndexerEventEmitter, IndexerStatus, type IndexerEvents } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 
@@ -630,7 +629,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @dev ignores events that have been processed before.
    * @param events new unprocessed events
    */
-  private onNewEvents(events: TypedEvent<any,any>[] | undefined): void {
+  private onNewEvents(events: TypedEvent<any, any>[] | undefined): void {
     if (events == undefined || events.length == 0) {
       // Nothing to do
       return
