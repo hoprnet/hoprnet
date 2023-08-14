@@ -311,7 +311,6 @@ where
     where
         T: HoprCoreEthereumDbActions,
     {
-        println!("handling safe registry events");
         Ok(match HoprNodeSafeRegistryEvents::decode_log(log)? {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.eq(&registered.node_address.0.try_into()?) {
