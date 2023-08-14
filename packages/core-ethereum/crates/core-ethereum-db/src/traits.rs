@@ -223,6 +223,28 @@ pub trait HoprCoreEthereumDbActions {
         snapshot: &Snapshot,
     ) -> Result<()>;
 
+    /// Add Hopr node ETH address to its associated safe address.
+    async fn add_to_node_safe_registry(
+        &mut self,
+        node_address: &Address,
+        safe_address: &Address,
+        snapshot: &Snapshot,
+    ) -> Result<()>;
+
+    /// Unlink Hopr node ETH address and the safe address.
+    async fn remove_from_node_safe_registry(
+        &mut self,
+        node_address: &Address,
+        safe_address: &Address,
+        snapshot: &Snapshot,
+    ) -> Result<()>;
+
+    /// Get safe address associated with the public key.
+    async fn get_safe_from_node_safe_registry(&self, node_address: &Address) -> Result<Option<Address>>;
+
+    /// Find HOPR node based on its associated safe address.
+    async fn find_hopr_node_using_safe_in_node_safe_registry(&self, account: &Address) -> Result<Vec<Address>>;
+
     /// Stores the REST API token.
     async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;
 

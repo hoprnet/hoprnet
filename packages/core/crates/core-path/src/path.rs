@@ -129,7 +129,8 @@ impl Display for Path {
 mod tests {
     use crate::errors::PathError;
     use crate::path::Path;
-    use core_crypto::types::{OffchainPublicKey, PublicKey};
+    use core_crypto::random::random_bytes;
+    use core_crypto::types::{Hash, OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::channels::{ChannelEntry, ChannelStatus};

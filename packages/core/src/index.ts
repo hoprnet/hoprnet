@@ -1596,10 +1596,6 @@ class Hopr extends EventEmitter {
     return ret
   }
 
-  public async getPublicKeyOf(addr: Address): Promise<OffchainPublicKey> {
-    return await HoprCoreEthereum.getInstance().getPublicKeyOf(addr)
-  }
-
   public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return HoprCoreEthereum.getInstance().waitForPublicNodes()
   }
