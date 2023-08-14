@@ -9,7 +9,7 @@ use k256::elliptic_curve::generic_array::GenericArray;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::elliptic_curve::CurveArithmetic;
 use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
-use libp2p_identity::{PeerId, PublicKey as lp2p_PublicKey};
+use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -18,12 +18,8 @@ use std::{
 };
 
 use utils_log::warn;
-use utils_types::{
-    errors::{GeneralError, GeneralError::ParseError},
-    primitives::{Address, EthereumChallenge},
-    traits::{BinarySerializable, PeerIdLike, ToHex},
-};
-
+use utils_types::errors::GeneralError;
+use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::{Address, EthereumChallenge};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
@@ -632,7 +628,7 @@ impl PublicKey {
 
                 Ok(PublicKey {
                     key,
-                    compressed: key.to_encoded_point(true).to_bytes(),
+                    compressed: key.to_encoded_point(true),
                 })
             }
             Self::SIZE_UNCOMPRESSED_PLAIN => {
@@ -642,7 +638,7 @@ impl PublicKey {
 
                 Ok(PublicKey {
                     key,
-                    compressed: key.to_encoded_point(true).to_bytes(),
+                    compressed: key.to_encoded_point(true),
                 })
             }
             Self::SIZE_COMPRESSED => {
@@ -651,7 +647,7 @@ impl PublicKey {
 
                 Ok(PublicKey {
                     key,
-                    compressed: key.to_encoded_point(true).to_bytes(),
+                    compressed: key.to_encoded_point(true),
                 })
             }
             _ => Err(ParseError),

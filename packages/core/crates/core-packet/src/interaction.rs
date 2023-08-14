@@ -1,13 +1,9 @@
 use async_lock::RwLock;
 use std::fmt::{Display, Formatter};
 
-use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketDecodingError, PathNotValid,
-    Retry, TagReplay, Timeout, TransportError,
-};
+use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError, Retry, TagReplay, Timeout, TransportError};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
-use crate::path::Path;
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
 use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
@@ -115,7 +111,7 @@ impl AsRef<[u8]> for ApplicationData {
     }
 }
 
-impl BinarySerializable<'_> for ApplicationData {
+impl BinarySerializable for ApplicationData {
     const SIZE: usize = 2; // minimum size
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -934,7 +930,7 @@ mod tests {
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
-    use utils_types::traits::{PeerIdLike, ToHex};
+    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
