@@ -905,10 +905,8 @@ mod tests {
     use async_std::sync::RwLock;
     use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::shared_keys::SharedSecret;
-    use core_crypto::shared_keys::SharedSecret;
-    use core_crypto::types::{OffchainPublicKey, OffchainPublicKey, PublicKey};
+    use core_crypto::types::{OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_mixer::mixer::MixerConfig;
