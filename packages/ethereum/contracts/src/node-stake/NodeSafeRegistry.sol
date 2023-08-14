@@ -35,6 +35,18 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     // Provided address is neither an owner of Safe nor a member of an enabled NodeManagementModule
     error NotSafeOwnerNorNode();
 
+/**
+ * @title Node safe must prove that the Safe is the only authorized controller of
+ * the CHAIN_KEY address. This link between the Safe and node's chain-key address
+ * should be registered upon successful verification
+ * This contract is meant to be deployed as a standalone contract
+ */
+contract HoprNodeSafeRegistry {
+    struct NodeSafeRecord {
+        address safeAddress;
+        uint96 nodeSigNonce;
+    }
+
     struct NodeSafe {
         address safeAddress;
         address nodeChainKeyAddress;
@@ -49,9 +61,8 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     string public constant VERSION = "1.0.0";
 
     bytes32 public domainSeparator;
-    mapping(address => address) public nodeToSafe;
-    mapping(address => uint256) public nodeSigNonce;
-    // NodeSafe struct type hash.
+    mapping(address => NodeSafeRecord) _nodeToSafe;
+    // NodeSafeNonce struct type hash.
     // keccak256("NodeSafeNonce(address safeAddress,address nodeChainKeyAddress,uint256 nodeSigNonce)");
     bytes32 public constant NODE_SAFE_TYPEHASH = hex"a8ac7aed128d1a2da0773fecc80b6265d15f7e62bf4401eb23bd46c3fcf5d2f8";
     // start and end point for linked list of modules
@@ -64,6 +75,14 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         updateDomainSeparator();
     }
 
+    function nodeToSafe(address nodeAddress) view external returns (address) {
+        return _nodeToSafe[nodeAddress].safeAddress;
+    }
+
+    function nodeSigNonce(address nodeAddress) view external returns (uint256) {
+        return _nodeToSafe[nodeAddress].nodeSigNonce;
+    }
+
     /**
      * @dev register the Safe with a signature from the node
      * This function can be called by any party
@@ -72,7 +91,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         // check adminKeyAddress has added HOPR tokens to the staking contract.
 
         // following encoding guidelines of EIP712
-        bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe, nodeSigNonce[nodeSafe.nodeChainKeyAddress]));
+        bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe, _nodeToSafe[nodeSafe.nodeChainKeyAddress].nodeSigNonce));
 
         // build typed digest
         bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
@@ -85,9 +104,6 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
 
         // store those state, emit events etc.
         addNodeSafe(nodeSafe);
-
-        // update nonce
-        nodeSigNonce[nodeSafe.nodeChainKeyAddress] ++;
     }
 
     /**
@@ -95,11 +111,11 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
      */
     function isNodeSafeRegistered(NodeSafe memory nodeSafe) external view returns (bool) {
         // node is not registered to any safe
-        if (nodeToSafe[nodeSafe.nodeChainKeyAddress] == address(0)) {
+        if (_nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress == address(0)) {
             return false;
         }
 
-        return nodeToSafe[nodeSafe.nodeChainKeyAddress] == nodeSafe.safeAddress;
+        return _nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress == nodeSafe.safeAddress;
     }
 
     /**
@@ -108,7 +124,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
      */
     function deregisterNodeBySafe(address nodeAddr) external {
         // check this node was registered to the caller
-        if (nodeToSafe[nodeAddr] != msg.sender) {
+        if (_nodeToSafe[nodeAddr].safeAddress != msg.sender) {
             revert NotValidSafe();
         }
 
@@ -116,7 +132,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         ensureNodeIsSafeModuleMember(NodeSafe({safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr}));
 
         // update and emit event
-        nodeToSafe[nodeAddr] = address(0);
+        _nodeToSafe[nodeAddr].safeAddress = address(0);
         emit DergisteredNodeSafe(msg.sender, nodeAddr);
     }
 
@@ -157,15 +173,20 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         }
 
         // check this node hasn't been registered ower
-        if (nodeToSafe[nodeSafe.nodeChainKeyAddress] != address(0)) {
+        if (_nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress != address(0)) {
             revert NodeHasSafe();
         }
 
         // ensure that node is either an owner or a member of the (enabled) NodeManagementModule
         ensureNodeIsSafeModuleMember(nodeSafe);
 
+        NodeSafeRecord storage record = _nodeToSafe[nodeSafe.nodeChainKeyAddress];
+
+        // update record
+        record.safeAddress = nodeSafe.safeAddress;
+        record.nodeSigNonce = record.nodeSigNonce + 1; // as of Solidity 0.8, this reverts on overflows
+
         // update and emit event
-        nodeToSafe[nodeSafe.nodeChainKeyAddress] = nodeSafe.safeAddress;
         emit RegisteredNodeSafe(nodeSafe.safeAddress, nodeSafe.nodeChainKeyAddress);
     }
 

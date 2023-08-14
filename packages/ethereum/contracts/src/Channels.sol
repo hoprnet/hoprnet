@@ -419,6 +419,8 @@ contract HoprChannels is
                 revert TokenTransferFailed();
             }
         } else {
+            // this CAN produce channels with more stake than MAX_USED_AMOUNT - which does not lead
+            // to overflows since total supply < type(uin96).max
             earningChannel.balance =
                 Balance.wrap(Balance.unwrap(earningChannel.balance) + Balance.unwrap(redeemable.data.amount));
             indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, outgoingChannelId, earningChannel.balance));
@@ -586,6 +588,8 @@ contract HoprChannels is
      *
      * Channel source and destination are specified by the userData payload.
      *
+     * @dev function reverts if it is a no-op, meaning no state change
+     *
      * @param from account from which the tokens have been transferred
      * @param to account to which the the tokens have been transferred
      * @param amount uint256 amount of tokens that have been transferred
@@ -599,10 +603,6 @@ contract HoprChannels is
         bytes calldata userData,
         bytes calldata // operatorData not needed
     ) external override {
-        if (amount > type(uint96).max) {
-            revert InvalidBalance();
-        }
-
         // don't accept any other tokens ;-)
         if (msg.sender != address(token)) {
             revert WrongToken();
@@ -622,14 +622,16 @@ contract HoprChannels is
         if (userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE) {
             (address src, address dest) = abi.decode(userData, (address, address));
 
+            address safeAddress = registry.nodeToSafe(src);
+
             // skip the check between `from` and `src` on node-safe registry
             if (from == src) {
                 // node if opening an outgoing channel
-                if (registry.nodeToSafe(src) != address(0)) {
+                if (safeAddress != address(0)) {
                     revert ContractNotResponsible();
                 }
             } else {
-                if (registry.nodeToSafe(src) != from) {
+                if (safeAddress != from) {
                     revert ContractNotResponsible();
                 }
             }
@@ -640,7 +642,7 @@ contract HoprChannels is
             (address account1, Balance amount1, address account2, Balance amount2) =
                 abi.decode(userData, (address, Balance, address, Balance));
 
-            if (amount != Balance.unwrap(amount1) + Balance.unwrap(amount2)) {
+            if (amount == 0 || amount != uint256(Balance.unwrap(amount1)) + uint256(Balance.unwrap(amount2))) {
                 revert InvalidBalance();
             }
 
@@ -730,10 +732,10 @@ contract HoprChannels is
 
             indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
             emit ChannelOpened(self, account);
-        } else {
-            indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
-            emit ChannelBalanceIncreased(channelId, channel.balance);
         }
+        
+        indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
+        emit ChannelBalanceIncreased(channelId, channel.balance);
     }
 
     // utility functions, no state changes involved
