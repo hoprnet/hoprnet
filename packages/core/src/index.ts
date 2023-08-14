@@ -234,9 +234,9 @@ export type HoprOptions = {
   }
   safeModule: {
     // Base URL to interact with safe transaction service
-    safeTransactionServiceProvider?: string,
+    safeTransactionServiceProvider?: string
     // Address of node's safe proxy instance
-    safeAddress?: Address,
+    safeAddress?: Address
     // Address of node's safe-module proxy instance
     moduleAddress?: Address
   }
