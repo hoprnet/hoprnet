@@ -126,7 +126,7 @@ impl Balance {
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
             value: U256 {
-                value: u256::from_str_radix(value, 10).expect(&format!("invalid number {}", value)),
+                value: u256::from_str_radix(value, 10).unwrap_or_else(|_| panic!("invalid number {}", value)),
             },
             balance_type,
         }

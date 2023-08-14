@@ -56,7 +56,7 @@ impl Path {
         }
 
         let mut ticket_receiver;
-        let mut ticket_issuer = self_addr.clone();
+        let mut ticket_issuer = *self_addr;
 
         for hop in path.iter() {
             ticket_receiver = db

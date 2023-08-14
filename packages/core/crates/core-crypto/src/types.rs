@@ -633,7 +633,7 @@ impl PublicKey {
             }
             Self::SIZE_UNCOMPRESSED_PLAIN => {
                 // add 0x04 prefix
-                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], &data[..]].concat())
+                let key = elliptic_curve::PublicKey::<Secp256k1>::from_sec1_bytes(&[&[4u8], data].concat())
                     .map_err(|_| ParseError)?;
 
                 Ok(PublicKey {

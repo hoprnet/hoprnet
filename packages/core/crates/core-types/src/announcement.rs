@@ -94,7 +94,7 @@ impl AnnouncementData {
     /// The multiaddress must not be empty and must end with `/p2p/<peer id>` to be considered valid.
     /// Also if `key_binding` is specified, the public key must match the peer id of the multiaddress.
     pub fn new(multiaddress: Multiaddr, key_binding: Option<KeyBinding>) -> Result<Self, GeneralError> {
-        let mut decapsulated = multiaddress.clone();
+        let mut decapsulated = multiaddress;
         match decapsulated.pop().ok_or(InvalidInput)? {
             Protocol::P2p(peer) => {
                 if key_binding

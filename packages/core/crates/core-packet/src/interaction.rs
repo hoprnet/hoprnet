@@ -670,8 +670,8 @@ where
 
                 // We're the destination of the packet, so emit the packet contents
                 if let Some(emitter) = &self.on_final_packet {
-                    let fd = ApplicationData::from_bytes(&plain_text).map_err(|_| {
-                        PacketDecodingError(format!("final plaintext is malformed: {}", hex::encode(&plain_text)))
+                    let fd = ApplicationData::from_bytes(plain_text).map_err(|_| {
+                        PacketDecodingError(format!("final plaintext is malformed: {}", hex::encode(plain_text)))
                     })?;
                     debug!("emitting final packet: {fd}");
 

@@ -258,25 +258,15 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub async fn find_commitment_preimage(db: &Database, channel_id: &Hash) -> JsResult<Hash> {
-        //debug!(">>> WRITE find_commitment_preimage");
-        let r = {
-            let val = db.as_ref_counted();
-            let mut g = val.write().await;
-            ok_or_jserr!(super::find_commitment_preimage(&mut *g, channel_id).await)
-        };
-        //debug!("<<< WRITE find_commitment_preimage");
-        r
+        let val = db.as_ref_counted();
+        let g = val.read().await;
+        ok_or_jserr!(super::find_commitment_preimage(&*g, channel_id).await)
     }
 
     #[wasm_bindgen]
     pub async fn bump_commitment(db: &Database, channel_id: &Hash, new_commitment: &Hash) -> JsResult<()> {
-        //debug!(">>> WRITE bump_commitment");
-        let r = {
-            let val = db.as_ref_counted();
-            let mut g = val.write().await;
-            ok_or_jserr!(super::bump_commitment(&mut *g, channel_id, new_commitment).await)
-        };
-        //debug!("<<< WRITE bump_commitment");
-        r
+        let val = db.as_ref_counted();
+        let mut g = val.write().await;
+        ok_or_jserr!(super::bump_commitment(&mut *g, channel_id, new_commitment).await)
     }
 }

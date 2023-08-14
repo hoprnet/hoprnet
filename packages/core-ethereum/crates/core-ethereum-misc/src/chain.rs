@@ -58,10 +58,10 @@ where
 {
     // bump commitment when on-chain ticket redemption is successful
     // FIXME: bump commitment can fail if channel runs out of commitments
-    bump_commitment(db, channel_id, &pre_image).await?;
+    bump_commitment(db, channel_id, pre_image).await?;
     debug!("Successfully bumped local commitment after {pre_image} for channel {channel_id}");
 
-    db.mark_redeemed(&acked_ticket).await?;
+    db.mark_redeemed(acked_ticket).await?;
 
     Ok(())
 }
