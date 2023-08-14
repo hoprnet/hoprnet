@@ -809,7 +809,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
 
@@ -822,7 +822,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
 
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
@@ -841,7 +841,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
         vm.prank(safeContract);
         hoprChannels.redeemTicketSafe(dest, redeemable, vrf);
 
@@ -854,10 +854,69 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
 
         vm.prank(safeContract);
         hoprChannels.redeemTicketSafe(dest, redeemable, vrf);
+    }
+
+    function test_CannotRedeemSameWinningTicketMultipleTimes(
+        uint256 privKeyA,
+        uint256 privKeyB,
+        address safeContract,
+        uint256 porSecret,
+        uint24 epoch
+    ) public {
+        porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+        privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+        privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+        vm.assume(privKeyA != privKeyB);
+    
+        uint96 amount = uint96(MIN_USED_BALANCE);
+        uint96 channelAmount = uint96(MAX_USED_BALANCE);
+        uint32 indexOffset = uint32(1);
+        uint48 maxTicketIndex = uint48(6);
+        uint48 channelTicketIndex = uint48(1);
+
+        address src = vm.addr(privKeyA);
+        address dest = vm.addr(privKeyB);
+        vm.assume(safeContract != address(0) && safeContract != src && safeContract != dest);
+
+        _helperNoSafeSetMock(dest);
+        _helperTokenTransferMock(dest, amount);
+
+        RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
+            privKeyA,
+            privKeyB,
+            abi.encodePacked(hoprChannels.domainSeparator()),
+            src,
+            dest,
+            amount,
+            maxTicketIndex,
+            indexOffset,
+            epoch,
+            HoprChannels.WinProb.unwrap(WIN_PROB_100),
+            porSecret
+        );
+
+        hoprChannels._storeChannel(
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+        );
+
+        (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
+            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+
+
+        vm.expectEmit(true, false, false, true, address(hoprChannels));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+        vm.prank(dest);
+        hoprChannels.redeemTicket(redeemable, vrf);
+
+        for (uint256 i = 1; i < uint256(maxTicketIndex - channelTicketIndex); i++) {
+            vm.expectRevert(HoprChannels.InvalidAggregatedTicketInterval.selector);
+            vm.prank(dest);
+            hoprChannels.redeemTicket(redeemable, vrf);
+        }
     }
 
     function test_redeemTicket_bidirectional(
@@ -917,7 +976,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelABAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceIncreased(

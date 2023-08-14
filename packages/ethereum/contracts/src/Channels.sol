@@ -397,7 +397,7 @@ contract HoprChannels is
         }
 
         spendingChannel.ticketIndex = TicketIndex.wrap(
-            TicketIndex.unwrap(spendingChannel.ticketIndex) + TicketIndexOffset.unwrap(redeemable.data.indexOffset)
+            TicketIndex.unwrap(redeemable.data.ticketIndex) + TicketIndexOffset.unwrap(redeemable.data.indexOffset)
         );
         spendingChannel.balance =
             Balance.wrap(Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount));
