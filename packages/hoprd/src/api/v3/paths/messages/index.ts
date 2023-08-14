@@ -31,7 +31,7 @@ const DELETE: Operation = [
 
 const POST: Operation = [
   async (req, res, _next) => {
-      console.log("SEND 1")
+    console.log('SEND 1')
     const tag = req.body.tag
     const message = encodeMessage(req.body.body)
     const recipient = peerIdFromString(req.body.recipient)
@@ -44,7 +44,7 @@ const POST: Operation = [
     }
 
     try {
-      console.log("SEND")
+      console.log('SEND')
       let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops, tag)
       log(`after sending message`)
       metric_successfulSendApiCalls.increment()

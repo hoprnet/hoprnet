@@ -1,5 +1,4 @@
 import path from 'path'
-import { debug } from '@hoprnet/hopr-utils'
 
 import {
   create_gauge,
@@ -12,7 +11,8 @@ import {
   create_histogram_with_buckets,
   pickVersion,
   defer,
-  Address
+  Address,
+  debug
 } from '@hoprnet/hopr-utils'
 import {
   Health,

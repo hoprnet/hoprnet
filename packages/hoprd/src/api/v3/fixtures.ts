@@ -2,7 +2,7 @@ import express from 'express'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { Balance, BalanceType, U256, ChannelEntry, PublicKey, ChannelStatus, Address } from '@hoprnet/hopr-utils'
+import { Balance, BalanceType, U256, ChannelEntry, ChannelStatus, Address } from '@hoprnet/hopr-utils'
 import { setupRestApi } from '../v3.js'
 import { MessageInbox, MessageInboxConfiguration, hoprd_inbox_initialize_crate } from '../../../lib/hoprd_inbox.js'
 hoprd_inbox_initialize_crate()
@@ -10,18 +10,12 @@ hoprd_inbox_initialize_crate()
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { State } from '../../types.js'
 
-console.log("ALICE")
 export const ALICE_PEER_ID: PeerId = peerIdFromString('12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs')
-console.log("ALICE 2")
 export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID.toString()}`)
-console.log("ALICE 3", ALICE_MULTI_ADDR)
-console.log(PublicKey.from_peerid_str('12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs'))
-console.log(PublicKey.from_peerid_str(ALICE_PEER_ID.toString())
-export const ALICE_NATIVE_ADDR = PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address()
-console.log("ALICE 4")
+export const ALICE_NATIVE_ADDR = Address.from_string('0xd08933750bffb86861d1d76e559382658ef4d761')
 export const BOB_PEER_ID: PeerId = peerIdFromString('12D3KooWRNw2pJC9748Fmq4WNV27HoSTcX3r37132FLkQMrbKAiC')
 export const BOB_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${BOB_PEER_ID.toString()}`)
-export const BOB_NATIVE_ADDR = PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address()
+export const BOB_NATIVE_ADDR = Address.from_string('0xd08933750bffb86861d1d76e559382658ef4d763')
 export const CHARLIE_PEER_ID: PeerId = peerIdFromString('12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF')
 export const INVALID_PEER_ID = 'definetly not a valid peerId'
 

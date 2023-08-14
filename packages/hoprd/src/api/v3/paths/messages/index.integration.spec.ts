@@ -3,9 +3,10 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 
-import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 import { ApplicationData, MessageInbox, hoprd_inbox_initialize_crate } from '../../../../../lib/hoprd_inbox.js'
 hoprd_inbox_initialize_crate()
+
+import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 
 import type Hopr from '@hoprnet/hopr-core'
 
@@ -66,9 +67,10 @@ describe('POST /messages', function () {
   })
 
   it('should work when parameters are correct', async function () {
+    console.log('HELLO')
     const tag = 112
     const body = 'hello world'
-    const recipient = ALICE_PEER_ID
+    const recipient = ALICE_PEER_ID.toString()
     const hops = 1
 
     expect(await inbox.size(tag)).to.equal(0)
