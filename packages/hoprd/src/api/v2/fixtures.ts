@@ -4,7 +4,7 @@ import { peerIdFromString } from '@libp2p/peer-id'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { setupRestApi } from '../v2.js'
-import { Balance, BalanceType, Hash, U256, ChannelEntry, PublicKey, ChannelStatus, Address } from '@hoprnet/hopr-utils'
+import { Balance, BalanceType, U256, ChannelEntry, PublicKey, ChannelStatus, Address } from '@hoprnet/hopr-utils'
 import { MessageInbox, MessageInboxConfiguration } from '../../../lib/hoprd_inbox.js'
 
 export const ALICE_PEER_ID: PeerId = peerIdFromString('16Uiu2HAmC9CRFeuF2cTf6955ECFmgDw6d27jLows7bftMqat5Woz')
@@ -34,8 +34,6 @@ export function channelEntryCreateMock(): ChannelEntry {
     src,
     dest,
     new Balance('1', BalanceType.HOPR),
-    Hash.create([]),
-    U256.one(),
     U256.one(),
     ChannelStatus.Closed,
     U256.one(),

@@ -18,6 +18,7 @@ import {
   PublicKey,
   AccountEntry,
   create_counter,
+  OffchainPublicKey,
   ChainKeypair,
   OffchainKeypair,
   KeyBinding
@@ -29,10 +30,7 @@ import {
   Ethereum_Balance,
   Ethereum_BalanceType,
   Ethereum_ChannelEntry,
-  Ethereum_U256,
   Ethereum_Hash,
-  initialize_commitment,
-  ChannelCommitmentInfo,
   CORE_ETHEREUM_CONSTANTS,
   is_allowed_to_access_network,
   redeem_ticket
@@ -70,6 +68,12 @@ export type ChainOptions = {
   network: string
 }
 
+export type SafeModuleOptions = {
+  safeTransactionServiceProvider?: string
+  safeAddress: Address
+  moduleAddress: Address
+}
+
 type ticketRedemtionInChannelOperations = Map<string, Promise<void>>
 
 // Exported from Rust
@@ -93,6 +97,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     private db: Ethereum_Database,
     private chainKeypair: ChainKeypair,
     private options: ChainOptions,
+    private safeModuleOptions: SafeModuleOptions,
     private automaticChainCreation: boolean
   ) {
     super()
@@ -107,13 +112,23 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public static createInstance(
+  public static async createInstance(
     db: Ethereum_Database,
     chainKeypair: ChainKeypair,
     options: ChainOptions,
+    safeModuleOptions: SafeModuleOptions,
+    deploymentAddresses: DeploymentExtract,
     automaticChainCreation = true
   ) {
-    HoprCoreEthereum._instance = new HoprCoreEthereum(db, chainKeypair, options, automaticChainCreation)
+    HoprCoreEthereum._instance = new HoprCoreEthereum(
+      db,
+      chainKeypair,
+      options,
+      safeModuleOptions,
+      automaticChainCreation
+    )
+    // Initialize connection to the blockchain
+    await HoprCoreEthereum._instance.initializeChainWrapper(deploymentAddresses)
     return HoprCoreEthereum._instance
   }
 
@@ -144,7 +159,20 @@ export default class HoprCoreEthereum extends EventEmitter {
           2
         )} `
       )
-      this.chain = await createChainWrapper(deploymentAddresses, this.options, this.chainKeypair.secret(), true)
+      log(
+        `[DEBUG] createChain createChainWrapper starting with safeModuleOptions... ${JSON.stringify(
+          this.safeModuleOptions,
+          null,
+          2
+        )} `
+      )
+      this.chain = await createChainWrapper(
+        deploymentAddresses,
+        this.safeModuleOptions,
+        this.options,
+        this.chainKeypair.secret(),
+        true
+      )
     } catch (err) {
       const errMsg = 'failed to create provider chain wrapper'
       log(`error: ${errMsg}`, err)
@@ -164,12 +192,14 @@ export default class HoprCoreEthereum extends EventEmitter {
       try {
         await this.chain.waitUntilReady()
 
+        // update token balance
         const hoprBalance = await this.chain.getBalance(this.chainKeypair.to_address())
         await this.db.set_hopr_balance(
           Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
         )
         log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
+        // indexer starts
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
 
         // Debug log used in e2e integration tests, please don't change
@@ -268,34 +298,14 @@ export default class HoprCoreEthereum extends EventEmitter {
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
-    channelClosureSecs: number
+    hoprNodeSafeRegistryAddress: string
+    noticePeriodChannelClosure: number
   } {
     return this.chain.getInfo()
   }
 
   public async waitForPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return await this.indexer.getPublicNodes()
-  }
-
-  public async commitToChannel(c: ChannelEntry): Promise<void> {
-    log(`committing to channel ${c.get_id().to_hex()}`)
-    log(c.to_string())
-    const setCommitment = async (commitment: Hash) => {
-      return this.chain.setCommitment(c.source, commitment, (txHash: string) =>
-        this.setTxHandler(`channel-updated-${txHash}`, txHash)
-      )
-    }
-
-    // Get all channel information required to build the initial commitment
-    const cci = new ChannelCommitmentInfo(
-      this.options.chainId,
-      this.smartContractInfo().hoprChannelsAddress,
-      Ethereum_Hash.deserialize(c.get_id().serialize()),
-      Ethereum_U256.deserialize(c.channel_epoch.serialize())
-    )
-
-    log(`initializing commitment`)
-    await initialize_commitment(this.db, this.chainKeypair.secret(), cci, setCommitment)
   }
 
   public async redeemAllTickets(): Promise<void> {
@@ -505,10 +515,10 @@ export default class HoprCoreEthereum extends EventEmitter {
       ).serialize()
     )
 
-    if (c.status !== ChannelStatus.Open && c.status !== ChannelStatus.WaitingForCommitment) {
+    if (c.status !== ChannelStatus.Open) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
     }
-    return this.chain.initiateChannelClosure(dest, (txHash: string) =>
+    return this.chain.initiateOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
@@ -530,7 +540,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    return await this.chain.finalizeChannelClosure(dest, (txHash: string) =>
+    return await this.chain.finalizeOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
@@ -574,6 +584,47 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
+  public async registerSafeByNode(): Promise<Receipt> {
+    const nodeAddress = this.chainKeypair.to_address()
+    const safeAddress = this.safeModuleOptions.safeAddress
+    log(`====> registerSafeByNode nodeAddress: ${nodeAddress.to_hex()} safeAddress ${safeAddress.to_hex()}`)
+
+    const targetAddress = await this.chain.getModuleTargetAddress()
+    if (!targetAddress.eq(Address.from_string(safeAddress.to_string()))) {
+      // cannot proceed when the safe address is not the target/owner of given module
+      throw Error('Safe is not a target of module.')
+    }
+
+    const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
+
+    let receipt = undefined
+    if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
+      // if the node is not associated with any safe address, register it
+      receipt = await this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
+        this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
+      )
+    }
+
+    if (!registeredAddress.eq(Address.from_string(safeAddress.to_string()))) {
+      // the node has been associated with a differnt safe address
+      throw Error('Node has been registered with a different safe')
+    }
+
+    // the node has been associated with the provided safe address
+    log(`====> registerSafeByNode registeredAddress: is safeAddress`)
+
+    // update safe and module address
+    log(`>> should update safe and module address`)
+    await this.db.set_staking_safe_address(Ethereum_Address.deserialize(safeAddress.serialize()))
+    log(`>> set staking safe address`)
+    await this.db.set_staking_module_address(
+      Ethereum_Address.deserialize(this.safeModuleOptions.moduleAddress.serialize())
+    )
+    log(`>> set staking module address`)
+
+    return receipt
+  }
+
   /**
    * Checks whether a given `hoprNode` is allowed access.
    * When the register is disabled, a `hoprNode` is seen as `registered`,
@@ -608,7 +659,12 @@ export default class HoprCoreEthereum extends EventEmitter {
       getAccount: () => {
         connectorLogger('getAccount method was called')
         return Promise.resolve(
-          new AccountEntry(chainKeypair.public().to_address(), `/ip4/127.0.0.1/tcp/124/p2p/${peerId.toString()}`, 1)
+          new AccountEntry(
+            OffchainPublicKey.from_peerid_str(peerId.toString()),
+            chainKeypair.public().to_address(),
+            `/ip4/127.0.0.1/tcp/124/p2p/${peerId.toString()}`,
+            1
+          )
         )
       },
       waitForPublicNodes: () => {
@@ -633,7 +689,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 }
 
-export { useFixtures } from './indexer/index.mock.js'
+// export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
-export { ChannelEntry, ChannelCommitmentInfo, Indexer, ChainWrapper, createChainWrapper }
+export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper }

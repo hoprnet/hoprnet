@@ -16,7 +16,14 @@ import {
   type PublicNodesEmitter,
   compareAddressesPublicMode
 } from '@hoprnet/hopr-connect'
-import { debug, isAddressWithPeerId, LevelDb, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-utils'
+import {
+  debug,
+  isAddressWithPeerId,
+  LevelDb,
+  ChainKeypair,
+  OffchainKeypair,
+  Address as Packet_Address
+} from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'
@@ -253,8 +260,25 @@ export async function createHoprNode(
 
   let db = new Database(levelDb, chainKeypair.public().to_address())
 
+  // if safe address or module address is not provided, replace with values stored in the db
+  log(`options.safeModule.safeAddress: ${options.safeModule.safeAddress}`)
+  log(`options.safeModule.safeAddress: ${options.safeModule.moduleAddress}`)
+  const safeAddress =
+    options.safeModule.safeAddress ?? Packet_Address.deserialize((await db.get_staking_safe_address()).serialize())
+  const moduleAddress =
+    options.safeModule.moduleAddress ?? Packet_Address.deserialize((await db.get_staking_module_address()).serialize())
+  if (!safeAddress || !moduleAddress) {
+    log(`failed to provide safe or module address:`)
+    throw new Error('Hopr Node must be initialized with safe and module address')
+  }
+
   log(`using provider URL: ${options.network.chain.default_provider}`)
-  const chain = HoprCoreEthereum.createInstance(
+
+  // get contract data for the given environment id and pass it on to create chain wrapper
+  const resolvedContractAddresses = getContractData(options.network.id)
+  log(`[DEBUG] resolvedContractAddresses ${options.network.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`)
+
+  await HoprCoreEthereum.createInstance(
     db,
     chainKeypair,
     {
@@ -265,14 +289,17 @@ export async function createHoprNode(
       chain: options.network.chain.id,
       provider: options.network.chain.default_provider
     },
+    {
+      safeTransactionServiceProvider: options.safeModule.safeTransactionServiceProvider,
+      safeAddress,
+      moduleAddress
+    },
+    resolvedContractAddresses,
     automaticChainCreation
   )
 
-  // get contract data for the given environment id and pass it on to create chain wrapper
-  const resolvedContractAddresses = getContractData(options.network.id)
-  log(`[DEBUG] resolvedContractAddresses ${options.network.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`)
-  // Initialize connection to the blockchain
-  await chain.initializeChainWrapper(resolvedContractAddresses)
+  // // Initialize connection to the blockchain
+  // await chain.initializeChainWrapper(resolvedContractAddresses)
 
   return new Hopr(chainKeypair, packetKeypair, db, options)
 }

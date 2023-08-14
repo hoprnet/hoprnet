@@ -176,6 +176,18 @@ pub trait HoprCoreEthereumDbActions {
     /// Subtract balance from the current balance.
     async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()>;
 
+    /// Get the staking safe address
+    async fn get_staking_safe_address(&self) -> Result<Option<Address>>;
+
+    /// Sets the staking safe address
+    async fn set_staking_safe_address(&mut self, safe_address: &Address) -> Result<()>;
+
+    /// Get the staking module address
+    async fn get_staking_module_address(&self) -> Result<Option<Address>>;
+
+    /// Sets the staking module address
+    async fn set_staking_module_address(&mut self, module_address: &Address) -> Result<()>;
+
     /// Check whether the Network Registry is enabled.
     async fn is_network_registry_enabled(&self) -> Result<bool>;
 
@@ -193,7 +205,7 @@ pub trait HoprCoreEthereumDbActions {
     /// Unlink Hopr public key to an ETH address by removing the entry.
     async fn remove_from_network_registry(
         &mut self,
-        public_key: &Address,
+        node_address: &Address,
         account: &Address,
         snapshot: &Snapshot,
     ) -> Result<()>;
@@ -209,6 +221,28 @@ pub trait HoprCoreEthereumDbActions {
 
     /// Set address as eligible to be operating in the network.
     async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()>;
+
+    /// Add Hopr node ETH address to its associated safe address.
+    async fn add_to_node_safe_registry(
+        &mut self,
+        node_address: &Address,
+        safe_address: &Address,
+        snapshot: &Snapshot,
+    ) -> Result<()>;
+
+    /// Unlink Hopr node ETH address and the safe address.
+    async fn remove_from_node_safe_registry(
+        &mut self,
+        node_address: &Address,
+        safe_address: &Address,
+        snapshot: &Snapshot,
+    ) -> Result<()>;
+
+    /// Get safe address associated with the public key.
+    async fn get_safe_from_node_safe_registry(&self, node_address: &Address) -> Result<Option<Address>>;
+
+    /// Find HOPR node based on its associated safe address.
+    async fn find_hopr_node_using_safe_in_node_safe_registry(&self, account: &Address) -> Result<Vec<Address>>;
 
     /// Stores the REST API token.
     async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;

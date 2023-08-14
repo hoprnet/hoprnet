@@ -1,5 +1,6 @@
 use ethnum::{u256, AsU256};
 use getrandom::getrandom;
+use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Mul};
@@ -78,6 +79,22 @@ impl BinarySerializable for Address {
 
     fn to_bytes(&self) -> Box<[u8]> {
         self.addr.into()
+    }
+}
+
+impl TryFrom<[u8; Address::SIZE]> for Address {
+    type Error = GeneralError;
+
+    fn try_from(value: [u8; Address::SIZE]) -> std::result::Result<Self, Self::Error> {
+        Address::from_bytes(&value)
+    }
+}
+
+impl TryFrom<H160> for Address {
+    type Error = GeneralError;
+
+    fn try_from(value: H160) -> std::result::Result<Self, Self::Error> {
+        Address::try_from(value.0)
     }
 }
 

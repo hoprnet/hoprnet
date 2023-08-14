@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
 import "../../src/static/HoprToken.sol";
@@ -18,7 +18,7 @@ contract HoprTokenFixtureTest is Test, ERC1820RegistryFixtureTest, AccountsFixtu
         // give deployer account minter role.
         hoprToken.grantRole(MINTER_ROLE, address(this));
         // mint 10 hopr tokens for accountA and accountB
-        hoprToken.mint(accountA.accountAddr, 10 ether, hex'00', hex'00');
-        hoprToken.mint(accountB.accountAddr, 10 ether, hex'00', hex'00');
+        hoprToken.mint(accountA.accountAddr, 10 ether, hex"00", hex"00");
+        hoprToken.mint(accountB.accountAddr, 10 ether, hex"00", hex"00");
     }
 }

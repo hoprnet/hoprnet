@@ -43,8 +43,6 @@ function channelEntryCreateMock(): ChannelEntry {
     src,
     dest,
     new Balance('1', BalanceType.HOPR),
-    Hash.create([]),
-    U256.one(),
     U256.one(),
     ChannelStatus.Closed,
     U256.one(),
@@ -60,7 +58,6 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, ba
   let chainKp = new ChainKeypair(signerPrivKey)
   let tkt = Ticket.new(
     counterparty,
-    U256.zero(),
     U256.zero(),
     balance,
     U256.from_inverse_probability(U256.one()),

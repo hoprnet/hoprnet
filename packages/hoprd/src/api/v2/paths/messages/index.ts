@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { create_counter, PublicKey } from '@hoprnet/hopr-utils'
+import { create_counter, OffchainPublicKey } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 import { encodeMessage } from '../../../utils.js'
 import { RPCH_MESSAGE_REGEXP } from '../../../v2.js'
@@ -22,9 +22,9 @@ const POST: Operation = [
     const hops = req.body.hops
 
     // only set path if given, otherwise a path will be chosen by hopr core
-    let path: PublicKey[]
+    let path: OffchainPublicKey[]
     if (req.body.path != undefined) {
-      path = req.body.path.map((peer: string) => PublicKey.from_peerid_str(peer))
+      path = req.body.path.map((peer: string) => OffchainPublicKey.from_peerid_str(peer))
     }
 
     try {

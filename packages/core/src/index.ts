@@ -49,7 +49,6 @@ import {
   AcknowledgedTicket,
   ChannelStatus,
   ChannelEntry,
-  OffchainPublicKey,
   PublicKey,
   Ticket,
   Hash,
@@ -57,24 +56,10 @@ import {
   Balance,
   BalanceType,
   pickVersion,
+  OffchainPublicKey,
   OffchainKeypair,
   ChainKeypair
 } from '@hoprnet/hopr-utils'
-
-import {
-  Address,
-  AcknowledgedTicket,
-  ChannelStatus,
-  ChannelEntry,
-  PublicKey,
-  Ticket,
-  Hash,
-  HalfKeyChallenge,
-  Balance,
-  BalanceType
-} from '@hoprnet/hopr-utils'
-
-import { type HoprDB } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
@@ -247,6 +232,14 @@ export type HoprOptions = {
     // When using mocked libp2p instances
     mockedNetwork?: Libp2pEmitter<any>
   }
+  safeModule: {
+    // Base URL to interact with safe transaction service
+    safeTransactionServiceProvider?: string
+    // Address of node's safe proxy instance
+    safeAddress?: Address
+    // Address of node's safe-module proxy instance
+    moduleAddress?: Address
+  }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -362,6 +355,7 @@ class Hopr extends EventEmitter {
       throw new Error('Cannot start node without a funded wallet')
     }
     log('Node has enough to get started, continuing starting payment channels')
+
     verbose('Starting HoprEthereum, which will trigger the indexer')
     await connector.start()
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
@@ -580,7 +574,15 @@ class Hopr extends EventEmitter {
       await this.onPeerAnnouncement(announcedNode)
     }
 
-    connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
+    try {
+      // register node-safe pair to NodeSafeRegistry
+      log(`check node-safe registry`)
+      await this.registerSafeByNode()
+    } catch (err) {
+      console.error(`Could not register node with safe`)
+      console.error(`Observed error:`, err)
+      process.exit(1)
+    }
 
     try {
       await this.announce(this.options.announce)
@@ -712,18 +714,6 @@ class Hopr extends EventEmitter {
       if ([AddressClass.Public, AddressClass.Public6].includes(maToClass(addr))) {
         await dht.setMode('server')
         break
-      }
-    }
-  }
-
-  private async onChannelWaitingForCommitment(c: ChannelEntry): Promise<void> {
-    if (this.strategy.shouldCommitToChannel(c)) {
-      log(`Found channel ${c.get_id().to_hex()} to us with unset commitment. Setting commitment`)
-      try {
-        await retryWithBackoffThenThrow(() => HoprCoreEthereum.getInstance().commitToChannel(c))
-      } catch (err) {
-        // @TODO what to do here? E.g. delete channel from db?
-        error(`Couldn't set commitment in channel to ${c.destination.to_string()} (channelId ${c.get_id().to_hex()})`)
       }
     }
   }
@@ -1227,6 +1217,25 @@ class Hopr extends EventEmitter {
   }
 
   /**
+   * Register node with safe in HoprNodeSaferegistry if needed
+   * @dev Promise resolves before own announcement appears in the indexer
+   * @returns a Promise that resolves once announce transaction has been published
+   */
+  private async registerSafeByNode(): Promise<void> {
+    const connector = HoprCoreEthereum.getInstance()
+
+    try {
+      log('registering node safe on-chain... ')
+      const registryTxHash = await connector.registerSafeByNode()
+      log('registering node safe on-chain done in tx %s', registryTxHash)
+    } catch (err) {
+      log('registering node safe on-chain failed')
+      this.maybeEmitFundsEmptyEvent(err)
+      throw new Error(`Failed to register node safe: ${err}`)
+    }
+  }
+
+  /**
    * Announces address of node on-chain to be reachable by other nodes.
    * @dev Promise resolves before own announcement appears in the indexer
    * @param announceRoutableAddress publish routable address if true
@@ -1278,7 +1287,7 @@ class Hopr extends EventEmitter {
     const ownAccount = await connector.getAccount(this.getEthereumAddress())
 
     // Do not announce if our last is equal to what we intend to announce
-    if (ownAccount?.get_multiaddress_str() === addrToAnnounce.toString()) {
+    if (ownAccount?.get_multiaddr_str() === addrToAnnounce.toString()) {
       log(`intended address has already been announced, nothing to do`)
       return
     }
@@ -1328,7 +1337,8 @@ class Hopr extends EventEmitter {
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
-    channelClosureSecs: number
+    hoprNodeSafeRegistryAddress: string
+    noticePeriodChannelClosure: number
   } {
     return HoprCoreEthereum.getInstance().smartContractInfo()
   }
@@ -1455,7 +1465,7 @@ class Hopr extends EventEmitter {
 
     let txHash: string
     try {
-      if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
+      if (channel.status === ChannelStatus.Open) {
         log('initiating closure of channel', channel.get_id().to_hex())
         txHash = await connector.initializeClosure(channel.source, channel.destination)
       } else {

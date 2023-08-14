@@ -1,0 +1,6 @@
+{
+	"dependencies": {
+		"solc": "^0.4.24",
+		"soljitsu": "^0.1.2"
+	}
+}

@@ -532,7 +532,6 @@ mod tests {
             Ticket::new(
                 next_peer_channel_key.to_address(),
                 U256::zero(),
-                U256::zero(),
                 Balance::new(
                     (PRICE_PER_PACKET * INVERSE_TICKET_WIN_PROB * (path_len - 1) as u128).into(),
                     BalanceType::HOPR,

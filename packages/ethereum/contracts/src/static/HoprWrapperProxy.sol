@@ -45,13 +45,12 @@ contract HoprWrapperProxy is IERC777Recipient {
    * @dev ERC677 hook. Token holder can send their xHOPR with `transferAndCall` to this contract.
    * @param _from address Address of tokens sender. It should be from the multisig
    * @param _value uint256 token amount being transferred
-   * @param _data bytes Data being sent along with token transfer
    */
   function onTokenTransfer(
     address _from,
     uint256 _value,
     // solhint-disable-next-line no-unused-vars
-    bytes memory _data
+    bytes memory
   ) external returns (bool) {
     require(msg.sender == XHOPR_TOKEN, 'HoprWrapperProxy: Only accept xHOPR token');
     require(_from == XDAI_MULTISIG, 'HoprWrapperProxy: Only accept xHOPR from the Asso MultiSig');
@@ -63,20 +62,17 @@ contract HoprWrapperProxy is IERC777Recipient {
 
   /**
    * @dev token recipient hook for ERC777
-   * @param operator address operator requesting the transfer
    * @param from address token holder address.
    * @param to address recipient address
    * @param amount uint256 amount of tokens to transfer
-   * @param userData bytes extra information provided by the token holder (if any)
-   * @param operatorData bytes extra information provided by the operator (if any)
    */
   function tokensReceived(
-    address operator,
+    address,
     address from,
     address to,
     uint256 amount,
-    bytes calldata userData,
-    bytes calldata operatorData
+    bytes calldata,
+    bytes calldata
   ) external override {
     require(msg.sender == WXHOPR_TOKEN, 'HoprWrapperProxy: Only accept WXHOPR_TOKEN token');
     // require(from == WRAPPER, 'HoprWrapperProxy: Only accept WXHOPR token from the wrapper');

@@ -32,4 +32,5 @@ exclude = [
     "node_modules",
     "venv",
     "vendor",
+    "packages/ethereum/contracts/lib"
 ]

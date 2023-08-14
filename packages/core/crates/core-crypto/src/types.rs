@@ -472,11 +472,25 @@ impl Hash {
     }
 }
 
+impl TryFrom<[u8; 32]> for Hash {
+    type Error = GeneralError;
+
+    fn try_from(value: [u8; 32]) -> std::result::Result<Self, Self::Error> {
+        Hash::from_bytes(&value)
+    }
+}
+
 /// Represents an Ed25519 public key.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct OffchainPublicKey {
     compressed: CompressedEdwardsY,
+}
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl OffchainPublicKey {
+    pub fn to_string(&self) -> String {
+        self.to_hex()
+    }
 }
 
 impl BinarySerializable for OffchainPublicKey {
@@ -494,6 +508,14 @@ impl BinarySerializable for OffchainPublicKey {
 
     fn to_bytes(&self) -> Box<[u8]> {
         self.compressed.to_bytes().into()
+    }
+}
+
+impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
+    type Error = GeneralError;
+
+    fn try_from(value: [u8; OffchainPublicKey::SIZE]) -> std::result::Result<Self, Self::Error> {
+        OffchainPublicKey::from_bytes(&value)
     }
 }
 
@@ -892,6 +914,19 @@ impl BinarySerializable for OffchainSignature {
     }
 }
 
+impl TryFrom<([u8; 32], [u8; 32])> for OffchainSignature {
+    type Error = GeneralError;
+
+    fn try_from(value: ([u8; 32], [u8; 32])) -> std::result::Result<Self, Self::Error> {
+        let mut sig = [0u8; OffchainSignature::SIZE];
+
+        sig[0..32].copy_from_slice(&value.0);
+        sig[32..64].copy_from_slice(&value.1);
+
+        OffchainSignature::from_bytes(&sig)
+    }
+}
+
 /// Represents an ECDSA signature based on the secp256k1 curve with recoverable public key.
 /// This signature encodes the 2-bit recovery information into the
 /// upper-most bits of MSB of the S value, which are never used by this ECDSA
@@ -1121,6 +1156,40 @@ pub mod tests {
 
         let deserialized = Signature::from_bytes(&sgn.to_bytes()).unwrap();
         assert_eq!(sgn, deserialized, "signatures don't match");
+    }
+
+    #[test]
+    fn offchain_signature() {
+        let msg = b"test12345";
+        let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
+
+        let key = ed25519_dalek::SecretKey::from_bytes(&PRIVATE_KEY).unwrap();
+        let pk: ed25519_dalek::PublicKey = (&key).into();
+        let kp = ed25519_dalek::Keypair {
+            secret: key,
+            public: pk.clone(),
+        };
+
+        let sgn = kp.sign(msg);
+        assert!(pk.verify_strict(msg, &sgn).is_ok(), "blomp");
+
+        let sgn_1 = OffchainSignature::sign_message(msg, &keypair);
+        let sgn_2 = OffchainSignature::from_bytes(&sgn_1.to_bytes()).unwrap();
+
+        assert!(
+            sgn_1.verify_message(msg, keypair.public()),
+            "cannot verify message via sig 1"
+        );
+        assert!(
+            sgn_2.verify_message(msg, keypair.public()),
+            "cannot verify message via sig 2"
+        );
+        assert_eq!(sgn_1, sgn_2, "signatures must be equal");
+        // let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
+
+        // let sig = OffchainSignature::sign_message("my test msg".as_bytes(), &keypair);
+
+        // assert!(sig.verify_message("my test msg".as_bytes(), keypair.public()));
     }
 
     #[test]

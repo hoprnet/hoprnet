@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
 import "../../src/static/HoprToken.sol";
@@ -28,7 +28,7 @@ contract HoprTokenTest is Test, ERC1820RegistryFixtureTest {
         // prank deployer account
         vm.prank(address(this));
         vm.expectRevert("caller does not have minter role");
-        hoprToken.mint(vm.addr(1), amount, hex'00', hex'00');
+        hoprToken.mint(vm.addr(1), amount, hex"00", hex"00");
     }
 
     function testMintWithMinterRole(uint256 amount) public {
@@ -37,7 +37,7 @@ contract HoprTokenTest is Test, ERC1820RegistryFixtureTest {
         // give deployer account minter role.
         hoprToken.grantRole(MINTER_ROLE, address(this));
         vm.expectEmit(true, false, false, false, address(hoprToken));
-        emit Minted(address(this), vm.addr(1), amount, hex'00', hex'00');
-        hoprToken.mint(vm.addr(1), amount, hex'00', hex'00');
+        emit Minted(address(this), vm.addr(1), amount, hex"00", hex"00");
+        hoprToken.mint(vm.addr(1), amount, hex"00", hex"00");
     }
 }

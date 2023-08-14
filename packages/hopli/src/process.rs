@@ -114,6 +114,30 @@ pub fn child_process_call_foundry_express_initialization(
     child_process_call_foundry(network, &self_register_args)
 }
 
+/// Launch a child process to call foundry express-setup-safe-module command
+///
+/// # Arguments
+///
+/// * `network` - Name of the network that nodes run in
+/// * `environment_type` - Type of the environment that nodes run in
+/// * `node_address` - Addresses of HOPR nodes to be included in the module
+pub fn child_process_call_foundry_express_setup_safe_module(
+    network: &str,
+    ethereum_address: &String,
+) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let self_register_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "expressSetupSafeModule(address[])",
+        &ethereum_address,
+    ];
+
+    child_process_call_foundry(network, &self_register_args)
+}
+
 /// Launch a child process to call foundry  command
 ///
 /// # Arguments

@@ -14,10 +14,6 @@ import {
   Ticket as Ethereum_Ticket,
   U256 as Ethereum_U256,
   core_hopr_initialize_crate,
-  initialize_commitment,
-  find_commitment_preimage,
-  bump_commitment,
-  ChannelCommitmentInfo,
   is_allowed_to_access_network,
   redeem_ticket
 } from '../../core/lib/core_hopr.js'
@@ -38,10 +34,6 @@ export {
   Ethereum_Ticket,
   Ethereum_U256,
   Ethereum_Hash,
-  initialize_commitment,
-  find_commitment_preimage,
-  bump_commitment,
-  ChannelCommitmentInfo,
   CORE_ETHEREUM_CONSTANTS,
   is_allowed_to_access_network,
   redeem_ticket

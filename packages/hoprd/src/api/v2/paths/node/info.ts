@@ -8,8 +8,14 @@ import { health_to_string } from '@hoprnet/hopr-core'
  */
 export const getInfo = async (node: Hopr) => {
   try {
-    const { chain, hoprTokenAddress, hoprChannelsAddress, channelClosureSecs, hoprNetworkRegistryAddress } =
-      node.smartContractInfo()
+    const {
+      chain,
+      hoprTokenAddress,
+      hoprChannelsAddress,
+      noticePeriodChannelClosure,
+      hoprNetworkRegistryAddress,
+      hoprNodeSafeRegistryAddress
+    } = node.smartContractInfo()
 
     return {
       network: node.network.id,
@@ -19,9 +25,10 @@ export const getInfo = async (node: Hopr) => {
       hoprToken: hoprTokenAddress,
       hoprChannels: hoprChannelsAddress,
       hoprNetworkRegistry: hoprNetworkRegistryAddress,
+      hoprNodeSafeRegistry: hoprNodeSafeRegistryAddress,
       isEligible: await node.isAllowedAccessToNetwork(node.getId()),
       connectivityStatus: health_to_string(node.getConnectivityHealth()),
-      channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
+      channelClosurePeriod: Math.ceil(noticePeriodChannelClosure / 60)
     }
   } catch (error) {
     // Make sure this doesn't throw
@@ -106,6 +113,11 @@ GET.apiDoc = {
                 example: '0xBEE1F5d64b562715E749771408d06D57EE0892A7',
                 description:
                   'Contract address of the contract that allows to control the number of nodes in the network'
+              },
+              hoprNodeSafeRegistryAddress: {
+                type: 'string',
+                example: '0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82',
+                description: 'Contract address of the contract that register node and safe pairs'
               },
               connectivityStatus: {
                 type: 'string',

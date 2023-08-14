@@ -167,8 +167,6 @@ mod tests {
             source,
             destination,
             Balance::new(U256::new("1234").mul(U256::new("10000000000000000")), BalanceType::HOPR),
-            Hash::new(&random_bytes::<32>()),
-            U256::zero(),
             U256::zero(),
             status,
             U256::zero(),

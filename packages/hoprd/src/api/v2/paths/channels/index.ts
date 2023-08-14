@@ -27,8 +27,6 @@ export interface ChannelTopologyInfo {
   destinationAddress: string
   balance: string
   status: string
-  commitment: string
-  ticketEpoch: string
   ticketIndex: string
   channelEpoch: string
   closureTime: string
@@ -46,8 +44,6 @@ export const formatChannelTopologyInfo = (channel: ChannelEntry): ChannelTopolog
     destinationAddress: channel.destination.to_hex(),
     balance: channel.balance.to_string(),
     status: channel_status_to_string(channel.status),
-    commitment: channel.commitment.to_hex(),
-    ticketEpoch: channel.ticket_epoch.to_string(),
     ticketIndex: channel.ticket_index.to_string(),
     channelEpoch: channel.channel_epoch.to_string(),
     closureTime: channel.closure_time.to_string()

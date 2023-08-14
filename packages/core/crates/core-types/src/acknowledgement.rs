@@ -299,7 +299,6 @@ pub mod test {
         Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
             U256::new("1"),
-            U256::new("2"),
             Balance::new(
                 (inverse_win_prob * price_per_packet * path_pos as u128).into(),
                 BalanceType::HOPR,

@@ -11,7 +11,8 @@ import {
   create_histogram_with_buckets,
   pickVersion,
   defer,
-  privKeyToPeerId
+  privKeyToPeerId,
+  Address
 } from '@hoprnet/hopr-utils'
 import {
   Health,
@@ -119,7 +120,12 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
     password: cfg.identity.password,
     strategy,
     forceCreateDB: cfg.db.force_initialize,
-    noRelay: cfg.network_options.no_relay
+    noRelay: cfg.network_options.no_relay,
+    safeModule: {
+      safeTransactionServiceProvider: cfg.safe_module.safe_transaction_service_provider,
+      safeAddress: cfg.safe_module.safe_address,
+      moduleAddress: cfg.safe_module.module_address
+    }
   }
 
   if (isStrategy(cfg.strategy.name)) {
@@ -128,6 +134,13 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
       auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
       max_channels: cfg.strategy.max_auto_channels ?? undefined
     })
+  }
+
+  if (cfg.safe_module.safe_address) {
+    options.safeModule.safeAddress = Address.deserialize(cfg.safe_module.safe_address.serialize())
+  }
+  if (cfg.safe_module.module_address) {
+    options.safeModule.moduleAddress = Address.deserialize(cfg.safe_module.module_address.serialize())
   }
 
   return options
@@ -260,10 +273,14 @@ async function main() {
     }
   }
 
+  logs.log('before parseCliArguments')
   const argv = parseCliArguments(process.argv.slice(1))
+  logs.log('after parseCliArguments')
   let cfg: HoprdConfig
   try {
+    logs.log('before fetch_configuration')
     cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
+    logs.log('after fetch_configuration')
   } catch (err) {
     console.error(err)
     process.exit(1)

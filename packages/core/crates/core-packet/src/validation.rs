@@ -47,16 +47,6 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
         )));
     }
 
-    // ticket's epoch MUST match our channel's epoch
-    if !ticket.epoch.eq(&channel.ticket_epoch) {
-        return Err(TicketValidation(format!(
-            "ticket epoch {} does not match our account epoch {} of channel {}",
-            ticket.epoch,
-            channel.ticket_epoch,
-            channel.get_id()
-        )));
-    }
-
     // ticket's channelEpoch MUST match the current channel's epoch
     if !ticket.channel_epoch.eq(&channel.channel_epoch) {
         return Err(TicketValidation(format!(
@@ -74,7 +64,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
             .get_tickets(Some(*sender))
             .await? // all tickets from sender
             .into_iter()
-            .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
+            .filter(|t| t.channel_epoch.eq(&channel.channel_epoch))
             .fold(Some(channel.balance), |result, t| {
                 result
                     .and_then(|b| b.value().value().checked_sub(*t.amount.value().value()))
@@ -206,6 +196,10 @@ mod tests {
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
             async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
+            async fn get_staking_safe_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn set_staking_safe_address(&mut self, safe_address: &Address) -> core_ethereum_db::errors::Result<()>;
+            async fn get_staking_module_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn set_staking_module_address(&mut self, module_address: &Address) -> core_ethereum_db::errors::Result<()>;
             async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn is_network_registry_enabled(&self) -> core_ethereum_db::errors::Result<bool>;
@@ -224,6 +218,20 @@ mod tests {
             ) -> core_ethereum_db::errors::Result<()>;
             async fn get_account_from_network_registry(&self, public_key: &Address) -> core_ethereum_db::errors::Result<Option<Address>>;
             async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
+            async fn add_to_node_safe_registry(
+                &mut self,
+                node_address: &Address,
+                safe_address: &Address,
+                snapshot: &Snapshot,
+            ) -> core_ethereum_db::errors::Result<()>;
+            async fn remove_from_node_safe_registry(
+                &mut self,
+                node_address: &Address,
+                safe_address: &Address,
+                snapshot: &Snapshot,
+            ) -> core_ethereum_db::errors::Result<()>;
+            async fn get_safe_from_node_safe_registry(&self, node_address: &Address) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn find_hopr_node_using_safe_in_node_safe_registry(&self, safe_address: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
             async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
             async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
@@ -235,7 +243,6 @@ mod tests {
     fn create_valid_ticket() -> Ticket {
         Ticket::new(
             TARGET_ADDR.clone(),
-            U256::one(),
             U256::one(),
             Balance::new(U256::one(), BalanceType::HOPR),
             U256::from_inverse_probability(U256::one()).unwrap(),
@@ -249,8 +256,6 @@ mod tests {
             TARGET_ADDR.clone(),
             TARGET_ADDR.clone(),
             Balance::from_str("100", BalanceType::HOPR),
-            Hash::create(&[&hex!("deadbeef")]),
-            U256::one(),
             U256::zero(),
             ChannelStatus::Open,
             U256::one(),
@@ -393,8 +398,7 @@ mod tests {
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
         let ticket = create_valid_ticket();
-        let mut channel = create_channel_entry();
-        channel.ticket_epoch = 2u32.into();
+        let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
             &db,

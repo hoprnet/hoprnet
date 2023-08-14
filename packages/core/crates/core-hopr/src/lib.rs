@@ -10,7 +10,13 @@ pub mod wasm {
 
     // Temporarily re-export core-ethereum-misc commitments
     #[allow(unused_imports)]
-    use core_ethereum_misc::commitment::wasm::*;
+    use core_ethereum_misc::chain::wasm::*;
+    #[allow(unused_imports)]
+    use core_ethereum_misc::constants::wasm::*;
+
+    // Temporarily re-export core-path
+    #[allow(unused_imports)]
+    use core_path::wasm::*;
 
     // Temporarily re-export core-path
     #[allow(unused_imports)]

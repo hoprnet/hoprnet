@@ -524,7 +524,6 @@ where
 
         let ticket = Ticket::new(
             destination,
-            channel.ticket_epoch,
             current_index,
             amount,
             U256::from_inverse_probability(U256::new(INVERSE_TICKET_WIN_PROB))?,
@@ -898,7 +897,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::PacketError::PacketDbError;
     use crate::interaction::{
         AcknowledgementInteraction, ApplicationData, PacketInteraction, PacketInteractionConfig, Payload,
         PRICE_PER_PACKET,
@@ -907,12 +905,10 @@ mod tests {
     use async_std::sync::RwLock;
     use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use core_crypto::random::random_bytes;
     use core_crypto::shared_keys::SharedSecret;
-    use core_crypto::types::{Hash, OffchainPublicKey, PublicKey};
+    use core_crypto::types::{OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_ethereum_misc::commitment::{initialize_commitment, ChannelCommitmentInfo};
     use core_mixer::mixer::MixerConfig;
     use core_path::path::Path;
     use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement};
@@ -929,7 +925,6 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use utils_db::db::DB;
-    use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
@@ -1015,8 +1010,6 @@ mod tests {
             source,
             destination,
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
-            Hash::new(&random_bytes::<32>()),
-            U256::zero(),
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
@@ -1085,17 +1078,6 @@ mod tests {
                     &testing_snapshot,
                 )
                 .await?;
-
-                let channel_info = ChannelCommitmentInfo {
-                    chain_id: 1,
-                    contract_address: "fakeaddress".to_string(),
-                    channel_id: previous_channel.clone().unwrap().get_id().clone(),
-                    channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
-                };
-
-                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info)
-                    .await
-                    .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }
 
             previous_channel = channel;
