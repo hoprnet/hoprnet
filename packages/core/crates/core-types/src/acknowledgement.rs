@@ -47,7 +47,7 @@ impl Acknowledgement {
 }
 
 impl BinarySerializable for Acknowledgement {
-    const SIZE: usize = OffchainSignature::SIZE + AcknowledgementChallenge::SIZE + HalfKey::SIZE;
+    const SIZE: usize = OffchainSignature::SIZE + HalfKey::SIZE;
 
     fn from_bytes(data: &[u8]) -> errors::Result<Self> {
         let mut buf = data.to_vec();
@@ -234,74 +234,6 @@ impl BinarySerializable for UnacknowledgedTicket {
         ret.extend_from_slice(&self.own_key.to_bytes());
         ret.extend_from_slice(&self.signer.to_bytes());
         ret.into_boxed_slice()
-    }
-}
-
-/// Contains cryptographic challenge that needs to be solved for acknowledging a packet.
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-pub struct AcknowledgementChallenge {
-    pub ack_challenge: Option<HalfKeyChallenge>,
-    pub signature: Signature,
-}
-
-fn hash_challenge(challenge: &HalfKeyChallenge) -> Box<[u8]> {
-    let mut digest = SimpleDigest::default();
-    digest.update(&challenge.to_bytes());
-    digest.finalize()
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl AcknowledgementChallenge {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(ack_challenge: &HalfKeyChallenge, private_key: &[u8]) -> Self {
-        let hash = hash_challenge(&ack_challenge);
-        Self {
-            ack_challenge: Some(ack_challenge.clone()),
-            signature: Signature::sign_hash(&hash, private_key),
-        }
-    }
-
-    /// Checks if the given secret solves this challenge.
-    pub fn solve(&self, secret: &[u8]) -> bool {
-        self.ack_challenge
-            .as_ref()
-            .expect("challenge not valid")
-            .eq(&HalfKey::new(secret).to_challenge())
-    }
-
-    pub fn verify(public_key: &PublicKey, signature: &Signature, challenge: &HalfKeyChallenge) -> bool {
-        let hash = hash_challenge(challenge);
-        signature.verify_hash_with_pubkey(&hash, public_key)
-    }
-
-    pub fn validate(&mut self, ack_challenge: HalfKeyChallenge, public_key: &PublicKey) -> bool {
-        if self.ack_challenge.is_some() || Self::verify(public_key, &self.signature, &ack_challenge) {
-            self.ack_challenge = Some(ack_challenge);
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl BinarySerializable for AcknowledgementChallenge {
-    const SIZE: usize = Signature::SIZE;
-
-    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            Ok(AcknowledgementChallenge {
-                ack_challenge: None,
-                signature: Signature::from_bytes(data)?,
-            })
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        assert!(self.ack_challenge.is_some(), "challenge is invalid");
-        self.signature.raw_signature()
     }
 }
 

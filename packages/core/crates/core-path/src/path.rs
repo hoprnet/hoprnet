@@ -129,8 +129,7 @@ impl Display for Path {
 mod tests {
     use crate::errors::PathError;
     use crate::path::Path;
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::{Hash, OffchainPublicKey, PublicKey};
+    use core_crypto::types::{OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::channels::{ChannelEntry, ChannelStatus};
@@ -167,8 +166,6 @@ mod tests {
             source,
             destination,
             Balance::new(U256::new("1234").mul(U256::new("10000000000000000")), BalanceType::HOPR),
-            Hash::new(&random_bytes::<32>()),
-            U256::zero(),
             U256::zero(),
             status,
             U256::zero(),

@@ -92,7 +92,7 @@ impl IdentityOptions {
 pub struct HoprKeys {
     pub packet_key: OffchainKeypair,
     pub chain_key: ChainKeypair,
-    pub id: Uuid,
+    id: Uuid,
 }
 
 impl Serialize for HoprKeys {
@@ -488,36 +488,19 @@ pub mod wasm {
     #[wasm_bindgen]
     impl HoprKeys {
         #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            let keys = super::HoprKeys::new();
-            Self { w: keys }
+        pub fn _random() -> Self {
+            HoprKeys::random()
         }
 
-        #[wasm_bindgen]
-        pub fn init(identity_options: IdentityOptions) -> Result<HoprKeys, JsValue> {
-            Ok(Self {
-                w: super::HoprKeys::init(identity_options).map_err(|e| JsValue::from(e.to_string()))?,
-            })
+        #[wasm_bindgen(js_name = "init")]
+        pub fn _init(identity_options: IdentityOptions) -> JsResult<HoprKeys> {
+            ok_or_jserr!(HoprKeys::init(identity_options))
+
         }
 
-        #[wasm_bindgen(getter, js_name = "packetKeyPeerId")]
-        pub fn get_packet_key_peer_id(&self) -> Promise {
-            let mut sliced = [0u8; ED25519_PEERID_LENGTH];
-            sliced.copy_from_slice(&self.w.packet_key.public().to_peerid().to_bytes()[2..]);
-            peer_id_from_keys(Box::new(sliced), self.w.packet_key.public().to_bytes())
-        }
-
-        #[wasm_bindgen(getter, js_name = "chainKeyPeerId")]
-        pub fn get_chain_key_peer_id(&self) -> Promise {
-            let mut sliced = [0u8; SECP256K1_PEERID_LENGTH];
-            sliced.copy_from_slice(&self.w.chain_key.1.to_peerid().to_bytes()[2..]);
-
-            peer_id_from_keys(Box::new(sliced), Box::new(self.w.chain_key.0))
-        }
-
-        #[wasm_bindgen(getter, js_name = "chainKeyPrivKey")]
-        pub fn get_chain_key_priv_key(&self) -> Uint8Array {
-            Uint8Array::from(&self.w.chain_key.0[..])
+        #[wasm_bindgen(js_name = "id")]
+        pub fn _id(&self) -> String {
+            self.id.to_string()
         }
     }
 }

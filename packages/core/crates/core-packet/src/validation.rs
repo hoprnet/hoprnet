@@ -398,7 +398,7 @@ mod tests {
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
         let ticket = create_valid_ticket();
-        let mut channel = create_channel_entry();
+        let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
             &db,

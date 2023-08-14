@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use crate::account::AccountType::{Announced, NotAnnounced};
 use multiaddr::Multiaddr;
 use std::fmt::{Display, Formatter};
+use core_crypto::keypairs::{Keypair, OffchainKeypair};
+use core_crypto::types::{OffchainPublicKey, OffchainSignature};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
-use utils_types::traits::{BinarySerializable, ToHex};
+use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
 /// Type of the node account.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,12 +41,8 @@ impl Display for AccountType {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AccountEntry {
-<<<<<<< HEAD
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,
-=======
-    pub chain_key: Address,
->>>>>>> origin/master
     entry_type: AccountType,
 }
 
@@ -87,7 +85,6 @@ impl AccountEntry {
     const MAX_MULTI_ADDR_LENGTH: usize = 200;
     const MA_LENGTH_PREFIX: usize = std::mem::size_of::<u32>();
 
-<<<<<<< HEAD
     pub fn new(public_key: OffchainPublicKey, address: Address, entry_type: AccountType) -> Self {
         Self {
             public_key,
@@ -111,16 +108,11 @@ impl AccountEntry {
     /// - the IP of a PRN has changed, e.g. due to relocation
     pub fn update(&mut self, new_entry_type: AccountType) {
         self.entry_type = new_entry_type;
-=======
-    pub fn new(chain_key: Address, entry_type: AccountType) -> Self {
-        Self { chain_key, entry_type }
->>>>>>> origin/master
     }
 }
 
 impl Display for AccountEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-<<<<<<< HEAD
         write!(f, "AccountEntry {}:", self.public_key.to_peerid_str())?;
         write!(f, " PublicKey: {}", self.public_key.to_hex())?;
         match &self.entry_type {
@@ -139,32 +131,18 @@ impl Display for AccountEntry {
             }
         }
         Ok(())
-=======
-        f.debug_struct("AccountEntry")
-            .field("ChainKey", &self.chain_key.to_hex())
-            .field("Type", &self.entry_type)
-            .finish()
->>>>>>> origin/master
     }
 }
 
 impl BinarySerializable for AccountEntry {
-<<<<<<< HEAD
     const SIZE: usize =
         OffchainPublicKey::SIZE + Address::SIZE + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
-=======
-    const SIZE: usize = Address::SIZE + Self::MA_LENGTH_PREFIX + Self::MAX_MULTI_ADDR_LENGTH + 4;
->>>>>>> origin/master
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
-<<<<<<< HEAD
             let public_key = OffchainPublicKey::from_bytes(buf.drain(..OffchainPublicKey::SIZE).as_ref())?;
             let chain_addr = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
-=======
-            let chain_key = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
->>>>>>> origin/master
             let ma_len = u32::from_be_bytes(buf.drain(..Self::MA_LENGTH_PREFIX).as_ref().try_into().unwrap()) as usize;
             let entry_type = if ma_len > 0 {
                 let multiaddr =
@@ -179,15 +157,11 @@ impl BinarySerializable for AccountEntry {
             } else {
                 NotAnnounced
             };
-<<<<<<< HEAD
             Ok(Self {
                 public_key,
                 chain_addr,
                 entry_type,
             })
-=======
-            Ok(Self { chain_key, entry_type })
->>>>>>> origin/master
         } else {
             Err(ParseError)
         }
@@ -195,12 +169,8 @@ impl BinarySerializable for AccountEntry {
 
     fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-<<<<<<< HEAD
         ret.extend_from_slice(&self.public_key.to_bytes());
         ret.extend_from_slice(&self.chain_addr.to_bytes());
-=======
-        ret.extend_from_slice(&self.chain_key.to_bytes());
->>>>>>> origin/master
 
         match &self.entry_type {
             NotAnnounced => {
@@ -280,19 +250,12 @@ mod test {
 
     #[test]
     fn test_account_entry_non_routable() {
-<<<<<<< HEAD
         let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
         let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
 
         let ae1 = AccountEntry::new(
             pub_key,
             chain_addr,
-=======
-        let pub_key = PublicKey::from_privkey(&PRIVATE_KEY).unwrap().to_address();
-
-        let ae1 = AccountEntry::new(
-            pub_key,
->>>>>>> origin/master
             Announced {
                 multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
                     .parse::<Multiaddr>()
@@ -311,19 +274,12 @@ mod test {
 
     #[test]
     fn test_account_entry_routable() {
-<<<<<<< HEAD
         let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
         let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
 
         let ae1 = AccountEntry::new(
             pub_key,
             chain_addr,
-=======
-        let pub_key = PublicKey::from_privkey(&PRIVATE_KEY).unwrap().to_address();
-
-        let ae1 = AccountEntry::new(
-            pub_key,
->>>>>>> origin/master
             Announced {
                 multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
                     .parse::<Multiaddr>()
@@ -342,16 +298,10 @@ mod test {
 
     #[test]
     fn test_account_entry_not_announced() {
-<<<<<<< HEAD
         let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
         let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
 
         let ae1 = AccountEntry::new(pub_key, chain_addr, NotAnnounced);
-=======
-        let pub_key = PublicKey::from_privkey(&PRIVATE_KEY).unwrap().to_address();
-
-        let ae1 = AccountEntry::new(pub_key, NotAnnounced);
->>>>>>> origin/master
 
         assert!(!ae1.has_announced());
         assert!(ae1.updated_at().is_none());
@@ -375,26 +325,17 @@ mod test {
 pub mod wasm {
     use crate::account::AccountEntry;
     use crate::account::AccountType::{Announced, NotAnnounced};
-<<<<<<< HEAD
     use core_crypto::types::OffchainPublicKey;
-=======
->>>>>>> origin/master
     use multiaddr::Multiaddr;
     use std::str::FromStr;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-<<<<<<< HEAD
     use utils_types::{primitives::Address, traits::BinarySerializable};
-=======
-    use utils_types::primitives::Address;
-    use utils_types::traits::BinarySerializable;
->>>>>>> origin/master
     use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
     impl AccountEntry {
         #[wasm_bindgen(constructor)]
-<<<<<<< HEAD
         pub fn _new(
             public_key: OffchainPublicKey,
             chain_addr: Address,
@@ -405,12 +346,6 @@ pub mod wasm {
                 Ok(Self {
                     public_key,
                     chain_addr,
-=======
-        pub fn _new(chain_key: Address, multiaddr: Option<String>, updated_at: Option<u32>) -> JsResult<AccountEntry> {
-            if (multiaddr.is_some() && updated_at.is_some()) || (multiaddr.is_none() && updated_at.is_none()) {
-                Ok(Self {
-                    chain_key,
->>>>>>> origin/master
                     entry_type: match multiaddr {
                         None => NotAnnounced,
                         Some(multiaddr) => Announced {

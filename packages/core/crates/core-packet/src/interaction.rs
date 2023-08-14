@@ -897,7 +897,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::PacketError::PacketDbError;
     use crate::interaction::{
         AcknowledgementInteraction, ApplicationData, PacketInteraction, PacketInteractionConfig, Payload,
         PRICE_PER_PACKET,
@@ -906,9 +905,8 @@ mod tests {
     use async_std::sync::RwLock;
     use core_crypto::derivation::derive_ack_key_share;
     use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use core_crypto::random::random_bytes;
     use core_crypto::shared_keys::SharedSecret;
-    use core_crypto::types::{Hash, OffchainPublicKey, PublicKey};
+    use core_crypto::types::{OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_mixer::mixer::MixerConfig;
@@ -927,7 +925,6 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use utils_db::db::DB;
-    use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};

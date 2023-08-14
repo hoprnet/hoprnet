@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use crate::errors::{CoreEthereumIndexerError, Result};
 use bindings::{
     hopr_announcements::HoprAnnouncementsEvents,
@@ -14,6 +15,7 @@ use core_types::{
 };
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use ethnum::u256;
+use multiaddr::Multiaddr;
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 struct DeploymentExtract {
@@ -49,7 +51,7 @@ impl Handlers {
 
                 if let Some(mut account) = maybe_account {
                     let new_entry_type = AccountType::Announced {
-                        multiaddr: address_announcement.base_multiaddr.try_into()?,
+                        multiaddr: Multiaddr::from_str(&address_announcement.base_multiaddr)?,
                         updated_block: block_number,
                     };
 
@@ -609,7 +611,7 @@ pub mod tests {
                 &transferred_log,
                 &Snapshot::default(),
             )
-            .await;
+            .await.unwrap();
 
         assert_eq!(
             db.get_hopr_balance().await.unwrap(),

@@ -41,9 +41,9 @@ impl ChannelStatus {
 impl Display for ChannelStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChannelStatus::Closed => "Closed",
-            ChannelStatus::Open => "Open",
-            ChannelStatus::PendingToClose => "PendingToClose",
+            ChannelStatus::Closed => write!(f, "Closed"),
+            ChannelStatus::Open => write!(f, "Open"),
+            ChannelStatus::PendingToClose => write!(f, "PendingToClose"),
         }
     }
 }
