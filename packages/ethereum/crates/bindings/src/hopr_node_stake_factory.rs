@@ -7,16 +7,18 @@ pub use hopr_node_stake_factory::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod hopr_node_stake_factory {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TooFewOwners\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"instance\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"NewHoprNodeStakeModule\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"instance\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"NewHoprNodeStakeSafe\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"moduleSingletonAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address[]\",\"name\":\"admins\",\"type\":\"address[]\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"defaultTarget\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"clone\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address payable\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"salt\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"predictDeterministicAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"predicted\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"safeVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRNODESTAKEFACTORY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(|| {
-            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
-        });
+    pub static HOPRNODESTAKEFACTORY_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(|| {
+        ::ethers::core::utils::__serde_json::from_str(__ABI)
+            .expect("ABI is always valid")
+    });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -4151,8 +4153,9 @@ pub mod hopr_node_stake_factory {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRNODESTAKEFACTORY_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__BYTECODE);
+    pub static HOPRNODESTAKEFACTORY_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __BYTECODE,
+    );
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -7696,8 +7699,9 @@ pub mod hopr_node_stake_factory {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRNODESTAKEFACTORY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static HOPRNODESTAKEFACTORY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct HoprNodeStakeFactory<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprNodeStakeFactory<M> {
         fn clone(&self) -> Self {
@@ -7725,12 +7729,17 @@ pub mod hopr_node_stake_factory {
     impl<M: ::ethers::providers::Middleware> HoprNodeStakeFactory<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                HOPRNODESTAKEFACTORY_ABI.clone(),
-                client,
-            ))
+        pub fn new<T: Into<::ethers::core::types::Address>>(
+            address: T,
+            client: ::std::sync::Arc<M>,
+        ) -> Self {
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    HOPRNODESTAKEFACTORY_ABI.clone(),
+                    client,
+                ),
+            )
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -7794,13 +7803,18 @@ pub mod hopr_node_stake_factory {
             &self,
             implementation: ::ethers::core::types::Address,
             salt: [u8; 32],
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([54, 13, 15, 173], (implementation, salt))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `safeVersion` (0x7ef2721f) function
-        pub fn safe_version(&self) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
+        pub fn safe_version(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
             self.0
                 .method_hash([126, 242, 114, 31], ())
                 .expect("method not found (this should never happen)")
@@ -7808,42 +7822,76 @@ pub mod hopr_node_stake_factory {
         ///Gets the contract's `NewHoprNodeStakeModule` event
         pub fn new_hopr_node_stake_module_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewHoprNodeStakeModuleFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NewHoprNodeStakeModuleFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `NewHoprNodeStakeSafe` event
         pub fn new_hopr_node_stake_safe_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewHoprNodeStakeSafeFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NewHoprNodeStakeSafeFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprNodeStakeFactoryEvents> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            HoprNodeStakeFactoryEvents,
+        > {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprNodeStakeFactory<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
+    for HoprNodeStakeFactory<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `TooFewOwners` with signature `TooFewOwners()` and selector `0x0d7fd1aa`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "TooFewOwners", abi = "TooFewOwners()")]
     pub struct TooFewOwners;
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "NewHoprNodeStakeModule", abi = "NewHoprNodeStakeModule(address)")]
     pub struct NewHoprNodeStakeModuleFilter {
         pub instance: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "NewHoprNodeStakeSafe", abi = "NewHoprNodeStakeSafe(address)")]
     pub struct NewHoprNodeStakeSafeFilter {
@@ -7856,12 +7904,18 @@ pub mod hopr_node_stake_factory {
         NewHoprNodeStakeSafeFilter(NewHoprNodeStakeSafeFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprNodeStakeFactoryEvents {
-        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(
+            log: &::ethers::core::abi::RawLog,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = NewHoprNodeStakeModuleFilter::decode_log(log) {
-                return Ok(HoprNodeStakeFactoryEvents::NewHoprNodeStakeModuleFilter(decoded));
+                return Ok(
+                    HoprNodeStakeFactoryEvents::NewHoprNodeStakeModuleFilter(decoded),
+                );
             }
             if let Ok(decoded) = NewHoprNodeStakeSafeFilter::decode_log(log) {
-                return Ok(HoprNodeStakeFactoryEvents::NewHoprNodeStakeSafeFilter(decoded));
+                return Ok(
+                    HoprNodeStakeFactoryEvents::NewHoprNodeStakeSafeFilter(decoded),
+                );
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -7869,24 +7923,37 @@ pub mod hopr_node_stake_factory {
     impl ::core::fmt::Display for HoprNodeStakeFactoryEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::NewHoprNodeStakeModuleFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NewHoprNodeStakeSafeFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NewHoprNodeStakeModuleFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NewHoprNodeStakeSafeFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
-    impl ::core::convert::From<NewHoprNodeStakeModuleFilter> for HoprNodeStakeFactoryEvents {
+    impl ::core::convert::From<NewHoprNodeStakeModuleFilter>
+    for HoprNodeStakeFactoryEvents {
         fn from(value: NewHoprNodeStakeModuleFilter) -> Self {
             Self::NewHoprNodeStakeModuleFilter(value)
         }
     }
-    impl ::core::convert::From<NewHoprNodeStakeSafeFilter> for HoprNodeStakeFactoryEvents {
+    impl ::core::convert::From<NewHoprNodeStakeSafeFilter>
+    for HoprNodeStakeFactoryEvents {
         fn from(value: NewHoprNodeStakeSafeFilter) -> Self {
             Self::NewHoprNodeStakeSafeFilter(value)
         }
     }
     ///Container type for all input parameters for the `clone` function with signature `clone(address,address[],uint256,bytes32)` and selector `0x930f426a`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "clone", abi = "clone(address,address[],uint256,bytes32)")]
     pub struct CloneCall {
@@ -7897,7 +7964,14 @@ pub mod hopr_node_stake_factory {
     }
     ///Container type for all input parameters for the `predictDeterministicAddress` function with signature `predictDeterministicAddress(address,bytes32)` and selector `0x360d0fad`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "predictDeterministicAddress",
@@ -7909,7 +7983,14 @@ pub mod hopr_node_stake_factory {
     }
     ///Container type for all input parameters for the `safeVersion` function with signature `safeVersion()` and selector `0x7ef2721f`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "safeVersion", abi = "safeVersion()")]
     pub struct SafeVersionCall;
@@ -7921,15 +8002,22 @@ pub mod hopr_node_stake_factory {
         SafeVersion(SafeVersionCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprNodeStakeFactoryCalls {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <CloneCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <CloneCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Clone(decoded));
             }
-            if let Ok(decoded) = <PredictDeterministicAddressCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <PredictDeterministicAddressCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::PredictDeterministicAddress(decoded));
             }
-            if let Ok(decoded) = <SafeVersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <SafeVersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SafeVersion(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -7939,8 +8027,12 @@ pub mod hopr_node_stake_factory {
         fn encode(self) -> Vec<u8> {
             match self {
                 Self::Clone(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::PredictDeterministicAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SafeVersion(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::PredictDeterministicAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SafeVersion(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -7948,7 +8040,9 @@ pub mod hopr_node_stake_factory {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::Clone(element) => ::core::fmt::Display::fmt(element, f),
-                Self::PredictDeterministicAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PredictDeterministicAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::SafeVersion(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
@@ -7958,7 +8052,8 @@ pub mod hopr_node_stake_factory {
             Self::Clone(value)
         }
     }
-    impl ::core::convert::From<PredictDeterministicAddressCall> for HoprNodeStakeFactoryCalls {
+    impl ::core::convert::From<PredictDeterministicAddressCall>
+    for HoprNodeStakeFactoryCalls {
         fn from(value: PredictDeterministicAddressCall) -> Self {
             Self::PredictDeterministicAddress(value)
         }
@@ -7970,19 +8065,43 @@ pub mod hopr_node_stake_factory {
     }
     ///Container type for all return fields from the `clone` function with signature `clone(address,address[],uint256,bytes32)` and selector `0x930f426a`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    pub struct CloneReturn(pub ::ethers::core::types::Address, pub ::ethers::core::types::Address);
+    pub struct CloneReturn(
+        pub ::ethers::core::types::Address,
+        pub ::ethers::core::types::Address,
+    );
     ///Container type for all return fields from the `predictDeterministicAddress` function with signature `predictDeterministicAddress(address,bytes32)` and selector `0x360d0fad`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct PredictDeterministicAddressReturn {
         pub predicted: ::ethers::core::types::Address,
     }
     ///Container type for all return fields from the `safeVersion` function with signature `safeVersion()` and selector `0x7ef2721f`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct SafeVersionReturn(pub ::std::string::String);
 }

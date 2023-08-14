@@ -7,16 +7,14 @@ pub use hopr_wrapper::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod hopr_wrapper {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"_xHOPR\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"contract HoprToken\",\"name\":\"_wxHOPR\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Unwrapped\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Wrapped\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"TOKENS_RECIPIENT_INTERFACE_HASH\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"interfaceHash\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"canImplementInterfaceForAddress\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onTokenTransfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"recoverTokens\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"tokensReceived\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"wxHOPR\",\"outputs\":[{\"internalType\":\"contract HoprToken\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"xHOPR\",\"outputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"xHoprAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRWRAPPER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(|| {
-            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
-        });
+    pub static HOPRWRAPPER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
+    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -3847,8 +3845,9 @@ pub mod hopr_wrapper {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRWRAPPER_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__BYTECODE);
+    pub static HOPRWRAPPER_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __BYTECODE,
+    );
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -7238,8 +7237,9 @@ pub mod hopr_wrapper {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRWRAPPER_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static HOPRWRAPPER_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct HoprWrapper<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprWrapper<M> {
         fn clone(&self) -> Self {
@@ -7265,12 +7265,17 @@ pub mod hopr_wrapper {
     impl<M: ::ethers::providers::Middleware> HoprWrapper<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                HOPRWRAPPER_ABI.clone(),
-                client,
-            ))
+        pub fn new<T: Into<::ethers::core::types::Address>>(
+            address: T,
+            client: ::std::sync::Arc<M>,
+        ) -> Self {
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    HOPRWRAPPER_ABI.clone(),
+                    client,
+                ),
+            )
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -7312,7 +7317,9 @@ pub mod hopr_wrapper {
             Ok(deployer)
         }
         ///Calls the contract's `TOKENS_RECIPIENT_INTERFACE_HASH` (0x72581cc0) function
-        pub fn tokens_recipient_interface_hash(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn tokens_recipient_interface_hash(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([114, 88, 28, 192], ())
                 .expect("method not found (this should never happen)")
@@ -7339,19 +7346,28 @@ pub mod hopr_wrapper {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `owner` (0x8da5cb5b) function
-        pub fn owner(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        pub fn owner(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([141, 165, 203, 91], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `recoverTokens` (0xb77f39fe) function
-        pub fn recover_tokens(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn recover_tokens(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([183, 127, 57, 254], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `renounceOwnership` (0x715018a6) function
-        pub fn renounce_ownership(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn renounce_ownership(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([113, 80, 24, 166], ())
                 .expect("method not found (this should never happen)")
@@ -7380,19 +7396,31 @@ pub mod hopr_wrapper {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `wxHOPR` (0xd9a465aa) function
-        pub fn wx_hopr(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        pub fn wx_hopr(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([217, 164, 101, 170], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `xHOPR` (0x1a5518b1) function
-        pub fn x_hopr(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        pub fn x_hopr(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([26, 85, 24, 177], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `xHoprAmount` (0xde279afe) function
-        pub fn x_hopr_amount(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
+        pub fn x_hopr_amount(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::U256> {
             self.0
                 .method_hash([222, 39, 154, 254], ())
                 .expect("method not found (this should never happen)")
@@ -7400,31 +7428,60 @@ pub mod hopr_wrapper {
         ///Gets the contract's `OwnershipTransferred` event
         pub fn ownership_transferred_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OwnershipTransferredFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            OwnershipTransferredFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `Unwrapped` event
-        pub fn unwrapped_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, UnwrappedFilter> {
+        pub fn unwrapped_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            UnwrappedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `Wrapped` event
-        pub fn wrapped_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, WrappedFilter> {
+        pub fn wrapped_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, WrappedFilter> {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
-        pub fn events(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprWrapperEvents> {
+        pub fn events(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            HoprWrapperEvents,
+        > {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprWrapper<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
+    for HoprWrapper<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "OwnershipTransferred", abi = "OwnershipTransferred(address,address)")]
+    #[ethevent(
+        name = "OwnershipTransferred",
+        abi = "OwnershipTransferred(address,address)"
+    )]
     pub struct OwnershipTransferredFilter {
         #[ethevent(indexed)]
         pub previous_owner: ::ethers::core::types::Address,
@@ -7432,7 +7489,14 @@ pub mod hopr_wrapper {
         pub new_owner: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "Unwrapped", abi = "Unwrapped(address,uint256)")]
     pub struct UnwrappedFilter {
@@ -7441,7 +7505,14 @@ pub mod hopr_wrapper {
         pub amount: ::ethers::core::types::U256,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "Wrapped", abi = "Wrapped(address,uint256)")]
     pub struct WrappedFilter {
@@ -7457,7 +7528,9 @@ pub mod hopr_wrapper {
         WrappedFilter(WrappedFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprWrapperEvents {
-        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(
+            log: &::ethers::core::abi::RawLog,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = OwnershipTransferredFilter::decode_log(log) {
                 return Ok(HoprWrapperEvents::OwnershipTransferredFilter(decoded));
             }
@@ -7473,7 +7546,9 @@ pub mod hopr_wrapper {
     impl ::core::fmt::Display for HoprWrapperEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::OwnershipTransferredFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnershipTransferredFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::UnwrappedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::WrappedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -7496,13 +7571,30 @@ pub mod hopr_wrapper {
     }
     ///Container type for all input parameters for the `TOKENS_RECIPIENT_INTERFACE_HASH` function with signature `TOKENS_RECIPIENT_INTERFACE_HASH()` and selector `0x72581cc0`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethcall(name = "TOKENS_RECIPIENT_INTERFACE_HASH", abi = "TOKENS_RECIPIENT_INTERFACE_HASH()")]
+    #[ethcall(
+        name = "TOKENS_RECIPIENT_INTERFACE_HASH",
+        abi = "TOKENS_RECIPIENT_INTERFACE_HASH()"
+    )]
     pub struct TokensRecipientInterfaceHashCall;
     ///Container type for all input parameters for the `canImplementInterfaceForAddress` function with signature `canImplementInterfaceForAddress(bytes32,address)` and selector `0x249cb3fa`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "canImplementInterfaceForAddress",
@@ -7514,7 +7606,14 @@ pub mod hopr_wrapper {
     }
     ///Container type for all input parameters for the `onTokenTransfer` function with signature `onTokenTransfer(address,uint256,bytes)` and selector `0xa4c0ed36`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "onTokenTransfer", abi = "onTokenTransfer(address,uint256,bytes)")]
     pub struct OnTokenTransferCall {
@@ -7524,25 +7623,53 @@ pub mod hopr_wrapper {
     }
     ///Container type for all input parameters for the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "owner", abi = "owner()")]
     pub struct OwnerCall;
     ///Container type for all input parameters for the `recoverTokens` function with signature `recoverTokens()` and selector `0xb77f39fe`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "recoverTokens", abi = "recoverTokens()")]
     pub struct RecoverTokensCall;
     ///Container type for all input parameters for the `renounceOwnership` function with signature `renounceOwnership()` and selector `0x715018a6`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "renounceOwnership", abi = "renounceOwnership()")]
     pub struct RenounceOwnershipCall;
     ///Container type for all input parameters for the `tokensReceived` function with signature `tokensReceived(address,address,address,uint256,bytes,bytes)` and selector `0x0023de29`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "tokensReceived",
@@ -7558,7 +7685,14 @@ pub mod hopr_wrapper {
     }
     ///Container type for all input parameters for the `transferOwnership` function with signature `transferOwnership(address)` and selector `0xf2fde38b`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "transferOwnership", abi = "transferOwnership(address)")]
     pub struct TransferOwnershipCall {
@@ -7566,19 +7700,40 @@ pub mod hopr_wrapper {
     }
     ///Container type for all input parameters for the `wxHOPR` function with signature `wxHOPR()` and selector `0xd9a465aa`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "wxHOPR", abi = "wxHOPR()")]
     pub struct WxHOPRCall;
     ///Container type for all input parameters for the `xHOPR` function with signature `xHOPR()` and selector `0x1a5518b1`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "xHOPR", abi = "xHOPR()")]
     pub struct XhoprCall;
     ///Container type for all input parameters for the `xHoprAmount` function with signature `xHoprAmount()` and selector `0xde279afe`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "xHoprAmount", abi = "xHoprAmount()")]
     pub struct XhoprAmountCall;
@@ -7598,39 +7753,60 @@ pub mod hopr_wrapper {
         XhoprAmount(XhoprAmountCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprWrapperCalls {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <TokensRecipientInterfaceHashCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TokensRecipientInterfaceHashCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::TokensRecipientInterfaceHash(decoded));
             }
-            if let Ok(decoded) = <CanImplementInterfaceForAddressCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <CanImplementInterfaceForAddressCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::CanImplementInterfaceForAddress(decoded));
             }
-            if let Ok(decoded) = <OnTokenTransferCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <OnTokenTransferCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::OnTokenTransfer(decoded));
             }
-            if let Ok(decoded) = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Owner(decoded));
             }
-            if let Ok(decoded) = <RecoverTokensCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RecoverTokensCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RecoverTokens(decoded));
             }
-            if let Ok(decoded) = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RenounceOwnership(decoded));
             }
-            if let Ok(decoded) = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TokensReceived(decoded));
             }
-            if let Ok(decoded) = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::TransferOwnership(decoded));
             }
-            if let Ok(decoded) = <WxHOPRCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <WxHOPRCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::WxHOPR(decoded));
             }
-            if let Ok(decoded) = <XhoprCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <XhoprCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Xhopr(decoded));
             }
-            if let Ok(decoded) = <XhoprAmountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <XhoprAmountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::XhoprAmount(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -7639,25 +7815,45 @@ pub mod hopr_wrapper {
     impl ::ethers::core::abi::AbiEncode for HoprWrapperCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::TokensRecipientInterfaceHash(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CanImplementInterfaceForAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::OnTokenTransfer(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TokensRecipientInterfaceHash(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CanImplementInterfaceForAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::OnTokenTransfer(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Owner(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RecoverTokens(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RenounceOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TokensReceived(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TransferOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RecoverTokens(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RenounceOwnership(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::TokensReceived(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::TransferOwnership(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::WxHOPR(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Xhopr(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::XhoprAmount(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::XhoprAmount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
     impl ::core::fmt::Display for HoprWrapperCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::TokensRecipientInterfaceHash(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CanImplementInterfaceForAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::TokensRecipientInterfaceHash(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CanImplementInterfaceForAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::OnTokenTransfer(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Owner(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RecoverTokens(element) => ::core::fmt::Display::fmt(element, f),
@@ -7675,7 +7871,8 @@ pub mod hopr_wrapper {
             Self::TokensRecipientInterfaceHash(value)
         }
     }
-    impl ::core::convert::From<CanImplementInterfaceForAddressCall> for HoprWrapperCalls {
+    impl ::core::convert::From<CanImplementInterfaceForAddressCall>
+    for HoprWrapperCalls {
         fn from(value: CanImplementInterfaceForAddressCall) -> Self {
             Self::CanImplementInterfaceForAddress(value)
         }
@@ -7727,39 +7924,88 @@ pub mod hopr_wrapper {
     }
     ///Container type for all return fields from the `TOKENS_RECIPIENT_INTERFACE_HASH` function with signature `TOKENS_RECIPIENT_INTERFACE_HASH()` and selector `0x72581cc0`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct TokensRecipientInterfaceHashReturn(pub [u8; 32]);
     ///Container type for all return fields from the `canImplementInterfaceForAddress` function with signature `canImplementInterfaceForAddress(bytes32,address)` and selector `0x249cb3fa`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct CanImplementInterfaceForAddressReturn(pub [u8; 32]);
     ///Container type for all return fields from the `onTokenTransfer` function with signature `onTokenTransfer(address,uint256,bytes)` and selector `0xa4c0ed36`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct OnTokenTransferReturn {
         pub success: bool,
     }
     ///Container type for all return fields from the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct OwnerReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `wxHOPR` function with signature `wxHOPR()` and selector `0xd9a465aa`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct WxHOPRReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `xHOPR` function with signature `xHOPR()` and selector `0x1a5518b1`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct XhoprReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `xHoprAmount` function with signature `xHoprAmount()` and selector `0xde279afe`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct XhoprAmountReturn(pub ::ethers::core::types::U256);
 }

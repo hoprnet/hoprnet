@@ -7,16 +7,18 @@ pub use hopr_node_safe_registry::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod hopr_node_safe_registry {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NodeAddressZero\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NodeHasSafe\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NotSafeOwnerNorNode\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NotValidSafe\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NotValidSignatureFromNode\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"SafeAddressZero\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"DergisteredNodeSafe\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RegisteredNodeSafe\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"NODE_SAFE_TYPEHASH\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"VERSION\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"deregisterNodeBySafe\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"domainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"struct HoprNodeSafeRegistry.NodeSafe\",\"name\":\"nodeSafe\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"nodeChainKeyAddress\",\"type\":\"address\",\"components\":[]}]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNodeSafeRegistered\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"nodeToSafe\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"safeAddr\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"registerSafeByNode\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"struct HoprNodeSafeRegistry.NodeSafe\",\"name\":\"nodeSafe\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"nodeChainKeyAddress\",\"type\":\"address\",\"components\":[]}]},{\"internalType\":\"bytes\",\"name\":\"sig\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"registerSafeWithNodeSig\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRNODESAFEREGISTRY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(|| {
-            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
-        });
+    pub static HOPRNODESAFEREGISTRY_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(|| {
+        ::ethers::core::utils::__serde_json::from_str(__ABI)
+            .expect("ABI is always valid")
+    });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -3247,8 +3249,9 @@ pub mod hopr_node_safe_registry {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRNODESAFEREGISTRY_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__BYTECODE);
+    pub static HOPRNODESAFEREGISTRY_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __BYTECODE,
+    );
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -6202,8 +6205,9 @@ pub mod hopr_node_safe_registry {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRNODESAFEREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static HOPRNODESAFEREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct HoprNodeSafeRegistry<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprNodeSafeRegistry<M> {
         fn clone(&self) -> Self {
@@ -6231,12 +6235,17 @@ pub mod hopr_node_safe_registry {
     impl<M: ::ethers::providers::Middleware> HoprNodeSafeRegistry<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                HOPRNODESAFEREGISTRY_ABI.clone(),
-                client,
-            ))
+        pub fn new<T: Into<::ethers::core::types::Address>>(
+            address: T,
+            client: ::std::sync::Arc<M>,
+        ) -> Self {
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    HOPRNODESAFEREGISTRY_ABI.clone(),
+                    client,
+                ),
+            )
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -6278,13 +6287,17 @@ pub mod hopr_node_safe_registry {
             Ok(deployer)
         }
         ///Calls the contract's `NODE_SAFE_TYPEHASH` (0x84b0dec2) function
-        pub fn node_safe_typehash(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn node_safe_typehash(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([132, 176, 222, 194], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `VERSION` (0xffa1ad74) function
-        pub fn version(&self) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
+        pub fn version(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
             self.0
                 .method_hash([255, 161, 173, 116], ())
                 .expect("method not found (this should never happen)")
@@ -6299,7 +6312,9 @@ pub mod hopr_node_safe_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `domainSeparator` (0xf698da25) function
-        pub fn domain_separator(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn domain_separator(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([246, 152, 218, 37], ())
                 .expect("method not found (this should never happen)")
@@ -6317,7 +6332,10 @@ pub mod hopr_node_safe_registry {
         pub fn node_to_safe(
             &self,
             p0: ::ethers::core::types::Address,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([137, 151, 140, 64], p0)
                 .expect("method not found (this should never happen)")
@@ -6344,60 +6362,115 @@ pub mod hopr_node_safe_registry {
         ///Gets the contract's `DergisteredNodeSafe` event
         pub fn dergistered_node_safe_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, DergisteredNodeSafeFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            DergisteredNodeSafeFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `RegisteredNodeSafe` event
         pub fn registered_node_safe_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RegisteredNodeSafeFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            RegisteredNodeSafeFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprNodeSafeRegistryEvents> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            HoprNodeSafeRegistryEvents,
+        > {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprNodeSafeRegistry<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
+    for HoprNodeSafeRegistry<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `NodeAddressZero` with signature `NodeAddressZero()` and selector `0x7d0ed526`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "NodeAddressZero", abi = "NodeAddressZero()")]
     pub struct NodeAddressZero;
     ///Custom Error type `NodeHasSafe` with signature `NodeHasSafe()` and selector `0x67dc3001`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "NodeHasSafe", abi = "NodeHasSafe()")]
     pub struct NodeHasSafe;
     ///Custom Error type `NotSafeOwnerNorNode` with signature `NotSafeOwnerNorNode()` and selector `0x6d98b41c`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "NotSafeOwnerNorNode", abi = "NotSafeOwnerNorNode()")]
     pub struct NotSafeOwnerNorNode;
     ///Custom Error type `NotValidSafe` with signature `NotValidSafe()` and selector `0x56fe8554`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "NotValidSafe", abi = "NotValidSafe()")]
     pub struct NotValidSafe;
     ///Custom Error type `NotValidSignatureFromNode` with signature `NotValidSignatureFromNode()` and selector `0xb4c91ffb`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "NotValidSignatureFromNode", abi = "NotValidSignatureFromNode()")]
     pub struct NotValidSignatureFromNode;
     ///Custom Error type `SafeAddressZero` with signature `SafeAddressZero()` and selector `0x14e79221`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "SafeAddressZero", abi = "SafeAddressZero()")]
     pub struct SafeAddressZero;
@@ -6415,27 +6488,40 @@ pub mod hopr_node_safe_registry {
         RevertString(::std::string::String),
     }
     impl ::ethers::core::abi::AbiDecode for HoprNodeSafeRegistryErrors {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <NodeAddressZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NodeAddressZero as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NodeAddressZero(decoded));
             }
-            if let Ok(decoded) = <NodeHasSafe as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NodeHasSafe as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NodeHasSafe(decoded));
             }
-            if let Ok(decoded) = <NotSafeOwnerNorNode as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NotSafeOwnerNorNode as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotSafeOwnerNorNode(decoded));
             }
-            if let Ok(decoded) = <NotValidSafe as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NotValidSafe as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotValidSafe(decoded));
             }
-            if let Ok(decoded) = <NotValidSignatureFromNode as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NotValidSignatureFromNode as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::NotValidSignatureFromNode(decoded));
             }
-            if let Ok(decoded) = <SafeAddressZero as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <SafeAddressZero as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SafeAddressZero(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -6444,12 +6530,24 @@ pub mod hopr_node_safe_registry {
     impl ::ethers::core::abi::AbiEncode for HoprNodeSafeRegistryErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::NodeAddressZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NodeHasSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NotSafeOwnerNorNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NotValidSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NotValidSignatureFromNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SafeAddressZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NodeAddressZero(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NodeHasSafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotSafeOwnerNorNode(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotValidSafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotValidSignatureFromNode(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SafeAddressZero(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -6458,12 +6556,26 @@ pub mod hopr_node_safe_registry {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <NodeAddressZero as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NodeHasSafe as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NotSafeOwnerNorNode as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NotValidSafe as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NotValidSignatureFromNode as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <SafeAddressZero as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <NodeAddressZero as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NodeHasSafe as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <NotSafeOwnerNorNode as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotValidSafe as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <NotValidSignatureFromNode as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SafeAddressZero as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ => false,
             }
         }
@@ -6473,9 +6585,13 @@ pub mod hopr_node_safe_registry {
             match self {
                 Self::NodeAddressZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NodeHasSafe(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotSafeOwnerNorNode(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotSafeOwnerNorNode(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotValidSafe(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotValidSignatureFromNode(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotValidSignatureFromNode(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::SafeAddressZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
@@ -6506,7 +6622,8 @@ pub mod hopr_node_safe_registry {
             Self::NotValidSafe(value)
         }
     }
-    impl ::core::convert::From<NotValidSignatureFromNode> for HoprNodeSafeRegistryErrors {
+    impl ::core::convert::From<NotValidSignatureFromNode>
+    for HoprNodeSafeRegistryErrors {
         fn from(value: NotValidSignatureFromNode) -> Self {
             Self::NotValidSignatureFromNode(value)
         }
@@ -6517,9 +6634,19 @@ pub mod hopr_node_safe_registry {
         }
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "DergisteredNodeSafe", abi = "DergisteredNodeSafe(address,address)")]
+    #[ethevent(
+        name = "DergisteredNodeSafe",
+        abi = "DergisteredNodeSafe(address,address)"
+    )]
     pub struct DergisteredNodeSafeFilter {
         #[ethevent(indexed)]
         pub safe_address: ::ethers::core::types::Address,
@@ -6527,7 +6654,14 @@ pub mod hopr_node_safe_registry {
         pub node_address: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "RegisteredNodeSafe", abi = "RegisteredNodeSafe(address,address)")]
     pub struct RegisteredNodeSafeFilter {
@@ -6543,9 +6677,13 @@ pub mod hopr_node_safe_registry {
         RegisteredNodeSafeFilter(RegisteredNodeSafeFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprNodeSafeRegistryEvents {
-        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(
+            log: &::ethers::core::abi::RawLog,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = DergisteredNodeSafeFilter::decode_log(log) {
-                return Ok(HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(decoded));
+                return Ok(
+                    HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(decoded),
+                );
             }
             if let Ok(decoded) = RegisteredNodeSafeFilter::decode_log(log) {
                 return Ok(HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(decoded));
@@ -6556,12 +6694,17 @@ pub mod hopr_node_safe_registry {
     impl ::core::fmt::Display for HoprNodeSafeRegistryEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::DergisteredNodeSafeFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RegisteredNodeSafeFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::DergisteredNodeSafeFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::RegisteredNodeSafeFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
-    impl ::core::convert::From<DergisteredNodeSafeFilter> for HoprNodeSafeRegistryEvents {
+    impl ::core::convert::From<DergisteredNodeSafeFilter>
+    for HoprNodeSafeRegistryEvents {
         fn from(value: DergisteredNodeSafeFilter) -> Self {
             Self::DergisteredNodeSafeFilter(value)
         }
@@ -6573,19 +6716,40 @@ pub mod hopr_node_safe_registry {
     }
     ///Container type for all input parameters for the `NODE_SAFE_TYPEHASH` function with signature `NODE_SAFE_TYPEHASH()` and selector `0x84b0dec2`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "NODE_SAFE_TYPEHASH", abi = "NODE_SAFE_TYPEHASH()")]
     pub struct NodeSafeTypehashCall;
     ///Container type for all input parameters for the `VERSION` function with signature `VERSION()` and selector `0xffa1ad74`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "VERSION", abi = "VERSION()")]
     pub struct VersionCall;
     ///Container type for all input parameters for the `deregisterNodeBySafe` function with signature `deregisterNodeBySafe(address)` and selector `0x91607c4c`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "deregisterNodeBySafe", abi = "deregisterNodeBySafe(address)")]
     pub struct DeregisterNodeBySafeCall {
@@ -6593,27 +6757,58 @@ pub mod hopr_node_safe_registry {
     }
     ///Container type for all input parameters for the `domainSeparator` function with signature `domainSeparator()` and selector `0xf698da25`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "domainSeparator", abi = "domainSeparator()")]
     pub struct DomainSeparatorCall;
     ///Container type for all input parameters for the `isNodeSafeRegistered` function with signature `isNodeSafeRegistered((address,address))` and selector `0xc6b8b261`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethcall(name = "isNodeSafeRegistered", abi = "isNodeSafeRegistered((address,address))")]
+    #[ethcall(
+        name = "isNodeSafeRegistered",
+        abi = "isNodeSafeRegistered((address,address))"
+    )]
     pub struct IsNodeSafeRegisteredCall {
         pub node_safe: NodeSafe,
     }
     ///Container type for all input parameters for the `nodeToSafe` function with signature `nodeToSafe(address)` and selector `0x89978c40`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "nodeToSafe", abi = "nodeToSafe(address)")]
     pub struct NodeToSafeCall(pub ::ethers::core::types::Address);
     ///Container type for all input parameters for the `registerSafeByNode` function with signature `registerSafeByNode(address)` and selector `0x7f935931`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "registerSafeByNode", abi = "registerSafeByNode(address)")]
     pub struct RegisterSafeByNodeCall {
@@ -6621,7 +6816,14 @@ pub mod hopr_node_safe_registry {
     }
     ///Container type for all input parameters for the `registerSafeWithNodeSig` function with signature `registerSafeWithNodeSig((address,address),bytes)` and selector `0xc5761d69`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "registerSafeWithNodeSig",
@@ -6644,30 +6846,50 @@ pub mod hopr_node_safe_registry {
         RegisterSafeWithNodeSig(RegisterSafeWithNodeSigCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprNodeSafeRegistryCalls {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <NodeSafeTypehashCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NodeSafeTypehashCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::NodeSafeTypehash(decoded));
             }
-            if let Ok(decoded) = <VersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <VersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Version(decoded));
             }
-            if let Ok(decoded) = <DeregisterNodeBySafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <DeregisterNodeBySafeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::DeregisterNodeBySafe(decoded));
             }
-            if let Ok(decoded) = <DomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <DomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::DomainSeparator(decoded));
             }
-            if let Ok(decoded) = <IsNodeSafeRegisteredCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <IsNodeSafeRegisteredCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::IsNodeSafeRegistered(decoded));
             }
-            if let Ok(decoded) = <NodeToSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NodeToSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NodeToSafe(decoded));
             }
-            if let Ok(decoded) = <RegisterSafeByNodeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RegisterSafeByNodeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RegisterSafeByNode(decoded));
             }
-            if let Ok(decoded) = <RegisterSafeWithNodeSigCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RegisterSafeWithNodeSigCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RegisterSafeWithNodeSig(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -6676,14 +6898,28 @@ pub mod hopr_node_safe_registry {
     impl ::ethers::core::abi::AbiEncode for HoprNodeSafeRegistryCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::NodeSafeTypehash(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NodeSafeTypehash(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Version(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::DeregisterNodeBySafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::DomainSeparator(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::IsNodeSafeRegistered(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NodeToSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RegisterSafeByNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RegisterSafeWithNodeSig(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::DeregisterNodeBySafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::DomainSeparator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::IsNodeSafeRegistered(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NodeToSafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RegisterSafeByNode(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RegisterSafeWithNodeSig(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -6692,12 +6928,20 @@ pub mod hopr_node_safe_registry {
             match self {
                 Self::NodeSafeTypehash(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Version(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DeregisterNodeBySafe(element) => ::core::fmt::Display::fmt(element, f),
+                Self::DeregisterNodeBySafe(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::DomainSeparator(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IsNodeSafeRegistered(element) => ::core::fmt::Display::fmt(element, f),
+                Self::IsNodeSafeRegistered(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NodeToSafe(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RegisterSafeByNode(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RegisterSafeWithNodeSig(element) => ::core::fmt::Display::fmt(element, f),
+                Self::RegisterSafeByNode(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::RegisterSafeWithNodeSig(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
@@ -6736,39 +6980,82 @@ pub mod hopr_node_safe_registry {
             Self::RegisterSafeByNode(value)
         }
     }
-    impl ::core::convert::From<RegisterSafeWithNodeSigCall> for HoprNodeSafeRegistryCalls {
+    impl ::core::convert::From<RegisterSafeWithNodeSigCall>
+    for HoprNodeSafeRegistryCalls {
         fn from(value: RegisterSafeWithNodeSigCall) -> Self {
             Self::RegisterSafeWithNodeSig(value)
         }
     }
     ///Container type for all return fields from the `NODE_SAFE_TYPEHASH` function with signature `NODE_SAFE_TYPEHASH()` and selector `0x84b0dec2`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct NodeSafeTypehashReturn(pub [u8; 32]);
     ///Container type for all return fields from the `VERSION` function with signature `VERSION()` and selector `0xffa1ad74`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct VersionReturn(pub ::std::string::String);
     ///Container type for all return fields from the `domainSeparator` function with signature `domainSeparator()` and selector `0xf698da25`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct DomainSeparatorReturn(pub [u8; 32]);
     ///Container type for all return fields from the `isNodeSafeRegistered` function with signature `isNodeSafeRegistered((address,address))` and selector `0xc6b8b261`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct IsNodeSafeRegisteredReturn(pub bool);
     ///Container type for all return fields from the `nodeToSafe` function with signature `nodeToSafe(address)` and selector `0x89978c40`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct NodeToSafeReturn(pub ::ethers::core::types::Address);
     ///`NodeSafe(address,address)`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct NodeSafe {
         pub safe_address: ::ethers::core::types::Address,

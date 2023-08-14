@@ -27,11 +27,7 @@ type PeerEventName = 'peer'
 type NetworkRegistryEligibilityChangedEventName = 'network-registry-eligibility-changed'
 type NetworkRegistryStatusChangedEventName = 'network-registry-status-changed'
 
-type ChannelUpdateEventNames =
-  | 'channel-update'
-  | 'own-channel-updated'
-  | 'channel-waiting-for-commitment'
-  | 'channel-closed'
+type ChannelUpdateEventNames = 'own-channel-updated'
 
 type IndexerEventNames =
   | BlockEventName
@@ -49,7 +45,7 @@ type StatusListener = (status: IndexerStatus) => void
 type PeerListener = (peerData: { id: PeerId; multiaddrs: Multiaddr[] }) => void
 type ChannelUpdateListener = (channel: ChannelEntry) => void
 type IndexerEventsListener = (txHash: string) => void
-type NetworkRegistryEligibilityChangedListener = (account: Address, hoprNodes: Address[], eligibility: boolean) => void
+type NetworkRegistryEligibilityChangedListener = (account: Address, allowed: boolean) => void
 type NetworkRegistryStatusChangedListener = (isEnabled: boolean) => void
 
 export interface IndexerEventEmitter {
@@ -73,12 +69,7 @@ export interface IndexerEventEmitter {
   emit(event: PeerEventName, peerData: { id: PeerId; multiaddrs: Multiaddr[] }): boolean
   emit(event: ChannelUpdateEventNames, channel: ChannelEntry): boolean
   emit(event: IndexerEvents, txHash: string): boolean
-  emit(
-    event: NetworkRegistryEligibilityChangedEventName,
-    account: Address,
-    hoprNodes: Address[],
-    eligibility: boolean
-  ): boolean
+  emit(event: NetworkRegistryEligibilityChangedEventName, account: Address, allowed: boolean): boolean
   emit(event: NetworkRegistryStatusChangedEventName, isEnabled: boolean): boolean
 
   on(event: IndexerEventNames, listener: () => void): this

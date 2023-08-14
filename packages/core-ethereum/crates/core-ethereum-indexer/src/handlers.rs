@@ -32,11 +32,11 @@ pub struct DeploymentExtract {
 }
 
 pub trait IndexerCallbacks {
-    fn own_channel_updated(&self, channel_entry: ChannelEntry);
+    fn own_channel_updated(&self, channel_entry: &ChannelEntry);
 
-    fn channel_updated(&self, channel_entry: ChannelEntry);
+    fn not_allowed_to_access_network(&self, address: &Address);
 
-    fn new_announcement(&self, account_entry: AccountEntry);
+    fn new_announcement(&self, account_entry: &AccountEntry);
 }
 
 pub struct ContractEventHandlers<Cbs> {
@@ -77,6 +77,8 @@ where
 
                     account.update(new_entry_type);
                     db.update_account_and_snapshot(&account, snapshot).await?;
+
+                    self.cbs.new_announcement(&account);
 
                     account
                 } else {
@@ -138,6 +140,10 @@ where
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -152,6 +158,10 @@ where
 
                     db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -162,8 +172,17 @@ where
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::Closed;
 
+                    // Incoming channel, so once closed. All unredeemed tickets just became invalid
+                    if channel.destination.eq(&self.chain_key) {
+                        db.delete_acknowledged_tickets_from(channel).await?;
+                    }
+
                     db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -180,6 +199,10 @@ where
                     channel.status = ChannelStatus::Open;
 
                     db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
+
+                    if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     let new_channel = ChannelEntry::new(
                         source,
@@ -193,6 +216,10 @@ where
 
                     db.update_channel_and_snapshot(&channel_id, &new_channel, snapshot)
                         .await?;
+
+                    if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&new_channel);
+                    }
                 }
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
@@ -203,6 +230,10 @@ where
 
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -216,6 +247,10 @@ where
 
                     db.update_channel_and_snapshot(&closure_initiated.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -257,46 +292,48 @@ where
         Ok(match HoprNetworkRegistryEvents::decode_log(log)? {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 db.remove_from_network_registry(
-                    &deregistered.node_address.0.try_into()?,
                     &deregistered.staking_account.0.try_into()?,
+                    &deregistered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 db.remove_from_network_registry(
-                    &deregistered.node_address.0.try_into()?,
                     &deregistered.staking_account.0.try_into()?,
+                    &deregistered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
-            }
-            HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
-                db.set_eligible(
-                    &eligibility_updated.staking_account.0.try_into()?,
-                    eligibility_updated.eligibility,
-                    snapshot,
-                )
-                .await?;
-            }
-            HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
-                db.set_network_registry(enabled.is_enabled, snapshot).await?;
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 db.add_to_network_registry(
-                    &registered.node_address.0.try_into()?,
                     &registered.staking_account.0.try_into()?,
+                    &registered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 db.add_to_network_registry(
-                    &registered.node_address.0.try_into()?,
                     &registered.staking_account.0.try_into()?,
+                    &registered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
+            }
+            HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
+                let account: Address = eligibility_updated.staking_account.0.try_into()?;
+                let affected_nodes = db
+                    .set_eligible(&account, eligibility_updated.eligibility, snapshot)
+                    .await?;
+
+                for affected_node in affected_nodes.iter() {
+                    self.cbs.not_allowed_to_access_network(affected_node);
+                }
+            }
+            HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
+                db.set_network_registry(enabled.is_enabled, snapshot).await?;
             }
             HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
                 // TODO: implement this
@@ -330,7 +367,7 @@ where
         })
     }
 
-    async fn on_node_management_module_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    async fn on_node_management_module_event<T>(&self, _db: &mut T, log: &RawLog, _snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
@@ -340,6 +377,7 @@ where
             }
         })
     }
+
     pub async fn on_event<T>(
         &self,
         db: &mut T,
@@ -421,7 +459,6 @@ pub mod tests {
     const NETWORK_REGISTRY_ADDR: [u8; 20] = hex!("a469d0225f884fb989cbad4fe289f6fd2fb98051"); // just a dummy
     const NODE_SAFE_REGISTRY_ADDR: [u8; 20] = hex!("0dcd1bf9a1b36ce34237eeafef220932846bcd82"); // just a dummy
     const ANNOUNCEMENTS_ADDR: [u8; 20] = hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
-    const NODE_SAFE_REGISTRY_ADDR: [u8; 20] = hex!("157e8439b2316ac87fdd4eca2b2cec43743b5cc8"); // just a dummy
     const SAFE_MANAGEMENT_MODULE_ADDR: [u8; 20] = hex!("9b91245a65ad469163a86e32b2281af7a25f38ce"); // just a dummy
     const SAFE_INSTANCE_ADDR: [u8; 20] = hex!("b93d7fdd605fb64fdcc87f21590f950170719d47"); // just a dummy
 
@@ -438,11 +475,11 @@ pub mod tests {
     struct DummyCallbacks {}
 
     impl super::IndexerCallbacks for DummyCallbacks {
-        fn channel_updated(&self, channel_entry: ChannelEntry) {}
+        fn new_announcement(&self, _account_entry: &AccountEntry) {}
 
-        fn new_announcement(&self, account_entry: AccountEntry) {}
+        fn own_channel_updated(&self, _channel_entry: &ChannelEntry) {}
 
-        fn own_channel_updated(&self, channel_entry: ChannelEntry) {}
+        fn not_allowed_to_access_network(&self, _address: &Address) {}
     }
 
     fn init_handlers() -> ContractEventHandlers<DummyCallbacks> {
@@ -453,7 +490,6 @@ pub mod tests {
                 network_registry: NETWORK_REGISTRY_ADDR.try_into().unwrap(),
                 node_safe_registry: NODE_SAFE_REGISTRY_ADDR.try_into().unwrap(),
                 announcements: ANNOUNCEMENTS_ADDR.try_into().unwrap(),
-                node_safe_registry: NODE_SAFE_REGISTRY_ADDR.try_into().unwrap(),
                 node_management_module: SAFE_MANAGEMENT_MODULE_ADDR.try_into().unwrap(),
             },
             chain_key: SELF_CHAIN_ADDRESS.try_into().unwrap(),
@@ -695,10 +731,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db
-            .find_hopr_node_using_account_in_network_registry(&stake_address)
-            .await
-            .unwrap();
+        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
 
         assert_eq!(stored, vec![chain_key]);
     }
@@ -731,10 +764,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db
-            .find_hopr_node_using_account_in_network_registry(&stake_address)
-            .await
-            .unwrap();
+        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
 
         assert_eq!(stored, vec![chain_key]);
     }
@@ -771,10 +801,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db
-            .find_hopr_node_using_account_in_network_registry(&stake_address)
-            .await
-            .unwrap();
+        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
 
         assert_eq!(stored, vec![]);
     }
@@ -811,10 +838,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db
-            .find_hopr_node_using_account_in_network_registry(&stake_address)
-            .await
-            .unwrap();
+        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
 
         assert_eq!(stored, vec![]);
     }
@@ -1324,27 +1348,27 @@ pub mod wasm {
         #[wasm_bindgen]
         pub type IndexerCallbacks;
 
-        #[wasm_bindgen(method)]
+        #[wasm_bindgen(method, js_name = "ownChannelUpdated")]
         pub fn js_own_channel_updated(this: &IndexerCallbacks, channel_entry: ChannelEntry);
 
-        #[wasm_bindgen(method)]
-        pub fn js_channel_updated(this: &IndexerCallbacks, channel_entry: ChannelEntry);
-
-        #[wasm_bindgen(method)]
+        #[wasm_bindgen(method, js_name = "newAnnouncement")]
         pub fn js_new_announcement(this: &IndexerCallbacks, account_entry: AccountEntry);
+
+        #[wasm_bindgen(method, js_name = "notAllowedToAccessNetwork")]
+        pub fn js_not_allowed_to_access_network(this: &IndexerCallbacks, address: Address);
     }
 
     impl super::IndexerCallbacks for IndexerCallbacks {
-        fn channel_updated(&self, channel_entry: ChannelEntry) {
-            self.js_own_channel_updated(channel_entry)
+        fn new_announcement(&self, account_entry: &AccountEntry) {
+            self.js_new_announcement(account_entry.clone())
         }
 
-        fn new_announcement(&self, account_entry: AccountEntry) {
-            self.js_new_announcement(account_entry)
+        fn own_channel_updated(&self, channel_entry: &ChannelEntry) {
+            self.js_own_channel_updated(channel_entry.clone())
         }
 
-        fn own_channel_updated(&self, channel_entry: ChannelEntry) {
-            self.js_own_channel_updated(channel_entry)
+        fn not_allowed_to_access_network(&self, address: &Address) {
+            self.js_not_allowed_to_access_network(address.clone())
         }
     }
 
@@ -1382,19 +1406,23 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn init(
             address_to_monitor: &str,
+            chain_key: &str,
             contract_addresses: ContractAddresses,
             callbacks: IndexerCallbacks,
         ) -> Handlers {
             Self {
                 w: super::ContractEventHandlers {
                     address_to_monitor: Address::from_str(address_to_monitor).unwrap(),
+                    chain_key: Address::from_str(chain_key).unwrap(),
                     addresses: super::DeploymentExtract {
                         channels: Address::from_str(contract_addresses.channels().as_str()).unwrap(),
                         token: Address::from_str(contract_addresses.token().as_str()).unwrap(),
                         network_registry: Address::from_str(contract_addresses.network_registry().as_str()).unwrap(),
-                        node_safe_registry: Address::from_str(contract_addresses.node_safe_registry().as_str()).unwrap(),
+                        node_safe_registry: Address::from_str(contract_addresses.node_safe_registry().as_str())
+                            .unwrap(),
                         announcements: Address::from_str(contract_addresses.announcements().as_str()).unwrap(),
-                        node_management_module: Address::from_str(contract_addresses.node_management_module().as_str()).unwrap()
+                        node_management_module: Address::from_str(contract_addresses.node_management_module().as_str())
+                            .unwrap(),
                     },
                     cbs: callbacks,
                 },

@@ -122,12 +122,15 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.status = IndexerStatus.STARTING
 
     this.handlers = Handlers.init(
+      // FIXME: change to Safe address if Safe is holding the tokens
       chain.getPublicKey().to_address().to_string(),
-      chain.getInfo().hoprChannelsAddress,
-      chain.getInfo().hoprTokenAddress,
-      chain.getInfo().hoprNetworkRegistryAddress,
-      chain.getInfo().hoprNodeSafeRegistryAddress,
-      chain.getInfo().hoprAnnouncementsAddress
+      chain.getPublicKey().to_address().to_string(),
+      chain.getInfo(),
+      {
+        newAnnouncement: this.onAnnouncementUpdate.bind(this),
+        onOwnChannelUpdated: this.onOwnChannelUpdated.bind(this),
+        notAllowedToAccessNetwork: this.onNotAllowedToAccessNetwork.bind(this)
+      }
     )
 
     log(`Starting indexer...`)
@@ -757,58 +760,28 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
   }
 
+  onAnnouncementUpdate(account: AccountEntry) {
+    this.emit('peer', {
+      id: peerIdFromString(account.public_key.to_peerid_str()),
+      multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
+    })
+  }
+
+  onOwnChannelUpdated(channel: ChannelEntry) {
+    this.emit('own-channel-updated', channel)
+  }
+
+  onNotAllowedToAccessNetwork(address: Address) {
+    this.emit('network-registry-eligibility-changed', address, false)
+  }
+
   /**
    * TODO: event update
    */
   // private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
   //   const { source, destination, newState } = event.args
 
-  //   log('channel-updated for hash %s', event.transactionHash)
-  //   let channel = new ChannelEntry(
-  //     Address.from_string(source),
-  //     Address.from_string(destination),
-  //     new Balance(newState.balance.toString(), BalanceType.HOPR),
-  //     new Hash(stringToU8a(newState.commitment)),
-  //     new U256(newState.ticketEpoch.toString()),
-  //     new U256(newState.ticketIndex.toString()),
-  //     number_to_channel_status(newState.status),
-  //     new U256(newState.channelEpoch.toString()),
-  //     new U256(newState.closureTime.toString())
-  //   )
-  //   log(channel.to_string())
-
-  //   let prevState: ChannelEntry
-  //   let channel_entry = await this.db.get_channel(Ethereum_Hash.deserialize(channel.get_id().serialize()))
-  //   if (channel_entry !== undefined) {
-  //     prevState = ChannelEntry.deserialize(channel_entry.serialize())
-  //   }
-
-  //   assert(lastSnapshot !== undefined)
-  //   await this.db.update_channel_and_snapshot(
-  //     Ethereum_Hash.deserialize(channel.get_id().serialize()),
-  //     Ethereum_ChannelEntry.deserialize(channel.serialize()),
-  //     Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-  //   )
-
   //   metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
-
-  //   if (prevState && channel.status == ChannelStatus.Closed && prevState.status != ChannelStatus.Closed) {
-  //     log('channel was closed')
-  //     await this.onChannelClosed(channel)
-  //   }
-
-  //   this.emit('channel-update', channel)
-  //   verbose(`channel-update for channel ${channel.get_id().to_hex()}`)
-
-  //   if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
-  //     this.emit('own-channel-updated', channel)
-
-  //     if (channel.destination.eq(this.address)) {
-  //       // Channel _to_ us
-  //       if (channel.status === ChannelStatus.WaitingForCommitment) {
-  //       }
-  //     }
-  //   }
   // }
 
   /**
@@ -851,113 +824,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   //   }
   // }
 
-  // private async onChannelClosed(channel: ChannelEntry) {
-  //   await this.db.delete_acknowledged_tickets_from(Ethereum_ChannelEntry.deserialize(channel.serialize()))
-  //   this.emit('channel-closed', channel)
-  // }
-
-  // private async onEligibilityUpdated(
-  //   event: RegistryEvent<'EligibilityUpdated'>,
-  //   lastSnapshot: Snapshot
-  // ): Promise<void> {
-  //   assert(lastSnapshot !== undefined)
-
-  //   const account = Address.from_string(event.args.account)
-  //   await this.db.set_eligible(
-  //     Ethereum_Address.deserialize(account.serialize()),
-  //     event.args.eligibility,
-  //     Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-  //   )
-  //   verbose(
-  //     `network-registry: account ${account.to_string()} is ${event.args.eligibility ? 'eligible' : 'not eligible'}`
-  //   )
-  //   // emit event only when eligibility changes on accounts with a HoprNode associated
-  //   try {
-  //     let hoprNodes = await this.db.find_hopr_node_using_account_in_network_registry(
-  //       Ethereum_Address.deserialize(account.serialize())
-  //     )
-  //     let nodes: Address[] = []
-  //     while (hoprNodes.len() > 0) {
-  //       nodes.push(Address.deserialize(hoprNodes.next().serialize()))
-  //     }
-
-  //     this.emit('network-registry-eligibility-changed', account, nodes, event.args.eligibility)
-  //   } catch (err) {
-  //     log('error while changing eligibility', err)
-  //   }
-  // }
-
-  // private async onRegistered(
-  //   event: RegistryEvent<'Registered'> | RegistryEvent<'RegisteredByOwner'>,
-  //   lastSnapshot: Snapshot
-  // ): Promise<void> {
-  //   let hoprNode: PeerId
-  //   try {
-  //     hoprNode = peerIdFromString(event.args.hoprPeerId)
-  //   } catch (error) {
-  //     log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onRegistered'`)
-  //     log(error)
-  //     return
-  //   }
-
-  //   assert(lastSnapshot !== undefined)
-  //   const account = Address.from_string(event.args.account)
-  //   await this.db.add_to_network_registry(
-  //     Ethereum_PublicKey.from_peerid_str(hoprNode.toString()).to_address(),
-  //     Ethereum_Address.deserialize(account.serialize()),
-  //     Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-  //   )
-  //   verbose(`network-registry: node ${event.args.hoprPeerId} is allowed to connect`)
-  // }
-
-  // private async onDeregistered(
-  //   event: RegistryEvent<'Deregistered'> | RegistryEvent<'DeregisteredByOwner'>,
-  //   lastSnapshot: Snapshot
-  // ): Promise<void> {
-  //   let hoprNode: PeerId
-  //   try {
-  //     hoprNode = peerIdFromString(event.args.hoprPeerId)
-  //   } catch (error) {
-  //     log(`Invalid peer Id '${event.args.hoprPeerId}' given in event 'onDeregistered'`)
-  //     log(error)
-  //     return
-  //   }
-  //   assert(lastSnapshot !== undefined)
-  //   await this.db.remove_from_network_registry(
-  //     Ethereum_PublicKey.from_peerid_str(hoprNode.toString()).to_address(),
-  //     Ethereum_Address.from_string(event.args.account),
-  //     Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-  //   )
-  //   verbose(`network-registry: node ${event.args.hoprPeerId} is not allowed to connect`)
-  // }
-
-  // private async onEnabledNetworkRegistry(
-  //   event: RegistryEvent<'EnabledNetworkRegistry'>,
-  //   lastSnapshot: Snapshot
-  // ): Promise<void> {
-  //   assert(lastSnapshot !== undefined)
-  //   this.emit('network-registry-status-changed', event.args.isEnabled)
-  //   await this.db.set_network_registry(event.args.isEnabled, Ethereum_Snapshot.deserialize(lastSnapshot.serialize()))
-  // }
-
-  // private async onTransfer(event: TokenEvent<'Transfer'>, lastSnapshot: Snapshot) {
-  //   const isIncoming = Address.from_string(event.args.to).eq(this.address)
-  //   const amount = new Balance(event.args.value.toString(), BalanceType.HOPR)
-
-  //   assert(lastSnapshot !== undefined)
-  //   if (isIncoming) {
-  //     await this.db.add_hopr_balance(
-  //       Ethereum_Balance.deserialize(amount.serialize_value(), BalanceType.HOPR),
-  //       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-  //     )
-  //   } else {
-  //     await this.db.sub_hopr_balance(
-  //       Ethereum_Balance.deserialize(amount.serialize_value(), BalanceType.HOPR),
-  //       Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
-  //     )
-  //   }
-  // }
-
   private indexEvent(indexerEvent: IndexerEvents) {
     log(`Indexer indexEvent ${indexerEvent}`)
     this.emit(indexerEvent)
@@ -990,7 +856,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
     let out = `Known public nodes:\n`
-    
+
     let publicAccounts = await this.db.get_public_node_accounts()
 
     while (publicAccounts.len() > 0) {
@@ -1002,7 +868,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
       })
     }
-    
+
     // Remove last `\n`
     log(out.substring(0, out.length - 1))
 

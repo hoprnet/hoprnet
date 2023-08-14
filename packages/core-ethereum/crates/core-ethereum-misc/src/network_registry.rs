@@ -12,12 +12,7 @@ where
         return Ok(true);
     }
 
-    let maybe_stake_account = db.get_account_from_network_registry(&chain_address).await?;
-
-    match maybe_stake_account {
-        None => Ok(false),
-        Some(account) => Ok(db.is_eligible(&account).await?),
-    }
+    db.is_allowed_to_access_network(&chain_address).await.map_err(|e| e.into())
 }
 
 #[cfg(all(not(target = "wasm32"), test))]

@@ -7,16 +7,14 @@ pub use hopr_ledger::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod hopr_ledger {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LEDGER_VERSION\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ledgerDomainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRLEDGER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(|| {
-            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
-        });
+    pub static HOPRLEDGER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
+    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
     pub struct HoprLedger<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprLedger<M> {
         fn clone(&self) -> Self {
@@ -42,40 +40,64 @@ pub mod hopr_ledger {
     impl<M: ::ethers::providers::Middleware> HoprLedger<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                HOPRLEDGER_ABI.clone(),
-                client,
-            ))
+        pub fn new<T: Into<::ethers::core::types::Address>>(
+            address: T,
+            client: ::std::sync::Arc<M>,
+        ) -> Self {
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    HOPRLEDGER_ABI.clone(),
+                    client,
+                ),
+            )
         }
         ///Calls the contract's `LEDGER_VERSION` (0xddad1902) function
-        pub fn ledger_version(&self) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
+        pub fn ledger_version(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
             self.0
                 .method_hash([221, 173, 25, 2], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `ledgerDomainSeparator` (0xc966c4fe) function
-        pub fn ledger_domain_separator(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn ledger_domain_separator(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([201, 102, 196, 254], ())
                 .expect("method not found (this should never happen)")
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprLedger<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
+    for HoprLedger<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Container type for all input parameters for the `LEDGER_VERSION` function with signature `LEDGER_VERSION()` and selector `0xddad1902`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "LEDGER_VERSION", abi = "LEDGER_VERSION()")]
     pub struct LedgerVersionCall;
     ///Container type for all input parameters for the `ledgerDomainSeparator` function with signature `ledgerDomainSeparator()` and selector `0xc966c4fe`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "ledgerDomainSeparator", abi = "ledgerDomainSeparator()")]
     pub struct LedgerDomainSeparatorCall;
@@ -86,12 +108,18 @@ pub mod hopr_ledger {
         LedgerDomainSeparator(LedgerDomainSeparatorCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprLedgerCalls {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <LedgerVersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <LedgerVersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::LedgerVersion(decoded));
             }
-            if let Ok(decoded) = <LedgerDomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <LedgerDomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::LedgerDomainSeparator(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -100,8 +128,12 @@ pub mod hopr_ledger {
     impl ::ethers::core::abi::AbiEncode for HoprLedgerCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::LedgerVersion(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::LedgerDomainSeparator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::LedgerVersion(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::LedgerDomainSeparator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -109,7 +141,9 @@ pub mod hopr_ledger {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::LedgerVersion(element) => ::core::fmt::Display::fmt(element, f),
-                Self::LedgerDomainSeparator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::LedgerDomainSeparator(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
@@ -125,12 +159,26 @@ pub mod hopr_ledger {
     }
     ///Container type for all return fields from the `LEDGER_VERSION` function with signature `LEDGER_VERSION()` and selector `0xddad1902`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct LedgerVersionReturn(pub ::std::string::String);
     ///Container type for all return fields from the `ledgerDomainSeparator` function with signature `ledgerDomainSeparator()` and selector `0xc966c4fe`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct LedgerDomainSeparatorReturn(pub [u8; 32]);
 }

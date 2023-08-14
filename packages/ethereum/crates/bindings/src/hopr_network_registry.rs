@@ -7,16 +7,18 @@ pub use hopr_network_registry::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod hopr_network_registry {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_requirementImplementation\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_newOwner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"_manager\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ArrayLengthNotMatch\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"type\":\"error\",\"name\":\"CannotOperateForNode\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"GloballyDisabledRegistry\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"GloballyEnabledRegistry\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"type\":\"error\",\"name\":\"NodeAlreadyRegisterd\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"type\":\"error\",\"name\":\"NodeNotYetRegisterd\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"type\":\"error\",\"name\":\"NodeRegisterdToOtherAccount\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NotEnoughAllowanceToRegisterNode\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakingAccount\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Deregistered\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakingAccount\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"DeregisteredByManager\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakingAccount\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"bool\",\"name\":\"eligibility\",\"type\":\"bool\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"EligibilityUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"isEnabled\",\"type\":\"bool\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"NetworkRegistryStatusUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakingAccount\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"Registered\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakingAccount\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RegisteredByManager\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"requirementImplementation\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RequirementUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes32\",\"name\":\"previousAdminRole\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes32\",\"name\":\"newAdminRole\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleAdminChanged\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleGranted\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RoleRevoked\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"DEFAULT_ADMIN_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"MANAGER_ROLE\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"countRegisterdNodesPerAccount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"disableRegistry\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"enableRegistry\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"enabled\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleAdmin\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"index\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleMember\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRoleMemberCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"grantRole\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"hasRole\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakingAccount\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isAccountEligible\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNodeRegisteredAndEligible\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"isNodeRegisteredByAccount\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"nodeAddresses\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"managerDeregister\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"stakingAccounts\",\"type\":\"address[]\",\"components\":[]},{\"internalType\":\"bool[]\",\"name\":\"eligibilities\",\"type\":\"bool[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"managerForceSync\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"stakingAccounts\",\"type\":\"address[]\",\"components\":[]},{\"internalType\":\"address[]\",\"name\":\"nodeAddresses\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"managerRegister\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"stakingAccounts\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"managerSync\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"stakingAccount\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"maxAdditionalRegistrations\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"nodeRegisterdToAccount\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceRole\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"requirementImplementation\",\"outputs\":[{\"internalType\":\"contract IHoprNetworkRegistryRequirement\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"revokeRole\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"nodeAddresses\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"selfDeregister\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"nodeAddresses\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"selfRegister\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"selfSync\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_requirementImplementation\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateRequirementImplementation\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRNETWORKREGISTRY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(|| {
-            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
-        });
+    pub static HOPRNETWORKREGISTRY_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(|| {
+        ::ethers::core::utils::__serde_json::from_str(__ABI)
+            .expect("ABI is always valid")
+    });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -7764,8 +7766,9 @@ pub mod hopr_network_registry {
         8,
     ];
     ///The bytecode of the contract.
-    pub static HOPRNETWORKREGISTRY_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__BYTECODE);
+    pub static HOPRNETWORKREGISTRY_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __BYTECODE,
+    );
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -14773,8 +14776,9 @@ pub mod hopr_network_registry {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRNETWORKREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static HOPRNETWORKREGISTRY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct HoprNetworkRegistry<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprNetworkRegistry<M> {
         fn clone(&self) -> Self {
@@ -14802,12 +14806,17 @@ pub mod hopr_network_registry {
     impl<M: ::ethers::providers::Middleware> HoprNetworkRegistry<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                HOPRNETWORKREGISTRY_ABI.clone(),
-                client,
-            ))
+        pub fn new<T: Into<::ethers::core::types::Address>>(
+            address: T,
+            client: ::std::sync::Arc<M>,
+        ) -> Self {
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    HOPRNETWORKREGISTRY_ABI.clone(),
+                    client,
+                ),
+            )
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -14849,13 +14858,17 @@ pub mod hopr_network_registry {
             Ok(deployer)
         }
         ///Calls the contract's `DEFAULT_ADMIN_ROLE` (0xa217fddf) function
-        pub fn default_admin_role(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn default_admin_role(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([162, 23, 253, 223], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `MANAGER_ROLE` (0xec87621c) function
-        pub fn manager_role(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn manager_role(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([236, 135, 98, 28], ())
                 .expect("method not found (this should never happen)")
@@ -14870,13 +14883,17 @@ pub mod hopr_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `disableRegistry` (0xcbebafe0) function
-        pub fn disable_registry(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn disable_registry(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([203, 235, 175, 224], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `enableRegistry` (0xcfb3735f) function
-        pub fn enable_registry(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn enable_registry(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([207, 179, 115, 95], ())
                 .expect("method not found (this should never happen)")
@@ -14888,7 +14905,10 @@ pub mod hopr_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getRoleAdmin` (0x248a9ca3) function
-        pub fn get_role_admin(&self, role: [u8; 32]) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn get_role_admin(
+            &self,
+            role: [u8; 32],
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([36, 138, 156, 163], role)
                 .expect("method not found (this should never happen)")
@@ -14898,7 +14918,10 @@ pub mod hopr_network_registry {
             &self,
             role: [u8; 32],
             index: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([144, 16, 208, 124], (role, index))
                 .expect("method not found (this should never happen)")
@@ -15011,7 +15034,10 @@ pub mod hopr_network_registry {
         pub fn node_registerd_to_account(
             &self,
             p0: ::ethers::core::types::Address,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([199, 236, 171, 143], p0)
                 .expect("method not found (this should never happen)")
@@ -15029,7 +15055,10 @@ pub mod hopr_network_registry {
         ///Calls the contract's `requirementImplementation` (0xe3d2a071) function
         pub fn requirement_implementation(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([227, 210, 160, 113], ())
                 .expect("method not found (this should never happen)")
@@ -15069,7 +15098,10 @@ pub mod hopr_network_registry {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `supportsInterface` (0x01ffc9a7) function
-        pub fn supports_interface(&self, interface_id: [u8; 4]) -> ::ethers::contract::builders::ContractCall<M, bool> {
+        pub fn supports_interface(
+            &self,
+            interface_id: [u8; 4],
+        ) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
                 .method_hash([1, 255, 201, 167], interface_id)
                 .expect("method not found (this should never happen)")
@@ -15086,82 +15118,143 @@ pub mod hopr_network_registry {
         ///Gets the contract's `Deregistered` event
         pub fn deregistered_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, DeregisteredFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            DeregisteredFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `DeregisteredByManager` event
         pub fn deregistered_by_manager_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, DeregisteredByManagerFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            DeregisteredByManagerFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `EligibilityUpdated` event
         pub fn eligibility_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, EligibilityUpdatedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            EligibilityUpdatedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `NetworkRegistryStatusUpdated` event
         pub fn network_registry_status_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NetworkRegistryStatusUpdatedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NetworkRegistryStatusUpdatedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `Registered` event
         pub fn registered_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RegisteredFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            RegisteredFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `RegisteredByManager` event
         pub fn registered_by_manager_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RegisteredByManagerFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            RegisteredByManagerFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `RequirementUpdated` event
         pub fn requirement_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RequirementUpdatedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            RequirementUpdatedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `RoleAdminChanged` event
         pub fn role_admin_changed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleAdminChangedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            RoleAdminChangedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `RoleGranted` event
         pub fn role_granted_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleGrantedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            RoleGrantedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `RoleRevoked` event
         pub fn role_revoked_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, RoleRevokedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            RoleRevokedFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
-        pub fn events(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprNetworkRegistryEvents> {
+        pub fn events(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            HoprNetworkRegistryEvents,
+        > {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprNetworkRegistry<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
+    for HoprNetworkRegistry<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `ArrayLengthNotMatch` with signature `ArrayLengthNotMatch()` and selector `0xed882f71`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "ArrayLengthNotMatch", abi = "ArrayLengthNotMatch()")]
     pub struct ArrayLengthNotMatch;
     ///Custom Error type `CannotOperateForNode` with signature `CannotOperateForNode(address)` and selector `0x07414967`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "CannotOperateForNode", abi = "CannotOperateForNode(address)")]
     pub struct CannotOperateForNode {
@@ -15169,19 +15262,40 @@ pub mod hopr_network_registry {
     }
     ///Custom Error type `GloballyDisabledRegistry` with signature `GloballyDisabledRegistry()` and selector `0xc42638bb`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "GloballyDisabledRegistry", abi = "GloballyDisabledRegistry()")]
     pub struct GloballyDisabledRegistry;
     ///Custom Error type `GloballyEnabledRegistry` with signature `GloballyEnabledRegistry()` and selector `0xed1a0c77`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "GloballyEnabledRegistry", abi = "GloballyEnabledRegistry()")]
     pub struct GloballyEnabledRegistry;
     ///Custom Error type `NodeAlreadyRegisterd` with signature `NodeAlreadyRegisterd(address)` and selector `0x5b533ba1`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "NodeAlreadyRegisterd", abi = "NodeAlreadyRegisterd(address)")]
     pub struct NodeAlreadyRegisterd {
@@ -15189,7 +15303,14 @@ pub mod hopr_network_registry {
     }
     ///Custom Error type `NodeNotYetRegisterd` with signature `NodeNotYetRegisterd(address)` and selector `0xb1c3c8a8`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "NodeNotYetRegisterd", abi = "NodeNotYetRegisterd(address)")]
     pub struct NodeNotYetRegisterd {
@@ -15197,15 +15318,32 @@ pub mod hopr_network_registry {
     }
     ///Custom Error type `NodeRegisterdToOtherAccount` with signature `NodeRegisterdToOtherAccount(address)` and selector `0xbf4fdd73`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[etherror(name = "NodeRegisterdToOtherAccount", abi = "NodeRegisterdToOtherAccount(address)")]
+    #[etherror(
+        name = "NodeRegisterdToOtherAccount",
+        abi = "NodeRegisterdToOtherAccount(address)"
+    )]
     pub struct NodeRegisterdToOtherAccount {
         pub node_address: ::ethers::core::types::Address,
     }
     ///Custom Error type `NotEnoughAllowanceToRegisterNode` with signature `NotEnoughAllowanceToRegisterNode()` and selector `0x0fb9bd5c`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(
         name = "NotEnoughAllowanceToRegisterNode",
@@ -15228,33 +15366,58 @@ pub mod hopr_network_registry {
         RevertString(::std::string::String),
     }
     impl ::ethers::core::abi::AbiDecode for HoprNetworkRegistryErrors {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <ArrayLengthNotMatch as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ArrayLengthNotMatch as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ArrayLengthNotMatch(decoded));
             }
-            if let Ok(decoded) = <CannotOperateForNode as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <CannotOperateForNode as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::CannotOperateForNode(decoded));
             }
-            if let Ok(decoded) = <GloballyDisabledRegistry as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GloballyDisabledRegistry as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::GloballyDisabledRegistry(decoded));
             }
-            if let Ok(decoded) = <GloballyEnabledRegistry as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GloballyEnabledRegistry as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::GloballyEnabledRegistry(decoded));
             }
-            if let Ok(decoded) = <NodeAlreadyRegisterd as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NodeAlreadyRegisterd as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::NodeAlreadyRegisterd(decoded));
             }
-            if let Ok(decoded) = <NodeNotYetRegisterd as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NodeNotYetRegisterd as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NodeNotYetRegisterd(decoded));
             }
-            if let Ok(decoded) = <NodeRegisterdToOtherAccount as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NodeRegisterdToOtherAccount as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::NodeRegisterdToOtherAccount(decoded));
             }
-            if let Ok(decoded) = <NotEnoughAllowanceToRegisterNode as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NotEnoughAllowanceToRegisterNode as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::NotEnoughAllowanceToRegisterNode(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -15263,14 +15426,30 @@ pub mod hopr_network_registry {
     impl ::ethers::core::abi::AbiEncode for HoprNetworkRegistryErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::ArrayLengthNotMatch(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CannotOperateForNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GloballyDisabledRegistry(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GloballyEnabledRegistry(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NodeAlreadyRegisterd(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NodeNotYetRegisterd(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NodeRegisterdToOtherAccount(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NotEnoughAllowanceToRegisterNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ArrayLengthNotMatch(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CannotOperateForNode(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GloballyDisabledRegistry(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GloballyEnabledRegistry(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NodeAlreadyRegisterd(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NodeNotYetRegisterd(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NodeRegisterdToOtherAccount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotEnoughAllowanceToRegisterNode(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -15279,14 +15458,38 @@ pub mod hopr_network_registry {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <ArrayLengthNotMatch as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <CannotOperateForNode as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <GloballyDisabledRegistry as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <GloballyEnabledRegistry as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NodeAlreadyRegisterd as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NodeNotYetRegisterd as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NodeRegisterdToOtherAccount as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NotEnoughAllowanceToRegisterNode as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <ArrayLengthNotMatch as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <CannotOperateForNode as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <GloballyDisabledRegistry as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <GloballyEnabledRegistry as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NodeAlreadyRegisterd as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NodeNotYetRegisterd as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NodeRegisterdToOtherAccount as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotEnoughAllowanceToRegisterNode as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ => false,
             }
         }
@@ -15294,14 +15497,30 @@ pub mod hopr_network_registry {
     impl ::core::fmt::Display for HoprNetworkRegistryErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::ArrayLengthNotMatch(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CannotOperateForNode(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GloballyDisabledRegistry(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GloballyEnabledRegistry(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NodeAlreadyRegisterd(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NodeNotYetRegisterd(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NodeRegisterdToOtherAccount(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotEnoughAllowanceToRegisterNode(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ArrayLengthNotMatch(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CannotOperateForNode(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GloballyDisabledRegistry(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::GloballyEnabledRegistry(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NodeAlreadyRegisterd(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NodeNotYetRegisterd(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NodeRegisterdToOtherAccount(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NotEnoughAllowanceToRegisterNode(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -15341,18 +15560,27 @@ pub mod hopr_network_registry {
             Self::NodeNotYetRegisterd(value)
         }
     }
-    impl ::core::convert::From<NodeRegisterdToOtherAccount> for HoprNetworkRegistryErrors {
+    impl ::core::convert::From<NodeRegisterdToOtherAccount>
+    for HoprNetworkRegistryErrors {
         fn from(value: NodeRegisterdToOtherAccount) -> Self {
             Self::NodeRegisterdToOtherAccount(value)
         }
     }
-    impl ::core::convert::From<NotEnoughAllowanceToRegisterNode> for HoprNetworkRegistryErrors {
+    impl ::core::convert::From<NotEnoughAllowanceToRegisterNode>
+    for HoprNetworkRegistryErrors {
         fn from(value: NotEnoughAllowanceToRegisterNode) -> Self {
             Self::NotEnoughAllowanceToRegisterNode(value)
         }
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "Deregistered", abi = "Deregistered(address,address)")]
     pub struct DeregisteredFilter {
@@ -15362,9 +15590,19 @@ pub mod hopr_network_registry {
         pub node_address: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "DeregisteredByManager", abi = "DeregisteredByManager(address,address)")]
+    #[ethevent(
+        name = "DeregisteredByManager",
+        abi = "DeregisteredByManager(address,address)"
+    )]
     pub struct DeregisteredByManagerFilter {
         #[ethevent(indexed)]
         pub staking_account: ::ethers::core::types::Address,
@@ -15372,7 +15610,14 @@ pub mod hopr_network_registry {
         pub node_address: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "EligibilityUpdated", abi = "EligibilityUpdated(address,bool)")]
     pub struct EligibilityUpdatedFilter {
@@ -15382,15 +15627,32 @@ pub mod hopr_network_registry {
         pub eligibility: bool,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "NetworkRegistryStatusUpdated", abi = "NetworkRegistryStatusUpdated(bool)")]
+    #[ethevent(
+        name = "NetworkRegistryStatusUpdated",
+        abi = "NetworkRegistryStatusUpdated(bool)"
+    )]
     pub struct NetworkRegistryStatusUpdatedFilter {
         #[ethevent(indexed)]
         pub is_enabled: bool,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "Registered", abi = "Registered(address,address)")]
     pub struct RegisteredFilter {
@@ -15400,9 +15662,19 @@ pub mod hopr_network_registry {
         pub node_address: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "RegisteredByManager", abi = "RegisteredByManager(address,address)")]
+    #[ethevent(
+        name = "RegisteredByManager",
+        abi = "RegisteredByManager(address,address)"
+    )]
     pub struct RegisteredByManagerFilter {
         #[ethevent(indexed)]
         pub staking_account: ::ethers::core::types::Address,
@@ -15410,7 +15682,14 @@ pub mod hopr_network_registry {
         pub node_address: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "RequirementUpdated", abi = "RequirementUpdated(address)")]
     pub struct RequirementUpdatedFilter {
@@ -15418,9 +15697,19 @@ pub mod hopr_network_registry {
         pub requirement_implementation: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "RoleAdminChanged", abi = "RoleAdminChanged(bytes32,bytes32,bytes32)")]
+    #[ethevent(
+        name = "RoleAdminChanged",
+        abi = "RoleAdminChanged(bytes32,bytes32,bytes32)"
+    )]
     pub struct RoleAdminChangedFilter {
         #[ethevent(indexed)]
         pub role: [u8; 32],
@@ -15430,7 +15719,14 @@ pub mod hopr_network_registry {
         pub new_admin_role: [u8; 32],
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "RoleGranted", abi = "RoleGranted(bytes32,address,address)")]
     pub struct RoleGrantedFilter {
@@ -15442,7 +15738,14 @@ pub mod hopr_network_registry {
         pub sender: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "RoleRevoked", abi = "RoleRevoked(bytes32,address,address)")]
     pub struct RoleRevokedFilter {
@@ -15468,18 +15771,26 @@ pub mod hopr_network_registry {
         RoleRevokedFilter(RoleRevokedFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprNetworkRegistryEvents {
-        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(
+            log: &::ethers::core::abi::RawLog,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = DeregisteredFilter::decode_log(log) {
                 return Ok(HoprNetworkRegistryEvents::DeregisteredFilter(decoded));
             }
             if let Ok(decoded) = DeregisteredByManagerFilter::decode_log(log) {
-                return Ok(HoprNetworkRegistryEvents::DeregisteredByManagerFilter(decoded));
+                return Ok(
+                    HoprNetworkRegistryEvents::DeregisteredByManagerFilter(decoded),
+                );
             }
             if let Ok(decoded) = EligibilityUpdatedFilter::decode_log(log) {
                 return Ok(HoprNetworkRegistryEvents::EligibilityUpdatedFilter(decoded));
             }
             if let Ok(decoded) = NetworkRegistryStatusUpdatedFilter::decode_log(log) {
-                return Ok(HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(decoded));
+                return Ok(
+                    HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(
+                        decoded,
+                    ),
+                );
             }
             if let Ok(decoded) = RegisteredFilter::decode_log(log) {
                 return Ok(HoprNetworkRegistryEvents::RegisteredFilter(decoded));
@@ -15505,14 +15816,28 @@ pub mod hopr_network_registry {
     impl ::core::fmt::Display for HoprNetworkRegistryEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::DeregisteredFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DeregisteredByManagerFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::EligibilityUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NetworkRegistryStatusUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::DeregisteredFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::DeregisteredByManagerFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::EligibilityUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NetworkRegistryStatusUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RegisteredFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RegisteredByManagerFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RequirementUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RoleAdminChangedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::RegisteredByManagerFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::RequirementUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::RoleAdminChangedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RoleGrantedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RoleRevokedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -15523,7 +15848,8 @@ pub mod hopr_network_registry {
             Self::DeregisteredFilter(value)
         }
     }
-    impl ::core::convert::From<DeregisteredByManagerFilter> for HoprNetworkRegistryEvents {
+    impl ::core::convert::From<DeregisteredByManagerFilter>
+    for HoprNetworkRegistryEvents {
         fn from(value: DeregisteredByManagerFilter) -> Self {
             Self::DeregisteredByManagerFilter(value)
         }
@@ -15533,7 +15859,8 @@ pub mod hopr_network_registry {
             Self::EligibilityUpdatedFilter(value)
         }
     }
-    impl ::core::convert::From<NetworkRegistryStatusUpdatedFilter> for HoprNetworkRegistryEvents {
+    impl ::core::convert::From<NetworkRegistryStatusUpdatedFilter>
+    for HoprNetworkRegistryEvents {
         fn from(value: NetworkRegistryStatusUpdatedFilter) -> Self {
             Self::NetworkRegistryStatusUpdatedFilter(value)
         }
@@ -15570,19 +15897,40 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `DEFAULT_ADMIN_ROLE` function with signature `DEFAULT_ADMIN_ROLE()` and selector `0xa217fddf`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "DEFAULT_ADMIN_ROLE", abi = "DEFAULT_ADMIN_ROLE()")]
     pub struct DefaultAdminRoleCall;
     ///Container type for all input parameters for the `MANAGER_ROLE` function with signature `MANAGER_ROLE()` and selector `0xec87621c`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "MANAGER_ROLE", abi = "MANAGER_ROLE()")]
     pub struct ManagerRoleCall;
     ///Container type for all input parameters for the `countRegisterdNodesPerAccount` function with signature `countRegisterdNodesPerAccount(address)` and selector `0x3fa58457`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "countRegisterdNodesPerAccount",
@@ -15591,25 +15939,53 @@ pub mod hopr_network_registry {
     pub struct CountRegisterdNodesPerAccountCall(pub ::ethers::core::types::Address);
     ///Container type for all input parameters for the `disableRegistry` function with signature `disableRegistry()` and selector `0xcbebafe0`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "disableRegistry", abi = "disableRegistry()")]
     pub struct DisableRegistryCall;
     ///Container type for all input parameters for the `enableRegistry` function with signature `enableRegistry()` and selector `0xcfb3735f`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "enableRegistry", abi = "enableRegistry()")]
     pub struct EnableRegistryCall;
     ///Container type for all input parameters for the `enabled` function with signature `enabled()` and selector `0x238dafe0`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "enabled", abi = "enabled()")]
     pub struct EnabledCall;
     ///Container type for all input parameters for the `getRoleAdmin` function with signature `getRoleAdmin(bytes32)` and selector `0x248a9ca3`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "getRoleAdmin", abi = "getRoleAdmin(bytes32)")]
     pub struct GetRoleAdminCall {
@@ -15617,7 +15993,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `getRoleMember` function with signature `getRoleMember(bytes32,uint256)` and selector `0x9010d07c`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "getRoleMember", abi = "getRoleMember(bytes32,uint256)")]
     pub struct GetRoleMemberCall {
@@ -15626,7 +16009,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `getRoleMemberCount` function with signature `getRoleMemberCount(bytes32)` and selector `0xca15c873`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "getRoleMemberCount", abi = "getRoleMemberCount(bytes32)")]
     pub struct GetRoleMemberCountCall {
@@ -15634,7 +16024,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `grantRole` function with signature `grantRole(bytes32,address)` and selector `0x2f2ff15d`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "grantRole", abi = "grantRole(bytes32,address)")]
     pub struct GrantRoleCall {
@@ -15643,7 +16040,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `hasRole` function with signature `hasRole(bytes32,address)` and selector `0x91d14854`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "hasRole", abi = "hasRole(bytes32,address)")]
     pub struct HasRoleCall {
@@ -15652,7 +16056,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `isAccountEligible` function with signature `isAccountEligible(address)` and selector `0x6ffbf988`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "isAccountEligible", abi = "isAccountEligible(address)")]
     pub struct IsAccountEligibleCall {
@@ -15660,15 +16071,32 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `isNodeRegisteredAndEligible` function with signature `isNodeRegisteredAndEligible(address)` and selector `0x4eb1805c`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethcall(name = "isNodeRegisteredAndEligible", abi = "isNodeRegisteredAndEligible(address)")]
+    #[ethcall(
+        name = "isNodeRegisteredAndEligible",
+        abi = "isNodeRegisteredAndEligible(address)"
+    )]
     pub struct IsNodeRegisteredAndEligibleCall {
         pub node_address: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `isNodeRegisteredByAccount` function with signature `isNodeRegisteredByAccount(address,address)` and selector `0xa5605da5`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "isNodeRegisteredByAccount",
@@ -15680,7 +16108,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `managerDeregister` function with signature `managerDeregister(address[])` and selector `0x41b64965`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "managerDeregister", abi = "managerDeregister(address[])")]
     pub struct ManagerDeregisterCall {
@@ -15688,7 +16123,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `managerForceSync` function with signature `managerForceSync(address[],bool[])` and selector `0xcaf5f501`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "managerForceSync", abi = "managerForceSync(address[],bool[])")]
     pub struct ManagerForceSyncCall {
@@ -15697,7 +16139,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `managerRegister` function with signature `managerRegister(address[],address[])` and selector `0x8d753b2d`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "managerRegister", abi = "managerRegister(address[],address[])")]
     pub struct ManagerRegisterCall {
@@ -15706,7 +16155,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `managerSync` function with signature `managerSync(address[])` and selector `0x2c33cafb`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "managerSync", abi = "managerSync(address[])")]
     pub struct ManagerSyncCall {
@@ -15714,21 +16170,45 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `maxAdditionalRegistrations` function with signature `maxAdditionalRegistrations(address)` and selector `0x2a2deee2`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethcall(name = "maxAdditionalRegistrations", abi = "maxAdditionalRegistrations(address)")]
+    #[ethcall(
+        name = "maxAdditionalRegistrations",
+        abi = "maxAdditionalRegistrations(address)"
+    )]
     pub struct MaxAdditionalRegistrationsCall {
         pub staking_account: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `nodeRegisterdToAccount` function with signature `nodeRegisterdToAccount(address)` and selector `0xc7ecab8f`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "nodeRegisterdToAccount", abi = "nodeRegisterdToAccount(address)")]
     pub struct NodeRegisterdToAccountCall(pub ::ethers::core::types::Address);
     ///Container type for all input parameters for the `renounceRole` function with signature `renounceRole(bytes32,address)` and selector `0x36568abe`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "renounceRole", abi = "renounceRole(bytes32,address)")]
     pub struct RenounceRoleCall {
@@ -15737,13 +16217,27 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `requirementImplementation` function with signature `requirementImplementation()` and selector `0xe3d2a071`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "requirementImplementation", abi = "requirementImplementation()")]
     pub struct RequirementImplementationCall;
     ///Container type for all input parameters for the `revokeRole` function with signature `revokeRole(bytes32,address)` and selector `0xd547741f`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "revokeRole", abi = "revokeRole(bytes32,address)")]
     pub struct RevokeRoleCall {
@@ -15752,7 +16246,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `selfDeregister` function with signature `selfDeregister(address[])` and selector `0xa05e0f6d`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "selfDeregister", abi = "selfDeregister(address[])")]
     pub struct SelfDeregisterCall {
@@ -15760,7 +16261,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `selfRegister` function with signature `selfRegister(address[])` and selector `0x76593a39`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "selfRegister", abi = "selfRegister(address[])")]
     pub struct SelfRegisterCall {
@@ -15768,13 +16276,27 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `selfSync` function with signature `selfSync()` and selector `0x9c7f643b`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "selfSync", abi = "selfSync()")]
     pub struct SelfSyncCall;
     ///Container type for all input parameters for the `supportsInterface` function with signature `supportsInterface(bytes4)` and selector `0x01ffc9a7`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "supportsInterface", abi = "supportsInterface(bytes4)")]
     pub struct SupportsInterfaceCall {
@@ -15782,7 +16304,14 @@ pub mod hopr_network_registry {
     }
     ///Container type for all input parameters for the `updateRequirementImplementation` function with signature `updateRequirementImplementation(address)` and selector `0x27b040a1`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "updateRequirementImplementation",
@@ -15824,90 +16353,146 @@ pub mod hopr_network_registry {
         UpdateRequirementImplementation(UpdateRequirementImplementationCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprNetworkRegistryCalls {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <DefaultAdminRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <DefaultAdminRoleCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::DefaultAdminRole(decoded));
             }
-            if let Ok(decoded) = <ManagerRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ManagerRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ManagerRole(decoded));
             }
-            if let Ok(decoded) = <CountRegisterdNodesPerAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <CountRegisterdNodesPerAccountCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::CountRegisterdNodesPerAccount(decoded));
             }
-            if let Ok(decoded) = <DisableRegistryCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <DisableRegistryCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::DisableRegistry(decoded));
             }
-            if let Ok(decoded) = <EnableRegistryCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <EnableRegistryCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::EnableRegistry(decoded));
             }
-            if let Ok(decoded) = <EnabledCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <EnabledCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Enabled(decoded));
             }
-            if let Ok(decoded) = <GetRoleAdminCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GetRoleAdminCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetRoleAdmin(decoded));
             }
-            if let Ok(decoded) = <GetRoleMemberCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GetRoleMemberCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetRoleMember(decoded));
             }
-            if let Ok(decoded) = <GetRoleMemberCountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GetRoleMemberCountCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::GetRoleMemberCount(decoded));
             }
-            if let Ok(decoded) = <GrantRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GrantRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GrantRole(decoded));
             }
-            if let Ok(decoded) = <HasRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <HasRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::HasRole(decoded));
             }
-            if let Ok(decoded) = <IsAccountEligibleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <IsAccountEligibleCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::IsAccountEligible(decoded));
             }
-            if let Ok(decoded) = <IsNodeRegisteredAndEligibleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <IsNodeRegisteredAndEligibleCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::IsNodeRegisteredAndEligible(decoded));
             }
-            if let Ok(decoded) = <IsNodeRegisteredByAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <IsNodeRegisteredByAccountCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::IsNodeRegisteredByAccount(decoded));
             }
-            if let Ok(decoded) = <ManagerDeregisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ManagerDeregisterCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::ManagerDeregister(decoded));
             }
-            if let Ok(decoded) = <ManagerForceSyncCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ManagerForceSyncCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::ManagerForceSync(decoded));
             }
-            if let Ok(decoded) = <ManagerRegisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ManagerRegisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ManagerRegister(decoded));
             }
-            if let Ok(decoded) = <ManagerSyncCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ManagerSyncCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ManagerSync(decoded));
             }
-            if let Ok(decoded) = <MaxAdditionalRegistrationsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <MaxAdditionalRegistrationsCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::MaxAdditionalRegistrations(decoded));
             }
-            if let Ok(decoded) = <NodeRegisterdToAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NodeRegisterdToAccountCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::NodeRegisterdToAccount(decoded));
             }
-            if let Ok(decoded) = <RenounceRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RenounceRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RenounceRole(decoded));
             }
-            if let Ok(decoded) = <RequirementImplementationCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RequirementImplementationCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RequirementImplementation(decoded));
             }
-            if let Ok(decoded) = <RevokeRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RevokeRoleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevokeRole(decoded));
             }
-            if let Ok(decoded) = <SelfDeregisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <SelfDeregisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SelfDeregister(decoded));
             }
-            if let Ok(decoded) = <SelfRegisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <SelfRegisterCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SelfRegister(decoded));
             }
-            if let Ok(decoded) = <SelfSyncCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <SelfSyncCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::SelfSync(decoded));
             }
-            if let Ok(decoded) = <SupportsInterfaceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <SupportsInterfaceCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::SupportsInterface(decoded));
             }
-            if let Ok(decoded) = <UpdateRequirementImplementationCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <UpdateRequirementImplementationCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::UpdateRequirementImplementation(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -15916,34 +16501,86 @@ pub mod hopr_network_registry {
     impl ::ethers::core::abi::AbiEncode for HoprNetworkRegistryCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::DefaultAdminRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ManagerRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CountRegisterdNodesPerAccount(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::DisableRegistry(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::EnableRegistry(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::DefaultAdminRole(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ManagerRole(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CountRegisterdNodesPerAccount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::DisableRegistry(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::EnableRegistry(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Enabled(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetRoleAdmin(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetRoleMember(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetRoleMemberCount(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GrantRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetRoleAdmin(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetRoleMember(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetRoleMemberCount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GrantRole(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::HasRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::IsAccountEligible(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::IsNodeRegisteredAndEligible(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::IsNodeRegisteredByAccount(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ManagerDeregister(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ManagerForceSync(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ManagerRegister(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ManagerSync(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MaxAdditionalRegistrations(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NodeRegisterdToAccount(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RenounceRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RequirementImplementation(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RevokeRole(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SelfDeregister(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SelfRegister(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SelfSync(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SupportsInterface(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::UpdateRequirementImplementation(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::IsAccountEligible(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::IsNodeRegisteredAndEligible(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::IsNodeRegisteredByAccount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ManagerDeregister(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ManagerForceSync(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ManagerRegister(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ManagerSync(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::MaxAdditionalRegistrations(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NodeRegisterdToAccount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RenounceRole(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RequirementImplementation(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RevokeRole(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SelfDeregister(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SelfRegister(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SelfSync(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SupportsInterface(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::UpdateRequirementImplementation(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -15952,32 +16589,48 @@ pub mod hopr_network_registry {
             match self {
                 Self::DefaultAdminRole(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ManagerRole(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CountRegisterdNodesPerAccount(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CountRegisterdNodesPerAccount(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::DisableRegistry(element) => ::core::fmt::Display::fmt(element, f),
                 Self::EnableRegistry(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Enabled(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRoleAdmin(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetRoleMember(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GetRoleMemberCount(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetRoleMemberCount(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::GrantRole(element) => ::core::fmt::Display::fmt(element, f),
                 Self::HasRole(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsAccountEligible(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IsNodeRegisteredAndEligible(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IsNodeRegisteredByAccount(element) => ::core::fmt::Display::fmt(element, f),
+                Self::IsNodeRegisteredAndEligible(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::IsNodeRegisteredByAccount(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::ManagerDeregister(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ManagerForceSync(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ManagerRegister(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ManagerSync(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MaxAdditionalRegistrations(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NodeRegisterdToAccount(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MaxAdditionalRegistrations(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NodeRegisterdToAccount(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RenounceRole(element) => ::core::fmt::Display::fmt(element, f),
-                Self::RequirementImplementation(element) => ::core::fmt::Display::fmt(element, f),
+                Self::RequirementImplementation(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevokeRole(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SelfDeregister(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SelfRegister(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SelfSync(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SupportsInterface(element) => ::core::fmt::Display::fmt(element, f),
-                Self::UpdateRequirementImplementation(element) => ::core::fmt::Display::fmt(element, f),
+                Self::UpdateRequirementImplementation(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
@@ -15991,7 +16644,8 @@ pub mod hopr_network_registry {
             Self::ManagerRole(value)
         }
     }
-    impl ::core::convert::From<CountRegisterdNodesPerAccountCall> for HoprNetworkRegistryCalls {
+    impl ::core::convert::From<CountRegisterdNodesPerAccountCall>
+    for HoprNetworkRegistryCalls {
         fn from(value: CountRegisterdNodesPerAccountCall) -> Self {
             Self::CountRegisterdNodesPerAccount(value)
         }
@@ -16041,12 +16695,14 @@ pub mod hopr_network_registry {
             Self::IsAccountEligible(value)
         }
     }
-    impl ::core::convert::From<IsNodeRegisteredAndEligibleCall> for HoprNetworkRegistryCalls {
+    impl ::core::convert::From<IsNodeRegisteredAndEligibleCall>
+    for HoprNetworkRegistryCalls {
         fn from(value: IsNodeRegisteredAndEligibleCall) -> Self {
             Self::IsNodeRegisteredAndEligible(value)
         }
     }
-    impl ::core::convert::From<IsNodeRegisteredByAccountCall> for HoprNetworkRegistryCalls {
+    impl ::core::convert::From<IsNodeRegisteredByAccountCall>
+    for HoprNetworkRegistryCalls {
         fn from(value: IsNodeRegisteredByAccountCall) -> Self {
             Self::IsNodeRegisteredByAccount(value)
         }
@@ -16071,7 +16727,8 @@ pub mod hopr_network_registry {
             Self::ManagerSync(value)
         }
     }
-    impl ::core::convert::From<MaxAdditionalRegistrationsCall> for HoprNetworkRegistryCalls {
+    impl ::core::convert::From<MaxAdditionalRegistrationsCall>
+    for HoprNetworkRegistryCalls {
         fn from(value: MaxAdditionalRegistrationsCall) -> Self {
             Self::MaxAdditionalRegistrations(value)
         }
@@ -16086,7 +16743,8 @@ pub mod hopr_network_registry {
             Self::RenounceRole(value)
         }
     }
-    impl ::core::convert::From<RequirementImplementationCall> for HoprNetworkRegistryCalls {
+    impl ::core::convert::From<RequirementImplementationCall>
+    for HoprNetworkRegistryCalls {
         fn from(value: RequirementImplementationCall) -> Self {
             Self::RequirementImplementation(value)
         }
@@ -16116,84 +16774,190 @@ pub mod hopr_network_registry {
             Self::SupportsInterface(value)
         }
     }
-    impl ::core::convert::From<UpdateRequirementImplementationCall> for HoprNetworkRegistryCalls {
+    impl ::core::convert::From<UpdateRequirementImplementationCall>
+    for HoprNetworkRegistryCalls {
         fn from(value: UpdateRequirementImplementationCall) -> Self {
             Self::UpdateRequirementImplementation(value)
         }
     }
     ///Container type for all return fields from the `DEFAULT_ADMIN_ROLE` function with signature `DEFAULT_ADMIN_ROLE()` and selector `0xa217fddf`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct DefaultAdminRoleReturn(pub [u8; 32]);
     ///Container type for all return fields from the `MANAGER_ROLE` function with signature `MANAGER_ROLE()` and selector `0xec87621c`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct ManagerRoleReturn(pub [u8; 32]);
     ///Container type for all return fields from the `countRegisterdNodesPerAccount` function with signature `countRegisterdNodesPerAccount(address)` and selector `0x3fa58457`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct CountRegisterdNodesPerAccountReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `enabled` function with signature `enabled()` and selector `0x238dafe0`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct EnabledReturn(pub bool);
     ///Container type for all return fields from the `getRoleAdmin` function with signature `getRoleAdmin(bytes32)` and selector `0x248a9ca3`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct GetRoleAdminReturn(pub [u8; 32]);
     ///Container type for all return fields from the `getRoleMember` function with signature `getRoleMember(bytes32,uint256)` and selector `0x9010d07c`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct GetRoleMemberReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `getRoleMemberCount` function with signature `getRoleMemberCount(bytes32)` and selector `0xca15c873`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct GetRoleMemberCountReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `hasRole` function with signature `hasRole(bytes32,address)` and selector `0x91d14854`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct HasRoleReturn(pub bool);
     ///Container type for all return fields from the `isAccountEligible` function with signature `isAccountEligible(address)` and selector `0x6ffbf988`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct IsAccountEligibleReturn(pub bool);
     ///Container type for all return fields from the `isNodeRegisteredAndEligible` function with signature `isNodeRegisteredAndEligible(address)` and selector `0x4eb1805c`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct IsNodeRegisteredAndEligibleReturn(pub bool);
     ///Container type for all return fields from the `isNodeRegisteredByAccount` function with signature `isNodeRegisteredByAccount(address,address)` and selector `0xa5605da5`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct IsNodeRegisteredByAccountReturn(pub bool);
     ///Container type for all return fields from the `maxAdditionalRegistrations` function with signature `maxAdditionalRegistrations(address)` and selector `0x2a2deee2`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct MaxAdditionalRegistrationsReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `nodeRegisterdToAccount` function with signature `nodeRegisterdToAccount(address)` and selector `0xc7ecab8f`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct NodeRegisterdToAccountReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `requirementImplementation` function with signature `requirementImplementation()` and selector `0xe3d2a071`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct RequirementImplementationReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `supportsInterface` function with signature `supportsInterface(bytes4)` and selector `0x01ffc9a7`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct SupportsInterfaceReturn(pub bool);
 }
