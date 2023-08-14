@@ -6,14 +6,15 @@ use aes::{
     cipher::{self, InnerIvInit, KeyInit, StreamCipherCore},
     Aes128,
 };
-use core_crypto::types::{OffchainPublicKey, PublicKey};
-use getrandom::getrandom;
+use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+use core_crypto::random::random_bytes;
 use hex;
 use scrypt::{scrypt, Params as ScryptParams};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
+use typenum::Unsigned;
 use utils_log::error;
 use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
@@ -21,6 +22,7 @@ use uuid::Uuid;
 #[cfg(all(feature = "wasm", not(test)))]
 use real_base::file::wasm::{metadata, read_to_string, write};
 
+use crate::errors::KeyPairError::KeyDerivationError;
 #[cfg(any(not(feature = "wasm"), test))]
 use real_base::file::native::{metadata, read_to_string, write};
 
@@ -32,14 +34,11 @@ const HOPR_KDF_PARAMS_LOG_N: u8 = 13u8;
 const HOPR_KDF_PARAMS_R: u32 = 8u32;
 const HOPR_KDF_PARAMS_P: u32 = 1u32;
 
-const PACKET_KEY_LENGTH: usize = 32;
-const CHAIN_KEY_LENGTH: usize = 32;
+const PACKET_KEY_LENGTH: usize = <OffchainKeypair as Keypair>::SecretLen::USIZE;
+const CHAIN_KEY_LENGTH: usize = <ChainKeypair as Keypair>::SecretLen::USIZE;
 
 const V1_PRIVKEY_LENGTH: usize = 32;
 const V2_PRIVKEYS_LENGTH: usize = 172;
-
-pub type PacketKey = [u8; PACKET_KEY_LENGTH];
-pub type ChainKey = [u8; CHAIN_KEY_LENGTH];
 
 // Current version, deviates from pre 2.0
 const VERSION: u32 = 2;
@@ -89,10 +88,11 @@ impl IdentityOptions {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct HoprKeys {
-    pub packet_key: (PacketKey, OffchainPublicKey),
-    pub chain_key: (ChainKey, PublicKey),
-    pub id: Uuid,
+    pub packet_key: OffchainKeypair,
+    pub chain_key: ChainKeypair,
+    id: Uuid,
 }
 
 impl Serialize for HoprKeys {
@@ -102,8 +102,8 @@ impl Serialize for HoprKeys {
         S: Serializer,
     {
         let mut s = serializer.serialize_struct("HoprKeys", 3)?;
-        s.serialize_field("packet_key", self.packet_key.1.to_peerid_str().as_str())?;
-        s.serialize_field("chain_key", &self.chain_key.1.to_peerid_str().as_str())?;
+        s.serialize_field("packet_key", self.packet_key.public().to_peerid_str().as_str())?;
+        s.serialize_field("chain_key", &self.chain_key.public().to_hex().as_str())?;
         s.serialize_field("uuid", &self.id)?;
         s.end()
     }
@@ -114,9 +114,9 @@ impl std::fmt::Display for HoprKeys {
         f.write_str(
             format!(
                 "packet_key: {}, chain_key: {} (Ethereum address: {})\nUUID: {}",
-                self.packet_key.1.to_peerid_str(),
-                self.chain_key.1.to_peerid_str(),
-                self.chain_key.1.to_address(),
+                self.packet_key.public().to_peerid_str(),
+                self.chain_key.public().to_hex(),
+                self.chain_key.public().0.to_address(),
                 self.id.to_string()
             )
             .as_str(),
@@ -200,8 +200,9 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
     /// ```
     fn try_from(value: ([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])) -> std::result::Result<Self, Self::Error> {
         Ok(HoprKeys {
-            packet_key: (value.0, OffchainPublicKey::from_privkey(&value.0[..])?),
-            chain_key: (value.1, PublicKey::from_privkey(&value.1[..])?),
+            packet_key: OffchainKeypair::from_secret(&value.0)
+                .map_err(|e| KeyDerivationError { err: e.to_string() })?,
+            chain_key: ChainKeypair::from_secret(&value.1).map_err(|e| KeyDerivationError { err: e.to_string() })?,
             id: Uuid::new_v4(),
         })
     }
@@ -209,19 +210,23 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
 
 impl PartialEq for HoprKeys {
     fn eq(&self, other: &Self) -> bool {
-        self.packet_key.eq(&other.packet_key) && self.chain_key.eq(&other.chain_key)
+        self.packet_key.public().eq(other.packet_key.public()) && self.chain_key.public().eq(other.chain_key.public())
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl HoprKeys {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn random() -> Self {
+        Self {
+            packet_key: OffchainKeypair::random(),
+            chain_key: ChainKeypair::random(),
+            id: Uuid::new_v4(),
+        }
     }
 }
 
 impl HoprKeys {
-    pub fn new() -> Self {
-        Self {
-            packet_key: OffchainPublicKey::random_keypair(),
-            chain_key: PublicKey::random_keypair(),
-            id: Uuid::new_v4(),
-        }
-    }
-
     pub fn init(opts: IdentityOptions) -> Result<Self> {
         let exists = metadata(&opts.id_path).is_ok();
 
@@ -239,7 +244,7 @@ impl HoprKeys {
 
                 priv_keys.try_into()?
             } else {
-                HoprKeys::new()
+                HoprKeys::random()
             };
             keys.write_eth_keystore(
                 &opts.id_path,
@@ -277,7 +282,7 @@ impl HoprKeys {
         }
 
         if opts.initialize {
-            let keys = HoprKeys::new();
+            let keys = HoprKeys::random();
             keys.write_eth_keystore(
                 &opts.id_path,
                 &opts.password,
@@ -338,20 +343,14 @@ impl HoprKeys {
             V1_PRIVKEY_LENGTH => {
                 decryptor.apply_keystream(&mut pk);
 
-                let mut packet_key = [0u8; PACKET_KEY_LENGTH];
-                getrandom(&mut packet_key)?;
+                let packet_key: [u8; PACKET_KEY_LENGTH] = random_bytes();
 
                 let mut chain_key = [0u8; CHAIN_KEY_LENGTH];
                 chain_key.clone_from_slice(&pk.as_slice()[0..CHAIN_KEY_LENGTH]);
 
-                Ok((
-                    HoprKeys {
-                        packet_key: (packet_key, OffchainPublicKey::from_privkey(&packet_key[..]).unwrap()),
-                        chain_key: (chain_key, PublicKey::from_privkey(&chain_key[..]).unwrap()),
-                        id: keystore.id,
-                    },
-                    true,
-                ))
+                let ret: HoprKeys = (packet_key, chain_key).try_into().unwrap();
+
+                Ok((ret, true))
             }
             V2_PRIVKEYS_LENGTH => {
                 decryptor.apply_keystream(&mut pk);
@@ -380,9 +379,8 @@ impl HoprKeys {
 
                 Ok((
                     HoprKeys {
-                        packet_key: (packet_key, OffchainPublicKey::from_privkey(&packet_key[..]).unwrap()),
-                        // TODO: change this to off-chain privKey
-                        chain_key: (chain_key, PublicKey::from_privkey(&chain_key[..]).unwrap()),
+                        packet_key: OffchainKeypair::from_secret(&packet_key).unwrap(),
+                        chain_key: ChainKeypair::from_secret(&chain_key).unwrap(),
                         id: keystore.id,
                     },
                     false,
@@ -402,9 +400,7 @@ impl HoprKeys {
     /// Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
     pub fn write_eth_keystore(&self, path: &str, password: &str, use_weak_crypto: bool) -> Result<()> {
         // Generate a random salt.
-        let mut salt = [0u8; HOPR_KEY_SIZE];
-
-        getrandom(&mut salt)?;
+        let salt: [u8; HOPR_KEY_SIZE] = random_bytes();
 
         // Derive the key.
         let mut key = [0u8; HOPR_KDF_PARAMS_DKLEN as usize];
@@ -420,14 +416,13 @@ impl HoprKeys {
             .map_err(|e| KeyPairError::KeyDerivationError { err: e.to_string() })?;
 
         // Encrypt the private key using AES-128-CTR.
-        let mut iv = [0u8; HOPR_IV_SIZE];
-        getrandom(&mut iv)?;
+        let iv: [u8; HOPR_IV_SIZE] = random_bytes();
 
         let encryptor = Aes128Ctr::new(&key[..16], &iv[..16]).expect("invalid length");
 
         let private_keys = PrivateKeys {
-            chain_key: self.chain_key.0.into(),
-            packet_key: self.packet_key.0.into(),
+            chain_key: self.chain_key.secret().as_ref().to_vec(),
+            packet_key: self.packet_key.secret().as_ref().to_vec(),
             version: VERSION,
         };
 
@@ -461,6 +456,10 @@ impl HoprKeys {
 
         write(path, serialized).map_err(|e| e.into())
     }
+
+    pub fn id(&self) -> &Uuid {
+        &self.id
+    }
 }
 
 impl Debug for HoprKeys {
@@ -468,11 +467,11 @@ impl Debug for HoprKeys {
         f.debug_struct("HoprKeys")
             .field(
                 "packet_key",
-                &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.packet_key.1.to_hex()),
+                &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.packet_key.public().to_hex()),
             )
             .field(
                 "chain_key",
-                &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.chain_key.1.to_hex(false)),
+                &format_args!("(priv_key: <REDACTED>, pub_key: {}", self.chain_key.public().to_hex()),
             )
             .finish()
     }
@@ -481,60 +480,16 @@ impl Debug for HoprKeys {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::IdentityOptions;
-    use js_sys::{Promise, Uint8Array};
-    use utils_types::traits::PeerIdLike;
+    use crate::key_pair::HoprKeys;
+    use utils_misc::ok_or_jserr;
+    use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
-
-    const SECP256K1_PEERID_LENGTH: usize = 37;
-    const ED25519_PEERID_LENGTH: usize = 36;
-
-    #[wasm_bindgen(module = "@libp2p/peer-id")]
-    extern "C" {
-        #[wasm_bindgen]
-        pub type JsPeerId;
-
-        #[wasm_bindgen(js_name = "peerIdFromKeys")]
-        pub fn peer_id_from_keys(pub_key: Box<[u8]>, priv_key: Box<[u8]>) -> Promise;
-    }
-
-    #[wasm_bindgen]
-    pub struct HoprKeys {
-        w: super::HoprKeys,
-    }
 
     #[wasm_bindgen]
     impl HoprKeys {
-        #[wasm_bindgen(constructor)]
-        pub fn new() -> Self {
-            let keys = super::HoprKeys::new();
-            Self { w: keys }
-        }
-
-        #[wasm_bindgen]
-        pub fn init(identity_options: IdentityOptions) -> Result<HoprKeys, JsValue> {
-            Ok(Self {
-                w: super::HoprKeys::init(identity_options).map_err(|e| JsValue::from(e.to_string()))?,
-            })
-        }
-
-        #[wasm_bindgen(getter, js_name = "packetKeyPeerId")]
-        pub fn get_packet_key_peer_id(&self) -> Promise {
-            let mut sliced = [0u8; ED25519_PEERID_LENGTH];
-            sliced.copy_from_slice(&self.w.packet_key.1.to_peerid().to_bytes()[2..]);
-            peer_id_from_keys(Box::new(sliced), Box::new(self.w.packet_key.0))
-        }
-
-        #[wasm_bindgen(getter, js_name = "chainKeyPeerId")]
-        pub fn get_chain_key_peer_id(&self) -> Promise {
-            let mut sliced = [0u8; SECP256K1_PEERID_LENGTH];
-            sliced.copy_from_slice(&self.w.chain_key.1.to_peerid().to_bytes()[2..]);
-
-            peer_id_from_keys(Box::new(sliced), Box::new(self.w.chain_key.0))
-        }
-
-        #[wasm_bindgen(getter, js_name = "chainKeyPrivKey")]
-        pub fn get_chain_key_priv_key(&self) -> Uint8Array {
-            Uint8Array::from(&self.w.chain_key.0[..])
+        #[wasm_bindgen(js_name = "init")]
+        pub fn _init(identity_options: IdentityOptions) -> JsResult<HoprKeys> {
+            ok_or_jserr!(HoprKeys::init(identity_options))
         }
     }
 }
@@ -544,14 +499,14 @@ mod tests {
     use std::fs;
 
     use super::HoprKeys;
+    use core_crypto::keypairs::Keypair;
     use tempfile::tempdir;
-    use utils_types::traits::PeerIdLike;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";
 
     #[test]
     fn create_keys() {
-        println!("{:?}", HoprKeys::new())
+        println!("{:?}", HoprKeys::random())
     }
 
     #[test]
@@ -560,7 +515,7 @@ mod tests {
 
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
 
-        let keys = HoprKeys::new();
+        let keys = HoprKeys::random();
 
         keys.write_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD, true)
             .unwrap();
@@ -587,8 +542,8 @@ mod tests {
 
         assert!(needs_migration);
         assert_eq!(
-            deserialized.chain_key.1.to_peerid_str(),
-            "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK"
+            deserialized.chain_key.public().0.to_address().to_string(),
+            "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
         );
     }
 
@@ -614,8 +569,8 @@ mod tests {
 
         assert!(!needs_migration);
         assert_eq!(
-            deserialized.chain_key.1.to_peerid_str(),
-            "16Uiu2HAm8WFpakjrdWauUKq2hb5bejivnbtFAumVv9KHKN5AvXXK"
+            deserialized.chain_key.public().0.to_address().to_string(),
+            "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
         );
     }
 }

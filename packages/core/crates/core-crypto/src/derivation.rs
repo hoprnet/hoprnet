@@ -1,12 +1,13 @@
-use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
+use crate::errors::CryptoError::{CalculationError, InvalidParameterSize};
 use blake2::Blake2s256;
 use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
+use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
 use k256::Secp256k1;
 
 use crate::errors::Result;
-use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE, SECRET_KEY_LENGTH};
-use crate::primitives::{calculate_mac, DigestLike, SimpleDigest};
+use crate::parameters::{PACKET_TAG_LENGTH, PING_PONG_NONCE_SIZE};
+use crate::primitives::{DigestLike, SecretKey, SimpleDigest, SimpleMac};
 use crate::random::random_fill;
 use crate::types::HalfKey;
 
@@ -18,18 +19,17 @@ const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
 const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
 
 /// Helper function to expand an already cryptographically strong key material using the HKDF expand function
-fn hkdf_expand_from_prk<const OUT_LENGTH: usize>(secret: &[u8], tag: &[u8]) -> Result<[u8; OUT_LENGTH]> {
+/// The size of the secret must be at least the size of the output of the underlying hash function, which in this
+/// case is Blake2s256, meaning the `secret` size must be at least 32 bytes.
+fn hkdf_expand_from_prk<L: ArrayLength<u8>>(secret: &SecretKey, tag: &[u8]) -> GenericArray<u8, L> {
     // Create HKDF instance
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret).map_err(|_| InvalidParameterSize {
-        name: "secret".into(),
-        expected: SECRET_KEY_LENGTH,
-    })?;
+    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref()).expect("size of the hkdf secret key is invalid"); // should not happen
 
     // Expand the key to the required length
-    let mut out = [0u8; OUT_LENGTH];
-    hkdf.expand(tag, &mut out).map_err(|_| InvalidInputValue)?;
+    let mut out = GenericArray::default();
+    hkdf.expand(tag, &mut out).expect("invalid hkdf output size"); // should not happen
 
-    Ok(out)
+    out
 }
 
 /// Derives a ping challenge (if no challenge is given) or a pong response to a ping challenge.
@@ -50,38 +50,38 @@ pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
 
 /// Derives the commitment seed given the compressed private key representation
 /// and the serialized channel information.
-pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> Result<Box<[u8]>> {
-    hkdf_expand_from_prk::<SECRET_KEY_LENGTH>(private_key, HASH_KEY_COMMITMENT_SEED.as_bytes())
-        .and_then(|key| calculate_mac(&key, channel_info))
+pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> [u8; SimpleMac::SIZE] {
+    let sk: SecretKey = hkdf_expand_from_prk(
+        &private_key.try_into().expect("commitment private key size invalid"),
+        HASH_KEY_COMMITMENT_SEED.as_bytes(),
+    )
+    .into();
+    let mut mac = SimpleMac::new(&sk);
+    mac.update(channel_info);
+    mac.finalize().into()
 }
 
+/// Represents a fixed size packet verification tag
+pub type PacketTag = [u8; PACKET_TAG_LENGTH];
+
 /// Derives the packet tag used during packet construction by expanding the given secret.
-pub fn derive_packet_tag(secret: &[u8]) -> Result<Box<[u8]>> {
-    hkdf_expand_from_prk::<PACKET_TAG_LENGTH>(secret, HASH_KEY_PACKET_TAG.as_bytes()).map(Box::from)
+pub fn derive_packet_tag(secret: &SecretKey) -> PacketTag {
+    hkdf_expand_from_prk::<typenum::U16>(secret, HASH_KEY_PACKET_TAG.as_bytes()).into()
 }
 
 /// Derives a key for MAC calculation by expanding the given secret.
-pub fn derive_mac_key(secret: &[u8]) -> Result<Box<[u8]>> {
-    hkdf_expand_from_prk::<SECRET_KEY_LENGTH>(secret, HASH_KEY_HMAC.as_bytes()).map(Box::from)
+pub fn derive_mac_key(secret: &SecretKey) -> SecretKey {
+    hkdf_expand_from_prk::<typenum::U32>(secret, HASH_KEY_HMAC.as_bytes()).into()
 }
 
 /// Internal convenience function to generate key and IV from the given secret.
 /// WARNING: The `iv_first` distinguishes if the IV should be sampled before or after the key is sampled.
-pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &mut [u8], iv_first: bool) -> Result<()> {
-    if secret.len() != SECRET_KEY_LENGTH {
-        return Err(InvalidParameterSize {
-            name: "secret".into(),
-            expected: SECRET_KEY_LENGTH,
-        });
-    }
-
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret).map_err(|_| InvalidParameterSize {
-        name: "secret".into(),
-        expected: SECRET_KEY_LENGTH,
-    })?;
+pub(crate) fn generate_key_iv(secret: &SecretKey, info: &[u8], key: &mut [u8], iv: &mut [u8], iv_first: bool) {
+    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref()).expect("secret key length must be correct");
 
     let mut out = vec![0u8; key.len() + iv.len()];
-    hkdf.expand(info, &mut out).map_err(|_| InvalidInputValue)?;
+    hkdf.expand(info, &mut out)
+        .expect("key and iv are too big for this kdf");
 
     if iv_first {
         let (v_iv, v_key) = out.split_at(iv.len());
@@ -92,37 +92,39 @@ pub(crate) fn generate_key_iv(secret: &[u8], info: &[u8], key: &mut [u8], iv: &m
         key.copy_from_slice(v_key);
         iv.copy_from_slice(v_iv);
     }
-
-    Ok(())
 }
 
 /// Sample a random secp256k1 field element that can represent a valid secp256k1 point.
 /// The implementation uses `hash_to_field` function as defined in
 /// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field
+/// The `secret` must be at least `SecretKey::LENGTH` long.
 /// The `tag` parameter will be used as an additional Domain Separation Tag.
-pub fn sample_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
-    let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(
-        &[secret],
-        &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
-    )
-    .map_err(|_| CalculationError)?;
-    Ok(HalfKey::new(scalar.to_bytes().as_ref()))
+pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {
+    if secret.len() >= SecretKey::LENGTH {
+        let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(
+            &[secret],
+            &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
+        )
+        .map_err(|_| CalculationError)?;
+        Ok(HalfKey::new(scalar.to_bytes().as_ref()))
+    } else {
+        Err(InvalidParameterSize {
+            name: "secret".into(),
+            expected: SecretKey::LENGTH,
+        })
+    }
 }
 
 /// Used in Proof of Relay to derive own half-key (S0)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-pub fn derive_own_key_share(secret: &[u8]) -> HalfKey {
-    assert_eq!(SECRET_KEY_LENGTH, secret.len());
-
-    sample_field_element(secret, HASH_KEY_OWN_KEY).expect("failed to sample own key share")
+pub fn derive_own_key_share(secret: &SecretKey) -> HalfKey {
+    sample_secp256k1_field_element(secret.as_ref(), HASH_KEY_OWN_KEY).expect("failed to sample own key share")
 }
 
 /// Used in Proof of Relay to derive the half-key of for the acknowledgement (S1)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-pub fn derive_ack_key_share(secret: &[u8]) -> HalfKey {
-    assert_eq!(SECRET_KEY_LENGTH, secret.len());
-
-    sample_field_element(secret, HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
+pub fn derive_ack_key_share(secret: &SecretKey) -> HalfKey {
+    sample_secp256k1_field_element(secret.as_ref(), HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
 }
 
 #[cfg(test)]
@@ -132,19 +134,18 @@ mod tests {
 
     #[test]
     fn test_derive_commitment_seed() {
-        let priv_key = [0u8; SECRET_KEY_LENGTH];
-        let chinfo = [0u8; SECRET_KEY_LENGTH];
+        let priv_key = [0u8; SecretKey::LENGTH];
+        let chinfo = [0u8; SecretKey::LENGTH];
 
-        let res = derive_commitment_seed(&priv_key, &chinfo).unwrap();
+        let res = derive_commitment_seed(&priv_key, &chinfo);
 
-        let r = hex!("6CBD916300C24CC0DA636490668A4D85A4F42113496FCB452099F76131A3662E");
+        let r = hex!("0abe559a1577e99e16f112bb8a88f7793ff1fb22af46b810995fb754ea319386");
         assert_eq!(r, res.as_ref());
     }
 
     #[test]
     fn test_derive_packet_tag() {
-        let secret = [0u8; SECRET_KEY_LENGTH];
-        let tag = derive_packet_tag(&secret).unwrap();
+        let tag = derive_packet_tag(&SecretKey::default());
 
         let r = hex!("e0cf0fb82ea5a541b0367b376eb36a60");
         assert_eq!(r, tag.as_ref());
@@ -152,8 +153,7 @@ mod tests {
 
     #[test]
     fn test_derive_mac_key() {
-        let secret = [0u8; SECRET_KEY_LENGTH];
-        let tag = derive_mac_key(&secret).unwrap();
+        let tag = derive_mac_key(&SecretKey::default());
 
         let r = hex!("7f656daaf7c2e64bcfc1386f8af273890e863dec63b410967a5652630617b09b");
         assert_eq!(r, tag.as_ref());
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_sample_field_element() {
-        let secret = [1u8; SECRET_KEY_LENGTH];
-        assert!(sample_field_element(&secret, "TEST_TAG").is_ok());
+        let secret = [1u8; SecretKey::LENGTH];
+        assert!(sample_secp256k1_field_element(&secret, "TEST_TAG").is_ok());
     }
 }

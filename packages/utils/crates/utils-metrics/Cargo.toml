@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 prometheus = "0.13"
 regex = "1"
 wasm-bindgen = { workspace = true, optional = true }

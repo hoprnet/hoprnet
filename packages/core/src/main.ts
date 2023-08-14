@@ -8,7 +8,6 @@ import { Mplex } from '@libp2p/mplex'
 import { KadDHT } from '@libp2p/kad-dht'
 import { Noise } from '@chainsafe/libp2p-noise'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { keysPBM } from '@libp2p/crypto/keys'
 import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
 import {
@@ -17,7 +16,7 @@ import {
   type PublicNodesEmitter,
   compareAddressesPublicMode
 } from '@hoprnet/hopr-connect'
-import { PublicKey, debug, isAddressWithPeerId, LevelDb } from '@hoprnet/hopr-utils'
+import { debug, isAddressWithPeerId, LevelDb, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'
@@ -25,7 +24,8 @@ import { getAddrs } from './identity.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { getContractData, supportedNetworks } from './network.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
-import { Database, PublicKey as Database_PublicKey, core_hopr_initialize_crate } from '../lib/core_hopr.js'
+import { Database, core_hopr_initialize_crate } from '../lib/core_hopr.js'
+import { peerIdFromKeys } from '@libp2p/peer-id'
 core_hopr_initialize_crate()
 
 const log = debug(`hopr-core:create-hopr`)
@@ -42,13 +42,16 @@ const error = debug(`hopr-core:error`)
  * @returns {Hopr} - HOPR node
  */
 export async function createLibp2pInstance(
-  peerId: PeerId,
+  packetKeypair: OffchainKeypair,
   options: HoprOptions,
   initialNodes: { id: PeerId; multiaddrs: Multiaddr[] }[],
   publicNodes: PublicNodesEmitter,
   isAllowedToAccessNetwork: Hopr['isAllowedAccessToNetwork']
 ): Promise<Libp2p> {
   let libp2p: Libp2p
+  // TODO: verify key formatting here
+  const peerId = await peerIdFromKeys(packetKeypair.public().serialize(), packetKeypair.secret())
+
   if (options.testing?.useMockedLibp2p) {
     // Used for quick integration testing
     libp2p = createLibp2pMock(peerId, {
@@ -227,7 +230,8 @@ export async function createLibp2pInstance(
  * @returns {Hopr} - HOPR node
  */
 export async function createHoprNode(
-  peerId: PeerId,
+  chainKeypair: ChainKeypair,
+  packetKeypair: OffchainKeypair,
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
@@ -247,13 +251,12 @@ export async function createHoprNode(
     throw err
   }
 
-  let db = new Database(levelDb, Database_PublicKey.from_peerid_str(peerId.toString()).to_address())
+  let db = new Database(levelDb, chainKeypair.public().to_address())
 
   log(`using provider URL: ${options.network.chain.default_provider}`)
   const chain = HoprCoreEthereum.createInstance(
     db,
-    PublicKey.from_peerid_str(peerId.toString()),
-    keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
+    chainKeypair,
     {
       chainId: options.network.chain.chain_id,
       network: options.network.id,
@@ -271,5 +274,5 @@ export async function createHoprNode(
   // Initialize connection to the blockchain
   await chain.initializeChainWrapper(resolvedContractAddresses)
 
-  return new Hopr(peerId, db, options)
+  return new Hopr(chainKeypair, packetKeypair, db, options)
 }

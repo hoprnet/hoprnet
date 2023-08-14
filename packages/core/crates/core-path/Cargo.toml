@@ -1,0 +1,51 @@
+[package]
+name = "core-path"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Contains mixnet path construction and path finding logic"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
+core-crypto = { path = "../../../core/crates/core-crypto", default-features = false }
+core-types = { path = "../../../core/crates/core-types", default-features = false }
+hex = "0.4"
+js-sys = { workspace = true, optional = true }
+libp2p-identity = { workspace = true }
+thiserror = "1"
+utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
+utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
+utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
+
+console_error_panic_hook = { version = "0.1.7", optional = true }
+
+[dev-dependencies]
+async-std = {version = "1.12.0", features = ["unstable"]}
+hex-literal = "0.4"
+tempfile = "3"
+rusty-leveldb = "1"
+wasm-bindgen-test = "0.3.36"
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-log/wasm", "utils-db/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

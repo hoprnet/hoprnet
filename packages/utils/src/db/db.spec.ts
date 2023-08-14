@@ -13,6 +13,7 @@ import {
   ChannelStatus,
   Database,
   Response,
+  ChainKeypair,
   core_ethereum_db_initialize_crate
 } from '../../../core-ethereum/lib/core_ethereum_db.js'
 core_ethereum_db_initialize_crate()
@@ -56,6 +57,7 @@ import { db_sanity_test } from '../../lib/utils_db.js'
 import fs from 'fs'
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
+  let chainKp = new ChainKeypair(signerPrivKey)
   let tkt = Ticket.new(
     counterparty,
     U256.zero(),
@@ -63,12 +65,9 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, ba
     balance,
     U256.from_inverse_probability(U256.one()),
     U256.one(),
-    signerPrivKey
+    chainKp
   )
-  tkt.set_challenge(
-    new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(),
-    signerPrivKey
-  )
+  tkt.set_challenge(new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(), chainKp)
   return tkt
 }
 

@@ -1,6 +1,6 @@
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use utils_log::logger::JsLogger;
+    use utils_log::logger::wasm::JsLogger;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
 
@@ -11,6 +11,10 @@ pub mod wasm {
     // Temporarily re-export core-ethereum-misc commitments
     #[allow(unused_imports)]
     use core_ethereum_misc::commitment::wasm::*;
+
+    // Temporarily re-export core-path
+    #[allow(unused_imports)]
+    use core_path::wasm::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]

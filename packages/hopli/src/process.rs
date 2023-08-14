@@ -89,16 +89,16 @@ pub fn child_process_call_foundry_faucet(
 ///
 /// * `network` - Name of the network that nodes run in
 /// * `environment_type` - Type of the environment that nodes run in
-/// * `peer_id` - Peer Ids of HOPR nodes to be registered under the caller
+/// * `chain_keys` - Ethereum addresses of Chain keys of HOPR nodes to be registered under the caller (comma separated)
 pub fn child_process_call_foundry_express_initialization(
     network: &str,
     ethereum_address: &String,
     hopr_amount: &str,
     native_amount: &str,
-    peer_ids: &String,
+    chain_keys: &String,
 ) -> Result<(), HelperErrors> {
     // add brackets to around the string
-    let peer_id_string = vec!["[", &peer_ids, "]"].concat();
+    let chain_addresses_str = vec!["[", &chain_keys, "]"].concat();
     let self_register_args = vec![
         "script",
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
@@ -108,7 +108,7 @@ pub fn child_process_call_foundry_express_initialization(
         &ethereum_address,
         &hopr_amount,
         &native_amount,
-        &peer_id_string,
+        &chain_addresses_str,
     ];
 
     child_process_call_foundry(network, &self_register_args)

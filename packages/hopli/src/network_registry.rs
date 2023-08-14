@@ -8,7 +8,7 @@ use crate::{
 use clap::Parser;
 use log::{log, Level};
 use std::env;
-use utils_types::traits::PeerIdLike;
+use core_crypto::keypairs::Keypair;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -46,7 +46,7 @@ impl RegisterInNetworkRegistryArgs {
         let RegisterInNetworkRegistryArgs {
             network,
             local_identity,
-            peer_ids,
+            peer_ids: chain_addresses,
             password,
             contracts_root,
         } = self;
@@ -57,10 +57,10 @@ impl RegisterInNetworkRegistryArgs {
         }
 
         // collect all the peer ids
-        let mut all_peer_ids = Vec::new();
+        let mut all_chain_addrs = Vec::new();
         // add peer_ids from CLI, if there's one
-        if let Some(provided_peer_ids) = peer_ids {
-            all_peer_ids.push(provided_peer_ids);
+        if let Some(provided_chain_addrs) = chain_addresses {
+            all_chain_addrs.push(provided_chain_addrs);
         }
 
         // read all the identities from the directory
@@ -76,7 +76,7 @@ impl RegisterInNetworkRegistryArgs {
             // read all the identities from the directory
             match read_identities(local_files, &pwd) {
                 Ok(node_identities) => {
-                    all_peer_ids.extend(node_identities.iter().map(|ni| ni.chain_key.1.to_peerid_str()));
+                    all_chain_addrs.extend(node_identities.iter().map(|ni| ni.chain_key.public().0.to_address().to_string()));
                 }
                 Err(e) => {
                     println!("error {:?}", e);
@@ -85,7 +85,7 @@ impl RegisterInNetworkRegistryArgs {
             }
         }
 
-        log!(target: "network_registry", Level::Info, "merged peer_ids {:?}", all_peer_ids.join(","));
+        log!(target: "network_registry", Level::Info, "merged peer_ids {:?}", all_chain_addrs.join(","));
 
         // set directory and environment variables
         if let Err(e) = set_process_path_env(&contracts_root, &network) {
@@ -93,7 +93,7 @@ impl RegisterInNetworkRegistryArgs {
         }
 
         // iterate and collect execution result. If error occurs, the entire operation failes.
-        child_process_call_foundry_self_register(&network, &all_peer_ids.join(","))
+        child_process_call_foundry_self_register(&network, &all_chain_addrs.join(","))
     }
 }
 

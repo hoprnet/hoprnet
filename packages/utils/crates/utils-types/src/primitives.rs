@@ -46,7 +46,8 @@ impl Address {
     }
 
     // impl std::string::ToString {
-    pub fn to_string(&self) -> String {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
+    pub fn _to_string(&self) -> String {
         self.to_hex()
     }
     // }
@@ -60,7 +61,7 @@ impl Address {
     }
 }
 
-impl BinarySerializable<'_> for Address {
+impl BinarySerializable for Address {
     const SIZE: usize = 20;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
@@ -68,7 +69,7 @@ impl BinarySerializable<'_> for Address {
             let mut ret = Address {
                 addr: [0u8; Self::SIZE],
             };
-            ret.addr.copy_from_slice(&data);
+            ret.addr.copy_from_slice(data);
             Ok(ret)
         } else {
             Err(ParseError)
@@ -125,7 +126,7 @@ impl Balance {
     pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
             value: U256 {
-                value: u256::from_str_radix(value, 10).expect(&format!("invalid number {}", value)),
+                value: u256::from_str_radix(value, 10).unwrap_or_else(|_| panic!("invalid number {}", value)),
             },
             balance_type,
         }
@@ -204,7 +205,7 @@ impl Balance {
                 value: self
                     .value()
                     .value()
-                    .checked_sub(other.value().value().clone())
+                    .checked_sub(*other.value().value())
                     .unwrap_or(u256::ZERO),
             },
             balance_type: self.balance_type,
@@ -240,7 +241,7 @@ impl Balance {
     }
 
     pub fn amount(&self) -> U256 {
-        self.value.clone().into()
+        self.value
     }
 }
 
@@ -299,7 +300,7 @@ impl EthereumChallenge {
     }
 }
 
-impl BinarySerializable<'_> for EthereumChallenge {
+impl BinarySerializable for EthereumChallenge {
     const SIZE: usize = 20;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
@@ -346,7 +347,7 @@ impl Snapshot {
     }
 }
 
-impl BinarySerializable<'_> for Snapshot {
+impl BinarySerializable for Snapshot {
     const SIZE: usize = 3 * U256::SIZE;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
@@ -436,7 +437,7 @@ impl Mul for U256 {
     }
 }
 
-impl BinarySerializable<'_> for U256 {
+impl BinarySerializable for U256 {
     const SIZE: usize = 32;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
@@ -482,7 +483,7 @@ impl From<u32> for U256 {
 
 impl AsU256 for U256 {
     fn as_u256(self) -> ethnum::U256 {
-        self.value.clone()
+        self.value
     }
 }
 
@@ -514,7 +515,7 @@ pub struct AuthorizationToken {
     token: Box<[u8]>,
 }
 
-impl AutoBinarySerializable<'_> for AuthorizationToken {}
+impl AutoBinarySerializable for AuthorizationToken {}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AuthorizationToken {
@@ -680,7 +681,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]
@@ -708,7 +709,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen(js_name = "to_string")]
@@ -769,7 +770,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]
@@ -817,7 +818,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "cmp")]
         pub fn _cmp(&self, other: &U256) -> i32 {
-            match self.cmp(&other) {
+            match self.cmp(other) {
                 Ordering::Less => -1,
                 Ordering::Equal => 0,
                 Ordering::Greater => 1,
@@ -826,7 +827,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]

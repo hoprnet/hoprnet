@@ -1,5 +1,5 @@
 use crate::errors::{
-    CoreEthereumError::{CommitmentError, CryptoError, DbError},
+    CoreEthereumError::{CommitmentError, DbError},
     Result,
 };
 use core_crypto::{
@@ -51,7 +51,7 @@ pub async fn bump_commitment<T: HoprCoreEthereumDbActions>(
 ) -> Result<()> {
     db.set_current_commitment(channel_id, new_commitment)
         .await
-        .map_err(|e| DbError(e))
+        .map_err(DbError)
 }
 
 async fn create_commitment_chain<T>(db: &mut T, channel_id: &Hash, initial_commitment_seed: &[u8]) -> Result<Hash>
@@ -106,7 +106,7 @@ impl ChannelCommitmentInfo {
         buf.extend_from_slice(&self.channel_id.to_bytes());
         buf.extend_from_slice(self.contract_address.as_bytes());
 
-        derive_commitment_seed(private_key, &buf).map_err(|e| CryptoError(e))
+        Ok(derive_commitment_seed(private_key, &buf).into())
     }
 }
 
@@ -258,25 +258,15 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub async fn find_commitment_preimage(db: &Database, channel_id: &Hash) -> JsResult<Hash> {
-        //debug!(">>> WRITE find_commitment_preimage");
-        let r = {
-            let val = db.as_ref_counted();
-            let mut g = val.write().await;
-            ok_or_jserr!(super::find_commitment_preimage(&mut *g, channel_id).await)
-        };
-        //debug!("<<< WRITE find_commitment_preimage");
-        r
+        let val = db.as_ref_counted();
+        let g = val.read().await;
+        ok_or_jserr!(super::find_commitment_preimage(&*g, channel_id).await)
     }
 
     #[wasm_bindgen]
     pub async fn bump_commitment(db: &Database, channel_id: &Hash, new_commitment: &Hash) -> JsResult<()> {
-        //debug!(">>> WRITE bump_commitment");
-        let r = {
-            let val = db.as_ref_counted();
-            let mut g = val.write().await;
-            ok_or_jserr!(super::bump_commitment(&mut *g, channel_id, new_commitment).await)
-        };
-        //debug!("<<< WRITE bump_commitment");
-        r
+        let val = db.as_ref_counted();
+        let mut g = val.write().await;
+        ok_or_jserr!(super::bump_commitment(&mut *g, channel_id, new_commitment).await)
     }
 }

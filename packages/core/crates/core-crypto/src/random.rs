@@ -1,5 +1,6 @@
 use elliptic_curve::rand_core::OsRng;
 use elliptic_curve::{Group, NonZeroScalar, ProjectivePoint};
+use generic_array::{ArrayLength, GenericArray};
 use k256::Secp256k1;
 use rand::{Rng, RngCore};
 
@@ -55,6 +56,13 @@ pub fn random_bytes<const T: usize>() -> [u8; T] {
     ret
 }
 
+/// Allocates `GenericArray` of the given size and fills it with random bytes
+pub fn random_array<L: ArrayLength<u8>>() -> GenericArray<u8, L> {
+    let mut ret = GenericArray::default();
+    random_fill(&mut ret);
+    ret
+}
+
 #[cfg(test)]
 mod tests {
     use crate::random::{random_fill, random_float, random_group_element, random_integer};
@@ -97,36 +105,10 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::types::CurvePoint;
     use js_sys::Uint8Array;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    pub struct GroupElement {
-        coeff: Box<[u8]>,
-        element: CurvePoint,
-    }
-
-    #[wasm_bindgen]
-    impl GroupElement {
-        pub fn random() -> GroupElement {
-            let (coeff, element) = crate::random::random_group_element();
-            Self {
-                coeff: Box::new(coeff),
-                element,
-            }
-        }
-
-        pub fn coefficient(&self) -> Uint8Array {
-            self.coeff.as_ref().into()
-        }
-
-        pub fn element(&self) -> CurvePoint {
-            self.element.clone()
-        }
-    }
 
     #[wasm_bindgen]
     pub fn random_float() -> f64 {

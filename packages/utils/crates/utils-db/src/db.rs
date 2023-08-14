@@ -15,7 +15,7 @@ pub struct Batch {
 }
 
 // NOTE: The LevelDB implementation's iterator needs to know the precise size of the
-pub fn serialize_to_bytes<'a, S: Serialize + BinarySerializable<'a>>(s: &S) -> Result<Vec<u8>> {
+pub fn serialize_to_bytes<S: Serialize + BinarySerializable>(s: &S) -> Result<Vec<u8>> {
     Ok(Vec::from(s.to_bytes()))
     // bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
 }
@@ -55,7 +55,7 @@ impl Display for Key {
 }
 
 impl Key {
-    pub fn new<'a, T: Serialize + BinarySerializable<'a>>(object: &T) -> Result<Self> {
+    pub fn new<T: Serialize + BinarySerializable>(object: &T) -> Result<Self> {
         Ok(Self { key: object.to_bytes() })
     }
 
@@ -65,7 +65,7 @@ impl Key {
         })
     }
 
-    pub fn new_with_prefix<'a, T: Serialize + BinarySerializable<'a>>(object: &T, prefix: &str) -> Result<Self> {
+    pub fn new_with_prefix<T: Serialize + BinarySerializable>(object: &T, prefix: &str) -> Result<Self> {
         let key = serialize_to_bytes(object)?;
 
         let mut result = Vec::with_capacity(prefix.len() + key.len());
@@ -201,7 +201,7 @@ mod tests {
         v: u8,
     }
 
-    impl BinarySerializable<'_> for TestKey {
+    impl BinarySerializable for TestKey {
         const SIZE: usize = 1;
 
         /// Deserializes the type from a binary blob.

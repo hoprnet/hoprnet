@@ -93,7 +93,7 @@ impl AsyncKVStorage for BinaryHashMapStorage {
             .filter(move |(key, _)| {
                 let upper_bound = key.as_ref().cmp(&last_key);
                 let lower_bound = key.as_ref().cmp(&first_key);
-                return upper_bound != Ordering::Greater && lower_bound != Ordering::Less;
+                upper_bound != Ordering::Greater && lower_bound != Ordering::Less
             })
             .map(|(_, v)| Ok(v));
 

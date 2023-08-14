@@ -1,6 +1,6 @@
 use core_types::channels::ChannelStatus;
 use std::str::FromStr;
-use utils_types::primitives::{Address, Balance, BalanceType};
+use utils_types::primitives::{Address, Balance};
 
 /// Basic strategy trait that all strategies must implement.
 /// Strategies make decisions to automatically open/close certain channels.
@@ -48,7 +48,7 @@ impl From<&wasm::OutgoingChannelStatus> for OutgoingChannelStatus {
     fn from(x: &wasm::OutgoingChannelStatus) -> Self {
         OutgoingChannelStatus {
             address: Address::from_str(&x.address).expect("invalid peer id given"),
-            stake: Balance::from_str(x.stake_str.as_str(), BalanceType::HOPR),
+            stake: Balance::from_str(x.stake_str.as_str(), utils_types::primitives::BalanceType::HOPR),
             status: x.status.clone(),
         }
     }

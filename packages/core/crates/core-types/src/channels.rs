@@ -1,9 +1,11 @@
 use core_crypto::errors::CryptoError::SignatureVerification;
+use core_crypto::keypairs::ChainKeypair;
 use core_crypto::types::{Hash, PublicKey, Response, Signature};
 use enum_iterator::{all, Sequence};
 use ethnum::u256;
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
+use std::fmt::{Display, Formatter};
 use std::ops::{Div, Mul, Sub};
 use utils_types::errors::{GeneralError::ParseError, Result};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
@@ -35,15 +37,16 @@ impl ChannelStatus {
     pub fn to_byte(&self) -> u8 {
         *self as u8
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl Display for ChannelStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChannelStatus::Closed => "Closed",
-            ChannelStatus::WaitingForCommitment => "WaitingForCommitment",
-            ChannelStatus::Open => "Open",
-            ChannelStatus::PendingToClose => "PendingToClose",
+            ChannelStatus::Closed => write!(f, "Closed"),
+            ChannelStatus::WaitingForCommitment => write!(f, "WaitingForCommitment"),
+            ChannelStatus::Open => write!(f, "Open"),
+            ChannelStatus::PendingToClose => write!(f, "PendingToClose"),
         }
-        .to_string()
     }
 }
 
@@ -114,8 +117,8 @@ impl ChannelEntry {
         })
     }
 
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-    pub fn to_string(&self) -> String {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
+    pub fn _to_string(&self) -> String {
         format!("{}", self)
     }
 }
@@ -136,7 +139,7 @@ impl std::fmt::Display for ChannelEntry {
     }
 }
 
-impl BinarySerializable<'_> for ChannelEntry {
+impl BinarySerializable for ChannelEntry {
     const SIZE: usize = Address::SIZE
         + Address::SIZE
         + Balance::SIZE
@@ -286,7 +289,7 @@ impl Ticket {
         amount: Balance,
         win_prob: U256,
         channel_epoch: U256,
-        signing_key: &[u8],
+        signing_key: &ChainKeypair,
     ) -> Self {
         let mut ret = Self {
             counterparty,
@@ -302,18 +305,18 @@ impl Ticket {
         ret
     }
 
-    pub fn set_challenge(&mut self, challenge: EthereumChallenge, signing_key: &[u8]) {
+    pub fn set_challenge(&mut self, challenge: EthereumChallenge, signing_key: &ChainKeypair) {
         self.challenge = challenge;
         self.sign(signing_key);
     }
 
     /// Signs the ticket using the given private key.
-    pub fn sign(&mut self, signing_key: &[u8]) {
+    pub fn sign(&mut self, signing_key: &ChainKeypair) {
         self.signature = Some(Signature::sign_message(&self.get_hash().to_bytes(), signing_key));
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: Address, private_key: &[u8]) -> Self {
+    pub fn new_zero_hop(destination: Address, private_key: &ChainKeypair) -> Self {
         Self::new(
             destination,
             U256::zero(),
@@ -373,7 +376,7 @@ impl Ticket {
     }
 }
 
-impl BinarySerializable<'_> for Ticket {
+impl BinarySerializable for Ticket {
     const SIZE: usize =
         Address::SIZE + EthereumChallenge::SIZE + 2 * U256::SIZE + Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
 
@@ -428,13 +431,14 @@ impl Ticket {
         recovered
             .to_address()
             .eq(address)
-            .then(|| ())
+            .then_some(())
             .ok_or(SignatureVerification)
     }
 }
 
 #[cfg(test)]
 pub mod tests {
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::{Hash, PublicKey};
     use ethnum::u256;
     use hex_literal::hex;
@@ -491,6 +495,8 @@ pub mod tests {
         let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
         let path_pos = 5u8;
 
+        let kp = ChainKeypair::from_secret(&SGN_PRIVATE_KEY).unwrap();
+
         let ticket1 = Ticket::new(
             Address::new(&[0u8; Address::SIZE]),
             U256::new("1"),
@@ -501,7 +507,7 @@ pub mod tests {
             ),
             U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
             U256::new("4"),
-            &SGN_PRIVATE_KEY,
+            &kp,
         );
 
         let ticket2 = Ticket::from_bytes(&ticket1.to_bytes()).unwrap();
