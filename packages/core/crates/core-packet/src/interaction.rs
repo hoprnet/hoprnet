@@ -1,7 +1,10 @@
 use async_lock::RwLock;
 use std::fmt::{Display, Formatter};
 
-use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError, Retry, TagReplay, Timeout, TransportError};
+use crate::errors::PacketError::{
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError,
+    PacketDecodingError, PathError, Retry, TagReplay, Timeout, TransportError,
+};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};

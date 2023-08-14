@@ -1,12 +1,12 @@
-use digest::Digest;
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::random::{random_bytes, random_group_element};
 use crate::shared_keys::Scalar;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
 use crate::utils::SecretValue;
-use sha2::Sha512;
+use digest::Digest;
 use generic_array::{ArrayLength, GenericArray};
+use sha2::Sha512;
 use subtle::{Choice, ConstantTimeEq};
 use utils_types::traits::BinarySerializable;
 use zeroize::ZeroizeOnDrop;
@@ -91,8 +91,8 @@ impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
 
 impl From<&OffchainKeypair> for libp2p_identity::Keypair {
     fn from(value: &OffchainKeypair) -> Self {
-        libp2p_identity::Keypair::ed25519_from_bytes(value.0.clone())
-            .expect("invalid offchain keypair") // must not happen
+        libp2p_identity::Keypair::ed25519_from_bytes(value.0.clone()).expect("invalid offchain keypair")
+        // must not happen
     }
 }
 
@@ -175,7 +175,11 @@ mod tests {
         let kp_1 = OffchainKeypair::random();
 
         let p2p_kp: libp2p_identity::Keypair = (&kp_1).into();
-        assert_eq!(kp_1.public().to_peerid(), p2p_kp.public().to_peer_id(), "peer ids must be equal");
+        assert_eq!(
+            kp_1.public().to_peerid(),
+            p2p_kp.public().to_peer_id(),
+            "peer ids must be equal"
+        );
     }
 
     #[test]
