@@ -133,7 +133,7 @@ contract HoprNodeSafeRegistry {
         domainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("NodeStakeRegistry")),
+                keccak256(bytes("NodeSafeRegistry")),
                 keccak256(bytes(VERSION)),
                 block.chainid,
                 address(this)
