@@ -6,6 +6,13 @@ import {IAvatar} from "../../interfaces/IAvatar.sol";
 import {UUPSUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 
+abstract contract SimplifiedModuleEvents {
+    // module emit event when execution is successful on avator
+    event ExecutionSuccess();
+    // module emit event when execution is failed on avator
+    event ExecutionFailure();
+}
+
 /**
  * @title Simplified Module Interface - A contract that can pass messages to a Module Manager contract if enabled by that contract.
  * @dev Adapted from Zodiac's `Module.sol` at
@@ -13,7 +20,7 @@ import {OwnableUpgradeable} from "openzeppelin-contracts-upgradeable/access/Owna
  *  , which * was audited https://github.com/gnosis/zodiac/tree/master/audits
  * This module removes target attribute, removes guard, and uses UUPS proxy.
  */
-abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
+abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable, SimplifiedModuleEvents{
     /**
      * @dev Passes a transaction to be executed by the avatar.
      * @notice Can only be called by this contract.
@@ -22,8 +29,13 @@ abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
      * @param data Data payload of module transaction.
      * @param operation Operation type of module transaction: 0 == call, 1 == delegate call.
      */
-    function exec(address to, uint256 value, bytes memory data, Enum.Operation operation) internal returns (bool) {
-        return IAvatar(owner()).execTransactionFromModule(to, value, data, operation);
+    function exec(address to, uint256 value, bytes memory data, Enum.Operation operation) internal returns (bool success) {
+        success = IAvatar(owner()).execTransactionFromModule(to, value, data, operation);
+        if (success) {
+            emit ExecutionSuccess();
+        } else {
+            emit ExecutionFailure();
+        }
     }
 
     /**
@@ -36,9 +48,14 @@ abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable {
      */
     function execAndReturnData(address to, uint256 value, bytes memory data, Enum.Operation operation)
         internal
-        returns (bool, bytes memory)
+        returns (bool success, bytes memory returnedData)
     {
-        return IAvatar(owner()).execTransactionFromModuleReturnData(to, value, data, operation);
+        (success, returnedData) = IAvatar(owner()).execTransactionFromModuleReturnData(to, value, data, operation);
+        if (success) {
+            emit ExecutionSuccess();
+        } else {
+            emit ExecutionFailure();
+        }
     }
 
     /**

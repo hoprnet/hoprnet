@@ -133,6 +133,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
         vm.assume(safeAddr != address(0));
         vm.assume(multisendAddr != address(0));
+        vm.assume(multisendAddr != safeAddr);
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
         // 1. Deploy node management module
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
