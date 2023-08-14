@@ -1,9 +1,12 @@
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::random::{random_bytes, random_group_element};
+use crate::shared_keys::Scalar;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
 use crate::utils::SecretValue;
+use digest::Digest;
 use generic_array::{ArrayLength, GenericArray};
+use sha2::Sha512;
 use subtle::{Choice, ConstantTimeEq};
 use utils_types::traits::BinarySerializable;
 use zeroize::ZeroizeOnDrop;
@@ -71,6 +74,21 @@ impl ConstantTimeEq for OffchainKeypair {
     }
 }
 
+impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
+    /// Transforms the secret to be equivalent with the EdDSA public key used for signing.
+    /// This is required, so that the secret keys used to generate Sphinx shared secrets
+    /// are corresponding to the public keys we obtain from the Ed25519 peer ids.
+    fn from(value: &OffchainKeypair) -> Self {
+        let mut h: Sha512 = Sha512::default();
+        h.update(&value.0);
+        let hash = h.finalize();
+
+        let mut ret = [0u8; ed25519_dalek::SECRET_KEY_LENGTH];
+        ret.copy_from_slice(&hash[..32]);
+        curve25519_dalek::scalar::Scalar::from_bytes(&ret).unwrap()
+    }
+}
+
 impl From<&OffchainKeypair> for libp2p_identity::Keypair {
     fn from(value: &OffchainKeypair) -> Self {
         libp2p_identity::Keypair::ed25519_from_bytes(value.0.clone()).expect("invalid offchain keypair")
@@ -113,6 +131,12 @@ impl Keypair for ChainKeypair {
 impl ConstantTimeEq for ChainKeypair {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.secret().ct_eq(other.secret())
+    }
+}
+
+impl From<&ChainKeypair> for k256::Scalar {
+    fn from(value: &ChainKeypair) -> Self {
+        k256::Scalar::from_bytes(value.0.as_ref()).unwrap()
     }
 }
 

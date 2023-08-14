@@ -55,25 +55,19 @@ where
 {
     debug!("Successfully bumped local commitment after {pre_image} for channel {channel_id}");
 
-    db.mark_redeemed(&acked_ticket).await?;
+    db.mark_redeemed(acked_ticket).await?;
 
     Ok(())
 }
 
 #[cfg(test)]
 pub mod tests {
-    use crate::chain::{after_redeem_ticket, prepare_redeem_ticket};
     use async_std;
-    use core_crypto::types::{Hash, PublicKey, Response};
-    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-    use core_types::acknowledgement::AcknowledgedTicket;
-    use core_types::channels::{generate_channel_id, Ticket};
+    use core_crypto::types::PublicKey;
+    use core_ethereum_db::db::CoreEthereumDb;
     use hex_literal::hex;
     use std::sync::{Arc, Mutex};
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
-    use utils_types::primitives::BalanceType;
-    use utils_types::primitives::{Address, Balance, BalanceType::HOPR, Snapshot, U256};
-    use utils_types::traits::BinarySerializable;
 
     const SELF_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const COUNTERPARTY_PRIV_KEY: [u8; 32] = hex!("6517e3d3245d7a111ba7be5b911adcdec7078ca5191e114e5d087a3ec936a146");
@@ -93,13 +87,14 @@ pub mod tests {
         // BIG TODO
         // let mut db = create_mock_db();
 
-        // let counterparty_pubkey = PublicKey::from_privkey(&COUNTERPARTY_PRIV_KEY).unwrap();
+        // let counterparty_keypair = ChainKeypair::from_secret(&COUNTERPARTY_PRIV_KEY).unwrap();
+
         // let self_pubkey = PublicKey::from_privkey(&SELF_PRIV_KEY).unwrap();
 
         // let response = Response::default();
         // let challenge = response.to_challenge();
 
-        // let channel_id = generate_channel_id(&counterparty_pubkey.to_address(), &self_pubkey.to_address());
+        // let channel_id = generate_channel_id(&counterparty_keypair.public().to_address(), &self_pubkey.to_address());
 
         // let cci = ChannelCommitmentInfo::new(100, Address::random().to_string(), channel_id.clone(), U256::zero());
 
@@ -109,24 +104,29 @@ pub mod tests {
         //     response,
         //     pre_image: Hash::default(),
         //     ticket: Ticket::new(
-        //         counterparty_pubkey.to_address(),
+        //         counterparty_keypair.public().to_address(),
+        //         U256::zero(),
         //         U256::zero(),
         //         Balance::new(U256::zero(), BalanceType::HOPR),
         //         U256::max(),
         //         U256::zero(),
-        //         &COUNTERPARTY_PRIV_KEY,
+        //         &counterparty_keypair,
         //     ),
-        //     signer: counterparty_pubkey.to_address(),
+        //     signer: counterparty_keypair.public().to_address(),
         // };
 
         // acked_ticket
         //     .ticket
-        //     .set_challenge(challenge.into(), &COUNTERPARTY_PRIV_KEY);
-        // acked_ticket.ticket.sign(&COUNTERPARTY_PRIV_KEY);
+        //     .set_challenge(challenge.into(), &counterparty_keypair);
 
-        // let pre_image = prepare_redeem_ticket(&db, &counterparty_pubkey.to_address(), &channel_id, &mut acked_ticket)
-        //     .await
-        //     .expect("preparing ticket redemption must not fail");
+        // let pre_image = prepare_redeem_ticket(
+        //     &db,
+        //     &counterparty_keypair.public().to_address(),
+        //     &channel_id,
+        //     &mut acked_ticket,
+        // )
+        // .await
+        // .expect("preparing ticket redemption must not fail");
 
         // assert!(after_redeem_ticket(&mut db, &channel_id, &pre_image, &acked_ticket)
         //     .await

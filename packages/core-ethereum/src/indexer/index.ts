@@ -23,8 +23,11 @@ import {
   // create_multi_gauge,
   U256,
   random_integer,
-  OffchainPublicKey
-  // number_to_channel_status
+  Hash,
+  number_to_channel_status,
+  KeyBinding,
+  OffchainSignature,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -32,7 +35,17 @@ import { type IndexerEventEmitter, IndexerStatus, type IndexerEvents } from './t
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 
-import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database } from '../db.js'
+import {
+  CORE_ETHEREUM_CONSTANTS,
+  Ethereum_AccountEntry,
+  Ethereum_Address,
+  Ethereum_Balance,
+  Ethereum_ChannelEntry,
+  Ethereum_Database,
+  Ethereum_Hash,
+  Ethereum_OffchainPublicKey,
+  Ethereum_Snapshot
+} from '../db.js'
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
@@ -40,6 +53,8 @@ import { Handlers } from '../../lib/core_ethereum_indexer.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
+import assert from 'assert'
+import { OffchainPublicKey } from '../../crates/core-ethereum-db/pkg/core_ethereum_db.js'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -778,15 +793,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   /**
    * TODO: event update
    */
-  // private async onChannelUpdated(event: Event<'ChannelUpdated'>, lastSnapshot: Snapshot): Promise<void> {
-  //   const { source, destination, newState } = event.args
-
-  //   metric_channelStatus.set([channel.get_id().to_hex()], channel.status)
-  // }
-
-  /**
-   * TODO: event update
-   */
   // private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
   //   if (Address.from_string(event.args.source).eq(this.address)) {
   //     // the node used to lock outstandingTicketBalance
@@ -838,12 +844,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     return account
   }
 
-  public async getPublicKeyOf(address: Address): Promise<OffchainPublicKey> {
+  public async getChainKeyOf(address: Address): Promise<Address> {
     const account = await this.getAccount(address)
     if (account !== undefined) {
-      return OffchainPublicKey.from_peerid_str(account.public_key.to_peerid_str())
+      return account.chain_key
     }
-    throw new Error('Could not find public key for address - have they announced? -' + address.to_hex())
+    throw new Error('Could not find chain key for address - have they announced? -' + address.to_hex())
+  }
+
+  public async getPacketKeyOf(address: Address): Promise<OffchainPublicKey> {
+    const pk = await this.db.get_packet_key(Ethereum_Address.deserialize(address.serialize()))
+    if (pk !== undefined) {
+      return pk
+    }
+    throw new Error('Could not find packet key for address - have they announced? -' + address.to_hex())
   }
 
   public async *getAddressesAnnouncedOnChain() {
@@ -861,12 +875,18 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
-
-      out += `  - ${account.public_key.to_peerid_str()} ${account.get_multiaddr_str()}\n`
-      result.push({
-        id: peerIdFromString(account.public_key.to_peerid_str()),
-        multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
-      })
+      if (account) {
+        let packetKey = await this.db.get_packet_key(account.chain_key)
+        if (packetKey) {
+          out += `  - ${packetKey.to_peerid_str()} (on-chain ${account.chain_key.to_string()}) ${account.get_multiaddress_str()}\n`
+          result.push({
+            id: peerIdFromString(packetKey.to_peerid_str()),
+            multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
+          })
+        } else {
+          log(`could not retrieve packet key for address ${account.chain_key.to_string()}`)
+        }
+      }
     }
 
     // Remove last `\n`

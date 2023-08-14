@@ -16,7 +16,12 @@ import {SimplifiedModuleEvents} from "../../../src/node-stake/permissioned-modul
 /**
  * @dev This files tests both HoprNodeManagementModule and the CapabilityPermissions.sol
  */
-contract HoprNodeManagementModuleTest is Test, CapabilityPermissionsLibFixtureTest, SafeSingletonFixtureTest, SimplifiedModuleEvents {
+contract HoprNodeManagementModuleTest is
+    Test,
+    CapabilityPermissionsLibFixtureTest,
+    SafeSingletonFixtureTest,
+    SimplifiedModuleEvents
+{
     using stdStorage for StdStorage;
     using TargetUtils for Target;
     using ClonesUpgradeable for address;

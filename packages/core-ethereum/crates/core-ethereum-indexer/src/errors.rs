@@ -1,5 +1,4 @@
 use ethers::core::abi::Error as AbiError;
-use multiaddr::Error as MultiaddrError;
 use thiserror::Error;
 use utils_db::errors::DbError;
 use utils_types::{errors::GeneralError, primitives::Address};
@@ -40,7 +39,7 @@ pub enum CoreEthereumIndexerError {
     UnknownContract(Address),
 
     #[error(transparent)]
-    MultiaddrParseError(#[from] MultiaddrError),
+    MultiaddrParseError(#[from] multiaddr::Error),
 }
 
 pub type Result<T> = core::result::Result<T, CoreEthereumIndexerError>;

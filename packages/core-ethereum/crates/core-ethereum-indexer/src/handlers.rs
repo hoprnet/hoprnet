@@ -12,6 +12,8 @@ use core_types::{
 };
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use ethnum::u256;
+use multiaddr::Multiaddr;
+use std::str::FromStr;
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 /// Holds addresses of deployed HOPR contracts
@@ -71,7 +73,7 @@ where
 
                 if let Some(mut account) = maybe_account {
                     let new_entry_type = AccountType::Announced {
-                        multiaddr: address_announcement.base_multiaddr.try_into()?,
+                        multiaddr: Multiaddr::from_str(&address_announcement.base_multiaddr)?,
                         updated_block: block_number,
                     };
 

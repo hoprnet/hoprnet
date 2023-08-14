@@ -79,6 +79,12 @@ impl<L: ArrayLength<u8>> AsMut<[u8]> for SecretValue<L> {
     }
 }
 
+impl<L: ArrayLength<u8>> From<SecretValue<L>> for Box<[u8]> {
+    fn from(value: SecretValue<L>) -> Self {
+        value.as_ref().into()
+    }
+}
+
 impl<L: ArrayLength<u8>> SecretValue<L> {
     /// Length of the secret value in bytes.
     pub const LENGTH: usize = L::USIZE;

@@ -120,6 +120,7 @@ hopli initialize-node --network anvil-localhost \
 ```
 
 Express create a safe and a module instances, then set default permissions
+
 ```
 PRIVATE_KEY=<bank_private_key> \
 hopli create-safe-module --network anvil-localhost \
@@ -217,6 +218,7 @@ PRIVATE_KEY=<bank_private_key> \
 ```
 
 Express create a safe and a module instances, then set default permissions
+
 ```
 PRIVATE_KEY=<bank_private_key> \
     cargo run -- create-safe-module --network anvil-localhost \

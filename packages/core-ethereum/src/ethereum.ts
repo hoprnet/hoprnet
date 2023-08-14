@@ -1,5 +1,5 @@
 import { setImmediate as setImmediatePromise } from 'timers/promises'
-import type { Multiaddr } from '@multiformats/multiaddr'
+
 import {
   providers,
   utils,
@@ -19,7 +19,9 @@ import {
   type AcknowledgedTicket,
   type DeferType,
   type Hash,
-  create_counter
+  create_counter,
+  AnnouncementData,
+  u8aSplit
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
@@ -36,7 +38,7 @@ import {
   HOPR_TOKEN_ABI,
   DeploymentExtract,
   HOPR_NODE_SAFE_REGISTRY_ABI,
-  HOPR_MODULE_ABI,
+  HOPR_MODULE_ABI
 } from './utils/index.js'
 
 import { SafeModuleOptions } from './index.js'
@@ -115,11 +117,7 @@ export async function createChainWrapper(
     provider
   )
 
-  const nodeManagementModule = new ethers.Contract(
-    safeModuleOptions.moduleAddress.to_hex(),
-    HOPR_MODULE_ABI,
-    provider
-  )
+  const nodeManagementModule = new ethers.Contract(safeModuleOptions.moduleAddress.to_hex(), HOPR_MODULE_ABI, provider)
 
   const nodeSafeRegistry = new ethers.Contract(
     deploymentExtract.hoprNodeSafeRegistryAddress,
@@ -425,11 +423,11 @@ export async function createChainWrapper(
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', populatedTx.nonce, transaction.hash)
     metric_countSendTransaction.increment()
     nonceLock.releaseLock()
-    
+
     // wait for the tx to be mined - mininal and scheduled implementation
     // only fails if tx does not get mined within the specified timeout
     await waitForTransaction(transaction.hash, deferredListener.reject.bind(deferredListener))
-    
+
     try {
       await deferredListener.promise
       transactions.moveFromMinedToConfirmed(transaction.hash)
@@ -446,26 +444,47 @@ export async function createChainWrapper(
   /**
    * FIXME: annouce is in a separate contract
    * Initiates a transaction that announces nodes on-chain.
-   * @param multiaddr the address to be announced
+   * @param data prepared announcement data
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (multiaddr: Multiaddr, _txHandler: (tx: string) => DeferType<string>): Promise<string> => {
-    log('Announcing on-chain with %s', multiaddr.toString())
-    // let sendResult: SendTransactionReturn
-    // let error: unknown
-    // try {
-    //   const confirmationEssentialTxPayload = buildEssentialTxPayload(
-    //     0,
-    //     channels,
-    //     'announce',
-    //     publicKey.to_hex(false),
-    //     multiaddr.bytes
-    //   )
-    //   sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
-    // } catch (err) {
-    //   error = err
-    // }
+  const announce = async (data: AnnouncementData, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+    let confirmationEssentialTxPayload: TransactionPayload
+    let keyBinding = data.key_binding
+
+    if (keyBinding) {
+      if (!keyBinding.chain_key.eq(publicKey.to_address())) {
+        throw new Error('cannot bind with different public key')
+      }
+
+      log(`announcing ${data.to_multiaddress_str()} with key binding`)
+      let sgn = u8aSplit(keyBinding.signature.serialize(), [32])
+      confirmationEssentialTxPayload = buildEssentialTxPayload(
+        0,
+        channels, // TODO: change the target contract used for announcement
+        'bindKeysAnnounce',
+        sgn[0],
+        sgn[1],
+        keyBinding.packet_key.serialize(),
+        data.to_multiaddress_str()
+      )
+    } else {
+      log(`announcing ${data.to_multiaddress_str()} without key binding`)
+      confirmationEssentialTxPayload = buildEssentialTxPayload(
+        0,
+        channels, // TODO: change the target contract used for announcement
+        'announce',
+        data.to_multiaddress_str() // this already passes the decapsulated multiaddress
+      )
+    }
+
+    let sendResult: SendTransactionReturn
+    let error: unknown
+    try {
+      sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
+    } catch (err) {
+      error = err
+    }
 
     // switch (sendResult.code) {
     //   case SendTransactionStatus.SUCCESS:
