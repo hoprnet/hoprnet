@@ -327,15 +327,12 @@ async function main() {
       )
     )
 
-    // total hack. peerIdFromKeys seems to produce incorrect objects
-    const peerId = privKeyToPeerId(keypair.chainKeyPrivKey)
-
-    console.log(`chain_key`, (await keypair.chainKeyPeerId).toString())
-    console.log(`packet_key`, (await keypair.packetKeyPeerId).toString())
+    console.log(`chain_key ${keypair.chain_key.public().to_hex(true)}`)
+    console.log(`packet_key ${keypair.packet_key.public().to_peerid_str()}`)
 
     // 2. Create node instance
     logs.log('Creating HOPR Node')
-    node = await createHoprNode(peerId, options, false)
+    node = await createHoprNode(keypair, options, false)
     logs.logStatus('PENDING')
 
     // Subscribe to node events

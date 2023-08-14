@@ -1,15 +1,15 @@
-import { Wallet } from 'ethers'
 import { Multiaddr } from '@multiformats/multiaddr'
-import { Hash, stringToU8a, Address, OffchainPublicKey } from '@hoprnet/hopr-utils'
 
-export const ACCOUNT_A = new Wallet('0x18a664889e28a432495758f0522b53b2f04a35f810b78c6ea01db305141bcba2')
-export const PARTY_A = () =>
-  OffchainPublicKey.from_privkey(stringToU8a('0xd698bd708b67339a8cb57a3ea2c6de244c587e2daa94f6cc496b8cee1caed828'))
-export const PARTY_A_MULTIADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${PARTY_A().to_peerid_str()}`)
-export const ACCOUNT_B = new Wallet('0x4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b')
-export const PARTY_B = () =>
-  OffchainPublicKey.from_privkey(stringToU8a('0xd7fb040aec169422228954a5abbcfe6818ad8377971299f9c2b7433335fe8e67'))
-export const PARTY_B_MULTIADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${PARTY_B().to_peerid_str()}`)
+import { PublicKey, Hash, stringToU8a, Address, ChainKeypair, OffchainKeypair, OffchainPublicKey } from '@hoprnet/hopr-utils'
+
+export const ACCOUNT_A = stringToU8a('0x18a664889e28a432495758f0522b53b2f04a35f810b78c6ea01db305141bcba2')
+export const PARTY_A = () => new ChainKeypair(ACCOUNT_A)
+export const PARTY_A_PEERID = new OffchainKeypair(ACCOUNT_A).to_peerid_str()
+export const PARTY_A_MULTIADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${PARTY_A_PEERID}`)
+export const ACCOUNT_B = stringToU8a('0x4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b')
+export const PARTY_B = () => new ChainKeypair(ACCOUNT_B)
+export const PARTY_B_PEERID = new OffchainKeypair(ACCOUNT_B).to_peerid_str()
+export const PARTY_B_MULTIADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${PARTY_B_PEERID}`)
 export const CHANNEL_ID = '0x6e454104cde7f1c088b14c3ead07945f6f2c1ce72fef4171a7670e528d1a043c'
 
 export const MOCK_PUBLIC_KEY = () =>

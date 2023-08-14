@@ -4,13 +4,8 @@ pub mod native {
     use std::fs;
 
     pub fn read_to_string(file_path: &str) -> Result<String> {
-        fs::read_to_string(file_path).map_err(|e| {
-            RealError::GeneralError(format!(
-                "Failed to read the file '{}' with error: {}",
-                file_path,
-                e.to_string()
-            ))
-        })
+        fs::read_to_string(file_path)
+            .map_err(|e| RealError::GeneralError(format!("Failed to read the file '{}' with error: {}", file_path, e)))
     }
 
     pub fn read_file(file_path: &str) -> Result<Box<[u8]>> {
@@ -18,8 +13,7 @@ pub mod native {
             Ok(buf) => Ok(Box::from(buf)),
             Err(e) => Err(RealError::GeneralError(format!(
                 "Failed to read the file '{}' with error: {}",
-                file_path,
-                e.to_string()
+                file_path, e
             ))),
         }
     }
@@ -28,7 +22,7 @@ pub mod native {
     where
         R: AsRef<[u8]>,
     {
-        fs::write(path, contents).map_err(|e| RealError::GeneralError(format!("{} {}", path, e.to_string())))
+        fs::write(path, contents).map_err(|e| RealError::GeneralError(format!("{} {}", path, e)))
     }
 
     pub fn metadata(path: &str) -> Result<()> {

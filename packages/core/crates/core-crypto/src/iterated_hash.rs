@@ -1,18 +1,18 @@
+use generic_array::GenericArray;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue};
 use crate::errors::Result;
-use crate::primitives::{DigestLike, EthDigest};
+use crate::primitives::{DigestLike, EthDigest, SimpleMac};
 
 /// Contains the complete hash iteration progression
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IteratedHash {
-    pub hash: Box<[u8]>,
+    pub hash: [u8; SimpleMac::SIZE],
     pub intermediates: Vec<Intermediate>,
 }
 
 /// Contains the intermediate result in the hash iteration progression
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Intermediate {
     pub iteration: usize,
@@ -26,13 +26,13 @@ pub async fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> I
     assert!(!seed.is_empty() && step_size > 0 && iterations > step_size);
 
     let mut intermediates: Vec<Intermediate> = Vec::with_capacity(iterations / step_size + 1);
-    let mut intermediate: Box<[u8]> = EthDigest::create_output();
 
     let mut hash = EthDigest::default();
 
     // Unroll the first iteration, because it uses different input length
     hash.update(seed);
-    hash.finalize_into(&mut intermediate);
+    let mut intermediate = hash.finalize();
+
     intermediates.push(Intermediate {
         iteration: 0,
         intermediate: seed.into(),
@@ -44,7 +44,7 @@ pub async fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> I
         if iteration % step_size == 0 {
             intermediates.push(Intermediate {
                 iteration,
-                intermediate: intermediate.clone(),
+                intermediate: intermediate.as_slice().into(),
             });
             async_std::task::yield_now().await;
         }
@@ -53,7 +53,7 @@ pub async fn iterate_hash(seed: &[u8], iterations: usize, step_size: usize) -> I
     }
 
     IteratedHash {
-        hash: intermediate,
+        hash: intermediate.into(),
         intermediates,
     }
 }
@@ -82,17 +82,18 @@ where
     for i in (0..=closest_intermediate).step_by(step_size) {
         // Check if we can get a hint for the current index
         let pos = closest_intermediate - i;
-        if let Some(mut intermediate) = hints(pos).await {
+        if let Some(fetched_intermediate) = hints(pos).await {
+            let mut intermediate = *GenericArray::from_slice(fetched_intermediate.as_ref());
             for iteration in 0..step_size {
                 // Compute the hash of current intermediate
                 digest.update(intermediate.as_ref());
                 let hash = digest.finalize();
 
                 // Is the computed hash the one we're looking for ?
-                if hash.len() == hash_value.len() && hash.as_ref() == hash_value {
+                if hash.len() == hash_value.len() && hash.as_slice() == hash_value {
                     return Ok(Intermediate {
                         iteration: iteration + pos,
-                        intermediate,
+                        intermediate: intermediate.as_slice().into(),
                     });
                 }
 
@@ -150,31 +151,5 @@ mod tests {
             Hash::create(&[recovered.intermediate.as_ref()]).to_bytes().as_ref(),
             &target
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::iterated_hash::Intermediate;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    pub struct IteratedHash {
-        w: super::IteratedHash,
-    }
-
-    #[wasm_bindgen]
-    impl IteratedHash {
-        pub fn hash(&self) -> Box<[u8]> {
-            self.w.hash.clone()
-        }
-
-        pub fn count_intermediates(&self) -> usize {
-            self.w.intermediates.len()
-        }
-
-        pub fn intermediate(&self, index: usize) -> Option<Intermediate> {
-            self.w.intermediates.get(index).cloned()
-        }
     }
 }
