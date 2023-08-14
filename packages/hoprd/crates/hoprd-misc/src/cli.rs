@@ -439,7 +439,7 @@ pub struct CliArgs {
         long = "safeTransactionServiceProvider",
         value_name = "HOPRD_SAFE_TX_SERVICE_PROVIDER",
         help = "Base URL for safe transaction service",
-        env = "SAFE_TRANSACTION_SERVICE_PROVIDER"
+        env = "HOPRD_SAFE_TRANSACTION_SERVICE_PROVIDER"
     )]
     pub safe_transaction_service_provider : Option<String>,
 
@@ -447,7 +447,7 @@ pub struct CliArgs {
         long = "safeAddress",
         value_name = "HOPRD_SAFE_ADDR",
         help = "Address of Safe that safeguards tokens",
-        env = "SAFE_ADDRESS"
+        env = "HOPRD_SAFE_ADDRESS"
     )]
     pub safe_address : Option<String>,
 
@@ -455,7 +455,7 @@ pub struct CliArgs {
         long = "moduleAddress",
         value_name = "HOPRD_MODULE_ADDR",
         help = "Address of the node mangement module",
-        env = "MODULE_ADDRESS"
+        env = "HOPRD_MODULE_ADDRESS"
     )]
     pub module_address : Option<String>,
 }
