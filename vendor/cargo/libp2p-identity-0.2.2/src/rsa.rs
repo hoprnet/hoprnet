@@ -45,8 +45,6 @@ impl Keypair {
     /// Decode an RSA keypair from a DER-encoded private key in PKCS#1 RSAPrivateKey
     /// format (i.e. unencrypted) as defined in [RFC3447].
     ///
-<<<<<<<< HEAD:vendor/cargo/libp2p-identity-0.2.0/src/rsa.rs
-========
     /// [RFC3447]: https://tools.ietf.org/html/rfc3447#appendix-A.1.2
     pub fn try_decode_pkcs1(der: &mut [u8]) -> Result<Keypair, DecodingError> {
         let kp = RsaKeyPair::from_der(der)
@@ -58,7 +56,6 @@ impl Keypair {
     /// Decode an RSA keypair from a DER-encoded private key in PKCS#8 PrivateKeyInfo
     /// format (i.e. unencrypted) as defined in [RFC5208].
     ///
->>>>>>>> master:vendor/cargo/libp2p-identity-0.2.2/src/rsa.rs
     /// [RFC5208]: https://tools.ietf.org/html/rfc5208#section-5
     pub fn try_decode_pkcs8(der: &mut [u8]) -> Result<Keypair, DecodingError> {
         let kp = RsaKeyPair::from_pkcs8(der)

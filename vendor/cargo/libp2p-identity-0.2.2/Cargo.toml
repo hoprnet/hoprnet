@@ -13,11 +13,7 @@
 edition = "2021"
 rust-version = "1.65.0"
 name = "libp2p-identity"
-<<<<<<<< HEAD:vendor/cargo/libp2p-identity-0.2.0/Cargo.toml
-version = "0.2.0"
-========
 version = "0.2.2"
->>>>>>>> master:vendor/cargo/libp2p-identity-0.2.2/Cargo.toml
 description = "Data structures and algorithms for identifying peers in libp2p."
 keywords = [
     "peer-to-peer",
