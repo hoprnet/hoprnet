@@ -1,7 +1,10 @@
 use crate::errors::{CoreEthereumIndexerError, Result};
 use bindings::{
-    hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
-    hopr_network_registry::HoprNetworkRegistryEvents, hopr_token::HoprTokenEvents,
+    hopr_announcements::HoprAnnouncementsEvents,
+    hopr_channels::HoprChannelsEvents,
+    hopr_network_registry::HoprNetworkRegistryEvents,
+    hopr_token::HoprTokenEvents,
+    hopr_node_safe_registry::HoprNodeSafeRegistryEvents,
 };
 use core_crypto::types::OffchainSignature;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -17,11 +20,12 @@ struct DeploymentExtract {
     channels: Address,
     token: Address,
     network_registry: Address,
+    node_safe_registry: Address,
     announcements: Address,
 }
 
 struct Handlers {
-    /// channels, announcements, network_registry, token: contract addresses
+    /// channels, announcements, network_registry, node_safe_registry, token: contract addresses
     /// whose event we process
     addresses: DeploymentExtract,
     /// monitor the Hopr Token events, ignore rest
@@ -281,6 +285,30 @@ impl Handlers {
         })
     }
 
+    pub(super) async fn on_node_safe_registry_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    where
+        T: HoprCoreEthereumDbActions,
+    {
+        Ok(match HoprNodeSafeRegistryEvents::decode_log(log)? {
+            HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
+                db.remove_from_node_safe_registry(
+                    &deregistered.node_address.0.try_into()?,
+                    &deregistered.safe_address.0.try_into()?,
+                    snapshot,
+                )
+                .await?;
+            }
+            HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
+                db.add_to_node_safe_registry(
+                    &registered.node_address.0.try_into()?,
+                    &registered.safe_address.0.try_into()?,
+                    snapshot,
+                )
+                .await?;
+            }
+        })
+    }
+
     pub async fn on_event<T>(
         &self,
         db: &mut T,
@@ -298,6 +326,8 @@ impl Handlers {
             self.on_channel_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.network_registry) {
             self.on_network_registry_event(db, log, snapshot).await?;
+        } else if address.eq(&self.addresses.node_safe_registry) {
+            self.on_node_safe_registry_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.token) {
             self.on_token_event(db, log, snapshot).await?;
         } else {
@@ -318,6 +348,9 @@ pub mod tests {
         hopr_network_registry::{
             DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter,
             NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter,
+        },
+        hopr_node_safe_registry::{
+            RegisteredNodeSafeFilter, DergisteredNodeSafeFilter,
         },
         hopr_token::TransferFilter,
     };
@@ -349,10 +382,12 @@ pub mod tests {
     const COUNTERPARTY_CHAIN_ADDRESS: [u8; 20] = hex!("f1a73ef496c45e260924a9279d2d9752ae378812");
     const SELF_CHAIN_ADDRESS: [u8; 20] = hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a");
     const STAKE_ADDRESS: [u8; 20] = hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3");
+    const SAFE_ADDRESS: [u8; 20] = hex!("295026fd99ecbabef94940e229f6e022823f1774");
 
     const CHANNELS_ADDR: [u8; 20] = hex!("bab20aea98368220baa4e3b7f151273ee71df93b"); // just a dummy
     const TOKEN_ADDR: [u8; 20] = hex!("47d1677e018e79dcdd8a9c554466cb1556fa5007"); // just a dummy
     const NETWORK_REGISTRY_ADDR: [u8; 20] = hex!("a469d0225f884fb989cbad4fe289f6fd2fb98051"); // just a dummy
+    const NODE_SAFE_REGISTRY_ADDR: [u8; 20] = hex!("0dcd1bf9a1b36ce34237eeafef220932846bcd82"); // just a dummy
     const ANNOUNCEMENTS_ADDR: [u8; 20] = hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
@@ -371,6 +406,7 @@ pub mod tests {
                 channels: CHANNELS_ADDR.try_into().unwrap(),
                 token: TOKEN_ADDR.try_into().unwrap(),
                 network_registry: NETWORK_REGISTRY_ADDR.try_into().unwrap(),
+                node_safe_registry: NODE_SAFE_REGISTRY_ADDR.try_into().unwrap(),
                 announcements: ANNOUNCEMENTS_ADDR.try_into().unwrap(),
             },
             address_to_monitor: SELF_CHAIN_ADDRESS.try_into().unwrap(),
@@ -854,6 +890,82 @@ pub mod tests {
     }
 
     #[async_std::test]
+    async fn on_node_safe_registry_event_registered() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+        let safe_address = Address::from_bytes(&SAFE_ADDRESS).unwrap();
+
+        let registered_log = RawLog {
+            topics: vec![
+                RegisteredNodeSafeFilter::signature(),
+                H256::from_slice(&safe_address.to_bytes32()),
+                H256::from_slice(&chain_key.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.node_safe_registry,
+                0u32,
+                &registered_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        let stored = db
+            .find_hopr_node_using_safe_in_node_safe_registry(&safe_address)
+            .await
+            .unwrap();
+
+        assert_eq!(stored, vec![chain_key]);
+    }
+
+    #[async_std::test]
+    async fn on_node_safe_registry_event_deregistered() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
+        let safe_address = Address::from_bytes(&SAFE_ADDRESS).unwrap();
+
+        db.add_to_node_safe_registry(&chain_key, &safe_address, &Snapshot::default())
+            .await
+            .unwrap();
+
+        let registered_log = RawLog {
+            topics: vec![
+                DergisteredNodeSafeFilter::signature(),
+                H256::from_slice(&safe_address.to_bytes32()),
+                H256::from_slice(&chain_key.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.node_safe_registry,
+                0u32,
+                &registered_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        let stored = db
+            .find_hopr_node_using_safe_in_node_safe_registry(&safe_address)
+            .await
+            .unwrap();
+
+        assert_eq!(stored, vec![]);
+    }
+
+    #[async_std::test]
     async fn on_channel_event_balance_increased() {
         let handlers = init_handlers();
         let mut db = create_mock_db();
@@ -1176,6 +1288,7 @@ pub mod wasm {
             channels: &str,
             token: &str,
             network_registry: &str,
+            node_safe_registry: &str,
             announcements: &str,
         ) -> Handlers {
             Self {
@@ -1185,6 +1298,7 @@ pub mod wasm {
                         channels: Address::from_str(channels).unwrap(),
                         token: Address::from_str(token).unwrap(),
                         network_registry: Address::from_str(network_registry).unwrap(),
+                        node_safe_registry: Address::from_str(node_safe_registry).unwrap(),
                         announcements: Address::from_str(announcements).unwrap(),
                     },
                 },

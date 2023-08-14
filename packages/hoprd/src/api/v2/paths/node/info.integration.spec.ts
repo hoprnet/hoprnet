@@ -14,7 +14,8 @@ const nodePeerId = privKeyToPeerId('0x9135f358f94b59e8cdee5545eb9ecc8ff32bc3a792
 // Use random checksummed addresses to correctly mimic outputs
 const HOPR_TOKEN_ADDRESS = '0x2be12eE6D553319F01Ea85A353203feC6444928F'
 const HOPR_CHANNELS_ADDRESS = '0x39344CE336712bD0280c2C374c60A42F16a84B20'
-const HOPR_NEWTWORK_REGISTRY_ADDRESS = '0xBEE1F5d64b562715E749771408d06D57EE0892A7'
+const HOPR_NETWORK_REGISTRY_ADDRESS = '0xBEE1F5d64b562715E749771408d06D57EE0892A7'
+const HOPR_NODE_SAFE_REGISTRY_ADDRESS = '0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82'
 
 const DHT_ADDRESSES = [
   new Multiaddr(`/ip4/1.2.3.4/tcp/23/p2p/${nodePeerId.toString()}`),
@@ -40,7 +41,8 @@ describe('GET /node/info', () => {
       chain: 'a',
       hoprTokenAddress: HOPR_TOKEN_ADDRESS,
       hoprChannelsAddress: HOPR_CHANNELS_ADDRESS,
-      hoprNetworkRegistryAddress: HOPR_NEWTWORK_REGISTRY_ADDRESS,
+      hoprNetworkRegistryAddress: HOPR_NETWORK_REGISTRY_ADDRESS,
+      hoprNodeSafeRegistryAddress: HOPR_NODE_SAFE_REGISTRY_ADDRESS,
       noticePeriodChannelClosure: 60
     })
     node.getAddressesAnnouncedToDHT = sinon.fake.resolves(DHT_ADDRESSES)
@@ -59,7 +61,8 @@ describe('GET /node/info', () => {
       chain: 'a',
       hoprToken: HOPR_TOKEN_ADDRESS,
       hoprChannels: HOPR_CHANNELS_ADDRESS,
-      hoprNetworkRegistry: HOPR_NEWTWORK_REGISTRY_ADDRESS,
+      hoprNetworkRegistry: HOPR_NETWORK_REGISTRY_ADDRESS,
+      hoprNodeSafeRegistry: HOPR_NODE_SAFE_REGISTRY_ADDRESS,
       isEligible: true,
       connectivityStatus: health_to_string(Health.Green),
       channelClosurePeriod: 1

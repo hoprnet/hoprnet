@@ -33,6 +33,7 @@ core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc"
 real-base = { path = "../../../real/crates/real-base", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
 [dev-dependencies]
 tempfile = "3"

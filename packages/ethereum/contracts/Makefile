@@ -131,6 +131,16 @@ endif
 		--broadcast --sig "transferNetworkRegistryNft(address,string)" \
 		$(recipient) $(nftrank)
 
+# E.g. make express-setup-safe-module network=anvil-localhost environment-type=local node_address="[0xcb192a4ba9abea8579c59231b8a57e3f0591e02b]"
+.PHONY: express-setup-safe-module
+express-setup-safe-module: ensure-environment-and-network-are-set ensure-privatekey-is-set
+express-setup-safe-module: ## create a new safe and a new node management module, include the provided node address
+ifeq ($(node_address),)
+	echo "parameter <node_address> missing" >&2 && exit 1
+endif
+	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
+		--broadcast --sig "expressSetupSafeModule(address[])" [$(node_address)]
+
 # E.g. make stake-funds network=anvil-localhost environment-type=local
 .PHONY: stake-funds
 stake-funds: ensure-environment-and-network-are-set ensure-privatekey-is-set

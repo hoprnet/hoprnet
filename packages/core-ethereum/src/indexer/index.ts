@@ -126,6 +126,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       chain.getInfo().hoprChannelsAddress,
       chain.getInfo().hoprTokenAddress,
       chain.getInfo().hoprNetworkRegistryAddress,
+      chain.getInfo().hoprNodeSafeRegistryAddress,
       chain.getInfo().hoprAnnouncementsAddress
     )
 
@@ -533,6 +534,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
               this.indexEvent(`announce-${txHash}`)
             } else if (this.listeners(`channel-updated-${txHash}`).length > 0) {
               this.indexEvent(`channel-updated-${txHash}`)
+            } else if (this.listeners(`node-safe-registered-${txHash}`).length > 0) {
+              this.indexEvent(`node-safe-registered-${txHash}`)
             }
 
             // update transaction manager
@@ -990,7 +993,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
     let out = `Known public nodes:\n`
-
+    
     let publicAccounts = await this.db.get_public_node_accounts()
 
     while (publicAccounts.len() > 0) {
@@ -1002,7 +1005,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
       })
     }
-
+    
     // Remove last `\n`
     log(out.substring(0, out.length - 1))
 

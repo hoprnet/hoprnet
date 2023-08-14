@@ -30,7 +30,16 @@ import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
-import { HOPR_CHANNELS_ABI, HOPR_NETWORK_REGISTRY_ABI, HOPR_TOKEN_ABI, DeploymentExtract } from './utils/index.js'
+import {
+  HOPR_CHANNELS_ABI,
+  HOPR_NETWORK_REGISTRY_ABI,
+  HOPR_TOKEN_ABI,
+  DeploymentExtract,
+  HOPR_NODE_SAFE_REGISTRY_ABI,
+  HOPR_MODULE_ABI,
+} from './utils/index.js'
+
+import { SafeModuleOptions } from './index.js'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -62,6 +71,7 @@ export type SendTransactionReturn =
 
 export async function createChainWrapper(
   deploymentExtract: DeploymentExtract,
+  safeModuleOptions: SafeModuleOptions,
   networkInfo: {
     provider: string
     chainId: number
@@ -92,6 +102,8 @@ export async function createChainWrapper(
   }
 
   log(`[DEBUG] deploymentExtract ${JSON.stringify(deploymentExtract, null, 2)}`)
+  log(`[DEBUG] safeModuleOptions.safeAddress ${JSON.stringify(safeModuleOptions.safeAddress.to_hex(), null, 2)}`)
+  log(`[DEBUG] safeModuleOptions.moduleAddress ${JSON.stringify(safeModuleOptions.moduleAddress.to_hex(), null, 2)}`)
 
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
 
@@ -100,6 +112,18 @@ export async function createChainWrapper(
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
     HOPR_NETWORK_REGISTRY_ABI,
+    provider
+  )
+
+  const nodeManagementModule = new ethers.Contract(
+    safeModuleOptions.moduleAddress.to_hex(),
+    HOPR_MODULE_ABI,
+    provider
+  )
+
+  const nodeSafeRegistry = new ethers.Contract(
+    deploymentExtract.hoprNodeSafeRegistryAddress,
+    HOPR_NODE_SAFE_REGISTRY_ABI,
     provider
   )
 
@@ -401,11 +425,11 @@ export async function createChainWrapper(
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', populatedTx.nonce, transaction.hash)
     metric_countSendTransaction.increment()
     nonceLock.releaseLock()
-
+    
     // wait for the tx to be mined - mininal and scheduled implementation
     // only fails if tx does not get mined within the specified timeout
     await waitForTransaction(transaction.hash, deferredListener.reject.bind(deferredListener))
-
+    
     try {
       await deferredListener.promise
       transactions.moveFromMinedToConfirmed(transaction.hash)
@@ -726,6 +750,43 @@ export async function createChainWrapper(
   }
 
   /**
+   * Initiates a transaction that registers a safe address
+   * @param safeAddress address of safe
+   * @param txHandler handler to call once the transaction has been published
+   * @returns a Promise that resolves with the transaction hash
+   */
+  const registerSafeByNode = async (
+    safeAddress: Address,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<Receipt> => {
+    log('Register a node to safe %s globally', safeAddress.to_hex())
+    let sendResult: SendTransactionReturn
+    let error: unknown
+
+    try {
+      const registerSafeByNodeEssentialTxPayload = buildEssentialTxPayload(
+        0,
+        nodeSafeRegistry,
+        'registerSafeByNode',
+        safeAddress.to_hex()
+      )
+      sendResult = await sendTransaction(checkDuplicate, registerSafeByNodeEssentialTxPayload, txHandler)
+    } catch (err) {
+      error = err
+    }
+
+    switch (sendResult.code) {
+      case SendTransactionStatus.SUCCESS:
+        return sendResult.tx.hash
+      case SendTransactionStatus.DUPLICATE:
+        throw new Error(`Failed in sending registerSafeByNode transaction because transaction is a duplicate`)
+      default:
+        throw new Error(`Failed in sending registerSafeByNode transaction due to ${error}`)
+    }
+    // TODO: catch race-condition
+  }
+
+  /**
    * Gets the transaction hashes of a specific block
    * @param blockNumber block number to look for
    * @returns a Promise that resolves with the transaction hashes of the requested block
@@ -830,17 +891,69 @@ export async function createChainWrapper(
     return new Balance(rawNativeBalance.toString(), BalanceType.Native)
   }
 
+  /**
+   * Gets the registered safe address from node safe registry
+   * @param nodeAddress node address
+   * @returns a Promise that resolves registered safe address
+   */
+  const getSafeFromNodeSafeRegistry = async (nodeAddress: Address): Promise<Address> => {
+    const RETRIES = 3
+    let registeredSafe: string
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        registeredSafe = await nodeSafeRegistry.nodeToSafe(nodeAddress.to_hex())
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        }
+
+        log(`Could not get the registered safe address using the provider.`)
+        throw Error(`Could not get the registered safe address due to ${err}`)
+      }
+    }
+
+    return Address.from_string(registeredSafe)
+  }
+
+  /**
+   * Gets module target (owner)
+   * @returns a Promise that resolves the target address of the node management module
+   */
+  const getModuleTargetAddress = async (): Promise<Address> => {
+    const RETRIES = 3
+    let targetAddress: string
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        targetAddress = await nodeManagementModule.owner()
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        }
+
+        log(`Could not get the target (owner) address of the node management module using the provider. due to ${err}`)
+        throw Error(`Could not get target (owner) address of the node management module`)
+      }
+    }
+
+    return Address.from_string(targetAddress)
+  }
+
   return {
     getBalance,
     getNativeBalance,
     getTransactionsInBlock,
     getTimestamp,
+    getSafeFromNodeSafeRegistry,
+    getModuleTargetAddress,
     announce,
     withdraw,
     fundChannel,
     finalizeOutgoingChannelClosure,
     initiateOutgoingChannelClosure,
     redeemTicket,
+    registerSafeByNode,
     getGenesisBlock: () => genesisBlock,
     setCommitment,
     sendTransaction, //: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
@@ -869,6 +982,8 @@ export async function createChainWrapper(
     getChannels: () => channels,
     getToken: () => token,
     getNetworkRegistry: () => networkRegistry,
+    getNodeSafeRegistry: () => nodeSafeRegistry,
+    getNodeManagementModule: () => nodeManagementModule,
     getPrivateKey: () => privateKey,
     getPublicKey: () => publicKey,
     getInfo: () => ({
@@ -877,6 +992,7 @@ export async function createChainWrapper(
       hoprTokenAddress: deploymentExtract.hoprTokenAddress,
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,
+      hoprNodeSafeRegistryAddress: deploymentExtract.hoprNodeSafeRegistryAddress,
       noticePeriodChannelClosure
     }),
     updateConfirmedTransaction: transactions.moveToConfirmed.bind(
