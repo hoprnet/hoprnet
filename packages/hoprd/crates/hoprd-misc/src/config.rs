@@ -204,16 +204,16 @@ impl Default for Chain {
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct SafeModule {
     pub safe_transaction_service_provider: Option<String>,
-    pub safe_address: Address,
-    pub module_address: Address,
+    pub safe_address:  Option<Address>,
+    pub module_address:  Option<Address>,
 }
 
 impl Default for SafeModule {
     fn default() -> Self {
         Self {
             safe_transaction_service_provider: None,
-            safe_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
-            module_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
+            safe_address: None,
+            module_address: None,
         }
     }
 }
@@ -487,10 +487,10 @@ impl HoprdConfig {
             cfg.safe_module.safe_transaction_service_provider = Some(x)
         };
         if let Some(x) = cli_args.safe_address {
-            cfg.safe_module.safe_address = Address::from_str(&x).unwrap()
+            cfg.safe_module.safe_address = Some(Address::from_str(&x).unwrap())
         };
         if let Some(x) = cli_args.module_address {
-            cfg.safe_module.module_address = Address::from_str(&x).unwrap()
+            cfg.safe_module.module_address = Some(Address::from_str(&x).unwrap())
         };
 
         // test

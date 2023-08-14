@@ -102,6 +102,8 @@ const provider = networkInfo.provider.startsWith('http')
   }
 
   log(`[DEBUG] deploymentExtract ${JSON.stringify(deploymentExtract, null, 2)}`)
+  log(`[DEBUG] safeModuleOptions.safeAddress ${JSON.stringify(safeModuleOptions.safeAddress.to_hex(), null, 2)}`)
+  log(`[DEBUG] safeModuleOptions.moduleAddress ${JSON.stringify(safeModuleOptions.moduleAddress.to_hex(), null, 2)}`)
 
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
 
@@ -905,7 +907,6 @@ const provider = networkInfo.provider.startsWith('http')
     for (let i = 0; i < RETRIES; i++) {
       try {
         registeredSafe = await nodeSafeRegistry.nodeToSafe(nodeAddress.to_hex())
-        log(`getSafeFromNodeSafeRegistry registeredSafe ${registeredSafe}`)
       } catch (err) {
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
@@ -913,7 +914,7 @@ const provider = networkInfo.provider.startsWith('http')
         }
 
         log(`Could not get the registered safe address using the provider.`)
-        throw Error(`Could not get the registered safe address`)
+        throw Error(`Could not get the registered safe address due to ${err}`)
       }
     }
 
@@ -936,7 +937,7 @@ const provider = networkInfo.provider.startsWith('http')
           continue
         }
 
-        log(`Could not get the target (owner) address of the node management module using the provider.`)
+        log(`Could not get the target (owner) address of the node management module using the provider. due to ${err}`)
         throw Error(`Could not get target (owner) address of the node management module`)
       }
     }
@@ -986,6 +987,8 @@ const provider = networkInfo.provider.startsWith('http')
     getChannels: () => channels,
     getToken: () => token,
     getNetworkRegistry: () => networkRegistry,
+    getNodeSafeRegistry: () => nodeSafeRegistry,
+    getNodeManagementModule: () => nodeManagementModule,
     getPrivateKey: () => privateKey,
     getPublicKey: () => publicKey,
     getInfo: () => ({

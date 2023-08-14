@@ -232,9 +232,9 @@ export type HoprOptions = {
     // Base URL to interact with safe transaction service
     safeTransactionServiceProvider?: string,
     // Address of node's safe proxy instance
-    safeAddress: Address,
+    safeAddress?: Address,
     // Address of node's safe-module proxy instance
-    moduleAddress: Address
+    moduleAddress?: Address
   }
 }
 
@@ -352,6 +352,7 @@ class Hopr extends EventEmitter {
       throw new Error('Cannot start node without a funded wallet')
     }
     log('Node has enough to get started, continuing starting payment channels')
+
     verbose('Starting HoprEthereum, which will trigger the indexer')
     await connector.start()
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
@@ -571,6 +572,22 @@ class Hopr extends EventEmitter {
     connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
     for (const announcedNode of recentlyAnnouncedNodes) {
       await this.onPeerAnnouncement(announcedNode)
+    }
+
+    try {
+      // register node-safe pair to NodeSafeRegistry
+      log(`check node-safe registry`)
+      await this.registerSafeByNode(this.options.safeModule.safeAddress)
+      log(`>> should update safe and module address`)
+      // update safe and module address
+      await this.db.set_staking_safe_address(Packet_Address.deserialize(this.options.safeModule.safeAddress.serialize()));
+      log(`>> set staking safe address`)
+      await this.db.set_staking_module_address(Packet_Address.deserialize(this.options.safeModule.moduleAddress.serialize()));
+      log(`>> set staking module address`)
+    } catch (err) {
+      console.error(`Could not register node with safe`)
+      console.error(`Observed error:`, err)
+      process.exit(1)
     }
 
     try {
@@ -1228,6 +1245,26 @@ class Hopr extends EventEmitter {
     log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
 
     this.stopPeriodicCheck = intervalTimer(periodicCheck, () => this.strategy.tickInterval)
+  }
+
+  /**
+   * Register node with safe in HoprNodeSaferegistry if needed
+   * @dev Promise resolves before own announcement appears in the indexer
+   * @returns a Promise that resolves once announce transaction has been published
+   */
+  private async registerSafeByNode(safeAddress: Address): Promise<void> {
+    const nodeAddress = this.getEthereumAddress()
+    const connector = HoprCoreEthereum.getInstance()
+
+    try {
+      log('registering node safe on-chain... ')
+      const registryTxHash = await connector.registerSafeByNode(nodeAddress, safeAddress)
+      log('registering node safe on-chain done in tx %s', registryTxHash)
+    } catch (err) {
+      log('registering node safe on-chain failed')
+      this.maybeEmitFundsEmptyEvent(err)
+      throw new Error(`Failed to register node safe: ${err}`)
+    }
   }
 
   /**

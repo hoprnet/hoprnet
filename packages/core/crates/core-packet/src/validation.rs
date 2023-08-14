@@ -189,6 +189,10 @@ mod tests {
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
             async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
+            async fn get_staking_safe_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn set_staking_safe_address(&mut self, safe_address: &Address) -> core_ethereum_db::errors::Result<()>;
+            async fn get_staking_module_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn set_staking_module_address(&mut self, module_address: &Address) -> core_ethereum_db::errors::Result<()>;
             async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn is_network_registry_enabled(&self) -> core_ethereum_db::errors::Result<bool>;

@@ -164,6 +164,18 @@ pub trait HoprCoreEthereumDbActions {
     /// Subtract balance from the current balance.
     async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()>;
 
+    /// Get the staking safe address
+    async fn get_staking_safe_address(&self) -> Result<Option<Address>>;
+
+    /// Sets the staking safe address
+    async fn set_staking_safe_address(&mut self, safe_address: &Address) -> Result<()>;
+    
+    /// Get the staking module address
+    async fn get_staking_module_address(&self) -> Result<Option<Address>>;
+
+    /// Sets the staking module address
+    async fn set_staking_module_address(&mut self, module_address: &Address) -> Result<()>;
+
     /// Check whether the Network Registry is enabled.
     async fn is_network_registry_enabled(&self) -> Result<bool>;
 

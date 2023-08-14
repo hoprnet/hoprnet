@@ -11,7 +11,8 @@ import {
   create_histogram_with_buckets,
   pickVersion,
   defer,
-  privKeyToPeerId
+  privKeyToPeerId,
+  Address
 } from '@hoprnet/hopr-utils'
 import {
   Health,
@@ -125,6 +126,13 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
       auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
       max_channels: cfg.strategy.max_auto_channels ?? undefined
     })
+  }
+
+  if (cfg.safe_module.safe_address) {
+    options.safeModule.safeAddress = Address.deserialize(cfg.safe_module.safe_address.serialize())
+  }
+  if (cfg.safe_module.module_address) {
+    options.safeModule.moduleAddress = Address.deserialize(cfg.safe_module.module_address.serialize())
   }
 
   return options

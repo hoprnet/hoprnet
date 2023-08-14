@@ -609,6 +609,42 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
+    /// Get the staking safe address
+    async fn get_staking_safe_address(&self) -> Result<Option<Address>> {
+        let key = utils_db::db::Key::new_from_str(STAKING_SAFE_ADDRESS_KEY)?;
+        self.db.get_or_none::<Address>(key).await
+    }
+
+    /// Sets the staking safe address
+    ///
+    /// - `safe_address`: safe address that holds tokens for the node
+    async fn set_staking_safe_address(&mut self, safe_address: &Address) -> Result<()> {
+        let safe_address_key = utils_db::db::Key::new_from_str(STAKING_SAFE_ADDRESS_KEY)?;
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.put(safe_address_key, safe_address);
+
+        self.db.batch(batch_ops, true).await
+    }
+    
+    /// Get the staking module address
+    async fn get_staking_module_address(&self) -> Result<Option<Address>> {
+        let key = utils_db::db::Key::new_from_str(STAKING_MODULE_ADDRESS_KEY)?;
+        self.db.get_or_none::<Address>(key).await
+    }
+
+    /// Sets the staking module address
+    ///
+    /// - `module_address`: module address that stores permissions
+    async fn set_staking_module_address(&mut self, module_address: &Address) -> Result<()> {
+        let module_address_key = utils_db::db::Key::new_from_str(STAKING_MODULE_ADDRESS_KEY)?;
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.put(module_address_key, module_address);
+
+        self.db.batch(batch_ops, true).await
+    }
+
     /// Checks whether network registry is enabled. Default: true
     async fn is_network_registry_enabled(&self) -> Result<bool> {
         let key = utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?;
@@ -1366,6 +1402,40 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.add_hopr_balance(balance, snapshot).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_staking_safe_address(&self) -> Result<Option<Address>, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_staking_safe_address().await)
+            //}
+        }
+        #[wasm_bindgen]
+        pub async fn set_staking_safe_address(&self, safe_address: &Address) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.set_staking_safe_address(safe_address).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_staking_module_address(&self) -> Result<Option<Address>, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_staking_module_address().await)
+            //}
+        }
+        #[wasm_bindgen]
+        pub async fn set_staking_module_address(&self, module_address: &Address) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.set_staking_module_address(module_address).await)
             //}
         }
 

@@ -109,15 +109,18 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public static createInstance(
+  public static async createInstance(
     db: Ethereum_Database,
     publicKey: PublicKey,
     privateKey: Uint8Array,
     options: ChainOptions,
     safeModuleOptions: SafeModuleOptions,
+    deploymentAddresses: DeploymentExtract,
     automaticChainCreation = true
   ) {
     HoprCoreEthereum._instance = new HoprCoreEthereum(db, publicKey, privateKey, options, safeModuleOptions, automaticChainCreation)
+    // Initialize connection to the blockchain
+    await HoprCoreEthereum._instance.initializeChainWrapper(deploymentAddresses)
     return HoprCoreEthereum._instance
   }
 
@@ -184,10 +187,6 @@ export default class HoprCoreEthereum extends EventEmitter {
         
         // indexer starts
         await this.indexer.start(this.chain, this.chain.getGenesisBlock())
-
-        // register node-safe pair to NodeSafeRegistry
-        log(`check node-safe registry`)
-        await this.registerSafeByNode(this.publicKey.to_address(), this.safeModuleOptions.safeAddress)
 
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.publicKey.to_address().to_hex()}`)
@@ -565,17 +564,16 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
   
   public async registerSafeByNode(nodeAddress: Address, safeAddress: Address): Promise<Receipt>  {
+    // log(`====> registerSafeByNode nodeAddress: ${this.publicKey.to_address())} safeAddress  ${this.safeModuleOptions.safeAddress.to_hex()}`)
     log(`====> registerSafeByNode nodeAddress: ${nodeAddress.to_hex()} safeAddress  ${safeAddress.to_hex()}`)
 
     const targetAddress = await this.chain.getModuleTargetAddress()
-    log(`====> registerSafeByNode targetAddress: ${targetAddress.to_hex()}`)
     if (!targetAddress.eq(Address.from_string(safeAddress.to_string()))) {
       // cannot proceed when the safe address is not the target/owner of given module
       throw Error('Safe is not a target of module.')
     }
 
     const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
-    log(`====> registerSafeByNode registeredAddress: ${registeredAddress.to_hex()}`)
 
     if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
       // if the node is not associated with any safe address, register it

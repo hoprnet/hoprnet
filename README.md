@@ -306,6 +306,9 @@ make create-local-identity
 # and passing the created safe and module as argument to 
 # run a test node local (separate terminal)
 make run-local-with-safe
+# or to restart a node and use the same id, safe and module
+# run:
+# make run-local id_path=$(find `pwd` -name ".identity-local*.id" | sort -r | head -n 1)
 
 # fund all your nodes to get started
 make fund-local-all id_dir=`pwd`

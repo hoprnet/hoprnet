@@ -9,7 +9,7 @@ import { KadDHT } from '@libp2p/kad-dht'
 import { Noise } from '@chainsafe/libp2p-noise'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { keysPBM } from '@libp2p/crypto/keys'
-import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
+import { type AddressSorter, Address } from '@libp2p/interfaces/peer-store'
 
 import {
   HoprConnect,
@@ -17,7 +17,7 @@ import {
   type PublicNodesEmitter,
   compareAddressesPublicMode
 } from '@hoprnet/hopr-connect'
-import { PublicKey, debug, isAddressWithPeerId, LevelDb } from '@hoprnet/hopr-utils'
+import { PublicKey, debug, isAddressWithPeerId, LevelDb, Address as Packet_Address } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'
@@ -249,8 +249,23 @@ export async function createHoprNode(
 
   let db = new Database(levelDb, Database_PublicKey.from_peerid_str(peerId.toString()).to_address())
 
+  // if safe address or module address is not provided, replace with values stored in the db
+  log(`options.safeModule.safeAddress: ${options.safeModule.safeAddress}`)
+  log(`options.safeModule.safeAddress: ${options.safeModule.moduleAddress}`)
+  const safeAddress = options.safeModule.safeAddress ?? Packet_Address.deserialize((await db.get_staking_safe_address()).serialize());
+  const moduleAddress = options.safeModule.moduleAddress ?? Packet_Address.deserialize((await db.get_staking_module_address()).serialize());
+  if (!safeAddress || !moduleAddress) {
+    log(`failed to provide safe or module address:`)
+    throw new Error('Hopr Node must be initialized with safe and module address')
+  }
+
   log(`using provider URL: ${options.network.chain.default_provider}`)
-  const chain = HoprCoreEthereum.createInstance(
+
+  // get contract data for the given environment id and pass it on to create chain wrapper
+  const resolvedContractAddresses = getContractData(options.network.id)
+  log(`[DEBUG] resolvedContractAddresses ${options.network.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`)
+  
+  await HoprCoreEthereum.createInstance(
     db,
     PublicKey.from_peerid_str(peerId.toString()),
     keysPBM.PrivateKey.decode(peerId.privateKey as Uint8Array).Data,
@@ -264,17 +279,15 @@ export async function createHoprNode(
     },
     {
       safeTransactionServiceProvider: options.safeModule.safeTransactionServiceProvider,
-      safeAddress: options.safeModule.safeAddress,
-      moduleAddress: options.safeModule.moduleAddress
+      safeAddress,
+      moduleAddress
     },
+    resolvedContractAddresses,
     automaticChainCreation
   )
 
-  // get contract data for the given environment id and pass it on to create chain wrapper
-  const resolvedContractAddresses = getContractData(options.network.id)
-  log(`[DEBUG] resolvedContractAddresses ${options.network.id} ${JSON.stringify(resolvedContractAddresses, null, 2)}`)
-  // Initialize connection to the blockchain
-  await chain.initializeChainWrapper(resolvedContractAddresses)
+  // // Initialize connection to the blockchain
+  // await chain.initializeChainWrapper(resolvedContractAddresses)
 
   return new Hopr(peerId, db, options)
 }
