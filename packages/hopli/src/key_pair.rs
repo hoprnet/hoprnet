@@ -1,7 +1,7 @@
 use crate::utils::HelperErrors;
 use hoprd_keypair::key_pair::HoprKeys;
 use log::warn;
-use std::{fs, path::PathBuf};
+use std::{fs, path::{PathBuf, Path}};
 
 /// Decrypt identity files and returns an vec of PeerIds and Ethereum Addresses
 ///
@@ -62,7 +62,11 @@ pub fn create_identity(dir_name: &str, password: &str, maybe_name: &Option<Strin
         None => format!("{dir_name}/{}.id", { keys.id().to_string() }),
     };
 
-    keys.write_eth_keystore(&file_path, password, false)?;
+    if Path::new(&file_path).exists() {
+        return Err(HelperErrors::IdentityFileExists(file_path));
+    } else {
+        keys.write_eth_keystore(&file_path, password, false)?;
+    }
 
     Ok(keys)
 }
