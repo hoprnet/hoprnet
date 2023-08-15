@@ -38,21 +38,23 @@
     },
     "rotsee": {
       "chain": "xdai",
-      "environment_type": "development",
+      "environment_type": "staging",
       "version_range": "*",
-      "indexer_start_block_number": 26356392,
+      "indexer_start_block_number": 29472592,
       "addresses": {
-        "channels": "0xB20ee6e0b714e531CabF2C29fbA147f4e5905B7b",
-        "module_implementation": "0x1cf6329673e8A2F009b00883118b3d15E35be529",
-        "network_registry": "0x625D27594DF4564A52a0ea5667b0D0450a6f6685",
-        "network_registry_proxy": "0xaefC99476f9F04326a748B7E32364B10B8fF4158",
-        "node_safe_registry": "0xf5FD9e286662830672B720c21A7Ddc67a00da77a",
-        "node_stake_v2_factory": "0x060Cb76C6541bF28f94088e658E4167966E37eF9",
-        "token": "0xf1aDf07D0d4e1beFdDe79066771d057337e55c08",
-        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
-        "announcements": "0x0000000000000000000000000000000000000000"
+        "channels": "0x4c3bb6470b72A749Db1bB394c024A92AB60a793e",
+        "module_implementation": "0xb3B09FA6504F9d59F1a9740F68f3E904ca857A82",
+        "network_registry": "0x2f3243adC9805F6dd3E01C9E9ED31675A5B16902",
+        "network_registry_proxy": "0x6af01f9B2eE06349a93032e9625D739FD8C199B1",
+        "node_safe_registry": "0x3E7c4720934ff6A9FE122Cb761f36a11E9b848D9",
+        "node_stake_v2_factory": "0x15b362617891169F7e448d88322D572F205E3c78",
+        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+        "ticket_price_oracle": "0xD47a3FAC305c2e272AD2344C1B718B2F70f81955",
+        "announcements": "0xD2C191dd9757D9f19f9815751a1A29B9933FfA63"
       },
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     },
     "debug-staging": {
       "chain": "xdai",
@@ -70,7 +72,9 @@
         "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
         "announcements": "0x0000000000000000000000000000000000000000"
       },
-      "tags": ["development"]
+      "tags": [
+        "development"
+      ]
     },
     "tuttlingen": {
       "environment_type": "production",
@@ -196,7 +200,9 @@
         "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
         "announcements": "0x0000000000000000000000000000000000000000"
       },
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     },
     "monte_rosa": {
       "chain": "xdai",
@@ -214,7 +220,9 @@
         "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
         "announcements": "0x0000000000000000000000000000000000000000"
       },
-      "tags": ["etherscan"]
+      "tags": [
+        "etherscan"
+      ]
     }
   },
   "chains": {
