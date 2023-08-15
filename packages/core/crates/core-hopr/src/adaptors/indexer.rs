@@ -93,7 +93,7 @@ impl WasmIndexerInteractions {
 
         spawn_local(async move {
             let mut emitter = emitter; 
-            let mut db = db;
+            let db = db;
 
             while let Some(value) = to_process_rx.next().await {
                 let event = match value {

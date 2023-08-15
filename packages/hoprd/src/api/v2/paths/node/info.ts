@@ -20,7 +20,7 @@ export const getInfo = async (node: Hopr) => {
       hoprChannels: hoprChannelsAddress,
       hoprNetworkRegistry: hoprNetworkRegistryAddress,
       isEligible: await node.isAllowedAccessToNetwork(node.getId()),
-      connectivityStatus: health_to_string(node.getConnectivityHealth()),
+      connectivityStatus: health_to_string(await node.getConnectivityHealth()),
       channelClosurePeriod: Math.ceil(channelClosureSecs / 60)
     }
   } catch (error) {

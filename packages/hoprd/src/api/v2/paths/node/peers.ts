@@ -3,7 +3,7 @@ import type { Multiaddr } from '@multiformats/multiaddr'
 import type Hopr from '@hoprnet/hopr-core'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
-import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
+import { PEER_METADATA_PROTOCOL_VERSION, PeerStatus } from '@hoprnet/hopr-core'
 
 export type PeerInfo = {
   peerId: string
@@ -25,7 +25,7 @@ export type PeerInfo = {
  * @param multiaddr
  * @returns PeerInfo
  */
-function toPeerInfoFormat(info: ReturnType<Hopr['getConnectionInfo']>, multiaddr?: Multiaddr): PeerInfo {
+function toPeerInfoFormat(info: PeerStatus, multiaddr?: Multiaddr): PeerInfo {
   return {
     peerId: info.peer_id(),
     multiAddr: multiaddr ? multiaddr.toString() : undefined,
@@ -60,10 +60,11 @@ export async function getPeers(
   try {
     const announcedMap = new Map<string, PeerInfo>()
 
-    for await (const addr of node.getAddressesAnnouncedOnChain()) {
+    let addresses_on_chain = await node.getAddressesAnnouncedOnChain()
+    for await (const addr of addresses_on_chain) {
       const peerId = peerIdFromString(addr.getPeerId())
       try {
-        const info = node.getConnectionInfo(peerId)
+        const info = await node.getConnectionInfo(peerId)
         // exclude if quality is lesser than the one wanted
         if (info === undefined || info.quality < quality) {
           continue
@@ -72,27 +73,27 @@ export async function getPeers(
       } catch {}
     }
 
-    const connected = [
-      ...(function* () {
-        for (const peerId of node.getConnectedPeers()) {
-          const peerIdStr = peerId.toString()
+    let connected_peers = await node.getConnectedPeers();
 
-          // already exists in announced, we use this because it contains multiaddr already
-          if (announcedMap.has(peerIdStr)) {
-            yield announcedMap.get(peerIdStr)
-          } else {
-            try {
-              const info = node.getConnectionInfo(peerId)
-              // exclude if quality is less than the one wanted
-              if (info === undefined || info.quality < quality) {
-                continue
-              }
-              yield toPeerInfoFormat(info)
-            } catch {}
-          }
+    const connected = []
+
+      for (const peerId of connected_peers) {
+        const peerIdStr = peerId.toString()
+
+        // already exists in announced, we use this because it contains multiaddr already
+        if (announcedMap.has(peerIdStr)) {
+          connected.push(announcedMap.get(peerIdStr)) 
+        } else {
+          try {
+            const info = await node.getConnectionInfo(peerId)
+            // exclude if quality is less than the one wanted
+            if (info === undefined || info.quality < quality) {
+              continue
+            }
+            connected.push(toPeerInfoFormat(info))
+          } catch {}
         }
-      })()
-    ]
+      }
 
     return {
       connected,
