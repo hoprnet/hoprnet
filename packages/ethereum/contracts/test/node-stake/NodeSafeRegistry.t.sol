@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "../../src/node-stake/NodeSafeRegistry.sol";
-import "../utils/Precompiles.sol";
-import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
-import "forge-std/Test.sol";
-import "forge-std/StdCheats.sol";
+import {HoprNodeSafeRegistry,HoprNodeSafeRegistryEvents} from "../../src/node-stake/NodeSafeRegistry.sol";
+import {PrecompileUtils} from"../utils/Precompiles.sol";
+import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import {Test} from "forge-std/Test.sol";
+import {stdStorage, StdStorage} from "forge-std/StdCheats.sol";
 
-contract HoprNodeSafeRegistryTest is Test {
+contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     // to alter the storage
     using stdStorage for StdStorage;
 
@@ -15,12 +15,6 @@ contract HoprNodeSafeRegistryTest is Test {
     HoprNodeSafeRegistry public nodeSafeRegistry;
     address private constant SENTINEL_MODULES = address(0x1);
     uint256 private constant pageSize = 100;
-
-    /**
-     * Manually import events and errors
-     */
-    event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
-    event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
 
     function setUp() public {
         safe = vm.addr(101); // make address(101) a caller
@@ -84,7 +78,7 @@ contract HoprNodeSafeRegistryTest is Test {
             bytes32(abi.encode(address(1)))
         );
         vm.prank(nodeAddress);
-        vm.expectRevert(NodeHasSafe.selector);
+        vm.expectRevert(HoprNodeSafeRegistry.NodeHasSafe.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
         vm.clearMockedCalls();
     }
@@ -104,7 +98,7 @@ contract HoprNodeSafeRegistryTest is Test {
         //     bytes32(abi.encode(address(1)))
         // );
         vm.prank(nodeAddress);
-        vm.expectRevert(SafeAddressZero.selector);
+        vm.expectRevert(HoprNodeSafeRegistry.SafeAddressZero.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
         vm.clearMockedCalls();
     }
@@ -124,7 +118,7 @@ contract HoprNodeSafeRegistryTest is Test {
         //     bytes32(abi.encode(address(1)))
         // );
         vm.prank(nodeAddress);
-        vm.expectRevert(NodeAddressZero.selector);
+        vm.expectRevert(HoprNodeSafeRegistry.NodeAddressZero.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
         vm.clearMockedCalls();
     }
@@ -146,7 +140,7 @@ contract HoprNodeSafeRegistryTest is Test {
             bytes32(abi.encode(address(0)))
         );
         vm.prank(nodeAddress);
-        vm.expectRevert(NotSafeOwnerNorNode.selector);
+        vm.expectRevert(HoprNodeSafeRegistry.NotSafeOwnerNorNode.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
         vm.clearMockedCalls();
     }
@@ -189,7 +183,7 @@ contract HoprNodeSafeRegistryTest is Test {
         );
 
         vm.prank(safeAddress);
-        vm.expectRevert(NotValidSafe.selector);
+        vm.expectRevert(HoprNodeSafeRegistry.NotValidSafe.selector);
         nodeSafeRegistry.deregisterNodeBySafe(nodeAddress);
 
         vm.clearMockedCalls();

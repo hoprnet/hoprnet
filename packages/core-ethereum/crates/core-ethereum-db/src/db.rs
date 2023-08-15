@@ -1,9 +1,5 @@
 use async_trait::async_trait;
-use core_crypto::types::OffchainPublicKey;
-use core_crypto::{
-    iterated_hash::{Intermediate, IteratedHash},
-    types::{HalfKeyChallenge, Hash},
-};
+use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
@@ -23,13 +19,6 @@ use utils_types::{
 
 use crate::errors::Result;
 use crate::traits::HoprCoreEthereumDbActions;
-
-fn to_commitment_key(channel: &Hash, iteration: usize) -> Result<utils_db::db::Key> {
-    let mut channel = serialize_to_bytes(channel)?;
-    channel.extend_from_slice(&iteration.to_be_bytes());
-
-    utils_db::db::Key::new_bytes_with_prefix(&channel, COMMITMENT_PREFIX)
-}
 
 fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Result<utils_db::db::Key> {
     let mut ack_key = serialize_to_bytes(challenge)?;
@@ -320,35 +309,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         }
 
         self.db.batch(batch_ops, true).await
-    }
-
-    async fn store_hash_intermediaries(&mut self, channel: &Hash, iterated_hash: &IteratedHash) -> Result<()> {
-        let mut batch_ops = utils_db::db::Batch::new();
-
-        for intermediate in iterated_hash.intermediates.iter() {
-            batch_ops.put(to_commitment_key(channel, intermediate.iteration)?, intermediate);
-        }
-
-        self.db.batch(batch_ops, true).await
-    }
-
-    async fn get_commitment(&self, channel_id: &Hash, iteration: usize) -> Result<Option<Hash>> {
-        Ok(self
-            .db
-            .get_or_none::<Intermediate>(to_commitment_key(channel_id, iteration)?)
-            .await?
-            .map(|opt| Hash::new(&opt.intermediate)))
-    }
-
-    async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>> {
-        let key = utils_db::db::Key::new_with_prefix(channel, CURRENT_COMMITMENT_PREFIX)?;
-        self.db.get_or_none::<Hash>(key).await
-    }
-
-    async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> Result<()> {
-        let key = utils_db::db::Key::new_with_prefix(channel, CURRENT_COMMITMENT_PREFIX)?;
-        let _ = self.db.set(key, commitment).await?;
-        Ok(())
     }
 
     async fn get_latest_block_number(&self) -> Result<u32> {
@@ -694,53 +654,40 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    /// Adds an additional chain address to an Ethereum account that has staked tokens.
-    ///
-    /// - `address`: the additional address to add
-    /// - `stake_account`: the account that has staked tokens
-    /// - `snapshot`: the latest chain snapshot
-    async fn add_to_network_registry(
+    async fn is_allowed_to_access_network(&self, node: &Address) -> Result<bool> {
+        let key = utils_db::db::Key::new_with_prefix(node, NETWORK_REGISTRY_ALLOWED_PREFIX)?;
+
+        Ok(self.db.contains(key).await)
+    }
+
+    async fn set_allowed_to_access_network(
         &mut self,
-        address: &Address,
-        stake_account: &Address,
+        node: &Address,
+        allowed: bool,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        let mut addresses = self
-            .find_hopr_node_using_account_in_network_registry(stake_account)
-            .await?;
-
-        for addr in addresses.iter() {
-            if address == addr {
-                let _ = self
-                    .db
-                    .set(
-                        utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-                        snapshot,
-                    )
-                    .await?;
-                return Ok(());
-            }
-        }
-
-        addresses.push(*address);
+        let key = utils_db::db::Key::new_with_prefix(node, NETWORK_REGISTRY_ALLOWED_PREFIX)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
-        // node chain address to stake address (N->1)
-        batch_ops.put(
-            utils_db::db::Key::new_with_prefix(address, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?,
-            stake_account,
-        );
-        // stake address to node chain address (1->M)
-        batch_ops.put(
-            utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?,
-            addresses,
-        );
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            snapshot,
+            &snapshot,
         );
 
+        if allowed {
+            println!("putting");
+            batch_ops.put(key, ());
+        } else {
+            batch_ops.del(key)
+        }
+
         self.db.batch(batch_ops, true).await
+    }
+
+    async fn get_from_network_registry(&self, stake_account: &Address) -> Result<Vec<Address>> {
+        let key = utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?;
+
+        Ok(self.db.get_or_none::<Vec<Address>>(key).await?.unwrap_or(vec![]))
     }
 
     /// Removes a node from the network registry
@@ -748,24 +695,31 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     /// - `address`: the address to remove
     /// - `stake_account`: the stake account from which the address should be removed
     /// - `snapshot`: latest chain snapshot
-    async fn remove_from_network_registry(
+    async fn add_to_network_registry(
         &mut self,
-        node_address: &Address,
         stake_account: &Address,
+        node_address: &Address,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        let registered_nodes = self
-            .find_hopr_node_using_account_in_network_registry(stake_account)
-            .await?
-            .into_iter()
-            .filter(|addr| !addr.eq(node_address))
-            .collect::<Vec<_>>();
+        let mut registered_nodes = self.get_from_network_registry(stake_account).await?;
+
+        let already_included = registered_nodes.contains(node_address);
+
+        if !already_included {
+            registered_nodes.push(node_address.to_owned());
+        }
 
         let mut batch_ops = utils_db::db::Batch::new();
-        batch_ops.del(utils_db::db::Key::new_with_prefix(
-            node_address,
-            NETWORK_REGISTRY_HOPR_NODE_PREFIX,
-        )?);
+
+        let eligible = self.is_eligible(stake_account).await?;
+
+        if eligible {
+            batch_ops.put(
+                utils_db::db::Key::new_with_prefix(node_address, NETWORK_REGISTRY_ALLOWED_PREFIX)?,
+                (),
+            )
+        }
+
         batch_ops.put(
             utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?,
             &registered_nodes,
@@ -778,24 +732,35 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    /// Gets the stake account that registered to this node
-    ///
-    /// - `address`: the node's chain address
-    async fn get_account_from_network_registry(&self, address: &Address) -> Result<Option<Address>> {
-        let key = utils_db::db::Key::new_with_prefix(address, NETWORK_REGISTRY_HOPR_NODE_PREFIX)?;
+    async fn remove_from_network_registry(
+        &mut self,
+        stake_account: &Address,
+        node_address: &Address,
+        snapshot: &Snapshot,
+    ) -> Result<()> {
+        let registered_nodes: Vec<Address> = self
+            .get_from_network_registry(stake_account)
+            .await?
+            .into_iter()
+            .filter(|registered_node| registered_node.ne(&node_address))
+            .collect();
 
-        self.db.get_or_none::<Address>(key).await
-    }
+        let mut batch_ops = utils_db::db::Batch::new();
 
-    /// Gets the registered accounts associated to this stake account
-    ///
-    /// - `stake_account`: the account which staked tokens
-    async fn find_hopr_node_using_account_in_network_registry(&self, stake_account: &Address) -> Result<Vec<Address>> {
-        // NOTE: behavioral change, this method does not panic, when no results are found,
-        // its returns an empty Vec instead
+        batch_ops.del(utils_db::db::Key::new_with_prefix(
+            node_address,
+            NETWORK_REGISTRY_ALLOWED_PREFIX,
+        )?);
+        batch_ops.put(
+            utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?,
+            &registered_nodes,
+        );
+        batch_ops.put(
+            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
+            snapshot,
+        );
 
-        let key = utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?;
-        Ok(self.db.get_or_none::<Vec<Address>>(key).await?.unwrap_or(vec![]))
+        self.db.batch(batch_ops, true).await
     }
 
     /// Checks if an stake account is eligible to register nodes
@@ -804,7 +769,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn is_eligible(&self, stake_account: &Address) -> Result<bool> {
         let key = utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
 
-        Ok(self.db.get_or_none::<bool>(key).await?.unwrap_or(false))
+        Ok(self.db.contains(key).await)
     }
 
     /// Sets the eligibility status of an account
@@ -812,14 +777,35 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     /// - `stake_account`: the account whose eligibility to be set
     /// - `eligible`: true if `stake_account` is now eligible
     /// - `snapshot`: latest chain snapshot
-    async fn set_eligible(&mut self, stake_account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()> {
+    async fn set_eligible(
+        &mut self,
+        stake_account: &Address,
+        eligible: bool,
+        snapshot: &Snapshot,
+    ) -> Result<Vec<Address>> {
         let key = utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
 
         let mut batch_ops = utils_db::db::Batch::new();
 
+        let registered_nodes = self.get_from_network_registry(stake_account).await?;
+
         if eligible {
-            batch_ops.put(key, true);
+            for registered_node in registered_nodes.iter() {
+                batch_ops.put(
+                    utils_db::db::Key::new_with_prefix(registered_node, NETWORK_REGISTRY_ALLOWED_PREFIX)?,
+                    (),
+                )
+            }
+
+            batch_ops.put(key, ());
         } else {
+            for registered_node in registered_nodes.iter() {
+                batch_ops.del(utils_db::db::Key::new_with_prefix(
+                    registered_node,
+                    NETWORK_REGISTRY_ALLOWED_PREFIX,
+                )?)
+            }
+
             batch_ops.del(key);
         }
 
@@ -827,111 +813,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
             snapshot,
         );
-        self.db.batch(batch_ops, true).await
-    }
+        self.db.batch(batch_ops, true).await?;
 
-    /// Associate node address to a safe address
-    ///
-    /// - `node_address`: node ethereum address
-    /// - `safe_address`: safe address that holds tokens for node
-    /// - `snapshot`: the latest chain snapshot
-    async fn add_to_node_safe_registry(
-        &mut self,
-        node_address: &Address,
-        safe_address: &Address,
-        snapshot: &Snapshot,
-    ) -> Result<()> {
-        let mut addresses = self
-            .find_hopr_node_using_safe_in_node_safe_registry(&safe_address)
-            .await?;
-
-        for addr in addresses.iter() {
-            if node_address == addr {
-                let _ = self
-                    .db
-                    .set(
-                        utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-                        snapshot,
-                    )
-                    .await?;
-                return Ok(());
-            }
-        }
-
-        addresses.push(node_address.clone());
-
-        let mut batch_ops = utils_db::db::Batch::new();
-        // node chain address to safe address (N->1)
-        batch_ops.put(
-            utils_db::db::Key::new_with_prefix(node_address, NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX)?,
-            safe_address,
-        );
-        // safe address to node chain address (1->M)
-        batch_ops.put(
-            utils_db::db::Key::new_with_prefix(safe_address, NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX)?,
-            addresses,
-        );
-        batch_ops.put(
-            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            snapshot,
-        );
-
-        self.db.batch(batch_ops, true).await
-    }
-
-    /// Removes a node from the node safe registry
-    ///
-    /// - `node_address`: the address to remove
-    /// - `safe_address`: the safe account from which the node_address should be removed
-    /// - `snapshot`: latest chain snapshot
-    async fn remove_from_node_safe_registry(
-        &mut self,
-        node_address: &Address,
-        safe_address: &Address,
-        snapshot: &Snapshot,
-    ) -> Result<()> {
-        let registered_nodes = self
-            .find_hopr_node_using_safe_in_node_safe_registry(safe_address)
-            .await?
-            .into_iter()
-            .filter(|addr| !addr.eq(node_address))
-            .collect::<Vec<_>>();
-
-        let mut batch_ops = utils_db::db::Batch::new();
-        batch_ops.del(utils_db::db::Key::new_with_prefix(
-            node_address,
-            NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX,
-        )?);
-        batch_ops.put(
-            utils_db::db::Key::new_with_prefix(safe_address, NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX)?,
-            &registered_nodes,
-        );
-        batch_ops.put(
-            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
-        );
-
-        self.db.batch(batch_ops, true).await
-    }
-
-    /// Gets the safe address that is associated with this node
-    ///
-    /// - `node_address`: the node's chain address
-    async fn get_safe_from_node_safe_registry(&self, node_address: &Address) -> Result<Option<Address>> {
-        let key = utils_db::db::Key::new_with_prefix(node_address, NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX)?;
-
-        self.db.get_or_none::<Address>(key).await
-    }
-
-    /// Gets the registered node addresses associated to the safe address
-    ///
-    /// - `safe_address`: the safe address
-    async fn find_hopr_node_using_safe_in_node_safe_registry(&self, safe_address: &Address) -> Result<Vec<Address>> {
-        // NOTE: behavioral change, this method does not panic, when no results are found,
-        // its returns an empty Vec instead
-
-        let key = utils_db::db::Key::new_with_prefix(safe_address, NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX)?;
-        Ok(self.db.get_or_none::<Vec<Address>>(key).await?.unwrap_or(vec![]))
+        Ok(registered_nodes)
     }
 
     async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()> {
@@ -939,6 +823,37 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
         let _ = self.db.set(key, &token).await?;
         Ok(())
+    }
+
+    async fn is_mfa_protected(&self) -> Result<Option<Address>> {
+        let key = utils_db::db::Key::new_from_str(MFA_MODULE_PREFIX)?;
+        self.db.get_or_none::<Address>(key).await
+    }
+
+    async fn set_mfa_protected_and_update_snapshot(
+        &mut self,
+        maybe_mfa_address: Option<Address>,
+        snapshot: &Snapshot,
+    ) -> Result<()> {
+        let mfa_key = utils_db::db::Key::new_from_str(MFA_MODULE_PREFIX)?;
+        let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
+
+        match maybe_mfa_address {
+            Some(mfa_address) => {
+                let mut batch_ops = utils_db::db::Batch::new();
+                batch_ops.put(mfa_key, mfa_address);
+                batch_ops.put(snapshot_key, snapshot);
+
+                self.db.batch(batch_ops, true).await
+            }
+            None => {
+                let mut batch_ops = utils_db::db::Batch::new();
+                batch_ops.del(mfa_key);
+                batch_ops.put(snapshot_key, snapshot);
+
+                self.db.batch(batch_ops, true).await
+            }
+        }
     }
 
     async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>> {
@@ -959,11 +874,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 pub mod wasm {
     use super::{CoreEthereumDb, HoprCoreEthereumDbActions, DB};
     use async_lock::RwLock;
-    use core_crypto::iterated_hash::IteratedHash;
     use core_crypto::types::{Hash, OffchainPublicKey};
-    use core_types::account::AccountEntry;
-    use core_types::acknowledgement::AcknowledgedTicket;
-    use core_types::channels::{ChannelEntry, Ticket};
+    use core_types::{
+        account::AccountEntry,
+        acknowledgement::AcknowledgedTicket,
+        channels::{ChannelEntry, Ticket},
+    };
     use js_sys::Uint8Array;
     use std::sync::Arc;
     use utils_db::leveldb;
@@ -1095,43 +1011,6 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn store_hash_intermediaries(&self, channel: &Hash, iterated_hash: JsValue) -> Result<(), JsValue> {
-            let iterated: IteratedHash = utils_misc::ok_or_jserr!(serde_wasm_bindgen::from_value(iterated_hash))?;
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.store_hash_intermediaries(channel, &iterated).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_commitment(channel, iteration).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_current_commitment(channel).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn set_current_commitment(&self, channel: &Hash, commitment: &Hash) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_current_commitment(channel, commitment).await)
-            //}
-        }
-
-        #[wasm_bindgen]
         pub async fn get_latest_block_number(&self) -> Result<u32, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
@@ -1185,38 +1064,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn update_channel_and_snapshot(
-            &self,
-            channel_id: &Hash,
-            channel: &ChannelEntry,
-            snapshot: &Snapshot,
-        ) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.update_channel_and_snapshot(channel_id, channel, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
         pub async fn get_account(&self, address: &Address) -> Result<Option<AccountEntry>, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_account(address).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn update_account_and_snapshot(
-            &self,
-            account: &AccountEntry,
-            snapshot: &Snapshot,
-        ) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.update_account_and_snapshot(account, snapshot).await)
             //}
         }
 
@@ -1457,11 +1309,19 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn add_hopr_balance(&self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
+        pub async fn get_staking_module_address(&self) -> Result<Option<Address>, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_staking_module_address().await)
+            //}
+        }
+        #[wasm_bindgen]
+        pub async fn set_staking_module_address(&self, module_address: &Address) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.add_hopr_balance(balance, snapshot).await)
+            utils_misc::ok_or_jserr!(db.set_staking_module_address(module_address).await)
             //}
         }
 
@@ -1483,184 +1343,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_staking_module_address(&self) -> Result<Option<Address>, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_staking_module_address().await)
-            //}
-        }
-        #[wasm_bindgen]
-        pub async fn set_staking_module_address(&self, module_address: &Address) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_staking_module_address(module_address).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn sub_hopr_balance(&self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.sub_hopr_balance(balance, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
         pub async fn check_and_set_packet_tag(&self, tag: &Uint8Array) -> Result<bool, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.check_and_set_packet_tag(&tag.to_vec()).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn is_network_registry_enabled(&self) -> Result<bool, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.is_network_registry_enabled().await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn set_network_registry(&self, enabled: bool, snapshot: &Snapshot) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_network_registry(enabled, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn add_to_network_registry(
-            &self,
-            address: &Address,
-            account: &Address,
-            snapshot: &Snapshot,
-        ) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.add_to_network_registry(address, account, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn remove_from_network_registry(
-            &self,
-            address: &Address,
-            account: &Address,
-            snapshot: &Snapshot,
-        ) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.remove_from_network_registry(address, account, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_account_from_network_registry(&self, address: &Address) -> Result<Option<Address>, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_account_from_network_registry(address).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn find_hopr_node_using_account_in_network_registry(
-            &self,
-            account: &Address,
-        ) -> Result<WasmVecAddress, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.find_hopr_node_using_account_in_network_registry(account).await)
-                .map(WasmVecAddress::from)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn add_to_node_safe_registry(
-            &self,
-            node_address: &Address,
-            safe_address: &Address,
-            snapshot: &Snapshot,
-        ) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.add_to_node_safe_registry(node_address, safe_address, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn remove_from_node_safe_registry(
-            &self,
-            node_address: &Address,
-            safe_address: &Address,
-            snapshot: &Snapshot,
-        ) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(
-                db.remove_from_node_safe_registry(node_address, safe_address, snapshot)
-                    .await
-            )
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_safe_from_node_safe_registry(
-            &self,
-            node_address: &Address,
-        ) -> Result<Option<Address>, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_safe_from_node_safe_registry(node_address).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn find_hopr_node_using_safe_in_node_safe_registry(
-            &self,
-            safe_address: &Address,
-        ) -> Result<WasmVecAddress, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.find_hopr_node_using_safe_in_node_safe_registry(safe_address).await)
-                .map(WasmVecAddress::from)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn is_eligible(&self, account: &Address) -> Result<bool, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.is_eligible(account).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn set_eligible(
-            &self,
-            account: &Address,
-            eligible: bool,
-            snapshot: &Snapshot,
-        ) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_eligible(account, eligible, snapshot).await)
             //}
         }
 
@@ -1758,7 +1445,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_network_registry_workflow() {
+    async fn test_set_network_registry() {
         let level_db = Arc::new(Mutex::new(
             rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
         ));
@@ -1766,42 +1453,112 @@ mod tests {
         let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
-        assert!(db.set_network_registry(true, &Snapshot::default()).await.is_ok());
-        let test_stake_address = Address::from_str("0xe3386e9810582f596562d3fbd8afcad0fb698169").unwrap();
 
-        assert_eq!(db.is_eligible(&test_stake_address).await, Ok(false));
+        db.set_network_registry(false, &Snapshot::default()).await;
+
+        assert_eq!(db.is_network_registry_enabled().await, Ok(false));
+    }
+
+    #[async_std::test]
+    async fn test_allowed_to_access_network() {
+        let level_db = Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
+        ));
+
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+
+        let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
+
+        assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), false);
+
+        db.set_allowed_to_access_network(&test_address, true, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), true);
+    }
+
+    #[async_std::test]
+    async fn test_add_to_network_registry() {
+        let level_db = Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
+        ));
+
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+
+        let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
+        let test_stake_account = Address::from_str("0xf2a867525fc8a16055d0dea371f0360288795c61").unwrap();
+
+        db.add_to_network_registry(&test_stake_account, &test_address, &Snapshot::default())
+            .await
+            .unwrap();
 
         assert_eq!(
-            db.find_hopr_node_using_account_in_network_registry(&test_stake_address)
-                .await
-                .unwrap(),
-            vec![]
+            db.get_from_network_registry(&test_stake_account).await.unwrap(),
+            vec![test_address]
         );
 
-        let test_chain_address = Address::from_str("0x7b6d32830bafb0212c092d33290d4cd2344b493a").unwrap();
+        assert!(!db.is_allowed_to_access_network(&test_address).await.unwrap());
 
-        assert!(db
-            .set_eligible(&test_stake_address, true, &Snapshot::default())
+        db.set_eligible(&test_stake_account, true, &Snapshot::default())
             .await
-            .is_ok());
+            .unwrap();
 
-        assert_eq!(db.is_eligible(&test_stake_address).await, Ok(true));
-
-        assert!(db
-            .add_to_network_registry(&test_chain_address, &test_stake_address, &Snapshot::default())
+        db.add_to_network_registry(&test_stake_account, &test_address, &Snapshot::default())
             .await
-            .is_ok());
+            .unwrap();
 
         assert_eq!(
-            db.find_hopr_node_using_account_in_network_registry(&test_stake_address)
-                .await,
-            Ok(vec![test_chain_address])
+            db.get_from_network_registry(&test_stake_account).await.unwrap(),
+            vec![test_address]
         );
 
+        assert!(db.is_allowed_to_access_network(&test_address).await.unwrap());
+    }
+
+    #[async_std::test]
+    async fn test_remove_from_network_registry() {
+        let level_db = Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
+        ));
+
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+
+        let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
+        let test_stake_account = Address::from_str("0xf2a867525fc8a16055d0dea371f0360288795c61").unwrap();
+
+        db.add_to_network_registry(&test_stake_account, &test_address, &Snapshot::default())
+            .await
+            .unwrap();
+
         assert_eq!(
-            db.get_account_from_network_registry(&test_chain_address).await,
-            Ok(Some(test_stake_address))
-        )
+            db.get_from_network_registry(&test_stake_account).await.unwrap(),
+            vec![test_address]
+        );
+
+        db.remove_from_network_registry(&test_stake_account, &test_address, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(db.get_from_network_registry(&test_stake_account).await.unwrap(), vec![]);
+
+        assert!(!db.is_allowed_to_access_network(&test_address).await.unwrap());
+
+        db.add_to_network_registry(&test_stake_account, &test_address, &Snapshot::default())
+            .await
+            .unwrap();
+
+        db.set_eligible(&test_stake_account, true, &Snapshot::default())
+            .await
+            .unwrap();
+
+        db.remove_from_network_registry(&test_stake_account, &test_address, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(db.get_from_network_registry(&test_stake_account).await.unwrap(), vec![]);
+
+        assert!(!db.is_allowed_to_access_network(&test_address).await.unwrap());
     }
 
     #[async_std::test]
@@ -1829,5 +1586,21 @@ mod tests {
 
         let nonexistent = db.retrieve_authorization(token_id.to_string()).await.unwrap();
         assert!(nonexistent.is_none(), "token should be removed from the db");
+    }
+
+    #[async_std::test]
+    async fn test_set_mfa() {
+        let level_db = Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
+        ));
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+
+        let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
+
+        db.set_mfa_protected_and_update_snapshot(Some(test_address), &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(db.is_mfa_protected().await.unwrap(), Some(test_address));
     }
 }

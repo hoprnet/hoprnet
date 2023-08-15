@@ -2,10 +2,7 @@ use crate::errors::Result;
 use async_trait::async_trait;
 
 use core_crypto::types::OffchainPublicKey;
-use core_crypto::{
-    iterated_hash::IteratedHash,
-    types::{HalfKeyChallenge, Hash},
-};
+use core_crypto::types::{HalfKeyChallenge, Hash};
 use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
@@ -82,18 +79,6 @@ pub trait HoprCoreEthereumDbActions {
     // core-ethereum only part
     /// Delete acknowledged tickets belonging to a channel
     async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> Result<()>;
-
-    /// Store intermediary hash values.
-    async fn store_hash_intermediaries(&mut self, channel: &Hash, intermediates: &IteratedHash) -> Result<()>;
-
-    /// Get the value of the commitment for channel with iteration.
-    async fn get_commitment(&self, channel: &Hash, iteration: usize) -> Result<Option<Hash>>;
-
-    /// Get the value of the current commitment hash for a specific channel.
-    async fn get_current_commitment(&self, channel: &Hash) -> Result<Option<Hash>>;
-
-    /// Set the value of the current commitment for a specific channel.
-    async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> Result<()>;
 
     /// Get the value of the lastest block number.
     async fn get_latest_block_number(&self) -> Result<u32>;
@@ -191,58 +176,50 @@ pub trait HoprCoreEthereumDbActions {
     /// Check whether the Network Registry is enabled.
     async fn is_network_registry_enabled(&self) -> Result<bool>;
 
-    /// Set whether the Network Registry is enabled.
+    /// Enable or disable network registry
     async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> Result<()>;
 
-    /// Add Hopr public key to an ETH address.
+    /// Check whether node is allowed to participate in the network
+    async fn is_allowed_to_access_network(&self, node: &Address) -> Result<bool>;
+
+    /// Enable or disable access to network
+    async fn set_allowed_to_access_network(&mut self, node: &Address, allowed: bool, snapshot: &Snapshot)
+        -> Result<()>;
+
+    async fn get_from_network_registry(&self, stake_account: &Address) -> Result<Vec<Address>>;
+
     async fn add_to_network_registry(
         &mut self,
-        address: &Address,
-        account: &Address,
+        stake_account: &Address,
+        node_address: &Address,
         snapshot: &Snapshot,
     ) -> Result<()>;
 
-    /// Unlink Hopr public key to an ETH address by removing the entry.
     async fn remove_from_network_registry(
         &mut self,
+        stake_account: &Address,
         node_address: &Address,
-        account: &Address,
         snapshot: &Snapshot,
     ) -> Result<()>;
-
-    /// Get address associated with the public key.
-    async fn get_account_from_network_registry(&self, public_key: &Address) -> Result<Option<Address>>;
-
-    /// Find HOPR node based on its address.
-    async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> Result<Vec<Address>>;
-
     /// Check if address as eligible to be operating in the network.
     async fn is_eligible(&self, account: &Address) -> Result<bool>;
 
     /// Set address as eligible to be operating in the network.
-    async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<()>;
+    /// returns affected node addresses
+    async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> Result<Vec<Address>>;
 
-    /// Add Hopr node ETH address to its associated safe address.
-    async fn add_to_node_safe_registry(
+    /// Check if account is protected by a MFA module (e.g. Gnosis Safe)
+    /// returns MFA module address
+    async fn is_mfa_protected(&self) -> Result<Option<Address>>;
+
+    /// Marks this account as being protected by a MFA module (e.g. Gnosis Safe) or removes it
+    /// `Some(Address)` -> MFA present
+    /// `None` -> no MFA
+    async fn set_mfa_protected_and_update_snapshot(
         &mut self,
-        node_address: &Address,
-        safe_address: &Address,
+        maybe_mfa_address: Option<Address>,
         snapshot: &Snapshot,
     ) -> Result<()>;
-
-    /// Unlink Hopr node ETH address and the safe address.
-    async fn remove_from_node_safe_registry(
-        &mut self,
-        node_address: &Address,
-        safe_address: &Address,
-        snapshot: &Snapshot,
-    ) -> Result<()>;
-
-    /// Get safe address associated with the public key.
-    async fn get_safe_from_node_safe_registry(&self, node_address: &Address) -> Result<Option<Address>>;
-
-    /// Find HOPR node based on its associated safe address.
-    async fn find_hopr_node_using_safe_in_node_safe_registry(&self, account: &Address) -> Result<Vec<Address>>;
 
     /// Stores the REST API token.
     async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;

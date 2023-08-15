@@ -1,8 +1,8 @@
 use crate::errors::{CoreEthereumIndexerError, Result};
 use bindings::{
     hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
-    hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_safe_registry::HoprNodeSafeRegistryEvents,
-    hopr_token::HoprTokenEvents,
+    hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_management_module::HoprNodeManagementModuleEvents,
+    hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_token::HoprTokenEvents,
 };
 use core_crypto::types::OffchainSignature;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -16,24 +16,48 @@ use multiaddr::Multiaddr;
 use std::str::FromStr;
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
-struct DeploymentExtract {
+/// Holds addresses of deployed HOPR contracts
+pub struct DeploymentExtract {
+    /// HoprChannels contract, manages mixnet incentives
     channels: Address,
+    /// HoprToken contract, the HOPR token
     token: Address,
+    /// HoprNetworkRegistry contract, manages authorization to
+    /// participate in the HOPR network
     network_registry: Address,
-    node_safe_registry: Address,
+    /// HoprAnnouncements, announces network information
     announcements: Address,
+    /// HoprNodeSafeRegistry, mapping from chain_key to Safe instance
+    node_safe_registry: Address,
+    /// NodeManagementModule, permission module for Safe
+    node_management_module: Address,
 }
 
-struct Handlers {
-    /// channels, announcements, network_registry, node_safe_registry, token: contract addresses
+pub trait IndexerCallbacks {
+    fn own_channel_updated(&self, channel_entry: &ChannelEntry);
+
+    fn not_allowed_to_access_network(&self, address: &Address);
+
+    fn new_announcement(&self, account_entry: &AccountEntry);
+}
+
+pub struct ContractEventHandlers<Cbs> {
+    /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: DeploymentExtract,
     /// monitor the Hopr Token events, ignore rest
     address_to_monitor: Address,
+    /// own address, aka msg.sender
+    chain_key: Address,
+    /// callbacks to inform other modules
+    cbs: Cbs,
 }
 
-impl Handlers {
-    pub(super) async fn on_announcement_event<T>(
+impl<Cbs> ContractEventHandlers<Cbs>
+where
+    Cbs: IndexerCallbacks,
+{
+    async fn on_announcement_event<T>(
         &self,
         db: &mut T,
         log: &RawLog,
@@ -55,6 +79,8 @@ impl Handlers {
 
                     account.update(new_entry_type);
                     db.update_account_and_snapshot(&account, snapshot).await?;
+
+                    self.cbs.new_announcement(&account);
 
                     account
                 } else {
@@ -101,7 +127,7 @@ impl Handlers {
         })
     }
 
-    pub(super) async fn on_channel_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    async fn on_channel_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
@@ -116,6 +142,10 @@ impl Handlers {
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -130,6 +160,10 @@ impl Handlers {
 
                     db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -140,8 +174,17 @@ impl Handlers {
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::Closed;
 
+                    // Incoming channel, so once closed. All unredeemed tickets just became invalid
+                    if channel.destination.eq(&self.chain_key) {
+                        db.delete_acknowledged_tickets_from(channel).await?;
+                    }
+
                     db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -158,6 +201,10 @@ impl Handlers {
                     channel.status = ChannelStatus::Open;
 
                     db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
+
+                    if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     let new_channel = ChannelEntry::new(
                         source,
@@ -171,6 +218,10 @@ impl Handlers {
 
                     db.update_channel_and_snapshot(&channel_id, &new_channel, snapshot)
                         .await?;
+
+                    if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&new_channel);
+                    }
                 }
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
@@ -181,6 +232,10 @@ impl Handlers {
 
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -194,6 +249,10 @@ impl Handlers {
 
                     db.update_channel_and_snapshot(&closure_initiated.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+
+                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        self.cbs.own_channel_updated(&channel);
+                    }
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -201,7 +260,7 @@ impl Handlers {
         })
     }
 
-    pub(super) async fn on_token_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    async fn on_token_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
@@ -228,53 +287,55 @@ impl Handlers {
         })
     }
 
-    pub(super) async fn on_network_registry_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
+    async fn on_network_registry_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
         Ok(match HoprNetworkRegistryEvents::decode_log(log)? {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 db.remove_from_network_registry(
-                    &deregistered.node_address.0.try_into()?,
                     &deregistered.staking_account.0.try_into()?,
+                    &deregistered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 db.remove_from_network_registry(
-                    &deregistered.node_address.0.try_into()?,
                     &deregistered.staking_account.0.try_into()?,
+                    &deregistered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
-            }
-            HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
-                db.set_eligible(
-                    &eligibility_updated.staking_account.0.try_into()?,
-                    eligibility_updated.eligibility,
-                    snapshot,
-                )
-                .await?;
-            }
-            HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
-                db.set_network_registry(enabled.is_enabled, snapshot).await?;
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 db.add_to_network_registry(
-                    &registered.node_address.0.try_into()?,
                     &registered.staking_account.0.try_into()?,
+                    &registered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 db.add_to_network_registry(
-                    &registered.node_address.0.try_into()?,
                     &registered.staking_account.0.try_into()?,
+                    &registered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
+            }
+            HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
+                let account: Address = eligibility_updated.staking_account.0.try_into()?;
+                let affected_nodes = db
+                    .set_eligible(&account, eligibility_updated.eligibility, snapshot)
+                    .await?;
+
+                for affected_node in affected_nodes.iter() {
+                    self.cbs.not_allowed_to_access_network(affected_node);
+                }
+            }
+            HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
+                db.set_network_registry(enabled.is_enabled, snapshot).await?;
             }
             HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
                 // TODO: implement this
@@ -285,31 +346,36 @@ impl Handlers {
         })
     }
 
-    pub(super) async fn on_node_safe_registry_event<T>(
-        &self,
-        db: &mut T,
-        log: &RawLog,
-        snapshot: &Snapshot,
-    ) -> Result<()>
+    async fn on_node_safe_registry_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
         Ok(match HoprNodeSafeRegistryEvents::decode_log(log)? {
-            HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
-                db.remove_from_node_safe_registry(
-                    &deregistered.node_address.0.try_into()?,
-                    &deregistered.safe_address.0.try_into()?,
-                    snapshot,
-                )
-                .await?;
-            }
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
-                db.add_to_node_safe_registry(
-                    &registered.node_address.0.try_into()?,
-                    &registered.safe_address.0.try_into()?,
-                    snapshot,
-                )
-                .await?;
+                if self.chain_key.eq(&registered.node_address.0.try_into()?) {
+                    db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.0.try_into()?), snapshot)
+                        .await?;
+                }
+            }
+            HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
+                if self.chain_key.eq(&deregistered.node_address.0.try_into()?) {
+                    if let Some(_) = db.is_mfa_protected().await? {
+                        db.set_mfa_protected_and_update_snapshot(None, snapshot).await?;
+                    } else {
+                        return Err(CoreEthereumIndexerError::MFAModuleDoesNotExist);
+                    }
+                }
+            }
+        })
+    }
+
+    async fn on_node_management_module_event<T>(&self, _db: &mut T, log: &RawLog, _snapshot: &Snapshot) -> Result<()>
+    where
+        T: HoprCoreEthereumDbActions,
+    {
+        Ok(match HoprNodeManagementModuleEvents::decode_log(log)? {
+            _ => {
+                // don't care at the moment
             }
         })
     }
@@ -335,6 +401,10 @@ impl Handlers {
             self.on_node_safe_registry_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.token) {
             self.on_token_event(db, log, snapshot).await?;
+        } else if address.eq(&self.addresses.node_safe_registry) {
+            self.on_node_safe_registry_event(db, log, snapshot).await?
+        } else if address.eq(&self.addresses.node_management_module) {
+            self.on_node_management_module_event(db, log, snapshot).await?
         } else {
             return Err(CoreEthereumIndexerError::UnknownContract(address.clone()));
         })
@@ -343,6 +413,7 @@ impl Handlers {
 
 #[cfg(test)]
 pub mod tests {
+    use super::ContractEventHandlers;
     use async_std;
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
@@ -379,8 +450,6 @@ pub mod tests {
         traits::BinarySerializable,
     };
 
-    use super::Handlers;
-
     const SELF_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const COUNTERPARTY_CHAIN_ADDRESS: [u8; 20] = hex!("f1a73ef496c45e260924a9279d2d9752ae378812");
     const SELF_CHAIN_ADDRESS: [u8; 20] = hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a");
@@ -392,6 +461,8 @@ pub mod tests {
     const NETWORK_REGISTRY_ADDR: [u8; 20] = hex!("a469d0225f884fb989cbad4fe289f6fd2fb98051"); // just a dummy
     const NODE_SAFE_REGISTRY_ADDR: [u8; 20] = hex!("0dcd1bf9a1b36ce34237eeafef220932846bcd82"); // just a dummy
     const ANNOUNCEMENTS_ADDR: [u8; 20] = hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
+    const SAFE_MANAGEMENT_MODULE_ADDR: [u8; 20] = hex!("9b91245a65ad469163a86e32b2281af7a25f38ce"); // just a dummy
+    const SAFE_INSTANCE_ADDR: [u8; 20] = hex!("b93d7fdd605fb64fdcc87f21590f950170719d47"); // just a dummy
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
         let opt = rusty_leveldb::in_memory();
@@ -403,16 +474,29 @@ pub mod tests {
         )
     }
 
-    fn init_handlers() -> Handlers {
-        Handlers {
+    struct DummyCallbacks {}
+
+    impl super::IndexerCallbacks for DummyCallbacks {
+        fn new_announcement(&self, _account_entry: &AccountEntry) {}
+
+        fn own_channel_updated(&self, _channel_entry: &ChannelEntry) {}
+
+        fn not_allowed_to_access_network(&self, _address: &Address) {}
+    }
+
+    fn init_handlers() -> ContractEventHandlers<DummyCallbacks> {
+        ContractEventHandlers {
             addresses: super::DeploymentExtract {
                 channels: CHANNELS_ADDR.try_into().unwrap(),
                 token: TOKEN_ADDR.try_into().unwrap(),
                 network_registry: NETWORK_REGISTRY_ADDR.try_into().unwrap(),
                 node_safe_registry: NODE_SAFE_REGISTRY_ADDR.try_into().unwrap(),
                 announcements: ANNOUNCEMENTS_ADDR.try_into().unwrap(),
+                node_management_module: SAFE_MANAGEMENT_MODULE_ADDR.try_into().unwrap(),
             },
+            chain_key: SELF_CHAIN_ADDRESS.try_into().unwrap(),
             address_to_monitor: SELF_CHAIN_ADDRESS.try_into().unwrap(),
+            cbs: DummyCallbacks {},
         }
     }
 
@@ -649,10 +733,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db
-            .find_hopr_node_using_account_in_network_registry(&stake_address)
-            .await
-            .unwrap();
+        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
 
         assert_eq!(stored, vec![chain_key]);
     }
@@ -685,10 +766,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db
-            .find_hopr_node_using_account_in_network_registry(&stake_address)
-            .await
-            .unwrap();
+        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
 
         assert_eq!(stored, vec![chain_key]);
     }
@@ -725,10 +803,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db
-            .find_hopr_node_using_account_in_network_registry(&stake_address)
-            .await
-            .unwrap();
+        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
 
         assert_eq!(stored, vec![]);
     }
@@ -765,10 +840,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db
-            .find_hopr_node_using_account_in_network_registry(&stake_address)
-            .await
-            .unwrap();
+        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
 
         assert_eq!(stored, vec![]);
     }
@@ -891,82 +963,6 @@ pub mod tests {
             .unwrap();
 
         assert!(!db.is_eligible(&stake_address).await.unwrap());
-    }
-
-    #[async_std::test]
-    async fn on_node_safe_registry_event_registered() {
-        let handlers = init_handlers();
-        let mut db = create_mock_db();
-
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let safe_address = Address::from_bytes(&SAFE_ADDRESS).unwrap();
-
-        let registered_log = RawLog {
-            topics: vec![
-                RegisteredNodeSafeFilter::signature(),
-                H256::from_slice(&safe_address.to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
-            ],
-            data: encode(&[]),
-        };
-
-        handlers
-            .on_event(
-                &mut db,
-                &handlers.addresses.node_safe_registry,
-                0u32,
-                &registered_log,
-                &Snapshot::default(),
-            )
-            .await
-            .unwrap();
-
-        let stored = db
-            .find_hopr_node_using_safe_in_node_safe_registry(&safe_address)
-            .await
-            .unwrap();
-
-        assert_eq!(stored, vec![chain_key]);
-    }
-
-    #[async_std::test]
-    async fn on_node_safe_registry_event_deregistered() {
-        let handlers = init_handlers();
-        let mut db = create_mock_db();
-
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let safe_address = Address::from_bytes(&SAFE_ADDRESS).unwrap();
-
-        db.add_to_node_safe_registry(&chain_key, &safe_address, &Snapshot::default())
-            .await
-            .unwrap();
-
-        let registered_log = RawLog {
-            topics: vec![
-                DergisteredNodeSafeFilter::signature(),
-                H256::from_slice(&safe_address.to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
-            ],
-            data: encode(&[]),
-        };
-
-        handlers
-            .on_event(
-                &mut db,
-                &handlers.addresses.node_safe_registry,
-                0u32,
-                &registered_log,
-                &Snapshot::default(),
-            )
-            .await
-            .unwrap();
-
-        let stored = db
-            .find_hopr_node_using_safe_in_node_safe_registry(&safe_address)
-            .await
-            .unwrap();
-
-        assert_eq!(stored, vec![]);
     }
 
     #[async_std::test]
@@ -1265,11 +1261,81 @@ pub mod tests {
         assert_eq!(channel.status, ChannelStatus::PendingToClose);
         assert_eq!(channel.closure_time, timestamp);
     }
+
+    #[async_std::test]
+    async fn on_node_safe_registry_registered() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let safe_instance: Address = SAFE_INSTANCE_ADDR.try_into().unwrap();
+        let chain_key: Address = SELF_CHAIN_ADDRESS.try_into().unwrap();
+
+        let safe_registered_log = RawLog {
+            topics: vec![
+                RegisteredNodeSafeFilter::signature(),
+                H256::from_slice(&safe_instance.to_bytes32()),
+                H256::from_slice(&chain_key.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.node_safe_registry,
+                0u32,
+                &safe_registered_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.is_mfa_protected().await.unwrap(),
+            Some(SAFE_INSTANCE_ADDR.try_into().unwrap())
+        );
+    }
+
+    #[async_std::test]
+    async fn on_node_safe_registry_deregistered() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let safe_instance: Address = SAFE_INSTANCE_ADDR.try_into().unwrap();
+        let chain_key: Address = SELF_CHAIN_ADDRESS.try_into().unwrap();
+
+        db.set_mfa_protected_and_update_snapshot(Some(safe_instance), &Snapshot::default())
+            .await
+            .unwrap();
+
+        let safe_registered_log = RawLog {
+            topics: vec![
+                DergisteredNodeSafeFilter::signature(),
+                H256::from_slice(&safe_instance.to_bytes32()),
+                H256::from_slice(&chain_key.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.node_safe_registry,
+                0u32,
+                &safe_registered_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(db.is_mfa_protected().await.unwrap(), None);
+    }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use core_ethereum_db::db::wasm::Database;
+    use core_types::{account::AccountEntry, channels::ChannelEntry};
     use ethers::{core::abi::RawLog, types::H256};
     use hex::decode_to_slice;
     use js_sys::{Array, Uint8Array};
@@ -1280,8 +1346,61 @@ pub mod wasm {
     use wasm_bindgen_futures;
 
     #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen]
+        pub type IndexerCallbacks;
+
+        #[wasm_bindgen(method, js_name = "ownChannelUpdated")]
+        pub fn js_own_channel_updated(this: &IndexerCallbacks, channel_entry: ChannelEntry);
+
+        #[wasm_bindgen(method, js_name = "newAnnouncement")]
+        pub fn js_new_announcement(this: &IndexerCallbacks, account_entry: AccountEntry);
+
+        #[wasm_bindgen(method, js_name = "notAllowedToAccessNetwork")]
+        pub fn js_not_allowed_to_access_network(this: &IndexerCallbacks, address: Address);
+    }
+
+    impl super::IndexerCallbacks for IndexerCallbacks {
+        fn new_announcement(&self, account_entry: &AccountEntry) {
+            self.js_new_announcement(account_entry.clone())
+        }
+
+        fn own_channel_updated(&self, channel_entry: &ChannelEntry) {
+            self.js_own_channel_updated(channel_entry.clone())
+        }
+
+        fn not_allowed_to_access_network(&self, address: &Address) {
+            self.js_not_allowed_to_access_network(address.clone())
+        }
+    }
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen]
+        pub type ContractAddresses;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn channels(this: &ContractAddresses) -> String;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn token(this: &ContractAddresses) -> String;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn network_registry(this: &ContractAddresses) -> String;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn announcements(this: &ContractAddresses) -> String;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn node_safe_registry(this: &ContractAddresses) -> String;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn node_management_module(this: &ContractAddresses) -> String;
+    }
+
+    #[wasm_bindgen]
     pub struct Handlers {
-        w: super::Handlers,
+        w: super::ContractEventHandlers<IndexerCallbacks>,
     }
 
     #[wasm_bindgen]
@@ -1289,22 +1408,25 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn init(
             address_to_monitor: &str,
-            channels: &str,
-            token: &str,
-            network_registry: &str,
-            node_safe_registry: &str,
-            announcements: &str,
+            chain_key: &str,
+            contract_addresses: ContractAddresses,
+            callbacks: IndexerCallbacks,
         ) -> Handlers {
             Self {
-                w: super::Handlers {
+                w: super::ContractEventHandlers {
                     address_to_monitor: Address::from_str(address_to_monitor).unwrap(),
+                    chain_key: Address::from_str(chain_key).unwrap(),
                     addresses: super::DeploymentExtract {
-                        channels: Address::from_str(channels).unwrap(),
-                        token: Address::from_str(token).unwrap(),
-                        network_registry: Address::from_str(network_registry).unwrap(),
-                        node_safe_registry: Address::from_str(node_safe_registry).unwrap(),
-                        announcements: Address::from_str(announcements).unwrap(),
+                        channels: Address::from_str(contract_addresses.channels().as_str()).unwrap(),
+                        token: Address::from_str(contract_addresses.token().as_str()).unwrap(),
+                        network_registry: Address::from_str(contract_addresses.network_registry().as_str()).unwrap(),
+                        node_safe_registry: Address::from_str(contract_addresses.node_safe_registry().as_str())
+                            .unwrap(),
+                        announcements: Address::from_str(contract_addresses.announcements().as_str()).unwrap(),
+                        node_management_module: Address::from_str(contract_addresses.node_management_module().as_str())
+                            .unwrap(),
                     },
+                    cbs: callbacks,
                 },
             }
         }

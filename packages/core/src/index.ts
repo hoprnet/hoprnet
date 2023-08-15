@@ -455,34 +455,19 @@ class Hopr extends EventEmitter {
     })
 
     // react when an account's eligibility has changed
-    connector.indexer.on(
-      'network-registry-eligibility-changed',
-      async (_account: Address, nodeAddrs: Address[], eligible: boolean) => {
-        // If account is no longer eligible to register nodes, we might need to close existing connections,
-        // otherwise there is nothing to do
-        if (!eligible) {
-          for (const nodeAddr of nodeAddrs) {
-            let pk: OffchainPublicKey
-            try {
-              pk = await connector.getPacketKeyOf(nodeAddr)
-            } catch (err) {
-              // node has not announced itself, so we don't need to care
-              return
-            }
+    connector.indexer.on('network-registry-eligibility-changed', async (address: Address, allowed: boolean) => {
+      if (!allowed) {
+        let pk = await connector.getPacketKeyOf(address)
 
-            this.networkPeers.unregister(pk.to_peerid_str())
-
-            for (const conn of this.libp2pComponents
-              .getConnectionManager()
-              .getConnections(peerIdFromString(pk.to_peerid_str()))) {
-              await safeCloseConnection(conn, this.libp2pComponents, (_err) => {
-                error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
-              })
-            }
-          }
+        for (const conn of this.libp2pComponents
+          .getConnectionManager()
+          .getConnections(peerIdFromString(pk.to_peerid_str()))) {
+          await safeCloseConnection(conn, this.libp2pComponents, (_err) => {
+            error(`error while closing existing connection to ${conn.remotePeer.toString()}`)
+          })
         }
       }
-    )
+    })
 
     let heartbeat_config = HeartbeatConfig.build(
       MAX_PARALLEL_PINGS,

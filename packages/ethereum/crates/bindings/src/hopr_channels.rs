@@ -7,16 +7,14 @@ pub use hopr_channels::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod hopr_channels {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"_noticePeriodChannelClosure\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"contract HoprNodeSafeRegistry\",\"name\":\"_safeRegistry\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"AlreadyInitialized\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"BalanceExceedsGlobalPerChannelAllowance\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ContractNotResponsible\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InsufficientChannelBalance\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidAggregatedTicketInterval\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidBalance\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidCurvePoint\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidFieldElement\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidNoticePeriod\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidPointWitness\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidSafeAddress\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidTicketSignature\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidTokenRecipient\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidTokensReceivedUsage\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidVRFProof\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"MultiSigUninitialized\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NoticePeriodNotDue\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"SourceEqualsDestination\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TicketIsNotAWin\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TokenTransferFailed\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"reason\",\"type\":\"string\",\"components\":[]}],\"type\":\"error\",\"name\":\"WrongChannelState\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"WrongToken\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"reason\",\"type\":\"string\",\"components\":[]}],\"type\":\"error\",\"name\":\"ZeroAddress\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceDecreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceIncreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelClosed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelOpened\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"closureTime\",\"type\":\"uint32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"OutgoingChannelClosureInitiated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"newTicketIndex\",\"type\":\"uint48\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"TicketRedeemed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ERC777_HOOK_FUND_CHANNEL_SIZE\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LEDGER_VERSION\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"MAX_USED_BALANCE\",\"outputs\":[{\"internalType\":\"HoprChannels.Balance\",\"name\":\"\",\"type\":\"uint96\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"MIN_USED_BALANCE\",\"outputs\":[{\"internalType\":\"HoprChannels.Balance\",\"name\":\"\",\"type\":\"uint96\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"TOKENS_RECIPIENT_INTERFACE_HASH\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"VERSION\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"_currentBlockTimestamp\",\"outputs\":[{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"\",\"type\":\"uint32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"_getChannelId\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"struct HoprChannels.RedeemableTicket\",\"name\":\"redeemable\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"struct HoprChannels.TicketData\",\"name\":\"data\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"amount\",\"type\":\"uint96\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"ticketIndex\",\"type\":\"uint48\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndexOffset\",\"name\":\"indexOffset\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"HoprChannels.ChannelEpoch\",\"name\":\"epoch\",\"type\":\"uint24\",\"components\":[]},{\"internalType\":\"HoprChannels.WinProb\",\"name\":\"winProb\",\"type\":\"uint56\",\"components\":[]}]},{\"internalType\":\"struct HoprCrypto.CompactSignature\",\"name\":\"signature\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"bytes32\",\"name\":\"r\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"vs\",\"type\":\"bytes32\",\"components\":[]}]},{\"internalType\":\"uint256\",\"name\":\"porSecret\",\"type\":\"uint256\",\"components\":[]}]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"_getTicketHash\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"ticketHash\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"struct HoprChannels.RedeemableTicket\",\"name\":\"redeemable\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"struct HoprChannels.TicketData\",\"name\":\"data\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"amount\",\"type\":\"uint96\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"ticketIndex\",\"type\":\"uint48\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndexOffset\",\"name\":\"indexOffset\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"HoprChannels.ChannelEpoch\",\"name\":\"epoch\",\"type\":\"uint24\",\"components\":[]},{\"internalType\":\"HoprChannels.WinProb\",\"name\":\"winProb\",\"type\":\"uint56\",\"components\":[]}]},{\"internalType\":\"struct HoprCrypto.CompactSignature\",\"name\":\"signature\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"bytes32\",\"name\":\"r\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"vs\",\"type\":\"bytes32\",\"components\":[]}]},{\"internalType\":\"uint256\",\"name\":\"porSecret\",\"type\":\"uint256\",\"components\":[]}]},{\"internalType\":\"struct HoprCrypto.VRFParameters\",\"name\":\"params\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"uint256\",\"name\":\"vx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"vy\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"s\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"h\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"sBx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"sBy\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"hVx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"hVy\",\"type\":\"uint256\",\"components\":[]}]}],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"_isWinningTicket\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"interfaceHash\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"canImplementInterfaceForAddress\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"channels\",\"outputs\":[{\"internalType\":\"HoprChannels.Balance\",\"name\":\"balance\",\"type\":\"uint96\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"ticketIndex\",\"type\":\"uint48\",\"components\":[]},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"closureTime\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"HoprChannels.ChannelEpoch\",\"name\":\"epoch\",\"type\":\"uint24\",\"components\":[]},{\"internalType\":\"enum HoprChannels.ChannelStatus\",\"name\":\"status\",\"type\":\"uint8\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"closeIncomingChannel\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"closeIncomingChannelSafe\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"domainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"finalizeOutgoingChannelClosure\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"finalizeOutgoingChannelClosureSafe\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"amount\",\"type\":\"uint96\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"fundChannel\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"amount\",\"type\":\"uint96\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"fundChannelSafe\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"initiateOutgoingChannelClosure\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"initiateOutgoingChannelClosureSafe\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ledgerDomainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"data\",\"type\":\"bytes[]\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"multicall\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"results\",\"type\":\"bytes[]\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"noticePeriodChannelClosure\",\"outputs\":[{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"\",\"type\":\"uint32\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"struct HoprChannels.RedeemableTicket\",\"name\":\"redeemable\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"struct HoprChannels.TicketData\",\"name\":\"data\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"amount\",\"type\":\"uint96\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"ticketIndex\",\"type\":\"uint48\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndexOffset\",\"name\":\"indexOffset\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"HoprChannels.ChannelEpoch\",\"name\":\"epoch\",\"type\":\"uint24\",\"components\":[]},{\"internalType\":\"HoprChannels.WinProb\",\"name\":\"winProb\",\"type\":\"uint56\",\"components\":[]}]},{\"internalType\":\"struct HoprCrypto.CompactSignature\",\"name\":\"signature\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"bytes32\",\"name\":\"r\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"vs\",\"type\":\"bytes32\",\"components\":[]}]},{\"internalType\":\"uint256\",\"name\":\"porSecret\",\"type\":\"uint256\",\"components\":[]}]},{\"internalType\":\"struct HoprCrypto.VRFParameters\",\"name\":\"params\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"uint256\",\"name\":\"vx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"vy\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"s\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"h\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"sBx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"sBy\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"hVx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"hVy\",\"type\":\"uint256\",\"components\":[]}]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"redeemTicket\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"self\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"struct HoprChannels.RedeemableTicket\",\"name\":\"redeemable\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"struct HoprChannels.TicketData\",\"name\":\"data\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"amount\",\"type\":\"uint96\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"ticketIndex\",\"type\":\"uint48\",\"components\":[]},{\"internalType\":\"HoprChannels.TicketIndexOffset\",\"name\":\"indexOffset\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"HoprChannels.ChannelEpoch\",\"name\":\"epoch\",\"type\":\"uint24\",\"components\":[]},{\"internalType\":\"HoprChannels.WinProb\",\"name\":\"winProb\",\"type\":\"uint56\",\"components\":[]}]},{\"internalType\":\"struct HoprCrypto.CompactSignature\",\"name\":\"signature\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"bytes32\",\"name\":\"r\",\"type\":\"bytes32\",\"components\":[]},{\"internalType\":\"bytes32\",\"name\":\"vs\",\"type\":\"bytes32\",\"components\":[]}]},{\"internalType\":\"uint256\",\"name\":\"porSecret\",\"type\":\"uint256\",\"components\":[]}]},{\"internalType\":\"struct HoprCrypto.VRFParameters\",\"name\":\"params\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"uint256\",\"name\":\"vx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"vy\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"s\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"h\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"sBx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"sBy\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"hVx\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"hVy\",\"type\":\"uint256\",\"components\":[]}]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"redeemTicketSafe\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"token\",\"outputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"tokensReceived\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRCHANNELS_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(|| {
-            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
-        });
+    pub static HOPRCHANNELS_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
+    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -2431,13 +2429,6 @@ pub mod hopr_channels {
         81,
         145,
         144,
-        21,
-        21,
-        129,
-        82,
-        96,
-        32,
-        1,
         97,
         61,
         128,
@@ -4629,20 +4620,6 @@ pub mod hopr_channels {
         12,
         224,
         87,
-        61,
-        96,
-        0,
-        128,
-        62,
-        61,
-        96,
-        0,
-        253,
-        91,
-        80,
-        80,
-        80,
-        80,
         96,
         64,
         81,
@@ -4657,8 +4634,7 @@ pub mod hopr_channels {
         129,
         82,
         96,
-        31,
-        130,
+        4,
         1,
         96,
         64,
@@ -4695,7 +4671,6 @@ pub mod hopr_channels {
         96,
         255,
         22,
-        20,
         97,
         13,
         23,
@@ -4948,18 +4923,6 @@ pub mod hopr_channels {
         130,
         82,
         128,
-        62,
-        61,
-        96,
-        0,
-        253,
-        91,
-        80,
-        80,
-        80,
-        80,
-        96,
-        64,
         81,
         96,
         32,
@@ -5031,9 +4994,6 @@ pub mod hopr_channels {
         160,
         132,
         1,
-        147,
-        144,
-        147,
         82,
         127,
         0,
@@ -5582,8 +5542,6 @@ pub mod hopr_channels {
         160,
         27,
         3,
-        144,
-        145,
         22,
         20,
         97,
@@ -7780,10 +7738,6 @@ pub mod hopr_channels {
         27,
         45,
         96,
-        9,
-        148,
-        133,
-        77,
         32,
         130,
         1,
@@ -18712,38 +18666,38 @@ pub mod hopr_channels {
         34,
         18,
         32,
-        142,
-        53,
-        171,
-        226,
-        136,
-        180,
-        114,
-        121,
-        24,
-        231,
-        83,
-        179,
-        147,
-        41,
+        234,
+        152,
         87,
+        180,
+        132,
+        55,
+        188,
+        34,
+        49,
+        23,
+        54,
+        191,
         161,
-        151,
-        104,
-        156,
-        249,
-        56,
+        82,
+        71,
+        24,
+        191,
+        32,
+        106,
+        159,
+        231,
+        38,
+        169,
         17,
-        33,
-        206,
-        240,
-        206,
-        221,
-        153,
-        12,
-        90,
-        215,
-        37,
+        114,
+        142,
+        1,
+        31,
+        241,
+        224,
+        27,
+        151,
         100,
         115,
         111,
@@ -18789,8 +18743,9 @@ pub mod hopr_channels {
         15,
     ];
     ///The bytecode of the contract.
-    pub static HOPRCHANNELS_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__BYTECODE);
+    pub static HOPRCHANNELS_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __BYTECODE,
+    );
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -19874,13 +19829,6 @@ pub mod hopr_channels {
         81,
         145,
         144,
-        21,
-        21,
-        129,
-        82,
-        96,
-        32,
-        1,
         97,
         61,
         128,
@@ -22072,20 +22020,6 @@ pub mod hopr_channels {
         12,
         224,
         87,
-        61,
-        96,
-        0,
-        128,
-        62,
-        61,
-        96,
-        0,
-        253,
-        91,
-        80,
-        80,
-        80,
-        80,
         96,
         64,
         81,
@@ -22100,8 +22034,7 @@ pub mod hopr_channels {
         129,
         82,
         96,
-        31,
-        130,
+        4,
         1,
         96,
         64,
@@ -22138,7 +22071,6 @@ pub mod hopr_channels {
         96,
         255,
         22,
-        20,
         97,
         13,
         23,
@@ -22391,18 +22323,6 @@ pub mod hopr_channels {
         130,
         82,
         128,
-        62,
-        61,
-        96,
-        0,
-        253,
-        91,
-        80,
-        80,
-        80,
-        80,
-        96,
-        64,
         81,
         96,
         32,
@@ -22474,9 +22394,6 @@ pub mod hopr_channels {
         160,
         132,
         1,
-        147,
-        144,
-        147,
         82,
         127,
         0,
@@ -23025,8 +22942,6 @@ pub mod hopr_channels {
         160,
         27,
         3,
-        144,
-        145,
         22,
         20,
         97,
@@ -25223,10 +25138,6 @@ pub mod hopr_channels {
         27,
         45,
         96,
-        9,
-        148,
-        133,
-        77,
         32,
         130,
         1,
@@ -36155,38 +36066,38 @@ pub mod hopr_channels {
         34,
         18,
         32,
-        142,
-        53,
-        171,
-        226,
-        136,
-        180,
-        114,
-        121,
-        24,
-        231,
-        83,
-        179,
-        147,
-        41,
+        234,
+        152,
         87,
+        180,
+        132,
+        55,
+        188,
+        34,
+        49,
+        23,
+        54,
+        191,
         161,
-        151,
-        104,
-        156,
-        249,
-        56,
+        82,
+        71,
+        24,
+        191,
+        32,
+        106,
+        159,
+        231,
+        38,
+        169,
         17,
-        33,
-        206,
-        240,
-        206,
-        221,
-        153,
-        12,
-        90,
-        215,
-        37,
+        114,
+        142,
+        1,
+        31,
+        241,
+        224,
+        27,
+        151,
         100,
         115,
         111,
@@ -36200,8 +36111,9 @@ pub mod hopr_channels {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRCHANNELS_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static HOPRCHANNELS_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct HoprChannels<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprChannels<M> {
         fn clone(&self) -> Self {
@@ -36227,12 +36139,17 @@ pub mod hopr_channels {
     impl<M: ::ethers::providers::Middleware> HoprChannels<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                HOPRCHANNELS_ABI.clone(),
-                client,
-            ))
+        pub fn new<T: Into<::ethers::core::types::Address>>(
+            address: T,
+            client: ::std::sync::Arc<M>,
+        ) -> Self {
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    HOPRCHANNELS_ABI.clone(),
+                    client,
+                ),
+            )
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -36290,37 +36207,49 @@ pub mod hopr_channels {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `LEDGER_VERSION` (0xddad1902) function
-        pub fn ledger_version(&self) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
+        pub fn ledger_version(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
             self.0
                 .method_hash([221, 173, 25, 2], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `MAX_USED_BALANCE` (0x5d2f07c5) function
-        pub fn max_used_balance(&self) -> ::ethers::contract::builders::ContractCall<M, u128> {
+        pub fn max_used_balance(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u128> {
             self.0
                 .method_hash([93, 47, 7, 197], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `MIN_USED_BALANCE` (0x29392e32) function
-        pub fn min_used_balance(&self) -> ::ethers::contract::builders::ContractCall<M, u128> {
+        pub fn min_used_balance(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u128> {
             self.0
                 .method_hash([41, 57, 46, 50], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `TOKENS_RECIPIENT_INTERFACE_HASH` (0x72581cc0) function
-        pub fn tokens_recipient_interface_hash(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn tokens_recipient_interface_hash(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([114, 88, 28, 192], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `VERSION` (0xffa1ad74) function
-        pub fn version(&self) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
+        pub fn version(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::string::String> {
             self.0
                 .method_hash([255, 161, 173, 116], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `_currentBlockTimestamp` (0xb920deed) function
-        pub fn current_block_timestamp(&self) -> ::ethers::contract::builders::ContractCall<M, u32> {
+        pub fn current_block_timestamp(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u32> {
             self.0
                 .method_hash([185, 32, 222, 237], ())
                 .expect("method not found (this should never happen)")
@@ -36394,7 +36323,9 @@ pub mod hopr_channels {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `domainSeparator` (0xf698da25) function
-        pub fn domain_separator(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn domain_separator(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([246, 152, 218, 37], ())
                 .expect("method not found (this should never happen)")
@@ -36459,7 +36390,9 @@ pub mod hopr_channels {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `ledgerDomainSeparator` (0xc966c4fe) function
-        pub fn ledger_domain_separator(&self) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
+        pub fn ledger_domain_separator(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 32]> {
             self.0
                 .method_hash([201, 102, 196, 254], ())
                 .expect("method not found (this should never happen)")
@@ -36468,13 +36401,18 @@ pub mod hopr_channels {
         pub fn multicall(
             &self,
             data: ::std::vec::Vec<::ethers::core::types::Bytes>,
-        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<::ethers::core::types::Bytes>> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::std::vec::Vec<::ethers::core::types::Bytes>,
+        > {
             self.0
                 .method_hash([172, 150, 80, 216], data)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `noticePeriodChannelClosure` (0x87352d65) function
-        pub fn notice_period_channel_closure(&self) -> ::ethers::contract::builders::ContractCall<M, u32> {
+        pub fn notice_period_channel_closure(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u32> {
             self.0
                 .method_hash([135, 53, 45, 101], ())
                 .expect("method not found (this should never happen)")
@@ -36501,7 +36439,12 @@ pub mod hopr_channels {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `token` (0xfc0c546a) function
-        pub fn token(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        pub fn token(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([252, 12, 84, 106], ())
                 .expect("method not found (this should never happen)")
@@ -36523,59 +36466,103 @@ pub mod hopr_channels {
         ///Gets the contract's `ChannelBalanceDecreased` event
         pub fn channel_balance_decreased_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ChannelBalanceDecreasedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ChannelBalanceDecreasedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ChannelBalanceIncreased` event
         pub fn channel_balance_increased_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ChannelBalanceIncreasedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ChannelBalanceIncreasedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ChannelClosed` event
         pub fn channel_closed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ChannelClosedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ChannelClosedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ChannelOpened` event
         pub fn channel_opened_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ChannelOpenedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ChannelOpenedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `OutgoingChannelClosureInitiated` event
         pub fn outgoing_channel_closure_initiated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OutgoingChannelClosureInitiatedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            OutgoingChannelClosureInitiatedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `TicketRedeemed` event
         pub fn ticket_redeemed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, TicketRedeemedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            TicketRedeemedFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
-        pub fn events(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprChannelsEvents> {
+        pub fn events(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            HoprChannelsEvents,
+        > {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprChannels<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
+    for HoprChannels<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     ///Custom Error type `AlreadyInitialized` with signature `AlreadyInitialized()` and selector `0x0dc149f0`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "AlreadyInitialized", abi = "AlreadyInitialized()")]
     pub struct AlreadyInitialized;
     ///Custom Error type `BalanceExceedsGlobalPerChannelAllowance` with signature `BalanceExceedsGlobalPerChannelAllowance()` and selector `0xa4f3bbe4`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(
         name = "BalanceExceedsGlobalPerChannelAllowance",
@@ -36584,115 +36571,257 @@ pub mod hopr_channels {
     pub struct BalanceExceedsGlobalPerChannelAllowance;
     ///Custom Error type `ContractNotResponsible` with signature `ContractNotResponsible()` and selector `0xacd5a823`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "ContractNotResponsible", abi = "ContractNotResponsible()")]
     pub struct ContractNotResponsible;
     ///Custom Error type `InsufficientChannelBalance` with signature `InsufficientChannelBalance()` and selector `0xb147636c`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[etherror(name = "InsufficientChannelBalance", abi = "InsufficientChannelBalance()")]
+    #[etherror(
+        name = "InsufficientChannelBalance",
+        abi = "InsufficientChannelBalance()"
+    )]
     pub struct InsufficientChannelBalance;
     ///Custom Error type `InvalidAggregatedTicketInterval` with signature `InvalidAggregatedTicketInterval()` and selector `0xd0dc3c1e`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[etherror(name = "InvalidAggregatedTicketInterval", abi = "InvalidAggregatedTicketInterval()")]
+    #[etherror(
+        name = "InvalidAggregatedTicketInterval",
+        abi = "InvalidAggregatedTicketInterval()"
+    )]
     pub struct InvalidAggregatedTicketInterval;
     ///Custom Error type `InvalidBalance` with signature `InvalidBalance()` and selector `0xc52e3eff`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidBalance", abi = "InvalidBalance()")]
     pub struct InvalidBalance;
     ///Custom Error type `InvalidCurvePoint` with signature `InvalidCurvePoint()` and selector `0x72454a82`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidCurvePoint", abi = "InvalidCurvePoint()")]
     pub struct InvalidCurvePoint;
     ///Custom Error type `InvalidFieldElement` with signature `InvalidFieldElement()` and selector `0x3ae4ed6b`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidFieldElement", abi = "InvalidFieldElement()")]
     pub struct InvalidFieldElement;
     ///Custom Error type `InvalidNoticePeriod` with signature `InvalidNoticePeriod()` and selector `0xf9ee9107`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidNoticePeriod", abi = "InvalidNoticePeriod()")]
     pub struct InvalidNoticePeriod;
     ///Custom Error type `InvalidPointWitness` with signature `InvalidPointWitness()` and selector `0xedfdcd98`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidPointWitness", abi = "InvalidPointWitness()")]
     pub struct InvalidPointWitness;
     ///Custom Error type `InvalidSafeAddress` with signature `InvalidSafeAddress()` and selector `0x8e9d7c5e`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidSafeAddress", abi = "InvalidSafeAddress()")]
     pub struct InvalidSafeAddress;
     ///Custom Error type `InvalidTicketSignature` with signature `InvalidTicketSignature()` and selector `0xcddd5356`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidTicketSignature", abi = "InvalidTicketSignature()")]
     pub struct InvalidTicketSignature;
     ///Custom Error type `InvalidTokenRecipient` with signature `InvalidTokenRecipient()` and selector `0xb9c49108`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidTokenRecipient", abi = "InvalidTokenRecipient()")]
     pub struct InvalidTokenRecipient;
     ///Custom Error type `InvalidTokensReceivedUsage` with signature `InvalidTokensReceivedUsage()` and selector `0x69ee6f28`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[etherror(name = "InvalidTokensReceivedUsage", abi = "InvalidTokensReceivedUsage()")]
+    #[etherror(
+        name = "InvalidTokensReceivedUsage",
+        abi = "InvalidTokensReceivedUsage()"
+    )]
     pub struct InvalidTokensReceivedUsage;
     ///Custom Error type `InvalidVRFProof` with signature `InvalidVRFProof()` and selector `0x95fdbdb8`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "InvalidVRFProof", abi = "InvalidVRFProof()")]
     pub struct InvalidVRFProof;
     ///Custom Error type `MultiSigUninitialized` with signature `MultiSigUninitialized()` and selector `0x454a20c8`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "MultiSigUninitialized", abi = "MultiSigUninitialized()")]
     pub struct MultiSigUninitialized;
     ///Custom Error type `NoticePeriodNotDue` with signature `NoticePeriodNotDue()` and selector `0x7164032a`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "NoticePeriodNotDue", abi = "NoticePeriodNotDue()")]
     pub struct NoticePeriodNotDue;
     ///Custom Error type `SourceEqualsDestination` with signature `SourceEqualsDestination()` and selector `0x97a3aed2`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "SourceEqualsDestination", abi = "SourceEqualsDestination()")]
     pub struct SourceEqualsDestination;
     ///Custom Error type `TicketIsNotAWin` with signature `TicketIsNotAWin()` and selector `0xee835c89`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "TicketIsNotAWin", abi = "TicketIsNotAWin()")]
     pub struct TicketIsNotAWin;
     ///Custom Error type `TokenTransferFailed` with signature `TokenTransferFailed()` and selector `0x045c4b02`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "TokenTransferFailed", abi = "TokenTransferFailed()")]
     pub struct TokenTransferFailed;
     ///Custom Error type `WrongChannelState` with signature `WrongChannelState(string)` and selector `0x499463c1`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "WrongChannelState", abi = "WrongChannelState(string)")]
     pub struct WrongChannelState {
@@ -36700,13 +36829,27 @@ pub mod hopr_channels {
     }
     ///Custom Error type `WrongToken` with signature `WrongToken()` and selector `0xa0f3feea`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "WrongToken", abi = "WrongToken()")]
     pub struct WrongToken;
     ///Custom Error type `ZeroAddress` with signature `ZeroAddress(string)` and selector `0xeac0d389`
     #[derive(
-        Clone, ::ethers::contract::EthError, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[etherror(name = "ZeroAddress", abi = "ZeroAddress(string)")]
     pub struct ZeroAddress {
@@ -36743,80 +36886,124 @@ pub mod hopr_channels {
         RevertString(::std::string::String),
     }
     impl ::ethers::core::abi::AbiDecode for HoprChannelsErrors {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <AlreadyInitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AlreadyInitialized(decoded));
             }
-            if let Ok(decoded) =
-                <BalanceExceedsGlobalPerChannelAllowance as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded)
+                = <BalanceExceedsGlobalPerChannelAllowance as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::BalanceExceedsGlobalPerChannelAllowance(decoded));
             }
-            if let Ok(decoded) = <ContractNotResponsible as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ContractNotResponsible as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::ContractNotResponsible(decoded));
             }
-            if let Ok(decoded) = <InsufficientChannelBalance as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InsufficientChannelBalance as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::InsufficientChannelBalance(decoded));
             }
-            if let Ok(decoded) = <InvalidAggregatedTicketInterval as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidAggregatedTicketInterval as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::InvalidAggregatedTicketInterval(decoded));
             }
-            if let Ok(decoded) = <InvalidBalance as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidBalance as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidBalance(decoded));
             }
-            if let Ok(decoded) = <InvalidCurvePoint as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidCurvePoint as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidCurvePoint(decoded));
             }
-            if let Ok(decoded) = <InvalidFieldElement as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidFieldElement as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidFieldElement(decoded));
             }
-            if let Ok(decoded) = <InvalidNoticePeriod as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidNoticePeriod as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidNoticePeriod(decoded));
             }
-            if let Ok(decoded) = <InvalidPointWitness as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidPointWitness as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidPointWitness(decoded));
             }
-            if let Ok(decoded) = <InvalidSafeAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidSafeAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidSafeAddress(decoded));
             }
-            if let Ok(decoded) = <InvalidTicketSignature as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidTicketSignature as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::InvalidTicketSignature(decoded));
             }
-            if let Ok(decoded) = <InvalidTokenRecipient as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidTokenRecipient as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::InvalidTokenRecipient(decoded));
             }
-            if let Ok(decoded) = <InvalidTokensReceivedUsage as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidTokensReceivedUsage as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::InvalidTokensReceivedUsage(decoded));
             }
-            if let Ok(decoded) = <InvalidVRFProof as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InvalidVRFProof as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::InvalidVRFProof(decoded));
             }
-            if let Ok(decoded) = <MultiSigUninitialized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <MultiSigUninitialized as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::MultiSigUninitialized(decoded));
             }
-            if let Ok(decoded) = <NoticePeriodNotDue as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NoticePeriodNotDue as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NoticePeriodNotDue(decoded));
             }
-            if let Ok(decoded) = <SourceEqualsDestination as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <SourceEqualsDestination as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::SourceEqualsDestination(decoded));
             }
-            if let Ok(decoded) = <TicketIsNotAWin as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TicketIsNotAWin as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TicketIsNotAWin(decoded));
             }
-            if let Ok(decoded) = <TokenTransferFailed as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TokenTransferFailed as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TokenTransferFailed(decoded));
             }
-            if let Ok(decoded) = <WrongChannelState as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <WrongChannelState as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::WrongChannelState(decoded));
             }
-            if let Ok(decoded) = <WrongToken as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <WrongToken as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::WrongToken(decoded));
             }
-            if let Ok(decoded) = <ZeroAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ZeroAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ZeroAddress(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -36825,31 +37012,75 @@ pub mod hopr_channels {
     impl ::ethers::core::abi::AbiEncode for HoprChannelsErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AlreadyInitialized(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AlreadyInitialized(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::BalanceExceedsGlobalPerChannelAllowance(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::ContractNotResponsible(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InsufficientChannelBalance(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidAggregatedTicketInterval(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidBalance(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidCurvePoint(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidFieldElement(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidNoticePeriod(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidPointWitness(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidSafeAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidTicketSignature(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidTokenRecipient(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidTokensReceivedUsage(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidVRFProof(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MultiSigUninitialized(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NoticePeriodNotDue(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SourceEqualsDestination(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TicketIsNotAWin(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TokenTransferFailed(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::WrongChannelState(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::WrongToken(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ZeroAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ContractNotResponsible(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InsufficientChannelBalance(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidAggregatedTicketInterval(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidBalance(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidCurvePoint(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidFieldElement(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidNoticePeriod(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidPointWitness(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidSafeAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidTicketSignature(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidTokenRecipient(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidTokensReceivedUsage(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidVRFProof(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::MultiSigUninitialized(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NoticePeriodNotDue(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SourceEqualsDestination(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::TicketIsNotAWin(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::TokenTransferFailed(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::WrongChannelState(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::WrongToken(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ZeroAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -36858,33 +37089,94 @@ pub mod hopr_channels {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <AlreadyInitialized as ::ethers::contract::EthError>::selector() => true,
                 _ if selector
-                    == <BalanceExceedsGlobalPerChannelAllowance as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <AlreadyInitialized as ::ethers::contract::EthError>::selector() => {
                     true
                 }
-                _ if selector == <ContractNotResponsible as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InsufficientChannelBalance as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidAggregatedTicketInterval as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidBalance as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidCurvePoint as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidFieldElement as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidNoticePeriod as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidPointWitness as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidSafeAddress as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidTicketSignature as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidTokenRecipient as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidTokensReceivedUsage as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <InvalidVRFProof as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <MultiSigUninitialized as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <NoticePeriodNotDue as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <SourceEqualsDestination as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <TicketIsNotAWin as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <TokenTransferFailed as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <WrongChannelState as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <WrongToken as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <ZeroAddress as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <BalanceExceedsGlobalPerChannelAllowance as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ContractNotResponsible as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InsufficientChannelBalance as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidAggregatedTicketInterval as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidBalance as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidCurvePoint as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidFieldElement as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidNoticePeriod as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidPointWitness as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidSafeAddress as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidTicketSignature as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidTokenRecipient as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidTokensReceivedUsage as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <InvalidVRFProof as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <MultiSigUninitialized as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NoticePeriodNotDue as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SourceEqualsDestination as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <TicketIsNotAWin as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <TokenTransferFailed as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <WrongChannelState as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <WrongToken as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <ZeroAddress as ::ethers::contract::EthError>::selector() => true,
                 _ => false,
             }
         }
@@ -36892,26 +37184,58 @@ pub mod hopr_channels {
     impl ::core::fmt::Display for HoprChannelsErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AlreadyInitialized(element) => ::core::fmt::Display::fmt(element, f),
-                Self::BalanceExceedsGlobalPerChannelAllowance(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ContractNotResponsible(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InsufficientChannelBalance(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidAggregatedTicketInterval(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AlreadyInitialized(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::BalanceExceedsGlobalPerChannelAllowance(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::ContractNotResponsible(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InsufficientChannelBalance(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidAggregatedTicketInterval(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::InvalidBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidCurvePoint(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidFieldElement(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidNoticePeriod(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidPointWitness(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidSafeAddress(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidTicketSignature(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidTokenRecipient(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidTokensReceivedUsage(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidFieldElement(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidNoticePeriod(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidPointWitness(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidSafeAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidTicketSignature(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidTokenRecipient(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidTokensReceivedUsage(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::InvalidVRFProof(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MultiSigUninitialized(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NoticePeriodNotDue(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SourceEqualsDestination(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MultiSigUninitialized(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NoticePeriodNotDue(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::SourceEqualsDestination(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::TicketIsNotAWin(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TokenTransferFailed(element) => ::core::fmt::Display::fmt(element, f),
+                Self::TokenTransferFailed(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::WrongChannelState(element) => ::core::fmt::Display::fmt(element, f),
                 Self::WrongToken(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ZeroAddress(element) => ::core::fmt::Display::fmt(element, f),
@@ -36929,7 +37253,8 @@ pub mod hopr_channels {
             Self::AlreadyInitialized(value)
         }
     }
-    impl ::core::convert::From<BalanceExceedsGlobalPerChannelAllowance> for HoprChannelsErrors {
+    impl ::core::convert::From<BalanceExceedsGlobalPerChannelAllowance>
+    for HoprChannelsErrors {
         fn from(value: BalanceExceedsGlobalPerChannelAllowance) -> Self {
             Self::BalanceExceedsGlobalPerChannelAllowance(value)
         }
@@ -37040,25 +37365,52 @@ pub mod hopr_channels {
         }
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "ChannelBalanceDecreased", abi = "ChannelBalanceDecreased(bytes32,uint96)")]
+    #[ethevent(
+        name = "ChannelBalanceDecreased",
+        abi = "ChannelBalanceDecreased(bytes32,uint96)"
+    )]
     pub struct ChannelBalanceDecreasedFilter {
         #[ethevent(indexed)]
         pub channel_id: [u8; 32],
         pub new_balance: u128,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "ChannelBalanceIncreased", abi = "ChannelBalanceIncreased(bytes32,uint96)")]
+    #[ethevent(
+        name = "ChannelBalanceIncreased",
+        abi = "ChannelBalanceIncreased(bytes32,uint96)"
+    )]
     pub struct ChannelBalanceIncreasedFilter {
         #[ethevent(indexed)]
         pub channel_id: [u8; 32],
         pub new_balance: u128,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "ChannelClosed", abi = "ChannelClosed(bytes32)")]
     pub struct ChannelClosedFilter {
@@ -37066,18 +37418,31 @@ pub mod hopr_channels {
         pub channel_id: [u8; 32],
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "ChannelOpened", abi = "ChannelOpened(address,address,uint96)")]
+    #[ethevent(name = "ChannelOpened", abi = "ChannelOpened(address,address)")]
     pub struct ChannelOpenedFilter {
         #[ethevent(indexed)]
         pub source: ::ethers::core::types::Address,
         #[ethevent(indexed)]
         pub destination: ::ethers::core::types::Address,
-        pub amount: u128,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(
         name = "OutgoingChannelClosureInitiated",
@@ -37089,7 +37454,14 @@ pub mod hopr_channels {
         pub closure_time: u32,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "TicketRedeemed", abi = "TicketRedeemed(bytes32,uint48)")]
     pub struct TicketRedeemedFilter {
@@ -37108,7 +37480,9 @@ pub mod hopr_channels {
         TicketRedeemedFilter(TicketRedeemedFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprChannelsEvents {
-        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(
+            log: &::ethers::core::abi::RawLog,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = ChannelBalanceDecreasedFilter::decode_log(log) {
                 return Ok(HoprChannelsEvents::ChannelBalanceDecreasedFilter(decoded));
             }
@@ -37122,7 +37496,9 @@ pub mod hopr_channels {
                 return Ok(HoprChannelsEvents::ChannelOpenedFilter(decoded));
             }
             if let Ok(decoded) = OutgoingChannelClosureInitiatedFilter::decode_log(log) {
-                return Ok(HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(decoded));
+                return Ok(
+                    HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(decoded),
+                );
             }
             if let Ok(decoded) = TicketRedeemedFilter::decode_log(log) {
                 return Ok(HoprChannelsEvents::TicketRedeemedFilter(decoded));
@@ -37133,12 +37509,24 @@ pub mod hopr_channels {
     impl ::core::fmt::Display for HoprChannelsEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::ChannelBalanceDecreasedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ChannelBalanceIncreasedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ChannelClosedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ChannelOpenedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OutgoingChannelClosureInitiatedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TicketRedeemedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ChannelBalanceDecreasedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::ChannelBalanceIncreasedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::ChannelClosedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::ChannelOpenedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::OutgoingChannelClosureInitiatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::TicketRedeemedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
@@ -37162,7 +37550,8 @@ pub mod hopr_channels {
             Self::ChannelOpenedFilter(value)
         }
     }
-    impl ::core::convert::From<OutgoingChannelClosureInitiatedFilter> for HoprChannelsEvents {
+    impl ::core::convert::From<OutgoingChannelClosureInitiatedFilter>
+    for HoprChannelsEvents {
         fn from(value: OutgoingChannelClosureInitiatedFilter) -> Self {
             Self::OutgoingChannelClosureInitiatedFilter(value)
         }
@@ -37174,7 +37563,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE` function with signature `ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE()` and selector `0x78d8016d`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE",
@@ -37183,49 +37579,111 @@ pub mod hopr_channels {
     pub struct Erc777HookFundChannelMultiSizeCall;
     ///Container type for all input parameters for the `ERC777_HOOK_FUND_CHANNEL_SIZE` function with signature `ERC777_HOOK_FUND_CHANNEL_SIZE()` and selector `0x44dae6f8`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethcall(name = "ERC777_HOOK_FUND_CHANNEL_SIZE", abi = "ERC777_HOOK_FUND_CHANNEL_SIZE()")]
+    #[ethcall(
+        name = "ERC777_HOOK_FUND_CHANNEL_SIZE",
+        abi = "ERC777_HOOK_FUND_CHANNEL_SIZE()"
+    )]
     pub struct Erc777HookFundChannelSizeCall;
     ///Container type for all input parameters for the `LEDGER_VERSION` function with signature `LEDGER_VERSION()` and selector `0xddad1902`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "LEDGER_VERSION", abi = "LEDGER_VERSION()")]
     pub struct LedgerVersionCall;
     ///Container type for all input parameters for the `MAX_USED_BALANCE` function with signature `MAX_USED_BALANCE()` and selector `0x5d2f07c5`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "MAX_USED_BALANCE", abi = "MAX_USED_BALANCE()")]
     pub struct MaxUsedBalanceCall;
     ///Container type for all input parameters for the `MIN_USED_BALANCE` function with signature `MIN_USED_BALANCE()` and selector `0x29392e32`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "MIN_USED_BALANCE", abi = "MIN_USED_BALANCE()")]
     pub struct MinUsedBalanceCall;
     ///Container type for all input parameters for the `TOKENS_RECIPIENT_INTERFACE_HASH` function with signature `TOKENS_RECIPIENT_INTERFACE_HASH()` and selector `0x72581cc0`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethcall(name = "TOKENS_RECIPIENT_INTERFACE_HASH", abi = "TOKENS_RECIPIENT_INTERFACE_HASH()")]
+    #[ethcall(
+        name = "TOKENS_RECIPIENT_INTERFACE_HASH",
+        abi = "TOKENS_RECIPIENT_INTERFACE_HASH()"
+    )]
     pub struct TokensRecipientInterfaceHashCall;
     ///Container type for all input parameters for the `VERSION` function with signature `VERSION()` and selector `0xffa1ad74`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "VERSION", abi = "VERSION()")]
     pub struct VersionCall;
     ///Container type for all input parameters for the `_currentBlockTimestamp` function with signature `_currentBlockTimestamp()` and selector `0xb920deed`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "_currentBlockTimestamp", abi = "_currentBlockTimestamp()")]
     pub struct CurrentBlockTimestampCall;
     ///Container type for all input parameters for the `_getChannelId` function with signature `_getChannelId(address,address)` and selector `0xbe9babdc`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "_getChannelId", abi = "_getChannelId(address,address)")]
     pub struct GetChannelIdCall {
@@ -37234,7 +37692,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `_getTicketHash` function with signature `_getTicketHash(((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256))` and selector `0x24086cc2`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "_getTicketHash",
@@ -37245,7 +37710,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `_isWinningTicket` function with signature `_isWinningTicket(bytes32,((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256),(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))` and selector `0x8c3710c9`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "_isWinningTicket",
@@ -37258,7 +37730,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `canImplementInterfaceForAddress` function with signature `canImplementInterfaceForAddress(bytes32,address)` and selector `0x249cb3fa`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "canImplementInterfaceForAddress",
@@ -37270,13 +37749,27 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `channels` function with signature `channels(bytes32)` and selector `0x7a7ebd7b`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "channels", abi = "channels(bytes32)")]
     pub struct ChannelsCall(pub [u8; 32]);
     ///Container type for all input parameters for the `closeIncomingChannel` function with signature `closeIncomingChannel(address)` and selector `0x1a7ffe7a`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "closeIncomingChannel", abi = "closeIncomingChannel(address)")]
     pub struct CloseIncomingChannelCall {
@@ -37284,22 +37777,46 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `closeIncomingChannelSafe` function with signature `closeIncomingChannelSafe(address,address)` and selector `0x54a2edf5`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethcall(name = "closeIncomingChannelSafe", abi = "closeIncomingChannelSafe(address,address)")]
+    #[ethcall(
+        name = "closeIncomingChannelSafe",
+        abi = "closeIncomingChannelSafe(address,address)"
+    )]
     pub struct CloseIncomingChannelSafeCall {
         pub self_: ::ethers::core::types::Address,
         pub source: ::ethers::core::types::Address,
     }
     ///Container type for all input parameters for the `domainSeparator` function with signature `domainSeparator()` and selector `0xf698da25`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "domainSeparator", abi = "domainSeparator()")]
     pub struct DomainSeparatorCall;
     ///Container type for all input parameters for the `finalizeOutgoingChannelClosure` function with signature `finalizeOutgoingChannelClosure(address)` and selector `0x23cb3ac0`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "finalizeOutgoingChannelClosure",
@@ -37310,7 +37827,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `finalizeOutgoingChannelClosureSafe` function with signature `finalizeOutgoingChannelClosureSafe(address,address)` and selector `0x651514bf`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "finalizeOutgoingChannelClosureSafe",
@@ -37322,7 +37846,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `fundChannel` function with signature `fundChannel(address,uint96)` and selector `0xfc55309a`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "fundChannel", abi = "fundChannel(address,uint96)")]
     pub struct FundChannelCall {
@@ -37331,7 +37862,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `fundChannelSafe` function with signature `fundChannelSafe(address,address,uint96)` and selector `0x0abec58f`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "fundChannelSafe", abi = "fundChannelSafe(address,address,uint96)")]
     pub struct FundChannelSafeCall {
@@ -37341,7 +37879,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `initiateOutgoingChannelClosure` function with signature `initiateOutgoingChannelClosure(address)` and selector `0x7c8e28da`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "initiateOutgoingChannelClosure",
@@ -37352,7 +37897,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `initiateOutgoingChannelClosureSafe` function with signature `initiateOutgoingChannelClosureSafe(address,address)` and selector `0xbda65f45`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "initiateOutgoingChannelClosureSafe",
@@ -37364,13 +37916,27 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `ledgerDomainSeparator` function with signature `ledgerDomainSeparator()` and selector `0xc966c4fe`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "ledgerDomainSeparator", abi = "ledgerDomainSeparator()")]
     pub struct LedgerDomainSeparatorCall;
     ///Container type for all input parameters for the `multicall` function with signature `multicall(bytes[])` and selector `0xac9650d8`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "multicall", abi = "multicall(bytes[])")]
     pub struct MulticallCall {
@@ -37378,13 +37944,27 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `noticePeriodChannelClosure` function with signature `noticePeriodChannelClosure()` and selector `0x87352d65`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "noticePeriodChannelClosure", abi = "noticePeriodChannelClosure()")]
     pub struct NoticePeriodChannelClosureCall;
     ///Container type for all input parameters for the `redeemTicket` function with signature `redeemTicket(((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256),(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))` and selector `0xfcb7796f`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "redeemTicket",
@@ -37396,7 +37976,14 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `redeemTicketSafe` function with signature `redeemTicketSafe(address,((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256),(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))` and selector `0x0cd88d72`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "redeemTicketSafe",
@@ -37409,13 +37996,27 @@ pub mod hopr_channels {
     }
     ///Container type for all input parameters for the `token` function with signature `token()` and selector `0xfc0c546a`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "token", abi = "token()")]
     pub struct TokenCall;
     ///Container type for all input parameters for the `tokensReceived` function with signature `tokensReceived(address,address,address,uint256,bytes,bytes)` and selector `0x0023de29`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(
         name = "tokensReceived",
@@ -37463,97 +38064,152 @@ pub mod hopr_channels {
         TokensReceived(TokensReceivedCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprChannelsCalls {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <Erc777HookFundChannelMultiSizeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <Erc777HookFundChannelMultiSizeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::Erc777HookFundChannelMultiSize(decoded));
             }
-            if let Ok(decoded) = <Erc777HookFundChannelSizeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <Erc777HookFundChannelSizeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::Erc777HookFundChannelSize(decoded));
             }
-            if let Ok(decoded) = <LedgerVersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <LedgerVersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::LedgerVersion(decoded));
             }
-            if let Ok(decoded) = <MaxUsedBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <MaxUsedBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MaxUsedBalance(decoded));
             }
-            if let Ok(decoded) = <MinUsedBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <MinUsedBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MinUsedBalance(decoded));
             }
-            if let Ok(decoded) = <TokensRecipientInterfaceHashCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TokensRecipientInterfaceHashCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::TokensRecipientInterfaceHash(decoded));
             }
-            if let Ok(decoded) = <VersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <VersionCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Version(decoded));
             }
-            if let Ok(decoded) = <CurrentBlockTimestampCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <CurrentBlockTimestampCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::CurrentBlockTimestamp(decoded));
             }
-            if let Ok(decoded) = <GetChannelIdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GetChannelIdCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetChannelId(decoded));
             }
-            if let Ok(decoded) = <GetTicketHashCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GetTicketHashCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetTicketHash(decoded));
             }
-            if let Ok(decoded) = <IsWinningTicketCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <IsWinningTicketCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::IsWinningTicket(decoded));
             }
-            if let Ok(decoded) = <CanImplementInterfaceForAddressCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <CanImplementInterfaceForAddressCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::CanImplementInterfaceForAddress(decoded));
             }
-            if let Ok(decoded) = <ChannelsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ChannelsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Channels(decoded));
             }
-            if let Ok(decoded) = <CloseIncomingChannelCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <CloseIncomingChannelCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::CloseIncomingChannel(decoded));
             }
-            if let Ok(decoded) = <CloseIncomingChannelSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <CloseIncomingChannelSafeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::CloseIncomingChannelSafe(decoded));
             }
-            if let Ok(decoded) = <DomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <DomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::DomainSeparator(decoded));
             }
-            if let Ok(decoded) = <FinalizeOutgoingChannelClosureCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <FinalizeOutgoingChannelClosureCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::FinalizeOutgoingChannelClosure(decoded));
             }
-            if let Ok(decoded) =
-                <FinalizeOutgoingChannelClosureSafeCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded)
+                = <FinalizeOutgoingChannelClosureSafeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::FinalizeOutgoingChannelClosureSafe(decoded));
             }
-            if let Ok(decoded) = <FundChannelCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <FundChannelCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::FundChannel(decoded));
             }
-            if let Ok(decoded) = <FundChannelSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <FundChannelSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::FundChannelSafe(decoded));
             }
-            if let Ok(decoded) = <InitiateOutgoingChannelClosureCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <InitiateOutgoingChannelClosureCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::InitiateOutgoingChannelClosure(decoded));
             }
-            if let Ok(decoded) =
-                <InitiateOutgoingChannelClosureSafeCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded)
+                = <InitiateOutgoingChannelClosureSafeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::InitiateOutgoingChannelClosureSafe(decoded));
             }
-            if let Ok(decoded) = <LedgerDomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <LedgerDomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::LedgerDomainSeparator(decoded));
             }
-            if let Ok(decoded) = <MulticallCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <MulticallCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Multicall(decoded));
             }
-            if let Ok(decoded) = <NoticePeriodChannelClosureCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <NoticePeriodChannelClosureCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::NoticePeriodChannelClosure(decoded));
             }
-            if let Ok(decoded) = <RedeemTicketCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RedeemTicketCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RedeemTicket(decoded));
             }
-            if let Ok(decoded) = <RedeemTicketSafeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RedeemTicketSafeCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RedeemTicketSafe(decoded));
             }
-            if let Ok(decoded) = <TokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Token(decoded));
             }
-            if let Ok(decoded) = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TokensReceivedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TokensReceived(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -37562,66 +38218,146 @@ pub mod hopr_channels {
     impl ::ethers::core::abi::AbiEncode for HoprChannelsCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::Erc777HookFundChannelMultiSize(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Erc777HookFundChannelSize(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::LedgerVersion(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MaxUsedBalance(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MinUsedBalance(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TokensRecipientInterfaceHash(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Erc777HookFundChannelMultiSize(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::Erc777HookFundChannelSize(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::LedgerVersion(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::MaxUsedBalance(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::MinUsedBalance(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::TokensRecipientInterfaceHash(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Version(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CurrentBlockTimestamp(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetChannelId(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetTicketHash(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::IsWinningTicket(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CanImplementInterfaceForAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Channels(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CloseIncomingChannel(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CloseIncomingChannelSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::DomainSeparator(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::FinalizeOutgoingChannelClosure(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::FinalizeOutgoingChannelClosureSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::FundChannel(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::FundChannelSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InitiateOutgoingChannelClosure(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InitiateOutgoingChannelClosureSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::LedgerDomainSeparator(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Multicall(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NoticePeriodChannelClosure(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RedeemTicket(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RedeemTicketSafe(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::CurrentBlockTimestamp(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetChannelId(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetTicketHash(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::IsWinningTicket(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CanImplementInterfaceForAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::Channels(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CloseIncomingChannel(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CloseIncomingChannelSafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::DomainSeparator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FinalizeOutgoingChannelClosure(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FinalizeOutgoingChannelClosureSafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FundChannel(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FundChannelSafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InitiateOutgoingChannelClosure(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InitiateOutgoingChannelClosureSafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::LedgerDomainSeparator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::Multicall(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NoticePeriodChannelClosure(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RedeemTicket(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RedeemTicketSafe(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Token(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TokensReceived(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TokensReceived(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
     impl ::core::fmt::Display for HoprChannelsCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::Erc777HookFundChannelMultiSize(element) => ::core::fmt::Display::fmt(element, f),
-                Self::Erc777HookFundChannelSize(element) => ::core::fmt::Display::fmt(element, f),
+                Self::Erc777HookFundChannelMultiSize(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::Erc777HookFundChannelSize(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::LedgerVersion(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MaxUsedBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MinUsedBalance(element) => ::core::fmt::Display::fmt(element, f),
-                Self::TokensRecipientInterfaceHash(element) => ::core::fmt::Display::fmt(element, f),
+                Self::TokensRecipientInterfaceHash(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::Version(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CurrentBlockTimestamp(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CurrentBlockTimestamp(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::GetChannelId(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetTicketHash(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsWinningTicket(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CanImplementInterfaceForAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CanImplementInterfaceForAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::Channels(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CloseIncomingChannel(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CloseIncomingChannelSafe(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CloseIncomingChannel(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CloseIncomingChannelSafe(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::DomainSeparator(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FinalizeOutgoingChannelClosure(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FinalizeOutgoingChannelClosureSafe(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FinalizeOutgoingChannelClosure(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::FinalizeOutgoingChannelClosureSafe(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::FundChannel(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FundChannelSafe(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InitiateOutgoingChannelClosure(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InitiateOutgoingChannelClosureSafe(element) => ::core::fmt::Display::fmt(element, f),
-                Self::LedgerDomainSeparator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InitiateOutgoingChannelClosure(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InitiateOutgoingChannelClosureSafe(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::LedgerDomainSeparator(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::Multicall(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NoticePeriodChannelClosure(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NoticePeriodChannelClosure(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RedeemTicket(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RedeemTicketSafe(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Token(element) => ::core::fmt::Display::fmt(element, f),
@@ -37629,7 +38365,8 @@ pub mod hopr_channels {
             }
         }
     }
-    impl ::core::convert::From<Erc777HookFundChannelMultiSizeCall> for HoprChannelsCalls {
+    impl ::core::convert::From<Erc777HookFundChannelMultiSizeCall>
+    for HoprChannelsCalls {
         fn from(value: Erc777HookFundChannelMultiSizeCall) -> Self {
             Self::Erc777HookFundChannelMultiSize(value)
         }
@@ -37684,7 +38421,8 @@ pub mod hopr_channels {
             Self::IsWinningTicket(value)
         }
     }
-    impl ::core::convert::From<CanImplementInterfaceForAddressCall> for HoprChannelsCalls {
+    impl ::core::convert::From<CanImplementInterfaceForAddressCall>
+    for HoprChannelsCalls {
         fn from(value: CanImplementInterfaceForAddressCall) -> Self {
             Self::CanImplementInterfaceForAddress(value)
         }
@@ -37709,12 +38447,14 @@ pub mod hopr_channels {
             Self::DomainSeparator(value)
         }
     }
-    impl ::core::convert::From<FinalizeOutgoingChannelClosureCall> for HoprChannelsCalls {
+    impl ::core::convert::From<FinalizeOutgoingChannelClosureCall>
+    for HoprChannelsCalls {
         fn from(value: FinalizeOutgoingChannelClosureCall) -> Self {
             Self::FinalizeOutgoingChannelClosure(value)
         }
     }
-    impl ::core::convert::From<FinalizeOutgoingChannelClosureSafeCall> for HoprChannelsCalls {
+    impl ::core::convert::From<FinalizeOutgoingChannelClosureSafeCall>
+    for HoprChannelsCalls {
         fn from(value: FinalizeOutgoingChannelClosureSafeCall) -> Self {
             Self::FinalizeOutgoingChannelClosureSafe(value)
         }
@@ -37729,12 +38469,14 @@ pub mod hopr_channels {
             Self::FundChannelSafe(value)
         }
     }
-    impl ::core::convert::From<InitiateOutgoingChannelClosureCall> for HoprChannelsCalls {
+    impl ::core::convert::From<InitiateOutgoingChannelClosureCall>
+    for HoprChannelsCalls {
         fn from(value: InitiateOutgoingChannelClosureCall) -> Self {
             Self::InitiateOutgoingChannelClosure(value)
         }
     }
-    impl ::core::convert::From<InitiateOutgoingChannelClosureSafeCall> for HoprChannelsCalls {
+    impl ::core::convert::From<InitiateOutgoingChannelClosureSafeCall>
+    for HoprChannelsCalls {
         fn from(value: InitiateOutgoingChannelClosureSafeCall) -> Self {
             Self::InitiateOutgoingChannelClosureSafe(value)
         }
@@ -37776,67 +38518,158 @@ pub mod hopr_channels {
     }
     ///Container type for all return fields from the `ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE` function with signature `ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE()` and selector `0x78d8016d`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct Erc777HookFundChannelMultiSizeReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `ERC777_HOOK_FUND_CHANNEL_SIZE` function with signature `ERC777_HOOK_FUND_CHANNEL_SIZE()` and selector `0x44dae6f8`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct Erc777HookFundChannelSizeReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `LEDGER_VERSION` function with signature `LEDGER_VERSION()` and selector `0xddad1902`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct LedgerVersionReturn(pub ::std::string::String);
     ///Container type for all return fields from the `MAX_USED_BALANCE` function with signature `MAX_USED_BALANCE()` and selector `0x5d2f07c5`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct MaxUsedBalanceReturn(pub u128);
     ///Container type for all return fields from the `MIN_USED_BALANCE` function with signature `MIN_USED_BALANCE()` and selector `0x29392e32`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct MinUsedBalanceReturn(pub u128);
     ///Container type for all return fields from the `TOKENS_RECIPIENT_INTERFACE_HASH` function with signature `TOKENS_RECIPIENT_INTERFACE_HASH()` and selector `0x72581cc0`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct TokensRecipientInterfaceHashReturn(pub [u8; 32]);
     ///Container type for all return fields from the `VERSION` function with signature `VERSION()` and selector `0xffa1ad74`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct VersionReturn(pub ::std::string::String);
     ///Container type for all return fields from the `_currentBlockTimestamp` function with signature `_currentBlockTimestamp()` and selector `0xb920deed`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct CurrentBlockTimestampReturn(pub u32);
     ///Container type for all return fields from the `_getChannelId` function with signature `_getChannelId(address,address)` and selector `0xbe9babdc`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct GetChannelIdReturn(pub [u8; 32]);
     ///Container type for all return fields from the `_getTicketHash` function with signature `_getTicketHash(((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256))` and selector `0x24086cc2`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct GetTicketHashReturn(pub [u8; 32]);
     ///Container type for all return fields from the `_isWinningTicket` function with signature `_isWinningTicket(bytes32,((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256),(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256))` and selector `0x8c3710c9`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct IsWinningTicketReturn(pub bool);
     ///Container type for all return fields from the `canImplementInterfaceForAddress` function with signature `canImplementInterfaceForAddress(bytes32,address)` and selector `0x249cb3fa`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct CanImplementInterfaceForAddressReturn(pub [u8; 32]);
     ///Container type for all return fields from the `channels` function with signature `channels(bytes32)` and selector `0x7a7ebd7b`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct ChannelsReturn {
         pub balance: u128,
@@ -37847,34 +38680,76 @@ pub mod hopr_channels {
     }
     ///Container type for all return fields from the `domainSeparator` function with signature `domainSeparator()` and selector `0xf698da25`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct DomainSeparatorReturn(pub [u8; 32]);
     ///Container type for all return fields from the `ledgerDomainSeparator` function with signature `ledgerDomainSeparator()` and selector `0xc966c4fe`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct LedgerDomainSeparatorReturn(pub [u8; 32]);
     ///Container type for all return fields from the `multicall` function with signature `multicall(bytes[])` and selector `0xac9650d8`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct MulticallReturn {
         pub results: ::std::vec::Vec<::ethers::core::types::Bytes>,
     }
     ///Container type for all return fields from the `noticePeriodChannelClosure` function with signature `noticePeriodChannelClosure()` and selector `0x87352d65`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct NoticePeriodChannelClosureReturn(pub u32);
     ///Container type for all return fields from the `token` function with signature `token()` and selector `0xfc0c546a`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct TokenReturn(pub ::ethers::core::types::Address);
     ///`RedeemableTicket((bytes32,uint96,uint48,uint32,uint24,uint56),(bytes32,bytes32),uint256)`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct RedeemableTicket {
         pub data: TicketData,
@@ -37883,7 +38758,14 @@ pub mod hopr_channels {
     }
     ///`TicketData(bytes32,uint96,uint48,uint32,uint24,uint56)`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct TicketData {
         pub channel_id: [u8; 32],
@@ -37895,7 +38777,14 @@ pub mod hopr_channels {
     }
     ///`CompactSignature(bytes32,bytes32)`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct CompactSignature {
         pub r: [u8; 32],
@@ -37903,7 +38792,14 @@ pub mod hopr_channels {
     }
     ///`Vrfparameters(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct Vrfparameters {
         pub vx: ::ethers::core::types::U256,

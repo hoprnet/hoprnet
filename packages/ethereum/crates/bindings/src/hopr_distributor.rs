@@ -7,16 +7,14 @@ pub use hopr_distributor::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod hopr_distributor {
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"contract HoprToken\",\"name\":\"_token\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"_startTime\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"_maxMintAmount\",\"type\":\"uint128\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint128\",\"name\":\"amount\",\"type\":\"uint128\",\"components\":[],\"indexed\":false},{\"internalType\":\"string\",\"name\":\"scheduleName\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"AllocationAdded\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint128\",\"name\":\"amount\",\"type\":\"uint128\",\"components\":[],\"indexed\":false},{\"internalType\":\"string\",\"name\":\"scheduleName\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Claimed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint128[]\",\"name\":\"durations\",\"type\":\"uint128[]\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint128[]\",\"name\":\"percents\",\"type\":\"uint128[]\",\"components\":[],\"indexed\":false},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScheduleAdded\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"MULTIPLIER\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"accounts\",\"type\":\"address[]\",\"components\":[]},{\"internalType\":\"uint128[]\",\"name\":\"amounts\",\"type\":\"uint128[]\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"scheduleName\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"addAllocations\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint128[]\",\"name\":\"durations\",\"type\":\"uint128[]\",\"components\":[]},{\"internalType\":\"uint128[]\",\"name\":\"percents\",\"type\":\"uint128[]\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"addSchedule\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"allocations\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"amount\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"claimed\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"lastClaim\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"bool\",\"name\":\"revoked\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"scheduleName\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"claim\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"scheduleName\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"claimFor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"scheduleName\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getClaimable\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getSchedule\",\"outputs\":[{\"internalType\":\"uint128[]\",\"name\":\"\",\"type\":\"uint128[]\",\"components\":[]},{\"internalType\":\"uint128[]\",\"name\":\"\",\"type\":\"uint128[]\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"maxMintAmount\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"renounceOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"string\",\"name\":\"scheduleName\",\"type\":\"string\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"revokeAccount\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"startTime\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"token\",\"outputs\":[{\"internalType\":\"contract HoprToken\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"totalMinted\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"totalToBeMinted\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"transferOwnership\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint128\",\"name\":\"_startTime\",\"type\":\"uint128\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateStartTime\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
-    pub static HOPRDISTRIBUTOR_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(|| {
-            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
-        });
+    pub static HOPRDISTRIBUTOR_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
+    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
         96,
@@ -8156,8 +8154,9 @@ pub mod hopr_distributor {
         51,
     ];
     ///The bytecode of the contract.
-    pub static HOPRDISTRIBUTOR_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__BYTECODE);
+    pub static HOPRDISTRIBUTOR_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __BYTECODE,
+    );
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = &[
         96,
@@ -15935,8 +15934,9 @@ pub mod hopr_distributor {
         51,
     ];
     ///The deployed bytecode of the contract.
-    pub static HOPRDISTRIBUTOR_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static HOPRDISTRIBUTOR_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct HoprDistributor<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for HoprDistributor<M> {
         fn clone(&self) -> Self {
@@ -15956,20 +15956,23 @@ pub mod hopr_distributor {
     }
     impl<M> ::core::fmt::Debug for HoprDistributor<M> {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-            f.debug_tuple(stringify!(HoprDistributor))
-                .field(&self.address())
-                .finish()
+            f.debug_tuple(stringify!(HoprDistributor)).field(&self.address()).finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> HoprDistributor<M> {
         /// Creates a new contract instance with the specified `ethers` client at
         /// `address`. The contract derefs to a `ethers::Contract` object.
-        pub fn new<T: Into<::ethers::core::types::Address>>(address: T, client: ::std::sync::Arc<M>) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                HOPRDISTRIBUTOR_ABI.clone(),
-                client,
-            ))
+        pub fn new<T: Into<::ethers::core::types::Address>>(
+            address: T,
+            client: ::std::sync::Arc<M>,
+        ) -> Self {
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    HOPRDISTRIBUTOR_ABI.clone(),
+                    client,
+                ),
+            )
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -16049,7 +16052,10 @@ pub mod hopr_distributor {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `claim` (0xf3fe12c9) function
-        pub fn claim(&self, schedule_name: ::std::string::String) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn claim(
+            &self,
+            schedule_name: ::std::string::String,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([243, 254, 18, 201], schedule_name)
                 .expect("method not found (this should never happen)")
@@ -16078,25 +16084,37 @@ pub mod hopr_distributor {
         pub fn get_schedule(
             &self,
             name: ::std::string::String,
-        ) -> ::ethers::contract::builders::ContractCall<M, (::std::vec::Vec<u128>, ::std::vec::Vec<u128>)> {
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            (::std::vec::Vec<u128>, ::std::vec::Vec<u128>),
+        > {
             self.0
                 .method_hash([114, 132, 15, 14], name)
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `maxMintAmount` (0x239c70ae) function
-        pub fn max_mint_amount(&self) -> ::ethers::contract::builders::ContractCall<M, u128> {
+        pub fn max_mint_amount(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u128> {
             self.0
                 .method_hash([35, 156, 112, 174], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `owner` (0x8da5cb5b) function
-        pub fn owner(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        pub fn owner(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([141, 165, 203, 91], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `renounceOwnership` (0x715018a6) function
-        pub fn renounce_ownership(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn renounce_ownership(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([113, 80, 24, 166], ())
                 .expect("method not found (this should never happen)")
@@ -16118,19 +16136,28 @@ pub mod hopr_distributor {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `token` (0xfc0c546a) function
-        pub fn token(&self) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
+        pub fn token(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::ethers::core::types::Address,
+        > {
             self.0
                 .method_hash([252, 12, 84, 106], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `totalMinted` (0xa2309ff8) function
-        pub fn total_minted(&self) -> ::ethers::contract::builders::ContractCall<M, u128> {
+        pub fn total_minted(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u128> {
             self.0
                 .method_hash([162, 48, 159, 248], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `totalToBeMinted` (0x0373a364) function
-        pub fn total_to_be_minted(&self) -> ::ethers::contract::builders::ContractCall<M, u128> {
+        pub fn total_to_be_minted(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, u128> {
             self.0
                 .method_hash([3, 115, 163, 100], ())
                 .expect("method not found (this should never happen)")
@@ -16145,7 +16172,10 @@ pub mod hopr_distributor {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `updateStartTime` (0xb733f67d) function
-        pub fn update_start_time(&self, start_time: u128) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        pub fn update_start_time(
+            &self,
+            start_time: u128,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([183, 51, 246, 125], start_time)
                 .expect("method not found (this should never happen)")
@@ -16153,39 +16183,70 @@ pub mod hopr_distributor {
         ///Gets the contract's `AllocationAdded` event
         pub fn allocation_added_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, AllocationAddedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            AllocationAddedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `Claimed` event
-        pub fn claimed_filter(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ClaimedFilter> {
+        pub fn claimed_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ClaimedFilter> {
             self.0.event()
         }
         ///Gets the contract's `OwnershipTransferred` event
         pub fn ownership_transferred_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OwnershipTransferredFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            OwnershipTransferredFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ScheduleAdded` event
         pub fn schedule_added_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ScheduleAddedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ScheduleAddedFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
-        pub fn events(&self) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, HoprDistributorEvents> {
+        pub fn events(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            HoprDistributorEvents,
+        > {
             self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HoprDistributor<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
+    for HoprDistributor<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "AllocationAdded", abi = "AllocationAdded(address,uint128,string)")]
+    #[ethevent(
+        name = "AllocationAdded",
+        abi = "AllocationAdded(address,uint128,string)"
+    )]
     pub struct AllocationAddedFilter {
         #[ethevent(indexed)]
         pub account: ::ethers::core::types::Address,
@@ -16193,7 +16254,14 @@ pub mod hopr_distributor {
         pub schedule_name: ::std::string::String,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethevent(name = "Claimed", abi = "Claimed(address,uint128,string)")]
     pub struct ClaimedFilter {
@@ -16203,9 +16271,19 @@ pub mod hopr_distributor {
         pub schedule_name: ::std::string::String,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "OwnershipTransferred", abi = "OwnershipTransferred(address,address)")]
+    #[ethevent(
+        name = "OwnershipTransferred",
+        abi = "OwnershipTransferred(address,address)"
+    )]
     pub struct OwnershipTransferredFilter {
         #[ethevent(indexed)]
         pub previous_owner: ::ethers::core::types::Address,
@@ -16213,9 +16291,19 @@ pub mod hopr_distributor {
         pub new_owner: ::ethers::core::types::Address,
     }
     #[derive(
-        Clone, ::ethers::contract::EthEvent, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethevent(name = "ScheduleAdded", abi = "ScheduleAdded(uint128[],uint128[],string)")]
+    #[ethevent(
+        name = "ScheduleAdded",
+        abi = "ScheduleAdded(uint128[],uint128[],string)"
+    )]
     pub struct ScheduleAddedFilter {
         pub durations: ::std::vec::Vec<u128>,
         pub percents: ::std::vec::Vec<u128>,
@@ -16230,7 +16318,9 @@ pub mod hopr_distributor {
         ScheduleAddedFilter(ScheduleAddedFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprDistributorEvents {
-        fn decode_log(log: &::ethers::core::abi::RawLog) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+        fn decode_log(
+            log: &::ethers::core::abi::RawLog,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = AllocationAddedFilter::decode_log(log) {
                 return Ok(HoprDistributorEvents::AllocationAddedFilter(decoded));
             }
@@ -16249,10 +16339,16 @@ pub mod hopr_distributor {
     impl ::core::fmt::Display for HoprDistributorEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AllocationAddedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AllocationAddedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::ClaimedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OwnershipTransferredFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ScheduleAddedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnershipTransferredFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::ScheduleAddedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
@@ -16278,15 +16374,32 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `MULTIPLIER` function with signature `MULTIPLIER()` and selector `0x059f8b16`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "MULTIPLIER", abi = "MULTIPLIER()")]
     pub struct MultiplierCall;
     ///Container type for all input parameters for the `addAllocations` function with signature `addAllocations(address[],uint128[],string)` and selector `0x22bccfd7`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
-    #[ethcall(name = "addAllocations", abi = "addAllocations(address[],uint128[],string)")]
+    #[ethcall(
+        name = "addAllocations",
+        abi = "addAllocations(address[],uint128[],string)"
+    )]
     pub struct AddAllocationsCall {
         pub accounts: ::std::vec::Vec<::ethers::core::types::Address>,
         pub amounts: ::std::vec::Vec<u128>,
@@ -16294,7 +16407,14 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `addSchedule` function with signature `addSchedule(uint128[],uint128[],string)` and selector `0xe5742970`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "addSchedule", abi = "addSchedule(uint128[],uint128[],string)")]
     pub struct AddScheduleCall {
@@ -16304,13 +16424,30 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `allocations` function with signature `allocations(address,string)` and selector `0xc31cd7d7`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "allocations", abi = "allocations(address,string)")]
-    pub struct AllocationsCall(pub ::ethers::core::types::Address, pub ::std::string::String);
+    pub struct AllocationsCall(
+        pub ::ethers::core::types::Address,
+        pub ::std::string::String,
+    );
     ///Container type for all input parameters for the `claim` function with signature `claim(string)` and selector `0xf3fe12c9`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "claim", abi = "claim(string)")]
     pub struct ClaimCall {
@@ -16318,7 +16455,14 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `claimFor` function with signature `claimFor(address,string)` and selector `0xe82330b2`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "claimFor", abi = "claimFor(address,string)")]
     pub struct ClaimForCall {
@@ -16327,7 +16471,14 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `getClaimable` function with signature `getClaimable(address,string)` and selector `0x70a42898`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "getClaimable", abi = "getClaimable(address,string)")]
     pub struct GetClaimableCall {
@@ -16336,7 +16487,14 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `getSchedule` function with signature `getSchedule(string)` and selector `0x72840f0e`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "getSchedule", abi = "getSchedule(string)")]
     pub struct GetScheduleCall {
@@ -16344,25 +16502,53 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `maxMintAmount` function with signature `maxMintAmount()` and selector `0x239c70ae`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "maxMintAmount", abi = "maxMintAmount()")]
     pub struct MaxMintAmountCall;
     ///Container type for all input parameters for the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "owner", abi = "owner()")]
     pub struct OwnerCall;
     ///Container type for all input parameters for the `renounceOwnership` function with signature `renounceOwnership()` and selector `0x715018a6`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "renounceOwnership", abi = "renounceOwnership()")]
     pub struct RenounceOwnershipCall;
     ///Container type for all input parameters for the `revokeAccount` function with signature `revokeAccount(address,string)` and selector `0x2c902c7c`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "revokeAccount", abi = "revokeAccount(address,string)")]
     pub struct RevokeAccountCall {
@@ -16371,31 +16557,66 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `startTime` function with signature `startTime()` and selector `0x78e97925`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "startTime", abi = "startTime()")]
     pub struct StartTimeCall;
     ///Container type for all input parameters for the `token` function with signature `token()` and selector `0xfc0c546a`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "token", abi = "token()")]
     pub struct TokenCall;
     ///Container type for all input parameters for the `totalMinted` function with signature `totalMinted()` and selector `0xa2309ff8`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "totalMinted", abi = "totalMinted()")]
     pub struct TotalMintedCall;
     ///Container type for all input parameters for the `totalToBeMinted` function with signature `totalToBeMinted()` and selector `0x0373a364`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "totalToBeMinted", abi = "totalToBeMinted()")]
     pub struct TotalToBeMintedCall;
     ///Container type for all input parameters for the `transferOwnership` function with signature `transferOwnership(address)` and selector `0xf2fde38b`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "transferOwnership", abi = "transferOwnership(address)")]
     pub struct TransferOwnershipCall {
@@ -16403,7 +16624,14 @@ pub mod hopr_distributor {
     }
     ///Container type for all input parameters for the `updateStartTime` function with signature `updateStartTime(uint128)` and selector `0xb733f67d`
     #[derive(
-        Clone, ::ethers::contract::EthCall, ::ethers::contract::EthDisplay, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     #[ethcall(name = "updateStartTime", abi = "updateStartTime(uint128)")]
     pub struct UpdateStartTimeCall {
@@ -16432,60 +16660,84 @@ pub mod hopr_distributor {
         UpdateStartTime(UpdateStartTimeCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprDistributorCalls {
-        fn decode(data: impl AsRef<[u8]>) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <MultiplierCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <MultiplierCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Multiplier(decoded));
             }
-            if let Ok(decoded) = <AddAllocationsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <AddAllocationsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AddAllocations(decoded));
             }
-            if let Ok(decoded) = <AddScheduleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <AddScheduleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::AddSchedule(decoded));
             }
-            if let Ok(decoded) = <AllocationsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <AllocationsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Allocations(decoded));
             }
-            if let Ok(decoded) = <ClaimCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ClaimCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Claim(decoded));
             }
-            if let Ok(decoded) = <ClaimForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <ClaimForCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::ClaimFor(decoded));
             }
-            if let Ok(decoded) = <GetClaimableCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GetClaimableCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetClaimable(decoded));
             }
-            if let Ok(decoded) = <GetScheduleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <GetScheduleCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::GetSchedule(decoded));
             }
-            if let Ok(decoded) = <MaxMintAmountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <MaxMintAmountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::MaxMintAmount(decoded));
             }
-            if let Ok(decoded) = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <OwnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Owner(decoded));
             }
-            if let Ok(decoded) = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RenounceOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::RenounceOwnership(decoded));
             }
-            if let Ok(decoded) = <RevokeAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <RevokeAccountCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::RevokeAccount(decoded));
             }
-            if let Ok(decoded) = <StartTimeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <StartTimeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::StartTime(decoded));
             }
-            if let Ok(decoded) = <TokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TokenCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Token(decoded));
             }
-            if let Ok(decoded) = <TotalMintedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TotalMintedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalMinted(decoded));
             }
-            if let Ok(decoded) = <TotalToBeMintedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TotalToBeMintedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::TotalToBeMinted(decoded));
             }
-            if let Ok(decoded) = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <TransferOwnershipCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
                 return Ok(Self::TransferOwnership(decoded));
             }
-            if let Ok(decoded) = <UpdateStartTimeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded)
+                = <UpdateStartTimeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::UpdateStartTime(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -16494,24 +16746,54 @@ pub mod hopr_distributor {
     impl ::ethers::core::abi::AbiEncode for HoprDistributorCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::Multiplier(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::AddAllocations(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::AddSchedule(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::Allocations(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::Multiplier(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::AddAllocations(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::AddSchedule(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::Allocations(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Claim(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ClaimFor(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetClaimable(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::GetSchedule(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::MaxMintAmount(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ClaimFor(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetClaimable(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::GetSchedule(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::MaxMintAmount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Owner(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RenounceOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::RevokeAccount(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::StartTime(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::RenounceOwnership(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RevokeAccount(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::StartTime(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Token(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TotalMinted(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TotalToBeMinted(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::TransferOwnership(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::UpdateStartTime(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::TotalMinted(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::TotalToBeMinted(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::TransferOwnership(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::UpdateStartTime(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -16631,12 +16913,26 @@ pub mod hopr_distributor {
     }
     ///Container type for all return fields from the `MULTIPLIER` function with signature `MULTIPLIER()` and selector `0x059f8b16`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct MultiplierReturn(pub u128);
     ///Container type for all return fields from the `allocations` function with signature `allocations(address,string)` and selector `0xc31cd7d7`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct AllocationsReturn {
         pub amount: u128,
@@ -16646,42 +16942,98 @@ pub mod hopr_distributor {
     }
     ///Container type for all return fields from the `getClaimable` function with signature `getClaimable(address,string)` and selector `0x70a42898`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct GetClaimableReturn(pub u128);
     ///Container type for all return fields from the `getSchedule` function with signature `getSchedule(string)` and selector `0x72840f0e`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct GetScheduleReturn(pub ::std::vec::Vec<u128>, pub ::std::vec::Vec<u128>);
     ///Container type for all return fields from the `maxMintAmount` function with signature `maxMintAmount()` and selector `0x239c70ae`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct MaxMintAmountReturn(pub u128);
     ///Container type for all return fields from the `owner` function with signature `owner()` and selector `0x8da5cb5b`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct OwnerReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `startTime` function with signature `startTime()` and selector `0x78e97925`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct StartTimeReturn(pub u128);
     ///Container type for all return fields from the `token` function with signature `token()` and selector `0xfc0c546a`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct TokenReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `totalMinted` function with signature `totalMinted()` and selector `0xa2309ff8`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct TotalMintedReturn(pub u128);
     ///Container type for all return fields from the `totalToBeMinted` function with signature `totalToBeMinted()` and selector `0x0373a364`
     #[derive(
-        Clone, ::ethers::contract::EthAbiType, ::ethers::contract::EthAbiCodec, Default, Debug, PartialEq, Eq, Hash,
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
     )]
     pub struct TotalToBeMintedReturn(pub u128);
 }

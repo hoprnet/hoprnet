@@ -18,13 +18,12 @@ pub const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
 pub const HOPR_BALANCE_KEY: &str = "hopr-balance";
 pub const STAKING_SAFE_ADDRESS_KEY: &str = "staking:safe-address";
 pub const STAKING_MODULE_ADDRESS_KEY: &str = "staking:module-address";
-pub const NETWORK_REGISTRY_HOPR_NODE_PREFIX: &str = "networkRegistry:hopr-node-";
+pub const NETWORK_REGISTRY_ALLOWED_PREFIX: &str = "networkRegistry:allowed-";
 pub const NETWORK_REGISTRY_ENABLED_PREFIX: &str = "networkRegistry:enabled";
 pub const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: &str = "networkRegistry:addressEligible-";
 pub const NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
-pub const NODE_SAFE_REGISTRY_HOPR_NODE_PREFIX: &str = "nodeSafeRegistry:hopr-node-";
-pub const NODE_SAFE_REGISTRY_ADDRESS_SAFE_PREFIX: &str = "nodeSafeRegistry:addressSafe-";
-pub const NETWORK_REGISTRY_ADDRESS_PUBLIC_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
+/// some Multi-Factor Authorization module, e.g. Gnosis Safe
+pub const MFA_MODULE_PREFIX: &str = "mfaModule:enabled";
 pub const API_AUTHORIZATION_TOKEN_KEY_PREFIX: &str = "api:authenticationTokens";
 pub const CHAIN_KEY_PREFIX: &str = "keys:chain-";
 pub const PACKET_KEY_PREFIX: &str = "keys:packet-";
