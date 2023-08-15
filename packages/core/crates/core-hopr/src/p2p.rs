@@ -1,23 +1,27 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
-use core_crypto::types::HalfKeyChallenge;
-use core_network::network::{Network, NetworkEvent};
-use core_types::acknowledgement::Acknowledgement;
+use futures_concurrency::stream::Merge;
 use futures::{
     select, StreamExt,
     channel::mpsc::Receiver
 };
-use futures_concurrency::stream::Merge;
 
+use core_network::network::{Network, NetworkEvent, PeerOrigin};
+use core_types::acknowledgement::Acknowledgement;
 use core_packet::interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction, PacketSendFinalizer};
 pub use core_p2p::{libp2p_identity, api};
 use core_p2p::{
     HoprNetworkBehaviorEvent,
     Ping, Pong,
-    libp2p_request_response, libp2p_swarm::SwarmEvent
+    libp2p_request_response, libp2p_swarm::{SwarmEvent, derive_prelude::Multiaddr}
 };
 use utils_log::{debug, info, error};
+
+use crate::{
+    PeerId,
+    adaptors::indexer::IndexerProcessed
+};
 
 
 #[derive(Debug)]
@@ -27,6 +31,7 @@ pub enum Inputs {
     NetworkUpdate(NetworkEvent),
     Message(MsgProcessed),
     Acknowledgement(AckProcessed),
+    Indexer(IndexerProcessed)
 }
 
 impl From<api::HeartbeatChallenge> for Inputs {
@@ -59,6 +64,11 @@ impl From<MsgProcessed> for Inputs {
     }
 }
 
+impl From<IndexerProcessed> for Inputs {
+    fn from(value: IndexerProcessed) -> Self {
+        Self::Indexer(value)
+    }
+}
 
 
 /// Main p2p loop that will instantiate a new libp2p::Swarm instance and setup listening and reacting pipelines
@@ -68,6 +78,7 @@ impl From<MsgProcessed> for Inputs {
 pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     network: Arc<RwLock<Network<crate::adaptors::network::ExternalNetworkInteractions>>>,
     network_update_input: Receiver<NetworkEvent>,
+    indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
     pkt_interactions: PacketInteraction,
     heartbeat_requests: api::HeartbeatRequester,
@@ -83,8 +94,9 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     let mut pkt_writer = pkt_interactions.writer();
 
     let mut active_manual_pings: std::collections::HashSet<libp2p_request_response::RequestId> = std::collections::HashSet::new();
+    let mut allowed_peers: std::collections::HashSet<PeerId> = std::collections::HashSet::new();
+    let mut announced_multiaddresses: std::collections::HashMap<PeerId,Vec<Multiaddr>> = std::collections::HashMap::new();
     let mut active_sent_packets: std::collections::HashMap<libp2p_request_response::RequestId, PacketSendFinalizer> = std::collections::HashMap::new();
-
 
     let mut inputs = (
         heartbeat_requests.map(Inputs::Heartbeat),
@@ -92,6 +104,7 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
         network_update_input.map(Inputs::NetworkUpdate),
         ack_interactions.map(Inputs::Acknowledgement),
         pkt_interactions.map(Inputs::Message),
+        indexer_update_input.map(Inputs::Indexer)
     ).merge().fuse();
     
     // NOTE: this should be changed to a merged stream as well, maybe `SwarmEvent<HoprNetworkBehaviorEvent>`
@@ -141,6 +154,39 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                     },
                     MsgProcessed::Forward(peer, octets) => {
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
+                    }
+                },
+                Inputs::Indexer(task) => match task {
+                    IndexerProcessed::Allow(peer) => {
+                        allowed_peers.insert(peer);
+                    },
+                    IndexerProcessed::Ban(peer) => {
+                        allowed_peers.remove(&peer);
+
+                        if swarm.is_connected(&peer) {
+                            match swarm.disconnect_peer_id(peer) {
+                                Ok(_) => debug!("Peer '{peer}' disconnected"),
+                                Err(e) => error!("Failed to disconnect peer '{peer}': {:?}", e)
+                            }
+                        }
+                    },
+                    IndexerProcessed::Announce(peer, multiaddresses) => {
+                        announced_multiaddresses.insert(peer, multiaddresses.clone());
+                        
+                        for multiaddress in multiaddresses.into_iter() {
+                            if !swarm.is_connected(&peer) {
+                                match swarm.dial(multiaddress.clone()) {
+                                    Ok(_) => {
+                                        swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
+                                        swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
+                                        swarm.behaviour_mut().ack.add_address(&peer, multiaddress);
+                                    },
+                                    Err(e) => {
+                                        error!("Failed to dial an announced peer '{}': {}, skipping the address", &peer, e);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -291,7 +337,16 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                     // num_established,
                     // concurrent_dial_errors,
                     // established_in,
-                } => {debug!("Connection established with {:?}", peer_id)},
+                } => {
+                    debug!("Connection established with {:?}", peer_id);
+                    if allowed_peers.contains(&peer_id) {
+                        if ! (*network.read().await).has(&peer_id) {
+                            (*network.write().await).add(&peer_id, PeerOrigin::IncomingConnection)
+                        }
+                    } else {
+                        let _ = swarm.disconnect_peer_id(peer_id);
+                    }
+                },
                 SwarmEvent::ConnectionClosed {
                     peer_id,
                     ..
@@ -304,7 +359,9 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                     connection_id,
                     local_addr,
                     send_back_addr,
-                } => {debug!("Incoming connection on {:?} from {:?} (conn_id: {:?})", local_addr, send_back_addr, connection_id)},
+                } => {
+                    debug!("Incoming connection at {local_addr} from {send_back_addr} ({:?})", connection_id);
+                },
                 SwarmEvent::IncomingConnectionError {
                     local_addr,
                     ..
@@ -315,25 +372,32 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                 SwarmEvent::OutgoingConnectionError {
                     connection_id,
                     error,
-                    ..
-                    // peer_id
-                } => {debug!("Outgoing connection error {:?}: {}", connection_id, error)},
+                    peer_id
+                } => {
+                    error!("Outgoing connection error for peer '{:?}' ({:?}): {}", peer_id, connection_id, error)
+                },
                 SwarmEvent::NewListenAddr {
                     listener_id,
                     ..
                     // address,
-                } => {debug!("New listen addr {:?}", listener_id)},
+                } => {
+                    debug!("New listen addr {:?}", listener_id)
+                },
                 SwarmEvent::ExpiredListenAddr {
                     listener_id,
                     ..
                     // address,
-                } => {debug!("Expired listen addr {:?}", listener_id)},
+                } => {
+                    debug!("Expired listen addr {:?}", listener_id)
+                },
                 SwarmEvent::ListenerClosed {
                     listener_id,
                     ..
                     // addresses,
                     // reason,
-                } => {debug!("Listener closed {:?}", listener_id)},
+                } => {
+                    debug!("Listener closed {:?}", listener_id)
+                },
                 SwarmEvent::ListenerError {
                     listener_id,
                     error,

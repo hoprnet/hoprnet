@@ -1,19 +1,26 @@
 mod adaptors;
+pub mod errors;
 mod helpers;
 mod p2p;
 
 use std::sync::Arc;
 
+use adaptors::indexer::IndexerProcessed;
 use async_lock::RwLock;
 use futures::{StreamExt, FutureExt, channel::mpsc::Sender};
 
 use core_ethereum_db::db::{wasm::Database, CoreEthereumDb};
+pub use core_network::{
+    heartbeat::HeartbeatConfig,
+    network::Health,
+    ping::PingConfig
+};
 use core_network::{
     PeerId,
     network::{Network, NetworkEvent},
-    heartbeat::{Heartbeat, HeartbeatConfig},
+    heartbeat::Heartbeat,
     messaging::ControlMessage,
-    ping::{Ping, PingConfig}
+    ping::Ping
 };
 use core_packet::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, PacketActions};
 use core_p2p::libp2p_identity;
@@ -31,6 +38,7 @@ const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 pub struct HoprTools {
     ping: adaptors::ping::wasm::WasmPing,
     network: adaptors::network::wasm::WasmNetwork,
+    indexer: adaptors::indexer::WasmIndexerInteractions,
     pkt_sender: PacketActions
 }
 
@@ -39,11 +47,13 @@ impl HoprTools {
     pub fn new(ping: Ping<adaptors::ping::PingExternalInteractions>,
         peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
         change_notifier: Sender<NetworkEvent>,
+        indexer: adaptors::indexer::WasmIndexerInteractions,
         packet_sender: PacketActions) -> Self
     {
         Self {
             ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
             network: adaptors::network::wasm::WasmNetwork::new(peers, change_notifier),
+            indexer,
             pkt_sender: packet_sender
         }
     }
@@ -59,6 +69,11 @@ impl HoprTools {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn network(&self) -> adaptors::network::wasm::WasmNetwork {
         self.network.clone()
+    }
+
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+    pub fn index_updater(&self) -> adaptors::indexer::WasmIndexerInteractions {
+        self.indexer.clone()
     }
 }
 
@@ -89,7 +104,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
     hb_cfg: HeartbeatConfig,
     ping_cfg: PingConfig,
     on_acknowledgement: Option<js_sys::Function>, on_acknowledged_ticket: Option<js_sys::Function>,
-    packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>
+    packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>,
 ) -> (HoprTools, impl std::future::Future<Output=()>)
 {
     let identity = me;
@@ -112,11 +127,10 @@ pub fn build_components(me: libp2p_identity::Keypair,
     let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 
     let packet_actions = PacketInteraction::new(
-        db, ack_actions.writer(), on_final_packet_tx, packet_cfg
+        db.clone(), ack_actions.writer(), on_final_packet_tx, packet_cfg
     );
 
     // packet processing
-    // let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
 
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (pong_tx, pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
@@ -129,7 +143,10 @@ pub fn build_components(me: libp2p_identity::Keypair,
         adaptors::ping::PingExternalInteractions::new(network.clone())
     );
 
-    let hopr_tools = HoprTools::new(ping, network.clone(), network_events_tx, packet_actions.writer());
+    let (indexer_update_tx, indexer_update_rx) = futures::channel::mpsc::channel::<IndexerProcessed>(adaptors::indexer::INDEXER_UPDATE_QUEUE_SIZE);
+    let indexer_updater = adaptors::indexer::WasmIndexerInteractions::new(db.clone(), network.clone(), indexer_update_tx);
+
+    let hopr_tools = HoprTools::new(ping, network.clone(), network_events_tx, indexer_updater, packet_actions.writer());
 
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
@@ -145,10 +162,10 @@ pub fn build_components(me: libp2p_identity::Keypair,
                 .map(|_| HoprLoopComponents::Heartbeat).await
             }
         ),
-        Box::pin(p2p::p2p_loop(identity, swarm_network_clone, network_events_rx,
+        Box::pin(p2p::p2p_loop(identity, swarm_network_clone, network_events_rx, indexer_update_rx,
             ack_actions, packet_actions,
             api::HeartbeatRequester::new(hb_ping_rx), api::HeartbeatResponder::new(hb_pong_tx),
-            api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx)
+            api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx),
         ).map(|_| HoprLoopComponents::Swarm))
     ];
     let mut futs = helpers::to_futures_unordered(ready_loops);
@@ -172,13 +189,12 @@ pub mod wasm_impl {
 
     #[wasm_bindgen]
     impl HoprTools {
-        #[wasm_bindgen(catch)]
+        #[wasm_bindgen]
         pub async fn send_message(&mut self, msg: &[u8], path: Path, timeout: u64) -> Result<HalfKeyChallenge, JsValue> {
             match self.pkt_sender.send_packet(msg.into(), path) {
                 Ok(mut awaiter) => {
                     awaiter.consume_and_wait(std::time::Duration::from_millis(timeout))
                         .await
-                        // .map(|v| JsValue::from(v))
                         .map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))
                 },
                 Err(e) => Err(wasm_bindgen::JsValue::from(e.to_string()))
@@ -198,18 +214,18 @@ pub mod wasm_impl {
         /// 
         /// # Arguments
         /// me: A value convertible to the `libp2p_identity::Keypair` needed by the swarm
-        #[wasm_bindgen]
+        #[wasm_bindgen(constructor)]
         pub fn new(_me: String, db: Database, // TODO: replace the string with the KeyPair
             network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig,
             on_acknowledgement: Option<js_sys::Function>, on_acknowledged_ticket: Option<js_sys::Function>,
-            packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>
+            packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>,
         ) -> Self {
             let me = libp2p_identity::Keypair::generate_ed25519();
             let (tools, run_loop) = build_components(
                 me, db.as_ref_counted(), 
                 network_quality_threshold, hb_cfg, ping_cfg,
                 on_acknowledgement, on_acknowledged_ticket,
-                packet_cfg, on_final_packet
+                packet_cfg, on_final_packet,
             );
 
             Self {

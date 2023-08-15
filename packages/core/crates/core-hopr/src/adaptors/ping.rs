@@ -34,7 +34,7 @@ impl PingExternalAPI for PingExternalInteractions {
 
 
 #[cfg(feature = "wasm")]
-pub(crate) mod wasm {
+pub mod wasm {
     use super::*;
     use std::str::FromStr;
     use core_network::ping::Pinging;
@@ -60,16 +60,11 @@ pub(crate) mod wasm {
         /// # Arguments
         /// * `peers` - Vector of String representations of the PeerIds to be pinged.
         #[wasm_bindgen]
-        pub async fn ping(&mut self, mut peers: Vec<js_sys::JsString>) {
-            let converted = peers
-                .drain(..)
-                .filter_map(|x| {
-                    let x: String = x.into();
-                    core_network::PeerId::from_str(&x).ok()
-                })
-                .collect::<Vec<_>>();
-
-            (*self.ping.write().await).ping(converted).await;
+        pub async fn ping(&mut self, peer: js_sys::JsString) {
+            let x: String = peer.into();
+            if let Some(converted) = core_network::PeerId::from_str(&x).ok() {
+                (*self.ping.write().await).ping(vec![converted]).await;
+            }
         }
     }
 }

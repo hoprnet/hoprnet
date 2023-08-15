@@ -3,9 +3,10 @@ use std::sync::Arc;
 use async_lock::RwLock;
 use futures::channel::mpsc::Sender;
 
+use core_strategy::generic::PeerQuality;
 use core_network::{
     PeerId,
-    network::{Network, NetworkExternalActions, PeerStatus, NetworkEvent}
+    network::{Network, NetworkExternalActions, PeerStatus, NetworkEvent, Health}
 };
 use utils_log::{warn,error};
 
@@ -34,14 +35,26 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
 }
 
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct WasmHealth {
+    h: Health
+}
+
+impl From<Health> for WasmHealth {
+    fn from(value: Health) -> Self {
+        Self { h: value }
+    }
+}
+
 #[cfg(feature = "wasm")]
-pub(crate) mod wasm {
+pub mod wasm {
     use std::{str::FromStr, pin::Pin};
 
     use super::*;
-    use core_network::network::PeerOrigin;
+    use core_network::network::{PeerOrigin, Health};
     use futures::future::poll_fn;
     use js_sys::JsString;
+    use utils_types::primitives::Address;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
@@ -54,6 +67,32 @@ pub(crate) mod wasm {
     impl WasmNetwork {
         pub(crate) fn new(network: Arc<RwLock<Network<ExternalNetworkInteractions>>>, change_notifier: Sender<NetworkEvent>) -> Self {
             Self { network, change_notifier }
+        }
+
+        pub fn as_counted_ref(&self) -> Arc<RwLock<Network<ExternalNetworkInteractions>>>{
+            self.network.clone()
+        }
+    }
+
+    // TODO: after rebasing on master, it is necessary to update this to get the address from the db's using the peerid
+    #[wasm_bindgen]
+    pub async fn get_peers_with_quality(network: &WasmNetwork) -> PeerQuality {
+        PeerQuality::new((*network.as_counted_ref().read().await).all_peers_with_quality()
+            .into_iter()
+            .filter_map(|(p,q)| {
+                Address::from_str(&p.to_string())
+                    .map(|a| (a, q))
+                    .ok()
+            })
+            .collect::<Vec<_>>()
+        )
+    }
+
+    #[wasm_bindgen]
+    impl WasmHealth {
+        #[wasm_bindgen]
+        pub fn unwrap(&self) -> Health {
+            self.h
         }
     }
 
@@ -95,6 +134,11 @@ pub(crate) mod wasm {
                     0.0f64
                 }
             }
+        }
+
+        #[wasm_bindgen]
+        pub async fn health(&self) -> WasmHealth {
+            (*self.network.read().await).health().into()
         }
 
         #[wasm_bindgen]
