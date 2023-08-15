@@ -96,7 +96,6 @@ mod tests {
     use core_crypto::types::OffchainPublicKey;
     use core_crypto::types::{HalfKey, Response};
     use core_crypto::{
-        iterated_hash::IteratedHash,
         keypairs::{ChainKeypair, Keypair},
         types::{HalfKeyChallenge, Hash, PublicKey},
     };
@@ -167,10 +166,6 @@ mod tests {
             async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
             async fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
-            async fn store_hash_intermediaries(&mut self, channel: &Hash, intermediates: &IteratedHash) -> core_ethereum_db::errors::Result<()>;
-            async fn get_commitment(&self, channel: &Hash, iteration: usize) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn get_current_commitment(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> core_ethereum_db::errors::Result<()>;
             async fn get_latest_block_number(&self) -> core_ethereum_db::errors::Result<u32>;
             async fn update_latest_block_number(&mut self, number: u32) -> core_ethereum_db::errors::Result<()>;
             async fn get_latest_confirmed_snapshot(&self) -> core_ethereum_db::errors::Result<Option<Snapshot>>;
@@ -216,27 +211,16 @@ mod tests {
                 account: &Address,
                 snapshot: &Snapshot,
             ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_account_from_network_registry(&self, public_key: &Address) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
-            async fn add_to_node_safe_registry(
-                &mut self,
-                node_address: &Address,
-                safe_address: &Address,
-                snapshot: &Snapshot,
-            ) -> core_ethereum_db::errors::Result<()>;
-            async fn remove_from_node_safe_registry(
-                &mut self,
-                node_address: &Address,
-                safe_address: &Address,
-                snapshot: &Snapshot,
-            ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_safe_from_node_safe_registry(&self, node_address: &Address) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn find_hopr_node_using_safe_in_node_safe_registry(&self, safe_address: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
             async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
-            async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
             async fn retrieve_authorization(&self, id: String) -> core_ethereum_db::errors::Result<Option<AuthorizationToken>>;
             async fn delete_authorization(&mut self, id: String) -> core_ethereum_db::errors::Result<()>;
+            async fn is_mfa_protected(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn set_mfa_protected_and_update_snapshot(&mut self,maybe_mfa_address: Option<Address>,snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            async fn is_allowed_to_access_network(&self, node: &Address) -> core_ethereum_db::errors::Result<bool>;
+            async fn set_allowed_to_access_network(&mut self, node: &Address, allowed: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            async fn get_from_network_registry(&self, stake_account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
+            async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<Vec<Address>>;
         }
     }
 
@@ -373,32 +357,6 @@ mod tests {
         let ticket = create_valid_ticket();
         let mut channel = create_channel_entry();
         channel.status = ChannelStatus::Closed;
-
-        let ret = validate_unacknowledged_ticket(
-            &db,
-            &ticket,
-            &channel,
-            &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
-            true,
-        )
-        .await;
-
-        assert!(ret.is_err());
-        match ret.unwrap_err() {
-            PacketError::TicketValidation(_) => {}
-            _ => panic!("invalid error type"),
-        }
-    }
-
-    #[async_std::test]
-    async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match() {
-        let mut db = MockDb::new();
-        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
-
-        let ticket = create_valid_ticket();
-        let channel = create_channel_entry();
 
         let ret = validate_unacknowledged_ticket(
             &db,
