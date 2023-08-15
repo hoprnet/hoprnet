@@ -4,7 +4,6 @@ use simple_moving_average::{SumTreeSMA, SMA};
 use utils_log::{debug, info, warn};
 
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 use core_types::channels::ChannelStatus::{Open, PendingToClose};
 use utils_types::primitives::{Address, Balance, BalanceType};
@@ -361,9 +360,8 @@ pub mod wasm {
     use crate::generic::ChannelStrategy;
     use crate::promiscuous::PromiscuousStrategy;
     use crate::strategy_tick;
-    use std::str::FromStr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::{Address, Balance};
+    use utils_types::primitives::Balance;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]

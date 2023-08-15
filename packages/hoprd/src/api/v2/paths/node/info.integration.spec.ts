@@ -47,7 +47,7 @@ describe('GET /node/info', () => {
     node.getListeningAddresses = sinon.fake.returns(LISTENING_ADDRS)
     node.getId = sinon.fake.returns(nodePeerId)
     node.isAllowedAccessToNetwork = sinon.fake.returns(Promise.resolve(true))
-    node.getConnectivityHealth = sinon.fake.returns(Health.Green)
+    node.getConnectivityHealth = async () => { return Health.Green }
 
     const res = await request(service).get(`/api/v2/node/info`)
     expect(res.status).to.equal(200)

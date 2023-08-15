@@ -24,6 +24,7 @@ export { StrategyTickResult } from '../lib/core_strategy.js'
 
 import { ChannelStatus, AcknowledgedTicket, ChannelEntry } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { PeerQuality } from '../lib/core_hopr.js'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']
 export type Strategy = (typeof STRATEGIES)[number]
@@ -53,9 +54,8 @@ export interface ChannelStrategyInterface {
 
   tick(
     balance: BN,
-    network_addresses: Iterator<string>,
+    network_addresses: PeerQuality,
     outgoing_channel: OutgoingChannelStatus[],
-    peer_quality: (string: string) => number
   ): StrategyTickResult
 
   onChannelWillClose(channel: ChannelEntry): Promise<void> // Before a channel closes
@@ -116,9 +116,8 @@ export abstract class SaneDefaults {
 interface RustStrategyInterface {
   tick: (
     balance: Balance,
-    network_addresses: Iterator<string>,
+    network_addresses: PeerQuality,
     outgoing_channels: OutgoingChannelStatus[],
-    peer_quality: (string: string) => number
   ) => StrategyTickResult
   name: string
 }
@@ -142,15 +141,13 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
 
   tick(
     balance: BN,
-    network_addresses: Iterator<string>,
+    network_addresses: PeerQuality,
     outgoing_channels: OutgoingChannelStatus[],
-    peer_quality: (string: string) => number
   ): StrategyTickResult {
     return this.strategy.tick(
       new Balance(balance.toString(), BalanceType.HOPR),
       network_addresses,
       outgoing_channels,
-      peer_quality
     )
   }
 

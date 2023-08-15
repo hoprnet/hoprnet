@@ -89,7 +89,6 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     let mut swarm = core_p2p::build_p2p_network(me);
     let mut heartbeat_responds = heartbeat_responds;
     let mut manual_ping_responds = manual_ping_responds;
-    let mut network = network;
 
     let mut ack_writer = ack_interactions.writer();
     let mut pkt_writer = pkt_interactions.writer();
@@ -167,7 +166,7 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                         if swarm.is_connected(&peer) {
                             match swarm.disconnect_peer_id(peer) {
                                 Ok(_) => debug!("Peer '{peer}' disconnected"),
-                                Err(e) => error!("Failed to disconnect peer '{peer}'")
+                                Err(e) => error!("Failed to disconnect peer '{peer}': {:?}", e)
                             }
                         }
                     },

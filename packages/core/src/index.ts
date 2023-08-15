@@ -49,6 +49,7 @@ import {
   CoreApp,
   HeartbeatConfig,
   Database,
+  get_peers_with_quality,
   Health,
   HoprTools,
   Address as Packet_Address,
@@ -589,7 +590,7 @@ class Hopr extends EventEmitter {
       // Perform the strategy tick
       tickResult = this.strategy.tick(
         new BN((await this.getBalance()).to_string()),
-        (await this.networkPeers.all()).values(),
+        await get_peers_with_quality(this.networkPeers),
         outgoingChannels.map((c) => {
           return {
             address: c.destination.to_string(),
@@ -597,7 +598,6 @@ class Hopr extends EventEmitter {
             status: c.status
           }
         }),
-        (peer_id_str: string) => await this.networkPeers.quality_of(peer_id_str)
       )
       metric_strategyTicks.increment()
       metric_strategyMaxChannels.set(tickResult.max_auto_channels)

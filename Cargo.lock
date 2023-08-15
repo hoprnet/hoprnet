@@ -1058,6 +1058,7 @@ dependencies = [
  "core-network",
  "core-p2p",
  "core-packet",
+ "core-strategy",
  "core-types",
  "futures",
  "futures-concurrency",

@@ -1,3 +1,4 @@
+#[cfg(feature = "wasm")]
 use log::{Level, Log, Metadata, Record, SetLoggerError};
 
 #[cfg(feature = "wasm")]
