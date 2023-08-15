@@ -29,7 +29,6 @@ forked-local-anvil:
 
 .PHONY: overwrite-sc-bindings
 overwrite-sc-bindings: ## Only create types for Hopr* contracts
-	env
 	$(forge-bind) --bindings-path ../crates/bindings --crate-name bindings \
 		--overwrite --select '^Hopr.*?(Boost|[^t])$$'
 
