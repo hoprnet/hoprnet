@@ -284,7 +284,7 @@ result=$(api_get_ticket_statistics "${api2}" "\"unredeemedValue\":\"0\"")
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
-api_send_message "${api1}" "${addr2}" "hello, world" ""
+api_send_message "${api1}" "${addr2}" "hello, world 0" ""
 
 # opening channels in parallel
 api_open_channel 1 2 "${api1}" "${addr2}" & jobs+=( "$!" )
@@ -307,16 +307,16 @@ api_close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
-  api_send_message "${api1}" "${addr1}" 'hello, world' "${addr2}" & jobs+=( "$!" )
+  api_send_message "${api1}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
 
   log "Node 2 send 1 hop message to self via node 3"
-  api_send_message "${api2}" "${addr2}" 'hello, world' "${addr3}" & jobs+=( "$!" )
+  api_send_message "${api2}" "${addr2}" 'hello, world from self via 3' "${addr3}" & jobs+=( "$!" )
 
   log "Node 3 send 1 hop message to self via node 4"
-  api_send_message "${api3}" "${addr3}" 'hello, world' "${addr4}" & jobs+=( "$!" )
+  api_send_message "${api3}" "${addr3}" 'hello, world from self via 4' "${addr4}" & jobs+=( "$!" )
 
   log "Node 4 send 1 hop message to self via node 5"
-  api_send_message "${api4}" "${addr4}" 'hello, world' "${addr5}" & jobs+=( "$!" )
+  api_send_message "${api4}" "${addr4}" 'hello, world from self via 5' "${addr5}" & jobs+=( "$!" )
 done
 
 log "Waiting for nodes to finish sending 1 hop messages"
@@ -341,16 +341,16 @@ log "-- ${result}"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to node 3 via node 2"
-  api_send_message "${api1}" "${addr3}" 'hello, world' "${addr2}" & jobs+=( "$!" )
+  api_send_message "${api1}" "${addr3}" 'hello, world from 1 via 2' "${addr2}" & jobs+=( "$!" )
 
   log "Node 2 send 1 hop message to node 4 via node 3"
-  api_send_message "${api2}" "${addr4}" 'hello, world' "${addr3}" & jobs+=( "$!" )
+  api_send_message "${api2}" "${addr4}" 'hello, world from 2 via 3' "${addr3}" & jobs+=( "$!" )
 
   log "Node 3 send 1 hop message to node 5 via node 4"
-  api_send_message "${api3}" "${addr5}" 'hello, world' "${addr4}" & jobs+=( "$!" )
+  api_send_message "${api3}" "${addr5}" 'hello, world from 3 via 4' "${addr4}" & jobs+=( "$!" )
 
   log "Node 5 send 1 hop message to node 2 via node 1"
-  api_send_message "${api5}" "${addr2}" 'hello, world' "${addr1}" & jobs+=( "$!" )
+  api_send_message "${api5}" "${addr2}" 'hello, world from 5 via 1' "${addr1}" & jobs+=( "$!" )
 done
 log "Waiting for nodes to finish sending 1-hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
@@ -358,7 +358,7 @@ log "Waiting DONE"
 
 for i in `seq 1 10`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-  api_send_message "${api1}" "${addr5}" "hello, world" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
+  api_send_message "${api1}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
 done
 log "Waiting for nodes to finish sending 3-hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
@@ -366,7 +366,7 @@ log "Waiting DONE"
 
 for i in `seq 1 10`; do
   log "Node 1 send message to node 5"
-  api_send_message "${api1}" "${addr5}" "hello, world" "" & jobs+=( "$!" )
+  api_send_message "${api1}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
 done
 log "Waiting for node 1 to send messages to node 5"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
@@ -385,13 +385,13 @@ test_redeem_in_specific_channel() {
 
   for i in `seq 1 3`; do
     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-    api_send_message "${node_api}" "${peer_id}" "hello, world" "${second_peer_id}"
+    api_send_message "${node_api}" "${peer_id}" "hello, world 1 self" "${second_peer_id}"
   done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
   sleep 2
   ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
-  [[ "${ticket_amount}" != "3" ]] && { msg "Ticket ammount is different than expected: ${ticket_amount} != 3"; exit 1; }
+  [[ "${ticket_amount}" != "3" ]] && { msg "Ticket amount is different than expected: ${ticket_amount} != 3"; exit 1; }
 
   api_redeem_tickets_in_channel ${second_node_api} ${peer_id}
 

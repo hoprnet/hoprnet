@@ -11,6 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="gcloud"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 # ------ GCloud utilities ------
@@ -55,7 +56,7 @@ wait_until_node_is_ready() {
 gcloud_get_ip() {
   local instance_uri="${1}"
 
-  gcloud compute instances describe ${instance_uri} \
+  gcloud compute instances describe "${instance_uri}" \
     --flatten 'networkInterfaces[].accessConfigs[]' \
     --format 'csv[no-heading](networkInterfaces.accessConfigs.natIP)'
 }
@@ -72,7 +73,7 @@ gcloud_find_vm_with_name() {
 gcloud_get_image_running_on_vm() {
   local vm_name="${1}"
 
-  gcloud compute instances describe ${vm_name} $ZONE \
+  gcloud compute instances describe "${vm_name}" $ZONE \
     --format='value[](metadata.items.gce-container-declaration)' \
     | grep image \
     | tr -s ' ' \
@@ -87,7 +88,7 @@ gcloud_stop() {
   local docker_image="${2}"
 
   log "Stopping docker image:${docker_image} on vm ${vm_name}"
-  ${gssh} ${vm_name} -- "export DOCKER_IMAGE=${docker_image} && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
+  ${gssh} "${vm_name}" -- "export DOCKER_IMAGE=${docker_image} && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
 }
 
 # $1 - vm name
@@ -97,8 +98,8 @@ gcloud_get_logs() {
   local docker_image="${2}"
 
   # Docker sucks and gives us warnings in stdout.
-  local id=$(${gssh} ${vm_name} --command "docker ps -q --filter ancestor='${docker_image}' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
-  ${gssh} ${vm_name} --command "docker logs $id"
+  local id=$(${gssh} "${vm_name}" --command "docker ps -q --filter ancestor='${docker_image}' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
+  ${gssh} "${vm_name}" --command "docker logs $id"
 }
 
 # $1 - vm name
@@ -138,7 +139,7 @@ gcloud_create_instance_template() {
   metadata_value="google-logging-enabled=true"
   metadata_value="${metadata_value},google-monitoring-enabled=true"
   metadata_value="${metadata_value},enable-oslogin=true"
-  metadata_value="${metadata_value},startup-script='/opt/hoprd/startup-script.sh > /tmp/startup-script-`date +%Y%m%d-%H%M%S`.log'"
+  metadata_value="${metadata_value},startup-script='/opt/hoprd/startup-script.sh > /tmp/startup-script-$(date +%Y%m%d-%H%M%S).log'"
   metadata_value="${metadata_value},HOPRD_DOCKER_IMAGE=${image}"
 
   if [ -n "${password}" ]; then
@@ -204,7 +205,7 @@ gcloud_create_or_update_managed_instance_group() {
     local first_instance_name="$(gcloud compute instance-groups list-instances \
       "${name}" ${gcloud_region} --format=json | jq '.[0].instance' | tr -d '"')"
     local previous_template="$(gcloud compute instances describe \
-      ${first_instance_name} --format=json | \
+      "${first_instance_name}" --format=json | \
       jq '.metadata.items[] | select(.key=="instance-template") | .value' | \
       tr -d '"' | awk -F'/' '{ print $5; }')"
 
@@ -213,7 +214,7 @@ gcloud_create_or_update_managed_instance_group() {
     # ensure instances are not replaced to prevent IP re-assignments
     gcloud beta compute instance-groups managed rolling-action start-update \
       "${name}"\
-      --version=template=${template} \
+      --version=template="${template}" \
       --minimal-action=restart \
       --most-disruptive-allowed-action=restart \
       --replacement-method=recreate \
@@ -227,7 +228,7 @@ gcloud_create_or_update_managed_instance_group() {
     log "creating managed instance group ${name}"
     gcloud compute instance-groups managed create "${name}" \
       --base-instance-name "${name}-vm" \
-      --size ${size} \
+      --size "${size}" \
       --template "${template}" \
       --instance-redistribution-type=NONE \
       --stateful-disk "device-name=boot-disk,auto-delete=on-permanent-instance-deletion" \
@@ -241,8 +242,8 @@ gcloud_create_or_update_managed_instance_group() {
 
   log "reserve all external addresses of the instance group ${name} instances"
   for instance_uri in $(gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --uri); do
-    local instance_name=$(gcloud compute instances describe ${instance_uri} --format 'csv[no-heading](name)')
-    local instance_ip=$(gcloud_get_ip ${instance_uri})
+    local instance_name=$(gcloud compute instances describe "${instance_uri}" --format 'csv[no-heading](name)')
+    local instance_ip=$(gcloud_get_ip "${instance_uri}")
 
     gcloud_reserve_static_ip_address "${instance_name}" "${instance_ip}"
   done
@@ -254,8 +255,8 @@ gcloud_delete_managed_instance_group() {
 
   log "un-reserve all external addresses of the instance group ${name} instances"
   for instance_uri in $(gcloud compute instance-groups list-instances "${name}" ${gcloud_region} --uri); do
-    local instance_name=$(gcloud compute instances describe ${instance_uri} --format 'csv[no-heading](name)')
-    local instance_ip=$(gcloud_get_ip ${instance_uri})
+    local instance_name=$(gcloud compute instances describe "${instance_uri}" --format 'csv[no-heading](name)')
+    local instance_ip=$(gcloud_get_ip "${instance_uri}")
 
     gcloud_delete_static_ip_address "${instance_name}"
   done
@@ -283,7 +284,7 @@ gcloud_get_managed_instance_group_instances_ips() {
   export -f gcloud_get_ip
   gcloud compute instance-groups list-instances "${name}" \
     ${gcloud_region} --sort-by=instance --uri | \
-    xargs -P `${nproc_cmd}` -I '{}' bash -c "gcloud_get_ip '{}'"
+    xargs -P $(${nproc_cmd}) -I '{}' bash -c "gcloud_get_ip '{}'"
 }
 
 # returns a JSON list of strings

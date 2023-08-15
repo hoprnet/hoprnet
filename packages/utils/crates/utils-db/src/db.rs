@@ -1,20 +1,21 @@
-use std::fmt::{Display, Formatter};
-use std::ops::Deref;
-
+use crate::{
+    errors::{DbError, Result},
+    traits::AsyncKVStorage,
+};
 use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
-
+use std::{
+    fmt::{Display, Formatter},
+    ops::Deref,
+};
 use utils_types::traits::BinarySerializable;
-
-use crate::errors::{DbError, Result};
-use crate::traits::AsyncKVStorage;
 
 pub struct Batch {
     pub ops: Vec<crate::traits::BatchOperation<Box<[u8]>, Box<[u8]>>>,
 }
 
 // NOTE: The LevelDB implementation's iterator needs to know the precise size of the
-pub fn serialize_to_bytes<'a, S: Serialize + BinarySerializable<'a>>(s: &S) -> Result<Vec<u8>> {
+pub fn serialize_to_bytes<S: Serialize + BinarySerializable>(s: &S) -> Result<Vec<u8>> {
     Ok(Vec::from(s.to_bytes()))
     // bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
 }
@@ -54,7 +55,7 @@ impl Display for Key {
 }
 
 impl Key {
-    pub fn new<'a, T: Serialize + BinarySerializable<'a>>(object: &T) -> Result<Self> {
+    pub fn new<T: Serialize + BinarySerializable>(object: &T) -> Result<Self> {
         Ok(Self { key: object.to_bytes() })
     }
 
@@ -64,7 +65,7 @@ impl Key {
         })
     }
 
-    pub fn new_with_prefix<'a, T: Serialize + BinarySerializable<'a>>(object: &T, prefix: &str) -> Result<Self> {
+    pub fn new_with_prefix<T: Serialize + BinarySerializable>(object: &T, prefix: &str) -> Result<Self> {
         let key = serialize_to_bytes(object)?;
 
         let mut result = Vec::with_capacity(prefix.len() + key.len());
@@ -107,26 +108,26 @@ pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
 
 impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
-        DB::<T> { backend }
+        Self { backend }
     }
 
     pub async fn contains(&self, key: Key) -> bool {
-        self.backend.contains(key.into()).await
-    }
-
-    pub async fn get<V: DeserializeOwned>(&self, key: Key) -> Result<V> {
-        let key: T::Key = key.into();
-        self.backend
-            .get(key)
-            .await
-            .and_then(|v| bincode::deserialize(v.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string())))
+        self.backend.contains(key.into()).await.is_ok_and(|v| v)
     }
 
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
-        if self.contains(key.clone()).await {
-            self.get::<V>(key).await.map(|v| Some(v))
-        } else {
-            Ok(None)
+        let key: T::Key = key.into();
+
+        match self.backend.get(key.into()).await {
+            Ok(Some(val)) => match bincode::deserialize(&val) {
+                Ok(deserialized) => Ok(Some(deserialized)),
+                Err(e) => Err(DbError::DeserializationError(format!(
+                    "during get operation: {}",
+                    e.to_string().as_str()
+                ))),
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -140,19 +141,20 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
             .into_boxed_slice();
 
         match self.backend.set(key, value).await? {
-            Some(v) => bincode::deserialize(v.as_ref())
-                .map(|v| Some(v))
-                .map_err(|e| DbError::DeserializationError(e.to_string())),
+            Some(v) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
+                DbError::DeserializationError(format!("during set operation: {}", e.to_string().as_str()))
+            }),
             None => Ok(None),
         }
     }
 
     pub async fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
+
         match self.backend.remove(key).await? {
-            Some(v) => bincode::deserialize(v.as_ref())
-                .map(|v| Some(v))
-                .map_err(|e| DbError::DeserializationError(e.to_string())),
+            Some(v) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
+                DbError::DeserializationError(format!("during remove operation: {}", e.to_string().as_str()))
+            }),
             None => Ok(None),
         }
     }
@@ -199,7 +201,7 @@ mod tests {
         v: u8,
     }
 
-    impl BinarySerializable<'_> for TestKey {
+    impl BinarySerializable for TestKey {
         const SIZE: usize = 1;
 
         /// Deserializes the type from a binary blob.
@@ -232,7 +234,7 @@ mod tests {
         backend
             .expect_contains()
             .with(predicate::eq(expected.clone()))
-            .return_const(true);
+            .returning(|_| Ok(true));
 
         let db = DB::new(backend);
 
@@ -245,7 +247,7 @@ mod tests {
         let value = TestValue { v: "value".to_string() };
 
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
-        let ser_value: Result<Box<[u8]>> = Ok(bincode::serialize(&value).unwrap().into_boxed_slice());
+        let ser_value: Result<Option<Box<[u8]>>> = Ok(Some(bincode::serialize(&value).unwrap().into_boxed_slice()));
 
         let mut backend = MockAsyncKVStorage::new();
         backend
@@ -255,7 +257,10 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert_eq!(db.get::<TestValue>(Key::new(&key).ok().unwrap()).await, Ok(value))
+        assert_eq!(
+            db.get_or_none::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            Ok(Some(value))
+        )
     }
 
     #[async_std::test]
@@ -268,12 +273,12 @@ mod tests {
         backend
             .expect_get()
             .with(predicate::eq(expected_key.clone()))
-            .return_once(|_| -> Result<Box<[u8]>> { Err(DbError::NotFound) });
+            .return_once(|_| -> Result<Option<Box<[u8]>>> { Err(DbError::NotFound) });
 
         let db = DB::new(backend);
 
         assert_eq!(
-            db.get::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            db.get_or_none::<TestValue>(Key::new(&key).ok().unwrap()).await,
             Err(DbError::NotFound)
         )
     }

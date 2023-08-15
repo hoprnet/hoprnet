@@ -1,12 +1,12 @@
 import assert from 'assert'
-import { StrategyFactory } from './channel-strategy.js'
+import { OutgoingChannelStatus, StrategyFactory } from './channel-strategy.js'
 import BN from 'bn.js'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
-import { privKeyToPeerId, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 
-function createPeerId(): string {
-  return privKeyToPeerId(u8aToHex(randomBytes(32))).toString()
+function createAddress(): string {
+  return u8aToHex(randomBytes(20))
 }
 
 describe('test strategies', async function () {
@@ -19,28 +19,28 @@ describe('test strategies', async function () {
 
     const stake = '1000000000000000000'
 
-    let alice = createPeerId()
-    let bob = createPeerId()
-    let charlie = createPeerId()
-    let gustave = createPeerId()
-    let eugene = createPeerId()
+    let alice = createAddress()
+    let bob = createAddress()
+    let charlie = createAddress()
+    let gustave = createAddress()
+    let eugene = createAddress()
 
     let peers = new Map<string, number>()
     peers.set(alice, 0.1)
     peers.set(bob, 0.7)
     peers.set(charlie, 0.9)
-    peers.set(createPeerId(), 0.1)
+    peers.set(createAddress(), 0.1)
     peers.set(eugene, 0.8)
-    peers.set(createPeerId(), 0.3)
+    peers.set(createAddress(), 0.3)
     peers.set(gustave, 1.0)
-    peers.set(createPeerId(), 0.1)
-    peers.set(createPeerId(), 0.2)
-    peers.set(createPeerId(), 0.3)
+    peers.set(createAddress(), 0.1)
+    peers.set(createAddress(), 0.2)
+    peers.set(createAddress(), 0.3)
 
-    let outgoing_channels = [
-      { peer_id: alice, stake_str: stake, status: ChannelStatus.Open },
-      { peer_id: charlie, stake_str: stake, status: ChannelStatus.Open },
-      { peer_id: gustave, stake_str: '1000000000000000', status: ChannelStatus.Open }
+    let outgoing_channels: OutgoingChannelStatus[] = [
+      { address: alice, stake_str: stake, status: ChannelStatus.Open },
+      { address: charlie, stake_str: stake, status: ChannelStatus.Open },
+      { address: gustave, stake_str: '1000000000000000', status: ChannelStatus.Open }
     ]
 
     // Do some dummy ticks to add some samples
@@ -57,9 +57,9 @@ describe('test strategies', async function () {
       assert(res.to_close().includes(alice))
       assert(res.to_close().includes(gustave))
 
-      assert.equal(res.to_open()[0].peer_id, gustave)
-      assert.equal(res.to_open()[1].peer_id, eugene)
-      assert.equal(res.to_open()[2].peer_id, bob)
+      assert.equal(res.to_open()[0].address, gustave)
+      assert.equal(res.to_open()[1].address, eugene)
+      assert.equal(res.to_open()[2].address, bob)
     }
 
     // Now reconfigure the strategy and tick again with same inputs
@@ -78,7 +78,7 @@ describe('test strategies', async function () {
       assert(res.to_close().includes(alice))
       assert(res.to_close().includes(gustave))
 
-      assert.equal(res.to_open()[0].peer_id, gustave)
+      assert.equal(res.to_open()[0].address, gustave)
     }
   })
 })

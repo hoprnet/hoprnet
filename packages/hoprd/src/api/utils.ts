@@ -1,7 +1,7 @@
 import cookie from 'cookie'
 import RLP from 'rlp'
 import { debug } from '@hoprnet/hopr-utils'
-import { STATUS_CODES } from './v2/utils.js'
+import { STATUS_CODES } from './v3/utils.js'
 
 const debugLog = debug('hoprd:api:utils')
 

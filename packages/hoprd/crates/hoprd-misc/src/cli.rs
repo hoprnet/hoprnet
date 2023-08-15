@@ -120,17 +120,19 @@ pub struct CliArgs {
         long,
         env = "HOPRD_ANNOUNCE",
         help = "Run as a Public Relay Node (PRN)",
-        action = ArgAction::SetTrue
+        action = ArgAction::SetTrue,
+        default_value_t = crate::config::NetworkOptions::default().announce
     )]
-    pub announce: Option<bool>,
+    pub announce: bool,
 
     #[arg(
         long,
         env = "HOPRD_API",
         help = format!("Expose the API on {}:{}", DEFAULT_API_HOST, DEFAULT_API_PORT),
         action = ArgAction::SetTrue,
+        default_value_t = crate::config::Api::default().enable
     )]
-    pub api: Option<bool>,
+    pub api: bool,
 
     #[arg(
         long = "apiHost",
@@ -154,9 +156,10 @@ pub struct CliArgs {
         help = "Completely disables the token authentication for the API, overrides any apiToken if set",
         action = ArgAction::SetTrue,
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Api::default().is_auth_disabled()
     )]
-    pub disable_api_authentication: Option<bool>,
+    pub disable_api_authentication: bool,
 
     #[arg(
         long = "apiToken",
@@ -172,9 +175,10 @@ pub struct CliArgs {
         long = "healthCheck",
         env = "HOPRD_HEALTH_CHECK",
         help = "Run a health check end point",
-        action = ArgAction::SetTrue
+        action = ArgAction::SetTrue,
+        default_value_t = crate::config::HealthCheck::default().enable
     )]
-    pub health_check: Option<bool>,
+    pub health_check: bool,
 
     #[arg(
         long = "healthCheckHost",
@@ -220,20 +224,22 @@ pub struct CliArgs {
     pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
 
     #[arg(
-        long = "autoRedeemTickets",
-        env = "HOPRD_AUTO_REDEEEM_TICKETS",
-        help = "If enabled automatically redeems winning tickets.",
-        action = ArgAction::SetTrue
+        long = "disableTicketAutoRedeem",
+        env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
+        help = "Disables automatic redeemeing of winning tickets.",
+        action = ArgAction::SetFalse,
+        default_value_t = crate::config::Strategy::default().auto_redeem_tickets
     )]
-    pub auto_redeem_tickets: Option<bool>,
+    pub auto_redeem_tickets: bool,
 
     #[arg(
-        long = "checkUnrealizedBalance",
-        env = "HOPRD_CHECK_UNREALIZED_BALANCE",
-        help = "Determines if unrealized balance shall be checked first before validating unacknowledged tickets.",
-        action = ArgAction::SetTrue
+        long = "disableUnrealizedBalanceCheck",
+        env = "HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK",
+        help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
+        action = ArgAction::SetFalse,
+        default_value_t = crate::config::Chain::default().check_unrealized_balance
     )]
-    pub check_unrealized_balance: Option<bool>,
+    pub check_unrealized_balance: bool,
 
     #[arg(
         long,
@@ -257,18 +263,18 @@ pub struct CliArgs {
         help = "initialize a database if it doesn't already exist",
         action = ArgAction::SetTrue,
         env = "HOPRD_INIT",
-        action = ArgAction::SetTrue
+        default_value_t = crate::config::Db::default().initialize
     )]
-    pub init: Option<bool>,
+    pub init: bool,
 
     #[arg(
         long = "forceInit",
         help = "initialize a database, even if it already exists",
         action = ArgAction::SetTrue,
         env = "HOPRD_FORCE_INIT",
-        action = ArgAction::SetTrue
+        default_value_t = crate::config::Db::default().force_initialize
     )]
-    pub force_init: Option<bool>,
+    pub force_init: bool,
 
     #[arg(
         long = "privateKey",
@@ -284,16 +290,18 @@ pub struct CliArgs {
         env = "HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS",
         action = ArgAction::SetTrue,
         help = "Allow connections to other nodes running on localhost",
+        default_value_t = crate::config::NetworkOptions::default().allow_local_node_connections
     )]
-    pub allow_local_node_connections: Option<bool>,
+    pub allow_local_node_connections: bool,
 
     #[arg(
         long = "allowPrivateNodeConnections",
         env = "HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS",
         action = ArgAction::SetTrue,
         help = "Allow connections to other nodes running on private addresses",
+        default_value_t = crate::config::NetworkOptions::default().allow_private_node_connections
     )]
-    pub allow_private_node_connections: Option<bool>,
+    pub allow_private_node_connections: bool,
 
     #[arg(
         long = "maxParallelConnections",
@@ -309,17 +317,19 @@ pub struct CliArgs {
         env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
         action = ArgAction::SetTrue,
+        default_value_t = crate::config::Testing::default().announce_local_addresses
     )]
-    pub test_announce_local_addresses: Option<bool>,
+    pub test_announce_local_addresses: bool,
 
     #[arg(
         long = "testPreferLocalAddresses",
         env = "HOPRD_TEST_PREFER_LOCAL_ADDRESSES",
         action = ArgAction::SetTrue,
         help = "For testing local testnets. Prefer local peers to remote",
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Testing::default().prefer_local_addresses
     )]
-    pub test_prefer_local_addresses: Option<bool>,
+    pub test_prefer_local_addresses: bool,
 
     #[arg(
         long = "testUseWeakCrypto",
@@ -327,43 +337,48 @@ pub struct CliArgs {
         action = ArgAction::SetTrue,
         help = "weaker crypto for faster node startup",
         hide = true,
+        default_value_t = crate::config::Testing::default().use_weak_crypto
     )]
-    pub test_use_weak_crypto: Option<bool>,
+    pub test_use_weak_crypto: bool,
 
     #[arg(
         long = "testNoDirectConnections",
         help = "NAT traversal testing: prevent nodes from establishing direct TCP connections",
         env = "HOPRD_TEST_NO_DIRECT_CONNECTIONS",
         action = ArgAction::SetTrue,
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Testing::default().no_direct_connections
     )]
-    pub test_no_direct_connections: Option<bool>,
+    pub test_no_direct_connections: bool,
 
     #[arg(
         long = "testNoWebRTCUpgrade",
         help = "NAT traversal testing: prevent nodes from establishing direct TCP connections",
         env = "HOPRD_TEST_NO_WEBRTC_UPGRADE",
         action = ArgAction::SetTrue,
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Testing::default().no_webrtc_upgrade
     )]
-    pub test_no_webrtc_upgrade: Option<bool>,
+    pub test_no_webrtc_upgrade: bool,
 
     #[arg(
         long = "noRelay",
         help = "disable NAT relay functionality entirely",
         env = "HOPRD_NO_RELAY",
         action = ArgAction::SetTrue,
+        default_value_t = crate::config::NetworkOptions::default().no_relay
     )]
-    pub no_relay: Option<bool>,
+    pub no_relay: bool,
 
     #[arg(
         long = "testLocalModeStun",
         help = "Transport testing: use full-featured STUN with local addresses",
         env = "HOPRD_TEST_LOCAL_MODE_STUN",
         action = ArgAction::SetTrue,
-        hide = true
+        hide = true,
+        default_value_t = crate::config::Testing::default().local_mode_stun
     )]
-    pub test_local_mode_stun: Option<bool>,
+    pub test_local_mode_stun: bool,
 
     #[arg(
         long = "heartbeatInterval",
@@ -419,6 +434,30 @@ pub struct CliArgs {
         env = "HOPRD_CONFIGURATION_FILE_PATH"
     )]
     pub configuration_file_path: Option<String>,
+
+    #[arg(
+        long = "safeTransactionServiceProvider",
+        value_name = "HOPRD_SAFE_TX_SERVICE_PROVIDER",
+        help = "Base URL for safe transaction service",
+        env = "HOPRD_SAFE_TRANSACTION_SERVICE_PROVIDER"
+    )]
+    pub safe_transaction_service_provider: Option<String>,
+
+    #[arg(
+        long = "safeAddress",
+        value_name = "HOPRD_SAFE_ADDR",
+        help = "Address of Safe that safeguards tokens",
+        env = "HOPRD_SAFE_ADDRESS"
+    )]
+    pub safe_address: Option<String>,
+
+    #[arg(
+        long = "moduleAddress",
+        value_name = "HOPRD_MODULE_ADDR",
+        help = "Address of the node mangement module",
+        env = "HOPRD_MODULE_ADDRESS"
+    )]
+    pub module_address: Option<String>,
 }
 
 impl CliArgs {

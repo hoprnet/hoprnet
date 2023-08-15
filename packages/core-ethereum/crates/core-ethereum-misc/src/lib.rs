@@ -1,10 +1,11 @@
-pub mod commitment;
+pub mod chain;
 pub mod constants;
 pub mod errors;
+pub mod network_registry;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use utils_log::logger::JsLogger;
+    use utils_log::logger::wasm::JsLogger;
     use wasm_bindgen::prelude::wasm_bindgen;
 
     static LOGGER: JsLogger = JsLogger {};

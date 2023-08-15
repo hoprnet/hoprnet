@@ -12,9 +12,8 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-getrandom = "0.2.8"
-js-sys = { version = "0.3.63", optional = true }
-libp2p-identity = { version = "0.1.2", features = ["peerid"] }
+getrandom = { workspace = true }
+js-sys = { workspace = true, optional = true }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.5", optional = true }

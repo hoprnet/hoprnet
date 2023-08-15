@@ -11,6 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="setup-local-cluster"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 # verify and set parameters
@@ -126,7 +127,7 @@ function cleanup {
   done
 
   log "Removing cluster env file"
-  rm -f ${env_file}
+  rm -f "${env_file}"
 
   exit $EXIT_CODE
 }
@@ -160,14 +161,14 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    DEBUG="hopr*,libp2p*" \
+    DEBUG="hopr*" \
     NODE_ENV="${node_env}" \
     HOPRD_HEARTBEAT_INTERVAL=2500 \
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
-    ${hoprd_command} \
+    "${hoprd_command}" \
       --announce \
       --api-token "${api_token}" \
       --data="${dir}" \
@@ -186,7 +187,7 @@ function setup_node() {
       --healthCheck \
       --healthCheckHost "${host}" \
       --healthCheckPort "${healthcheck_port}" \
-      ${additional_args} \
+      "${additional_args}" \
       > "${log}" 2>&1 &
 }
 
@@ -238,7 +239,7 @@ log "Running anvil local node"
 make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log}"
 
 log "Wait for anvil local node to complete startup"
-wait_for_regex ${anvil_rpc_log} "Listening on 0.0.0.0:8545"
+wait_for_regex "${anvil_rpc_log}" "Listening on 0.0.0.0:8545"
 log "Anvil node started (0.0.0.0:8545)"
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost
@@ -261,11 +262,11 @@ setup_node 13305 19095 18085 "${node5_dir}" "${node5_log}" "${node5_id}" "${list
 
 log "Waiting for nodes bootstrap"
 
-wait_for_regex ${node1_log} "unfunded"
-wait_for_regex ${node2_log} "unfunded"
-wait_for_regex ${node3_log} "unfunded"
-wait_for_regex ${node4_log} "unfunded"
-wait_for_regex ${node5_log} "unfunded"
+wait_for_regex "${node1_log}" "unfunded"
+wait_for_regex "${node2_log}" "unfunded"
+wait_for_regex "${node3_log}" "unfunded"
+wait_for_regex "${node4_log}" "unfunded"
+wait_for_regex "${node5_log}" "unfunded"
 
 log "Funding nodes"
 
@@ -278,21 +279,21 @@ log "Waiting for nodes startup"
 
 #  --- Wait until started --- {{{
 # Wait until node has recovered its private key
-wait_for_regex ${node1_log} "using blockchain address"
-wait_for_regex ${node2_log} "using blockchain address"
-wait_for_regex ${node3_log} "using blockchain address"
-wait_for_regex ${node4_log} "using blockchain address"
-wait_for_regex ${node5_log} "using blockchain address"
+wait_for_regex "${node1_log}" "using blockchain address"
+wait_for_regex "${node2_log}" "using blockchain address"
+wait_for_regex "${node3_log}" "using blockchain address"
+wait_for_regex "${node4_log}" "using blockchain address"
+wait_for_regex "${node5_log}" "using blockchain address"
 # }}}
 
 log "Waiting for port binding"
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_regex ${node1_log} "STARTED NODE"
-wait_for_regex ${node2_log} "STARTED NODE"
-wait_for_regex ${node3_log} "STARTED NODE"
-wait_for_regex ${node4_log} "STARTED NODE"
-wait_for_regex ${node5_log} "STARTED NODE"
+wait_for_regex "${node1_log}" "STARTED NODE"
+wait_for_regex "${node2_log}" "STARTED NODE"
+wait_for_regex "${node3_log}" "STARTED NODE"
+wait_for_regex "${node4_log}" "STARTED NODE"
+wait_for_regex "${node5_log}" "STARTED NODE"
 # }}}
 
 log "All nodes came up online"
@@ -313,7 +314,7 @@ if [ -n "${init_script}" ]; then
   # execute script if a path was found
   if [ -n "${full_init_script}" ]; then
     log "Calling init script ${full_init_script}"
-    HOPRD_API_TOKEN="${api_token}" "${full_init_script}" ${endpoints}
+    HOPRD_API_TOKEN="${api_token}" "${full_init_script}" "${endpoints}"
   else
     log "Error: Could not determine executable path of init script ${init_script}"
   fi
@@ -372,7 +373,7 @@ log "\t\tHealthcheck:\thttp://localhost:18085/"
 log "\t\tWebSocket:\tws://localhost:13305/api/v2/messages/websocket?apiToken=${api_token}"
 log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
 
-cat <<EOF > ${env_file}
+cat <<EOF > "${env_file}"
 #!/usr/bin/env bash
 export apiToken="${api_token}"
 export HOPR_NODE_1_ADDR=${peers[0]} HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:13301/api/v2/messages/websocket

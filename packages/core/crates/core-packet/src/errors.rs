@@ -1,4 +1,5 @@
 use core_crypto::errors::CryptoError;
+use core_path::errors::PathError;
 use thiserror::Error;
 use utils_db::errors::DbError;
 use utils_types::errors::GeneralError;
@@ -20,13 +21,10 @@ pub enum PacketError {
     #[error("could not find channel to {0}")]
     ChannelNotFound(String),
 
-    #[error("path for the packet is not valid")]
-    PathNotValid,
-
     #[error("ticket validation failed, packet dropped: {0}")]
     TicketValidation(String),
 
-    #[error("invalid received acknowledgement: {0}")]
+    #[error("received invalid acknowledgement: {0}")]
     AcknowledgementValidation(String),
 
     #[error("Proof of Relay challenge could not be verified")]
@@ -38,6 +36,9 @@ pub enum PacketError {
     #[error("tx queue is full, retry later")]
     Retry,
 
+    #[error("operation timed out after {0} seconds")]
+    Timeout(u64),
+
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),
 
@@ -46,6 +47,9 @@ pub enum PacketError {
 
     #[error(transparent)]
     PacketDbError(#[from] DbError),
+
+    #[error(transparent)]
+    PathError(#[from] PathError),
 
     #[error(transparent)]
     Other(#[from] GeneralError),

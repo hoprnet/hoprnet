@@ -22,17 +22,18 @@ async def test_stress_hoprd_send_message_should_send_sequential_messages_without
     hops = []  # zero hop
 
     # wait for peers to be connected
-    for _ in range(20):
+    for _ in range(60):
         if (
             len([i["peerId"] for i in (await alice.peers()).json()["connected"]])
-            > cmd_line_args["stress_minimum_peer_count"]
+            >= cmd_line_args["stress_minimum_peer_count"]
         ):
+            logging.info(f'peers ready {[i["peerId"] for i in (await alice.peers()).json()["connected"]]}')
             break
         else:
             await asyncio.sleep(1)
 
     connected_peers = [i["peerId"] for i in (await alice.peers()).json()["connected"]]
-    assert len(connected_peers) > cmd_line_args["stress_minimum_peer_count"]
+    assert len(connected_peers) >= cmd_line_args["stress_minimum_peer_count"]
 
     expected = [HTTP_STATUS_CODE_SEND_MESSAGE_OK] * STRESS_SEQUENTIAL_MESSAGE_COUNT
     actual = [
@@ -54,19 +55,18 @@ async def test_stress_hoprd_send_message_should_send_parallel_messages_without_e
     hops = []  # zero hop
 
     # wait for peers to be connected
-    for _ in range(20):
+    for _ in range(60):
         if (
             len([i["peerId"] for i in (await alice.peers()).json()["connected"]])
-            > cmd_line_args["stress_minimum_peer_count"]
+            >= cmd_line_args["stress_minimum_peer_count"]
         ):
-            logging.error(f'peers ready {[i["peerId"] for i in (await alice.peers()).json()["connected"]]}')
+            logging.info(f'peers ready {[i["peerId"] for i in (await alice.peers()).json()["connected"]]}')
             break
         else:
-            logging.error("waiting for peers")
             await asyncio.sleep(1)
 
     connected_peers = [i["peerId"] for i in (await alice.peers()).json()["connected"]]
-    assert len(connected_peers) > cmd_line_args["stress_minimum_peer_count"]
+    assert len(connected_peers) >= cmd_line_args["stress_minimum_peer_count"]
 
     expected = [HTTP_STATUS_CODE_SEND_MESSAGE_OK] * STRESS_PARALLEL_MESSAGE_COUNT
     actual = await asyncio.gather(

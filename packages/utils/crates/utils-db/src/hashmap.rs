@@ -1,6 +1,11 @@
 use crate::errors::DbError;
-use crate::traits::KVStorage;
+use crate::traits::{AsyncKVStorage, BatchOperation, KVStorage, StorageValueIterator};
+use async_trait::async_trait;
+use futures_lite::stream::iter;
+use futures_lite::StreamExt;
+use std::cmp::Ordering;
 
+#[derive(Default)]
 pub struct InMemoryHashMapStorage<K, V>
 where
     K: std::cmp::Eq + std::hash::Hash,
@@ -46,6 +51,66 @@ where
     }
 
     fn dump(&self) -> Result<(), DbError> {
+        Ok(())
+    }
+}
+
+pub type BinaryHashMapStorage = InMemoryHashMapStorage<Box<[u8]>, Box<[u8]>>;
+
+#[async_trait(?Send)]
+impl AsyncKVStorage for BinaryHashMapStorage {
+    type Key = Box<[u8]>;
+    type Value = Box<[u8]>;
+
+    async fn get(&self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
+        Ok(self.data.get(&key).cloned())
+    }
+
+    async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
+        Ok(self.data.insert(key, value))
+    }
+
+    async fn contains(&self, key: Self::Key) -> crate::errors::Result<bool> {
+        Ok(self.data.contains_key(&key))
+    }
+
+    async fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
+        Ok(self.data.remove(&key))
+    }
+
+    async fn dump(&self, _destination: String) -> crate::errors::Result<()> {
+        Ok(())
+    }
+
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+        let mut first_key: Vec<u8> = prefix.clone().into();
+        first_key.extend((0..suffix_size).map(|_| 0u8));
+
+        let mut last_key: Vec<u8> = prefix.clone().into();
+        last_key.extend((0..suffix_size).map(|_| 0xffu8));
+
+        let d = iter(self.data.clone().into_iter())
+            .filter(move |(key, _)| {
+                let upper_bound = key.as_ref().cmp(&last_key);
+                let lower_bound = key.as_ref().cmp(&first_key);
+                upper_bound != Ordering::Greater && lower_bound != Ordering::Less
+            })
+            .map(|(_, v)| Ok(v));
+
+        Ok(Box::new(d))
+    }
+
+    async fn batch(
+        &mut self,
+        operations: Vec<BatchOperation<Self::Key, Self::Value>>,
+        _wait_for_write: bool,
+    ) -> crate::errors::Result<()> {
+        for op in operations {
+            match op {
+                BatchOperation::del(v) => self.data.remove(&v.key),
+                BatchOperation::put(v) => self.data.insert(v.key, v.value),
+            };
+        }
         Ok(())
     }
 }

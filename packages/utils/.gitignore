@@ -4,5 +4,8 @@
 # Exclude built Typescript files
 /lib
 
+# Exclude auto-generated docs
+/docs
+
 # Exclude built npm packages
 /*.tgz

@@ -18,12 +18,12 @@ pub trait ToHex {
 /// A type that can be serialized and deserialized to a binary form.
 /// Implementing this trait automatically implements ToHex trait
 /// which then uses the serialize method.
-pub trait BinarySerializable<'a>: Sized {
+pub trait BinarySerializable: Sized {
     /// Minimum size of this type in bytes.
     const SIZE: usize;
 
     /// Deserializes the type from a binary blob.
-    fn from_bytes(data: &'a [u8]) -> Result<Self>;
+    fn from_bytes(data: &[u8]) -> Result<Self>;
 
     /// Serializes the type into a fixed size binary blob.
     fn to_bytes(&self) -> Box<[u8]>;
@@ -31,19 +31,19 @@ pub trait BinarySerializable<'a>: Sized {
 
 /// Type implementing this trait has automatic binary serialization/deserialization capability
 /// using the default binary format, which is currently `bincode`.
-pub trait AutoBinarySerializable<'a>: Serialize + Deserialize<'a> {
+pub trait AutoBinarySerializable: Serialize + for<'a> Deserialize<'a> {
     /// Minimum size of an automatically serialized type in bytes is 1.
     const SIZE: usize = 1;
 }
 
-impl<'a, T> BinarySerializable<'a> for T
+impl<T> BinarySerializable for T
 where
-    T: AutoBinarySerializable<'a>,
+    T: AutoBinarySerializable,
 {
     const SIZE: usize = Self::SIZE;
 
     /// Deserializes the type from a binary blob.
-    fn from_bytes(data: &'a [u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> Result<Self> {
         bincode::deserialize(data).map_err(|_| ParseError)
     }
 
@@ -53,9 +53,9 @@ where
     }
 }
 
-impl<'a, T> ToHex for T
+impl<T> ToHex for T
 where
-    T: BinarySerializable<'a>,
+    T: BinarySerializable,
 {
     fn to_hex(&self) -> String {
         format!("0x{}", hex::encode(&self.to_bytes()))

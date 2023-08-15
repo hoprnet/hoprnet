@@ -29,8 +29,8 @@
   "devDependencies": {
     "@ethersproject/cli": "5.7.0",
     "@types/node": "18",
-    "@types/yargs": "^17.0.23",
     "prettier": "2.8.8",
+    "solhint-community": "3.6.1",
     "ts-node": "10.9.1",
     "typescript": "5.0.4"
   },
@@ -51,5 +51,5 @@
     "printWidth": 120,
     "trailingComma": "none"
   },
-  "packageManager": "yarn@3.6.0"
+  "packageManager": "yarn@3.6.1"
 }

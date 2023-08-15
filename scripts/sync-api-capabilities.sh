@@ -11,6 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="sync-api-capabilities"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -24,8 +25,8 @@ usage() {
 # return early with help info when requested
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
-declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-full-spec.json"
-declare partial_spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-spec.yaml"
+declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v3-full-spec.json"
+declare partial_spec_file_path="${mydir}/../packages/hoprd/rest-api-v3-spec.yaml"
 declare caps_file_path="${mydir}/../packages/hoprd/src/supported-api-capabilities.json"
 declare endpoints
 
@@ -44,7 +45,7 @@ mv "${caps_file_path}.merged" "${caps_file_path}"
 rm "${caps_file_path}.base"
 
 # get list of endpoints from newly updated caps file
-endpoints="$(jq -r "to_entries | map(.key)" ${caps_file_path})"
+endpoints="$(jq -r "to_entries | map(.key)" "${caps_file_path}")"
 
 # update list in API documentation
 yq e -o=json '.' "${partial_spec_file_path}" | \

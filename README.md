@@ -26,16 +26,19 @@
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Using](#using)
   - [Using Docker](#using-docker)
-  - [Using Docker Compose with extended monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
+  - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
+- [Local cluster](#local-cluster)
 - [Test](#test)
   - [Unit testing](#unit-testing)
     - [Test-driven development](#test-driven-development)
   - [Github Actions CI](#github-actions-ci)
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
+      - [Testing environment](#testing-environment)
+      - [Test execution](#test-execution)
 - [Deploy](#deploy)
   - [Using Google Cloud Platform](#using-google-cloud-platform)
   - [Using Google Cloud Platform and a Default Topology](#using-google-cloud-platform-and-a-default-topology)
@@ -61,7 +64,7 @@ The preferred way of installation should be via Docker.
 
 All our docker images can be found in [our Google Cloud Container Registry][4].
 Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
-The `master-staging` tag represents the `master` branch, while the `bratislava` tag
+The `rotsee` tag represents the `master` branch, while the `bratislava` tag
 represents the most recent `release/*` branch.
 
 You can pull the Docker image like so:
@@ -123,7 +126,7 @@ The `hoprd` provides various command-line switches to configure its behaviour. F
 $ hoprd --help
 Options:
       --network <NETWORK>
-          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master, debug-staging, anvil-localhost2, monte_rosa]
+          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, rotsee, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
           The path to the identity file [env: HOPRD_IDENTITY=] [default: <IDENTITY_DIR>]
       --data <data>
@@ -152,10 +155,10 @@ Options:
           Default channel strategy to use after node starts up [env: HOPRD_DEFAULT_STRATEGY=] [default: passive] [possible values: promiscuous, passive, random]
       --maxAutoChannels <MAX_AUTO_CHANNELS>
           Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used. [env: HOPRD_MAX_AUTO_CHANNELS=]
-      --autoRedeemTickets
-          If enabled automatically redeems winning tickets. [env: HOPRD_AUTO_REDEEEM_TICKETS=]
-      --checkUnrealizedBalance
-          Determines if unrealized balance shall be checked first before validating unacknowledged tickets. [env: HOPRD_CHECK_UNREALIZED_BALANCE=]
+      --disableTicketAutoRedeem
+          Disables automatic redeemeing of winning tickets. [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS]
+      --disableUnrealizedBalanceCheck
+          Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
       --dryRun
@@ -280,6 +283,36 @@ DEBUG="hopr*" yarn run:hoprd:bob
 
 # fund all your nodes to get started
 make fund-local-all
+
+# start local HOPR admin in a container (and put into background)
+make run-hopr-admin &
+```
+
+Running one node in test mode, with safe and module attached
+
+```sh
+# build deps and HOPRd code
+make -j deps && make -j build
+
+# starting network
+make run-anvil
+
+# update protocol-config
+scripts/update-protocol-config.sh -n anvil-localhost
+
+# create identity files
+make create-local-identity
+
+# create a safe and a node management module instance,
+# and passing the created safe and module as argument to
+# run a test node local (separate terminal)
+make run-local-with-safe
+# or to restart a node and use the same id, safe and module
+# run:
+# make run-local id_path=$(find `pwd` -name ".identity-local*.id" | sort -r | head -n 1)
+
+# fund all your nodes to get started
+make fund-local-all id_dir=`pwd`
 
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &

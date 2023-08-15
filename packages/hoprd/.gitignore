@@ -1,4 +1,7 @@
+# Exclude node.js stuff
 /node_modules
+
+# Typescript builds
 /lib
 /db
 /hoprd-db
@@ -18,4 +21,8 @@
 
 # auto-generated file
 /rest-api-v2-full-spec.json
+/rest-api-v3-full-spec.json
 /npm-shrinkwrap.json
+
+# Exclude auto-generated docs
+/docs

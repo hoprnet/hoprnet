@@ -23,7 +23,7 @@ See `hoprd --help` for full list.
 $ hoprd --help
 Options:
       --network <NETWORK>
-          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, master, debug-staging, anvil-localhost2, monte_rosa]
+          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost, rotsee, debug-staging, anvil-localhost2, monte_rosa]
       --identity <identity>
           The path to the identity file [env: HOPRD_IDENTITY=] [default: /home/tino/.hopr-identity]
       --data <data>

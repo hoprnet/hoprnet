@@ -11,7 +11,9 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="testnet"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
+# shellcheck disable=SC1090
 source "${mydir}/dns.sh"
 
 # API used for funding the calls, source code in https://github.com/hoprnet/api
@@ -152,7 +154,7 @@ fund_if_empty() {
 
   if (( $(echo "${address_native_balance} < ${min_funds}" | bc -l) )); then
     # @TODO: Provide retry by checking balance again.
-    log "Hoprd node with peerId ${address} has not enough native balance. Funding native tokens..."
+    log "Hoprd node with address ${address} has not enough native balance. Funding native tokens..."
     local tx_hash tx_error tx_res
     tx_res="$(faucet_to_address "${network}" "${address}" "native")"
     tx_error="$(echo "${tx_res}" | jq -r '.err // empty' 2>/dev/null || echo "${tx_res}")"
@@ -182,8 +184,8 @@ fund_if_empty() {
 # $1=vm name
 # Run a VM with an anvil instance
 start_chain_provider(){
-  gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
+  gcloud compute instances create-with-container "$1"-provider "$GCLOUD_DEFAULTS" \
+      --create-disk name=$(disk_name "$1"),size=10GB,type=pd-standard,mode=rw \
       --container-image='hopr-provider'
 
   #hardhat node --config packages/ethereum/hardhat.config.ts
@@ -193,7 +195,7 @@ start_chain_provider(){
 add_keys() {
   if test -f "$1"; then
     log "Reading keys from $1"
-    cat $1 | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
+    cat "$1" | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
   else
     echo "Authorized keys file not found"
   fi

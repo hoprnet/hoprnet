@@ -1,23 +1,6 @@
-import type { HoprToken, HoprChannels, HoprNetworkRegistry, TypedEventFilter } from '../utils/index.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Multiaddr } from '@multiformats/multiaddr'
-import type { Address, ChannelEntry, PublicKey } from '@hoprnet/hopr-utils'
-
-/**
- * Typechain does not provide us with clean event types, in the lines below we infer
- * the generic type from the 'HoprChannels.filters'.
- * This allows us to retrieve HoprChannel's events.
- */
-type extractEventArgs<Type> = Type extends TypedEventFilter<infer A> ? A : null
-
-export type EventNames = keyof HoprChannels['filters']
-export type Event<T extends EventNames> = extractEventArgs<ReturnType<Pick<HoprChannels['filters'], T>[T]>>
-export type TokenEventNames = keyof HoprToken['filters']
-export type TokenEvent<T extends TokenEventNames> = extractEventArgs<ReturnType<Pick<HoprToken['filters'], T>[T]>>
-export type RegistryEventNames = keyof HoprNetworkRegistry['filters']
-export type RegistryEvent<T extends RegistryEventNames> = extractEventArgs<
-  ReturnType<Pick<HoprNetworkRegistry['filters'], T>[T]>
->
+import type { Address, ChannelEntry } from '@hoprnet/hopr-utils'
 
 export enum IndexerStatus {
   STARTING = 'starting',
@@ -35,6 +18,7 @@ export type IndexerEvents =
   | `channel-updated-${string}`
   | `on-provider-error-${string}`
   | `on-new-block-${string}`
+  | `node-safe-registered-${string}`
 
 type BlockEventName = 'block'
 type BlockProcessedEventName = 'block-processed'
@@ -43,11 +27,7 @@ type PeerEventName = 'peer'
 type NetworkRegistryEligibilityChangedEventName = 'network-registry-eligibility-changed'
 type NetworkRegistryStatusChangedEventName = 'network-registry-status-changed'
 
-type ChannelUpdateEventNames =
-  | 'channel-update'
-  | 'own-channel-updated'
-  | 'channel-waiting-for-commitment'
-  | 'channel-closed'
+type ChannelUpdateEventNames = 'own-channel-updated'
 
 type IndexerEventNames =
   | BlockEventName
@@ -65,11 +45,7 @@ type StatusListener = (status: IndexerStatus) => void
 type PeerListener = (peerData: { id: PeerId; multiaddrs: Multiaddr[] }) => void
 type ChannelUpdateListener = (channel: ChannelEntry) => void
 type IndexerEventsListener = (txHash: string) => void
-type NetworkRegistryEligibilityChangedListener = (
-  account: Address,
-  hoprNodes: PublicKey[],
-  eligibility: boolean
-) => void
+type NetworkRegistryEligibilityChangedListener = (account: Address, allowed: boolean) => void
 type NetworkRegistryStatusChangedListener = (isEnabled: boolean) => void
 
 export interface IndexerEventEmitter {
@@ -93,12 +69,7 @@ export interface IndexerEventEmitter {
   emit(event: PeerEventName, peerData: { id: PeerId; multiaddrs: Multiaddr[] }): boolean
   emit(event: ChannelUpdateEventNames, channel: ChannelEntry): boolean
   emit(event: IndexerEvents, txHash: string): boolean
-  emit(
-    event: NetworkRegistryEligibilityChangedEventName,
-    account: Address,
-    hoprNodes: PublicKey[],
-    eligibility: boolean
-  ): boolean
+  emit(event: NetworkRegistryEligibilityChangedEventName, account: Address, allowed: boolean): boolean
   emit(event: NetworkRegistryStatusChangedEventName, isEnabled: boolean): boolean
 
   on(event: IndexerEventNames, listener: () => void): this

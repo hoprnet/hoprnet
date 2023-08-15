@@ -1,5 +1,6 @@
-# Debian 11.5 https://hub.docker.com/layers/library/debian/bullseye-slim/images/sha256-64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9?context=explore
-FROM debian:bullseye-slim@sha256:64e251208f3bddf166a7020437103f75aabf3fceb1d5bd932272f3f73668caa9 as runtime
+# Debian 11.7
+# https://hub.docker.com/layers/library/debian/11.7-slim/images/sha256-b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3?context=explore
+FROM debian:11.7-slim@sha256:b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3 as runtime
 
 LABEL description="Image that contains all utilities necessary to build hopr monorepo, including Rust and Yarn"
 
@@ -9,6 +10,8 @@ SHELL ["/bin/bash", "-lc"]
 WORKDIR /app/hoprnet-toolchain
 
 RUN mkdir -p scripts/toolchain
+
+ENV DEBIAN_FRONTEND="noninteractive"
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \

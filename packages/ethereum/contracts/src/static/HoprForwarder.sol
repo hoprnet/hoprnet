@@ -24,20 +24,17 @@ contract HoprForwarder is IERC777Recipient {
 
   /**
    * @dev token recipient hook for ERC777
-   * @param operator address operator requesting the transfer
    * @param from address token holder address. Should be zddress zero for token mintin
    * @param to address recipient address
    * @param amount uint256 amount of tokens to transfer
-   * @param userData bytes extra information provided by the token holder (if any)
-   * @param operatorData bytes extra information provided by the operator (if any)
    */
   function tokensReceived(
-    address operator,
+    address,
     address from,
     address to,
     uint256 amount,
-    bytes calldata userData,
-    bytes calldata operatorData
+    bytes calldata,
+    bytes calldata
   ) external override {
     require(msg.sender == HOPR_TOKEN, 'HoprMinterWrapper: Only accept HOPR token');
     require(from == address(0), 'HoprMinterWrapper: Only receive mint');

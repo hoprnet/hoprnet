@@ -16,9 +16,9 @@ lazy_static = "1.4.0"
 rand = "0.8.5"
 pin-project = "1.0.12"
 console_error_panic_hook = { version = "0.1.7", optional = true }
-getrandom =  "0.2.8"
+getrandom = { workspace = true }
 gloo-timers = { version = "0.2.6", optional = true }
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 
@@ -37,6 +37,7 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
+prometheus = []
 default = ["console_error_panic_hook", "wasm"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "getrandom/js", "dep:gloo-timers", "utils-log/wasm", "utils-metrics/wasm", "utils-misc/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]

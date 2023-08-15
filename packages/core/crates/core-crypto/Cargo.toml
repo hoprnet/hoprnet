@@ -1,6 +1,6 @@
 [package]
 name = "core-crypto"
-version = "0.3.3"
+version = "0.4.0"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -12,41 +12,43 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-aes = "0.8"
-blake2 = "0.10"
-chacha20 = "0.9"
+aes = "0.8.3"
+async-std = { version = "1.12.0", features = ["attributes"] }
+blake2 = { version = "0.10", features = ["reset"] }
+chacha20 = { version = "0.9", features = ["zeroize"] }
 ctr = "0.9"
-console_error_panic_hook = { version = "0.1.7", optional = true }
-curve25519-dalek = { version = "4.0.0-rc.2", features = ["serde", "rand_core"] }
+curve25519-dalek = { version = "4.0.0-rc.1", features = ["serde"] } # must use 4.0.0-rc.1 due to rs-libp2p (snow)
 digest = "0.10"
-ed25519-dalek = "1.0.1"
+ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 elliptic-curve = { version = "0.13", features = ["serde"] }
 futures = "0.3.28"
-generic-array = "0.14.7"
-getrandom = "0.2.8"
+generic-array = { version = "0.14.7", features = ["zeroize"] }
+getrandom = { workspace = true, features = ["js"] }
 hex = "0.4"
 hex-literal = "0.4"
 hkdf = "0.12"
 hmac = "0.12"
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
-libp2p-identity = { version = "0.1.2", features = ["secp256k1", "peerid", "ed25519"] }
+libp2p-identity = { workspace = true }
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
+sha2 = "0.10"
 sha3 = "0.10"
 subtle = "2"
 typenum = "1.16"
 thiserror = "1.0"
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
+zeroize = { version = "1.6", features = ["zeroize_derive"] }
 
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
+console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
 parameterized = "1.0"
 
 [package.metadata.wasm-pack.profile.dev]

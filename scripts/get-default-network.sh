@@ -11,7 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="get-default-network"
-
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 declare key_to_extract=".value.network"
@@ -38,8 +38,8 @@ for git_ref in $(cat "${mydir}/../packages/hoprd/releases.json" | jq -r "to_entr
   fi
 done
 
-: ${network:?"Could not read value for default network id"}
+: "${network:?"Could not read value for default network id"}"
 
 log "found default network: ${network}"
 
-echo ${network}
+echo "${network}"

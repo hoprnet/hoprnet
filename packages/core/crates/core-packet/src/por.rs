@@ -1,7 +1,7 @@
 use core_crypto::derivation::{derive_ack_key_share, derive_own_key_share};
-use core_crypto::parameters::SECRET_KEY_LENGTH;
-use core_crypto::random::random_bytes;
+use core_crypto::shared_keys::SharedSecret;
 use core_crypto::types::{Challenge, CurvePoint, HalfKey, HalfKeyChallenge, PublicKey, Response};
+use utils_log::error;
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::EthereumChallenge;
 use utils_types::traits::BinarySerializable;
@@ -13,7 +13,6 @@ pub const POR_SECRET_LENGTH: usize = 2 * PublicKey::SIZE_COMPRESSED;
 
 /// Type that contains the challenge for the first ticket sent to the first relayer.
 #[derive(Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ProofOfRelayValues {
     pub ack_challenge: HalfKeyChallenge,
     pub ticket_challenge: Challenge,
@@ -23,15 +22,17 @@ pub struct ProofOfRelayValues {
 impl ProofOfRelayValues {
     /// Takes the secrets which the first and the second relayer are able to derive from the packet header
     /// and computes the challenge for the first ticket.
-    pub fn new(secret_b: &[u8], secret_c: Option<&[u8]>) -> Result<Self> {
+    pub fn new(secret_b: &SharedSecret, secret_c: Option<&SharedSecret>) -> Self {
         let s0 = derive_own_key_share(secret_b);
-        let s1 = derive_ack_key_share(secret_c.unwrap_or(&random_bytes::<SECRET_KEY_LENGTH>()));
+        let s1 = derive_ack_key_share(secret_c.unwrap_or(&SharedSecret::random()));
 
-        Ok(Self {
+        Self {
             ack_challenge: derive_ack_key_share(secret_b).to_challenge(),
-            ticket_challenge: Response::from_half_keys(&s0, &s1)?.to_challenge(),
+            ticket_challenge: Response::from_half_keys(&s0, &s1)
+                .expect("failed to derive response")
+                .to_challenge(),
             own_key: s0,
-        })
+        }
     }
 }
 
@@ -45,22 +46,27 @@ pub struct ProofOfRelayString {
 
 impl ProofOfRelayString {
     /// Creates instance from the shared secrets with node+2 and node+3
-    pub fn new(secret_c: &[u8], secret_d: Option<&[u8]>) -> Result<Self> {
-        assert_eq!(SECRET_KEY_LENGTH, secret_c.len(), "invalid secret length");
-        assert!(secret_d.is_none() || secret_d.unwrap().len() == SECRET_KEY_LENGTH);
-
+    pub fn new(secret_c: &SharedSecret, secret_d: Option<&SharedSecret>) -> Self {
         let s0 = derive_ack_key_share(secret_c);
         let s1 = derive_own_key_share(secret_c);
-        let s2 = derive_ack_key_share(secret_d.unwrap_or(&random_bytes::<SECRET_KEY_LENGTH>()));
+        let s2 = derive_ack_key_share(secret_d.unwrap_or(&SharedSecret::random()));
 
-        Ok(Self {
-            next_ticket_challenge: Response::from_half_keys(&s1, &s2)?.to_challenge(),
+        Self {
+            next_ticket_challenge: Response::from_half_keys(&s1, &s2)
+                .expect("failed to derive response")
+                .to_challenge(),
             hint: s0.to_challenge(),
-        })
+        }
+    }
+
+    pub fn from_shared_secrets(secrets: &Vec<SharedSecret>) -> Vec<Box<[u8]>> {
+        (1..secrets.len())
+            .map(|i| ProofOfRelayString::new(&secrets[i], secrets.get(i + 1)).to_bytes())
+            .collect::<Vec<_>>()
     }
 }
 
-impl BinarySerializable<'_> for ProofOfRelayString {
+impl BinarySerializable for ProofOfRelayString {
     const SIZE: usize = POR_SECRET_LENGTH;
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
@@ -99,8 +105,11 @@ pub struct ProofOfRelayOutput {
 /// * `secret` shared secret with the creator of the packet
 /// * `por_bytes` serialized `ProofOfRelayString` as included within the packet
 /// * `challenge` ticket challenge of the incoming ticket
-pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: &EthereumChallenge) -> Result<ProofOfRelayOutput> {
-    assert_eq!(SECRET_KEY_LENGTH, secret.len(), "invalid secret length");
+pub fn pre_verify(
+    secret: &SharedSecret,
+    por_bytes: &[u8],
+    challenge: &EthereumChallenge,
+) -> Result<ProofOfRelayOutput> {
     assert_eq!(POR_SECRET_LENGTH, por_bytes.len(), "invalid por bytes length");
 
     let pors = ProofOfRelayString::from_bytes(por_bytes)?;
@@ -127,8 +136,8 @@ pub fn pre_verify(secret: &[u8], por_bytes: &[u8], challenge: &EthereumChallenge
 pub fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &HalfKey, ack: &HalfKey) -> bool {
     Response::from_half_keys(own_key, ack)
         .map(|response| validate_por_response(ethereum_challenge, &response))
-        .unwrap_or_else(|_| {
-            // TODO: log error here
+        .unwrap_or_else(|e| {
+            error!("failed to validate por half keys: {e}");
             false
         })
 }
@@ -142,8 +151,8 @@ pub fn validate_por_response(ethereum_challenge: &EthereumChallenge, response: &
 pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &HalfKeyChallenge, ack: &HalfKey) -> bool {
     Challenge::from_own_share_and_half_key(own_share, ack)
         .map(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
-        .unwrap_or_else(|_| {
-            // TODO: log error here
+        .unwrap_or_else(|e| {
+            error!("failed to validate por hint: {e}");
             false
         })
 }
@@ -155,8 +164,7 @@ mod tests {
         ProofOfRelayValues,
     };
     use core_crypto::derivation::derive_ack_key_share;
-    use core_crypto::parameters::SECRET_KEY_LENGTH;
-    use core_crypto::random::random_bytes;
+    use core_crypto::shared_keys::SharedSecret;
     use core_crypto::types::Response;
     use utils_types::traits::BinarySerializable;
 
@@ -164,18 +172,16 @@ mod tests {
     fn test_por_preverify_validate() {
         const AMOUNT: usize = 4;
 
-        let secrets = (0..AMOUNT)
-            .map(|_| random_bytes::<SECRET_KEY_LENGTH>())
-            .collect::<Vec<_>>();
+        let secrets = (0..AMOUNT).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
         // Generated challenge
-        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1])).unwrap();
+        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
 
         // For the first relayer
-        let first_por_string = ProofOfRelayString::new(&secrets[1], Some(&secrets[2])).unwrap();
+        let first_por_string = ProofOfRelayString::new(&secrets[1], Some(&secrets[2]));
 
         // For the second relayer
-        let second_por_string = ProofOfRelayString::new(&secrets[2], Some(&secrets[3])).unwrap();
+        let second_por_string = ProofOfRelayString::new(&secrets[2], Some(&secrets[3]));
 
         // Computation result of the first relayer before receiving an acknowledgement from the second relayer
         let first_challenge_eth = first_challenge.ticket_challenge.to_ethereum_challenge();
@@ -231,11 +237,9 @@ mod tests {
     #[test]
     fn test_challenge_and_response_solving() {
         const AMOUNT: usize = 2;
-        let secrets = (0..AMOUNT)
-            .map(|_| random_bytes::<SECRET_KEY_LENGTH>())
-            .collect::<Vec<_>>();
+        let secrets = (0..AMOUNT).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
-        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1])).unwrap();
+        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
         let ack = derive_ack_key_share(&secrets[1]);
 
         assert!(
@@ -254,27 +258,5 @@ mod tests {
             ),
             "Returned response must solve the challenge"
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::por::ProofOfRelayValues;
-    use js_sys::Uint8Array;
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    impl ProofOfRelayValues {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(secret_b: &[u8], secret_c: Uint8Array) -> JsResult<ProofOfRelayValues> {
-            if !secret_c.is_null() && !secret_c.is_undefined() {
-                let c_slice = secret_c.to_vec();
-                ok_or_jserr!(Self::new(secret_b, Some(c_slice.as_slice())))
-            } else {
-                ok_or_jserr!(Self::new(secret_b, None))
-            }
-        }
     }
 }

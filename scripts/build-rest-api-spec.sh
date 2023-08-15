@@ -11,11 +11,12 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="build-rest-api-spec"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
   msg
-  msg "This script can be used to generate the OpenAPI spec file for hoprd's Rest API v2."
+  msg "This script can be used to generate the OpenAPI spec file for hoprd's Rest API v3."
   msg
   msg "Usage: $0"
   msg
@@ -24,7 +25,7 @@ usage() {
 # return early with help info when requested
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
-declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-full-spec.json"
+declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v3-full-spec.json"
 declare api_port=9876
 declare tmp="$(find_tmp_dir)"
 declare node_log_file="${tmp}/node.logs"

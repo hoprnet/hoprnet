@@ -1,6 +1,7 @@
 # HOPR Ethereum Package
 
-Draft readme, for rust migration
+Draft readme, for rust migration.
+Appending node-staking management notes to the end.
 
 ## Installation
 
@@ -87,10 +88,10 @@ forge verify-check --chain-id <number> <GUID>
 #### Deploy new staking season contract
 
 1. Create a new season contract from `HoprStakeBase.sol` and update the parameters (start, end timestamp) accordingly
-2. Change the `"stake_season":` to the number of the new season, for `master-staging`, `debug-staging` and the running production environment.
+2. Change the `"stake_season":` to the number of the new season, for `rotsee`, `debug-staging` and the running production environment.
 3. Deploy for each network with
    - `debug-staging`: `FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
-   - `master-staging`: FOUNDRY_PROFILE=staging NETWORK=master-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
+   - `rotsee`: FOUNDRY_PROFILE=staging NETWORK=rotsee forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
    - `monte_rosa`: _Temporarily update the `token_contract_address` to wxHOPR. Then run_ `FOUNDRY_PROFILE=production NETWORK=monte_rosa forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
 4. Switch back `token_contract_address` for `monte_rosa`
 5. Commit contract changes and make a PR
@@ -254,3 +255,46 @@ Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC182
 - `hardhat accounts` turns into `make get-account-balances network=<name of the network, e.g. "monte_rosa"> environment-type=<type of environment, from development, staging, to production> account=<address to check>`
 
 11. `ETHERSCAN_API_KEY` contains the value of "API key for Gnosisscan", as our production and staging environment is on Gnosis chain. The reason why it remains "ETHERSCAN" instead of "GNOSISSCAN" is that foundry reads `ETHERSCAN_API_KEY` as an environment vairable for both `forge verify-contract` and `forge script`, which can not be configured in the foundry.toml file
+
+## Node Management Smart Contracts
+
+The latest node-staking design uses Safe as a center-piece.
+Leveraging its Account-Abstraction design, HOPR node runners can secure node operation with an m-of-n Smart Account.
+
+### Developer Notes:
+
+1. Imported libraries:
+
+Dependencies are vendored directly into the repo. :
+
+- Audited Safe contracts at commit [eb93dbb0f62e2dc1b308ac4c110038062df0a8c9](https://github.com/safe-global/safe-contracts/blob/main/docs/audit_1_4_0.md)
+- Audited Zodiac Modifier Roles v1 contracts at commit [454be9d3c26f90221ca717518df002d1eca1845f](https://github.com/gnosis/zodiac-modifier-roles-v1/tree/main) After importing the contracts, adjust the pragma for two contracts; and manually imported their imports from Gnosis Safe, e.g. Enum.sol
+- Audited Zodiac Base contract at commit [8a77e7b224af8004bd9f2ff4e2919642e93ffd85](https://github.com/gnosis/zodiac/tree/8a77e7b224af8004bd9f2ff4e2919642e93ffd85)
+
+```
+forge install safe-global/safe-contracts@eb93dbb0f62e2dc1b308ac4c110038062df0a8c9 \
+   gnosis/zodiac-modifier-roles-v1@454be9d3c26f90221ca717518df002d1eca1845f \
+   gnosis/zodiac@8a77e7b224af8004bd9f2ff4e2919642e93ffd85 \
+   OpenZeppelin/openzeppelin-contracts-upgradeable \
+   --no-git --no-commit
+```
+
+2. `SafeSuiteSetupScript` deploys basic Safe suites. We deploy all the contracts with `main-suite` tag, in a deterministic way
+
+|                              | l2  | l2-suite | main-suite | accessors | factory | handlers | libraries | singleton |
+| ---------------------------- | --- | -------- | ---------- | --------- | ------- | -------- | --------- | --------- |
+| SimulateTxAccessor           |     | x        | x          | x         |         |          |           |           |
+| SafeProxyFactory             |     | x        | x          |           | x       |          |           |           |
+| TokenCallbackHandler         |     | x        | x          |           |         | x        |           |           |
+| CompatibilityFallbackHandler |     | x        | x          |           |         | x        |           |           |
+| CreateCall                   |     | x        | x          |           |         |          | x         |           |
+| MultiSend                    |     | x        | x          |           |         |          | x         |           |
+| MultiSendCallOnly            |     | x        | x          |           |         |          | x         |           |
+| SignMessageLib               |     | x        | x          |           |         |          | x         |           |
+| SafeL2                       | x   | x        |            |           |         |          |           |           |
+| Safe                         |     |          | x          |           |         |          |           | x         |
+
+3. deployment starts with a singleton contract. Singleton's deployment details are saved under https://github.com/safe-global/safe-singleton-factory/tree/main/artifacts
+   Specifically, for "anvil-deploy-safe-singleton" target, it follows instruction from [safe-global/safe-singleton-factory/artifacts/31337/deployment.json](https://github.com/safe-global/safe-singleton-factory/blob/6700a7c90ececc8cb9e1a4d97fd70fea1ee4670d/artifacts/31337/deployment.json)
+
+4. when running `make run-anvil`, it also deploys the SafeSingleton which is used as a deployer factory in deterministic deployment.

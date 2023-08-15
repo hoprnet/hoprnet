@@ -1,0 +1,26 @@
+---
+name: New PR
+
+on:
+  pull_request:
+    types:
+      - opened
+concurrency:
+  group: ${{ github.head_ref }}-new
+  cancel-in-progress: false
+jobs:
+  draft:
+    name: Convert to draft
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - name: Convert to draft
+        run: |
+          set -x
+          gh pr ready ${{ github.event.pull_request.number }} --undo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  

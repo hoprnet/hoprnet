@@ -1,4 +1,4 @@
-name: renovate cargo update
+name: Dependencies
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
@@ -12,7 +12,7 @@ on:
 
 jobs:
   cargo-update:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - uses: actions/checkout@v3
 
@@ -45,7 +45,7 @@ jobs:
 
       - name: get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
 
       - name: restore yarn cache
         uses: actions/cache@v3

@@ -1,2 +1,8 @@
-lib/
-node_modules/
+# Exclude node.js stuff
+/node_modules
+
+# Typescript builds
+/lib
+
+# Exclude auto-generated docs
+/docs

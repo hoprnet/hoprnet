@@ -11,6 +11,7 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare -x HOPR_LOG_ID="deployment-status"
+# shellcheck disable=SC1090
 source "${mydir}/gcloud.sh"
 
 readonly flag_prefix="DEPLOYMENT_FAILED"

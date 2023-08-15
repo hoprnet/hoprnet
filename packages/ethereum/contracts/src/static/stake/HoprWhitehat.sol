@@ -9,8 +9,8 @@ import 'openzeppelin-contracts-4.4.2/utils/introspection/ERC1820Implementer.sol'
 import 'openzeppelin-contracts-4.4.2/security/ReentrancyGuard.sol';
 import './HoprStake.sol';
 import './HoprBoost.sol';
-import '../../../test/mocks/ERC777Mock.sol';
-import '../../../test/mocks/ERC677Mock.sol';
+import './mocks/ERC677Mock.sol';
+import './mocks/ERC777Mock.sol';
 
 /*
   CHECKLIST:
@@ -118,7 +118,7 @@ contract HoprWhitehat is Ownable, IERC777Recipient, IERC721Receiver, ERC1820Impl
   /**
    * override implementation check
    */
-  function canImplementInterfaceForAddress(bytes32 interfaceHash, address account)
+  function canImplementInterfaceForAddress(bytes32 interfaceHash, address)
     public
     view
     virtual
@@ -144,11 +144,10 @@ contract HoprWhitehat is Ownable, IERC777Recipient, IERC721Receiver, ERC1820Impl
     // updates the rewards inside the accounts mapping struct
     myHoprStake.sync(currentCaller);
 
-    // solhint-disable-next-line no-unused-vars
     (
-      uint256 actualLockedTokenAmount,
-      uint256 virtualLockedTokenAmount,
-      uint256 lastSyncTimestamp,
+      ,
+      ,
+      ,
       uint256 cumulatedRewards,
       uint256 claimedRewards
     ) = myHoprStake.accounts(currentCaller);
@@ -176,9 +175,9 @@ contract HoprWhitehat is Ownable, IERC777Recipient, IERC721Receiver, ERC1820Impl
     myHoprStake.sync(currentCaller); // updates the rewards inside the accounts mapping struct
     // solhint-disable-next-line no-unused-vars
     (
-      uint256 actualLockedTokenAmount,
-      uint256 virtualLockedTokenAmount,
-      uint256 lastSyncTimestamp,
+      ,
+      ,
+      ,
       uint256 cumulatedRewards,
       uint256 claimedRewards
     ) = myHoprStake.accounts(currentCaller);
@@ -192,12 +191,12 @@ contract HoprWhitehat is Ownable, IERC777Recipient, IERC721Receiver, ERC1820Impl
 
   // ERC777 fallback (wxHOPR aka reward tokens)
   function tokensReceived(
-    address operator,
+    address,
     address from,
     address to,
     uint256 amount,
-    bytes calldata userData,
-    bytes calldata operatorData
+    bytes calldata,
+    bytes calldata
   ) external override {
     if (isActive) {
       require(msg.sender == address(wxHopr), 'can only be called from wxHOPR');
@@ -221,7 +220,7 @@ contract HoprWhitehat is Ownable, IERC777Recipient, IERC721Receiver, ERC1820Impl
   function onTokenTransfer(
     address _from,
     uint256 _value,
-    bytes memory _data
+    bytes memory
   ) external returns (bool) {
     if (msg.sender == address(xHopr)) {
       rescuedXHoprAmount += _value;
@@ -234,13 +233,11 @@ contract HoprWhitehat is Ownable, IERC777Recipient, IERC721Receiver, ERC1820Impl
    * ERC721 hook. Allow contract to receive 721
    */
   function onERC721Received(
-    // solhint-disable-next-line no-unused-vars
-    address operator,
-    address from,
-    uint256 tokenId,
-    // solhint-disable-next-line no-unused-vars
-    bytes calldata data
-  ) external override returns (bytes4) {
+    address,
+    address,
+    uint256,
+    bytes calldata
+  ) view external override returns (bytes4) {
     return IERC721Receiver(address(this)).onERC721Received.selector;
   }
 

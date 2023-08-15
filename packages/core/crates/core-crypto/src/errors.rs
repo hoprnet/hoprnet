@@ -15,7 +15,7 @@ pub enum CryptoError {
     #[error("mac or authentication tag did not match")]
     TagMismatch,
 
-    #[error("elliptic curve error: {0}")]
+    #[error("curve error: {0}")]
     EllipticCurveError(#[from] elliptic_curve::Error),
 
     #[error("failed to perform cryptographic calculation")]
@@ -24,8 +24,18 @@ pub enum CryptoError {
     #[error("signature verification failed")]
     SignatureVerification,
 
+    #[error("ethereum challenge on the ticket is invalid")]
+    InvalidChallenge,
+
     #[error("lower-level error: {0}")]
     Other(#[from] GeneralError),
 }
 
 pub type Result<T> = core::result::Result<T, CryptoError>;
+
+#[cfg(feature = "wasm")]
+impl From<CryptoError> for wasm_bindgen::JsValue {
+    fn from(value: CryptoError) -> Self {
+        value.to_string().into()
+    }
+}

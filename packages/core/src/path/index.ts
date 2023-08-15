@@ -1,6 +1,6 @@
 import HeapPackage from 'heap-js'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS, PATH_RANDOMNESS, MAX_HOPS } from '../constants.js'
-import { type ChannelEntry, type PublicKey } from '@hoprnet/hopr-utils'
+import { type ChannelEntry, type Address } from '@hoprnet/hopr-utils'
 import { debug } from '@hoprnet/hopr-utils'
 
 import BN from 'bn.js'
@@ -10,7 +10,7 @@ const { Heap } = HeapPackage
 
 const log = debug('hopr-core:pathfinder')
 
-export type Path = PublicKey[]
+export type Path = Address[]
 type ChannelPath = { weight: BN; path: ChannelEntry[] }
 
 const sum = (a: BN, b: BN) => a.add(b)
@@ -38,11 +38,11 @@ const defaultWeight = async (edge: ChannelEntry): Promise<BN> => {
  * destination
  */
 export async function findPath(
-  start: PublicKey,
-  destination: PublicKey,
+  start: Address,
+  destination: Address,
   hops: number,
-  networkQualityOf: (p: PublicKey) => number,
-  getOpenChannelsFromPeer: (p: PublicKey) => Promise<ChannelEntry[]>,
+  networkQualityOf: (p: Address) => Promise<number>,
+  getOpenChannelsFromPeer: (p: Address) => Promise<ChannelEntry[]>,
   weight = defaultWeight
 ): Promise<Path> {
   log('find path from', start.toString(), 'to ', destination.toString(), 'length', hops)
@@ -69,18 +69,24 @@ export async function findPath(
     }
 
     const lastPeer = currentPath.path[currentPath.path.length - 1].destination
-    const newChannels = (await getOpenChannelsFromPeer(lastPeer)).filter((c: ChannelEntry) => {
-      return (
-        !destination.eq(c.destination) &&
-        networkQualityOf(c.destination) > NETWORK_QUALITY_THRESHOLD &&
-        filterCycles(c, currentPath) &&
-        !deadEnds.has(c.destination.to_hex(false))
-      )
-    })
+    const openChannels = await getOpenChannelsFromPeer(lastPeer)
+
+    const newChannels = []
+
+    for (const openChannel of openChannels) {
+      if (
+        !destination.eq(openChannel.destination) &&
+        (await networkQualityOf(openChannel.destination)) > NETWORK_QUALITY_THRESHOLD &&
+        filterCycles(openChannel, currentPath) &&
+        !deadEnds.has(openChannel.destination.to_hex())
+      ) {
+        newChannels.push(openChannel)
+      }
+    }
 
     if (newChannels.length == 0) {
       queue.pop()
-      deadEnds.add(lastPeer.to_hex(false))
+      deadEnds.add(lastPeer.to_hex())
     } else {
       for (let c of newChannels) {
         const toPush = Array.from(currentPath.path)

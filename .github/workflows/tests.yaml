@@ -1,0 +1,194 @@
+name: Test
+
+env:
+  RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  HOPR_GITHUB_REF: ${{ github.ref }}
+  MATRIX_ROOM: ${{ secrets.MATRIX_ROOM }}
+  MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
+  MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
+  FOUNDRY_PROFILE: ci
+
+on:
+  pull_request:
+    types:
+      - synchronize
+      - ready_for_review
+    paths-ignore:
+      - '.processes/**/*'
+      - 'docs/**/*'
+concurrency:
+  group: ${{ github.head_ref }}-test
+  cancel-in-progress: true
+jobs:
+  unit_testing:
+    name: Unit
+    runs-on: ubuntu-2-core
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
+      - name: Sccache Setup
+        if: ${{ !env.ACT }}
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v20
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            .cargo/.package-cache/
+            .cargo/bin/
+            .foundry/bin/
+
+      - name: Install dependencies
+        run: nix develop -c make -j deps-ci
+
+      - name: Build
+        run: nix develop -c make -j build
+
+      - name: Test
+        run: nix develop -c make -j test
+        env:
+          HOPR_NETWORK: anvil-localhost
+
+  e2e_testing:
+    name: End to end
+    runs-on: ubuntu-8-core
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Disable sccache (act-only)
+        if: ${{ env.ACT }}
+        run: |
+          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+
+      - name: Sccache Setup
+        if: ${{ !env.ACT }}
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v20
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        if: ${{ !env.ACT }}
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            .cargo/.package-cache/
+            .cargo/bin/
+            .foundry/bin/
+
+      - name: Install dependencies
+        run: nix develop -c make -j deps-ci
+
+      - name: Setup Hoprd Runtime
+        run: |
+          sudo ./scripts/toolchain/install-toolchain.sh --runtime-only
+
+      - name: Build application
+        run: nix develop -c make -j build
+
+      - name: Test with pytest
+        run: |
+          nix develop -c make smoke-test
+        timeout-minutes: 60
+
+      - name: Compress test logs
+        if: always()
+        run: |
+          # Copy all the logs to a directory to avoid log file changes and simplify tar command
+          test_path=/tmp/test-e2e-${{ github.run_id }}-${{ github.run_number }}
+          mkdir -p ${test_path}
+          cp -r /tmp/hopr-smoke-test* ${test_path}
+          cd ${test_path}
+          tar -czvf ${test_path}.tgz ${test_path}
+        working-directory: "/tmp"
+
+      - name: Upload test logs
+        uses: 'google-github-actions/upload-cloud-storage@v1'
+        if: always()
+        with:
+          path: /tmp/
+          glob: 'test-e2e-*'
+          parent: false
+          destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}

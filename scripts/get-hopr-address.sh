@@ -9,6 +9,7 @@ set -Eeuo pipefail
 
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 # $1 = optional: apitoken, defaults to ""
@@ -26,6 +27,6 @@ fi
 
 declare url="${apitoken}@${endpoint}/api/v2/account/addresses"
 
-declare cmd="$(get_authenticated_curl_cmd ${url})"
+declare cmd="$(get_authenticated_curl_cmd "${url}")"
 
 try_cmd "${cmd}" 30 5 | jq -r ".hopr"

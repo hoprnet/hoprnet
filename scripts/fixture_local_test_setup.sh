@@ -11,8 +11,9 @@ set -Eeuo pipefail
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 declare HOPR_LOG_ID="smoke-fixture-setup"
-
+# shellcheck disable=SC1090
 source "${mydir}/testnet.sh"
+# shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
 usage() {
@@ -118,7 +119,7 @@ function cleanup {
 
   # Cleaning up everything
   log "Cleaning up processes"
-  for port in ${all_ports[@]}; do
+  for port in "${all_ports[@]}"; do
     lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
@@ -128,16 +129,16 @@ function cleanup {
       continue
     fi
 
-    log=$(grep -E "Process exiting with signal [0-9]" ${node_log} || echo "")
+    log=$(grep -E "Process exiting with signal [0-9]" "${node_log}" || echo "")
 
     if [ -z "${log}" ]; then
       log "${node_log}: Process did not exit properly"
       exit_code=1
     else
-      exit_code=$(echo ${log} | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
+      exit_code=$(echo "${log}" | sed -E "s/.*signal[ ]([0-9]+).*/\1/")
     fi
 
-    if [ ${exit_code} != "0" ]; then
+    if [ "${exit_code}" != "0" ]; then
       non_zero=true
       log "${node_log}: terminated with non-zero exit code ${exit_code}"
     fi
@@ -271,7 +272,7 @@ declare protocol_config="${mydir}/../packages/core/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
-${mydir}/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
+"${mydir}"/run-local-anvil.sh -l "${anvil_rpc_log}" -c "${anvil_cfg_file}"
 if [ ! -f "${anvil_cfg_file}" ]; then
   log "Could not find anvil cfg file ${anvil_cfg_file}"
   exit 1
@@ -307,13 +308,13 @@ setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${nod
 
 # DO NOT MOVE THIS STEP
 #  --- Wait until private key has been created or recovered --- {{{
-wait_for_regex ${node1_log} "please fund this node"
-wait_for_regex ${node2_log} "please fund this node"
-wait_for_regex ${node3_log} "please fund this node"
-wait_for_regex ${node4_log} "please fund this node"
-wait_for_regex ${node5_log} "please fund this node"
-wait_for_regex ${node6_log} "please fund this node"
-wait_for_regex ${node7_log} "please fund this node"
+wait_for_regex "${node1_log}" "please fund this node"
+wait_for_regex "${node2_log}" "please fund this node"
+wait_for_regex "${node3_log}" "please fund this node"
+wait_for_regex "${node4_log}" "please fund this node"
+wait_for_regex "${node5_log}" "please fund this node"
+wait_for_regex "${node6_log}" "please fund this node"
+wait_for_regex "${node7_log}" "please fund this node"
 # }}}
 
 log "Funding nodes"
@@ -325,19 +326,19 @@ make -C "${mydir}/../" fund-local-all \
 log "Waiting for port binding"
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_regex ${node1_log} "STARTED NODE"
-wait_for_regex ${node2_log} "STARTED NODE"
-wait_for_regex ${node3_log} "STARTED NODE"
-wait_for_regex ${node4_log} "STARTED NODE"
-wait_for_regex ${node5_log} "STARTED NODE"
-wait_for_regex ${node6_log} "STARTED NODE"
+wait_for_regex "${node1_log}" "STARTED NODE"
+wait_for_regex "${node2_log}" "STARTED NODE"
+wait_for_regex "${node3_log}" "STARTED NODE"
+wait_for_regex "${node4_log}" "STARTED NODE"
+wait_for_regex "${node5_log}" "STARTED NODE"
+wait_for_regex "${node6_log}" "STARTED NODE"
 wait_for_port 19096 "127.0.0.1" "${node6_log}"
-wait_for_regex ${node7_log} "STARTED NODE"
+wait_for_regex "${node7_log}" "STARTED NODE"
 # }}}
 
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
-  declare node_dir_db="${node_dir}/db/LOG"
+  declare node_dir_db="${node_dir}/db/db.sqlite"
   declare node_dir_peerstore="${node_dir}/peerstore/LOG"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
   [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }
