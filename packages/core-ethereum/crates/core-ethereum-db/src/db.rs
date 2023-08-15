@@ -689,7 +689,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         Ok(self.db.get_or_none::<Vec<Address>>(key).await?.unwrap_or(vec![]))
     }
-    
+
     /// Removes a node from the network registry
     ///
     /// - `address`: the address to remove
@@ -706,7 +706,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let already_included = registered_nodes.contains(node_address);
 
         if !already_included {
-            println!("pushing");
             registered_nodes.push(node_address.to_owned());
         }
 
@@ -1340,15 +1339,6 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_staking_safe_address(safe_address).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn sub_hopr_balance(&self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.sub_hopr_balance(balance, snapshot).await)
             //}
         }
 

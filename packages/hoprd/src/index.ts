@@ -11,7 +11,6 @@ import {
   create_histogram_with_buckets,
   pickVersion,
   defer,
-  privKeyToPeerId,
   Address
 } from '@hoprnet/hopr-utils'
 import {
@@ -332,7 +331,7 @@ async function main() {
 
     // 2. Create node instance
     logs.log('Creating HOPR Node')
-    node = await createHoprNode(keypair, options, false)
+    node = await createHoprNode(keypair.chain_key, keypair.packet_key, options, false)
     logs.logStatus('PENDING')
 
     // Subscribe to node events

@@ -6,11 +6,8 @@ import {
   BalanceType,
   Hash,
   U256,
-  ChannelEntry,
   PublicKey,
   Address,
-  Snapshot,
-  ChannelStatus,
   Database,
   Response,
   ChainKeypair,
@@ -29,26 +26,10 @@ export const SECP256K1_CONSTANTS = {
   RECOVERABLE_SIGNATURE_LENGTH: 65
 }
 
-const TestingSnapshot = new Snapshot(U256.zero(), U256.zero(), U256.zero())
-
 const MOCK_PUBLIC_KEY = () =>
   PublicKey.deserialize(stringToU8a('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'))
 
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
-
-function channelEntryCreateMock(): ChannelEntry {
-  const src = Address.from_string('0x86d854baec85640ef8c80b2c618c28024f2926d4')
-  const dest = Address.from_string('0x245445dbdcdaa115bb1d7d1de8717f9facecdbbe')
-  return new ChannelEntry(
-    src,
-    dest,
-    new Balance('1', BalanceType.HOPR),
-    U256.one(),
-    ChannelStatus.Closed,
-    U256.one(),
-    U256.one()
-  )
-}
 
 import { LevelDb } from './db.js'
 import { db_sanity_test } from '../../lib/utils_db.js'
@@ -106,77 +87,6 @@ describe('db functional tests', function () {
 
     await db.set_hopr_balance(new Balance('10', BalanceType.HOPR))
     assert.equal((await db.get_hopr_balance()).to_string(), '10')
-
-    await db.add_hopr_balance(new Balance('1', BalanceType.HOPR), TestingSnapshot)
-    assert.equal((await db.get_hopr_balance()).to_string(), '11')
-
-    await db.sub_hopr_balance(new Balance('2', BalanceType.HOPR), TestingSnapshot)
-    assert.equal((await db.get_hopr_balance()).to_string(), '9')
-  })
-
-  it('should test register toggle', async function () {
-    let db = test_in_memory_db()
-
-    // should be false by default
-    assert((await db.is_network_registry_enabled()) === true, 'register should be enabled by default')
-
-    // should be true once set
-    await db.set_network_registry(true, TestingSnapshot)
-    assert((await db.is_network_registry_enabled()) === true, 'register should be enabled')
-
-    // should be false once unset
-    await db.set_network_registry(false, TestingSnapshot)
-    assert((await db.is_network_registry_enabled()) === false, 'register should be disabled')
-  })
-
-  it('should test registry', async function () {
-    let db = test_in_memory_db()
-
-    const hoprNode = MOCK_PUBLIC_KEY()
-    const account = MOCK_ADDRESS()
-
-    // should be throw when not added
-    assert.equal(await db.get_account_from_network_registry(hoprNode.to_address()), undefined)
-
-    // should be set
-    await db.add_to_network_registry(hoprNode.to_address(), account, TestingSnapshot)
-
-    let nodes = await db.find_hopr_node_using_account_in_network_registry(account)
-    assert(nodes.len() === 1, 'should have only 1 hoprNode registered')
-    assert(
-      (await db.find_hopr_node_using_account_in_network_registry(account)).next().eq(hoprNode.to_address()),
-      'should match the registered hoprNode'
-    )
-    assert(
-      (await db.get_account_from_network_registry(hoprNode.to_address())).eq(account),
-      'should match account added'
-    )
-
-    // should be removed
-    await db.remove_from_network_registry(hoprNode.to_address(), account, TestingSnapshot)
-
-    assert(
-      (await db.find_hopr_node_using_account_in_network_registry(account)).len() === 0,
-      'should have 0 hoprNode registered'
-    )
-    assert.equal(await db.get_account_from_network_registry(hoprNode.to_address()), undefined)
-  })
-
-  it('should test eligible', async function () {
-    let db = test_in_memory_db()
-
-    const account = MOCK_ADDRESS()
-
-    // should be false by default
-    assert((await db.is_eligible(account)) === false, 'account is not eligible by default')
-
-    // should be true once set
-    await db.set_eligible(account, true, TestingSnapshot.clone())
-    assert((await db.is_eligible(account)) === true, 'account should be eligible')
-
-    // should be false once unset
-    await db.set_eligible(account, false, TestingSnapshot.clone())
-    assert((await db.is_eligible(account)) === false, 'account should not be eligible')
   })
 
   it('should store rejected tickets statistics', async function () {
@@ -198,16 +108,6 @@ describe('db functional tests', function () {
     assert((await db.get_rejected_tickets_value()).eq(new Balance(amount.toString(10), BalanceType.HOPR)))
   })
 
-  it('should store ChannelEntry', async function () {
-    let db = test_in_memory_db()
-
-    const channelEntry = channelEntryCreateMock()
-
-    await db.update_channel_and_snapshot(channelEntry.get_id(), channelEntry.clone(), TestingSnapshot)
-
-    assert((await db.get_channel(channelEntry.get_id())) !== undefined)
-    assert.equal((await db.get_channels()).len(), 1, 'did not find channel')
-  })
 
   it('block number workflow', async function () {
     let db = test_in_memory_db()
@@ -222,19 +122,6 @@ describe('db functional tests', function () {
     const latestBlockNumber = await db.get_latest_block_number()
 
     assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
-  })
-
-  it('should store current commitment', async function () {
-    let db = test_in_memory_db()
-
-    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.size()).fill(0xff))
-    const DUMMY_COMMITMENT = new Hash(new Uint8Array(Hash.size()).fill(0xbb))
-
-    await db.set_current_commitment(DUMMY_CHANNEL, DUMMY_COMMITMENT)
-
-    const fromDb = await db.get_current_commitment(DUMMY_CHANNEL)
-
-    assert(fromDb.eq(DUMMY_COMMITMENT))
   })
 
   it('should set a packet tag', async function () {

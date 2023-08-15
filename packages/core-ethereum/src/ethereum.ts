@@ -478,7 +478,9 @@ export async function createChainWrapper(
       )
     }
 
+    // @ts-ignore fixme: treat result
     let sendResult: SendTransactionReturn
+    // @ts-ignore fixme: treat result
     let error: unknown
     try {
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)

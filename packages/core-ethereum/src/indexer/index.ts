@@ -22,12 +22,7 @@ import {
   create_gauge,
   // create_multi_gauge,
   U256,
-  random_integer,
-  Hash,
-  number_to_channel_status,
-  KeyBinding,
-  OffchainSignature,
-  u8aConcat
+  random_integer
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -35,17 +30,7 @@ import { type IndexerEventEmitter, IndexerStatus, type IndexerEvents } from './t
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, type Contract, errors } from 'ethers'
 
-import {
-  CORE_ETHEREUM_CONSTANTS,
-  Ethereum_AccountEntry,
-  Ethereum_Address,
-  Ethereum_Balance,
-  Ethereum_ChannelEntry,
-  Ethereum_Database,
-  Ethereum_Hash,
-  Ethereum_OffchainPublicKey,
-  Ethereum_Snapshot
-} from '../db.js'
+import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database } from '../db.js'
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
@@ -53,7 +38,6 @@ import { Handlers } from '../../lib/core_ethereum_indexer.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
-import assert from 'assert'
 import { OffchainPublicKey } from '../../crates/core-ethereum-db/pkg/core_ethereum_db.js'
 
 // Exported from Rust
@@ -847,7 +831,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public async getChainKeyOf(address: Address): Promise<Address> {
     const account = await this.getAccount(address)
     if (account !== undefined) {
-      return account.chain_key
+      return account.chain_addr
     }
     throw new Error('Could not find chain key for address - have they announced? -' + address.to_hex())
   }
@@ -876,15 +860,15 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     while (publicAccounts.len() > 0) {
       let account = publicAccounts.next()
       if (account) {
-        let packetKey = await this.db.get_packet_key(account.chain_key)
+        let packetKey = await this.db.get_packet_key(account.chain_addr)
         if (packetKey) {
-          out += `  - ${packetKey.to_peerid_str()} (on-chain ${account.chain_key.to_string()}) ${account.get_multiaddress_str()}\n`
+          out += `  - ${packetKey.to_peerid_str()} (on-chain ${account.chain_addr.to_string()}) ${account.get_multiaddr_str()}\n`
           result.push({
             id: peerIdFromString(packetKey.to_peerid_str()),
-            multiaddrs: [new Multiaddr(account.get_multiaddress_str())]
+            multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
           })
         } else {
-          log(`could not retrieve packet key for address ${account.chain_key.to_string()}`)
+          log(`could not retrieve packet key for address ${account.chain_addr.to_string()}`)
         }
       }
     }
