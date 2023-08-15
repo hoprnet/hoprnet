@@ -377,32 +377,6 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match() {
-        let mut db = MockDb::new();
-        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
-
-        let ticket = create_valid_ticket();
-        let channel = create_channel_entry();
-
-        let ret = validate_unacknowledged_ticket(
-            &db,
-            &ticket,
-            &channel,
-            &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
-            true,
-        )
-        .await;
-
-        assert!(ret.is_err());
-        match ret.unwrap_err() {
-            PacketError::TicketValidation(_) => {}
-            _ => panic!("invalid error type"),
-        }
-    }
-
-    #[async_std::test]
     async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match_2() {
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
