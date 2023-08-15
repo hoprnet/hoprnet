@@ -14,6 +14,9 @@ CRATES := $(foreach crate,${WORKSPACES_WITH_RUST_MODULES},$(dir $(wildcard $(cra
 # base names of all crates
 CRATES_NAMES := $(foreach crate,${CRATES},$(shell basename $(crate)))
 
+# No need to lint Foundry-generated Rust bindings
+LINTABLE_CRATES_NAMES := $(filter-out bindings,$(CRATES_NAMES))
+
 # Gets all solidity files which can be modified
 SOLIDITY_SRC_FILES := $(shell find ./packages/ethereum/contracts/src -type f -name "*.sol" ! -path "*/static/*")
 SOLIDITY_TEST_FILES := $(shell find ./packages/ethereum/contracts/test -type f -name "*.sol")
@@ -298,7 +301,7 @@ fmt-ts: ## run code formatter for TS
 
 .PHONY: fmt-rust
 fmt-rust: ## run code formatter for Rust
-	$(foreach c, $(CRATES_NAMES), cargo fmt -p $(c) && ) echo ""
+	$(foreach c, $(LINTABLE_CRATES_NAMES), cargo fmt -p $(c) && ) echo ""
 
 .PHONY: fmt-python
 fmt-python: ## run code formatter for Python
