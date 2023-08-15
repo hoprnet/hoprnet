@@ -17,7 +17,7 @@ abstract contract HoprNodeSafeRegistryEvents {
  * This contract is meant to be deployed as a standalone contract
  */
 contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
-    // Node already has mapped to Safe
+        // Node already has mapped to Safe
     error NodeHasSafe();
 
     // Not a valid Safe address;
@@ -35,13 +35,6 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     // Provided address is neither an owner of Safe nor a member of an enabled NodeManagementModule
     error NotSafeOwnerNorNode();
 
-/**
- * @title Node safe must prove that the Safe is the only authorized controller of
- * the CHAIN_KEY address. This link between the Safe and node's chain-key address
- * should be registered upon successful verification
- * This contract is meant to be deployed as a standalone contract
- */
-contract HoprNodeSafeRegistry {
     struct NodeSafeRecord {
         address safeAddress;
         uint96 nodeSigNonce;

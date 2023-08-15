@@ -85,7 +85,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
 
         // fail to re-use the signature
-        vm.expectRevert(NotValidSignatureFromNode.selector);
+        vm.expectRevert(HoprNodeSafeRegistry.NotValidSignatureFromNode.selector);
         nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
 
         vm.clearMockedCalls();
