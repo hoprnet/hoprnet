@@ -5,7 +5,7 @@ use futures::channel::mpsc::Sender;
 
 use core_network::{
     PeerId,
-    network::{Network, NetworkExternalActions, PeerStatus, NetworkEvent}
+    network::{Network, NetworkExternalActions, PeerStatus, NetworkEvent, Health}
 };
 use utils_log::{warn,error};
 
@@ -34,12 +34,23 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
 }
 
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct WasmHealth {
+    h: Health
+}
+
+impl From<Health> for WasmHealth {
+    fn from(value: Health) -> Self {
+        Self { h: value }
+    }
+}
+
 #[cfg(feature = "wasm")]
-pub(crate) mod wasm {
+pub mod wasm {
     use std::{str::FromStr, pin::Pin};
 
     use super::*;
-    use core_network::network::PeerOrigin;
+    use core_network::network::{PeerOrigin, Health};
     use futures::future::poll_fn;
     use js_sys::JsString;
     use wasm_bindgen::prelude::*;
@@ -54,6 +65,14 @@ pub(crate) mod wasm {
     impl WasmNetwork {
         pub(crate) fn new(network: Arc<RwLock<Network<ExternalNetworkInteractions>>>, change_notifier: Sender<NetworkEvent>) -> Self {
             Self { network, change_notifier }
+        }
+    }
+
+    #[wasm_bindgen]
+    impl WasmHealth {
+        #[wasm_bindgen]
+        pub fn unwrap(&self) -> Health {
+            self.h
         }
     }
 
@@ -95,6 +114,11 @@ pub(crate) mod wasm {
                     0.0f64
                 }
             }
+        }
+
+        #[wasm_bindgen]
+        pub async fn health(&self) -> WasmHealth {
+            (*self.network.read().await).health().into()
         }
 
         #[wasm_bindgen]

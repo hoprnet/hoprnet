@@ -13,8 +13,8 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys",
-    "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-packet/wasm", "core-p2p/wasm",
-    "utils-log/wasm", "utils-misc/wasm", "utils-metrics?/wasm"
+    "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-network/wasm", "core-packet/wasm", "core-p2p/wasm", "core-types/wasm",
+    "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
 prometheus = ["dep:utils-metrics", "core-packet/prometheus"]
 
@@ -26,6 +26,7 @@ futures = { workspace = true }
 futures-concurrency = "7.3.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.63", optional = true }
+thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 

@@ -39,6 +39,14 @@ pub struct PingConfig {
     pub timeout: u64    // `Duration` -> should be in millis,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl PingConfig {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(max_parallel_pings: usize, timeout: u64) -> Self {
+        Self { max_parallel_pings, timeout }
+    }
+}
+
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait Pinging {
     async fn ping(&mut self, peers: Vec<PeerId>);

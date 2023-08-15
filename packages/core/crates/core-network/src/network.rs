@@ -107,12 +107,13 @@ impl std::fmt::Display for Health {
     }
 }
 
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum NetworkEvent {
     CloseConnection(PeerId),
     PeerOffline(PeerId),
     Register(PeerId, PeerOrigin),
-    Unregister(PeerId),
+    Unregister(PeerId), 
 }
 
 impl std::fmt::Display for NetworkEvent {
@@ -422,6 +423,13 @@ impl<T: NetworkExternalActions> Network<T> {
             Some(entry) => Some(entry.clone()),
             None => None,
         };
+    }
+
+    pub fn get_all_peers(&self) -> Vec<PeerId> {
+        self.entries
+            .values()
+            .map(|peer_status| peer_status.id.clone())
+            .collect::<Vec<_>>()
     }
 
     /// Perform arbitrary predicate filtering operation on the network entries
