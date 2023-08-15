@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # prevent sourcing of this script, only allow execution
+# shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -10,14 +11,15 @@ set -Eeuo pipefail
 # set log id and use shared log function for readable logs
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
-# shellcheck disable=SC1090
+# shellcheck disable=SC1091
 source "${mydir}/testnet.sh"
 
 declare docker_image ssh_hosts
 
-docker_image="${1:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
-: "${2:?"2nd parameter <ssh_hosts> missing"}"
-ssh_hosts=( ${2} )
+: "${1:?"1st parameter <ssh_hosts_file> missing"}"
+[ -f "${1}" ] || { echo "1st parameters <ssh_hosts_file> does not point to a file"; exit 1; }
+mapfile -t ssh_hosts <<< "$(<${1})"
+docker_image="${2:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
 
 NODE_NAME=hoprd-node-rotsee-providence
 API_TOKEN=^binary6wire6GLEEMAN9urbanebetween1watch^
@@ -29,9 +31,8 @@ NETWORK=rotsee
 declare -a hopr_addrs
 
 run_node() {
-  local host safe_args
+  local host
   host="${1}"
-  safe_args="${2}"
 
   echo ""
   echo "==="
@@ -39,9 +40,10 @@ run_node() {
   echo "==="
   echo ""
 
-  ssh -tt ${SSH_USER}@${host} <<EOF
+  ssh "${SSH_USER}@${host}" <<EOF
   	docker stop ${NODE_NAME} || echo 'HOPRd node was not running'
     docker rm ${NODE_NAME} || echo 'HOPRd node was not created'
+    safe_args=\$(</root/hoprd-db/.hopr-id.safe.args)
 		docker run -d --pull always --restart on-failure -m 4g \
 		  --name "${NODE_NAME}" \
 		  --log-driver json-file --log-opt max-size=1000M --log-opt max-file=5 \
@@ -57,7 +59,7 @@ run_node() {
       --apiHost "0.0.0.0" --apiToken "${API_TOKEN}" \
       --healthCheck --healthCheckHost "0.0.0.0" \
       --heartbeatInterval 20000 --heartbeatThreshold 60000 \
-      ${safe_args}
+      \${safe_args}
 EOF
 }
 
@@ -70,7 +72,7 @@ test_ssh_connection() {
   echo "==="
   echo ""
 
-  ssh -tt ${SSH_USER}@${host} hostname
+  ssh "${SSH_USER}@${host}" hostname
 }
 
 update_and_restart_host() {
@@ -78,16 +80,23 @@ update_and_restart_host() {
 
   echo ""
   echo "==="
-  echo "Updating and restarting host ${host}"
+  echo "Updating host ${host}"
   echo "==="
   echo ""
 
-  ! ssh -tt ${SSH_USER}@${host} <<EOF
+  ! ssh "${SSH_USER}@${host}" <<EOF
     apt-get update -y
     apt-get upgrade -y
     apt-get dist-upgrade -y
-    shutdown -r now
 EOF
+
+  echo ""
+  echo "==="
+  echo "Restarting host ${host}"
+  echo "==="
+  echo ""
+
+  ssh "${SSH_USER}@${host}" "shutdown -r now" || :
 }
 
 register_nodes() {
@@ -117,12 +126,15 @@ generate_local_identities() {
   rm -rf "${mydir}/tmp/"
   mkdir -p "${mydir}/tmp"
 
-  env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
-    ${mydir}/../.cargo/bin/hopli identity \
-    --action create \
-    --identity-directory "${mydir}/tmp/" \
-    --identity-prefix ".hopr-id_" \
-    --number "${#ssh_hosts[@]}"
+  for i in "${!ssh_hosts[@]}"; do
+    env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
+      "${mydir}/../.cargo/bin/hopli" identity \
+      --action create \
+      --identity-directory "${mydir}/tmp/" \
+      --identity-prefix ".hopr-id_" \
+      --number 1
+    sleep 1
+  done
 }
 
 upload_identities() {
@@ -135,7 +147,7 @@ upload_identities() {
   local dest src identities
   dest="/root/hoprd-db/.hopr-id"
   src="${mydir}/tmp/"
-  identities="`find ${src} -type f -name '.hopr-id_*'`"
+  identities="$(find "${src}" -type f -name '.hopr-id_*')"
 
   for i in "${!ssh_hosts[@]}"; do
     local host
@@ -148,6 +160,9 @@ upload_identities() {
     # download identity for safe deployment, at this point both files should
     # always be the same
     rsync -av "${SSH_USER}@${host}:${dest}" "${identities[$i]}"
+
+    # download safe args file if it exists
+    rsync -av "${SSH_USER}@${host}:${dest}.safe.args" "${identities[$i]}.safe.args"
   done
 }
 
@@ -159,11 +174,14 @@ deploy_safes() {
   echo ""
 
   local identities
-  identities="`find ${src} -type f -name '.hopr-id_*'`"
+  identities="$(find "${src}" -type f -name '.hopr-id_*')"
 
   for i in "${!identities[@]}"; do
     local id_path
     id_path="${identities[$i]}"
+
+    # skip if safe args already exists
+    [ -f "${id_path}.safe.args" ] && continue
 
     env \
       ETHERSCAN_API_KEY="" \
@@ -177,28 +195,24 @@ deploy_safes() {
     # store safe arguments in separate file for later use
     grep -oE "(\-\-safeAddress.*)" safe.log > "${id_path}.safe.args"
     rm safe.logs
+
+    # upload safe args to host for later use
+    rsync -av --ignore-existing "${id_path}.safe.args" "${SSH_USER}@${ssh_hosts[$i]}:/root/hoprd-db/.hopr-id.safe.args"
   done
 }
 
 start_nodes() {
-  local identities
-  identities="`find ${src} -type f -name '.hopr-id_*'`"
-
-  for i in "${!ssh_hosts[@]}"; do
-    local host safe_args
-    host="${ssh_hosts[$i]}"
-    safe_args=$(<"${identities[$i]}.safe.args")
-
+  for host in "${ssh_hosts[@]}"; do
     test_ssh_connection "${host}"
-    run_node "${host}" "${safe_args}"
+    run_node "${host}"
   done
 }
 
 ### STARTING
 
-for host in ${ssh_hosts[@]}; do
+for host in "${ssh_hosts[@]}"; do
   test_ssh_connection "${host}"
-  update_and_restart_host "${host}"
+  #update_and_restart_host "${host}"
 done
 
 generate_local_identities
@@ -209,7 +223,7 @@ deploy_safes
 
 start_nodes
 
-for host in ${ssh_hosts[@]}; do
+for host in "${ssh_hosts[@]}"; do
   test_ssh_connection "${host}"
 
   declare api_wallet_addr
