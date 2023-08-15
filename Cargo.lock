@@ -1062,6 +1062,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "js-sys",
+ "thiserror",
  "utils-db",
  "utils-log",
  "utils-metrics",

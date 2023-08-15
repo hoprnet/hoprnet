@@ -33,10 +33,19 @@ use crate::ping::Pinging;
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
-    /// The maximum number of concurrent heartbeats
     pub heartbeat_variance: f32,
+    /// Interval in which the heartbeat is triggered
     pub heartbeat_interval: u32,
+    /// The maximum number of concurrent heartbeats
     pub heartbeat_threshold: u64,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl HeartbeatConfig {
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
+    pub fn new(heartbeat_variance: f32, heartbeat_interval: u32, heartbeat_threshold: u64) -> HeartbeatConfig {
+        HeartbeatConfig { heartbeat_variance, heartbeat_interval, heartbeat_threshold}
+    }
 }
 
 #[cfg_attr(test, mockall::automock)]
@@ -114,7 +123,6 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
         }
 
     }
-
 } 
 
 #[cfg(test)]
