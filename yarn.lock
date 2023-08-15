@@ -635,7 +635,7 @@ __metadata:
     retimer: 3.0.0
     sinon: 12.0.1
     typedoc: 0.24.8
-    typedoc-plugin-markdown: 3.15.3
+    typedoc-plugin-markdown: 3.15.4
     typescript: 5.0.4
   languageName: unknown
   linkType: soft
@@ -672,7 +672,7 @@ __metadata:
     retimer: 3.0.0
     secp256k1: 4.0.3
     typedoc: 0.24.8
-    typedoc-plugin-markdown: 3.15.3
+    typedoc-plugin-markdown: 3.15.4
     typescript: 5.0.4
   languageName: unknown
   linkType: soft
@@ -685,7 +685,7 @@ __metadata:
     mocha: 10.2.0
     semver: 7.5.3
     typedoc: 0.24.8
-    typedoc-plugin-markdown: 3.15.3
+    typedoc-plugin-markdown: 3.15.4
     typescript: 5.0.4
   languageName: unknown
   linkType: soft
@@ -735,7 +735,7 @@ __metadata:
     sqlite-level: 1.0.1
     timeout-abort-controller: 3.0.0
     typedoc: 0.24.8
-    typedoc-plugin-markdown: 3.15.3
+    typedoc-plugin-markdown: 3.15.4
     typescript: 5.0.4
   languageName: unknown
   linkType: soft
@@ -780,7 +780,7 @@ __metadata:
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
     typedoc: 0.24.8
-    typedoc-plugin-markdown: 3.15.3
+    typedoc-plugin-markdown: 3.15.4
     typescript: 5.0.4
     uuid: ^9.0.0
     ws: 8.13.0
@@ -9394,14 +9394,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typedoc-plugin-markdown@npm:3.15.3":
-  version: 3.15.3
-  resolution: "typedoc-plugin-markdown@npm:3.15.3"
+"typedoc-plugin-markdown@npm:3.15.4":
+  version: 3.15.4
+  resolution: "typedoc-plugin-markdown@npm:3.15.4"
   dependencies:
     handlebars: ^4.7.7
   peerDependencies:
     typedoc: ">=0.24.0"
-  checksum: 845d8907948a7ea9f3eed31d8c2f1a4053569fb763f5c5187d06ecbffd247c6a6e532eaf0ec09d11f09eabbf26a3df8646c96fc3ac1a836cc9af273fa0e53413
+  checksum: 0ba19732713a0e0da12ae4eb3ec634e6e7ffb7237451780ae1e8c072276fc682603502086104728477ce03e1168853346046648443a718f7393d1eab0bb23e84
   languageName: node
   linkType: hard
 
