@@ -444,6 +444,16 @@ impl<T: NetworkExternalActions> Network<T> {
             .collect::<Vec<_>>()
     }
 
+    pub fn all_peers_with_quality(&self) -> Vec<(PeerId, f64)>
+    {
+        self.entries
+            .values()
+            .map(|status: &PeerStatus| {
+                (status.id, status.quality)
+            })
+            .collect::<Vec<_>>()
+    }
+
     pub fn find_peers_to_ping(&self, threshold: u64) -> Vec<PeerId> {
         let mut data: Vec<PeerId> = self.filter(|v| {
             let backoff = v.backoff.powf(self.cfg.backoff_exponent);
