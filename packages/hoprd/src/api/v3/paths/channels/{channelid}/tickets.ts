@@ -1,27 +1,23 @@
-import type Hopr from '@hoprnet/hopr-core'
-import type { Operation } from 'express-openapi'
+import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum/lib/db.js'
 import { STATUS_CODES } from '../../../utils.js'
 import { formatTicket } from '../../tickets/index.js'
-import { Address, PublicKey } from '@hoprnet/hopr-utils'
 
-export const getTickets = async (node: Hopr, addr: Address) => {
-  const tickets = await node.getTickets(addr)
-  return tickets.map(formatTicket)
-}
+import type { Operation } from 'express-openapi'
+import type Hopr from '@hoprnet/hopr-core'
 
 const GET: Operation = [
   async (req, res, _next) => {
     const { node }: { node: Hopr } = req.context
-    const { peerid } = req.params
-
-    const addr = PublicKey.from_peerid_str(peerid).to_address()
+    const { channelid } = req.params
 
     try {
-      const tickets = await getTickets(node, addr)
+      const channelIdHash = Ethereum_Hash.deserialize(new TextEncoder().encode(channelid))
+      const tickets = await node.getTickets(channelIdHash)
       if (tickets.length <= 0) {
         return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
       }
-      return res.status(200).send(tickets)
+      const formattedTickets = tickets.map(formatTicket)
+      return res.status(200).send(formattedTickets)
     } catch (err) {
       return res
         .status(422)
@@ -37,14 +33,10 @@ GET.apiDoc = {
   parameters: [
     {
       in: 'path',
-      name: 'peerid',
-      example: '16Uiu2HAm91QFjPepnwjuZWzK5pb5ZS8z8qxQRfKZJNXjkgGNUAit',
+      name: 'channelid',
       required: true,
       schema: {
-        type: 'string',
-        format: 'peerId',
-        description: 'PeerId attached to the channel.',
-        example: '16Uiu2HAmUsJwbECMroQUC29LQZZWsYpYZx1oaM1H9DBoZHLkYn12'
+        $ref: '#/components/schemas/ChannelId'
       }
     }
   ],

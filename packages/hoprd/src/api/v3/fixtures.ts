@@ -10,13 +10,23 @@ hoprd_inbox_initialize_crate()
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { State } from '../../types.js'
 
-export const ALICE_PEER_ID: PeerId = peerIdFromString('12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs')
-export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID.toString()}`)
-export const ALICE_NATIVE_ADDR = Address.from_string('0xd08933750bffb86861d1d76e559382658ef4d761')
-export const BOB_PEER_ID: PeerId = peerIdFromString('12D3KooWRNw2pJC9748Fmq4WNV27HoSTcX3r37132FLkQMrbKAiC')
-export const BOB_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${BOB_PEER_ID.toString()}`)
-export const BOB_NATIVE_ADDR = Address.from_string('0xd08933750bffb86861d1d76e559382658ef4d763')
-export const CHARLIE_PEER_ID: PeerId = peerIdFromString('12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF')
+const ALICE_PEER_ID_STR: string = '12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs'
+const ALICE_ETHEREUM_ADDR_STR: string = '0xd08933750bffb86861d1d76e559382658ef4d761'
+const BOB_PEER_ID_STR: string = '12D3KooWRNw2pJC9748Fmq4WNV27HoSTcX3r37132FLkQMrbKAiC'
+const BOB_ETHEREUM_ADDR_STR: string = '0xd08933750bffb86861d1d76e559382658ef4d762'
+const CHARLIE_PEER_ID_STR: string = '12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF'
+const CHARLIE_ETHEREUM_ADDR_STR: string = '0xd08933750bffb86861d1d76e559382658ef4d763'
+
+export const ALICE_PEER_ID: PeerId = peerIdFromString(ALICE_PEER_ID_STR)
+export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID_STR}`)
+export const ALICE_ETHEREUM_ADDR: Address = Address.from_string(ALICE_ETHEREUM_ADDR_STR)
+
+export const BOB_PEER_ID: PeerId = peerIdFromString(BOB_PEER_ID_STR)
+export const BOB_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${BOB_PEER_ID_STR}`)
+export const BOB_ETHEREUM_ADDR: Address = Address.from_string(BOB_ETHEREUM_ADDR_STR)
+export const CHARLIE_PEER_ID: PeerId = peerIdFromString(CHARLIE_PEER_ID_STR)
+export const CHARLIE_ETHEREUM_ADDR: Address = Address.from_string(CHARLIE_ETHEREUM_ADDR_STR)
+
 export const INVALID_PEER_ID = 'definetly not a valid peerId'
 
 export const TICKET_MOCK = {

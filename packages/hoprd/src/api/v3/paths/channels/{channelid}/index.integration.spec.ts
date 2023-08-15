@@ -4,14 +4,14 @@ import sinon from 'sinon'
 // import chaiResponseValidator from 'chai-openapi-response-validator'
 // import chai, { expect } from 'chai'
 // import { STATUS_CODES } from '../../../utils.js'
-import { ALICE_PEER_ID, ALICE_NATIVE_ADDR } from '../../../fixtures.js'
+import { ALICE_PEER_ID, ALICE_ETHEREUM_ADDR } from '../../../fixtures.js'
 // import { getChannel, closeChannel } from './index.js'
 // import { formatIncomingChannel, formatOutgoingChannel } from '../index.js'
 // import type { Address } from '@hoprnet/hopr-utils'
 
 let node = sinon.fake() as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
-node.getEthereumAddress = sinon.fake.returns(ALICE_NATIVE_ADDR)
+node.getEthereumAddress = sinon.fake.returns(ALICE_ETHEREUM_ADDR)
 // const outgoingMock = channelEntryCreateMock()
 // const incomingMock = channelEntryCreateMock()
 
@@ -32,7 +32,7 @@ describe('getChannel', function () {
 
   it('should return outgoing channel', async function () {
     node.getChannel = (src: Address, dest: Address) => {
-      if (src.eq(ALICE_NATIVE_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
+      if (src.eq(ALICE_ETHEREUM_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
         return Promise.resolve(outgoingMock)
       }
     }
@@ -44,11 +44,11 @@ describe('getChannel', function () {
 
   it('should return outgoing and incoming channels', async function () {
     node.getChannel = (src: Address, dest: Address) => {
-      if (src.eq(ALICE_NATIVE_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
+      if (src.eq(ALICE_ETHEREUM_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
         return Promise.resolve(outgoingMock)
       }
 
-      if (src.eq(BOB_NATIVE_ADDR) && dest.eq(ALICE_NATIVE_ADDR)) {
+      if (src.eq(BOB_NATIVE_ADDR) && dest.eq(ALICE_ETHEREUM_ADDR)) {
         return Promise.resolve(incomingMock)
       }
     }
@@ -98,7 +98,7 @@ describe('GET /channels/{peerId}/{direction}', () => {
 
   it('should get outgoing channels', async () => {
     node.getChannel = (src: Address, dest: Address) => {
-      if (src.eq(ALICE_NATIVE_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
+      if (src.eq(ALICE_ETHEREUM_ADDR) && dest.eq(BOB_NATIVE_ADDR)) {
         return Promise.resolve(outgoingMock)
       }
     }
@@ -109,7 +109,7 @@ describe('GET /channels/{peerId}/{direction}', () => {
 
   it('should get incoming channels', async () => {
     node.getChannel = (src: Address, dest: Address) => {
-      if (src.eq(BOB_NATIVE_ADDR) && dest.eq(ALICE_NATIVE_ADDR)) {
+      if (src.eq(BOB_NATIVE_ADDR) && dest.eq(ALICE_ETHEREUM_ADDR)) {
         return Promise.resolve(incomingMock)
       }
     }

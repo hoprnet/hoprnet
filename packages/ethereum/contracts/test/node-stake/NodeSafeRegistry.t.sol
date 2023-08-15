@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import {HoprNodeSafeRegistry,HoprNodeSafeRegistryEvents} from "../../src/node-stake/NodeSafeRegistry.sol";
-import {PrecompileUtils} from"../utils/Precompiles.sol";
+import {HoprNodeSafeRegistry, HoprNodeSafeRegistryEvents} from "../../src/node-stake/NodeSafeRegistry.sol";
+import {PrecompileUtils} from "../utils/Precompiles.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import {Test} from "forge-std/Test.sol";
 import {stdStorage, StdStorage} from "forge-std/StdCheats.sol";

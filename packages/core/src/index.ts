@@ -6,6 +6,7 @@ import BN from 'bn.js'
 import { keysPBM } from '@libp2p/crypto/keys'
 import { createHash } from 'crypto'
 import secp256k1 from 'secp256k1'
+
 import type { Libp2p as Libp2pType } from 'libp2p'
 import type { Connection } from '@libp2p/interface-connection'
 import type { Peer } from '@libp2p/interface-peer-store'
@@ -958,6 +959,13 @@ class Hopr extends EventEmitter {
   }
 
   /**
+   * Gets the chain public key this HOPR node.
+   */
+  public getEthereumPublicKey(): PublicKey {
+    return this.chainKeypair.public()
+  }
+
+  /**
    * List of addresses that is announced to other nodes
    * @dev returned list can change at runtime
    * @param peer peer to query for, default self
@@ -1488,14 +1496,13 @@ class Hopr extends EventEmitter {
     return ret
   }
 
-  public async getTickets(counterparty: Address): Promise<Ticket[]> {
-    const self = this.getEthereumAddress()
-    const channel = await this.db.get_channel_x(
-      Packet_Address.deserialize(counterparty.serialize()),
-      Packet_Address.deserialize(self.serialize())
-    )
-
-    log(`looking for tickets in channel ${channel.to_string()}`)
+  public async getTickets(channelId: Hash): Promise<Ticket[]> {
+    log(`looking for tickets in channel ${channelId.to_hex()}`)
+    const channel = await this.db.get_channel(channelId)
+    // return no tickets if channel does not exist or is not an incoming channel
+    if (!channel || !channel.destination.eq(this.getEthereumAddress())) {
+      return []
+    }
 
     const ackedTickets = await this.db.get_acknowledged_tickets(channel)
 
@@ -1542,19 +1549,17 @@ class Hopr extends EventEmitter {
     await HoprCoreEthereum.getInstance().redeemAllTickets()
   }
 
-  public async redeemTicketsInChannel(counterparty: Address) {
-    log(`redeeming tickets in channel with ${counterparty.to_hex()}`)
-    const self = this.getEthereumAddress()
-    const channel = ChannelEntry.deserialize(
-      (
-        await this.db.get_channel_x(
-          Packet_Address.deserialize(counterparty.serialize()),
-          Packet_Address.deserialize(self.serialize())
-        )
-      ).serialize()
-    )
-
-    await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
+  public async redeemTicketsInChannel(channelId: Hash) {
+    log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
+    const channel = await this.db.get_channel(channelId)
+    if (channel) {
+      if (channel.destination.eq(this.getEthereumAddress())) {
+        await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
+        return
+      }
+      log(`cannot redeem tickets in outgoing channel ${channelId.to_hex()}`)
+    }
+    log(`cannot redeem tickets in unknown channel ${channelId.to_hex()}`)
   }
 
   /**
@@ -1617,7 +1622,7 @@ class Hopr extends EventEmitter {
   }
 
   public getEthereumAddress(): Address {
-    return HoprCoreEthereum.getInstance().getPublicKey().to_address()
+    return this.chainKeypair.public().to_address()
   }
 
   /**

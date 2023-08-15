@@ -1,22 +1,22 @@
 import request from 'supertest'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
+import { Balance, ChannelEntry, BalanceType, U256, ChannelStatus } from '@hoprnet/hopr-utils'
+
 import {
   createTestApiInstance,
   ALICE_PEER_ID,
-  BOB_PEER_ID,
-  CHARLIE_PEER_ID,
-  ALICE_NATIVE_ADDR,
+  ALICE_ETHEREUM_ADDR,
+  BOB_ETHEREUM_ADDR,
+  CHARLIE_ETHEREUM_ADDR,
   INVALID_PEER_ID,
   channelEntryCreateMock
 } from '../../fixtures.js'
-import { Balance, ChannelEntry, BalanceType, PublicKey, U256, ChannelStatus } from '@hoprnet/hopr-utils'
-
 import { STATUS_CODES } from '../../utils.js'
 
 let node = {} as any
 node.getId = () => ALICE_PEER_ID
-node.getEthereumAddress = () => ALICE_NATIVE_ADDR
+node.getEthereumAddress = () => ALICE_ETHEREUM_ADDR
 node.getNativeBalance = () => new Balance('10', BalanceType.Native)
 node.getBalance = () => new Balance('1', BalanceType.HOPR)
 
@@ -29,8 +29,8 @@ node.openChannel = async () => ({
 
 describe('GET /channels', function () {
   const incoming = new ChannelEntry(
-    PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address(),
-    PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
+    ALICE_ETHEREUM_ADDR.clone(),
+    BOB_ETHEREUM_ADDR.clone(),
     new Balance('1', BalanceType.HOPR),
     U256.one(),
     ChannelStatus.Closed,
@@ -38,8 +38,8 @@ describe('GET /channels', function () {
     U256.one()
   )
   const outgoing = new ChannelEntry(
-    PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
-    PublicKey.from_peerid_str(ALICE_PEER_ID.toString()).to_address(),
+    BOB_ETHEREUM_ADDR.clone(),
+    ALICE_ETHEREUM_ADDR.clone(),
     new Balance('2', BalanceType.HOPR),
     new U256('2'),
     ChannelStatus.Closed,
@@ -47,8 +47,8 @@ describe('GET /channels', function () {
     new U256('2')
   )
   const otherChannel = new ChannelEntry(
-    PublicKey.from_peerid_str(BOB_PEER_ID.toString()).to_address(),
-    PublicKey.from_peerid_str(CHARLIE_PEER_ID.toString()).to_address(),
+    BOB_ETHEREUM_ADDR.clone(),
+    CHARLIE_ETHEREUM_ADDR.clone(),
     new Balance('3', BalanceType.HOPR),
     new U256('3'),
     ChannelStatus.Open,

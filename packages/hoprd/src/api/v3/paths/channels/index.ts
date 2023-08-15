@@ -1,22 +1,15 @@
+import BN from 'bn.js'
+import { ChannelStatus, defer, generate_channel_id, channel_status_to_string, Address } from '@hoprnet/hopr-utils'
+import { STATUS_CODES } from '../../utils.js'
+
 import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
-import {
-  type ChannelEntry,
-  ChannelStatus,
-  defer,
-  generate_channel_id,
-  PublicKey,
-  channel_status_to_string,
-  type DeferType,
-  Address
-} from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
-import { STATUS_CODES } from '../../utils.js'
+import type { ChannelEntry, DeferType } from '@hoprnet/hopr-utils'
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
   id: string
-  peerId: string
+  peerAddress: string
   status: string
   balance: string
 }
@@ -61,7 +54,7 @@ export const formatOutgoingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'outgoing',
     id: channel.get_id().to_hex(),
-    peerId: channel.destination.to_string(),
+    peerAddress: channel.destination.to_string(),
     status: channel_status_to_string(channel.status),
     balance: channel.balance.to_string()
   }
@@ -71,7 +64,7 @@ export const formatIncomingChannel = (channel: ChannelEntry): ChannelInfo => {
   return {
     type: 'incoming',
     id: channel.get_id().to_hex(),
-    peerId: channel.source.to_string(),
+    peerAddress: channel.source.to_string(),
     status: channel_status_to_string(channel.status),
     balance: channel.balance.to_string()
   }
@@ -83,8 +76,7 @@ const openingRequests = new Map<string, DeferType<void>>()
  * @returns List of incoming and outgoing channels associated with the node.
  */
 export const getChannels = async (node: Hopr, includingClosed: boolean) => {
-  const selfPubKey = PublicKey.from_peerid_str(node.getId().toString())
-  const selfAddress = selfPubKey.to_address()
+  const selfAddress = node.getEthereumAddress()
 
   const channelsFrom: ChannelInfo[] = (await node.getChannelsFrom(selfAddress))
     .filter((channel) => includingClosed || channel.status !== ChannelStatus.Closed)
@@ -213,7 +205,7 @@ GET.apiDoc = {
 
 async function validateOpenChannelParameters(
   node: Hopr,
-  counterpartyStr: string,
+  counterpartyAddressStr: string,
   amountStr: string
 ): Promise<
   | {
@@ -228,7 +220,7 @@ async function validateOpenChannelParameters(
 > {
   let counterparty: Address
   try {
-    counterparty = PublicKey.from_peerid_str(counterpartyStr).to_address()
+    counterparty = Address.from_string(counterpartyAddressStr)
   } catch (err) {
     return {
       valid: false,
@@ -267,7 +259,7 @@ async function validateOpenChannelParameters(
  */
 export async function openChannel(
   node: Hopr,
-  counterpartyStr: string,
+  counterpartyAddressStr: string,
   amountStr: string
 ): Promise<
   | {
@@ -280,7 +272,7 @@ export async function openChannel(
       receipt: string
     }
 > {
-  const validationResult = await validateOpenChannelParameters(node, counterpartyStr, amountStr)
+  const validationResult = await validateOpenChannelParameters(node, counterpartyAddressStr, amountStr)
 
   if (validationResult.valid == false) {
     return { success: false, reason: validationResult.reason }
@@ -319,9 +311,9 @@ export async function openChannel(
 const POST: Operation = [
   async (req, res, _next) => {
     const { node }: { node: Hopr } = req.context
-    const { peerId, amount } = req.body
+    const { peerAddress, amount } = req.body
 
-    const openingResult = await openChannel(node, peerId, amount)
+    const openingResult = await openChannel(node, peerAddress, amount)
 
     if (openingResult.success == true) {
       res.status(201).send({ channelId: openingResult.channelId, transactionReceipt: openingResult.receipt })
@@ -352,12 +344,12 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['peerId', 'amount'],
+          required: ['peerAddress', 'amount'],
           properties: {
-            peerId: {
-              format: 'peerId',
+            peerAddress: {
+              format: 'peerAddress',
               type: 'string',
-              description: 'PeerId that we want to transact with using this channel.'
+              description: 'Peer address that we want to transact with using this channel.'
             },
             amount: {
               format: 'amount',
@@ -367,7 +359,7 @@ POST.apiDoc = {
             }
           },
           example: {
-            peerId: '12Diu2HAmUsJwbECMroQUC29LQZZWsYpYZx1',
+            peerAddress: '0xf55df5f3ce0ccce707f76ef3e8459adff376ac99',
             amount: '1000000'
           }
         }

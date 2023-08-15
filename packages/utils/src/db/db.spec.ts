@@ -108,7 +108,6 @@ describe('db functional tests', function () {
     assert((await db.get_rejected_tickets_value()).eq(new Balance(amount.toString(10), BalanceType.HOPR)))
   })
 
-
   it('block number workflow', async function () {
     let db = test_in_memory_db()
 
