@@ -4,14 +4,13 @@ FOUNDRY_DIR ?= ${CURDIR}/../../../.foundry
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
 
-# use custom PATH in all shell processes
-SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
-#SHELL := /bin/bash
+SHELL := env $(shell which bash)
 
 # utility wrapper for forge script to use same options on every invocation
 forge := time forge
 forge-bind = time forge bind
 forge-script = env NETWORK=$(network) FOUNDRY_PROFILE=$(environment-type) ETHERSCAN_API_KEY=$(etherscan_api_key) time forge script
+
 .PHONY: sc-test
 sc-test:
 	$(forge) test --gas-report

@@ -85,7 +85,7 @@ impl ChannelEntry {
         }
     }
 
-    /// Generates the ticket ID using the source and destination address
+    /// Generates the channel ID using the source and destination address
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn get_id(&self) -> Hash {
         generate_channel_id(&self.source, &self.destination)

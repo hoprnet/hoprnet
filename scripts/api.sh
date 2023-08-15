@@ -45,7 +45,7 @@ api_call(){
     response_type="-d"
   fi
 
-  local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v2${api_endpoint} ${response_type}"
+  local cmd="curl -X ${rest_method} -m ${step_time} --connect-timeout ${step_time} -s -H X-Auth-Token:${api_token} -H Content-Type:application/json --url ${source_api}/api/v3${api_endpoint} ${response_type}"
   # if no end time was given we need to calculate it once
 
   local now=$(node -e "console.log(process.hrtime.bigint().toString());")
