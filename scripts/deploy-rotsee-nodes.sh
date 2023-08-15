@@ -13,12 +13,11 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # shellcheck disable=SC1090
 source "${mydir}/testnet.sh"
 
-declare branch docker_image
+declare docker_image ssh_hosts
 
 docker_image="${1:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
-branch=${2:-master}
-: "${3:?"3rd parameter <ssh_hosts> missing"}"
-ssh_hosts=( ${3} )
+: "${2:?"2nd parameter <ssh_hosts> missing"}"
+ssh_hosts=( ${2} )
 
 NODE_NAME=hoprd-node-rotsee-providence
 API_TOKEN=^binary6wire6GLEEMAN9urbanebetween1watch^
@@ -49,7 +48,7 @@ run_node() {
 		  -ti -v /root/hoprd-db:/app/hoprd-db \
 		  -p 9091:9091/tcp -p 9091:9091/udp -p 8080:8080 -p 3001:3001 -e DEBUG="*" \
       ${docker_image} \
-      --environment ${NETWORK} \
+      --network ${NETWORK} \
       --init --api \
       --announce \
       --identity /app/hoprd-db/.hopr-id \
