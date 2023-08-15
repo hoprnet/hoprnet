@@ -675,7 +675,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         );
 
         if allowed {
-            println!("putting");
             batch_ops.put(key, ());
         } else {
             batch_ops.del(key)
