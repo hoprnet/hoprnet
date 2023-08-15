@@ -115,7 +115,7 @@ All relevant test files have been appropriately updated in alignment with the fi
 **Status:** <span style="background-color:#000058">Code Change</span>
 
 **Description of Changes:**
-- Added `nodeSigNonce` mapping in `HoprNodeSafeRegistry`. This value is required to be signed and gets incremented after each successful `registerSafeWithNodeSig` call.
+- Created `NodeSafeRecord` struct that holds `nodeSigNonce` next to `safeAddress` mapping in `HoprNodeSafeRegistry`. The `nodeSigNonce` gets bumped when a node-safe pair is added. 
 
 **Commit Hash:** [b01ef3f74d63f766a98041a3508a56a68bbfdae9](https://github.com/hoprnet/hoprnet/commit/b01ef3f74d63f766a98041a3508a56a68bbfdae9)
 
@@ -174,3 +174,7 @@ All relevant test files have been appropriately updated in alignment with the fi
 - Added `ExecutionSuccess` and `ExecutionFailure` events in `SimplifiedModuleEvents`, which is inherited by `SimplifiedModule`. This allows HOPR daemon to listen to update in transaction execution results from the node management module proxy in addition to safe proxy.
 
 **Commit Hash:** [c647548f63380e80a3253439fb7b91150cea59fe](https://github.com/hoprnet/hoprnet/commit/c647548f63380e80a3253439fb7b91150cea59fe)
+
+#### 3. Improve HoprChannels
+- When funding two channels with `tokenReceived`, if the token balance is zero error `InvalidBalance` gets reverted.
+- Always emit `ChannelBalanceIncreased` in a successful `tokenReceived` call.
