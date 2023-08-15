@@ -105,7 +105,7 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
         address nodeAddress = vm.addr(254);
         // other nodes point to a different address than safeAddress
         vm.mockCall(
-            nodeSafeRegistry, abi.encodeWithSelector(IHoprNodeSafeRegistry.nodeToSafe.selector), abi.encode(vm.addr(1))
+            nodeSafeRegistry, abi.encodeWithSignature("nodeToSafe(address)"), abi.encode(vm.addr(1))
         );
         // nodeSafeRegistry is able to reply to call nodeToSafe
         vm.mockCall(

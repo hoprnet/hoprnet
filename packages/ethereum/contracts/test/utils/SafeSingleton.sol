@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import "forge-std/Test.sol";
-import "../../script/utils/SafeSuiteLib.sol";
+import "../../src/utils/SafeSuiteLib.sol";
 
 /**
  * Contract deployed bytecode and addresses

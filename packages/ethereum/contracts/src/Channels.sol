@@ -8,7 +8,6 @@ import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import {IERC777Recipient} from "openzeppelin-contracts/token/ERC777/IERC777Recipient.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 
-import {IHoprNodeSafeRegistry} from "./interfaces/INodeSafeRegistry.sol";
 import {HoprCrypto} from "./Crypto.sol";
 import {HoprLedger} from "./Ledger.sol";
 import {HoprMultiSig} from "./MultiSig.sol";
@@ -127,7 +126,7 @@ contract HoprChannels is
 
     string public constant VERSION = "2.0.0";
 
-    bytes32 public immutable domainSeparator; // depends on chainId
+    bytes32 public domainSeparator; // depends on chainId
 
     /**
      * @dev Channel state machine
@@ -243,15 +242,7 @@ contract HoprChannels is
         noticePeriodChannelClosure = _noticePeriodChannelClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
 
-        domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("HoprChannels")),
-                keccak256(bytes(VERSION)),
-                block.chainid,
-                address(this)
-            )
-        );
+        updateDomainSeparator();
     }
 
     /**
@@ -278,6 +269,22 @@ contract HoprChannels is
             revert BalanceExceedsGlobalPerChannelAllowance();
         }
         _;
+    }
+
+    /**
+     * @dev recompute the domain seperator in case of a fork
+     */
+    function updateDomainSeparator() public {
+        // following encoding guidelines of EIP712
+        domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("HoprChannels")),
+                keccak256(bytes(VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     /**
@@ -390,7 +397,7 @@ contract HoprChannels is
         }
 
         spendingChannel.ticketIndex = TicketIndex.wrap(
-            TicketIndex.unwrap(spendingChannel.ticketIndex) + TicketIndexOffset.unwrap(redeemable.data.indexOffset)
+            TicketIndex.unwrap(redeemable.data.ticketIndex) + TicketIndexOffset.unwrap(redeemable.data.indexOffset)
         );
         spendingChannel.balance =
             Balance.wrap(Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount));
@@ -402,21 +409,23 @@ contract HoprChannels is
         bytes32 outgoingChannelId = _getChannelId(self, source);
         Channel storage earningChannel = channels[outgoingChannelId];
 
+        // Informs about new ticketIndex
+        indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, spendingChannel.ticketIndex));
+        emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
+
         if (earningChannel.status == ChannelStatus.CLOSED) {
             // The other channel does not exist, so we need to transfer funds directly
             if (token.transfer(msg.sender, Balance.unwrap(redeemable.data.amount)) != true) {
                 revert TokenTransferFailed();
             }
         } else {
+            // this CAN produce channels with more stake than MAX_USED_AMOUNT - which does not lead
+            // to overflows since total supply < type(uin96).max
             earningChannel.balance =
                 Balance.wrap(Balance.unwrap(earningChannel.balance) + Balance.unwrap(redeemable.data.amount));
             indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, outgoingChannelId, earningChannel.balance));
             emit ChannelBalanceIncreased(outgoingChannelId, earningChannel.balance);
         }
-
-        // Informs about new ticketIndex
-        indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, spendingChannel.ticketIndex));
-        emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
     }
 
     /**
@@ -495,22 +504,23 @@ contract HoprChannels is
             revert WrongChannelState({reason: "channel must have state OPEN or PENDING_TO_CLOSE"});
         }
 
+        uint256 balance = Balance.unwrap(channel.balance);
+
         channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
         channel.closureTime = Timestamp.wrap(0);
         channel.ticketIndex = TicketIndex.wrap(0);
+        channel.balance = Balance.wrap(0);
 
         // channel.epoch must be kept
-
-        if (Balance.unwrap(channel.balance) > 0) {
-            if (token.transfer(source, Balance.unwrap(channel.balance)) != true) {
-                revert TokenTransferFailed();
-            }
-        }
 
         indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
         emit ChannelClosed(channelId);
 
-        channel.balance = Balance.wrap(0);
+        if (balance > 0) {
+            if (token.transfer(source, balance) != true) {
+                revert TokenTransferFailed();
+            }
+        }
     }
 
     /**
@@ -549,22 +559,23 @@ contract HoprChannels is
             revert NoticePeriodNotDue();
         }
 
+        uint256 balance = Balance.unwrap(channel.balance);
+
         channel.status = ChannelStatus.CLOSED; // ChannelStatus.CLOSED == 0
         channel.closureTime = Timestamp.wrap(0);
         channel.ticketIndex = TicketIndex.wrap(0);
+        channel.balance = Balance.wrap(0);
 
         // channel.epoch must be kept
 
-        if (Balance.unwrap(channel.balance) > 0) {
-            if (token.transfer(msg.sender, Balance.unwrap(channel.balance)) != true) {
+        indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
+        emit ChannelClosed(channelId);
+
+        if (balance > 0) {
+            if (token.transfer(msg.sender, balance) != true) {
                 revert TokenTransferFailed();
             }
         }
-
-        channel.balance = Balance.wrap(0);
-
-        indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
-        emit ChannelClosed(channelId);
     }
 
     /**
@@ -576,6 +587,8 @@ contract HoprChannels is
      * channels.
      *
      * Channel source and destination are specified by the userData payload.
+     *
+     * @dev function reverts if it is a no-op, meaning no state change
      *
      * @param from account from which the tokens have been transferred
      * @param to account to which the the tokens have been transferred
@@ -590,10 +603,6 @@ contract HoprChannels is
         bytes calldata userData,
         bytes calldata // operatorData not needed
     ) external override {
-        if (amount > type(uint96).max) {
-            revert InvalidBalance();
-        }
-
         // don't accept any other tokens ;-)
         if (msg.sender != address(token)) {
             revert WrongToken();
@@ -613,14 +622,16 @@ contract HoprChannels is
         if (userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE) {
             (address src, address dest) = abi.decode(userData, (address, address));
 
+            address safeAddress = registry.nodeToSafe(src);
+
             // skip the check between `from` and `src` on node-safe registry
             if (from == src) {
                 // node if opening an outgoing channel
-                if (registry.nodeToSafe(src) != address(0)) {
+                if (safeAddress != address(0)) {
                     revert ContractNotResponsible();
                 }
             } else {
-                if (registry.nodeToSafe(src) != from) {
+                if (safeAddress != from) {
                     revert ContractNotResponsible();
                 }
             }
@@ -631,7 +642,7 @@ contract HoprChannels is
             (address account1, Balance amount1, address account2, Balance amount2) =
                 abi.decode(userData, (address, Balance, address, Balance));
 
-            if (amount != Balance.unwrap(amount1) + Balance.unwrap(amount2)) {
+            if (amount == 0 || amount != uint256(Balance.unwrap(amount1)) + uint256(Balance.unwrap(amount2))) {
                 revert InvalidBalance();
             }
 
@@ -659,16 +670,14 @@ contract HoprChannels is
     function fundChannelSafe(address self, address account, Balance amount)
         external
         HoprMultiSig.onlySafe(self)
-        validateBalance(amount)
-        validateChannelParties(self, account)
     {
+        _fundChannelInternal(self, account, amount);
+
         // pull tokens from Safe and handle result
         if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
             // sth. went wrong, we need to revert here
             revert TokenTransferFailed();
         }
-
-        _fundChannelInternal(self, account, amount);
     }
 
     /**
@@ -679,16 +688,14 @@ contract HoprChannels is
     function fundChannel(address account, Balance amount)
         external
         HoprMultiSig.noSafeSet()
-        validateBalance(amount)
-        validateChannelParties(msg.sender, account)
     {
+        _fundChannelInternal(msg.sender, account, amount);
+
         // pull tokens from funder and handle result
         if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
             // sth. went wrong, we need to revert here
             revert TokenTransferFailed();
         }
-
-        _fundChannelInternal(msg.sender, account, amount);
     }
 
     /**
@@ -699,7 +706,14 @@ contract HoprChannels is
      * @param account destination address
      * @param amount token amount
      */
-    function _fundChannelInternal(address self, address account, Balance amount) internal {
+    function _fundChannelInternal(
+        address self, 
+        address account,
+        Balance amount
+    ) internal 
+        validateBalance(amount)
+        validateChannelParties(self, account)
+    {
         bytes32 channelId = _getChannelId(self, account);
         Channel storage channel = channels[channelId];
 
@@ -718,10 +732,10 @@ contract HoprChannels is
 
             indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
             emit ChannelOpened(self, account);
-        } else {
-            indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
-            emit ChannelBalanceIncreased(channelId, channel.balance);
         }
+        
+        indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
+        emit ChannelBalanceIncreased(channelId, channel.balance);
     }
 
     // utility functions, no state changes involved
@@ -767,7 +781,7 @@ contract HoprChannels is
             )
         );
 
-        return keccak256(abi.encode(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
+        return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
     }
 
     /**

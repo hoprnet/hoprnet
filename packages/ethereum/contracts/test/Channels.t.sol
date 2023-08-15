@@ -809,7 +809,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
 
@@ -822,7 +822,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
 
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
@@ -841,7 +841,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
         vm.prank(safeContract);
         hoprChannels.redeemTicketSafe(dest, redeemable, vrf);
 
@@ -854,10 +854,69 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
 
         vm.prank(safeContract);
         hoprChannels.redeemTicketSafe(dest, redeemable, vrf);
+    }
+
+    function testRevert_CannotRedeemSameWinningTicketMultipleTimes(
+        uint256 privKeyA,
+        uint256 privKeyB,
+        uint256 porSecret,
+        uint96 amount,
+        uint96 channelAmount,
+        uint24 epoch
+    ) public {
+        porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+        privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+        privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
+        vm.assume(privKeyA != privKeyB);
+    
+        channelAmount = uint96(bound(channelAmount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+        amount = uint96(bound(amount, MIN_USED_BALANCE, channelAmount));
+        uint32 indexOffset = uint32(1);
+        uint48 maxTicketIndex = uint48(6);
+        uint48 channelTicketIndex = uint48(1);
+
+        address src = vm.addr(privKeyA);
+        address dest = vm.addr(privKeyB);
+
+        _helperNoSafeSetMock(dest);
+        _helperTokenTransferMock(dest, amount);
+
+        RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
+            privKeyA,
+            privKeyB,
+            abi.encodePacked(hoprChannels.domainSeparator()),
+            src,
+            dest,
+            amount,
+            maxTicketIndex,
+            indexOffset,
+            epoch,
+            HoprChannels.WinProb.unwrap(WIN_PROB_100),
+            porSecret
+        );
+
+        hoprChannels._storeChannel(
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+        );
+
+        (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
+            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+
+
+        vm.expectEmit(true, false, false, true, address(hoprChannels));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+        vm.prank(dest);
+        hoprChannels.redeemTicket(redeemable, vrf);
+
+        for (uint256 i = 1; i < uint256(maxTicketIndex - channelTicketIndex); i++) {
+            vm.expectRevert(HoprChannels.InvalidAggregatedTicketInterval.selector);
+            vm.prank(dest);
+            hoprChannels.redeemTicket(redeemable, vrf);
+        }
     }
 
     function test_redeemTicket_bidirectional(
@@ -917,12 +976,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelABAmount - amount));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
+        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+
+        vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceIncreased(
             hoprChannels._getChannelId(dest, src), HoprChannels.Balance.wrap(channelBAAmount + amount)
         );
-
-        vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(channelTicketIndex + indexOffset));
 
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
@@ -1540,6 +1599,95 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
     }
 
+    function testRevert_tokensReceivedInvalidBalance(address safeContract, address src, address dest, uint256 amountTooSmall, uint256 amountTooLarge, address operator) public {
+        vm.assume(src != dest && src != safeContract && dest != safeContract);
+        vm.assume(src != address(0) && dest != address(0));
+        vm.assume(safeContract != address(0));
+        vm.assume(operator != address(0));
+        
+        vm.assume(amountTooSmall < uint256(MIN_USED_BALANCE) - 1);
+        amountTooLarge = bound(amountTooLarge, uint256(MAX_USED_BALANCE) + 1, type(uint96).max);
+        HoprChannels.Balance balanceTooSmall = HoprChannels.Balance.wrap(uint96(amountTooSmall));
+        HoprChannels.Balance balanceTooLarge = HoprChannels.Balance.wrap(uint96(amountTooLarge));
+
+        vm.startPrank(address(hoprToken));
+
+        // a. from == src (called by node directly)
+        // userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE 
+        _helperNoSafeSetMock(src);
+
+        vm.expectRevert(HoprChannels.InvalidBalance.selector);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooSmall, abi.encode(src, dest), hex"");
+        vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooLarge, abi.encode(src, dest), hex"");
+
+        // userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
+        vm.expectRevert(HoprChannels.InvalidBalance.selector);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooSmall * 2, abi.encode(src, balanceTooSmall, dest, balanceTooSmall), hex"");
+        vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooLarge * 2, abi.encode(src, balanceTooLarge, dest, balanceTooLarge), hex"");
+
+        // b. from != src (called by Safe)
+        vm.clearMockedCalls();
+        _helperOnlySafeMock(src, safeContract);
+        hoprChannels._removeChannel(src, dest);
+
+        // userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE 
+        vm.expectRevert(HoprChannels.InvalidBalance.selector);
+        hoprChannels.tokensReceived(
+            operator, safeContract, address(hoprChannels), amountTooSmall, abi.encode(safeContract, dest), hex""
+        );
+        vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
+        hoprChannels.tokensReceived(
+            operator, safeContract, address(hoprChannels), amountTooLarge, abi.encode(safeContract, dest), hex""
+        );
+
+        // userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
+        vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
+        hoprChannels.tokensReceived(operator, safeContract, address(hoprChannels), amountTooLarge * 2, abi.encode(src, balanceTooLarge, dest, balanceTooLarge), hex"");
+        vm.clearMockedCalls();
+        vm.stopPrank();
+    }
+
+    function testRevert_tokensReceivedSameParty(address safeContract, address src, uint96 amount) public {
+        amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
+        vm.assume(src != address(0));
+
+        address operator = address(0);
+        HoprChannels.Balance balance = HoprChannels.Balance.wrap(amount);
+
+        vm.startPrank(address(hoprToken));
+
+        // a. from == src (called by node directly)
+        // userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE 
+        _helperNoSafeSetMock(src);
+
+        vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount, abi.encode(src, src), hex"");
+
+        // userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
+        vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount * 2, abi.encode(src, balance, src, balance), hex"");
+
+        // b. from != src (called by Safe)
+        vm.clearMockedCalls();
+        vm.clearMockedCalls();
+        _helperOnlySafeMock(src, safeContract);
+        // hoprChannels._removeChannel(src, dest);
+
+        // userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE 
+        vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
+        hoprChannels.tokensReceived(
+            operator, safeContract, address(hoprChannels), amount, abi.encode(src, src), hex""
+        );
+
+        // userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
+        vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
+        hoprChannels.tokensReceived(operator, safeContract, address(hoprChannels), amount * 2, abi.encode(src, balance, src, balance), hex"");
+        vm.clearMockedCalls();
+        vm.stopPrank();
+    }
+
     function testRevert_tokensReceivedSafeIntegration(
         address someAccount,
         address operator,
@@ -1569,6 +1717,36 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         vm.clearMockedCalls();
+    }
+
+    function testFuzz_DomainSeparator(uint256 newChaidId) public {
+        newChaidId = bound(newChaidId, 1, 1e18);
+        vm.assume(newChaidId != block.chainid);
+        bytes32 domainSeparatorOnDeployment = hoprChannels.domainSeparator();
+
+        // call updateDomainSeparator when chainid is the same
+        hoprChannels.updateDomainSeparator();
+        assertEq(hoprChannels.domainSeparator(), domainSeparatorOnDeployment);
+
+        // call updateDomainSeparator when chainid is different
+        vm.chainId(newChaidId);
+        hoprChannels.updateDomainSeparator();
+        assertTrue(hoprChannels.domainSeparator() != domainSeparatorOnDeployment);
+    }
+
+    function testFuzz_LedgerDomainSeparator(uint256 newChaidId) public {
+        newChaidId = bound(newChaidId, 1, 1e18);
+        vm.assume(newChaidId != block.chainid);
+        bytes32 ledgerDomainSeparatorOnDeployment = hoprChannels.ledgerDomainSeparator();
+
+        // call updateLedgerDomainSeparator when chainid is the same
+        hoprChannels.updateLedgerDomainSeparator();
+        assertEq(hoprChannels.ledgerDomainSeparator(), ledgerDomainSeparatorOnDeployment);
+
+        // call updateLedgerDomainSeparator when chainid is different
+        vm.chainId(newChaidId);
+        hoprChannels.updateLedgerDomainSeparator();
+        assertTrue(hoprChannels.ledgerDomainSeparator() != ledgerDomainSeparatorOnDeployment);
     }
 
     /**

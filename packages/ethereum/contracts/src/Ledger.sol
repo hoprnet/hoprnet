@@ -50,6 +50,15 @@ abstract contract HoprLedger {
         latestRoot.rootHash = bytes28(keccak256(abi.encodePacked(address(this))));
         latestRoot.timestamp = uint32(block.timestamp);
 
+        // compute the domain separator on deployment
+        updateLedgerDomainSeparator();
+    }
+
+    /**
+     * @dev recompute the domain seperator in case of a fork
+     */
+    function updateLedgerDomainSeparator() public {
+        // following encoding guidelines of EIP712
         ledgerDomainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
@@ -85,6 +94,7 @@ abstract contract HoprLedger {
 
         if (createSnapshot) {
             latestSnapshotRoot = latestRoot;
+            latestRoot.timestamp = uint32(block.timestamp);
         }
     }
 }

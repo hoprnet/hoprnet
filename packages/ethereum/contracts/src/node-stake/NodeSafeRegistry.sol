@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
-import "../interfaces/IAvatar.sol";
-import "../interfaces/INodeManagementModule.sol";
+import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import {IAvatar} from "../interfaces/IAvatar.sol";
+import {IHoprNodeManagementModule} from "../interfaces/INodeManagementModule.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {
     event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
@@ -17,7 +17,7 @@ abstract contract HoprNodeSafeRegistryEvents {
  * This contract is meant to be deployed as a standalone contract
  */
 contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
-    // Node already has mapped to Safe
+        // Node already has mapped to Safe
     error NodeHasSafe();
 
     // Not a valid Safe address;
@@ -35,35 +35,45 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     // Provided address is neither an owner of Safe nor a member of an enabled NodeManagementModule
     error NotSafeOwnerNorNode();
 
+    struct NodeSafeRecord {
+        address safeAddress;
+        uint96 nodeSigNonce;
+    }
+
     struct NodeSafe {
         address safeAddress;
         address nodeChainKeyAddress;
+    }
+    struct NodeSafeNonce {
+        address safeAddress;
+        address nodeChainKeyAddress;
+        uint256 nodeSigNonce;
     }
 
     // Currently deployed version, starting with 1.0.0
     string public constant VERSION = "1.0.0";
 
-    bytes32 public immutable domainSeparator;
-    mapping(address => address) public nodeToSafe;
-    // NodeSafe struct type hash.
-    // keccak256("NodeSafe(address safeAddress,address nodeChainKeyAddress)");
-    bytes32 public constant NODE_SAFE_TYPEHASH = hex"6e9a9ee91e0fce141f0eeaf47e1bfe3af5b5f40e5baf2a86acc37a075199c16d";
+    bytes32 public domainSeparator;
+    mapping(address => NodeSafeRecord) _nodeToSafe;
+    // NodeSafeNonce struct type hash.
+    // keccak256("NodeSafeNonce(address safeAddress,address nodeChainKeyAddress,uint256 nodeSigNonce)");
+    bytes32 public constant NODE_SAFE_TYPEHASH = hex"a8ac7aed128d1a2da0773fecc80b6265d15f7e62bf4401eb23bd46c3fcf5d2f8";
     // start and end point for linked list of modules
     address private constant SENTINEL_MODULES = address(0x1);
     // page size of querying modules
     uint256 private constant pageSize = 100;
 
     constructor() {
-        // following encoding guidelines of EIP712
-        domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("NodeStakeRegistry")),
-                keccak256(bytes(VERSION)),
-                block.chainid,
-                address(this)
-            )
-        );
+        // compute the domain separator on deployment
+        updateDomainSeparator();
+    }
+
+    function nodeToSafe(address nodeAddress) view external returns (address) {
+        return _nodeToSafe[nodeAddress].safeAddress;
+    }
+
+    function nodeSigNonce(address nodeAddress) view external returns (uint256) {
+        return _nodeToSafe[nodeAddress].nodeSigNonce;
     }
 
     /**
@@ -74,10 +84,10 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         // check adminKeyAddress has added HOPR tokens to the staking contract.
 
         // following encoding guidelines of EIP712
-        bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe));
+        bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe, _nodeToSafe[nodeSafe.nodeChainKeyAddress].nodeSigNonce));
 
         // build typed digest
-        bytes32 registerHash = keccak256(abi.encode(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
+        bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
 
         // verify that signatures is from nodeChainKeyAddress. This signature can only be
         (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(registerHash, sig);
@@ -90,10 +100,15 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     }
 
     /**
-     * @dev checks whether a NodeSafe combination has been registered before.
+     * @dev checks whether a NodeSafe combination is registered
      */
     function isNodeSafeRegistered(NodeSafe memory nodeSafe) external view returns (bool) {
-        return nodeToSafe[nodeSafe.nodeChainKeyAddress] == nodeSafe.safeAddress;
+        // node is not registered to any safe
+        if (_nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress == address(0)) {
+            return false;
+        }
+
+        return _nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress == nodeSafe.safeAddress;
     }
 
     /**
@@ -102,7 +117,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
      */
     function deregisterNodeBySafe(address nodeAddr) external {
         // check this node was registered to the caller
-        if (nodeToSafe[nodeAddr] != msg.sender) {
+        if (_nodeToSafe[nodeAddr].safeAddress != msg.sender) {
             revert NotValidSafe();
         }
 
@@ -110,7 +125,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         ensureNodeIsSafeModuleMember(NodeSafe({safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr}));
 
         // update and emit event
-        nodeToSafe[nodeAddr] = address(0);
+        _nodeToSafe[nodeAddr].safeAddress = address(0);
         emit DergisteredNodeSafe(msg.sender, nodeAddr);
     }
 
@@ -119,6 +134,22 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
      */
     function registerSafeByNode(address safeAddr) external {
         addNodeSafe(NodeSafe({safeAddress: safeAddr, nodeChainKeyAddress: msg.sender}));
+    }
+
+    /**
+     * @dev recompute the domain seperator in case of a fork
+     */
+    function updateDomainSeparator() public {
+        // following encoding guidelines of EIP712
+        domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("NodeSafeRegistry")),
+                keccak256(bytes(VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     /**
@@ -135,15 +166,20 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         }
 
         // check this node hasn't been registered ower
-        if (nodeToSafe[nodeSafe.nodeChainKeyAddress] != address(0)) {
+        if (_nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress != address(0)) {
             revert NodeHasSafe();
         }
 
         // ensure that node is either an owner or a member of the (enabled) NodeManagementModule
         ensureNodeIsSafeModuleMember(nodeSafe);
 
+        NodeSafeRecord storage record = _nodeToSafe[nodeSafe.nodeChainKeyAddress];
+
+        // update record
+        record.safeAddress = nodeSafe.safeAddress;
+        record.nodeSigNonce = record.nodeSigNonce + 1; // as of Solidity 0.8, this reverts on overflows
+
         // update and emit event
-        nodeToSafe[nodeSafe.nodeChainKeyAddress] = nodeSafe.safeAddress;
         emit RegisteredNodeSafe(nodeSafe.safeAddress, nodeSafe.nodeChainKeyAddress);
     }
 
