@@ -4,10 +4,7 @@ use crate::password::PasswordArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{builder::RangedU64ValueParser, Parser};
 use log::{debug, error, info};
-use std::{
-    str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::str::FromStr;
 
 #[derive(clap::ValueEnum, Debug, Clone, PartialEq, Eq)]
 pub enum IdentityActionType {
@@ -81,12 +78,11 @@ impl IdentityArgs {
                 }
                 let local_id = local_identity.identity_from_directory.unwrap();
                 let id_dir = local_id.identity_directory.unwrap();
-                for _n in 1..=number {
+                for index in 0..=number-1 {
                     // build file name
                     let file_prefix = match &local_id.identity_prefix {
                         Some(ref provided_name) => Some(
-                            provided_name.to_owned()
-                                + &SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().to_string(),
+                            provided_name.to_owned() + &index.to_string(),
                         ),
                         None => None,
                     };
