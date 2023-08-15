@@ -1604,7 +1604,9 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, Payload};
+    use crate::interaction::{
+        AcknowledgementInteraction, ApplicationData, PacketInteraction, PacketInteractionConfig, Payload,
+    };
     use async_std::channel::unbounded;
     use core_crypto::types::HalfKeyChallenge;
     use core_ethereum_db::db::wasm::Database;
@@ -1626,6 +1628,27 @@ pub mod wasm {
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
+
+    #[wasm_bindgen]
+    impl ApplicationData {
+        #[wasm_bindgen(constructor)]
+        pub fn _new(tag: Option<u16>, data: Box<[u8]>) -> Self {
+            Self {
+                application_tag: tag,
+                plain_text: data,
+            }
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<ApplicationData> {
+            ok_or_jserr!(Self::from_bytes(data))
+        }
+    }
 
     #[wasm_bindgen]
     impl Payload {

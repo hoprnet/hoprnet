@@ -25,8 +25,8 @@ usage() {
 # return early with help info when requested
 { [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
 
-declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-full-spec.json"
-declare partial_spec_file_path="${mydir}/../packages/hoprd/rest-api-v2-spec.yaml"
+declare spec_file_path="${mydir}/../packages/hoprd/rest-api-v3-full-spec.json"
+declare partial_spec_file_path="${mydir}/../packages/hoprd/rest-api-v3-spec.yaml"
 declare caps_file_path="${mydir}/../packages/hoprd/src/supported-api-capabilities.json"
 declare endpoints
 

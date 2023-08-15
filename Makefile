@@ -48,7 +48,8 @@ PATH := $(subst :${CARGO_DIR}/bin,,$(PATH)):${CARGO_DIR}/bin
 PATH := $(subst :${HOME}/.cargo/bin,,$(PATH)):${HOME}/.cargo/bin
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
-# use custom PATH in all shell processes, escape spaces
+# use custom PATH in all shell processes
+# escape spaces
 SHELL := env PATH=$(subst $(space),\$(space),$(PATH)) $(shell which bash)
 
 # use custom Cargo config file for each invocation
