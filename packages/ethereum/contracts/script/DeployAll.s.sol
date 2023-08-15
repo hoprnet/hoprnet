@@ -260,7 +260,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     function _deployHoprAnnouncements() internal {
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
-                || !isValidAddress(currentNetworkDetail.addresses.ticketPriceOracleContractAddress)
+                || !isValidAddress(currentNetworkDetail.addresses.announcements)
         ) {
             // deploy HoprAnnouncements contract and register with current NodeSafeRegistry
             currentNetworkDetail.addresses.announcements = deployCode(
