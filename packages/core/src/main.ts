@@ -31,7 +31,7 @@ import { getAddrs } from './identity.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { getContractData, supportedNetworks } from './network.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
-import { Database, core_hopr_initialize_crate } from '../lib/core_hopr.js'
+import { Database, Address as Ethereum_Address, core_hopr_initialize_crate } from '../lib/core_hopr.js'
 import { peerIdFromKeys } from '@libp2p/peer-id'
 core_hopr_initialize_crate()
 
@@ -258,11 +258,11 @@ export async function createHoprNode(
     throw err
   }
 
-  let db = new Database(levelDb, chainKeypair.public().to_address())
+  let db = new Database(levelDb, Ethereum_Address.deserialize(chainKeypair.public().to_address().serialize()))
 
   // if safe address or module address is not provided, replace with values stored in the db
   log(`options.safeModule.safeAddress: ${options.safeModule.safeAddress}`)
-  log(`options.safeModule.safeAddress: ${options.safeModule.moduleAddress}`)
+  log(`options.safeModule.moduleAddress: ${options.safeModule.moduleAddress}`)
   const safeAddress =
     options.safeModule.safeAddress ?? Packet_Address.deserialize((await db.get_staking_safe_address()).serialize())
   const moduleAddress =
