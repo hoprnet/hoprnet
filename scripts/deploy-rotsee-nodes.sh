@@ -22,12 +22,14 @@ mapfile -t ssh_hosts <<< "$(<${1})"
 docker_image="${2:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
 
 NODE_NAME=hoprd-node-rotsee-providence
-API_TOKEN=^binary6wire6GLEEMAN9urbanebetween1watch^
-IDENTITY_PASSWORD=some2TABLE5lamp1glas9WHITE8wood
 SSH_USER=root
 NETWORK=rotsee
 
+PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
+
 : "${DEPLOYER_PRIVATE_KEY?"Missing environment variable DEPLOYER_PRIVATE_KEY"}"
+: "${API_TOKEN?"Missing environment variable API_TOKEN"}"
+: "${IDENTITY_PASSWORD?"Missing environment variable IDENTITY_PASSWORD"}"
 declare -a hopr_addrs
 
 run_node() {
@@ -85,9 +87,17 @@ update_and_restart_host() {
   echo ""
 
   ! ssh "${SSH_USER}@${host}" <<EOF
+    export DEBIAN_FRONTEND="noninteractive"
     apt-get update -y
     apt-get upgrade -y
     apt-get dist-upgrade -y
+    apt-get install -y ca-certificates curl gnupg
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch="\$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian "\$(. /etc/os-release && echo "\$VERSION_CODENAME")" stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -y
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 EOF
 
   echo ""
@@ -126,15 +136,12 @@ generate_local_identities() {
   rm -rf "${mydir}/tmp/"
   mkdir -p "${mydir}/tmp"
 
-  for i in "${!ssh_hosts[@]}"; do
-    env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
-      "${mydir}/../.cargo/bin/hopli" identity \
-      --action create \
-      --identity-directory "${mydir}/tmp/" \
-      --identity-prefix ".hopr-id_" \
-      --number 1
-    sleep 1
-  done
+  env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
+    hopli identity \
+    --action create \
+    --identity-directory "${mydir}/tmp/" \
+    --identity-prefix ".hopr-id_" \
+    --number "${#ssh_hosts[@]}"
 }
 
 upload_identities() {
@@ -147,13 +154,17 @@ upload_identities() {
   local dest src identities
   dest="/root/hoprd-db/.hopr-id"
   src="${mydir}/tmp/"
-  identities="$(find "${src}" -type f -name '.hopr-id_*')"
+  mapfile -t identities <<< "$(find "${src}" -type f -name '.hopr-id_*.id' | sort)"
 
   for i in "${!ssh_hosts[@]}"; do
     local host
     host="${ssh_hosts[$i]}"
 
     test_ssh_connection "${host}"
+
+    # ensure target folder exists
+    ssh "${SSH_USER}@${host}" mkdir -p /root/hoprd-db
+
     # only upload new identity if none is present
     rsync -av --ignore-existing "${identities[$i]}" "${SSH_USER}@${host}:${dest}"
 
@@ -161,8 +172,9 @@ upload_identities() {
     # always be the same
     rsync -av "${SSH_USER}@${host}:${dest}" "${identities[$i]}"
 
-    # download safe args file if it exists
-    rsync -av "${SSH_USER}@${host}:${dest}.safe.args" "${identities[$i]}.safe.args"
+    # download safe args file if it exists, ignore failure if file does not
+    # exist
+    rsync -av "${SSH_USER}@${host}:${dest}.safe.args" "${identities[$i]}.safe.args" || :
   done
 }
 
@@ -173,8 +185,9 @@ deploy_safes() {
   echo "==="
   echo ""
 
-  local identities
-  identities="$(find "${src}" -type f -name '.hopr-id_*')"
+  local src identities
+  src="${mydir}/tmp/"
+  mapfile -t identities <<< "$(find "${src}" -type f -name '.hopr-id_*.id' | sort)"
 
   for i in "${!identities[@]}"; do
     local id_path
@@ -186,7 +199,7 @@ deploy_safes() {
     env \
       ETHERSCAN_API_KEY="" \
       IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
-      PRIVATE_KEY="DEPLOYER_PRIVATE_KEY" \
+      PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" \
       hopli create-safe-module \
       --network "${NETWORK}" \
       --identity-from-path "${id_path}" \
@@ -194,7 +207,7 @@ deploy_safes() {
 
     # store safe arguments in separate file for later use
     grep -oE "(\-\-safeAddress.*)" safe.log > "${id_path}.safe.args"
-    rm safe.logs
+    rm safe.log
 
     # upload safe args to host for later use
     rsync -av --ignore-existing "${id_path}.safe.args" "${SSH_USER}@${ssh_hosts[$i]}:/root/hoprd-db/.hopr-id.safe.args"
@@ -212,7 +225,7 @@ start_nodes() {
 
 for host in "${ssh_hosts[@]}"; do
   test_ssh_connection "${host}"
-  #update_and_restart_host "${host}"
+  update_and_restart_host "${host}"
 done
 
 generate_local_identities
