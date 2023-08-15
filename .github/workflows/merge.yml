@@ -60,7 +60,8 @@ jobs:
         run: |
           git fetch -u --progress origin pull/${{ github.event.pull_request.number }}/head:${{ github.event.pull_request.head.ref }}
           ./scripts/check-pr.sh --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
-          cat check_pr.log >> $GITHUB_ENV
+          cat check_pr.log >> $GITHUB_OUTPUT
+          cat check_pr.log
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [ "${base_branch}" == "master" ]; then
             echo "DOCKER_STABLE_TAG=latest"  >> $GITHUB_ENV
@@ -86,31 +87,38 @@ jobs:
           password: ${{ steps.auth.outputs.access_token }}
 
       - name: Docker Tag Toolchain
-        if: env.build_toolchain
+        if: |
+          steps.check_pr_changeset.outputs.build_toolchain
+          || steps.check_pr_changeset.outputs.build_hoprd
+          || steps.check_pr_changeset.outputs.build_hopli
+          || steps.check_pr_changeset.outputs.build_anvil
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Hopli
-        if: env.build_toolchain || env.build_hopli
+        if: steps.check_pr_changeset.outputs.build_hopli
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Hoprd
-        if: env.build_toolchain || env.build_hoprd
+        if: steps.check_pr_changeset.outputs.build_hoprd
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Anvil
-        if: env.build_anvil
+        if: steps.check_pr_changeset.outputs.build_anvil
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Pluto
-        if: env.build_hoprd || env.build_hopli || env.build_anvil
+        if: |
+          steps.check_pr_changeset.outputs.build_hoprd
+          || steps.check_pr_changeset.outputs.build_hopli
+          || steps.check_pr_changeset.outputs.build_anvil
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_STABLE_TAG }}
