@@ -214,9 +214,7 @@ impl PartialEq for HoprKeys {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl HoprKeys {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn random() -> Self {
         Self {
             packet_key: OffchainKeypair::random(),
