@@ -480,6 +480,12 @@ impl TryFrom<[u8; 32]> for Hash {
     }
 }
 
+impl Into<[u8; 32]> for Hash {
+    fn into(self) -> [u8; 32] {
+        self.hash
+    }
+}
+
 /// Represents an Ed25519 public key.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]

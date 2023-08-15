@@ -1,12 +1,11 @@
 use crate::errors::CryptoError::{CalculationError, InvalidParameterSize};
+use crate::keypairs::{ChainKeypair, Keypair};
 use blake2::Blake2s256;
 use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use elliptic_curve::sec1::ToEncodedPoint;
-use elliptic_curve::ScalarPrimitive;
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
 use k256::{AffinePoint, Scalar, Secp256k1};
-use utils_types::primitives::Address;
 use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
@@ -187,13 +186,13 @@ impl std::fmt::Display for VrfParameters {
 /// to prove that a ticket is a win.
 pub fn derive_vrf_parameters<const T: usize>(
     msg: &[u8; T],
-    secret: &[u8],
-    chain_addr: &Address,
+    chain_keypair: &ChainKeypair,
     dst: &[u8],
 ) -> Result<VrfParameters> {
+    let chain_addr = chain_keypair.public().to_address();
     let b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[&chain_addr.to_bytes(), msg], &[dst])?;
 
-    let a: Scalar = ScalarPrimitive::<Secp256k1>::from_slice(&secret)?.into();
+    let a: Scalar = chain_keypair.into();
 
     if a.is_zero().into() {
         return Err(crate::errors::CryptoError::InvalidSecretScalar);
@@ -298,10 +297,11 @@ mod tests {
         let priv_key: [u8; 32] = hex!("f13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba"); // dummy
         let message = hex!("f13233ff60e1f618525dac5f7d117bef0bad0eb0b0afb2459f9cbc57a3a987ba"); // dummy
 
+        let keypair = ChainKeypair::from_secret(&priv_key).unwrap();
         // vrf verification algorithm
         let pub_key = PublicKey::from_privkey(&priv_key).unwrap();
 
-        let params = derive_vrf_parameters(&message, &priv_key, &pub_key.to_address(), dst).unwrap();
+        let params = derive_vrf_parameters(&message, &keypair, dst).unwrap();
 
         let cap_b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(
             &[&pub_key.to_address().to_bytes(), &message],

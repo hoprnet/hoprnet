@@ -950,18 +950,25 @@ version = "0.3.0"
 dependencies = [
  "async-std",
  "async-trait",
+ "bindings",
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
  "core-types",
  "env_logger",
+ "ethers",
  "futures",
  "hex-literal 0.4.1",
  "js-sys",
+ "k256",
  "libp2p-identity",
  "mockall",
+ "multiaddr",
  "rusty-leveldb",
+ "semver",
+ "svm-rs",
  "thiserror",
+ "tokio",
  "utils-db",
  "utils-log",
  "utils-misc",
@@ -1887,6 +1894,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22b3a8269d3df0ed6364bc05b4735b95f4bf830ce3aef87d5e760fb0e93e5b91"
 dependencies = [
  "ethers-core",
+ "ethers-solc",
  "reqwest",
  "semver",
  "serde",
@@ -2753,6 +2761,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "indicatif"
+version = "0.17.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b297dc40733f23a0e52728a58fa9489a5b7638a324932de16b41adc3ef80730"
+dependencies = [
+ "console",
+ "instant",
+ "number_prefix",
+ "portable-atomic",
+]
+
+[[package]]
 name = "inout"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3152,6 +3172,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "number_prefix"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
+
+[[package]]
 name = "object"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3475,6 +3501,12 @@ dependencies = [
  "pin-project-lite",
  "windows-sys 0.48.0",
 ]
+
+[[package]]
+name = "portable-atomic"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f32154ba0af3a075eefa1eda8bb414ee928f62303a54ea85b8d6638ff1a6ee9e"
 
 [[package]]
 name = "ppv-lite86"
@@ -4557,9 +4589,15 @@ version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a04fc4f5cd35c700153b233f5575ccb3237e0f941fa5049d9e98254d10bf2fe"
 dependencies = [
+ "anyhow",
+ "clap 4.3.21",
+ "console",
+ "dialoguer",
  "fs2",
  "hex",
  "home",
+ "indicatif",
+ "itertools",
  "once_cell",
  "reqwest",
  "semver",
@@ -4567,6 +4605,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.7",
  "thiserror",
+ "tokio",
  "url",
  "zip",
 ]
@@ -4734,7 +4773,19 @@ dependencies = [
  "num_cpus",
  "pin-project-lite",
  "socket2 0.5.3",
+ "tokio-macros",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "630bdcf245f78637c13ec01ffae6187cca34625e8c63150d424b59e55af2675e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.28",
 ]
 
 [[package]]

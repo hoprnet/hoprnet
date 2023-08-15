@@ -13,6 +13,9 @@ pub enum CoreEthereumError {
     #[error(transparent)]
     DbError(#[from] DbError),
 
+    #[error("{0}")]
+    InvalidArguments(String),
+
     #[error("Invalid response to acknowledgement {0}")]
     InvalidResponseToAcknowledgement(String),
 
