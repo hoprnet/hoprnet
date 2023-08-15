@@ -61,20 +61,20 @@ function check_push() {
 
   echo "Checking pushed changeset from ${head_branch} against ${base_branch}"
   git diff --name-only --diff-filter=ACMRT "${base_branch}" "${head_branch}" > changes.txt
-  if grep -e ^scripts/ -e ^.github/workflows/build.yaml -e ^.github/workflows/build-toolchain.yaml -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
+  if grep -E "^(scripts/|.github/workflows/build.yaml|.github/workflows/build-toolchain.yaml|Makefile|package.json|.yarnrc.yml|rust-toolchain.toml|.nvmrc|yarn.lock|Cargo.toml)" changes.txt 1> /dev/null; then
       echo "Changes detected on Toolchain"
       echo "build_toolchain=true" >> ${results_file}
   fi
-  if grep  -e ^.github/workflows/build-hopli.yaml -e ^packages/hopli/ -e ^Makefile$ -e ^rust-toolchain.toml$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
+  if grep  -E "^(.github/workflows/build-hopli.yaml|packages/hopli/|Makefile|rust-toolchain.toml|Cargo.toml)" changes.txt 1> /dev/null; then
       echo "Changes detected on Hopli"
       echo "build_hopli=true" >> ${results_file}
   fi
 
-  if grep -e ^.github/workflows/build-hoprd.yaml -e "^packages/(hoprd|core|core-ethereum|utils|real|connect)/" -e ^Makefile$ -e ^package.json$ -e ^.yarnrc.yml$ -e ^rust-toolchain.toml$ -e ^.nvmrc -e ^yarn.lock$ -e ^Cargo.toml$ changes.txt 1> /dev/null; then
+  if grep -E "^(.github/workflows/build-hoprd.yaml|packages/(hoprd|core|core-ethereum|utils|real|connect)/|Makefile|package.json|.yarnrc.yml|rust-toolchain.toml|.nvmrc|yarn.lock|Cargo.toml)" changes.txt 1> /dev/null; then
       echo "Changes detected on Hoprd"
       echo "build_hoprd=true" >> ${results_file}
   fi
-  if grep -e ^scripts/ -e ^.github/workflows/build-anvil.yaml -e ^Makefile$ -e ^packages/ethereum/ changes.txt | grep -v .md 1> /dev/null; then
+  if grep -E "^(scripts/|.github/workflows/build-anvil.yaml|Makefile|packages/ethereum/)" changes.txt | grep -v .md 1> /dev/null; then
       echo "Changes detected on Anvil"
       echo "build_anvil=true" >> ${results_file}
   fi
