@@ -3,6 +3,9 @@ use rand::seq::SliceRandom;
 use simple_moving_average::{SumTreeSMA, SMA};
 use utils_log::{debug, info, warn};
 
+use std::collections::HashMap;
+use std::collections::HashSet;
+
 use core_types::channels::ChannelStatus::{Open, PendingToClose};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
@@ -69,34 +72,29 @@ impl Default for PromiscuousStrategy {
 impl ChannelStrategy for PromiscuousStrategy {
     const NAME: &'static str = "promiscuous";
 
-    fn tick<Q>(
+    fn tick(
         &mut self,
         balance: Balance,
-        addresses: impl Iterator<Item = Address>,
+        addresses: impl Iterator<Item = (Address, f64)>,
         outgoing_channels: Vec<OutgoingChannelStatus>,
-        quality_of_peer: Q,
     ) -> StrategyTickResult
-    where
-        Q: Fn(&str) -> Option<f64>,
     {
         let mut to_open: Vec<OutgoingChannelStatus> = vec![];
         let mut to_close: Vec<Address> = vec![];
         let mut new_channel_candidates: Vec<(Address, f64)> = vec![];
         let mut network_size: usize = 0;
 
+        let mut active_addresses: HashMap<Address, f64> = HashMap::new();
+
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
         // which peer ids should become candidates for a new channel
         // Also re-open all the channels that have dropped under minimum given balance
-        for address in addresses {
+        for (address, quality) in addresses {
             if to_close.contains(&address) || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some() {
                 // Skip this peer if we already processed it (iterator may have duplicates)
                 debug!("encountered duplicate peer {}", address);
                 continue;
             }
-
-            // Retrieve quality of that peer
-            let quality = quality_of_peer(&address.to_string())
-                .expect(format!("failed to retrieve quality of {}", address).as_str());
 
             // Also get channels we have opened with it
             let channel_with_peer = outgoing_channels
@@ -107,19 +105,20 @@ impl ChannelStrategy for PromiscuousStrategy {
                 if quality <= self.network_quality_threshold {
                     // Need to close the channel, because quality has dropped
                     debug!("new channel closure candidate with {} (quality {})", address, quality);
-                    to_close.push(address);
+                    to_close.push(address.clone());
                 } else if channel.stake.lt(&self.minimum_channel_balance) {
                     // Need to re-open channel, because channel stake has dropped
                     debug!("new channel closure & re-stake candidate with {}", address);
                     to_close.push(address.clone());
-                    new_channel_candidates.push((address, quality));
+                    new_channel_candidates.push((address.clone(), quality));
                 }
             } else if quality >= self.network_quality_threshold {
                 // Try to open channel with this peer, because it is high-quality
                 debug!("new channel opening candidate {} with quality {}", address, quality);
-                new_channel_candidates.push((address, quality));
+                new_channel_candidates.push((address.clone(), quality));
             }
 
+            active_addresses.insert(address, quality);
             network_size += 1;
         }
         self.sma.add_sample(network_size);
@@ -139,7 +138,7 @@ impl ChannelStrategy for PromiscuousStrategy {
         outgoing_channels
             .iter()
             .filter(|c| c.status == PendingToClose)
-            .for_each(|c| to_close.push(c.address.clone()));
+            .for_each(|c| { to_close.push(c.address.clone()); });
         debug!(
             "{} channels are in PendingToClose, so strategy will mark them for closing too",
             outgoing_channels.len() - before_pending
@@ -178,8 +177,8 @@ impl ChannelStrategy for PromiscuousStrategy {
 
             // Sort by quality, lowest-quality first
             sorted_channels.sort_unstable_by(|p1, p2| {
-                quality_of_peer(&p1.address.to_string())
-                    .zip(quality_of_peer(&p2.address.to_string()))
+                active_addresses.get(&p1.address)
+                    .zip(active_addresses.get(&p2.address))
                     .and_then(|(q1, q2)| q1.partial_cmp(&q2))
                     .expect(format!("failed to retrieve quality of {} or {}", p1.address, p2.address).as_str())
             });
@@ -188,7 +187,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             sorted_channels
                 .into_iter()
                 .take(occupied - max_auto_channels)
-                .for_each(|c| to_close.push(c.address));
+                .for_each(|c| { to_close.push(c.address); });
         }
 
         if max_auto_channels > occupied {
@@ -293,9 +292,7 @@ mod tests {
         strat.sma.add_sample(peers.len());
         strat.sma.add_sample(peers.len());
 
-        let results = strat.tick(balance, peers.iter().map(|(x, _)| x.clone()), outgoing_channels, |s| {
-            peers.get(&Address::from_str(s).unwrap()).copied()
-        });
+        let results = strat.tick(balance, peers.iter().map(|(x, q)| (x.clone(), q.clone())), outgoing_channels);
 
         assert_eq!(results.max_auto_channels(), 4);
 
@@ -336,9 +333,8 @@ mod tests {
 
         let results = strat.tick(
             Balance::from_str("1000000000000000000", BalanceType::HOPR),
-            peers.iter().map(|(&x, _)| x.clone()),
+            peers.iter().map(|(&x, q)| (x.clone(), q.clone())),
             outgoing_channels.clone(),
-            |s| peers.get(&Address::from_str(s).unwrap()).copied(),
         );
 
         assert_eq!(results.max_auto_channels(), 10);
@@ -361,7 +357,7 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::generic::wasm::StrategyTickResult;
+    use crate::generic::{wasm::StrategyTickResult, PeerQuality};
     use crate::generic::ChannelStrategy;
     use crate::promiscuous::PromiscuousStrategy;
     use crate::strategy_tick;
@@ -386,11 +382,10 @@ pub mod wasm {
         pub fn _tick(
             &mut self,
             balance: Balance,
-            addresses: &js_sys::Iterator,
+            mut peers: PeerQuality,
             outgoing_channels: JsValue,
-            quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            strategy_tick!(self, balance, addresses, outgoing_channels, quality_of)
+            strategy_tick!(self, balance, peers, outgoing_channels)
         }
     }
 }

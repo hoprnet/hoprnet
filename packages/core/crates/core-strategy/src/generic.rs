@@ -19,15 +19,12 @@ pub trait ChannelStrategy {
 
     /// Performs the strategy tick - deciding which new channels should be opened and
     /// which existing channels should be closed.
-    fn tick<Q>(
+    fn tick(
         &mut self,
         balance: Balance,
-        addresses: impl Iterator<Item = Address>,
+        addresses: impl Iterator<Item = (Address, f64)>,
         outgoing_channels: Vec<OutgoingChannelStatus>,
-        quality_of_peer: Q,
-    ) -> StrategyTickResult
-    where
-        Q: Fn(&str) -> Option<f64>;
+    ) -> StrategyTickResult;
 
     /// Indicates if according to this strategy, a commitment should be made for the given channel.
     fn should_commit_to_channel(&self, _channel: &OutgoingChannelStatus) -> bool {
@@ -88,6 +85,23 @@ impl StrategyTickResult {
     /// Peer IDs to which any open channels should be closed according to this strategy.
     pub fn to_close(&self) -> &Vec<Address> {
         &self.to_close
+    }
+}
+
+/// Object needed only to simplify the iteration over the address and quality pair until 
+/// the strategy is migrated into Rust
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct PeerQuality {
+    peers_with_quality: Vec<(Address, f64)>
+}
+
+impl PeerQuality {
+    pub fn new(peers: Vec<(Address, f64)>) -> Self {
+        Self { peers_with_quality: peers }
+    }
+
+    pub fn take(&mut self) -> Vec<(Address, f64)> {
+        self.peers_with_quality.clone()
     }
 }
 
@@ -178,31 +192,17 @@ pub mod wasm {
     /// Since wasm_bindgen annotation is not supported on trait impls, the WASM-wrapped strategies cannot implement a common trait.
     #[macro_export]
     macro_rules! strategy_tick {
-        ($strategy:ident, $balance:ident, $peer_ids:ident, $outgoing_channels:ident, $quality_of:ident) => {
+        ($strategy:ident, $balance:ident, $peers:ident, $outgoing_channels:ident) => {
             Ok(StrategyTickResult {
                 w: $strategy.tick(
                     $balance,
-                    $peer_ids.into_iter().map(|v| {
-                        v.and_then(|v| {
-                            v.as_string()
-                                .ok_or(wasm_bindgen::JsValue::from("not a string"))
-                                .and_then(|s| utils_misc::ok_or_jserr!(Address::from_str(&s)))
-                        })
-                        .unwrap()
-                    }),
+                    $peers.take().into_iter(),
                     serde_wasm_bindgen::from_value::<Vec<crate::generic::wasm::OutgoingChannelStatus>>(
                         $outgoing_channels,
                     )?
                     .iter()
                     .map(|c| crate::generic::OutgoingChannelStatus::from(c))
                     .collect(),
-                    |peer_id: &str| {
-                        $quality_of
-                            .call1(&wasm_bindgen::JsValue::null(), &js_sys::JsString::from(peer_id))
-                            .ok()
-                            .map(|q| q.as_f64())
-                            .flatten()
-                    },
                 ),
             })
         };
