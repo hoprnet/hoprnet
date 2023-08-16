@@ -189,8 +189,8 @@ Options:
           Miniumum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=] [default: 0.5]
       --safeAddress <HOPRD_SAFE_ADDR>
           The Safe instance for a node where its HOPR tokens are held
-      --moduleAddress <HOPRD_MODULE_ADDRESS> [env: HOPRD_SAFE_ADDR=]  
-          The node management module instance that manages node permission to assets held in safe [env: HOPRD_MODULE_ADDRESS=]         
+      --moduleAddress <HOPRD_MODULE_ADDRESS> [env: HOPRD_SAFE_ADDR=]
+          The node management module instance that manages node permission to assets held in safe [env: HOPRD_MODULE_ADDRESS=]
   -h, --help
           Print help
   -V, --version

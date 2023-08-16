@@ -22,7 +22,9 @@ import {
   LevelDb,
   ChainKeypair,
   OffchainKeypair,
-  Address as Packet_Address, stringToU8a, u8aConcat
+  Address as Packet_Address,
+  stringToU8a,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -58,7 +60,7 @@ export async function createLibp2pInstance(
   let libp2p: Libp2p
 
   // Hack until migrated to rs-libp2p: put the public key to the protobuf format expected by JS PeerId
-  let protoBufPrefixedPubKey = u8aConcat(stringToU8a("08011220"), packetKeypair.public().serialize())
+  let protoBufPrefixedPubKey = u8aConcat(stringToU8a('08011220'), packetKeypair.public().serialize())
   const peerId = await peerIdFromKeys(protoBufPrefixedPubKey, packetKeypair.secret())
 
   if (options.testing?.useMockedLibp2p) {

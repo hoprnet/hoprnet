@@ -367,11 +367,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 let response = unackowledged.get_response(&ack.ack_key_share)?;
                 debug!("acknowledging ticket using response {}", response.to_hex());
 
-                let ack_ticket = AcknowledgedTicket::new(
-                    unackowledged.ticket,
-                    response,
-                    unackowledged.signer,
-                );
+                let ack_ticket = AcknowledgedTicket::new(unackowledged.ticket, response, unackowledged.signer);
 
                 // replace the un-acked ticket with acked ticket.
                 //debug!(">>> WRITE replacing unack with acked");
