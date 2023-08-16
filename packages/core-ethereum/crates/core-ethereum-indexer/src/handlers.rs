@@ -508,7 +508,7 @@ pub mod tests {
         let keypair = OffchainKeypair::from_secret(&SELF_PRIV_KEY).unwrap();
         let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
 
-        let sig = AccountSignature::new(&keypair, chain_key);
+        let sig = AccountSignature::new(&keypair, &chain_key);
 
         let keybinding_log = RawLog {
             topics: vec![KeyBindingFilter::signature()],

@@ -1,14 +1,24 @@
-use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
-use curve25519_dalek::montgomery::MontgomeryPoint;
-use elliptic_curve::sec1::EncodedPoint;
-use elliptic_curve::{NonZeroScalar, ProjectivePoint};
-use k256::ecdsa::signature::hazmat::PrehashVerifier;
-use k256::ecdsa::signature::Verifier;
-use k256::ecdsa::{RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey};
-use k256::elliptic_curve::generic_array::GenericArray;
-use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
-use k256::elliptic_curve::CurveArithmetic;
-use k256::{ecdsa, elliptic_curve, AffinePoint, Secp256k1};
+use crate::shared_keys::Scalar as _;
+use curve25519_dalek::{
+    edwards::{CompressedEdwardsY, EdwardsPoint},
+    montgomery::MontgomeryPoint,
+};
+use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
+use k256::{
+    ecdsa,
+    ecdsa::{
+        signature::{hazmat::PrehashVerifier, Verifier},
+        RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
+    },
+    elliptic_curve,
+    elliptic_curve::{
+        generic_array::GenericArray,
+        sec1::{FromEncodedPoint, ToEncodedPoint},
+        CurveArithmetic,
+    },
+    AffinePoint, Scalar, Secp256k1,
+};
+
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -23,11 +33,16 @@ use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::{Address, EthereumChallenge};
 use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
 
-use crate::errors::CryptoError::InvalidInputValue;
-use crate::errors::{CryptoError, CryptoError::CalculationError, Result};
-use crate::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use crate::primitives::{DigestLike, EthDigest};
-use crate::random::random_group_element;
+use crate::{
+    errors::{
+        CryptoError,
+        CryptoError::{CalculationError, InvalidInputValue},
+        Result,
+    },
+    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    primitives::{DigestLike, EthDigest},
+    random::random_group_element,
+};
 
 /// Extend support for arbitrary array sizes in serde
 ///
@@ -108,13 +123,13 @@ impl CurvePoint {
 
 impl From<PublicKey> for CurvePoint {
     fn from(pubkey: PublicKey) -> Self {
-        CurvePoint::from_affine(*pubkey.key.as_affine())
+        (*pubkey.key.as_affine()).into()
     }
 }
 
 impl From<&PublicKey> for CurvePoint {
     fn from(pubkey: &PublicKey) -> Self {
-        CurvePoint::from_affine(*pubkey.key.as_affine())
+        (*pubkey.key.as_affine()).into()
     }
 }
 
@@ -135,6 +150,12 @@ impl FromStr for CurvePoint {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(CurvePoint::from_bytes(&hex::decode(s).map_err(|_| ParseError)?)?)
+    }
+}
+
+impl From<CurvePoint> for AffinePoint {
+    fn from(value: CurvePoint) -> Self {
+        value.affine
     }
 }
 
@@ -165,11 +186,6 @@ impl CurvePoint {
         PublicKey::from_privkey(exponent).map(CurvePoint::from)
     }
 
-    /// Creates a curve point from the affine point representation.
-    pub fn from_affine(affine: AffinePoint) -> Self {
-        Self { affine }
-    }
-
     /// Converts the curve point to a representation suitable for calculations.
     pub fn to_projective_point(&self) -> ProjectivePoint<Secp256k1> {
         self.affine.into()
@@ -186,7 +202,7 @@ impl CurvePoint {
         // more efficient for doing the additions. Then finally make in an affine point
         let affine: AffinePoint = summands
             .iter()
-            .map(|p| p.to_projective_point())
+            .map(|p| ProjectivePoint::<Secp256k1>::from(p.affine))
             .fold(<Secp256k1 as CurveArithmetic>::ProjectivePoint::IDENTITY, |acc, x| {
                 acc.add(x)
             })
@@ -480,9 +496,9 @@ impl TryFrom<[u8; 32]> for Hash {
     }
 }
 
-impl Into<[u8; 32]> for Hash {
-    fn into(self) -> [u8; 32] {
-        self.hash
+impl From<Hash> for [u8; 32] {
+    fn from(value: Hash) -> Self {
+        value.hash
     }
 }
 
@@ -798,6 +814,92 @@ impl From<&CompressedPublicKey> for k256::ProjectivePoint {
 impl CompressedPublicKey {
     pub fn to_address(&self) -> Address {
         self.0.to_address()
+    }
+}
+
+/// Bundles values given to the smart contract to prove that a ticket is a win.
+///
+/// The VRF is thereby needed because it generates on-demand determinitstic
+/// entropy that can only be derived by the ticket redeemer.
+pub struct VrfParameters {
+    /// the pseudo-random point
+    pub v: CurvePoint,
+    pub h: Scalar,
+    pub s: Scalar,
+    /// helper value for smart contract
+    pub h_v: CurvePoint,
+    /// helper value for smart contract
+    pub s_b: CurvePoint,
+}
+
+impl std::fmt::Display for VrfParameters {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let v_encoded = self.v.affine.to_encoded_point(false);
+        let h_v_encoded = self.h_v.affine.to_encoded_point(false);
+        let s_b_encoded = self.s_b.affine.to_encoded_point(false);
+        f.debug_struct("VrfParameters")
+            .field(
+                "V",
+                &format!(
+                    "({},{})",
+                    hex::encode(v_encoded.x().unwrap()),
+                    hex::encode(v_encoded.y().unwrap())
+                ),
+            )
+            .field("h", &hex::encode(self.h.to_bytes()))
+            .field("s", &hex::encode(self.s.to_bytes()))
+            .field(
+                "h_v",
+                &format!(
+                    "({},{})",
+                    hex::encode(h_v_encoded.x().unwrap()),
+                    hex::encode(h_v_encoded.y().unwrap())
+                ),
+            )
+            .field(
+                "s_b",
+                &format!(
+                    "({},{})",
+                    hex::encode(s_b_encoded.x().unwrap()),
+                    hex::encode(s_b_encoded.y().unwrap())
+                ),
+            )
+            .finish()
+    }
+}
+
+impl BinarySerializable for VrfParameters {
+    const SIZE: usize = CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE;
+
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+        if data.len() == Self::SIZE {
+            Ok(VrfParameters {
+                v: CurvePoint::from_bytes(&data[0..CurvePoint::SIZE]).unwrap(),
+                h: k256::Scalar::from_bytes(&data[CurvePoint::SIZE..CurvePoint::SIZE + 32]).unwrap(),
+                s: k256::Scalar::from_bytes(&data[CurvePoint::SIZE + 32..CurvePoint::SIZE + 32 + 32]).unwrap(),
+                h_v: CurvePoint::from_bytes(
+                    &data[CurvePoint::SIZE + 32 + 32..CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE],
+                )
+                .unwrap(),
+                s_b: CurvePoint::from_bytes(
+                    &data[CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE
+                        ..CurvePoint::SIZE + 32 + 32 + CurvePoint::SIZE + CurvePoint::SIZE],
+                )
+                .unwrap(),
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn to_bytes(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(Self::SIZE);
+        ret.extend_from_slice(&self.v.to_bytes());
+        ret.extend_from_slice(&self.h.to_bytes());
+        ret.extend_from_slice(&self.s.to_bytes());
+        ret.extend_from_slice(&self.h_v.to_bytes());
+        ret.extend_from_slice(&self.s_b.to_bytes());
+        ret.into_boxed_slice()
     }
 }
 
