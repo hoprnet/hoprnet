@@ -19,7 +19,6 @@ use serde::Deserialize;
 
 /// Holds addresses of deployed HOPR contracts
 #[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct ContractAddresses {
     /// HoprChannels contract, manages mixnet incentives
     channels: Address,
@@ -1429,7 +1428,8 @@ pub mod wasm {
             contract_addresses_js: JsValue,
             callbacks: IndexerCallbacks,
         ) -> Handlers {
-            let contract_addresses = serde_wasm_bindgen::from_value::<super::ContractAddresses>(contract_addresses_js).unwrap();
+            let get_contract_info = serde_wasm_bindgen::from_value::<crate::handlers::wasm::ContractAddresses>(contract_addresses_js).unwrap();
+            let contract_addresses = super::ContractAddresses::from(&get_contract_info);
             Self {
                 w: super::ContractEventHandlers {
                     address_to_monitor: Address::from_str(address_to_monitor).unwrap(),

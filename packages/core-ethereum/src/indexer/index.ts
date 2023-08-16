@@ -34,7 +34,7 @@ import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database } from '..
 
 import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
-import { ContractAddresses, Handlers } from '../../lib/core_ethereum_indexer.js'
+import { Handlers } from '../../lib/core_ethereum_indexer.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
@@ -134,7 +134,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         announcements: contractAddresses.hoprAnnouncementsAddress,
         node_safe_registry: contractAddresses.hoprNodeSafeRegistryAddress,
         node_management_module: contractAddresses.moduleAddress
-      } as ContractAddresses,
+      },
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
         onOwnChannelUpdated: this.onOwnChannelUpdated.bind(this),
