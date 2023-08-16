@@ -297,7 +297,7 @@ Running one node in test mode, with safe and module attached
 ```sh
 # clean up, e.g.
 # make kill-anvil
-# cargo clean
+# make clean
 
 # build deps and HOPRd code
 make -j deps && make -j build
