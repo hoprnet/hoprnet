@@ -3,8 +3,8 @@ import { STATUS_CODES } from '../../utils.js'
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const tag = req.body.tag
-    const size = req.context.inbox.size(tag)
+    const tag: number = req.query.tag as unknown as number
+    const size = await req.context.inbox.size(tag)
     return res.status(200).send({ size })
   }
 ]
@@ -18,6 +18,7 @@ GET.apiDoc = {
       in: 'query',
       name: 'tag',
       description: 'Tag used to filter target messages.',
+      required: true,
       schema: {
         $ref: '#/components/schemas/MessageTag'
       }
