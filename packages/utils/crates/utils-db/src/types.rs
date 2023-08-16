@@ -1,11 +1,14 @@
-use core::task::{Context, Poll};
-use std::pin::Pin;
-
-use futures_lite::stream::{Stream, StreamExt};
-use pin_project_lite::pin_project;
-
 #[cfg(feature = "wasm")]
-use wasm_bindgen_futures::stream::JsStream;
+use {
+    core::task::{Context, Poll},
+    std::pin::Pin,
+
+    futures_lite::stream::{Stream, StreamExt},
+    pin_project_lite::pin_project,
+
+    wasm_bindgen_futures::stream::JsStream
+};
+
 
 #[cfg(feature = "wasm")]
 pin_project! {

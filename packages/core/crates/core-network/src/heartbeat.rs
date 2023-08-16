@@ -121,7 +121,6 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
             sleep(std::time::Duration::from_millis(0u64.max(current_timestamp() - start))).await
         }
-
     }
 } 
 

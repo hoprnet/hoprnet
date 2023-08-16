@@ -355,19 +355,15 @@ pub enum PacketType {
     Forward(Packet, Option<Acknowledgement>, PeerId, PeerId)
 }
 
-impl<Db> PacketProcessor<Db>
+impl<Db,> PacketProcessor<Db>
 where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig, mixer: Mixer<Payload>) -> Self {
         Self {
             db,
-            mixer: if cfg!(all(feature = "wasm", not(test))) {
-                Mixer::new_with_gloo_timers(cfg.mixer.clone())
-            } else {
-                Mixer::new(cfg.mixer.clone())
-            },
+            mixer: mixer,
             cfg,
         }
     }
@@ -756,11 +752,11 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, mut ack_interaction: AcknowledgementActions, mut on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, mixer: Mixer<Payload>, mut ack_interaction: AcknowledgementActions, mut on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
         let (to_process_tx, mut to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (mut processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         
-        let processor = PacketProcessor::new(db, cfg);
+        let processor = PacketProcessor::new(db, cfg, mixer);
 
         // background processing pipeline
         spawn_local(async move {
@@ -896,7 +892,7 @@ mod tests {
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_ethereum_misc::commitment::{initialize_commitment, ChannelCommitmentInfo};
-    use core_mixer::mixer::MixerConfig;
+    use core_mixer::mixer::{MixerConfig, Mixer};
     use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, AcknowledgedTicket};
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::channel::mpsc::{UnboundedSender, Sender};
@@ -1193,12 +1189,13 @@ mod tests {
                 );
                 let pkt = PacketInteraction::new(
                     db.clone(),
+                    Mixer::new(MixerConfig::default()),
                     ack.writer(),
                     if i == peer_count - 1 { Some(pkt_tx.clone()) } else { None },
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
                         private_key: PEERS_PRIVS[i].into(),
-                        mixer: MixerConfig::default(),
+                        mixer: MixerConfig::default(),      // TODO: unnecessary, can be removed
                     },
                 );
 

@@ -307,8 +307,10 @@ macro_rules! histogram_start_measure {
     };
 }
 
+
 enum TimerVariant {
     Native(HistogramTimer),
+    #[cfg_attr(not(feature = "wasm"), allow(dead_code))]
     WASM {
         start_ts: f64,
         new_ts: fn() -> f64,

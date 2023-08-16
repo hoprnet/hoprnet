@@ -314,7 +314,7 @@ mod tests {
         // NOTE: timeout is ensure by the libp2p protocol handling, only error arrives
         // from the channel
         let timeout_single_use_channel = async move {
-            if let Some((peer, challenge)) = rx_ping.next().await {
+            if let Some((peer, _challenge)) = rx_ping.next().await {
                 let _ = tx_pong.start_send((peer, Err(())));
             };
         };

@@ -15,8 +15,9 @@ pub struct HeartbeatChallenge(pub PeerId, pub ControlMessage);
 pub struct ManualPingChallenge(pub PeerId, pub ControlMessage);
 
 
-// TODO: NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
-// in case of faster input than output the memory might run out
+// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory in
+// case of faster input than output the memory might run out, but these are protected
+// by a bounded queue managing the request generation.
 pub type HeartbeaRequestRx = mpsc::UnboundedReceiver<(PeerId, ControlMessage)>;
 pub type HeartbeatResponseTx = mpsc::UnboundedSender<(PeerId, std::result::Result<ControlMessage, ()>)>;
 

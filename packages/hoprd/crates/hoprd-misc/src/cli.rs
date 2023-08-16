@@ -444,7 +444,9 @@ impl CliArgs {
         self.identity = m.get_one::<String>("identity").unwrap().to_owned();
     }
 
+
     /// Creates a new instance using custom cli_args and custom network variables
+    #[cfg(feature = "wasm")]
     fn new_from(
         cli_args: Vec<&str>,
         env_vars: HashMap<OsString, OsString>,

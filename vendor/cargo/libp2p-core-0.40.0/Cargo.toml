@@ -65,7 +65,7 @@ features = [
 ]
 
 [dependencies.libp2p-identity]
-version = "0.2.1"
+version = "0.2.2"
 features = [
     "peerid",
     "ed25519",
@@ -89,7 +89,7 @@ version = "1.6.2"
 features = ["attributes"]
 
 [dev-dependencies.libp2p-identity]
-version = "0.2.1"
+version = "0.2.2"
 features = ["ed25519"]
 
 [dev-dependencies.libp2p-mplex]

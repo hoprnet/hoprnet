@@ -9,14 +9,14 @@ use adaptors::indexer::IndexerProcessed;
 use async_lock::RwLock;
 use futures::{StreamExt, FutureExt, channel::mpsc::Sender};
 
-use core_ethereum_db::db::{wasm::Database, CoreEthereumDb};
+use core_ethereum_db::db::CoreEthereumDb;
 pub use core_network::{
+    PeerId,
     heartbeat::HeartbeatConfig,
     network::Health,
     ping::PingConfig
 };
 use core_network::{
-    PeerId,
     network::{Network, NetworkEvent},
     heartbeat::Heartbeat,
     messaging::ControlMessage,
@@ -24,16 +24,24 @@ use core_network::{
 };
 use core_packet::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, PacketActions};
 use core_p2p::libp2p_identity;
-use utils_db::leveldb::wasm::LevelDbShim;
+
 use utils_log::error;
 
 use crate::p2p::api;
+
+#[cfg(feature = "wasm")]
+use {
+    core_ethereum_db::db::wasm::Database,
+    utils_db::leveldb::wasm::LevelDbShim,
+    wasm_bindgen::prelude::wasm_bindgen
+};
 
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
 #[derive(Clone)]
 pub struct HoprTools {
     ping: adaptors::ping::wasm::WasmPing,
@@ -42,8 +50,8 @@ pub struct HoprTools {
     pkt_sender: PacketActions
 }
 
+#[cfg(feature = "wasm")]
 impl HoprTools {
-    // pub async fn ping()
     pub fn new(ping: Ping<adaptors::ping::PingExternalInteractions>,
         peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
         change_notifier: Sender<NetworkEvent>,
@@ -59,19 +67,20 @@ impl HoprTools {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
 impl HoprTools {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+    #[wasm_bindgen]
     pub fn ping(&self) -> adaptors::ping::wasm::WasmPing {
         self.ping.clone()
     }
 
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+    #[wasm_bindgen]
     pub fn network(&self) -> adaptors::network::wasm::WasmNetwork {
         self.network.clone()
     }
 
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+    #[wasm_bindgen]
     pub fn index_updater(&self) -> adaptors::indexer::WasmIndexerInteractions {
         self.indexer.clone()
     }
@@ -98,6 +107,7 @@ impl std::fmt::Display for HoprLoopComponents {
 
 /// The main core loop containing all of the individual core components running indefinitely
 /// or until the first error/panic.
+#[cfg(feature = "wasm")]
 pub fn build_components(me: libp2p_identity::Keypair,
     db: Arc<RwLock<CoreEthereumDb<LevelDbShim>>>,
     network_quality_threshold: f64,
@@ -107,6 +117,8 @@ pub fn build_components(me: libp2p_identity::Keypair,
     packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>,
 ) -> (HoprTools, impl std::future::Future<Output=()>)
 {
+    use core_mixer::mixer::{Mixer, MixerConfig};
+
     let identity = me;
 
     let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
@@ -127,7 +139,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
     let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 
     let packet_actions = PacketInteraction::new(
-        db.clone(), ack_actions.writer(), on_final_packet_tx, packet_cfg
+        db.clone(), Mixer::new_with_gloo_timers(MixerConfig::default()),ack_actions.writer(), on_final_packet_tx, packet_cfg
     );
 
     // packet processing

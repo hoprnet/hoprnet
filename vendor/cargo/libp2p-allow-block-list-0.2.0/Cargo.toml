@@ -35,11 +35,11 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.1"
+version = "0.2.2"
 features = ["peerid"]
 
 [dependencies.libp2p-swarm]
-version = "0.43.1"
+version = "0.43.3"
 path = "../../swarm"
 
 [dev-dependencies.async-std]
