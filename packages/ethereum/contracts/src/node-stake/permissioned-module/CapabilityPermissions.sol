@@ -209,7 +209,7 @@ library HoprCapabilityPermissions {
                 value := mload(add(data, add(i, 0x15)))
                 // We offset the load address by 53 byte (operation byte + 20 address bytes + 32 value bytes)
                 dataLength := mload(add(data, add(i, 0x35)))
-                // We offset the load address by 85 byte (operation byte + 20 address bytes + 32 value bytes + 32 data length bytes)
+                // load actual transaction data with an offset of 53 byte (operation byte + 20 address bytes + 32 value bytes)
                 out := add(data, add(i, 0x35))
             }
             checkTransaction(role, to, value, out, operation);
@@ -700,7 +700,7 @@ library HoprCapabilityPermissions {
     /**
      * @dev Returns an bytes4 array which decodes from the combined encoding
      * of function signature and permissions. It can take maxinum 7 items.
-     * Encoding of function signatures is right-padded, where indexes grow from left to right
+     * Encoding of function signatures is right-padded, where indexes grow from right to left
      * Encoding of permissions is left-padded, where indexes grow from left to right
      * @param encoded encode permissions in bytes32
      * @param length length of permissions

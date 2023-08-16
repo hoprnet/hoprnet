@@ -24,6 +24,9 @@ pub enum HelperErrors {
     #[error("incorrect filename: {0}")]
     IncorrectFilename(String),
 
+    #[error("identity file exists: {0}")]
+    IdentityFileExists(String),
+
     #[error("unable to read identity")]
     UnableToReadIdentity,
 

@@ -991,6 +991,8 @@ export async function createChainWrapper(
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,
       hoprNodeSafeRegistryAddress: deploymentExtract.hoprNodeSafeRegistryAddress,
+      moduleAddress: safeModuleOptions.moduleAddress.to_hex(),
+      safeAddress: safeModuleOptions.safeAddress.to_hex(),
       noticePeriodChannelClosure
     }),
     updateConfirmedTransaction: transactions.moveToConfirmed.bind(

@@ -3,13 +3,18 @@ pragma solidity ^0.8.0;
 
 import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import "openzeppelin-contracts/utils/Address.sol";
-import "../../script/utils/SafeSuiteLib.sol";
+import "../utils/SafeSuiteLib.sol";
 import "safe-contracts/proxies/SafeProxy.sol";
 import "safe-contracts/proxies/SafeProxyFactory.sol";
 import "safe-contracts/Safe.sol";
 import "safe-contracts/common/Enum.sol";
 
-contract HoprNodeStakeFactory {
+abstract contract HoprNodeStakeFactoryEvents {
+    event NewHoprNodeStakeModule(address indexed moduleImplementation, address instance);   // Emit when a new module is created
+    event NewHoprNodeStakeSafe(address instance);   // Emit when a new safe proxy is created
+}
+
+contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {
     using Address for address;
     using ClonesUpgradeable for address;
 
@@ -18,9 +23,6 @@ contract HoprNodeStakeFactory {
     bytes internal approvalHashSig;
 
     error TooFewOwners();
-
-    event NewHoprNodeStakeModule(address instance);
-    event NewHoprNodeStakeSafe(address instance);
 
     constructor() {
         r = bytes32(uint256(uint160(address(this))));
@@ -93,7 +95,7 @@ contract HoprNodeStakeFactory {
             abi.encodeWithSignature("swapOwner(address,address,address)", SENTINEL_OWNERS, address(this), admin0);
         prepareSafeTx(Safe(safeProxyAddr), 1, swapOwnerData);
 
-        emit NewHoprNodeStakeModule(moduleProxy);
+        emit NewHoprNodeStakeModule(moduleSingletonAddress, moduleProxy);
         emit NewHoprNodeStakeSafe(address(safeProxy));
         safeProxyAddr = payable(address(safeProxy));
         return (moduleProxy, safeProxyAddr);

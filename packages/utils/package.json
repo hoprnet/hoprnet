@@ -69,7 +69,7 @@
     "rewiremock": "3.14.5",
     "sinon": "12.0.1",
     "typedoc": "0.24.8",
-    "typedoc-plugin-markdown": "3.15.3",
+    "typedoc-plugin-markdown": "3.15.4",
     "typescript": "5.0.4"
   },
   "mocha": {

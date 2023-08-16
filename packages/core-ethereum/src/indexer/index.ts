@@ -119,12 +119,22 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return
     }
     this.status = IndexerStatus.STARTING
+    const contractAddresses = chain.getInfo();
+    log(`[DEBUG]contractAddresses...${JSON.stringify(contractAddresses, null, 2)}`)
+
 
     this.handlers = Handlers.init(
       // FIXME: change to Safe address if Safe is holding the tokens
       chain.getPublicKey().to_address().to_string(),
       chain.getPublicKey().to_address().to_string(),
-      chain.getInfo(),
+      {
+        channels: contractAddresses.hoprChannelsAddress,
+        token: contractAddresses.hoprTokenAddress,
+        network_registry: contractAddresses.hoprNetworkRegistryAddress,
+        announcements: contractAddresses.hoprAnnouncementsAddress,
+        node_safe_registry: contractAddresses.hoprNodeSafeRegistryAddress,
+        node_management_module: contractAddresses.moduleAddress
+      },
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
         onOwnChannelUpdated: this.onOwnChannelUpdated.bind(this),

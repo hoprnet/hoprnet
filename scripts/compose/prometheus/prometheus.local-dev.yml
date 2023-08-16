@@ -11,7 +11,7 @@ scrape_configs:
       - targets: ['host.docker.internal:3001']
         labels:
           group: 'hopr'
-    metrics_path: /api/v2/node/metrics
+    metrics_path: /api/v3/node/metrics
 
   - job_name: 'cadvisor'
     scrape_interval: 10s

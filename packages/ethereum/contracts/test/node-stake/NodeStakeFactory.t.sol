@@ -5,13 +5,13 @@ import "forge-std/Test.sol";
 
 import {HoprNodeManagementModule} from "../../src/node-stake/permissioned-module/NodeManagementModule.sol";
 import {HoprCapabilityPermissions} from "../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
-import {HoprNodeStakeFactory} from "../../src/node-stake/NodeStakeFactory.sol";
+import {HoprNodeStakeFactory, HoprNodeStakeFactoryEvents} from "../../src/node-stake/NodeStakeFactory.sol";
 import {Safe} from "safe-contracts/Safe.sol";
-import {SafeSuiteLib} from "../../script/utils/SafeSuiteLib.sol";
+import {SafeSuiteLib} from "../../src/utils/SafeSuiteLib.sol";
 import {SafeSingletonFixtureTest} from "../utils/SafeSingleton.sol";
 import {ClonesUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 
-contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest {
+contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
     using ClonesUpgradeable for address;
 
     HoprNodeManagementModule public moduleSingleton;
@@ -26,8 +26,6 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest {
      */
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event SetMultisendAddress(address indexed multisendAddress);
-    event NewHoprNodeStakeModule(address instance);
-    event NewHoprNodeStakeSafe(address instance);
 
     function setUp() public override(SafeSingletonFixtureTest) {
         super.setUp();
@@ -93,9 +91,8 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest {
             factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
 
         vm.startPrank(caller);
-        vm.expectEmit(true, false, false, false, address(factory));
-        emit NewHoprNodeStakeModule(expectedModuleAddress);
-
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit NewHoprNodeStakeModule(address(moduleSingleton), expectedModuleAddress);
         address[] memory admins = new address[](10);
         for (uint256 i = 0; i < admins.length; i++) {
             admins[i] = vm.addr(200 + i);

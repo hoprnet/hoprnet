@@ -28,7 +28,6 @@ cluster_size=${2:-3}
 branch=${3:-master} # bratislava , providence
 cluster_tag=${4:-} # optional cluster tag
 
-
 api_token="${HOPRD_API_TOKEN}"
 password="${HOPRD_PASSWORD}"
 

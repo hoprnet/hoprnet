@@ -15,9 +15,11 @@ use ethnum::u256;
 use multiaddr::Multiaddr;
 use std::str::FromStr;
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
+use serde::Deserialize;
 
 /// Holds addresses of deployed HOPR contracts
-pub struct DeploymentExtract {
+#[derive(Clone, Debug, Deserialize)]
+pub struct ContractAddresses {
     /// HoprChannels contract, manages mixnet incentives
     channels: Address,
     /// HoprToken contract, the HOPR token
@@ -33,6 +35,20 @@ pub struct DeploymentExtract {
     node_management_module: Address,
 }
 
+#[cfg(feature = "wasm")]
+impl From<&wasm::ContractAddresses> for ContractAddresses {
+    fn from(x: &wasm::ContractAddresses) -> Self {
+        ContractAddresses {
+            channels: Address::from_str(&x.channels).expect("invalid channels address given"),
+            token: Address::from_str(&x.token).expect("invalid token address given"),
+            network_registry: Address::from_str(&x.network_registry).expect("invalid network_registry address given"),
+            announcements: Address::from_str(&x.announcements).expect("invalid announcements address given"),
+            node_safe_registry: Address::from_str(&x.node_safe_registry).expect("invalid node_safe_registry address given"),
+            node_management_module: Address::from_str(&x.node_management_module).expect("invalid node_management_module address given"),
+        }
+    }
+}
+
 pub trait IndexerCallbacks {
     fn own_channel_updated(&self, channel_entry: &ChannelEntry);
 
@@ -44,7 +60,7 @@ pub trait IndexerCallbacks {
 pub struct ContractEventHandlers<Cbs> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
-    addresses: DeploymentExtract,
+    addresses: ContractAddresses,
     /// monitor the Hopr Token events, ignore rest
     address_to_monitor: Address,
     /// own address, aka msg.sender
@@ -486,7 +502,7 @@ pub mod tests {
 
     fn init_handlers() -> ContractEventHandlers<DummyCallbacks> {
         ContractEventHandlers {
-            addresses: super::DeploymentExtract {
+            addresses: super::ContractAddresses {
                 channels: CHANNELS_ADDR.try_into().unwrap(),
                 token: TOKEN_ADDR.try_into().unwrap(),
                 network_registry: NETWORK_REGISTRY_ADDR.try_into().unwrap(),
@@ -1342,8 +1358,9 @@ pub mod wasm {
     use std::str::FromStr;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::primitives::{Address, Snapshot};
-    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_futures;
+    use serde::{Deserialize, Serialize};
 
     #[wasm_bindgen]
     extern "C" {
@@ -1374,28 +1391,27 @@ pub mod wasm {
         }
     }
 
-    #[wasm_bindgen]
-    extern "C" {
-        #[wasm_bindgen]
-        pub type ContractAddresses;
+    #[derive(Serialize, Deserialize)]
+    pub struct ContractAddresses {
+        pub channels: String,
+        pub token: String,
+        pub network_registry: String,
+        pub announcements: String,
+        pub node_safe_registry: String,
+        pub node_management_module: String,
+    }
 
-        #[wasm_bindgen(method, getter)]
-        pub fn channels(this: &ContractAddresses) -> String;
-
-        #[wasm_bindgen(method, getter)]
-        pub fn token(this: &ContractAddresses) -> String;
-
-        #[wasm_bindgen(method, getter)]
-        pub fn network_registry(this: &ContractAddresses) -> String;
-
-        #[wasm_bindgen(method, getter)]
-        pub fn announcements(this: &ContractAddresses) -> String;
-
-        #[wasm_bindgen(method, getter)]
-        pub fn node_safe_registry(this: &ContractAddresses) -> String;
-
-        #[wasm_bindgen(method, getter)]
-        pub fn node_management_module(this: &ContractAddresses) -> String;
+    impl From<&super::ContractAddresses> for ContractAddresses {
+        fn from(x: &crate::handlers::ContractAddresses) -> Self {
+            ContractAddresses {
+                channels: x.channels.to_string(),
+                token: x.token.to_string(),
+                network_registry: x.network_registry.to_string(),
+                announcements: x.announcements.to_string(),
+                node_safe_registry: x.node_safe_registry.to_string(),
+                node_management_module: x.node_management_module.to_string(),
+            }
+        }
     }
 
     #[wasm_bindgen]
@@ -1409,23 +1425,15 @@ pub mod wasm {
         pub fn init(
             address_to_monitor: &str,
             chain_key: &str,
-            contract_addresses: ContractAddresses,
+            contract_addresses_js: JsValue,
             callbacks: IndexerCallbacks,
         ) -> Handlers {
+            let contract_addresses = serde_wasm_bindgen::from_value::<crate::handlers::wasm::ContractAddresses>(contract_addresses_js).unwrap();
             Self {
                 w: super::ContractEventHandlers {
                     address_to_monitor: Address::from_str(address_to_monitor).unwrap(),
                     chain_key: Address::from_str(chain_key).unwrap(),
-                    addresses: super::DeploymentExtract {
-                        channels: Address::from_str(contract_addresses.channels().as_str()).unwrap(),
-                        token: Address::from_str(contract_addresses.token().as_str()).unwrap(),
-                        network_registry: Address::from_str(contract_addresses.network_registry().as_str()).unwrap(),
-                        node_safe_registry: Address::from_str(contract_addresses.node_safe_registry().as_str())
-                            .unwrap(),
-                        announcements: Address::from_str(contract_addresses.announcements().as_str()).unwrap(),
-                        node_management_module: Address::from_str(contract_addresses.node_management_module().as_str())
-                            .unwrap(),
-                    },
+                    addresses: (&contract_addresses).into(),
                     cbs: callbacks,
                 },
             }

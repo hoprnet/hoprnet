@@ -25,7 +25,7 @@ if [[ -z "${endpoint}" ]]; then
     msg "No <endpoint> is set, use default value localhost:3001"
 fi
 
-declare url="${apitoken}@${endpoint}/api/v2/account/addresses"
+declare url="${apitoken}@${endpoint}/api/v3/account/addresses"
 
 declare cmd="$(get_authenticated_curl_cmd "${url}")"
 
