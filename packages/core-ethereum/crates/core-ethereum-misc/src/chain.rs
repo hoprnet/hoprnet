@@ -10,21 +10,19 @@ use bindings::{
     },
 };
 use core_crypto::{
-    derivation::{derive_vrf_parameters, VrfParameters},
+    derivation::derive_vrf_parameters,
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::Hash,
+    types::{Hash, VrfParameters},
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{account::AccountSignature, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
 use ethers::types::{Address as EthereumAddress, H256, U256};
-use k256::elliptic_curve::{point::AffineCoordinates, sec1::ToEncodedPoint};
 use multiaddr::Multiaddr;
 use utils_log::debug;
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
     traits::BinarySerializable,
 };
-
 pub fn announce(
     offchain_keypair: &OffchainKeypair,
     chain_key: &Address,
@@ -77,9 +75,9 @@ pub fn redeem_ticket(chain_keypair: &ChainKeypair, acked_ticket: &AcknowledgedTi
     // BIG TODO
     let vrf_output = derive_vrf_parameters(&acked_ticket.ticket.get_hash().into(), chain_keypair, &[])?;
 
-    let v = vrf_output.v.to_encoded_point(false);
-    let s_b = vrf_output.s_b.to_encoded_point(false);
-    let h_v = vrf_output.h_v.to_encoded_point(false);
+    let v = vrf_output.v.to_bytes();
+    let s_b = vrf_output.s_b.to_bytes();
+    let h_v = vrf_output.h_v.to_bytes();
 
     Ok(RedeemTicketCall {
         redeemable: RedeemableTicket {
@@ -98,14 +96,14 @@ pub fn redeem_ticket(chain_keypair: &ChainKeypair, acked_ticket: &AcknowledgedTi
             por_secret: U256::default(),
         },
         params: Vrfparameters {
-            vx: U256::from_big_endian(v.x().unwrap()).into(),
-            vy: U256::from_big_endian(v.y().unwrap()).into(),
+            vx: U256::from_big_endian(&v[0..32]).into(),
+            vy: U256::from_big_endian(&v[32..64]).into(),
             s: U256::from_big_endian(&vrf_output.s.to_bytes()),
             h: U256::from_big_endian(&vrf_output.h.to_bytes()),
-            s_bx: U256::from_big_endian(s_b.x().unwrap()).into(),
-            s_by: U256::from_big_endian(s_b.y().unwrap()).into(),
-            h_vx: U256::from_big_endian(h_v.x().unwrap()).into(),
-            h_vy: U256::from_big_endian(h_v.y().unwrap()).into(),
+            s_bx: U256::from_big_endian(&s_b[0..32]).into(),
+            s_by: U256::from_big_endian(&s_b[32..64]).into(),
+            h_vx: U256::from_big_endian(&h_v[0..32]).into(),
+            h_vy: U256::from_big_endian(&h_v[32..64]).into(),
         },
     })
 }
@@ -125,7 +123,6 @@ where
 
     todo!("Rewrite acked ticket");
     let pre_image = Hash::default();
-    acked_ticket.set_preimage(&Hash::default());
     debug!(
         "Set preImage {pre_image} for ticket {} in channel to {counterparty}",
         acked_ticket.response
@@ -191,7 +188,6 @@ pub mod tests {
         middleware::SignerMiddleware,
         providers::{Http, Provider},
         signers::{LocalWallet, Signer},
-        types::TransactionRequest,
     };
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
@@ -320,10 +316,13 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::types::Hash;
+    use core_crypto::{keypairs::OffchainKeypair, types::Hash};
     use core_ethereum_db::db::wasm::Database;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use ethers::abi::AbiEncode;
     use js_sys::{Function, JsString};
+    use multiaddr::Multiaddr;
+    use std::str::FromStr;
     use utils_log::debug;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
@@ -372,5 +371,18 @@ pub mod wasm {
         debug!("Successfully submitted ticket {}", acked_ticket.response);
 
         Ok(JsString::from(receipt).as_string().unwrap_or("no receipt given".into()))
+    }
+
+    #[wasm_bindgen]
+    pub fn get_announce_payload(
+        offchain_keypair: &OffchainKeypair,
+        chain_key: &Address,
+        announced_multiaddr: &str,
+    ) -> JsResult<Vec<u8>> {
+        let ma = match Multiaddr::from_str(announced_multiaddr) {
+            Ok(ma) => ma,
+            Err(e) => return Err(JsValue::from(e.to_string())),
+        };
+        Ok(super::announce(offchain_keypair, chain_key, &ma).encode())
     }
 }
