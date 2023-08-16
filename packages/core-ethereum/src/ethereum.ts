@@ -14,20 +14,20 @@ import {
   Address,
   Balance,
   BalanceType,
-  PublicKey,
   durations,
   type AcknowledgedTicket,
   type DeferType,
   type Hash,
   create_counter,
   OffchainKeypair,
-  u8aToHex
+  u8aToHex,
+  ChainKeypair
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
-import { CORE_ETHEREUM_CONSTANTS, get_announce_payload } from '../lib/core_ethereum_misc.js'
+import { CORE_ETHEREUM_CONSTANTS, ChainCalls } from '../lib/core_ethereum_misc.js'
 import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
@@ -83,7 +83,7 @@ export async function createChainWrapper(
     chain: string
     network: string
   },
-  privateKey: Uint8Array,
+  keypair: ChainKeypair,
   checkDuplicate: Boolean = true,
   txTimeout = constants.TX_CONFIRMATION_WAIT
 ) {
@@ -92,7 +92,7 @@ export async function createChainWrapper(
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
   log(`[DEBUG] provider ${provider}`)
-  const publicKey = PublicKey.from_privkey(privateKey)
+  const publicKey = keypair.public()
   log(`[DEBUG] publicKey ${publicKey.to_hex(true)}`)
   const address = publicKey.to_address()
   log(`[DEBUG] address ${address.to_string()}`)
@@ -111,6 +111,8 @@ export async function createChainWrapper(
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
 
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
+
+  const chainCalls = new ChainCalls(keypair, Address.from_string(deploymentExtract.hoprChannelsAddress))
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -357,7 +359,7 @@ export async function createChainWrapper(
     }
 
     // 3. sign transaction
-    const signingKey = new utils.SigningKey(privateKey)
+    const signingKey = new utils.SigningKey(keypair.secret())
     const signature = signingKey.signDigest(utils.keccak256(utils.serializeTransaction(populatedTx)))
 
     const signedTx = utils.serializeTransaction(populatedTx, signature)
@@ -451,13 +453,12 @@ export async function createChainWrapper(
    */
   const announce = async (
     keypair: OffchainKeypair,
-    chain_key: Address,
     multiaddr: Multiaddr,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<string> => {
     let confirmationEssentialTxPayload: TransactionPayload
 
-    confirmationEssentialTxPayload.data = u8aToHex(get_announce_payload(keypair, chain_key, multiaddr.toString()))
+    confirmationEssentialTxPayload.data = u8aToHex(chainCalls.get_announce_payload(keypair, multiaddr.toString()))
     confirmationEssentialTxPayload.to = deploymentExtract.hoprAnnouncementsAddress
 
     // @ts-ignore fixme: treat result
@@ -987,7 +988,7 @@ export async function createChainWrapper(
     getNetworkRegistry: () => networkRegistry,
     getNodeSafeRegistry: () => nodeSafeRegistry,
     getNodeManagementModule: () => nodeManagementModule,
-    getPrivateKey: () => privateKey,
+    getPrivateKey: () => keypair.secret(),
     getPublicKey: () => publicKey,
     getInfo: () => ({
       chain: networkInfo.chain,

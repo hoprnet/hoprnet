@@ -19,7 +19,7 @@ import {
   create_counter,
   OffchainPublicKey,
   ChainKeypair,
-  OffchainKeypair,
+  OffchainKeypair
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
@@ -168,7 +168,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         deploymentAddresses,
         this.safeModuleOptions,
         this.options,
-        this.chainKeypair.secret(),
+        this.chainKeypair,
         true
       )
     } catch (err) {
@@ -224,7 +224,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   announce(multiaddr: Multiaddr, packetKeypair: OffchainKeypair): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(packetKeypair, this.chainKeypair.to_address(), multiaddr, (txHash: string) =>
+    return this.chain.announce(packetKeypair, multiaddr, (txHash: string) =>
       this.setTxHandler(`announce-${txHash}`, txHash)
     )
   }

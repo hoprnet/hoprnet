@@ -258,9 +258,9 @@ endif
 ensure-etherscan-api-key-is-set:
 ifeq ($(origin ETHERSCAN_API_KEY),undefined)
 # On local testing a dummy key is needed
-	etherscan_api_key=dummyKey
+etherscan_api_key=dummyKey
 else
-	etherscan_api_key=${ETHERSCAN_API_KEY}
+etherscan_api_key=${ETHERSCAN_API_KEY}
 endif
 
 ensure-environment-is-set:
