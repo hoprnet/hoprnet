@@ -19,8 +19,7 @@ import {
   create_counter,
   OffchainPublicKey,
   ChainKeypair,
-  OffchainKeypair,
-  KeyBinding
+  OffchainKeypair
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
