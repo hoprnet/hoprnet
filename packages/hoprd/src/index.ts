@@ -11,7 +11,8 @@ import {
   create_histogram_with_buckets,
   pickVersion,
   defer,
-  privKeyToPeerId
+  Address,
+  debug
 } from '@hoprnet/hopr-utils'
 import {
   Health,
@@ -35,16 +36,25 @@ import {
 } from '../lib/hoprd_misc.js'
 hoprd_misc_initialize_crate()
 
+import {
+  MessageInbox,
+  hoprd_inbox_initialize_crate,
+  ApplicationData,
+  MessageInboxConfiguration
+} from '../lib/hoprd_inbox.js'
+hoprd_inbox_initialize_crate()
+
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
-import { LogStream } from './logs.js'
 
 import { HoprKeys, IdentityOptions, hoprd_keypair_set_panic_hook } from '../lib/hoprd_keypair.js'
 hoprd_keypair_set_panic_hook()
 import { decodeMessage } from './api/utils.js'
 import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
-import { RPCH_MESSAGE_REGEXP } from './api/v2.js'
+import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
+
+const log = debug('hoprd')
 
 // Metrics
 const metric_processStartTime = create_gauge(
@@ -111,7 +121,12 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
     password: cfg.identity.password,
     strategy,
     forceCreateDB: cfg.db.force_initialize,
-    noRelay: cfg.network_options.no_relay
+    noRelay: cfg.network_options.no_relay,
+    safeModule: {
+      safeTransactionServiceProvider: cfg.safe_module.safe_transaction_service_provider,
+      safeAddress: cfg.safe_module.safe_address,
+      moduleAddress: cfg.safe_module.module_address
+    }
   }
 
   if (isStrategy(cfg.strategy.name)) {
@@ -120,6 +135,13 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
       auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
       max_channels: cfg.strategy.max_auto_channels ?? undefined
     })
+  }
+
+  if (cfg.safe_module.safe_address) {
+    options.safeModule.safeAddress = Address.deserialize(cfg.safe_module.safe_address.serialize())
+  }
+  if (cfg.safe_module.module_address) {
+    options.safeModule.moduleAddress = Address.deserialize(cfg.safe_module.module_address.serialize())
   }
 
   return options
@@ -179,7 +201,7 @@ async function main() {
   const metric_startupTimer = metric_nodeStartupTime.start_measure()
 
   let node: Hopr
-  let logs = new LogStream()
+  let inbox: MessageInbox
   let state: State = {
     aliases: new Map(),
     settings: {
@@ -191,13 +213,13 @@ async function main() {
   }
 
   function stopGracefully(signal) {
-    logs.log(`Process exiting with signal ${signal}`)
+    log(`Process exiting with signal ${signal}`)
     process.exit()
   }
 
   process.on('uncaughtExceptionMonitor', (err, origin) => {
     // Make sure we get a log.
-    logs.log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
+    log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
   })
 
   process.once('exit', stopGracefully)
@@ -216,38 +238,43 @@ async function main() {
 
   const networkHealthChanged = (oldState: Health, newState: Health): void => {
     // Log the network health indicator state change (goes over the WS as well)
-    logs.log(`Network health indicator changed: ${health_to_string(oldState)} -> ${health_to_string(newState)}`)
-    logs.log(`NETWORK HEALTH: ${health_to_string(newState)}`)
+    log(`Network health indicator changed: ${health_to_string(oldState)} -> ${health_to_string(newState)}`)
+    log(`NETWORK HEALTH: ${health_to_string(newState)}`)
     if (metric_timerToGreen && newState == Health.Green) {
       metric_timeToGreen.record_measure(metric_timerToGreen)
       metric_timerToGreen = undefined
     }
   }
 
-  const logMessageToNode = (msg: Uint8Array): void => {
-    logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
+  const logMessageToNode = async (data: ApplicationData) => {
+    log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
-      let decodedMsg = decodeMessage(msg)
-      logs.log(`Message: ${decodedMsg.msg}`)
-      logs.log(`Latency: ${decodedMsg.latency} ms`)
+      let decodedMsg = decodeMessage(data.plain_text)
+      log(`Message: ${decodedMsg.msg}`)
+      log(`App tag: ${data.application_tag ?? 0}`)
+      log(`Latency: ${decodedMsg.latency} ms`)
       metric_latency.observe(decodedMsg.latency)
 
       if (RPCH_MESSAGE_REGEXP.test(decodedMsg.msg)) {
-        logs.log(`RPCh: received message [${decodedMsg.msg}]`)
+        log(`RPCh: received message [${decodedMsg.msg}]`)
       }
 
-      // also send it tagged as message for apps to use
-      logs.logMessage(decodedMsg.msg)
+      // Needs to be created new, because the incoming `data` is from serde_wasmbindgen and not a Rust WASM object
+      let appData = new ApplicationData(data.application_tag, data.plain_text)
+      await inbox.push(appData)
     } catch (err) {
-      logs.log('Could not decode message', err instanceof Error ? err.message : 'Unknown error')
-      logs.log(msg.toString())
+      log('Could not decode message', err instanceof Error ? err.message : 'Unknown error', data.plain_text.toString())
     }
   }
 
+  log('before parseCliArguments')
   const argv = parseCliArguments(process.argv.slice(1))
+  log('after parseCliArguments')
   let cfg: HoprdConfig
   try {
+    log('before fetch_configuration')
     cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
+    log('after fetch_configuration')
   } catch (err) {
     console.error(err)
     process.exit(1)
@@ -276,11 +303,11 @@ async function main() {
   let options = generateNodeOptions(cfg, network)
 
   try {
-    logs.log(`This is HOPRd version ${version}`)
+    log(`This is HOPRd version ${version}`)
     metric_version.set([pickVersion(version)], 1.0)
 
     if (on_dappnode) {
-      logs.log('This node appears to be running on an Dappnode')
+      log('This node appears to be running on an Dappnode')
     }
 
     // 1. Find or create an identity
@@ -294,16 +321,13 @@ async function main() {
       )
     )
 
-    // total hack. peerIdFromKeys seems to produce incorrect objects
-    const peerId = privKeyToPeerId(keypair.chainKeyPrivKey)
-
-    console.log(`chain_key`, (await keypair.chainKeyPeerId).toString())
-    console.log(`packet_key`, (await keypair.packetKeyPeerId).toString())
+    log(`chain_key ${keypair.chain_key.public().to_hex(true)}`)
+    log(`packet_key ${keypair.packet_key.public().to_peerid_str()}`)
 
     // 2. Create node instance
-    logs.log('Creating HOPR Node')
-    node = await createHoprNode(peerId, options, false)
-    logs.logStatus('PENDING')
+    log('Creating HOPR Node')
+    node = await createHoprNode(keypair.chain_key, keypair.packet_key, options, false)
+    log('Status: PENDING')
 
     // Subscribe to node events
     node.on('hopr:message', logMessageToNode)
@@ -312,24 +336,29 @@ async function main() {
     let continueStartup = defer<void>()
     node.subscribeOnConnector('hopr:connector:created', () => {
       // 2.b - Connector has been created, and we can now trigger the next set of steps.
-      logs.log('Connector has been loaded properly.')
+      log('Connector has been loaded properly.')
       node.emit('hopr:monitoring:start')
       continueStartup.resolve()
     })
 
     // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
-    logs.log(`Ready to request on-chain connector to connect to provider.`)
+    log(`Ready to request on-chain connector to connect to provider.`)
     node.emitOnConnector('connector:create')
 
     await continueStartup.promise
 
     // 3. start all monitoring services, and continue with the rest of the setup.
 
+    let inboxCfg = new MessageInboxConfiguration()
+    // TODO: pass configuration parameters for the inbox
+
+    inbox = new MessageInbox(inboxCfg)
+
     let api = cfg.api as Api
     console.log(JSON.stringify(api, null, 2))
     const startApiListen = setupAPI(
       node,
-      logs,
+      inbox,
       { getState, setState },
       {
         disableApiAuthentication: api.is_auth_disabled(),
@@ -342,19 +371,19 @@ async function main() {
     if (cfg.api.enable) startApiListen()
 
     if (cfg.healthcheck.enable) {
-      setupHealthcheck(node, logs, cfg.healthcheck.host, cfg.healthcheck.port)
+      setupHealthcheck(node, cfg.healthcheck.host, cfg.healthcheck.port)
     }
 
-    logs.log(`Node address: ${node.getId().toString()}`)
+    log(`Node address: ${node.getId().toString()}`)
 
     const ethAddr = node.getEthereumAddress().to_hex()
     const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
 
-    logs.log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
+    log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
 
     // 2.5 Await funding of wallet.
     await node.waitForFunds()
-    logs.log('Node has been funded, starting...')
+    log('Node has been funded, starting...')
 
     // 3. Start the node.
     await node.start()
@@ -362,15 +391,14 @@ async function main() {
     // alias self
     state.aliases.set('me', node.getId())
 
-    logs.logStatus('READY')
-    logs.log('Node has started!')
+    log('Status: READY')
+    log('Node has started!')
     metric_nodeStartupTime.record_measure(metric_startupTimer)
 
     // Won't return until node is terminated
     await node.startProcessing()
   } catch (e) {
-    logs.log('Node failed to start:')
-    logs.logFatalError('' + e)
+    log('Node failed to start: ' + e)
     process.exit(1)
   }
 }

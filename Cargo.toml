@@ -6,14 +6,17 @@ members = [
     "packages/core/crates/core-misc",
     "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",
+    "packages/core/crates/core-path",
     "packages/core/crates/core-packet",
     "packages/core/crates/core-strategy",
     "packages/core/crates/core-types",
-    "packages/core-ethereum/crates/core-ethereum-misc",
     "packages/core-ethereum/crates/core-ethereum-db",
+    "packages/core-ethereum/crates/core-ethereum-indexer",
+    "packages/core-ethereum/crates/core-ethereum-misc",
     "packages/ethereum/crates/bindings",
     "packages/hopli",
     "packages/real/crates/real-base",
+    "packages/hoprd/crates/hoprd-inbox",
     "packages/hoprd/crates/hoprd-keypair",
     "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-db",
@@ -30,10 +33,12 @@ async-trait = "0.1"
 futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
-libp2p-identity = "0.2.2"
+libp2p-identity = { version = "0.2.2", features = ["peerid", "ed25519"] }
 libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
 serde = { version = "1.0" }
 thiserror = "1.0"
+js-sys = "0.3.64"
+getrandom = "0.2.10"
 wasm-pack = "0.12.0"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.86"

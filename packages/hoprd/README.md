@@ -3,9 +3,9 @@
 Runs a HOPR Node and the HOPR Admin interface.
 
 When the Rest API is enabled, the node serves a Swagger UI to inspect and test
-the Rest API v2 at:
+the Rest API v3 at:
 
-http://localhost:3001/api/v2/\_swagger
+http://localhost:3001/api/v3/\_swagger
 
 NOTE: Hostname and port can be different, since they depend on the settings `--apiHost` and `--apiPort`.
 

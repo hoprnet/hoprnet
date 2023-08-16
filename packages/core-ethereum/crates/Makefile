@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES = core-ethereum-db core-ethereum-misc
+PACKAGES = core-ethereum-db core-ethereum-misc core-ethereum-indexer
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))
@@ -10,7 +10,7 @@ JS_FILES = $(foreach package,$(PACKAGES),$(package)/pkg/$(subst -,_,$(package)).
 all: $(JS_FILES)
 
 test: $(JS_FILES)
-	$(foreach pkg,$(PACKAGES),cargo test -p $(pkg) && WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 wasm-pack test --node `pwd`/$(pkg) && ) true
+	$(foreach pkg,$(PACKAGES),cargo test --no-default-features -p $(pkg) && WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 wasm-pack test --node `pwd`/$(pkg) && ) true
 
 $(JS_FILES):
 	mkdir -p $(@D)

@@ -1,7 +1,7 @@
 use std::{sync::Arc, pin::Pin};
 
 use async_lock::RwLock;
-use core_crypto::types::PublicKey;
+use core_crypto::types::OffchainPublicKey;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::Network;
 use core_p2p::libp2p_swarm::derive_prelude::Multiaddr;
@@ -20,9 +20,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use core_network::PeerId;
 use utils_log::{warn,error};
-use utils_types::primitives::Address;
 
-use crate::errors::Result;
 use crate::CoreEthereumDb;
 
 use super::network::ExternalNetworkInteractions;
@@ -32,24 +30,6 @@ use crate::LevelDbShim;
 
 pub const INDEXER_UPDATE_QUEUE_SIZE: usize = 4096;
 
-
-async fn is_allowed_to_access_network<T>(db: &T, chain_address: &Address) -> Result<bool>
-where
-    T: HoprCoreEthereumDbActions,
-{
-    let nr_enabled = db.is_network_registry_enabled().await?;
-
-    if !nr_enabled {
-        return Ok(true);
-    }
-
-    let maybe_stake_account = db.get_account_from_network_registry(&chain_address).await?;
-
-    match maybe_stake_account {
-        None => Ok(false),
-        Some(account) => Ok(db.is_eligible(&account).await?),
-    }
-}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PeerEligibility {
@@ -113,16 +93,27 @@ impl WasmIndexerInteractions {
                         for peer in peers.into_iter() {
                             let is_allowed = {
                                 let address = {
-                                    let a = PublicKey::from_peerid(&peer)
-                                        .map(|v| v.to_address());
-                                    if a.is_ok() {
-                                        a.unwrap()
-                                    } else {
+                                    if let Ok(key) = OffchainPublicKey::from_peerid(&peer) {
+                                        match db.read().await
+                                            .get_chain_key(&key)
+                                            .await
+                                            .and_then(|maybe_address| {
+                                                maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!("No address available for peer '{}'", peer)))
+                                            }) {
+                                                Ok(v) => v,
+                                                Err(e) => {
+                                                    error!("{e}");
+                                                    continue
+                                                },
+                                            }
+                                    } else { 
+                                        warn!("Could not convert the peer id '{}' to an offchain public key", peer);
                                         continue
                                     }
+
                                 };
                                 
-                                match is_allowed_to_access_network(&(*db.read().await), &address).await {
+                                match db.read().await.is_allowed_to_access_network(&&address).await {
                                     Ok(v) => v,
                                     Err(_) => continue,
                                 }

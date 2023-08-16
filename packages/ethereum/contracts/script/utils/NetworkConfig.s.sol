@@ -1,227 +1,314 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import 'forge-std/Script.sol';
-import 'forge-std/StdJson.sol';
+import "forge-std/Script.sol";
+import "forge-std/StdJson.sol";
 
 /**
  * Get environment_type from the environment variable `FOUNDRY_PROFILE`
  * Get network string from the environment variable "NETWORK"
  */
 contract NetworkConfig is Script {
-  using stdJson for string;
+    using stdJson for string;
 
-  enum EnvironmentType {
-    LOCAL,
-    DEVELOPMENT,
-    STAGING,
-    PRODUCTION
-  }
-
-  struct NetworkDetail {
-    EnvironmentType environmentType;
-    uint256 stakeSeason;
-    address hoprTokenContractAddress;
-    address hoprChannelsContractAddress;
-    address xhoprTokenContractAddress;
-    address hoprBoostContractAddress;
-    address stakeContractAddress;
-    address networkRegistryContractAddress;
-    address networkRegistryProxyContractAddress;
-    uint256 indexerStartBlockNumber;
-  }
-
-  // Deployed contract addresses
-  // address constant PROD_WXHOPR_TOKEN_CONTRACT_ADDRESS = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // TODO: this contract is not necessarily the "HoprToken" contract used in releases
-  address constant PROD_XHOPR_TOKEN_CONTRACT_ADDRESS = 0xD057604A14982FE8D88c5fC25Aac3267eA142a08;
-  address constant PROD_HOPR_BOOST_CONTRACT_ADDRESS = 0x43d13D7B83607F14335cF2cB75E87dA369D056c7;
-  uint256 constant NETWORK_REGISTRY_NFT_INDEX = 26;
-  string constant NETWORK_REGISTRY_TYPE_NAME = 'Network_registry';
-  string constant NETWORK_REGISTRY_RANK1_NAME = 'developer';
-  string constant NETWORK_REGISTRY_RANK2_NAME = 'community';
-  string constant DUMMY_TYPE_PREFIX = 'Dummy_';
-  bytes32 constant NETWORK_REGISTRY_TYPE_HASH = keccak256(bytes(NETWORK_REGISTRY_TYPE_NAME));
-  bytes32 constant MINTER_ROLE = keccak256('MINTER_ROLE');
-  address constant DEV_BANK_ADDRESS = 0x2402da10A6172ED018AEEa22CA60EDe1F766655C;
-
-  string public currentNetworkId;
-  EnvironmentType public currentEnvironmentType;
-  NetworkDetail public currentNetworkDetail;
-
-  string public pathToDeploymentFile = string(abi.encodePacked(vm.projectRoot(), '/contracts-addresses.json'));
-
-  function getNetwork() public {
-    // get network of the script
-    string memory profile = vm.envString('FOUNDRY_PROFILE');
-    currentNetworkId = vm.envString('NETWORK');
-    currentEnvironmentType = parseEnvironmentTypeFromString(profile);
-  }
-
-  function readNetwork(string memory _networkName) internal view returns (NetworkDetail memory networkDetail) {
-    string memory json = vm.readFile(pathToDeploymentFile);
-    bytes memory levelToNetworkConfig = abi.encodePacked('.networks.', _networkName);
-
-    // read all the contract addresses from contracts-addresses.json. This way ensures that the order of attributes does not affect parsing
-    EnvironmentType envType = parseEnvironmentTypeFromString(
-      json.readString(string(abi.encodePacked(levelToNetworkConfig, '.environment_type')))
-    );
-    uint256 stakeSeasonNum = json.readUint(string(abi.encodePacked(levelToNetworkConfig, '.stake_season')));
-    uint256 indexerStartBlkNum = json.readUint(
-      string(abi.encodePacked(levelToNetworkConfig, '.indexer_start_block_number'))
-    );
-    address tokenAddr = json.readAddress(string(abi.encodePacked(levelToNetworkConfig, '.token_contract_address')));
-    address channelAddr = json.readAddress(
-      string(abi.encodePacked(levelToNetworkConfig, '.channels_contract_address'))
-    );
-    address xhoprAddr = json.readAddress(string(abi.encodePacked(levelToNetworkConfig, '.xhopr_contract_address')));
-    address boostAddr = json.readAddress(string(abi.encodePacked(levelToNetworkConfig, '.boost_contract_address')));
-    address stakeAddr = json.readAddress(string(abi.encodePacked(levelToNetworkConfig, '.stake_contract_address')));
-    address networkRegistryProxyAddr = json.readAddress(
-      string(abi.encodePacked(levelToNetworkConfig, '.network_registry_proxy_contract_address'))
-    );
-    address networkRegistryAddr = json.readAddress(
-      string(abi.encodePacked(levelToNetworkConfig, '.network_registry_contract_address'))
-    );
-
-    networkDetail = NetworkDetail({
-      environmentType: envType,
-      stakeSeason: stakeSeasonNum,
-      hoprTokenContractAddress: tokenAddr,
-      hoprChannelsContractAddress: channelAddr,
-      xhoprTokenContractAddress: xhoprAddr,
-      hoprBoostContractAddress: boostAddr,
-      stakeContractAddress: stakeAddr,
-      networkRegistryContractAddress: networkRegistryAddr,
-      networkRegistryProxyContractAddress: networkRegistryProxyAddr,
-      indexerStartBlockNumber: indexerStartBlkNum
-    });
-  }
-
-  function readCurrentNetwork() internal {
-    currentNetworkDetail = readNetwork(currentNetworkId);
-  }
-
-  function writeNetwork(string memory _networkName, NetworkDetail memory networkDetail) internal {
-    string memory parsedNewEnvDetail = parseNetworkDetailToString(networkDetail);
-
-    // write parsedNewEnvDetail to corresponding key
-    string memory configKey = string(abi.encodePacked('.networks.', _networkName));
-
-    // write to file;
-    vm.writeJson(parsedNewEnvDetail, pathToDeploymentFile, configKey);
-  }
-
-  function writeCurrentNetwork() internal {
-    // if currentNetworkId is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
-    if (keccak256(bytes(currentNetworkId)) == keccak256(bytes('anvil-localhost'))) {
-      writeNetwork('anvil-localhost2', currentNetworkDetail);
+    enum EnvironmentType {
+        LOCAL,
+        DEVELOPMENT,
+        STAGING,
+        PRODUCTION
     }
-    writeNetwork(currentNetworkId, currentNetworkDetail);
-  }
 
-  // FIXME: remove this temporary method
-  function displayNetworkDetail(string memory filePath, NetworkDetail memory networkDetail) internal {
-    vm.writeLine(
-      filePath,
-      string(
-        abi.encodePacked('"environment_type": "', parseEnvironmentTypeToString(networkDetail.environmentType), '",')
-      )
-    );
-    vm.writeLine(filePath, string(abi.encodePacked('"stake_season": ', vm.toString(networkDetail.stakeSeason), ',')));
-    vm.writeLine(
-      filePath,
-      string(abi.encodePacked('"indexer_start_block_umber": ', vm.toString(networkDetail.indexerStartBlockNumber), ','))
-    );
-    vm.writeLine(
-      filePath,
-      string(abi.encodePacked('"token_contract_address": "', vm.toString(networkDetail.hoprTokenContractAddress), '",'))
-    );
-    vm.writeLine(
-      filePath,
-      string(
-        abi.encodePacked('"channels_contract_address": "', vm.toString(networkDetail.hoprChannelsContractAddress), '",')
-      )
-    );
-    vm.writeLine(
-      filePath,
-      string(
-        abi.encodePacked('"xhopr_contract_address": "', vm.toString(networkDetail.xhoprTokenContractAddress), '",')
-      )
-    );
-    vm.writeLine(
-      filePath,
-      string(abi.encodePacked('"boost_contract_address": "', vm.toString(networkDetail.hoprBoostContractAddress), '",'))
-    );
-    vm.writeLine(
-      filePath,
-      string(abi.encodePacked('"stake_contract_address": "', vm.toString(networkDetail.stakeContractAddress), '",'))
-    );
-    vm.writeLine(
-      filePath,
-      string(
-        abi.encodePacked(
-          '"network_registry_proxy_contract_address": "',
-          vm.toString(networkDetail.networkRegistryProxyContractAddress),
-          '",'
-        )
-      )
-    );
-    vm.writeLine(
-      filePath,
-      string(
-        abi.encodePacked(
-          '"network_registry_contract_address": "',
-          vm.toString(networkDetail.networkRegistryContractAddress),
-          '"'
-        )
-      )
-    );
-  }
-
-  // FIXME: remove this temporary method
-  function displayCurrentNetworkDetail() internal {
-    displayNetworkDetail('test.txt', currentNetworkDetail);
-  }
-
-  function isValidAddress(address addr) public pure returns (bool) {
-    return addr == address(32) || addr == address(0) ? false : true;
-  }
-
-  function parseEnvironmentTypeFromString(string memory environmentType) public pure returns (EnvironmentType) {
-    if (keccak256(bytes(environmentType)) == keccak256(bytes('production'))) {
-      return EnvironmentType.PRODUCTION;
-    } else if (keccak256(bytes(environmentType)) == keccak256(bytes('staging'))) {
-      return EnvironmentType.STAGING;
-    } else if (keccak256(bytes(environmentType)) == keccak256(bytes('development'))) {
-      return EnvironmentType.DEVELOPMENT;
-    } else {
-      return EnvironmentType.LOCAL;
+    struct Addresses {
+        address tokenContractAddress;
+        address channelsContractAddress;
+        address nodeStakeV2FactoryAddress;
+        address moduleImplementationAddress;
+        address nodeSafeRegistryAddress;
+        address networkRegistryContractAddress;
+        address networkRegistryProxyContractAddress;
+        address ticketPriceOracleContractAddress;
+        address announcements;
     }
-  }
 
-  function parseEnvironmentTypeToString(EnvironmentType environmentType) public pure returns (string memory) {
-    if (environmentType == EnvironmentType.PRODUCTION) {
-      return 'production';
-    } else if (environmentType == EnvironmentType.STAGING) {
-      return 'staging';
-    } else if (environmentType == EnvironmentType.DEVELOPMENT) {
-      return 'development';
-    } else {
-      return 'local';
+    struct NetworkDetail {
+        EnvironmentType environmentType;
+        uint256 indexerStartBlockNumber;
+        Addresses addresses;
     }
-  }
 
-  function parseNetworkDetailToString(NetworkDetail memory networkDetail) internal returns (string memory) {
-    string memory json = 'config';
-    json.serialize('environment_type', parseEnvironmentTypeToString(networkDetail.environmentType));
-    json.serialize('stake_season', networkDetail.stakeSeason);
-    json.serialize('indexer_start_block_number', networkDetail.indexerStartBlockNumber);
-    json.serialize('token_contract_address', networkDetail.hoprTokenContractAddress);
-    json.serialize('channels_contract_address', networkDetail.hoprChannelsContractAddress);
-    json.serialize('xhopr_contract_address', networkDetail.xhoprTokenContractAddress);
-    json.serialize('boost_contract_address', networkDetail.hoprBoostContractAddress);
-    json.serialize('stake_contract_address', networkDetail.stakeContractAddress);
-    json.serialize('network_registry_proxy_contract_address', networkDetail.networkRegistryProxyContractAddress);
-    json = json.serialize('network_registry_contract_address', networkDetail.networkRegistryContractAddress);
-    return json;
-  }
+    // Deployed contract addresses
+    // address constant PROD_WXHOPR_TOKEN_CONTRACT_ADDRESS = 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1; // TODO: this contract is not necessarily the "HoprToken" contract used in releases
+    bytes32 constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+    address constant DEV_BANK_ADDRESS = 0x2402da10A6172ED018AEEa22CA60EDe1F766655C;
+    address constant COMM_MULTISIG_ADDRESS = 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05;
+
+    string public currentNetworkId;
+    EnvironmentType public currentEnvironmentType;
+    NetworkDetail public currentNetworkDetail;
+
+    string public pathToDeploymentFile = string(abi.encodePacked(vm.projectRoot(), "/contracts-addresses.json"));
+
+    function getNetwork() public {
+        // get environment of the script
+        string memory profile = vm.envString("FOUNDRY_PROFILE");
+        currentNetworkId = vm.envString("NETWORK");
+        currentEnvironmentType = parseEnvironmentTypeFromString(profile);
+    }
+
+    function readNetwork(string memory _networkName) internal returns (NetworkDetail memory networkDetail) {
+        string memory json = vm.readFile(pathToDeploymentFile);
+        bytes memory levelToNetworkConfig = abi.encodePacked(".networks.", _networkName);
+
+        // read all the contract addresses from contracts-addresses.json. This way ensures that the order of attributes does not affect parsing
+        EnvironmentType envType = parseEnvironmentTypeFromString(
+            json.readString(string(abi.encodePacked(levelToNetworkConfig, ".environment_type")))
+        );
+        uint256 indexerStartBlkNum =
+            json.readUint(string(abi.encodePacked(levelToNetworkConfig, ".indexer_start_block_number")));
+
+        bytes memory addresses = abi.encodePacked(levelToNetworkConfig, ".addresses");
+
+        // console2.log_string(addresses);
+
+        address tokenAddr = json.readAddress(string(abi.encodePacked(addresses, ".token")));
+        address channelAddr = json.readAddress(string(abi.encodePacked(addresses, ".channels")));
+        address nodeStakeV2FactoryAddr = json.readAddress(string(abi.encodePacked(addresses, ".node_stake_v2_factory")));
+        address moduleImplementationAddr =
+            json.readAddress(string(abi.encodePacked(addresses, ".module_implementation")));
+        address nodeSafeRegistryAddr = json.readAddress(string(abi.encodePacked(addresses, ".node_safe_registry")));
+        address networkRegistryProxyAddr =
+            json.readAddress(string(abi.encodePacked(addresses, ".network_registry_proxy")));
+        address networkRegistryAddr = json.readAddress(string(abi.encodePacked(addresses, ".network_registry")));
+        address ticketPriceOracleAddress = json.readAddress(string(abi.encodePacked(addresses, ".ticket_price_oracle")));
+        address announcementAdddress = json.readAddress(string(abi.encodePacked(addresses, ".announcements")));
+
+        Addresses memory addressStruct = Addresses({
+            tokenContractAddress: tokenAddr,
+            channelsContractAddress: channelAddr,
+            nodeStakeV2FactoryAddress: nodeStakeV2FactoryAddr,
+            moduleImplementationAddress: moduleImplementationAddr,
+            nodeSafeRegistryAddress: nodeSafeRegistryAddr,
+            networkRegistryContractAddress: networkRegistryAddr,
+            networkRegistryProxyContractAddress: networkRegistryProxyAddr,
+            ticketPriceOracleContractAddress: ticketPriceOracleAddress,
+            announcements: announcementAdddress
+        });
+
+        networkDetail = NetworkDetail({
+            environmentType: envType,
+            indexerStartBlockNumber: indexerStartBlkNum,
+            addresses: addressStruct
+        });
+    }
+
+    function readCurrentNetwork() internal {
+        currentNetworkDetail = readNetwork(currentNetworkId);
+    }
+
+    function writeNetwork(string memory _networkName, NetworkDetail memory networkDetail) internal {
+        // write parsedNewEnvDetail to corresponding key
+        string memory configKey = string(abi.encodePacked(".networks.", _networkName));
+
+        // use vm.writeJson to preserve order of JSON properties
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.tokenContractAddress),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.token"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.channelsContractAddress),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.channels"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.nodeStakeV2FactoryAddress),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.node_stake_v2_factory"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.moduleImplementationAddress),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.module_implementation"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.nodeSafeRegistryAddress),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.node_safe_registry"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.networkRegistryProxyContractAddress),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.network_registry_proxy"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.ticketPriceOracleContractAddress),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.ticket_price_oracle"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.announcements),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.announcements"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.addresses.networkRegistryContractAddress),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".addresses.network_registry"))
+        );
+
+        vm.writeJson(
+            parseEnvironmentTypeToString(networkDetail.environmentType),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".environment_type"))
+        );
+        vm.writeJson(
+            vm.toString(networkDetail.indexerStartBlockNumber),
+            pathToDeploymentFile,
+            string(abi.encodePacked(configKey, ".indexer_start_block_number"))
+        );
+    }
+
+    function writeCurrentNetwork() internal {
+        // if currentNetworkId is anvil-localhost, update both `anvil-localhost` and `anvil-localhost2`
+        if (keccak256(bytes(currentNetworkId)) == keccak256(bytes("anvil-localhost"))) {
+            writeNetwork("anvil-localhost2", currentNetworkDetail);
+        }
+        writeNetwork(currentNetworkId, currentNetworkDetail);
+    }
+
+    // FIXME: remove this temporary method
+    function displayNetworkDetail(string memory filePath, NetworkDetail memory networkDetail) internal {
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"environment_type": "', parseEnvironmentTypeToString(networkDetail.environmentType), '",'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"indexer_start_block_umber": ', vm.toString(networkDetail.indexerStartBlockNumber), ","
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"token_contract_address": "', vm.toString(networkDetail.addresses.tokenContractAddress), '",'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"channels_contract_address": "', vm.toString(networkDetail.addresses.channelsContractAddress), '",'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"node_stake_v2_factory_address": "',
+                    vm.toString(networkDetail.addresses.nodeStakeV2FactoryAddress),
+                    '"'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"module_implementation_address": "',
+                    vm.toString(networkDetail.addresses.moduleImplementationAddress),
+                    '"'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"node_safe_registry_address": "', vm.toString(networkDetail.addresses.nodeSafeRegistryAddress), '"'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"network_registry_proxy_contract_address": "',
+                    vm.toString(networkDetail.addresses.networkRegistryProxyContractAddress),
+                    '",'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"network_registry_contract_address": "',
+                    vm.toString(networkDetail.addresses.networkRegistryContractAddress),
+                    '"'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"ticket_price_oracle_contract_address": "',
+                    vm.toString(networkDetail.addresses.ticketPriceOracleContractAddress),
+                    '",'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"announcements_contract_address": "', vm.toString(networkDetail.addresses.announcements), '",'
+                )
+            )
+        );
+    }
+
+    // FIXME: remove this temporary method
+    function displayCurrentNetworkDetail() internal {
+        displayNetworkDetail("test.txt", currentNetworkDetail);
+    }
+
+    function isValidAddress(address addr) public pure returns (bool) {
+        return addr == address(32) || addr == address(0) ? false : true;
+    }
+
+    function parseEnvironmentTypeFromString(string memory environmentType) public pure returns (EnvironmentType) {
+        if (keccak256(bytes(environmentType)) == keccak256(bytes("production"))) {
+            return EnvironmentType.PRODUCTION;
+        } else if (keccak256(bytes(environmentType)) == keccak256(bytes("staging"))) {
+            return EnvironmentType.STAGING;
+        } else if (keccak256(bytes(environmentType)) == keccak256(bytes("development"))) {
+            return EnvironmentType.DEVELOPMENT;
+        } else {
+            return EnvironmentType.LOCAL;
+        }
+    }
+
+    function parseEnvironmentTypeToString(EnvironmentType environmentType) public pure returns (string memory) {
+        if (environmentType == EnvironmentType.PRODUCTION) {
+            return "production";
+        } else if (environmentType == EnvironmentType.STAGING) {
+            return "staging";
+        } else if (environmentType == EnvironmentType.DEVELOPMENT) {
+            return "development";
+        } else {
+            return "local";
+        }
+    }
 }

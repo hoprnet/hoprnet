@@ -166,7 +166,7 @@ pub type HoprSwarm = libp2p_swarm::Swarm<HoprNetworkBehavior>;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use utils_log::logger::JsLogger;
+    use utils_log::logger::wasm::JsLogger;
     // use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
 

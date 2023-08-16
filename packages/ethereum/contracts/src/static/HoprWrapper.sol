@@ -45,12 +45,11 @@ contract HoprWrapper is Ownable, IERC777Recipient, ERC1820Implementer, Reentranc
    * @dev ERC677 hook for xHOPR `transferAndCall` function
    * @param from address token holder address
    * @param amount uint256 amount of tokens to transfer
-   * @param data bytes extra information provided by the token holder (if any)
    */
   function onTokenTransfer(
     address from,
     uint256 amount,
-    bytes calldata data
+    bytes calldata
   ) external nonReentrant returns (bool success) {
     // must be xHOPR token
     require(msg.sender == address(xHOPR), 'Sender must be xHOPR');
@@ -65,20 +64,17 @@ contract HoprWrapper is Ownable, IERC777Recipient, ERC1820Implementer, Reentranc
 
   /**
    * @dev ERC777 hook triggered when wxHOPR tokens are send to this contract.
-   * @param operator address operator requesting the transfer
    * @param from address token holder address
    * @param to address recipient address
    * @param amount uint256 amount of tokens to transfer
-   * @param userData bytes extra information provided by the token holder (if any)
-   * @param operatorData bytes extra information provided by the operator (if any)
    */
   function tokensReceived(
-    address operator,
+    address,
     address from,
     address to,
     uint256 amount,
-    bytes calldata userData,
-    bytes calldata operatorData
+    bytes calldata,
+    bytes calldata
   ) external override nonReentrant {
     // must be wxHOPR
     require(msg.sender == address(wxHOPR), 'Sender must be wxHOPR');

@@ -7,6 +7,8 @@ use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
     DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
+use std::str::FromStr;
+use utils_types::primitives::Address;
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -16,6 +18,8 @@ pub const DEFAULT_PORT: u16 = 9091;
 
 pub const DEFAULT_HEALTH_CHECK_HOST: &str = "127.0.0.1";
 pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
+
+pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.stage.hoprtech.net/";
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
@@ -198,6 +202,24 @@ impl Default for Chain {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
+pub struct SafeModule {
+    pub safe_transaction_service_provider: Option<String>,
+    pub safe_address: Option<Address>,
+    pub module_address: Option<Address>,
+}
+
+impl Default for SafeModule {
+    fn default() -> Self {
+        Self {
+            safe_transaction_service_provider: None,
+            safe_address: None,
+            module_address: None,
+        }
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Strategy {
     // TODO: implement checks
     pub name: String,
@@ -321,7 +343,8 @@ pub struct HoprdConfig {
     pub network: String,
     #[validate]
     pub chain: Chain,
-
+    #[validate]
+    pub safe_module: SafeModule,
     #[validate]
     pub test: Testing,
 }
@@ -342,6 +365,7 @@ impl Default for HoprdConfig {
             healthcheck: HealthCheck::default(),
             network: String::default(),
             chain: Chain::default(),
+            safe_module: SafeModule::default(),
             test: Testing::default(),
         }
     }
@@ -458,6 +482,17 @@ impl HoprdConfig {
             cfg.chain.on_chain_confirmations = x
         };
 
+        // safe module
+        if let Some(x) = cli_args.safe_transaction_service_provider {
+            cfg.safe_module.safe_transaction_service_provider = Some(x)
+        };
+        if let Some(x) = cli_args.safe_address {
+            cfg.safe_module.safe_address = Some(Address::from_str(&x).unwrap())
+        };
+        if let Some(x) = cli_args.module_address {
+            cfg.safe_module.module_address = Some(Address::from_str(&x).unwrap())
+        };
+
         // test
         cfg.test.announce_local_addresses = cli_args.test_announce_local_addresses;
         cfg.test.prefer_local_addresses = cli_args.test_prefer_local_addresses;
@@ -566,6 +601,11 @@ mod tests {
                 check_unrealized_balance: true,
                 on_chain_confirmations: 0,
             },
+            safe_module: SafeModule {
+                safe_transaction_service_provider: None,
+                safe_address: None,
+                module_address: None,
+            },
             test: Testing {
                 announce_local_addresses: false,
                 prefer_local_addresses: false,
@@ -618,6 +658,10 @@ chain:
   provider: null
   check_unrealized_balance: true
   on_chain_confirmations: 0
+safe_module:
+  safe_transaction_service_provider: null
+  safe_address: null
+  module_address: null
 test:
   announce_local_addresses: false
   prefer_local_addresses: false

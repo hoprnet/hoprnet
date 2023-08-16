@@ -41,6 +41,9 @@ import {
   Balance,
   BalanceType,
   isMultiaddrLocal,
+  OffchainPublicKey,
+  OffchainKeypair,
+  ChainKeypair
 } from '@hoprnet/hopr-utils'
 
 import {
@@ -52,8 +55,11 @@ import {
   get_peers_with_quality,
   Health,
   HoprTools,
+  OffchainPublicKey as Ethereum_OffchainPublicKey,
   Address as Packet_Address,
   PacketInteractionConfig,
+  OffchainKeypair as Packet_OffchainKeypair,
+  ChainKeypair as Packet_ChainKeypair,
   Path,
   Balance as Packet_Balance,
   WasmNetwork,
@@ -205,11 +211,19 @@ export type HoprOptions = {
     // When using mocked libp2p instances
     mockedNetwork?: Libp2pEmitter<any>
   }
+  safeModule: {
+    // Base URL to interact with safe transaction service
+    safeTransactionServiceProvider?: string
+    // Address of node's safe proxy instance
+    safeAddress?: Address
+    // Address of node's safe-module proxy instance
+    moduleAddress?: Address
+  }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
 
-class Hopr extends EventEmitter {
+export class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
   private stopPeriodicCheck: (() => void) | undefined
@@ -219,6 +233,7 @@ class Hopr extends EventEmitter {
   private pinger: WasmPing
   private index_updater: WasmIndexerInteractions
   private pubKey: PublicKey
+  private id: PeerId
   private knownPublicNodesCache = new Set()
   private main_loop: Promise<void>
 
@@ -231,26 +246,24 @@ class Hopr extends EventEmitter {
    *
    * @constructor
    *
-   * @param id PeerId to use, determines node address
+   * @param chainKeypair Chain key, determines node address
+   * @param packetKeypair Packet key, determines peer ID
    * @param db used to persist protocol state
-   * @param connector an instance of the blockchain wrapper
    * @param options
    * @param publicNodesEmitter used to pass information about newly announced nodes to transport module
    */
   public constructor(
-    private id: PeerId,
+    private chainKeypair: ChainKeypair,
+    private packetKeypair: OffchainKeypair,
     public db: Database,
     private options: HoprOptions,
   ) {
     super()
 
-    if (!id.privateKey) {
-      throw new Error('Hopr Node must be initialized with an id with private key')
-    }
     this.network = options.network
     log(`using network: ${this.network.id}`)
-    this.indexer = HoprCoreEthereum.getInstance().indexer
-    this.pubKey = PublicKey.from_peerid_str(id.toString())
+    this.indexer = HoprCoreEthereum.getInstance().indexer // TODO temporary
+    this.id = peerIdFromString(packetKeypair.to_peerid_str())
   }
 
   /**
@@ -296,14 +309,15 @@ class Hopr extends EventEmitter {
     } else {
       log('Node has enough balance to start, initiating payment channels')
     }
+    log('Node has enough to get started, continuing starting payment channels')
 
-    verbose('Starting HoprEthereum and initiating the indexer')
+    verbose('Starting HoprEthereum, which will trigger the indexer')
     await connector.start()
     verbose('Waiting for indexer to find connected nodes.')
 
     // Add us as public node if announced
     if (this.options.announce) {
-      this.knownPublicNodesCache.add(this.id.toString())
+      this.knownPublicNodesCache.add(this.id)
     }
 
     // Fetch previous announcements from database
@@ -339,7 +353,10 @@ class Hopr extends EventEmitter {
       connector.emit('ticket:acknowledged', tkt)
     }
 
-    let packetCfg = new PacketInteractionConfig(privateKeyFromPeer(this.id))
+    let packetCfg = new PacketInteractionConfig(
+      new Packet_OffchainKeypair(this.packetKeypair.secret()), // need to be re-serialized due to WASM runtime boundary
+      new Packet_ChainKeypair(this.chainKeypair.secret())
+    )
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
     const onReceivedMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
@@ -357,23 +374,20 @@ class Hopr extends EventEmitter {
     this.index_updater = tools.index_updater()
     this.networkPeers = tools.network()
 
-    connector.indexer.on(
-      'network-registry-eligibility-changed',
-      async (_account: Address, nodeAddrs: Address[], eligible: boolean) => {
+    connector.indexer.on('network-registry-eligibility-changed',
+      async (address: Address, allowed: boolean) => {
         // If account is no longer eligible to register nodes, we might need to close existing connections,
         // otherwise there is nothing to do
-        if (!eligible) {
-          for (const nodeAddr of nodeAddrs) {
-            let pk: PublicKey
+        if (!allowed) {
+            let pk: OffchainPublicKey
             try {
-              pk = await connector.getPublicKeyOf(nodeAddr)
+              pk = await connector.getPacketKeyOf(address)
             } catch (err) {
               // node has not announced itself, so we don't need to care
               return
             }
 
             await this.networkPeers.unregister(pk.to_peerid_str())
-          }
         }
       }
     )
@@ -394,9 +408,15 @@ class Hopr extends EventEmitter {
       process.exit(1)
     }
     
-
-    connector.indexer.on('channel-waiting-for-commitment', this.onChannelWaitingForCommitment.bind(this))
-
+    try {
+      // register node-safe pair to NodeSafeRegistry
+      log(`check node-safe registry`)
+      await this.registerSafeByNode()
+    } catch (err) {
+      console.error(`Could not register node with safe`)
+      console.error(`Observed error:`, err)
+      process.exit(1)
+    }
 
     // subscribe so we can process channel close events
     connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
@@ -419,18 +439,6 @@ class Hopr extends EventEmitter {
   public async startProcessing() {
     await Promise.all([this.main_loop])
     log(`all interactions finished execution`)
-  }
-
-  private async onChannelWaitingForCommitment(c: ChannelEntry): Promise<void> {
-    if (this.strategy.shouldCommitToChannel(c)) {
-      log(`Found channel ${c.get_id().to_hex()} to us with unset commitment. Setting commitment`)
-      try {
-        await retryWithBackoffThenThrow(() => HoprCoreEthereum.getInstance().commitToChannel(c))
-      } catch (err) {
-        // @TODO what to do here? E.g. delete channel from db?
-        error(`Couldn't set commitment in channel to ${c.destination.to_string()} (channelId ${c.get_id().to_hex()})`)
-      }
-    }
   }
 
   /*
@@ -493,7 +501,7 @@ class Hopr extends EventEmitter {
   private async strategyOpenChannel(status: OutgoingChannelStatus) {
     try {
       const destinationAddress = Address.from_string(status.address)
-      const pk = await HoprCoreEthereum.getInstance().indexer.getPublicKeyOf(Address.from_string(status.address))
+      const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(Address.from_string(status.address))
       const stake = new BN(status.stake_str)
 
       const pId = peerIdFromString(pk.to_peerid_str())
@@ -575,7 +583,7 @@ class Hopr extends EventEmitter {
       // Check if all peer ids are still registered
       await Promise.all(
         outgoingChannels.map(async (channel) => {
-          const pk = await HoprCoreEthereum.getInstance().indexer.getPublicKeyOf(
+          const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(
             Address.from_string(channel.destination.to_string())
           )
 
@@ -686,55 +694,18 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Validates the manual intermediate path by checking if it does not contain
-   * channels that are not opened.
-   * Throws an error if some channel is not opened.
-   * @param intermediatePath
-   */
-  private async validateIntermediatePath(intermediatePath: PublicKey[]) {
-    // checking if path makes sense
-    for (let i = 0; i < intermediatePath.length; i++) {
-      let ticketIssuer: Address
-      let ticketReceiver: Address
-
-      if (i == 0) {
-        ticketIssuer = this.getEthereumAddress()
-        ticketReceiver = intermediatePath[0].to_address()
-      } else {
-        ticketIssuer = intermediatePath[i - 1].to_address()
-        ticketReceiver = intermediatePath[i].to_address()
-      }
-
-      if (ticketIssuer.eq(ticketReceiver)) log(`WARNING: duplicated adjacent path entries.`)
-
-      let channel: ChannelEntry
-      try {
-        channel = await this.db.get_channel_x(
-          Packet_Address.deserialize(ticketIssuer.serialize()),
-          Packet_Address.deserialize(ticketReceiver.serialize())
-        )
-      } catch (err) {
-        throw Error(`Channel from ${ticketIssuer.to_hex()} to ${ticketReceiver.to_hex()} not found`)
-      }
-
-      if (channel.status !== ChannelStatus.Open) {
-        throw Error(`Channel ${channel.get_id().to_hex()} is not open`)
-      }
-    }
-  }
-
-  /**
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediatePath optional set path manually
    * @param hops optional number of required intermediate nodes
+   * @param applicationTag optional tag identifying the sending application
    * @returns hex representation of ack challenge
    */
   public async sendMessage(
     msg: Uint8Array,
     destination: PeerId,
-    intermediatePath?: PublicKey[],
-    hops?: number
+    intermediatePath?: OffchainPublicKey[],
+    hops?: number,
   ): Promise<string> {
     if (this.status != 'RUNNING') {
       metric_sentMessageFailCount.increment()
@@ -746,24 +717,38 @@ class Hopr extends EventEmitter {
       throw Error(`Message does not fit into one packet. Please split message into chunks of ${PACKET_SIZE} bytes`)
     }
 
+    let path: Path
     if (intermediatePath != undefined) {
       // Validate the manually specified intermediate path
+      let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
       try {
-        await this.validateIntermediatePath(intermediatePath)
+        path = await Path.validated(
+          withDestination,
+          Packet_Address.deserialize(this.chainKeypair.to_address().serialize()),
+          true,
+          this.db
+        )
       } catch (e) {
         metric_sentMessageFailCount.increment()
         throw e
       }
     } else {
-      intermediatePath = await this.getIntermediateNodes(PublicKey.from_peerid_str(destination.toString()), hops)
+      let chain_key = await this.peerIdToChainKey(destination)
+      if (chain_key) {
+        intermediatePath = await this.getIntermediateNodes(chain_key, hops)
 
-      if (intermediatePath == null || !intermediatePath.length) {
-        metric_sentMessageFailCount.increment()
-        throw Error(`Failed to find automatic path`)
+        if (intermediatePath == null || !intermediatePath.length) {
+          metric_sentMessageFailCount.increment()
+          throw Error(`Failed to find automatic path`)
+        }
+
+        let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
+        path = new Path(withDestination)
+      } else {
+        log(``)
       }
     }
 
-    const path = new Path([...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()])
     metric_pathLength.observe(path.length())
 
     return (await this.tools.send_message(msg, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
@@ -877,10 +862,30 @@ class Hopr extends EventEmitter {
       // @TODO add abort controller
       addrs = await this.getObservedAddresses(peer)
     }
+    
 
     return addrs.sort(
       this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
     )
+  }
+
+  /*
+   * Register node with safe in HoprNodeSaferegistry if needed
+   * @dev Promise resolves before own announcement appears in the indexer
+   * @returns a Promise that resolves once announce transaction has been published
+   */
+  private async registerSafeByNode(): Promise<void> {
+    const connector = HoprCoreEthereum.getInstance()
+
+    try {
+      log('registering node safe on-chain... ')
+      const registryTxHash = await connector.registerSafeByNode()
+      log('registering node safe on-chain done in tx %s', registryTxHash)
+    } catch (err) {
+      log('registering node safe on-chain failed')
+      this.maybeEmitFundsEmptyEvent(err)
+      throw new Error(`Failed to register node safe: ${err}`)
+    }
   }
 
   /**
@@ -931,11 +936,11 @@ class Hopr extends EventEmitter {
       addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toString())
     }
 
-    // Check if there was a previous annoucement from us
+    // Check if there was a previous announcement from us
     const ownAccount = await connector.getAccount(this.getEthereumAddress())
 
     // Do not announce if our last is equal to what we intend to announce
-    if (ownAccount?.get_multiaddress_str() === addrToAnnounce.toString()) {
+    if (ownAccount?.get_multiaddr_str() === addrToAnnounce.toString()) {
       log(`intended address has already been announced, nothing to do`)
       return
     }
@@ -945,7 +950,7 @@ class Hopr extends EventEmitter {
         'announcing on-chain %s routable address',
         announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
       )
-      const announceTxHash = await connector.announce(addrToAnnounce)
+      const announceTxHash = await connector.announce(addrToAnnounce, this.packetKeypair)
       log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
     } catch (err) {
       log('announcing address %s failed', addrToAnnounce.toString())
@@ -985,7 +990,10 @@ class Hopr extends EventEmitter {
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
-    channelClosureSecs: number
+    hoprNodeSafeRegistryAddress: string
+    moduleAddress: string
+    safeAddress: string
+    noticePeriodChannelClosure: number
   } {
     return HoprCoreEthereum.getInstance().smartContractInfo()
   }
@@ -1112,7 +1120,7 @@ class Hopr extends EventEmitter {
 
     let txHash: string
     try {
-      if (channel.status === ChannelStatus.Open || channel.status == ChannelStatus.WaitingForCommitment) {
+      if (channel.status === ChannelStatus.Open) {
         log('initiating closure of channel', channel.get_id().to_hex())
         txHash = await connector.initializeClosure(channel.source, channel.destination)
       } else {
@@ -1149,14 +1157,13 @@ class Hopr extends EventEmitter {
     return ret
   }
 
-  public async getTickets(counterparty: Address): Promise<Ticket[]> {
-    const self = this.getEthereumAddress()
-    const channel = await this.db.get_channel_x(
-      Packet_Address.deserialize(counterparty.serialize()),
-      Packet_Address.deserialize(self.serialize())
-    )
-
-    log(`looking for tickets in channel ${channel.to_string()}`)
+  public async getTickets(channelId: Hash): Promise<Ticket[]> {
+    log(`looking for tickets in channel ${channelId.to_hex()}`)
+    const channel = await this.db.get_channel(channelId)
+    // return no tickets if channel does not exist or is not an incoming channel
+    if (!channel || !channel.destination.eq(this.getEthereumAddress())) {
+      return []
+    }
 
     const ackedTickets = await this.db.get_acknowledged_tickets(channel)
 
@@ -1203,19 +1210,17 @@ class Hopr extends EventEmitter {
     await HoprCoreEthereum.getInstance().redeemAllTickets()
   }
 
-  public async redeemTicketsInChannel(counterparty: Address) {
-    log(`redeeming tickets in channel with ${counterparty.to_hex()}`)
-    const self = this.getEthereumAddress()
-    const channel = ChannelEntry.deserialize(
-      (
-        await this.db.get_channel_x(
-          Packet_Address.deserialize(counterparty.serialize()),
-          Packet_Address.deserialize(self.serialize())
-        )
-      ).serialize()
-    )
-
-    await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
+  public async redeemTicketsInChannel(channelId: Hash) {
+    log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
+    const channel = await this.db.get_channel(channelId)
+    if (channel) {
+      if (channel.destination.eq(this.getEthereumAddress())) {
+        await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
+        return
+      }
+      log(`cannot redeem tickets in outgoing channel ${channelId.to_hex()}`)
+    }
+    log(`cannot redeem tickets in unknown channel ${channelId.to_hex()}`)
   }
 
   /**
@@ -1258,10 +1263,6 @@ class Hopr extends EventEmitter {
     return ret
   }
 
-  public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
-    return await HoprCoreEthereum.getInstance().getPublicKeyOf(addr)
-  }
-
   public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return HoprCoreEthereum.getInstance().waitForPublicNodes()
   }
@@ -1282,7 +1283,7 @@ class Hopr extends EventEmitter {
   }
 
   public getEthereumAddress(): Address {
-    return HoprCoreEthereum.getInstance().getPublicKey().to_address()
+    return this.chainKeypair.public().to_address()
   }
 
   /**
@@ -1304,12 +1305,23 @@ class Hopr extends EventEmitter {
     return result
   }
 
+  private async peerIdToChainKey(id: PeerId) {
+    let pk = Ethereum_OffchainPublicKey.from_peerid_str(id.toString())
+    return await this.db.get_chain_key(pk)
+  }
+
   /**
    * @param id the peer id of the account we want to check if it's allowed access to the network
    * @returns true if allowed access
    */
   public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
-    return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(PublicKey.from_peerid_str(id.toString()))
+    let chain_key = await this.peerIdToChainKey(id)
+    if (chain_key) {
+      return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(Address.deserialize(chain_key.serialize()))
+    } else {
+      log(`failed to determine channel key of ${id.toString()}`)
+      return false
+    }
   }
 
   /**
@@ -1317,10 +1329,10 @@ class Hopr extends EventEmitter {
    * and samples randomly intermediate nodes
    * that will relay that message before it reaches its destination.
    *
-   * @param destination instance of peerInfo that contains the peerId of the destination
+   * @param destination ethereum address of the destination node
    * @param hops optional number of required intermediate nodes (must be an integer 1,2,...MAX_HOPS inclusive)
    */
-  private async getIntermediateNodes(destination: PublicKey, hops?: number): Promise<PublicKey[]> {
+  private async getIntermediateNodes(destination: Address, hops?: number): Promise<OffchainPublicKey[]> {
     if (!hops) {
       hops = INTERMEDIATE_HOPS
     } else if (![...Array(MAX_HOPS).keys()].map((i) => i + 1).includes(hops)) {
@@ -1328,17 +1340,21 @@ class Hopr extends EventEmitter {
     }
     const path = await findPath(
       this.getEthereumAddress(),
-      destination.to_address(),
+      destination,
       hops,
       async (address: Address) => {
-        const pk = await HoprCoreEthereum.getInstance().indexer.getPublicKeyOf(address)
-
-        return await this.networkPeers.quality_of(pk.to_peerid_str())
+        try {
+          const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(address)
+          return await this.networkPeers.quality_of(pk.to_peerid_str())
+        } catch (e) {
+          log(`error while looking up the packet key of ${address}`)
+          return 0
+        }
       },
       HoprCoreEthereum.getInstance().getOpenChannelsFrom.bind(HoprCoreEthereum.getInstance())
     )
 
-    return await Promise.all(path.map((x) => HoprCoreEthereum.getInstance().indexer.getPublicKeyOf(x)))
+    return await Promise.all(path.map((x) => HoprCoreEthereum.getInstance().getPacketKeyOf(x)))
   }
 
   /**
@@ -1419,4 +1435,3 @@ export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './netwo
 export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'
 export * from './types.js'
-

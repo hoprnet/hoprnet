@@ -1,24 +1,28 @@
 use async_lock::RwLock;
 use futures::future::{poll_fn, Either};
+use futures::channel::mpsc::{channel, UnboundedSender, Receiver, Sender};
+use futures_lite::stream::StreamExt;
 use std::fmt::{Display, Formatter};
 use std::pin::Pin;
 
 use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PathNotValid, Retry, TagReplay,
-    TransportError,
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError,
+    PacketDecodingError, PathError, Retry, TagReplay, TransportError,
 };
 use crate::errors::Result;
-use crate::packet::{Packet, PacketState};
-use crate::path::Path;
-use futures::channel::mpsc::{channel, UnboundedSender, Receiver, Sender};
-use futures_lite::stream::StreamExt;
-use core_crypto::types::{HalfKeyChallenge, Hash, PublicKey};
+use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
+
+use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
+use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
+use core_path::errors::PathError::PathNotValid;
+use core_path::path::Path;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
 use futures::{Stream, pin_mut};
 use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
 use std::ops::Mul;
 use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
@@ -34,6 +38,7 @@ use wasm_bindgen_futures::spawn_local;
 use crate::validation::validate_unacknowledged_ticket;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
+use utils_types::errors::GeneralError::ParseError;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -66,11 +71,9 @@ pub const PRICE_PER_PACKET: &str = "10000000000000000";
 /// Fixed inverse ticket winning probability
 pub const INVERSE_TICKET_WIN_PROB: &str = "1";
 
-const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
-
 /// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Payload {
     remote_peer: PeerId,
     data: Box<[u8]>,
@@ -82,6 +85,66 @@ impl Display for Payload {
             .field("remote_peer", &self.remote_peer)
             .field("data", &hex::encode(&self.data))
             .finish()
+    }
+}
+
+/// Tags are currently 16-bit unsigned integers
+pub type Tag = u16;
+
+/// Represent a default application tag if none is specified in `send_packet`.
+pub const DEFAULT_APPLICATION_TAG: Tag = 0;
+
+/// Represents the received decrypted packet carrying the application-layer data.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ApplicationData {
+    pub application_tag: Option<Tag>,
+    #[serde(with = "serde_bytes")]
+    pub plain_text: Box<[u8]>,
+}
+
+impl Display for ApplicationData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "({}): {}",
+            self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG),
+            hex::encode(&self.plain_text)
+        )
+    }
+}
+
+impl AsRef<[u8]> for ApplicationData {
+    fn as_ref(&self) -> &[u8] {
+        &self.plain_text
+    }
+}
+
+impl BinarySerializable for ApplicationData {
+    const SIZE: usize = 2; // minimum size
+
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+        if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
+            let tag = u16::from_be_bytes(data[0..2].try_into().map_err(|_| ParseError)?);
+            Ok(Self {
+                application_tag: if tag != DEFAULT_APPLICATION_TAG {
+                    Some(tag)
+                } else {
+                    None
+                },
+                plain_text: (&data[2..]).into(),
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn to_bytes(&self) -> Box<[u8]> {
+        let mut buf = Vec::with_capacity(Self::SIZE + self.plain_text.len());
+        let tag = self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG);
+        buf.extend_from_slice(&tag.to_be_bytes());
+        buf.extend_from_slice(&self.plain_text);
+        buf.into_boxed_slice()
     }
 }
 
@@ -134,11 +197,11 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                return AcknowledgementValidation(format!(
+                AcknowledgementValidation(format!(
                     "received unexpected acknowledgement for half key challenge {} - half key {}",
                     ack.ack_challenge().to_hex(),
                     ack.ack_key_share.to_hex()
-                ));
+                ))
             })?;
 
         match pending {
@@ -161,9 +224,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                    return AcknowledgementValidation(format!(
+                    AcknowledgementValidation(format!(
                         "the acknowledgement is not sufficient to solve the embedded challenge, {e}"
-                    ));
+                    ))
                 })?;
 
                 self.db
@@ -175,9 +238,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                        return AcknowledgementValidation(format!(
+                        AcknowledgementValidation(format!(
                             "acknowledgement received for channel that does not exist, {e}"
-                        ));
+                        ))
                     })?;
                 let response = unackowledged.get_response(&ack.ack_key_share)?;
                 debug!("acknowledging ticket using response {}", response.to_hex());
@@ -185,7 +248,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 let ack_ticket = AcknowledgedTicket::new(
                     unackowledged.ticket,
                     response,
-                    Hash::new(&PREIMAGE_PLACE_HOLDER),
                     unackowledged.signer,
                 );
 
@@ -275,14 +337,27 @@ impl AcknowledgementInteraction {
         spawn_local(async move {
             while let Some(value) = processing_in_rx.next().await {
                 let message = match value {
-                    AckToProcess::ToReceive(peer, ack) => {
-                        let result = processor.handle_acknowledgement(ack).await;
-                        match result {
-                            Ok(_) => AckProcessed::Receive(peer, result),
-                            Err(e) => {
-                                error!("Encountered error while handling acknowledgement from peer '{}': {}", &peer, e);
+                    AckToProcess::ToReceive(peer, mut ack) => {
+                        if let Ok(remote_pk) = OffchainPublicKey::from_peerid(&peer) {
+                            debug!("validating incoming acknowledgement from {}", peer);
+                            if ack.validate(&remote_pk) {
+                                match processor.handle_acknowledgement(ack).await {
+                                    Ok(_) => AckProcessed::Receive(peer, Ok(())),
+                                    Err(e) => {
+                                        error!("Encountered error while handling acknowledgement from peer '{}': {}", &peer, e);
+                                        continue
+                                    }
+                                }
+                            } else {
+                                error!(
+                                    "failed to verify signature on acknowledgement from peer {}",
+                                    peer
+                                );
                                 continue
                             }
+                        } else {
+                            error!("invalid remote peer id {}", peer);
+                            continue
                         }
                     },
                     AckToProcess::ToSend(peer, ack) => AckProcessed::Send(peer, ack)
@@ -392,7 +467,6 @@ where
             .db
             .read()
             .await
-            // TODO: map from off-chain key to on-chain address
             .get_channel_to(&destination)
             .await?
             .ok_or(ChannelNotFound(destination.to_string()))?;
@@ -423,12 +497,11 @@ where
 
         let ticket = Ticket::new(
             destination,
-            channel.ticket_epoch,
             current_index,
             amount,
             U256::from_inverse_probability(U256::new(INVERSE_TICKET_WIN_PROB))?,
             channel.channel_epoch,
-            &self.cfg.private_key,
+            &self.cfg.chain_keypair,
         );
 
         self.db.write().await.mark_pending(&ticket).await?;
@@ -445,29 +518,34 @@ where
     }
 
     pub async fn create_packet_from_me(&self, data: Box<[u8]>, path: Path) -> Result<(Payload, HalfKeyChallenge)> {
+        let next_peer = self
+            .db
+            .read()
+            .await
+            .get_chain_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
+            .await?
+            .ok_or(PacketConstructionError)?;
+
         // Decide whether to create 0-hop or multihop ticket
-        let next_peer = PublicKey::from_peerid(&path.hops()[0])?;
         let next_ticket = if path.length() == 1 {
-            // TODO: map from off-chain key to on-chain address
-            Ticket::new_zero_hop(next_peer.to_address(), &self.cfg.private_key)
+            Ticket::new_zero_hop(next_peer, &self.cfg.chain_keypair)
         } else {
-            self.create_multihop_ticket(next_peer.to_address(), path.length() as u8)
-                .await?
+            self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
 
         // Create the packet
-        let packet = Packet::new(&data, &path.hops(), &self.cfg.private_key, next_ticket)?;
+        let packet = Packet::new(&data, &path, &self.cfg.chain_keypair, next_ticket)?;
         debug!("packet state {}", packet.state());
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db
                     .write()
                     .await
-                    .store_pending_acknowledgment(ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
+                    .store_pending_acknowledgment(*ack_challenge, PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
                 Ok((Payload {
-                    remote_peer: path.hops()[0].clone(),
+                    remote_peer: path.hops()[0],
                     data: packet.to_bytes(),
                 }, ack_challenge.clone()))
             }
@@ -481,7 +559,7 @@ where
     }
 
     pub fn create_packet_from_bytes(&self, data: &[u8], peer: &PeerId) -> Result<Packet> {
-        Packet::from_bytes(data, &self.cfg.private_key, peer)
+        Packet::from_bytes(data, &self.cfg.packet_keypair, peer)
     }
 
     pub async fn handle_mixed_packet(&self, mut packet: Packet) -> Result<PacketType> {
@@ -501,7 +579,7 @@ where
                     return Err(TagReplay);
                 }
 
-                let ack = packet.create_acknowledgement(&self.cfg.private_key);
+                let ack = packet.create_acknowledgement(&self.cfg.packet_keypair);
                 return Ok(PacketType::Final(packet, ack))
             }
 
@@ -520,14 +598,33 @@ where
 
                 let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
 
+                let previous_hop_addr =
+                    self.db
+                        .read()
+                        .await
+                        .get_chain_key(previous_hop)
+                        .await?
+                        .ok_or(PacketDecodingError(format!(
+                            "failed to find channel key for packet key {previous_hop} on previous hop"
+                        )))?;
+
+                let next_hop_addr = self
+                    .db
+                    .read()
+                    .await
+                    .get_chain_key(next_hop)
+                    .await?
+                    .ok_or(PacketDecodingError(format!(
+                        "failed to find channel key for packet key {next_hop} on next hop"
+                    )))?;
+
                 // Find the corresponding channel
-                debug!("looking for channel {}", previous_hop.to_address());
+                debug!("looking for channel with {previous_hop}");
                 let channel = self
                     .db
                     .read()
                     .await
-                    // TODO: map from off-chain key to on-chain address
-                    .get_channel_from(&previous_hop.to_address())
+                    .get_channel_from(&previous_hop_addr)
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
@@ -536,7 +633,7 @@ where
                     &*self.db.read().await,
                     &packet.ticket,
                     &channel,
-                    &previous_hop.to_address(),
+                    &previous_hop_addr,
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
                     inverse_win_prob,
                     self.cfg.check_unrealized_balance,
@@ -555,11 +652,11 @@ where
 
                     // Store the unacknowledged ticket
                     g.store_pending_acknowledgment(
-                        ack_challenge.clone(),
+                        *ack_challenge,
                         PendingAcknowledgement::WaitingAsRelayer(UnacknowledgedTicket::new(
                             packet.ticket.clone(),
                             own_key.clone(),
-                            previous_hop.to_address(),
+                            previous_hop_addr,
                         )),
                     )
                     .await?;
@@ -571,9 +668,9 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop.to_address(), &self.cfg.private_key)
+                    Ticket::new_zero_hop(next_hop_addr, &self.cfg.chain_keypair)
                 } else {
-                    self.create_multihop_ticket(next_hop.to_address(), path_pos).await?
+                    self.create_multihop_ticket(next_hop_addr, path_pos).await?
                 };
                 previous_peer = previous_hop.to_peerid();
                 next_peer = next_hop.to_peerid();
@@ -581,9 +678,9 @@ where
         }
 
         // Transform the packet for forwarding using the next ticket
-        packet.forward(&self.cfg.private_key, next_ticket)?;
+        packet.forward(&self.cfg.chain_keypair, next_ticket)?;
 
-        let ack = packet.create_acknowledgement(&self.cfg.private_key);
+        let ack = packet.create_acknowledgement(&self.cfg.packet_keypair);
         Ok(PacketType::Forward(packet, ack, previous_peer, next_peer))
     }
 }
@@ -677,7 +774,7 @@ impl PacketActions {
     pub fn send_packet(&mut self, msg: Box<[u8]>, path: Path) -> Result<PacketSendAwaiter> {
         // Check if the path is valid
         if !path.valid() {
-            return Err(PathNotValid);
+            return Err(PathError(PathNotValid));
         }
 
         let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
@@ -719,16 +816,18 @@ impl PacketActions {
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
     pub check_unrealized_balance: bool,
-    pub private_key: Box<[u8]>,
+    pub packet_keypair: OffchainKeypair,
+    pub chain_keypair: ChainKeypair,
     pub mixer: MixerConfig,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PacketInteractionConfig {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(private_key: Box<[u8]>) -> Self {
+    pub fn new(packet_keypair: OffchainKeypair, chain_keypair: ChainKeypair) -> Self {
         Self {
-            private_key,
+            packet_keypair,
+            chain_keypair,
             check_unrealized_balance: true,
             mixer: MixerConfig::default(),
         }
@@ -877,23 +976,66 @@ impl Stream for PacketInteraction {
 }
 
 
+#[cfg(feature = "wasm")]
+mod wasm {
+    use std::str::FromStr;
+
+    use crate::interaction::Payload;
+
+    use super::ApplicationData;
+    use libp2p_identity::PeerId;
+    use utils_misc::{utils::wasm::JsResult, ok_or_jserr};
+    use utils_types::traits::BinarySerializable;
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    impl ApplicationData {
+        #[wasm_bindgen(constructor)]
+        pub fn _new(tag: Option<u16>, data: Box<[u8]>) -> Self {
+            Self {
+                application_tag: tag,
+                plain_text: data,
+            }
+        }
+
+        #[wasm_bindgen(js_name = "serialize")]
+        pub fn _serialize(&self) -> Box<[u8]> {
+            self.to_bytes()
+        }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<ApplicationData> {
+            ok_or_jserr!(Self::from_bytes(data))
+        }
+    }
+
+    #[wasm_bindgen]
+    impl Payload {
+        #[wasm_bindgen(constructor)]
+        pub fn _new(peer_id: &str, packet_data: Box<[u8]>) -> JsResult<Payload> {
+            Ok(Self {
+                remote_peer: ok_or_jserr!(PeerId::from_str(peer_id))?,
+                data: packet_data,
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::errors::PacketError::PacketDbError;
     use crate::interaction::{
         AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, PRICE_PER_PACKET, AckProcessed, MsgProcessed,
     };
-    use crate::path::Path;
     use crate::por::ProofOfRelayValues;
     use async_std::sync::RwLock;
     use core_crypto::derivation::derive_ack_key_share;
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::{Hash, PublicKey, HalfKeyChallenge};
-    use core_ethereum_db::db::CoreEthereumDb;
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_ethereum_misc::commitment::{initialize_commitment, ChannelCommitmentInfo};
+    use core_crypto::types::{PublicKey, HalfKeyChallenge, OffchainPublicKey};
+    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_mixer::mixer::{MixerConfig, Mixer};
-    use core_types::acknowledgement::{Acknowledgement, AcknowledgementChallenge, PendingAcknowledgement, AcknowledgedTicket};
+    use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, AcknowledgedTicket};
+    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use core_crypto::shared_keys::SharedSecret;
+    use core_path::path::Path;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::channel::mpsc::{UnboundedSender, Sender};
     use futures::future::{select, Either};
@@ -906,11 +1048,10 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use utils_db::db::DB;
-    use utils_db::errors::DbError;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
-    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
-    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+    use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
+    use utils_types::traits::{PeerIdLike, ToHex};
 
     use super::{PacketSendFinalizer, PacketSendAwaiter};
 
@@ -957,17 +1098,26 @@ mod tests {
     lazy_static! {
         static ref PEERS: Vec<PeerId> = PEERS_PRIVS
             .iter()
-            .map(|private| PublicKey::from_privkey(private).unwrap().to_peerid())
+            .map(|private| OffchainPublicKey::from_privkey(private).unwrap().to_peerid())
             .collect();
     }
 
-    fn create_dummy_channel(from: &Address, to: &Address) -> ChannelEntry {
+    async fn create_dummy_channel(db: &CoreEthereumDb<RustyLevelDbShim>, from: &PeerId, to: &PeerId) -> ChannelEntry {
+        let source = db
+            .get_chain_key(&OffchainPublicKey::from_peerid(from).unwrap())
+            .await
+            .unwrap()
+            .expect("failed to retrieve source address");
+        let destination = db
+            .get_chain_key(&OffchainPublicKey::from_peerid(to).unwrap())
+            .await
+            .unwrap()
+            .expect("failed to retrieve destination address");
+
         ChannelEntry::new(
-            from.to_owned(),
-            to.to_owned(),
+            source,
+            destination,
             Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
-            Hash::new(&random_bytes::<32>()),
-            U256::zero(),
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
@@ -991,29 +1141,35 @@ mod tests {
             .map(|(i, db)| {
                 Arc::new(RwLock::new(CoreEthereumDb::new(
                     DB::new(RustyLevelDbShim::new(db.clone())),
-                    PublicKey::from_peerid(&PEERS[i]).unwrap().to_address(),
+                    PublicKey::from_privkey(&PEERS_PRIVS[i]).unwrap().to_address(),
                 )))
             })
             .collect::<Vec<_>>()
     }
 
     async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
-        let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
+        let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
-        for (index, peer_id) in PEERS.iter().enumerate().take(dbs.len()) {
+        for (index, peer_key) in PEERS_PRIVS.iter().enumerate().take(dbs.len()) {
             let mut db = CoreEthereumDb::new(
                 DB::new(RustyLevelDbShim::new(dbs[index].clone())),
-                PublicKey::from_peerid(&peer_id).unwrap().to_address(),
+                PublicKey::from_privkey(peer_key)?.to_address(),
             );
 
+            // Link all the node keys and chain keys from the simulated announcements
+            for peer_key in PEERS_PRIVS {
+                let node_key = OffchainPublicKey::from_privkey(&peer_key)?;
+                let chain_key = PublicKey::from_privkey(&peer_key)?;
+                db.link_chain_and_packet_keys(&chain_key.to_address(), &node_key, &Snapshot::default())
+                    .await?;
+            }
+
             let mut channel: Option<ChannelEntry> = None;
+            let this_peer = OffchainPublicKey::from_privkey(peer_key)?.to_peerid();
 
             if index < PEERS.len() - 1 {
-                channel = Some(create_dummy_channel(
-                    &PublicKey::from_peerid(peer_id).unwrap().to_address(),
-                    &PublicKey::from_peerid(&PEERS[index + 1]).unwrap().to_address(),
-                ));
+                channel = Some(create_dummy_channel(&db, &this_peer, &PEERS[index + 1]).await);
 
                 db.update_channel_and_snapshot(
                     &channel.clone().unwrap().get_id(),
@@ -1030,17 +1186,6 @@ mod tests {
                     &testing_snapshot,
                 )
                 .await?;
-
-                let channel_info = ChannelCommitmentInfo {
-                    chain_id: 1,
-                    contract_address: "fakeaddress".to_string(),
-                    channel_id: previous_channel.clone().unwrap().get_id().clone(),
-                    channel_epoch: previous_channel.clone().unwrap().channel_epoch.clone(),
-                };
-
-                initialize_commitment(&mut db, &PEERS_PRIVS[0], &channel_info)
-                    .await
-                    .map_err(|e| PacketDbError(DbError::GenericError(e.to_string())))?;
             }
 
             previous_channel = channel;
@@ -1072,9 +1217,8 @@ mod tests {
         const PENDING_ACKS: usize = 5;
         let mut sent_challenges = Vec::with_capacity(PENDING_ACKS);
         for _ in 0..PENDING_ACKS {
-            let secrets = (0..2).into_iter().map(|_| random_bytes::<32>()).collect::<Vec<_>>();
-            let porv = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]))
-                .expect("failed to create Proof of Relay values");
+            let secrets = (0..2).into_iter().map(|_| SharedSecret::random()).collect::<Vec<_>>();
+            let porv = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]));
 
             // Mimics that the packet sender has sent a packet and now it has a pending acknowledgement in it's DB
             core_dbs[0]
@@ -1084,10 +1228,10 @@ mod tests {
                 .await
                 .expect("failed to store pending ack");
 
+            // This is what counterparty derives and sends back to solve the challenge
             let ack_key = derive_ack_key_share(&secrets[0]);
-            let ack_msg = AcknowledgementChallenge::new(&porv.ack_challenge, &PEERS_PRIVS[0]);
 
-            sent_challenges.push((ack_key, ack_msg));
+            sent_challenges.push((ack_key, porv.ack_challenge));
         }
 
         // Peer 1: ACK interaction of the packet sender, hookup receiving of acknowledgements and start processing them
@@ -1105,20 +1249,20 @@ mod tests {
         );
 
         // Peer 2: start sending out outgoing acknowledgement
-        for (ack_key, ack_msg) in sent_challenges.clone() {
+        for (ack_key, _) in sent_challenges.clone() {
             ack_interaction_counterparty
                 .writer()
                 .send_acknowledgement(
                     PEERS[0].clone(),
-                    Acknowledgement::new(ack_msg, ack_key, &PEERS_PRIVS[1]),
+                    Acknowledgement::new(ack_key, &OffchainKeypair::from_secret(&PEERS_PRIVS[1]).unwrap()),
                 )
                 .expect("failed to send ack");
 
             // emulate channel to another peer
             match ack_interaction_counterparty.next().await {
                 Some(value) => match value {
-                    AckProcessed::Send(peer, ack) => {
-                        ack_interaction_sender.writer().receive_acknowledgement(peer, ack).expect("Should succeed")
+                    AckProcessed::Send(_, ack) => {
+                        ack_interaction_sender.writer().receive_acknowledgement(PEERS[1].clone(), ack).expect("Should succeed")
                     },
                     _ => panic!("Unexpected incoming acknowledgement detected")
                 }
@@ -1130,14 +1274,12 @@ mod tests {
             for i in 1..PENDING_ACKS + 1 {
                 let ack = done_rx.next().await.expect("failed finalize ack");
                 debug!("sender has received acknowledgement: {}", ack.to_hex());
-                if let Some((ack_key, ack_msg)) = sent_challenges
-                    .iter()
-                    .find(|(_, chal)| chal.ack_challenge.unwrap().eq(&ack))
-                {
-                    assert!(
+                if let Some(_) = sent_challenges.iter().find(|(_, chal)| chal.eq(&ack)) {
+                    // TODO: check solution of ack challenge
+                    /*assert!(
                         ack_msg.solve(&ack_key.to_bytes()),
                         "acknowledgement key must solve acknowledgement challenge"
-                    );
+                    );*/
 
                     // If it matches, set a signal that the test has finished
                     debug!("peer 1 received expected ack");
@@ -1194,7 +1336,8 @@ mod tests {
                     if i == peer_count - 1 { Some(pkt_tx.clone()) } else { None },
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
-                        private_key: PEERS_PRIVS[i].into(),
+                        packet_keypair: OffchainKeypair::from_secret(&PEERS_PRIVS[i]).unwrap(),
+                        chain_keypair: ChainKeypair::from_secret(&PEERS_PRIVS[i]).unwrap(),
                         mixer: MixerConfig::default(),      // TODO: unnecessary, can be removed
                     },
                 );

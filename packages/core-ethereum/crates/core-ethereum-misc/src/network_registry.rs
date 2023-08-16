@@ -6,7 +6,7 @@ use {
 };
 
 #[cfg(any(feature = "wasm", test))]
-async fn is_allowed_to_access_network<T>(db: &T, chain_address: &Address) -> Result<bool>
+pub async fn is_allowed_to_access_network<T>(db: &T, chain_address: &Address) -> Result<bool>
 where
     T: HoprCoreEthereumDbActions,
 {
@@ -16,12 +16,9 @@ where
         return Ok(true);
     }
 
-    let maybe_stake_account = db.get_account_from_network_registry(&chain_address).await?;
-
-    match maybe_stake_account {
-        None => Ok(false),
-        Some(account) => Ok(db.is_eligible(&account).await?),
-    }
+    db.is_allowed_to_access_network(&chain_address)
+        .await
+        .map_err(|e| e.into())
 }
 
 #[cfg(test)]
@@ -55,9 +52,10 @@ mod tests {
 
         db.set_network_registry(true, &Snapshot::default()).await.unwrap();
 
-        db.set_eligible(&Address::from_bytes(&TEST_ACCOUNT).unwrap(), true, &Snapshot::default())
+        db.set_eligible(&Address::from_bytes(&TEST_ADDR).unwrap(), true, &Snapshot::default())
             .await
             .unwrap();
+
         db.add_to_network_registry(
             &Address::from_bytes(&TEST_ADDR).unwrap(),
             &Address::from_bytes(&TEST_ACCOUNT).unwrap(),
@@ -66,9 +64,10 @@ mod tests {
         .await
         .unwrap();
 
-        let is_allowed = super::is_allowed_to_access_network(&db, &Address::from_bytes(&TEST_ADDR).unwrap()).await;
+        let is_allowed = super::is_allowed_to_access_network(&db, &Address::from_bytes(&TEST_ACCOUNT).unwrap()).await;
 
-        assert!(is_allowed.is_ok() && is_allowed.unwrap() == true);
+        assert!(is_allowed.is_ok(), "error while checking access in NR");
+        assert!(is_allowed.unwrap(), "should be allowed access");
     }
 }
 

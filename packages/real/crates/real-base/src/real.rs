@@ -1,12 +1,9 @@
 use crate::error::Result;
 
 #[cfg(feature = "wasm")]
-use crate::error::RealError;
-
-#[cfg(feature = "wasm")]
 // These functions are meant to be used in pure Rust code, since they are cleared from WASM types
 pub fn coerce_version(version: &str) -> Result<String> {
-    wasm::coerce_version(version).map_err(RealError::from)
+    wasm::coerce_version(version).map_err(crate::error::RealError::from)
 }
 
 #[cfg(not(feature = "wasm"))]
@@ -17,7 +14,7 @@ pub fn coerce_version(_version: &str) -> Result<String> {
 
 #[cfg(feature = "wasm")]
 pub fn satisfies(version: &str, range: &str) -> Result<bool> {
-    wasm::satisfies(version, range).map_err(RealError::from)
+    wasm::satisfies(version, range).map_err(crate::error::RealError::from)
 }
 
 #[cfg(not(feature = "wasm"))]

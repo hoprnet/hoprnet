@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-misc"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust WASM modules for HOPRd"
@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 hex = "0.4.3"
-js-sys = { version = "0.3.63", optional = true }
+js-sys = { workspace = true, optional = true }
 proc-macro-regex = "~1.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
@@ -33,6 +33,7 @@ core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc"
 real-base = { path = "../../../real/crates/real-base", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
 [dev-dependencies]
 tempfile = "3"

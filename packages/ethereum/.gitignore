@@ -21,3 +21,7 @@ target/
 
 # ignore coverage test outpout
 contracts/lcov.info
+contracts/report
+
+# Ignore WASM bindings
+/lib

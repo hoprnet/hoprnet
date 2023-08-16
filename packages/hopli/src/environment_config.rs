@@ -29,26 +29,36 @@ impl fmt::Display for EnvironmentType {
 /// Contract addresses and configuration associated with a environment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkDetail {
-    /// number of the staking season used in the environment
-    pub stake_season: u8,
     /// block number from which the indexer starts
     pub indexer_start_block_number: u32,
-    /// HoprBoost NFT contract address
-    pub boost_contract_address: String,
-    /// HoprStake contract address
-    pub stake_contract_address: String,
-    /// NetworkRegistryProxy contract address
-    pub network_registry_proxy_contract_address: String,
     /// Type of environment
     pub environment_type: EnvironmentType,
-    /// HoprChannel contract address
-    pub channels_contract_address: String,
-    /// xHOPR contract address
-    pub xhopr_contract_address: String,
-    /// NetworkRegistry contract address
-    pub network_registry_contract_address: String,
-    /// HOPR token contract address
-    pub token_contract_address: String,
+    /// Contract addresses
+    pub addresses: Addresses,
+}
+
+/// Contract addresses (directly from deployment logic)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Addresses {
+    /// address of contract that manages authorization to access the Hopr network
+    pub network_registry: String,
+    /// address of contract that maps to the requirements that need to be fulfilled
+    /// in order to access the network, upgradeable
+    pub network_registry_proxy: String,
+    /// HoprChannels contract address, implementation of mixnet incentives
+    pub channels: String, 
+    /// Hopr token contract address
+    pub token: String,
+    /// contract address of Safe capability module implementation 
+    pub module_implementation: String,
+    /// address of contract that maps between Safe instances and node addresses
+    pub node_safe_registry: String,
+    /// address of contract that allows Hopr Association to dictate price per packet in Hopr
+    pub ticket_price_oracle: String,
+    /// address of contract that manages transport announcements in the hopr network
+    pub announcements: String,
+    /// factory contract to produce Safe instances
+    pub node_stake_v2_factory: String,
 }
 
 /// mapping of networks with its details

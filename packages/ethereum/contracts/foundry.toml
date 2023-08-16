@@ -8,9 +8,12 @@ out = 'out'
 libs = ['lib']
 verbosity = 3
 fs_permissions = [{ access = "read-write", path = "./"}] # to write logs into a local `./test.txt` file
+allow_paths = ["../../../vendor/solidity"]
 offline = false
 build_info = true
 build_info_path = "build-info"
+optimizer = true
+optimizer_runs = 200
 
 [rpc_endpoints]
 local = "http://localhost:8545"
@@ -40,3 +43,17 @@ eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 # provide deployed BoostUtilsLib
 libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A"]
 eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
+
+[profile.ci]
+  fuzz = { runs = 10_000 }
+  verbosity = 4
+
+[fmt]
+  bracket_spacing = true
+  int_types = "long"
+  line_length = 120
+  multiline_func_header = "all"
+  number_underscore = "thousands"
+  quote_style = "double"
+  tab_width = 4
+  wrap_comments = true

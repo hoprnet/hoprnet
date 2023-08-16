@@ -30,12 +30,17 @@ jobs:
         run: |
           ./scripts/check-pr.sh --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
           cat check_pr.log >> $GITHUB_OUTPUT
+          cat check_pr.log
 
   build_toolchain:
     name: Toolchain
     needs:
       - check_changeset
-    if: needs.check_changeset.outputs.build_toolchain
+    if: |
+      needs.check_changeset.outputs.build_toolchain
+      || needs.check_changeset.outputs.build_hoprd
+      || needs.check_changeset.outputs.build_hopli
+      || needs.check_changeset.outputs.build_anvil
     uses: ./.github/workflows/build-toolchain.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -46,9 +51,7 @@ jobs:
     needs:
       - check_changeset
       - build_toolchain
-    if: |
-      needs.check_changeset.outputs.build_hopli
-      || needs.check_changeset.outputs.build_toolchain
+    if: needs.check_changeset.outputs.build_hopli
     uses: ./.github/workflows/build-hopli.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -61,9 +64,7 @@ jobs:
     needs:
       - check_changeset
       - build_toolchain
-    if: |
-      needs.check_changeset.outputs.build_hoprd
-      || needs.check_changeset.outputs.build_toolchain
+    if: needs.check_changeset.outputs.build_hoprd
     uses: ./.github/workflows/build-hoprd.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -79,9 +80,7 @@ jobs:
     needs:
       - check_changeset
       - build_toolchain
-    if: |
-      needs.check_changeset.outputs.build_anvil
-      || needs.check_changeset.outputs.build_toolchain
+    if: needs.check_changeset.outputs.build_anvil
     uses: ./.github/workflows/build-anvil.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}

@@ -1,0 +1,10 @@
+*.pyc
+package-lock.json
+yarn.lock
+/node_modules
+/build
+solc-static-linux
+.coverage
+.coverage.*
+lextab.py
+yacctab.py

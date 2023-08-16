@@ -48,6 +48,9 @@ let
     # test Github automation
     act # 0.2.42
 
+    # test coverage generation
+    lcov
+
     # custom pkg groups
     macosPkgs
     linuxPkgs

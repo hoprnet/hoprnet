@@ -1,6 +1,6 @@
 [package]
 name = "core-packet"
-version = "0.3.0"
+version = "0.4.0"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -18,11 +18,15 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 futures = "0.3"
 futures-lite = { workspace = true }
 futures-concurrency = { workspace = true }
-hex = "0.4.3"
-js-sys = { version = "0.3.63", optional = true }
+hex = "0.4"
+js-sys = { workspace = true, optional = true }
 lazy_static = "1.4"
-libp2p-identity = { workspace = true, features = ["secp256k1", "peerid"] }
+libp2p-identity = { workspace = true }
+serde = "1.0"
+serde_bytes = "0.11"
+serde-wasm-bindgen = { version = "0.5.0", optional = true }
 thiserror = "1.0"
+typenum = "1.16"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
@@ -30,6 +34,7 @@ gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
 core-crypto = { path = "../core-crypto", default-features = false }
 core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
 core-mixer = { path = "../core-mixer", default-features = false }
+core-path = { path = "../core-path" , default-features = false}
 core-types = { path = "../core-types", default-features = false }
 utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
@@ -40,7 +45,7 @@ utils-types = { path = "../../../utils/crates/utils-types", default-features = f
 [dev-dependencies]
 async-std = {version = "1.12.0", features = ["unstable"]}
 async-process = "1.7.0"
-async-trait = "0.1.68"
+async-trait = "0.1.73"
 core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc", default-features = false }
 env_logger = "0.10.0"
 hex = "0.4.3"
@@ -58,6 +63,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
-wasm = ["dep:wasm-bindgen", "dep:gloo-timers", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-mixer/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-misc/wasm" ]
+wasm = ["dep:wasm-bindgen", "dep:gloo-timers", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen", "core-crypto/wasm", "core-ethereum-db/wasm", "core-mixer/wasm", "core-path/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-metrics?/wasm", "core-ethereum-misc/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 prometheus = ["dep:utils-metrics"]

@@ -47,16 +47,6 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
         )));
     }
 
-    // ticket's epoch MUST match our channel's epoch
-    if !ticket.epoch.eq(&channel.ticket_epoch) {
-        return Err(TicketValidation(format!(
-            "ticket epoch {} does not match our account epoch {} of channel {}",
-            ticket.epoch,
-            channel.ticket_epoch,
-            channel.get_id()
-        )));
-    }
-
     // ticket's channelEpoch MUST match the current channel's epoch
     if !ticket.channel_epoch.eq(&channel.channel_epoch) {
         return Err(TicketValidation(format!(
@@ -71,13 +61,13 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
         info!("checking unrealized balances for channel {}", channel.get_id());
 
         let unrealized_balance = db
-            .get_tickets(Some(sender.clone()))
+            .get_tickets(Some(*sender))
             .await? // all tickets from sender
             .into_iter()
-            .filter(|t| t.epoch.eq(&channel.ticket_epoch) && t.channel_epoch.eq(&channel.channel_epoch))
+            .filter(|t| t.channel_epoch.eq(&channel.channel_epoch))
             .fold(Some(channel.balance), |result, t| {
                 result
-                    .and_then(|b| b.value().value().checked_sub(t.amount.value().value().clone()))
+                    .and_then(|b| b.value().value().checked_sub(*t.amount.value().value()))
                     .map(|u| Balance::new(u.into(), channel.balance.balance_type()))
             });
 
@@ -103,9 +93,10 @@ mod tests {
     use crate::validation::validate_unacknowledged_ticket;
     use async_trait::async_trait;
     use core_crypto::random::random_bytes;
+    use core_crypto::types::OffchainPublicKey;
     use core_crypto::types::{HalfKey, Response};
     use core_crypto::{
-        iterated_hash::IteratedHash,
+        keypairs::{ChainKeypair, Keypair},
         types::{HalfKeyChallenge, Hash, PublicKey},
     };
     use core_ethereum_db::db::CoreEthereumDb;
@@ -125,12 +116,14 @@ mod tests {
     use utils_types::primitives::{Address, AuthorizationToken, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 
-    const SENDER_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-    const TARGET_PRIV_KEY: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
+    const SENDER_PRIV_BYTES: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+    const TARGET_PRIV_BYTES: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");
 
     lazy_static! {
-        static ref SENDER_PUB: PublicKey = PublicKey::from_privkey(&SENDER_PRIV_KEY).unwrap();
-        static ref TARGET_PUB: PublicKey = PublicKey::from_privkey(&TARGET_PRIV_KEY).unwrap();
+        static ref SENDER_PRIV_KEY: ChainKeypair = ChainKeypair::from_secret(&SENDER_PRIV_BYTES).unwrap();
+        static ref TARGET_PRIV_KEY: ChainKeypair = ChainKeypair::from_secret(&TARGET_PRIV_BYTES).unwrap();
+        static ref SENDER_PUB: PublicKey = PublicKey::from_privkey(&SENDER_PRIV_BYTES).unwrap();
+        static ref TARGET_PUB: PublicKey = PublicKey::from_privkey(&TARGET_PRIV_BYTES).unwrap();
         static ref TARGET_ADDR: Address = Address::new(&hex!("65e78d07acf7b654e5ae6777a93ebbf30f639356"));
     }
 
@@ -169,11 +162,10 @@ mod tests {
                 channel: &ChannelEntry,
                 snapshot: &Snapshot,
             ) -> core_ethereum_db::errors::Result<()>;
+            async fn get_packet_key(&self, chain_key: &Address) -> core_ethereum_db::errors::Result<Option<OffchainPublicKey>>;
+            async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
-            async fn store_hash_intermediaries(&mut self, channel: &Hash, intermediates: &IteratedHash) -> core_ethereum_db::errors::Result<()>;
-            async fn get_commitment(&self, channel: &Hash, iteration: usize) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn get_current_commitment(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn set_current_commitment(&mut self, channel: &Hash, commitment: &Hash) -> core_ethereum_db::errors::Result<()>;
             async fn get_latest_block_number(&self) -> core_ethereum_db::errors::Result<u32>;
             async fn update_latest_block_number(&mut self, number: u32) -> core_ethereum_db::errors::Result<()>;
             async fn get_latest_confirmed_snapshot(&self) -> core_ethereum_db::errors::Result<Option<Snapshot>>;
@@ -199,6 +191,10 @@ mod tests {
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
             async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
+            async fn get_staking_safe_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn set_staking_safe_address(&mut self, safe_address: &Address) -> core_ethereum_db::errors::Result<()>;
+            async fn get_staking_module_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn set_staking_module_address(&mut self, module_address: &Address) -> core_ethereum_db::errors::Result<()>;
             async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn is_network_registry_enabled(&self) -> core_ethereum_db::errors::Result<bool>;
@@ -215,20 +211,22 @@ mod tests {
                 account: &Address,
                 snapshot: &Snapshot,
             ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_account_from_network_registry(&self, public_key: &Address) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn find_hopr_node_using_account_in_network_registry(&self, account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
             async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
-            async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
             async fn retrieve_authorization(&self, id: String) -> core_ethereum_db::errors::Result<Option<AuthorizationToken>>;
             async fn delete_authorization(&mut self, id: String) -> core_ethereum_db::errors::Result<()>;
+            async fn is_mfa_protected(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            async fn set_mfa_protected_and_update_snapshot(&mut self,maybe_mfa_address: Option<Address>,snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            async fn is_allowed_to_access_network(&self, node: &Address) -> core_ethereum_db::errors::Result<bool>;
+            async fn set_allowed_to_access_network(&mut self, node: &Address, allowed: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            async fn get_from_network_registry(&self, stake_account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
+            async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<Vec<Address>>;
         }
     }
 
     fn create_valid_ticket() -> Ticket {
         Ticket::new(
             TARGET_ADDR.clone(),
-            U256::one(),
             U256::one(),
             Balance::new(U256::one(), BalanceType::HOPR),
             U256::from_inverse_probability(U256::one()).unwrap(),
@@ -242,8 +240,6 @@ mod tests {
             TARGET_ADDR.clone(),
             TARGET_ADDR.clone(),
             Balance::from_str("100", BalanceType::HOPR),
-            Hash::create(&[&hex!("deadbeef")]),
-            U256::one(),
             U256::zero(),
             ChannelStatus::Open,
             U256::one(),
@@ -361,33 +357,6 @@ mod tests {
         let ticket = create_valid_ticket();
         let mut channel = create_channel_entry();
         channel.status = ChannelStatus::Closed;
-
-        let ret = validate_unacknowledged_ticket(
-            &db,
-            &ticket,
-            &channel,
-            &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
-            true,
-        )
-        .await;
-
-        assert!(ret.is_err());
-        match ret.unwrap_err() {
-            PacketError::TicketValidation(_) => {}
-            _ => panic!("invalid error type"),
-        }
-    }
-
-    #[async_std::test]
-    async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match() {
-        let mut db = MockDb::new();
-        db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
-
-        let ticket = create_valid_ticket();
-        let mut channel = create_channel_entry();
-        channel.ticket_epoch = 2u32.into();
 
         let ret = validate_unacknowledged_ticket(
             &db,
@@ -601,7 +570,6 @@ mod tests {
                 let ack = AcknowledgedTicket::new(
                     ticket.ticket,
                     Response::new(&random_bytes::<{ Response::SIZE }>()),
-                    Hash::new(&random_bytes::<{ Hash::SIZE }>()),
                     SENDER_PUB.to_address(),
                 );
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();

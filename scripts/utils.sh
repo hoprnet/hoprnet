@@ -231,7 +231,7 @@ get_native_address(){
   local endpoint url cmd
 
   endpoint="${1:-localhost:3001}"
-  url="${endpoint}/api/v2/account/addresses"
+  url="${endpoint}/api/v3/account/addresses"
   cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".native"
@@ -242,7 +242,7 @@ get_hopr_address() {
   local endpoint url cmd
 
   endpoint="${1:-localhost:3001}"
-  url="${endpoint}/api/v2/account/addresses"
+  url="${endpoint}/api/v3/account/addresses"
   cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".hopr"
@@ -357,7 +357,7 @@ update_protocol_config_addresses() {
   log "updating contract addresses in protocol configuration"
 
   # copy all the fields except for the `stake_season`
-  source_data="$(jq -r ".networks.\"${source_network}\"" "${source_file}" | jq "{environment_type: .environment_type, indexer_start_block_number: .indexer_start_block_number, token_contract_address: .token_contract_address, channels_contract_address: .channels_contract_address, xhopr_contract_address: .xhopr_contract_address, boost_contract_address: .boost_contract_address, stake_contract_address: .stake_contract_address, network_registry_proxy_contract_address: .network_registry_proxy_contract_address, network_registry_contract_address: .network_registry_contract_address}")"
+  source_data="$(jq -r ".networks.\"${source_network}\"" "${source_file}" | jq "{environment_type: .environment_type, indexer_start_block_number: .indexer_start_block_number, addresses: .addresses}")"
   jq --argjson inputdata "${source_data}" ".networks.\"${destination_network}\" += \$inputdata" "${target_file}" > "${target_file}.new"
   mv "${target_file}.new" "${target_file}"
 

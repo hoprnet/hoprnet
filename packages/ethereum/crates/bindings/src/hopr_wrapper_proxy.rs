@@ -11,7 +11,7 @@ pub use hopr_wrapper_proxy::*;
 )]
 pub mod hopr_wrapper_proxy {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"FowardedFrom\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"FowardedTo\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ERC1820_REGISTRY\",\"outputs\":[{\"internalType\":\"contract IERC1820Registry\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"TOKENS_RECIPIENT_INTERFACE_HASH\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"WRAPPER\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"WXHOPR_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"XDAI_MULTISIG\",\"outputs\":[{\"internalType\":\"address payable\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"XHOPR_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"_value\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"_data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onTokenTransfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"recoverTokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"operator\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"userData\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"operatorData\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"tokensReceived\",\"outputs\":[]}]";
+    const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"FowardedFrom\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"FowardedTo\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ERC1820_REGISTRY\",\"outputs\":[{\"internalType\":\"contract IERC1820Registry\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"TOKENS_RECIPIENT_INTERFACE_HASH\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"WRAPPER\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"WXHOPR_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"XDAI_MULTISIG\",\"outputs\":[{\"internalType\":\"address payable\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"XHOPR_TOKEN\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"_value\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"onTokenTransfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"recoverTokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"tokensReceived\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
     pub static HOPRWRAPPERPROXY_ABI: ::ethers::contract::Lazy<
         ::ethers::core::abi::Abi,
@@ -3143,38 +3143,38 @@ pub mod hopr_wrapper_proxy {
         34,
         18,
         32,
-        113,
-        30,
-        15,
-        206,
-        141,
-        88,
-        103,
-        136,
-        160,
-        15,
-        190,
-        44,
-        15,
-        202,
-        188,
-        234,
-        156,
-        77,
-        162,
-        24,
-        32,
-        37,
         67,
-        239,
-        20,
-        8,
+        3,
+        54,
+        147,
+        102,
+        17,
+        240,
+        96,
+        82,
+        78,
+        5,
+        183,
+        91,
+        36,
+        254,
+        32,
+        224,
         81,
-        21,
-        122,
-        148,
-        57,
-        230,
+        118,
+        14,
+        179,
+        25,
+        61,
+        210,
+        185,
+        163,
+        32,
+        85,
+        205,
+        195,
+        124,
+        153,
         100,
         115,
         111,
@@ -6138,38 +6138,38 @@ pub mod hopr_wrapper_proxy {
         34,
         18,
         32,
-        113,
-        30,
-        15,
-        206,
-        141,
-        88,
-        103,
-        136,
-        160,
-        15,
-        190,
-        44,
-        15,
-        202,
-        188,
-        234,
-        156,
-        77,
-        162,
-        24,
-        32,
-        37,
         67,
-        239,
-        20,
-        8,
+        3,
+        54,
+        147,
+        102,
+        17,
+        240,
+        96,
+        82,
+        78,
+        5,
+        183,
+        91,
+        36,
+        254,
+        32,
+        224,
         81,
-        21,
-        122,
-        148,
-        57,
-        230,
+        118,
+        14,
+        179,
+        25,
+        61,
+        210,
+        185,
+        163,
+        32,
+        85,
+        205,
+        195,
+        124,
+        153,
         100,
         115,
         111,
@@ -6330,10 +6330,10 @@ pub mod hopr_wrapper_proxy {
             &self,
             from: ::ethers::core::types::Address,
             value: ::ethers::core::types::U256,
-            data: ::ethers::core::types::Bytes,
+            p2: ::ethers::core::types::Bytes,
         ) -> ::ethers::contract::builders::ContractCall<M, bool> {
             self.0
-                .method_hash([164, 192, 237, 54], (from, value, data))
+                .method_hash([164, 192, 237, 54], (from, value, p2))
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `recoverTokens` (0x16114acd) function
@@ -6348,18 +6348,15 @@ pub mod hopr_wrapper_proxy {
         ///Calls the contract's `tokensReceived` (0x0023de29) function
         pub fn tokens_received(
             &self,
-            operator: ::ethers::core::types::Address,
+            p0: ::ethers::core::types::Address,
             from: ::ethers::core::types::Address,
             to: ::ethers::core::types::Address,
             amount: ::ethers::core::types::U256,
-            user_data: ::ethers::core::types::Bytes,
-            operator_data: ::ethers::core::types::Bytes,
+            p4: ::ethers::core::types::Bytes,
+            p5: ::ethers::core::types::Bytes,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash(
-                    [0, 35, 222, 41],
-                    (operator, from, to, amount, user_data, operator_data),
-                )
+                .method_hash([0, 35, 222, 41], (p0, from, to, amount, p4, p5))
                 .expect("method not found (this should never happen)")
         }
         ///Gets the contract's `FowardedFrom` event
@@ -6564,7 +6561,7 @@ pub mod hopr_wrapper_proxy {
     pub struct OnTokenTransferCall {
         pub from: ::ethers::core::types::Address,
         pub value: ::ethers::core::types::U256,
-        pub data: ::ethers::core::types::Bytes,
+        pub p2: ::ethers::core::types::Bytes,
     }
     ///Container type for all input parameters for the `recoverTokens` function with signature `recoverTokens(address)` and selector `0x16114acd`
     #[derive(
@@ -6597,12 +6594,12 @@ pub mod hopr_wrapper_proxy {
         abi = "tokensReceived(address,address,address,uint256,bytes,bytes)"
     )]
     pub struct TokensReceivedCall {
-        pub operator: ::ethers::core::types::Address,
+        pub p0: ::ethers::core::types::Address,
         pub from: ::ethers::core::types::Address,
         pub to: ::ethers::core::types::Address,
         pub amount: ::ethers::core::types::U256,
-        pub user_data: ::ethers::core::types::Bytes,
-        pub operator_data: ::ethers::core::types::Bytes,
+        pub p4: ::ethers::core::types::Bytes,
+        pub p5: ::ethers::core::types::Bytes,
     }
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
