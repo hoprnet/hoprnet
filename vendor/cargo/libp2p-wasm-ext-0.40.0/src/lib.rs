@@ -239,7 +239,7 @@ impl Transport for ExtTransport {
             next_event: None,
             pending_events: VecDeque::new(),
             is_closed: false,
-            finalizer: listener.finalizer(),
+            finalizer: SendWrapper::new(listener.finalizer()),
         };
         self.listeners.push(listen);
         Ok(())
@@ -318,7 +318,7 @@ pub struct Listen {
     pending_events: VecDeque<<Self as Stream>::Item>,
     /// If the iterator is done close the listener.
     is_closed: bool,
-    finalizer: js_sys::Function
+    finalizer: SendWrapper<js_sys::Function>
 }
 
 impl Listen {

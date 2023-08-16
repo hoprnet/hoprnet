@@ -24,9 +24,11 @@ use utils_types::primitives::Address;
 
 use crate::errors::Result;
 use crate::CoreEthereumDb;
-use crate::LevelDbShim;
 
 use super::network::ExternalNetworkInteractions;
+
+#[cfg(feature = "wasm")]
+use crate::LevelDbShim;
 
 pub const INDEXER_UPDATE_QUEUE_SIZE: usize = 4096;
 
@@ -84,6 +86,7 @@ pub struct WasmIndexerInteractions {
     internal_emitter: Sender<IndexerToProcess>,
 }
 
+#[cfg(feature = "wasm")]
 impl WasmIndexerInteractions {
     pub fn new(db: Arc<RwLock<CoreEthereumDb<LevelDbShim>>>,
         network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,

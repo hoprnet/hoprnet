@@ -3,18 +3,15 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::time::Duration;
 
-use futures::stream::Stream;
-use futures_lite::stream::StreamExt;
 use rand::Rng;
-
-use crate::future_extensions::StreamThenConcurrentExt;
 
 use utils_log::debug;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use lazy_static::lazy_static;
-#[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::SimpleGauge;
+use {
+    lazy_static::lazy_static,
+    utils_metrics::metrics::SimpleGauge
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static! {
@@ -143,6 +140,9 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
     use wasm_bindgen_futures::stream::JsStream;
+    use futures::stream::Stream;
+    use futures_lite::stream::StreamExt;
+    use crate::future_extensions::StreamThenConcurrentExt;
 
     #[wasm_bindgen]
     pub struct AsyncIterableHelperMixer {
@@ -182,6 +182,8 @@ pub mod wasm {
 mod tests {
     use super::*;
     use more_asserts::*;
+    use futures_lite::stream::StreamExt;
+    use crate::future_extensions::StreamThenConcurrentExt;
 
     type Packet = Box<[u8]>;
 

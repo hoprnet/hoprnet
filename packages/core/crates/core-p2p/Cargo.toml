@@ -17,7 +17,8 @@ wasm = [
 ]
 
 [dependencies]
-libp2p = { workspace = true, features = ["noise", "request-response", "cbor", "macros"] }
+# a better separation of tcp + async-std for non wasm case could be designed
+libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp"] }
 libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
 futures = { workspace = true }
 futures-lite = { workspace = true }

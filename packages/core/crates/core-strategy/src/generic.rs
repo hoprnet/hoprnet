@@ -1,6 +1,11 @@
 use core_types::channels::ChannelStatus;
-use std::str::FromStr;
-use utils_types::primitives::{Address, Balance, BalanceType};
+use utils_types::primitives::{Address, Balance};
+
+#[cfg(feature = "wasm")]
+use {
+    std::str::FromStr,
+    utils_types::primitives::BalanceType
+};
 
 /// Basic strategy trait that all strategies must implement.
 /// Strategies make decisions to automatically open/close certain channels.
