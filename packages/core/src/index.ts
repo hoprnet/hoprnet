@@ -561,6 +561,14 @@ class Hopr extends EventEmitter {
     }
 
     try {
+      await this.announce(this.options.announce)
+    } catch (err) {
+      console.error(`Could not announce self on-chain`)
+      console.error(`Observed error:`, err)
+      process.exit(1)
+    }
+
+    try {
       // register node-safe pair to NodeSafeRegistry
       log(`check node-safe registry`)
       await this.registerSafeByNode()
@@ -570,13 +578,6 @@ class Hopr extends EventEmitter {
       process.exit(1)
     }
 
-    try {
-      await this.announce(this.options.announce)
-    } catch (err) {
-      console.error(`Could not announce self on-chain`)
-      console.error(`Observed error:`, err)
-      process.exit(1)
-    }
     // subscribe so we can process channel close events
     connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
@@ -1332,6 +1333,8 @@ class Hopr extends EventEmitter {
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
     hoprNodeSafeRegistryAddress: string
+    moduleAddress: string
+    safeAddress: string
     noticePeriodChannelClosure: number
   } {
     return HoprCoreEthereum.getInstance().smartContractInfo()
