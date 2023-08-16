@@ -205,20 +205,6 @@ pub mod tests {
         )
     }
 
-    fn get_anvil_env() -> Arc<SignerMiddleware<Provider<Http>, LocalWallet>> {
-        let anvil = Anvil::new()
-            .path(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"))
-            .spawn();
-        let wallet: LocalWallet = anvil.keys()[0].clone().into();
-
-        let provider = Provider::<Http>::try_from(anvil.endpoint())
-            .unwrap()
-            .interval(std::time::Duration::from_millis(10u64));
-
-        let client = SignerMiddleware::new(provider, wallet.with_chain_id(anvil.chain_id()));
-        Arc::new(client)
-    }
-
     #[tokio::test]
     async fn test_announce() {
         let anvil = Anvil::new()
