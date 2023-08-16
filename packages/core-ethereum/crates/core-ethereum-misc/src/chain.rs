@@ -5,8 +5,8 @@ use crate::errors::{
 use bindings::{
     hopr_announcements::{BindKeysAnnounceCall, BindKeysAnnounceSafeCall},
     hopr_channels::{
-        CloseIncomingChannelCall, CompactSignature, FundChannelCall, InitiateOutgoingChannelClosureCall,
-        RedeemTicketCall, RedeemableTicket, TicketData, Vrfparameters,
+        CloseIncomingChannelCall, CompactSignature, FundChannelCall, FundChannelSafeCall,
+        InitiateOutgoingChannelClosureCall, RedeemTicketCall, RedeemableTicket, TicketData, Vrfparameters,
     },
 };
 use core_crypto::{
@@ -16,49 +16,85 @@ use core_crypto::{
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{account::AccountSignature, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
-use ethers::types::{Address as EthereumAddress, H256, U256, H160};
+use ethers::types::{Address as EthereumAddress, H160, H256, U256};
 use multiaddr::Multiaddr;
+use std::str::FromStr;
 use utils_log::debug;
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
-    traits::BinarySerializable,
+    traits::{BinarySerializable, PeerIdLike},
 };
+
 pub fn announce(
     offchain_keypair: &OffchainKeypair,
     chain_key: &Address,
     announced_multiaddr: &Multiaddr,
-) -> BindKeysAnnounceCall {
+) -> Result<BindKeysAnnounceCall> {
     let account_sig = AccountSignature::new(offchain_keypair, chain_key);
+
+    if let Some(ending) = announced_multiaddr.protocol_stack().last() {
+        let expected: String = format!("/p2p/{}", offchain_keypair.public().to_peerid_str());
+        if ending == "p2p" && !announced_multiaddr.ends_with(&Multiaddr::from_str(expected.as_str())?) {
+            return Err(InvalidArguments(format!(
+                "Received a multiaddr with incorrect PeerId, got {} but expected {}",
+                announced_multiaddr.to_string(),
+                expected
+            )));
+        }
+    }
 
     let serialized_signature = account_sig.signature.to_bytes();
 
-    BindKeysAnnounceCall {
+    Ok(BindKeysAnnounceCall {
         base_multiaddr: announced_multiaddr.to_string(),
         ed_25519_pub_key: H256::from_slice(&offchain_keypair.public().to_bytes()).into(),
         ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
         ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-    }
+    })
 }
 
 pub fn announce_safe(
     offchain_keypair: &OffchainKeypair,
     chain_key: &Address,
     announced_multiaddr: &Multiaddr,
-) -> BindKeysAnnounceSafeCall {
+) -> Result<BindKeysAnnounceSafeCall> {
     let account_sig = AccountSignature::new(offchain_keypair, chain_key);
+
+    if let Some(ending) = announced_multiaddr.protocol_stack().last() {
+        let expected: String = format!("/p2p/{}", offchain_keypair.public().to_peerid_str());
+        if ending == "p2p" && !announced_multiaddr.ends_with(&Multiaddr::from_str(expected.as_str())?) {
+            return Err(InvalidArguments(format!(
+                "Received a multiaddr with incorrect PeerId, got {} but expected {}",
+                announced_multiaddr.to_string(),
+                expected
+            )));
+        }
+    }
 
     let serialized_signature = account_sig.signature.to_bytes();
 
-    BindKeysAnnounceSafeCall {
+    Ok(BindKeysAnnounceSafeCall {
         self_: H160::from_slice(&chain_key.to_bytes()),
         base_multiaddr: announced_multiaddr.to_string(),
         ed_25519_pub_key: H256::from_slice(&offchain_keypair.public().to_bytes()).into(),
         ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
         ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-    }
+    })
 }
 
-pub fn fund_channel(dest: &Address, amount: Balance) -> Result<FundChannelCall> {
+pub fn fund_channel(dest: &Address, amount: &Balance) -> Result<FundChannelCall> {
+    if amount.balance_type() != BalanceType::HOPR {
+        return Err(InvalidArguments(
+            "Invalid balance type. Expected a HOPR balance.".into(),
+        ));
+    }
+    Ok(FundChannelCall {
+        amount: amount.value().as_u128(),
+        account: EthereumAddress::from_slice(&dest.to_bytes()),
+    })
+}
+
+pub fn fund_channel_safe(dest: &Address, amount: &Balance) -> Result<FundChannelCall> {
     if amount.balance_type() != BalanceType::HOPR {
         return Err(InvalidArguments(
             "Invalid balance type. Expected a HOPR balance.".into(),
@@ -140,7 +176,6 @@ where
         .map_err(|e| InvalidResponseToAcknowledgement(e.to_string()))?;
 
     todo!("Rewrite acked ticket");
-
 
     // if !acked_ticket
     //     .ticket
@@ -324,8 +359,8 @@ pub mod wasm {
     use multiaddr::Multiaddr;
     use std::str::FromStr;
     use utils_log::debug;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Address;
+    use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
+    use utils_types::primitives::{Address, Balance};
     use wasm_bindgen::{prelude::*, JsValue};
 
     #[wasm_bindgen]
@@ -383,7 +418,7 @@ pub mod wasm {
             Ok(ma) => ma,
             Err(e) => return Err(JsValue::from(e.to_string())),
         };
-        Ok(super::announce(offchain_keypair, chain_key, &ma).encode())
+        ok_or_jserr!(super::announce(offchain_keypair, chain_key, &ma).map(|p| p.encode()))
     }
 
     #[wasm_bindgen]
@@ -396,6 +431,16 @@ pub mod wasm {
             Ok(ma) => ma,
             Err(e) => return Err(JsValue::from(e.to_string())),
         };
-        Ok(super::announce_safe(offchain_keypair, chain_key, &ma).encode())
+        ok_or_jserr!(super::announce_safe(offchain_keypair, chain_key, &ma).map(|p| p.encode()))
+    }
+
+    #[wasm_bindgen]
+    pub fn get_fund_channel_payload(dest: &Address, amount: &Balance) -> JsResult<Vec<u8>> {
+        ok_or_jserr!(super::fund_channel(dest, amount).map(|p| p.encode()))
+    }
+
+    #[wasm_bindgen]
+    pub fn get_fund_channel_safe_payload(dest: &Address, amount: &Balance) -> JsResult<Vec<u8>> {
+        ok_or_jserr!(super::fund_channel_safe(dest, amount).map(|p| p.encode()))
     }
 }

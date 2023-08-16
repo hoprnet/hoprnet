@@ -1,6 +1,7 @@
 use core_crypto::errors::CryptoError;
 use thiserror::Error;
 use utils_db::errors::DbError;
+use multiaddr::Error as MultiaddrError;
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumError {
@@ -18,6 +19,9 @@ pub enum CoreEthereumError {
 
     #[error("Invalid response to acknowledgement {0}")]
     InvalidResponseToAcknowledgement(String),
+
+    #[error(transparent)]
+    MultiaddrParseError(#[from] MultiaddrError),
 
     #[error("Ticket is not a win")]
     NotAWinningTicket,
