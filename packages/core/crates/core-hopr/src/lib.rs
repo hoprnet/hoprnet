@@ -11,12 +11,12 @@ use futures::{StreamExt, FutureExt, channel::mpsc::Sender};
 
 use core_ethereum_db::db::CoreEthereumDb;
 pub use core_network::{
+    PeerId,
     heartbeat::HeartbeatConfig,
     network::Health,
     ping::PingConfig
 };
 use core_network::{
-    PeerId,
     network::{Network, NetworkEvent},
     heartbeat::Heartbeat,
     messaging::ControlMessage,

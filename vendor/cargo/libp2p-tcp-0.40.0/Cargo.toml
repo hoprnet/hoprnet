@@ -44,7 +44,7 @@ futures = "0.3.28"
 futures-timer = "3.0"
 if-watch = "3.0.1"
 libc = "0.2.147"
-log = "0.4.19"
+log = "0.4.20"
 
 [dependencies.async-io]
 version = "1.13.0"
@@ -55,14 +55,14 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.socket2]
 version = "0.5.3"
 features = ["all"]
 
 [dependencies.tokio]
-version = "1.29.1"
+version = "1.31.0"
 features = ["net"]
 optional = true
 default-features = false
@@ -75,7 +75,7 @@ version = "1.6.5"
 features = ["attributes"]
 
 [dev-dependencies.tokio]
-version = "1.29.1"
+version = "1.31.0"
 features = ["full"]
 default-features = false
 

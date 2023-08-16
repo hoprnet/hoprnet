@@ -41,7 +41,7 @@ rustdoc-args = [
 
 [dependencies]
 futures = "0.3.28"
-log = "0.4.19"
+log = "0.4.20"
 parking_lot = "0.12.0"
 smallvec = "1.11.0"
 
@@ -54,7 +54,7 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.trust-dns-resolver]
 version = "0.22"

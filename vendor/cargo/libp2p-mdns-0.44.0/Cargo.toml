@@ -51,7 +51,7 @@ required-features = ["tokio"]
 data-encoding = "2.4.0"
 futures = "0.3.28"
 if-watch = "3.0.1"
-log = "0.4.19"
+log = "0.4.20"
 rand = "0.8.3"
 smallvec = "1.11.0"
 void = "1.0.2"
@@ -65,10 +65,10 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.libp2p-swarm]
-version = "0.43.1"
+version = "0.43.3"
 path = "../../swarm"
 
 [dependencies.socket2]
@@ -76,7 +76,7 @@ version = "0.5.3"
 features = ["all"]
 
 [dependencies.tokio]
-version = "1.29"
+version = "1.31"
 features = [
     "net",
     "time",
@@ -104,7 +104,7 @@ version = "0.43.0"
 path = "../../transports/noise"
 
 [dev-dependencies.libp2p-swarm]
-version = "0.43.1"
+version = "0.43.3"
 path = "../../swarm"
 features = [
     "tokio",
@@ -123,11 +123,11 @@ features = [
 ]
 
 [dev-dependencies.libp2p-yamux]
-version = "0.44.0"
+version = "0.44.1"
 path = "../../muxers/yamux"
 
 [dev-dependencies.tokio]
-version = "1.29"
+version = "1.31"
 features = [
     "macros",
     "rt",

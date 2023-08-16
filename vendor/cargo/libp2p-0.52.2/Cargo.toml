@@ -58,7 +58,7 @@ path = "../protocols/autonat"
 optional = true
 
 [dependencies.libp2p-connection-limits]
-version = "0.2.0"
+version = "0.2.1"
 path = "../misc/connection-limits"
 
 [dependencies.libp2p-core]
@@ -76,7 +76,7 @@ path = "../protocols/floodsub"
 optional = true
 
 [dependencies.libp2p-gossipsub]
-version = "0.45.0"
+version = "0.45.1"
 path = "../protocols/gossipsub"
 optional = true
 
@@ -86,10 +86,10 @@ path = "../protocols/identify"
 optional = true
 
 [dependencies.libp2p-identity]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.libp2p-kad]
-version = "0.44.3"
+version = "0.44.4"
 path = "../protocols/kad"
 optional = true
 
@@ -134,7 +134,7 @@ path = "../protocols/request-response"
 optional = true
 
 [dependencies.libp2p-swarm]
-version = "0.43.1"
+version = "0.43.3"
 path = "../swarm"
 
 [dependencies.libp2p-wasm-ext]
@@ -148,7 +148,7 @@ path = "../transports/webtransport-websys"
 optional = true
 
 [dependencies.libp2p-yamux]
-version = "0.44.0"
+version = "0.44.1"
 path = "../muxers/yamux"
 optional = true
 
@@ -218,6 +218,7 @@ full = [
     "kad",
     "macros",
     "mdns",
+    "memory-connection-limits",
     "metrics",
     "noise",
     "ping",
@@ -255,6 +256,7 @@ kad = [
 ]
 macros = ["libp2p-swarm/macros"]
 mdns = ["dep:libp2p-mdns"]
+memory-connection-limits = ["dep:libp2p-memory-connection-limits"]
 metrics = ["dep:libp2p-metrics"]
 noise = ["dep:libp2p-noise"]
 ping = [
@@ -314,6 +316,11 @@ optional = true
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.libp2p-mdns]
 version = "0.44.0"
 path = "../protocols/mdns"
+optional = true
+
+[target."cfg(not(target_arch = \"wasm32\"))".dependencies.libp2p-memory-connection-limits]
+version = "0.1.0"
+path = "../misc/memory-connection-limits"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.libp2p-tcp]

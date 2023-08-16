@@ -43,7 +43,7 @@ rustdoc-args = [
 async-trait = "0.1"
 futures = "0.3.28"
 instant = "0.1.12"
-log = "0.4.19"
+log = "0.4.20"
 rand = "0.8"
 smallvec = "1.11.0"
 void = "1.0.2"
@@ -61,10 +61,10 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.1"
+version = "0.2.2"
 
 [dependencies.libp2p-swarm]
-version = "0.43.1"
+version = "0.43.3"
 path = "../../swarm"
 
 [dependencies.serde]
@@ -97,7 +97,7 @@ path = "../../transports/tcp"
 features = ["async-io"]
 
 [dev-dependencies.libp2p-yamux]
-version = "0.44.0"
+version = "0.44.1"
 path = "../../muxers/yamux"
 
 [dev-dependencies.serde]

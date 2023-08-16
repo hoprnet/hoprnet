@@ -29,24 +29,22 @@ pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
 pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";
 pub const HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0: &str = "/hopr/ack/0.1.0";
 
-// TODO: should be loaded from the HOPRD configuration
-const HOPR_HEARTBEAT_CONNECTION_KEEPALIVE_SECS: u64 = 15;
-const HOPR_HEARTBEAT_REQUEST_TIMEOUT_SECS: u64 = 30;
+const HOPR_HEARTBEAT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600);      // 1 hour
+const HOPR_HEARTBEAT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-const HOPR_MESSAGE_CONNECTION_KEEPALIVE_SECS: std::time::Duration = std::time::Duration::from_secs(3600);       // 1 hour
-const HOPR_MESSAGE_REQUEST_TIMEOUT_SECS: std::time::Duration = std::time::Duration::from_secs(15);
+const HOPR_MESSAGE_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600);        // 1 hour
+const HOPR_MESSAGE_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
-const HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE_SECS: std::time::Duration = std::time::Duration::from_secs(3600);       // 1 hour
-const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT_SECS: std::time::Duration = std::time::Duration::from_secs(15);
+const HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600);       // 1 hour
+const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
-    // TODO: consider including regular ipfs/ping/1.0.0 for socket keep alive
     pub heartbeat: libp2p_request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p_request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p_request_response::cbor::Behaviour<Acknowledgement, ()>,
-    keep_alive: libp2p_swarm::keep_alive::Behaviour     // run the business logic loop indefinitely
+    keep_alive: libp2p_swarm::keep_alive::Behaviour             // run the business logic loop indefinitely
 }
 
 pub enum HoprNetworkBehaviorEvent {
@@ -91,8 +89,8 @@ impl Default for HoprNetworkBehavior {
                 )],
                 {
                     let mut cfg = libp2p_request_response::Config::default();
-                    cfg.set_connection_keep_alive(std::time::Duration::from_secs(HOPR_HEARTBEAT_CONNECTION_KEEPALIVE_SECS));
-                    cfg.set_request_timeout(std::time::Duration::from_secs(HOPR_HEARTBEAT_REQUEST_TIMEOUT_SECS));
+                    cfg.set_connection_keep_alive(HOPR_HEARTBEAT_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(HOPR_HEARTBEAT_REQUEST_TIMEOUT);
                     cfg
                 },
             ),
@@ -103,8 +101,8 @@ impl Default for HoprNetworkBehavior {
                 )],
                 {
                     let mut cfg = libp2p_request_response::Config::default();
-                    cfg.set_connection_keep_alive(HOPR_MESSAGE_CONNECTION_KEEPALIVE_SECS);
-                    cfg.set_request_timeout(HOPR_MESSAGE_REQUEST_TIMEOUT_SECS);
+                    cfg.set_connection_keep_alive(HOPR_MESSAGE_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(HOPR_MESSAGE_REQUEST_TIMEOUT);
                     cfg
                 },
             ),
@@ -115,8 +113,8 @@ impl Default for HoprNetworkBehavior {
                 )],
                 {
                     let mut cfg = libp2p_request_response::Config::default();
-                    cfg.set_connection_keep_alive(HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE_SECS);
-                    cfg.set_request_timeout(HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT_SECS);
+                    cfg.set_connection_keep_alive(HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT);
                     cfg
                 },
             ),
