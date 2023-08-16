@@ -605,9 +605,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       receipt = await this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
         this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
       )
-    }
-
-    if (!registeredAddress.eq(Address.from_string(safeAddress.to_string()))) {
+    } else if (!registeredAddress.eq(Address.deserialize(safeAddress.serialize()))) {
       // the node has been associated with a differnt safe address
       throw Error('Node has been registered with a different safe')
     }

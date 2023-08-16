@@ -1428,13 +1428,12 @@ pub mod wasm {
             contract_addresses_js: JsValue,
             callbacks: IndexerCallbacks,
         ) -> Handlers {
-            let get_contract_info = serde_wasm_bindgen::from_value::<crate::handlers::wasm::ContractAddresses>(contract_addresses_js).unwrap();
-            let contract_addresses = super::ContractAddresses::from(&get_contract_info);
+            let contract_addresses = serde_wasm_bindgen::from_value::<crate::handlers::wasm::ContractAddresses>(contract_addresses_js).unwrap();
             Self {
                 w: super::ContractEventHandlers {
                     address_to_monitor: Address::from_str(address_to_monitor).unwrap(),
                     chain_key: Address::from_str(chain_key).unwrap(),
-                    addresses: contract_addresses,
+                    addresses: (&contract_addresses).into(),
                     cbs: callbacks,
                 },
             }
