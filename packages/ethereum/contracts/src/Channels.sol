@@ -667,10 +667,7 @@ contract HoprChannels is
      * @param account address of the destination
      * @param amount amount to fund for channel
      */
-    function fundChannelSafe(address self, address account, Balance amount)
-        external
-        HoprMultiSig.onlySafe(self)
-    {
+    function fundChannelSafe(address self, address account, Balance amount) external HoprMultiSig.onlySafe(self) {
         _fundChannelInternal(self, account, amount);
 
         // pull tokens from Safe and handle result
@@ -685,10 +682,7 @@ contract HoprChannels is
      * @param account address of the destination
      * @param amount amount to fund for channel
      */
-    function fundChannel(address account, Balance amount)
-        external
-        HoprMultiSig.noSafeSet()
-    {
+    function fundChannel(address account, Balance amount) external HoprMultiSig.noSafeSet() {
         _fundChannelInternal(msg.sender, account, amount);
 
         // pull tokens from funder and handle result
@@ -706,11 +700,8 @@ contract HoprChannels is
      * @param account destination address
      * @param amount token amount
      */
-    function _fundChannelInternal(
-        address self, 
-        address account,
-        Balance amount
-    ) internal 
+    function _fundChannelInternal(address self, address account, Balance amount)
+        internal
         validateBalance(amount)
         validateChannelParties(self, account)
     {
@@ -733,7 +724,7 @@ contract HoprChannels is
             indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
             emit ChannelOpened(self, account);
         }
-        
+
         indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
         emit ChannelBalanceIncreased(channelId, channel.balance);
     }
