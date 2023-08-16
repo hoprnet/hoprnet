@@ -79,14 +79,13 @@ impl BinarySerializable for Acknowledgement {
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
     pub response: Response,
-    pub pre_image: Hash,
     pub signer: Address,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AcknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(ticket: Ticket, response: Response, pre_image: Hash, signer: Address) -> Self {
+    pub fn new(ticket: Ticket, response: Response, signer: Address) -> Self {
         assert_ne!(
             ticket.counterparty, signer,
             "signer must be different from the ticket counterparty"
@@ -94,31 +93,24 @@ impl AcknowledgedTicket {
         Self {
             ticket,
             response,
-            pre_image,
             signer,
         }
-    }
-
-    pub fn set_preimage(&mut self, hash: &Hash) {
-        self.pre_image = *hash;
     }
 }
 
 impl BinarySerializable for AcknowledgedTicket {
-    const SIZE: usize = Ticket::SIZE + Response::SIZE + Hash::SIZE + Address::SIZE;
+    const SIZE: usize = Ticket::SIZE + Response::SIZE + Address::SIZE;
 
     fn from_bytes(data: &[u8]) -> errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
             let ticket = Ticket::from_bytes(buf.drain(..Ticket::SIZE).as_ref())?;
             let response = Response::from_bytes(buf.drain(..Response::SIZE).as_ref())?;
-            let pre_image = Hash::from_bytes(buf.drain(..Hash::SIZE).as_ref())?;
             let signer = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
 
             Ok(Self {
                 ticket,
                 response,
-                pre_image,
                 signer,
             })
         } else {
@@ -130,7 +122,6 @@ impl BinarySerializable for AcknowledgedTicket {
         let mut ret = Vec::with_capacity(Self::SIZE);
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.extend_from_slice(&self.response.to_bytes());
-        ret.extend_from_slice(&self.pre_image.to_bytes());
         ret.extend_from_slice(&self.signer.to_bytes());
         ret.into_boxed_slice()
     }
@@ -156,7 +147,6 @@ impl std::fmt::Display for AcknowledgedTicket {
         f.debug_struct("AcknowledgedTicket")
             .field("ticket", &self.ticket)
             .field("response", &self.response)
-            .field("pre_image", &self.pre_image)
             .field("signer", &self.signer)
             .finish()
     }

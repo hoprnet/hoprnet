@@ -106,7 +106,7 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
     fn to_alpha(&self) -> Alpha<typenum::U33> {
         let mut ret = Alpha::<typenum::U33>::default();
         ret.copy_from_slice(
-            CurvePoint::from_affine(self.to_affine())
+            CurvePoint::from(self.to_affine())
                 .serialize_compressed()
                 .as_ref(),
         );

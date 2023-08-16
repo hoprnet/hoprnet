@@ -3,7 +3,6 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
 import chalk from 'chalk'
 import {
-  AnnouncementData,
   AcknowledgedTicket,
   Balance,
   BalanceType,
@@ -226,9 +225,9 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   announce(multiaddr: Multiaddr, packetKeypair: OffchainKeypair): Promise<string> {
     // Currently we announce always with key bindings
-    let keyBinding = new KeyBinding(this.chainKeypair.to_address(), packetKeypair)
-    let data = new AnnouncementData(multiaddr.toString(), keyBinding)
-    return this.chain.announce(data, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
+    return this.chain.announce(packetKeypair, this.chainKeypair.to_address(), multiaddr, (txHash: string) =>
+      this.setTxHandler(`announce-${txHash}`, txHash)
+    )
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -299,8 +298,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
     hoprNodeSafeRegistryAddress: string
-    moduleAddress: string,
-    safeAddress: string,
+    moduleAddress: string
+    safeAddress: string
     noticePeriodChannelClosure: number
   } {
     return this.chain.getInfo()
@@ -414,7 +413,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         ticket = fetched
 
         log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel ${channelId.to_hex()} from ${channel.source.to_hex()} to ${channel.destination.to_hex()}, preImage ${ticket.pre_image.to_hex()}, porSecret ${ticket.response.to_hex()}`
+          `redeeming ticket ${ticket.response.to_hex()} in channel ${channelId.to_hex()} from ${channel.source.to_hex()} to ${channel.destination.to_hex()}, porSecret ${ticket.response.to_hex()}`
         )
 
         log(ticket.ticket.to_string())

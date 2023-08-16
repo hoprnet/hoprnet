@@ -396,6 +396,12 @@ pub struct U256 {
     value: u256,
 }
 
+impl U256 {
+    pub fn as_u128(&self) -> u128 {
+        self.value.as_u128()
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl U256 {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]

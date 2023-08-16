@@ -21,10 +21,13 @@ libp2p-identity = { workspace = true }
 thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
+multiaddr = "0.18"
+ethers = { version = "2", default-features = false, features = ["ethers-solc"] }
 
 core-crypto = { path = "../../../core/crates/core-crypto", default-features = false }
 core-ethereum-db = { path = "../core-ethereum-db", default-features = false }
 core-types = { path = "../../../core/crates/core-types", default-features = false }
+bindings = { path = "../../../ethereum/crates/bindings", default-features = false }
 utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
@@ -37,7 +40,10 @@ mockall = "0.11.4"
 hex-literal = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = "1"
 rusty-leveldb = "1.0"
+svm-rs = "0.2.23"
+semver = "1.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

@@ -203,7 +203,7 @@ pub struct AccountSignature {
 }
 
 impl AccountSignature {
-    pub fn new(signing_key: &OffchainKeypair, chain_key: Address) -> Self {
+    pub fn new(signing_key: &OffchainKeypair, chain_key: &Address) -> Self {
         Self {
             signature: OffchainSignature::sign_message(
                 format!(
@@ -215,7 +215,7 @@ impl AccountSignature {
                 signing_key,
             ),
             pub_key: signing_key.public().to_owned(),
-            chain_key,
+            chain_key: chain_key.to_owned(),
         }
     }
 
@@ -316,7 +316,7 @@ mod test {
         let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
         let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
 
-        let sig = AccountSignature::new(&keypair, chain_addr);
+        let sig = AccountSignature::new(&keypair, &chain_addr);
         assert!(sig.verify());
     }
 }

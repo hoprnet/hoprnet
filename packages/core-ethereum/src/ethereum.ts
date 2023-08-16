@@ -20,14 +20,14 @@ import {
   type DeferType,
   type Hash,
   create_counter,
-  AnnouncementData,
-  u8aSplit
+  OffchainKeypair,
+  u8aToHex
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
-import { CORE_ETHEREUM_CONSTANTS } from '../lib/core_ethereum_misc.js'
+import { CORE_ETHEREUM_CONSTANTS, get_announce_payload } from '../lib/core_ethereum_misc.js'
 import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
@@ -42,6 +42,7 @@ import {
 } from './utils/index.js'
 
 import { SafeModuleOptions } from './index.js'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -448,35 +449,16 @@ export async function createChainWrapper(
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (data: AnnouncementData, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+  const announce = async (
+    keypair: OffchainKeypair,
+    chain_key: Address,
+    multiaddr: Multiaddr,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<string> => {
     let confirmationEssentialTxPayload: TransactionPayload
-    let keyBinding = data.key_binding
 
-    if (keyBinding) {
-      if (!keyBinding.chain_key.eq(publicKey.to_address())) {
-        throw new Error('cannot bind with different public key')
-      }
-
-      log(`announcing ${data.to_multiaddress_str()} with key binding`)
-      let sgn = u8aSplit(keyBinding.signature.serialize(), [32])
-      confirmationEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        channels, // TODO: change the target contract used for announcement
-        'bindKeysAnnounce',
-        sgn[0],
-        sgn[1],
-        keyBinding.packet_key.serialize(),
-        data.to_multiaddress_str()
-      )
-    } else {
-      log(`announcing ${data.to_multiaddress_str()} without key binding`)
-      confirmationEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        channels, // TODO: change the target contract used for announcement
-        'announce',
-        data.to_multiaddress_str() // this already passes the decapsulated multiaddress
-      )
-    }
+    confirmationEssentialTxPayload.data = u8aToHex(get_announce_payload(keypair, chain_key, multiaddr.toString()))
+    confirmationEssentialTxPayload.to = deploymentExtract.hoprAnnouncementsAddress
 
     // @ts-ignore fixme: treat result
     let sendResult: SendTransactionReturn

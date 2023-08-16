@@ -63,8 +63,6 @@ pub const PRICE_PER_PACKET: &str = "10000000000000000";
 /// Fixed inverse ticket winning probability
 pub const INVERSE_TICKET_WIN_PROB: &str = "1";
 
-const PREIMAGE_PLACE_HOLDER: [u8; Hash::SIZE] = [0xffu8; Hash::SIZE];
-
 /// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone)]
@@ -372,7 +370,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 let ack_ticket = AcknowledgedTicket::new(
                     unackowledged.ticket,
                     response,
-                    Hash::new(&PREIMAGE_PLACE_HOLDER),
                     unackowledged.signer,
                 );
 
