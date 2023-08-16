@@ -14,7 +14,9 @@ export const getInfo = async (node: Hopr) => {
       hoprChannelsAddress,
       noticePeriodChannelClosure,
       hoprNetworkRegistryAddress,
-      hoprNodeSafeRegistryAddress
+      hoprNodeSafeRegistryAddress,
+      moduleAddress,
+      safeAddress
     } = node.smartContractInfo()
 
     return {
@@ -26,6 +28,8 @@ export const getInfo = async (node: Hopr) => {
       hoprChannels: hoprChannelsAddress,
       hoprNetworkRegistry: hoprNetworkRegistryAddress,
       hoprNodeSafeRegistry: hoprNodeSafeRegistryAddress,
+      nodeManagementModule: moduleAddress,
+      nodeSafe: safeAddress,
       isEligible: await node.isAllowedAccessToNetwork(node.getId()),
       connectivityStatus: health_to_string(node.getConnectivityHealth()),
       channelClosurePeriod: Math.ceil(noticePeriodChannelClosure / 60)
@@ -118,6 +122,17 @@ GET.apiDoc = {
                 type: 'string',
                 example: '0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82',
                 description: 'Contract address of the contract that register node and safe pairs'
+              },
+              nodeManagementModule: {
+                type: 'string',
+                example: '0x0262496080c3916d9afd5904EA3DFd46DfFBfF3D',
+                description:
+                  'Contract address of the Safe module for managing the current hopr node'
+              },
+              nodeSafe: {
+                type: 'string',
+                example: '0x8D56Ef78c9dfF0d1446A28476653D979336032f9',
+                description: 'Contract address of the safe that holds asset for the current node'
               },
               connectivityStatus: {
                 type: 'string',

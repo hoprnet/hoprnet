@@ -299,6 +299,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
     hoprNodeSafeRegistryAddress: string
+    moduleAddress: string,
+    safeAddress: string,
     noticePeriodChannelClosure: number
   } {
     return this.chain.getInfo()

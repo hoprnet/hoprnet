@@ -935,6 +935,8 @@ dependencies = [
  "multiaddr",
  "primitive-types",
  "rusty-leveldb",
+ "serde",
+ "serde-wasm-bindgen",
  "thiserror",
  "utils-db",
  "utils-log",

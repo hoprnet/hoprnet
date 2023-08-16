@@ -23,6 +23,8 @@ multiaddr = "0.18"
 js-sys = { version = "0.3.63", optional = true }
 hex = "0.4.3"
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = { version = "0.5", optional = true }
 
 bindings = { path = "../../../ethereum/crates/bindings", default-features = false }
 core-types = { path = "../../../core/crates/core-types", default-features = false }
@@ -44,5 +46,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
