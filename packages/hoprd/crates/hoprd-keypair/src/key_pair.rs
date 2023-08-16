@@ -392,6 +392,7 @@ impl HoprKeys {
             }
         }
     }
+
     /// Writes a keystore file using custom FS operation and custom entropy source
     ///
     /// Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
