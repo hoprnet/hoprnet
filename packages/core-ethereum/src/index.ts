@@ -20,7 +20,6 @@ import {
   OffchainPublicKey,
   ChainKeypair,
   OffchainKeypair,
-  KeyBinding
 } from '@hoprnet/hopr-utils'
 import {
   Ethereum_AcknowledgedTicket,
