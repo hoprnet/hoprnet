@@ -960,7 +960,6 @@ dependencies = [
  "futures",
  "hex-literal 0.4.1",
  "js-sys",
- "k256",
  "libp2p-identity",
  "mockall",
  "multiaddr",

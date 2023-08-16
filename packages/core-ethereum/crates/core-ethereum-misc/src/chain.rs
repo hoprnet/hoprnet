@@ -3,7 +3,7 @@ use crate::errors::{
     Result,
 };
 use bindings::{
-    hopr_announcements::BindKeysAnnounceCall,
+    hopr_announcements::{BindKeysAnnounceCall, BindKeysAnnounceSafeCall},
     hopr_channels::{
         CloseIncomingChannelCall, CompactSignature, FundChannelCall, InitiateOutgoingChannelClosureCall,
         RedeemTicketCall, RedeemableTicket, TicketData, Vrfparameters,
@@ -16,7 +16,7 @@ use core_crypto::{
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{account::AccountSignature, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
-use ethers::types::{Address as EthereumAddress, H256, U256};
+use ethers::types::{Address as EthereumAddress, H256, U256, H160};
 use multiaddr::Multiaddr;
 use utils_log::debug;
 use utils_types::{
@@ -33,6 +33,24 @@ pub fn announce(
     let serialized_signature = account_sig.signature.to_bytes();
 
     BindKeysAnnounceCall {
+        base_multiaddr: announced_multiaddr.to_string(),
+        ed_25519_pub_key: H256::from_slice(&offchain_keypair.public().to_bytes()).into(),
+        ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
+        ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
+    }
+}
+
+pub fn announce_safe(
+    offchain_keypair: &OffchainKeypair,
+    chain_key: &Address,
+    announced_multiaddr: &Multiaddr,
+) -> BindKeysAnnounceSafeCall {
+    let account_sig = AccountSignature::new(offchain_keypair, chain_key);
+
+    let serialized_signature = account_sig.signature.to_bytes();
+
+    BindKeysAnnounceSafeCall {
+        self_: H160::from_slice(&chain_key.to_bytes()),
         base_multiaddr: announced_multiaddr.to_string(),
         ed_25519_pub_key: H256::from_slice(&offchain_keypair.public().to_bytes()).into(),
         ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
@@ -122,25 +140,21 @@ where
         .map_err(|e| InvalidResponseToAcknowledgement(e.to_string()))?;
 
     todo!("Rewrite acked ticket");
-    let pre_image = Hash::default();
-    debug!(
-        "Set preImage {pre_image} for ticket {} in channel to {counterparty}",
-        acked_ticket.response
-    );
 
-    if !acked_ticket
-        .ticket
-        .is_winning(&pre_image, &acked_ticket.response, acked_ticket.ticket.win_prob)
-    {
-        debug!(
-            "Failed to submit ticket {}: 'Not a winning ticket.'",
-            acked_ticket.response
-        );
 
-        return Err(NotAWinningTicket);
-    }
+    // if !acked_ticket
+    //     .ticket
+    //     .is_winning(&pre_image, &acked_ticket.response, acked_ticket.ticket.win_prob)
+    // {
+    //     debug!(
+    //         "Failed to submit ticket {}: 'Not a winning ticket.'",
+    //         acked_ticket.response
+    //     );
 
-    Ok(pre_image)
+    //     return Err(NotAWinningTicket);
+    // }
+
+    Ok(Hash::default())
 }
 
 pub async fn after_redeem_ticket<T>(
@@ -370,5 +384,18 @@ pub mod wasm {
             Err(e) => return Err(JsValue::from(e.to_string())),
         };
         Ok(super::announce(offchain_keypair, chain_key, &ma).encode())
+    }
+
+    #[wasm_bindgen]
+    pub fn get_announce_safe_payload(
+        offchain_keypair: &OffchainKeypair,
+        chain_key: &Address,
+        announced_multiaddr: &str,
+    ) -> JsResult<Vec<u8>> {
+        let ma = match Multiaddr::from_str(announced_multiaddr) {
+            Ok(ma) => ma,
+            Err(e) => return Err(JsValue::from(e.to_string())),
+        };
+        Ok(super::announce_safe(offchain_keypair, chain_key, &ma).encode())
     }
 }
