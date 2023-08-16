@@ -119,9 +119,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return
     }
     this.status = IndexerStatus.STARTING
-    const contractAddresses = chain.getInfo();
+    const contractAddresses = chain.getInfo()
     log(`[DEBUG]contractAddresses...${JSON.stringify(contractAddresses, null, 2)}`)
-
 
     this.handlers = Handlers.init(
       // FIXME: change to Safe address if Safe is holding the tokens

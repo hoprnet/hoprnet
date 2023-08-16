@@ -225,7 +225,9 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   announce(multiaddr: Multiaddr, packetKeypair: OffchainKeypair): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(packetKeypair, this.chainKeypair.to_address(), multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
+    return this.chain.announce(packetKeypair, this.chainKeypair.to_address(), multiaddr, (txHash: string) =>
+      this.setTxHandler(`announce-${txHash}`, txHash)
+    )
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -296,8 +298,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
     hoprNodeSafeRegistryAddress: string
-    moduleAddress: string,
-    safeAddress: string,
+    moduleAddress: string
+    safeAddress: string
     noticePeriodChannelClosure: number
   } {
     return this.chain.getInfo()

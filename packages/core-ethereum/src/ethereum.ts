@@ -449,7 +449,12 @@ export async function createChainWrapper(
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (keypair: OffchainKeypair, chain_key: Address, multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+  const announce = async (
+    keypair: OffchainKeypair,
+    chain_key: Address,
+    multiaddr: Multiaddr,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<string> => {
     let confirmationEssentialTxPayload: TransactionPayload
 
     confirmationEssentialTxPayload.data = u8aToHex(get_announce_payload(keypair, chain_key, multiaddr.toString()))
