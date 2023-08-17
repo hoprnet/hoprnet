@@ -13,9 +13,9 @@ use core_types::{
 use ethers::{contract::EthLogDecode, core::abi::RawLog};
 use ethnum::u256;
 use multiaddr::Multiaddr;
+use serde::Deserialize;
 use std::str::FromStr;
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
-use serde::Deserialize;
 
 /// Holds addresses of deployed HOPR contracts
 #[derive(Clone, Debug, Deserialize)]
@@ -43,8 +43,10 @@ impl From<&wasm::ContractAddresses> for ContractAddresses {
             token: Address::from_str(&x.token).expect("invalid token address given"),
             network_registry: Address::from_str(&x.network_registry).expect("invalid network_registry address given"),
             announcements: Address::from_str(&x.announcements).expect("invalid announcements address given"),
-            node_safe_registry: Address::from_str(&x.node_safe_registry).expect("invalid node_safe_registry address given"),
-            node_management_module: Address::from_str(&x.node_management_module).expect("invalid node_management_module address given"),
+            node_safe_registry: Address::from_str(&x.node_safe_registry)
+                .expect("invalid node_safe_registry address given"),
+            node_management_module: Address::from_str(&x.node_management_module)
+                .expect("invalid node_management_module address given"),
         }
     }
 }
@@ -1355,12 +1357,12 @@ pub mod wasm {
     use ethers::{core::abi::RawLog, types::H256};
     use hex::decode_to_slice;
     use js_sys::{Array, Uint8Array};
+    use serde::{Deserialize, Serialize};
     use std::str::FromStr;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::primitives::{Address, Snapshot};
     use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_futures;
-    use serde::{Deserialize, Serialize};
 
     #[wasm_bindgen]
     extern "C" {
@@ -1428,7 +1430,9 @@ pub mod wasm {
             contract_addresses_js: JsValue,
             callbacks: IndexerCallbacks,
         ) -> Handlers {
-            let contract_addresses = serde_wasm_bindgen::from_value::<crate::handlers::wasm::ContractAddresses>(contract_addresses_js).unwrap();
+            let contract_addresses =
+                serde_wasm_bindgen::from_value::<crate::handlers::wasm::ContractAddresses>(contract_addresses_js)
+                    .unwrap();
             Self {
                 w: super::ContractEventHandlers {
                     address_to_monitor: Address::from_str(address_to_monitor).unwrap(),

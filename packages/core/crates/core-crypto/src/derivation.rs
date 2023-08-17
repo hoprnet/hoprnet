@@ -205,8 +205,8 @@ pub mod wasm {
 mod tests {
     use super::*;
     use crate::types::PublicKey;
+    use elliptic_curve::{sec1::ToEncodedPoint, ProjectivePoint, ScalarPrimitive};
     use hex_literal::hex;
-    use elliptic_curve::{ScalarPrimitive, sec1::ToEncodedPoint, ProjectivePoint};
 
     #[test]
     fn test_derive_commitment_seed() {
@@ -266,7 +266,6 @@ mod tests {
 
         let r_v: ProjectivePoint<Secp256k1> = cap_b * params.s - params.v.to_projective_point() * params.h;
 
-        
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
             &[
                 &pub_key.to_address().to_bytes(),

@@ -1,7 +1,7 @@
 use core_crypto::errors::CryptoError;
+use multiaddr::Error as MultiaddrError;
 use thiserror::Error;
 use utils_db::errors::DbError;
-use multiaddr::Error as MultiaddrError;
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumError {
