@@ -30,7 +30,7 @@ import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './ut
 import { BigNumber, errors } from 'ethers'
 import { Filter, Log } from '@ethersproject/abstract-provider'
 
-import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database } from '../db.js'
+import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database, Ethereum_Snapshot } from '../db.js'
 
 
 import { Handlers } from '../../../core/lib/core_hopr.js'
@@ -503,7 +503,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     let fetchedSnapshot = await this.db.get_latest_confirmed_snapshot()
     let lastDatabaseSnapshot =
-      fetchedSnapshot === undefined ? fetchedSnapshot : Snapshot.deserialize(fetchedSnapshot.serialize())
+      fetchedSnapshot === undefined ? fetchedSnapshot : Ethereum_Snapshot.deserialize(fetchedSnapshot.serialize())
 
     // settle transactions before processing events
     if (fetchNativeTxs) {
