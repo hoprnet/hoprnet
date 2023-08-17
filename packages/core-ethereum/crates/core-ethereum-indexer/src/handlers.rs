@@ -21,18 +21,18 @@ use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 #[derive(Clone, Debug, Deserialize)]
 pub struct ContractAddresses {
     /// HoprChannels contract, manages mixnet incentives
-    channels: Address,
+    pub channels: Address,
     /// HoprToken contract, the HOPR token
-    token: Address,
+    pub token: Address,
     /// HoprNetworkRegistry contract, manages authorization to
     /// participate in the HOPR network
-    network_registry: Address,
+    pub network_registry: Address,
     /// HoprAnnouncements, announces network information
-    announcements: Address,
+    pub announcements: Address,
     /// HoprNodeSafeRegistry, mapping from chain_key to Safe instance
-    node_safe_registry: Address,
+    pub node_safe_registry: Address,
     /// NodeManagementModule, permission module for Safe
-    node_management_module: Address,
+    pub node_management_module: Address,
 }
 
 #[cfg(feature = "wasm")]
@@ -472,7 +472,6 @@ pub mod tests {
     const COUNTERPARTY_CHAIN_ADDRESS: [u8; 20] = hex!("f1a73ef496c45e260924a9279d2d9752ae378812");
     const SELF_CHAIN_ADDRESS: [u8; 20] = hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a");
     const STAKE_ADDRESS: [u8; 20] = hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3");
-    const SAFE_ADDRESS: [u8; 20] = hex!("295026fd99ecbabef94940e229f6e022823f1774");
 
     const CHANNELS_ADDR: [u8; 20] = hex!("bab20aea98368220baa4e3b7f151273ee71df93b"); // just a dummy
     const TOKEN_ADDR: [u8; 20] = hex!("47d1677e018e79dcdd8a9c554466cb1556fa5007"); // just a dummy
@@ -1431,7 +1430,7 @@ pub mod wasm {
             callbacks: IndexerCallbacks,
         ) -> Handlers {
             let contract_addresses =
-                serde_wasm_bindgen::from_value::<crate::handlers::wasm::ContractAddresses>(contract_addresses_js)
+                serde_wasm_bindgen::from_value::<ContractAddresses>(contract_addresses_js)
                     .unwrap();
             Self {
                 w: super::ContractEventHandlers {

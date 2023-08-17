@@ -73,6 +73,7 @@ export async function createChainWrapper(
     chain: string
     network: string
   },
+  offchainKeypair: OffchainKeypair,
   keypair: ChainKeypair,
   checkDuplicate: Boolean = true,
   txTimeout = constants.TX_CONFIRMATION_WAIT
@@ -102,7 +103,7 @@ export async function createChainWrapper(
 
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
 
-  const chainCalls = new ChainCalls(keypair, Address.from_string(deploymentExtract.hoprChannelsAddress))
+  const chainCalls = new ChainCalls(new Ethereum_OffchainKeypair(offchainKeypair.secret()), keypair, Address.from_string(deploymentExtract.hoprChannelsAddress))
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -412,14 +413,12 @@ export async function createChainWrapper(
    * @returns a Promise that resolves with the transaction hash
    */
   const announce = async (
-    offchain_keypair: OffchainKeypair,
     multiaddr: Multiaddr,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<string> => {
     let confirmationEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(
         chainCalls.get_announce_payload(
-          new Ethereum_OffchainKeypair(offchain_keypair.secret()),
           multiaddr.toString()
         )
       ),

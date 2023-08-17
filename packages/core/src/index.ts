@@ -1292,7 +1292,7 @@ class Hopr extends EventEmitter {
         'announcing on-chain %s routable address',
         announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
       )
-      const announceTxHash = await connector.announce(addrToAnnounce, this.packetKeypair)
+      const announceTxHash = await connector.announce(addrToAnnounce)
       log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
     } catch (err) {
       log('announcing address %s failed', addrToAnnounce.toString())

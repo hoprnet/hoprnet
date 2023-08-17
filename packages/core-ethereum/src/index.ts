@@ -93,6 +93,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private constructor(
     private db: Ethereum_Database,
+    private offchainKeypair: OffchainKeypair,
     private chainKeypair: ChainKeypair,
     private options: ChainOptions,
     private safeModuleOptions: SafeModuleOptions,
@@ -112,6 +113,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public static async createInstance(
     db: Ethereum_Database,
+    offchainKeypair: OffchainKeypair,
     chainKeypair: ChainKeypair,
     options: ChainOptions,
     safeModuleOptions: SafeModuleOptions,
@@ -120,6 +122,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   ) {
     HoprCoreEthereum._instance = new HoprCoreEthereum(
       db,
+      offchainKeypair,
       chainKeypair,
       options,
       safeModuleOptions,
@@ -168,6 +171,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         deploymentAddresses,
         this.safeModuleOptions,
         this.options,
+        this.offchainKeypair,
         this.chainKeypair,
         true
       )
@@ -222,9 +226,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  announce(multiaddr: Multiaddr, packetKeypair: OffchainKeypair): Promise<string> {
+  announce(multiaddr: Multiaddr): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(packetKeypair, multiaddr, (txHash: string) =>
+    return this.chain.announce(multiaddr, (txHash: string) =>
       this.setTxHandler(`announce-${txHash}`, txHash)
     )
   }

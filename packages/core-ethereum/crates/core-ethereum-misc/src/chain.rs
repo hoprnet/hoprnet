@@ -33,6 +33,7 @@ use utils_types::{
 };
 
 struct ChainCalls {
+    offchain_keypair: OffchainKeypair,
     chain_keypair: ChainKeypair,
     chain_key: Address,
     hopr_channels: Address,
@@ -40,8 +41,9 @@ struct ChainCalls {
 }
 
 impl ChainCalls {
-    pub fn new(chain_keypair: ChainKeypair, hopr_channels: Address) -> Self {
+    pub fn new(offchain_keypair: OffchainKeypair, chain_keypair: ChainKeypair, hopr_channels: Address) -> Self {
         Self {
+            offchain_keypair,
             chain_key: chain_keypair.public().to_address(),
             chain_keypair,
             hopr_channels,
@@ -53,11 +55,11 @@ impl ChainCalls {
         self.use_safe = enabled;
     }
 
-    pub fn announce(&self, offchain_keypair: &OffchainKeypair, announced_multiaddr: &Multiaddr) -> Result<Vec<u8>> {
-        let account_sig = AccountSignature::new(offchain_keypair, &self.chain_key);
+    pub fn announce(&self, announced_multiaddr: &Multiaddr) -> Result<Vec<u8>> {
+        let account_sig = AccountSignature::new(&self.offchain_keypair, &self.chain_key);
 
         if let Some(ending) = announced_multiaddr.protocol_stack().last() {
-            let expected: String = format!("/p2p/{}", offchain_keypair.public().to_peerid_str());
+            let expected: String = format!("/p2p/{}", self.offchain_keypair.public().to_peerid_str());
             if ending == "p2p" && !announced_multiaddr.ends_with(&Multiaddr::from_str(expected.as_str())?) {
                 return Err(InvalidArguments(format!(
                     "Received a multiaddr with incorrect PeerId, got {} but expected {}",
@@ -73,7 +75,7 @@ impl ChainCalls {
             Ok(BindKeysAnnounceSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 base_multiaddr: announced_multiaddr.to_string(),
-                ed_25519_pub_key: H256::from_slice(&offchain_keypair.public().to_bytes()).into(),
+                ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
                 ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                 ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
             }
@@ -81,7 +83,7 @@ impl ChainCalls {
         } else {
             Ok(BindKeysAnnounceCall {
                 base_multiaddr: announced_multiaddr.to_string(),
-                ed_25519_pub_key: H256::from_slice(&offchain_keypair.public().to_bytes()).into(),
+                ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
                 ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                 ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
             }
@@ -351,7 +353,6 @@ pub mod tests {
 
     use super::ChainCalls;
     use ethers::{
-        abi::AbiEncode,
         core::utils::Anvil,
         middleware::SignerMiddleware,
         providers::{Http, Provider},
@@ -381,6 +382,7 @@ pub mod tests {
         let wallet: LocalWallet = anvil.keys()[0].clone().into();
 
         let chain = ChainCalls::new(
+            OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
             ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap(),
             Address::default(),
         );
@@ -404,12 +406,11 @@ pub mod tests {
             .await
             .unwrap();
 
-        let offchain_keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
         let chain_key = PublicKey::from(anvil.keys()[0].public_key());
 
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
 
-        let payload = chain.announce(&offchain_keypair, &test_multiaddr).unwrap();
+        let payload = chain.announce(&test_multiaddr).unwrap();
 
         let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
@@ -498,9 +499,9 @@ pub mod wasm {
     #[wasm_bindgen]
     impl ChainCalls {
         #[wasm_bindgen(constructor)]
-        pub fn new(chain_keypair: ChainKeypair, hopr_channels: Address) -> Self {
+        pub fn new(offchain_keypair: OffchainKeypair, chain_keypair: ChainKeypair, hopr_channels: Address) -> Self {
             Self {
-                w: super::ChainCalls::new(chain_keypair, hopr_channels),
+                w: super::ChainCalls::new(offchain_keypair, chain_keypair, hopr_channels),
             }
         }
 
@@ -512,14 +513,13 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn get_announce_payload(
             &self,
-            offchain_keypair: &OffchainKeypair,
             announced_multiaddr: &str,
         ) -> JsResult<Vec<u8>> {
             let ma = match Multiaddr::from_str(announced_multiaddr) {
                 Ok(ma) => ma,
                 Err(e) => return Err(JsValue::from(e.to_string())),
             };
-            ok_or_jserr!(self.w.announce(offchain_keypair, &ma))
+            ok_or_jserr!(self.w.announce(&ma))
         }
 
         #[wasm_bindgen]
