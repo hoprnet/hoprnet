@@ -19,7 +19,7 @@ const metric_failedSendApiCalls = create_counter(
 
 const DELETE: Operation = [
   async (req, res, _next) => {
-    const tag = req.body.tag
+    const tag: number = req.query.tag as unknown as number
 
     // the popped messages are ignored
     // @ts-ignore unused-variable
@@ -31,8 +31,7 @@ const DELETE: Operation = [
 
 const POST: Operation = [
   async (req, res, _next) => {
-    console.log('SEND 1')
-    const tag = req.body.tag
+    const tag: number = req.body.tag
     const message = encodeMessage(req.body.body)
     const recipient = peerIdFromString(req.body.recipient)
     const hops = req.body.hops
@@ -44,7 +43,6 @@ const POST: Operation = [
     }
 
     try {
-      console.log('SEND')
       let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops, tag)
       log(`after sending message`)
       metric_successfulSendApiCalls.increment()
@@ -72,6 +70,7 @@ DELETE.apiDoc = {
       in: 'query',
       name: 'tag',
       description: 'Tag used to filter target messages.',
+      required: true,
       schema: {
         $ref: '#/components/schemas/MessageTag'
       }
