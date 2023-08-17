@@ -93,6 +93,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private constructor(
     private db: Ethereum_Database,
+    private offchainKeypair: OffchainKeypair,
     private chainKeypair: ChainKeypair,
     private options: ChainOptions,
     private safeModuleOptions: SafeModuleOptions,
@@ -112,6 +113,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public static async createInstance(
     db: Ethereum_Database,
+    offchainKeypair: OffchainKeypair,
     chainKeypair: ChainKeypair,
     options: ChainOptions,
     safeModuleOptions: SafeModuleOptions,
@@ -120,6 +122,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   ) {
     HoprCoreEthereum._instance = new HoprCoreEthereum(
       db,
+      offchainKeypair,
       chainKeypair,
       options,
       safeModuleOptions,
@@ -168,7 +171,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         deploymentAddresses,
         this.safeModuleOptions,
         this.options,
-        this.chainKeypair.secret(),
+        this.offchainKeypair,
+        this.chainKeypair,
         true
       )
     } catch (err) {
@@ -222,9 +226,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  announce(multiaddr: Multiaddr, packetKeypair: OffchainKeypair): Promise<string> {
+  announce(multiaddr: Multiaddr): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(packetKeypair, this.chainKeypair.to_address(), multiaddr, (txHash: string) =>
+    return this.chain.announce(multiaddr, (txHash: string) =>
       this.setTxHandler(`announce-${txHash}`, txHash)
     )
   }
@@ -579,9 +583,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
     log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
 
-    return this.chain.fundChannel(this.chainKeypair.to_address(), dest, myFund, counterpartyFund, (txHash: string) =>
+    return (await this.chain.fundChannel(dest, counterpartyFund, (txHash: string) =>
+      this.setTxHandler(`token-approved-${txHash}`, txHash), (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
-    )
+      // we are only interested in fundChannel receipt
+    ))[1]
   }
 
   public async registerSafeByNode(): Promise<Receipt> {

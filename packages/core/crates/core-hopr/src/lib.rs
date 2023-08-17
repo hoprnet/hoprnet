@@ -18,6 +18,9 @@ pub mod wasm {
     #[allow(unused_imports)]
     use core_path::wasm::*;
 
+    #[allow(unused_imports)]
+    use core_ethereum_indexer::handlers::wasm::*;
+
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]
     #[global_allocator]
