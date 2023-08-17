@@ -64,23 +64,16 @@ import {
   Balance as Packet_Balance,
   WasmNetwork,
   WasmPing,
-  WasmIndexerInteractions
-} from '../lib/core_hopr.js'
+  WasmIndexerInteractions,
+  PeerStatus,
+  PeerOrigin,
+  PingConfig,
+  health_to_string,
+} from '../../core/lib/core_hopr.js'
 core_hopr_initialize_crate()
 registerMetricsCollector(core_hopr_gather_metrics)
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
-
-import {
-  PeerStatus,
-  PeerOrigin,
-  health_to_string,
-  core_network_initialize_crate,
-  core_network_gather_metrics,
-  PingConfig
-} from '../lib/core_network.js'
-core_network_initialize_crate()
-registerMetricsCollector(core_network_gather_metrics)
 
 import { findPath } from './path/index.js'
 
@@ -1432,6 +1425,5 @@ export {
   type ChannelStrategyInterface
 }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
-export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'
-export * from './types.js'
+export { Acknowledgement, CORE_CONSTANTS as CONSTANTS } from '../../core/lib/core_hopr.js'

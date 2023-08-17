@@ -9,13 +9,26 @@ use adaptors::indexer::IndexerProcessed;
 use async_lock::RwLock;
 use futures::{StreamExt, FutureExt, channel::mpsc::Sender};
 
-use core_ethereum_db::db::CoreEthereumDb;
-pub use core_network::{
-    PeerId,
-    heartbeat::HeartbeatConfig,
-    network::Health,
-    ping::PingConfig
+pub use {
+    core_network::{
+        PeerId,
+        heartbeat::HeartbeatConfig,
+        network::{Health, PeerOrigin, PeerStatus},
+        ping::PingConfig
+    },
+    core_types::acknowledgement::Acknowledgement,
 };
+
+#[cfg(feature = "wasm")]
+pub use core_misc::{
+    constants::wasm::*,
+    environment::{
+        ChainOptions, ResolvedNetwork, Network as EnvNetwork,
+        wasm::{supported_networks, resolve_network}
+    }
+};
+
+use core_ethereum_db::db::CoreEthereumDb;
 use core_network::{
     network::{Network, NetworkEvent},
     heartbeat::Heartbeat,

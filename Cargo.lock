@@ -1137,6 +1137,7 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "core-ethereum-misc",
+ "core-misc",
  "core-mixer",
  "core-network",
  "core-p2p",

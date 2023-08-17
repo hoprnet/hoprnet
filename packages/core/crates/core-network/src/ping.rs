@@ -18,7 +18,7 @@ use crate::messaging::ControlMessage;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
-const PINGS_MAX_PARALLEL: usize = 14;
+const MAX_PARALLEL_PINGS: usize = 14;
 
 // TODO: NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
 // in case of faster input than output the memory might run out
@@ -66,7 +66,7 @@ pub struct Ping<T: PingExternalAPI> {
 impl<T: PingExternalAPI> Ping<T> {
     pub fn new(config: PingConfig, send_ping: HeartbeatSendPingTx, receive_pong: HeartbeatGetPongRx, external_api: T) -> Ping<T> {
         let config = PingConfig {
-            max_parallel_pings: config.max_parallel_pings.min(PINGS_MAX_PARALLEL),
+            max_parallel_pings: config.max_parallel_pings.min(MAX_PARALLEL_PINGS),
             ..config
         };
 
