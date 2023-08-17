@@ -1552,7 +1552,6 @@ pub mod wasm {
             block_number: &str,
             snapshot: &Snapshot,
         ) -> JsResult<()> {
-            utils_log::debug!("{:?} {:?} {:?} {:?}", address, topics, data, block_number);
             let contract_address = Address::from_str(address).unwrap();
             let u32_block_number = u32::from_str(block_number).unwrap();
 
@@ -1564,10 +1563,8 @@ pub mod wasm {
             let mut decoded_topics: Vec<H256> = vec![];
 
             for topic in topics.iter() {
-                println!("topic {:?} {}", topic, JsString::from(topic.clone()));
-
-                let foo = ok_or_jserr!(decode(String::from(JsString::from(topic))))?;
-                decoded_topics.push(H256::from_slice(&foo));
+                let decoded_topic = ok_or_jserr!(decode(String::from(JsString::from(topic))))?;
+                decoded_topics.push(H256::from_slice(&decoded_topic));
             }
 
             self.w

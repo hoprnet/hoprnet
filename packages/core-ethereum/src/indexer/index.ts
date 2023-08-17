@@ -29,8 +29,13 @@ import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './ut
 import { BigNumber, errors } from 'ethers'
 import { Filter, Log } from '@ethersproject/abstract-provider'
 
-import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database, Ethereum_Snapshot, Ethereum_U256 } from '../db.js'
-
+import {
+  CORE_ETHEREUM_CONSTANTS,
+  Ethereum_Address,
+  Ethereum_Database,
+  Ethereum_Snapshot,
+  Ethereum_U256
+} from '../db.js'
 
 import { Handlers } from '../../../core/lib/core_hopr.js'
 
@@ -279,20 +284,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   > {
     let rawEvents: Log[] = []
 
-    //   export interface EventFilter {
-    //     address?: string;
-    //     topics?: Array<string | Array<string> | null>;
-    // }
-
-    // export interface Filter extends EventFilter {
-    //     fromBlock?: BlockTag,
-    //     toBlock?: BlockTag,
-    // }
-
     const provider = this.chain.getProvider()
     const contractAddresses = this.chain.getInfo()
 
-    let new_queries: Filter[] = [
+    let queries: Filter[] = [
       {
         address: contractAddresses.hoprAnnouncementsAddress,
         topics: [this.handlers.get_announcement_topics()],
@@ -324,7 +319,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // that don't retry on failed attempts and thus makes the indexer
     // handle errors produced by internal Ethers.js provider calls
     if (fetchTokenTransactions) {
-      new_queries.push({
+      queries.push({
         address: contractAddresses.hoprTokenAddress,
         topics: [this.handlers.get_token_topics()],
         fromBlock,
@@ -332,26 +327,14 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       })
     }
 
-    for (const query of new_queries) {
-      // let tmpEvents: TypedEvent<any, any>[]
-
-      rawEvents.push(...(await provider.getLogs(query)))
-      // try {
-      //   tmpEvents = (await query.contract.queryFilter(query.filter, fromBlock, toBlock)) as any
-      // } catch {
-      //   return {
-      //     success: false
-      //   }
-      // }
-
-      // for (const event of tmpEvents) {
-      //   Object.assign(event, query.contract.interface.parseLog(event))
-
-      //   if (event.event == undefined) {
-      //     Object.assign(event, { event: (event as any).name })
-      //   }
-      //   rawEvents.push(event)
-      // }
+    for (const query of queries) {
+      try {
+        rawEvents.push(...(await provider.getLogs(query)))
+      } catch {
+        return {
+          success: false
+        }
+      }
     }
 
     // sort in-place
@@ -746,9 +729,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       try {
         await this.handlers.on_event(
           this.db,
-          event.address.replace("0x", ""),
-          event.topics.map(t => t.replace("0x", "")),
-          event.data.replace("0x", ""),
+          event.address.replace('0x', ''),
+          event.topics.map((t) => t.replace('0x', '')),
+          event.data.replace('0x', ''),
           blockNumber.toString(),
           lastDatabaseSnapshot
         )
