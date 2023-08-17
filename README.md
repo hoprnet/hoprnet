@@ -187,6 +187,10 @@ Options:
           Number of confirmations required for on-chain transactions [env: HOPRD_ON_CHAIN_CONFIRMATIONS=] [default: 8]
       --networkQualityThreshold <THRESHOLD>
           Miniumum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=] [default: 0.5]
+      --safeAddress <HOPRD_SAFE_ADDR>
+          The Safe instance for a node where its HOPR tokens are held
+      --moduleAddress <HOPRD_MODULE_ADDRESS> [env: HOPRD_SAFE_ADDR=]
+          The node management module instance that manages node permission to assets held in safe [env: HOPRD_MODULE_ADDRESS=]
   -h, --help
           Print help
   -V, --version
@@ -291,6 +295,10 @@ make run-hopr-admin &
 Running one node in test mode, with safe and module attached
 
 ```sh
+# clean up, e.g.
+# make kill-anvil
+# make clean
+
 # build deps and HOPRd code
 make -j deps && make -j build
 

@@ -27,7 +27,12 @@ import {
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
-import { CORE_ETHEREUM_CONSTANTS, get_announce_payload } from '../lib/core_ethereum_misc.js'
+import {
+  CORE_ETHEREUM_CONSTANTS,
+  get_announce_payload,
+  OffchainKeypair as Ethereum_OffchainKeypair,
+  Address as Ethereum_Address
+} from '../lib/core_ethereum_misc.js'
 import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
@@ -455,11 +460,17 @@ export async function createChainWrapper(
     multiaddr: Multiaddr,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<string> => {
-    let confirmationEssentialTxPayload: TransactionPayload
-
-    confirmationEssentialTxPayload.data = u8aToHex(get_announce_payload(keypair, chain_key, multiaddr.toString()))
-    confirmationEssentialTxPayload.to = deploymentExtract.hoprAnnouncementsAddress
-
+    let confirmationEssentialTxPayload: TransactionPayload = {
+      data: u8aToHex(
+        get_announce_payload(
+          new Ethereum_OffchainKeypair(keypair.secret()),
+          Ethereum_Address.deserialize(chain_key.serialize()),
+          multiaddr.toString()
+        )
+      ),
+      to: deploymentExtract.hoprAnnouncementsAddress,
+      value: BigNumber.from(0)
+    }
     // @ts-ignore fixme: treat result
     let sendResult: SendTransactionReturn
     // @ts-ignore fixme: treat result
