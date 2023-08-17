@@ -7,7 +7,9 @@ import { createAuthenticatedTestApiInstance } from './../../fixtures.js'
 import { STATUS_CODES } from './../../utils.js'
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
-import { Address, LevelDb } from '@hoprnet/hopr-utils'
+import { LevelDb } from '@hoprnet/hopr-utils'
+import { Address } from '../../../../../lib/hoprd_misc.js'
+
 import { Database } from '../../../../../../core/lib/core_hopr.js'
 
 describe('POST /tokens', function () {
