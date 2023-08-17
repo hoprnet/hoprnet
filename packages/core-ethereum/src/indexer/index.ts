@@ -15,7 +15,6 @@ import {
   debug,
   retryWithBackoffThenThrow,
   ordered,
-  u8aToHex,
   FIFO,
   type DeferType,
   create_multi_counter,
@@ -28,13 +27,13 @@ import {
 import type { ChainWrapper } from '../ethereum.js'
 import { type IndexerEventEmitter, IndexerStatus, type IndexerEvents } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
-import { BigNumber, type Contract, errors } from 'ethers'
+import { BigNumber, errors } from 'ethers'
+import { Filter, Log } from '@ethersproject/abstract-provider'
 
 import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database } from '../db.js'
 
-import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
 
-import { Handlers } from '../../lib/core_ethereum_indexer.js'
+import { Handlers } from '../../../core/lib/core_hopr.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
@@ -87,7 +86,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public startupBlock: number = 0 // blocknumber at which the indexer starts
 
   // Use FIFO + sliding window for many events
-  private unconfirmedEvents: FIFO<TypedEvent<any, any>>
+  private unconfirmedEvents: FIFO<Log>
 
   private chain: ChainWrapper
   private genesisBlock: number
@@ -108,7 +107,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   ) {
     super()
 
-    this.unconfirmedEvents = FIFO<TypedEvent<any, any>>()
+    this.unconfirmedEvents = FIFO<Log>()
   }
 
   /**
@@ -273,45 +272,51 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   ): Promise<
     | {
         success: true
-        events: TypedEvent<any, any>[]
+        events: Log[]
       }
     | {
         success: false
       }
   > {
-    let rawEvents: TypedEvent<any, any>[] = []
+    let rawEvents: Log[] = []
 
-    const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
-      // HoprChannels
+    //   export interface EventFilter {
+    //     address?: string;
+    //     topics?: Array<string | Array<string> | null>;
+    // }
+
+    // export interface Filter extends EventFilter {
+    //     fromBlock?: BlockTag,
+    //     toBlock?: BlockTag,
+    // }
+
+    const provider = this.chain.getProvider()
+    const contractAddresses = this.chain.getInfo()
+
+    let new_queries: Filter[] = [
       {
-        contract: this.chain.getChannels() as unknown as Contract,
-        filter: {
-          topics: [
-            [
-              // Relevant channel events
-              // this.chain.getChannels().interface.getEventTopic('Announcement'),
-              // this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
-              // this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
-            ]
-          ]
-        }
+        address: contractAddresses.hoprAnnouncementsAddress,
+        topics: [this.handlers.get_announcement_topics()],
+        fromBlock,
+        toBlock
       },
-      // HoprNetworkRegistry
       {
-        contract: this.chain.getNetworkRegistry() as unknown as Contract,
-        filter: {
-          topics: [
-            [
-              // Relevant HoprNetworkRegistry events
-              // this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
-            ]
-          ]
-        }
+        address: contractAddresses.hoprChannelsAddress,
+        topics: [this.handlers.get_channel_topics()],
+        fromBlock,
+        toBlock
+      },
+      {
+        address: contractAddresses.hoprNodeSafeRegistryAddress,
+        topics: [this.handlers.get_node_safe_registry_topics()],
+        fromBlock,
+        toBlock
+      },
+      {
+        address: contractAddresses.hoprNetworkRegistryAddress,
+        topics: [this.handlers.get_network_registry_topics()],
+        fromBlock,
+        toBlock
       }
     ]
 
@@ -320,47 +325,34 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // that don't retry on failed attempts and thus makes the indexer
     // handle errors produced by internal Ethers.js provider calls
     if (fetchTokenTransactions) {
-      queries.push({
-        contract: this.chain.getToken() as unknown as Contract,
-        filter: {
-          topics: [
-            // Token transfer *from* us
-            [this.chain.getToken().interface.getEventTopic('Transfer')],
-            [u8aToHex(this.address.to_bytes32())]
-          ]
-        }
-      })
-      queries.push({
-        contract: this.chain.getToken() as unknown as Contract,
-        filter: {
-          topics: [
-            // Token transfer *towards* us
-            [this.chain.getToken().interface.getEventTopic('Transfer')],
-            null,
-            [u8aToHex(this.address.to_bytes32())]
-          ]
-        }
+      new_queries.push({
+        address: contractAddresses.hoprTokenAddress,
+        topics: [this.handlers.get_token_topics()],
+        fromBlock,
+        toBlock
       })
     }
 
-    for (const query of queries) {
-      let tmpEvents: TypedEvent<any, any>[]
-      try {
-        tmpEvents = (await query.contract.queryFilter(query.filter, fromBlock, toBlock)) as any
-      } catch {
-        return {
-          success: false
-        }
-      }
+    for (const query of new_queries) {
+      // let tmpEvents: TypedEvent<any, any>[]
 
-      for (const event of tmpEvents) {
-        Object.assign(event, query.contract.interface.parseLog(event))
+      rawEvents.push(...(await provider.getLogs(query)))
+      // try {
+      //   tmpEvents = (await query.contract.queryFilter(query.filter, fromBlock, toBlock)) as any
+      // } catch {
+      //   return {
+      //     success: false
+      //   }
+      // }
 
-        if (event.event == undefined) {
-          Object.assign(event, { event: (event as any).name })
-        }
-        rawEvents.push(event)
-      }
+      // for (const event of tmpEvents) {
+      //   Object.assign(event, query.contract.interface.parseLog(event))
+
+      //   if (event.event == undefined) {
+      //     Object.assign(event, { event: (event as any).name })
+      //   }
+      //   rawEvents.push(event)
+      // }
     }
 
     // sort in-place
@@ -643,7 +635,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @dev ignores events that have been processed before.
    * @param events new unprocessed events
    */
-  private onNewEvents(events: TypedEvent<any, any>[] | undefined): void {
+  private onNewEvents(events: Log[] | undefined): void {
     if (events == undefined || events.length == 0) {
       // Nothing to do
       return
@@ -720,9 +712,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     ) {
       const event = this.unconfirmedEvents.shift()
       log(
-        'Processing event %s blockNumber=%s maxConfirmations=%s',
+        'Processing event at blockNumber=%s maxConfirmations=%s',
         // @TODO: fix type clash
-        event.event,
         blockNumber,
         this.maxConfirmations
       )
@@ -751,7 +742,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         new U256(event.logIndex.toString())
       )
 
-      log('Event name %s and hash %s', event.event, event.transactionHash)
+      log('Event and hash %s', event.transactionHash)
 
       try {
         await this.handlers.on_event(
@@ -763,7 +754,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           lastDatabaseSnapshot
         )
       } catch (err) {
-        error('Error while processing', event)
+        error('Error while processing', err, event)
       }
     }
   }

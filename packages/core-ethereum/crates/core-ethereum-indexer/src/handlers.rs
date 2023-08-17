@@ -1,8 +1,19 @@
 use crate::errors::{CoreEthereumIndexerError, Result};
 use bindings::{
-    hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
-    hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_management_module::HoprNodeManagementModuleEvents,
-    hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_token::HoprTokenEvents,
+    hopr_announcements::{
+        AddressAnnouncementFilter, HoprAnnouncementsEvents, KeyBindingFilter, RevokeAnnouncementFilter,
+    },
+    hopr_channels::{
+        ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
+        HoprChannelsEvents, OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
+    },
+    hopr_network_registry::{
+        DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter, HoprNetworkRegistryEvents,
+        NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter,
+    },
+    hopr_node_management_module::HoprNodeManagementModuleEvents,
+    hopr_node_safe_registry::{DergisteredNodeSafeFilter, HoprNodeSafeRegistryEvents, RegisteredNodeSafeFilter},
+    hopr_token::{ApprovalFilter, HoprTokenEvents, TransferFilter},
 };
 use core_crypto::types::OffchainSignature;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -10,7 +21,11 @@ use core_types::{
     account::{AccountEntry, AccountSignature, AccountType},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
-use ethers::{contract::EthLogDecode, core::abi::RawLog};
+use ethers::{
+    contract::{EthEvent, EthLogDecode},
+    core::abi::RawLog,
+    types::TxHash,
+};
 use ethnum::u256;
 use multiaddr::Multiaddr;
 use serde::Deserialize;
@@ -75,6 +90,47 @@ impl<Cbs> ContractEventHandlers<Cbs>
 where
     Cbs: IndexerCallbacks,
 {
+    pub fn get_channel_topics(&self) -> Vec<TxHash> {
+        vec![
+            ChannelBalanceDecreasedFilter::signature(),
+            ChannelBalanceIncreasedFilter::signature(),
+            ChannelClosedFilter::signature(),
+            ChannelOpenedFilter::signature(),
+            OutgoingChannelClosureInitiatedFilter::signature(),
+            TicketRedeemedFilter::signature(),
+        ]
+    }
+
+    pub fn get_token_topics(&self) -> Vec<TxHash> {
+        vec![TransferFilter::signature(), ApprovalFilter::signature()]
+    }
+
+    pub fn get_network_registry_topics(&self) -> Vec<TxHash> {
+        vec![
+            DeregisteredByManagerFilter::signature(),
+            DeregisteredFilter::signature(),
+            EligibilityUpdatedFilter::signature(),
+            NetworkRegistryStatusUpdatedFilter::signature(),
+            RegisteredByManagerFilter::signature(),
+            RegisteredFilter::signature(),
+        ]
+    }
+
+    pub fn get_announcement_topics(&self) -> Vec<TxHash> {
+        vec![
+            AddressAnnouncementFilter::signature(),
+            KeyBindingFilter::signature(),
+            RevokeAnnouncementFilter::signature(),
+        ]
+    }
+
+    pub fn get_node_safe_registry_topics(&self) -> Vec<TxHash> {
+        vec![
+            RegisteredNodeSafeFilter::signature(),
+            DergisteredNodeSafeFilter::signature(),
+        ]
+    }
+
     async fn on_announcement_event<T>(
         &self,
         db: &mut T,
@@ -409,14 +465,14 @@ where
     where
         T: HoprCoreEthereumDbActions,
     {
+        utils_log::debug!("indexer received log {:?}", log);
+
         Ok(if address.eq(&self.addresses.announcements) {
             self.on_announcement_event(db, log, block_number, snapshot).await?;
         } else if address.eq(&self.addresses.channels) {
             self.on_channel_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.network_registry) {
             self.on_network_registry_event(db, log, snapshot).await?;
-        } else if address.eq(&self.addresses.node_safe_registry) {
-            self.on_node_safe_registry_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.token) {
             self.on_token_event(db, log, snapshot).await?;
         } else if address.eq(&self.addresses.node_safe_registry) {
@@ -1355,7 +1411,7 @@ pub mod wasm {
     use core_types::{account::AccountEntry, channels::ChannelEntry};
     use ethers::{core::abi::RawLog, types::H256};
     use hex::decode_to_slice;
-    use js_sys::{Array, Uint8Array};
+    use js_sys::{Array, JsString, Uint8Array};
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
@@ -1423,6 +1479,51 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Handlers {
         #[wasm_bindgen]
+        pub fn get_token_topics(&self) -> Vec<JsString> {
+            self.w
+                .get_token_topics()
+                .iter()
+                .map(|t| JsString::from(format!("0x{}", hex::encode(t.0))))
+                .collect::<Vec<_>>()
+        }
+
+        #[wasm_bindgen]
+        pub fn get_announcement_topics(&self) -> Vec<JsString> {
+            self.w
+                .get_announcement_topics()
+                .iter()
+                .map(|t| JsString::from(format!("0x{}", hex::encode(t.0))))
+                .collect::<Vec<_>>()
+        }
+
+        #[wasm_bindgen]
+        pub fn get_channel_topics(&self) -> Vec<JsString> {
+            self.w
+                .get_channel_topics()
+                .iter()
+                .map(|t| JsString::from(format!("0x{}", hex::encode(t.0))))
+                .collect::<Vec<_>>()
+        }
+
+        #[wasm_bindgen]
+        pub fn get_network_registry_topics(&self) -> Vec<JsString> {
+            self.w
+                .get_network_registry_topics()
+                .iter()
+                .map(|t| JsString::from(format!("0x{}", hex::encode(t.0))))
+                .collect::<Vec<_>>()
+        }
+
+        #[wasm_bindgen]
+        pub fn get_node_safe_registry_topics(&self) -> Vec<JsString> {
+            self.w
+                .get_node_safe_registry_topics()
+                .iter()
+                .map(|t| JsString::from(format!("0x{}", hex::encode(t.0))))
+                .collect::<Vec<_>>()
+        }
+
+        #[wasm_bindgen]
         pub fn init(
             address_to_monitor: &str,
             chain_key: &str,
@@ -1430,8 +1531,7 @@ pub mod wasm {
             callbacks: IndexerCallbacks,
         ) -> Handlers {
             let contract_addresses =
-                serde_wasm_bindgen::from_value::<ContractAddresses>(contract_addresses_js)
-                    .unwrap();
+                serde_wasm_bindgen::from_value::<ContractAddresses>(contract_addresses_js).unwrap();
             Self {
                 w: super::ContractEventHandlers {
                     address_to_monitor: Address::from_str(address_to_monitor).unwrap(),

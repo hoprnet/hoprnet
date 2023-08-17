@@ -17,7 +17,16 @@ import {
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
-import { CORE_ETHEREUM_CONSTANTS, ChainCalls, OffchainKeypair as Ethereum_OffchainKeypair } from '../lib/core_ethereum_misc.js'
+import {
+  CORE_ETHEREUM_CONSTANTS,
+  ChainCalls,
+  OffchainKeypair as Ethereum_OffchainKeypair,
+  ChainKeypair as Ethereum_Chainkeypair,
+  Address as CoreEthereum_Address,
+  Balance as CoreEthereum_Balance,
+  BalanceType as CoreEthereum_BalanceType,
+  AcknowledgedTicket as CoreEthereum_AcknowledgedTicket
+} from '../../core/lib/core_hopr.js'
 import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
@@ -33,7 +42,6 @@ import {
 
 import { SafeModuleOptions } from './index.js'
 import { Multiaddr } from '@multiformats/multiaddr'
-import { Ethereum_AcknowledgedTicket, Ethereum_Address, Ethereum_Balance, Ethereum_BalanceType } from './db.js'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -103,7 +111,11 @@ export async function createChainWrapper(
 
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
 
-  const chainCalls = new ChainCalls(new Ethereum_OffchainKeypair(offchainKeypair.secret()), keypair, Address.from_string(deploymentExtract.hoprChannelsAddress))
+  const chainCalls = new ChainCalls(
+    new Ethereum_OffchainKeypair(offchainKeypair.secret()),
+    new Ethereum_Chainkeypair(keypair.secret()),
+    CoreEthereum_Address.from_string(deploymentExtract.hoprChannelsAddress)
+  )
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -412,16 +424,9 @@ export async function createChainWrapper(
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (
-    multiaddr: Multiaddr,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<string> => {
+  const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
     let confirmationEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(
-        chainCalls.get_announce_payload(
-          multiaddr.toString()
-        )
-      ),
+      data: u8aToHex(chainCalls.get_announce_payload(multiaddr.toString())),
       to: deploymentExtract.hoprAnnouncementsAddress,
       value: BigNumber.from(0)
     }
@@ -477,8 +482,8 @@ export async function createChainWrapper(
           withdrawEssentialTxPayload = {
             data: u8aToHex(
               chainCalls.get_transfer_payload(
-                Ethereum_Address.from_string(recipient),
-                new Ethereum_Balance(amount, Ethereum_BalanceType.HOPR)
+                CoreEthereum_Address.from_string(recipient),
+                new CoreEthereum_Balance(amount, CoreEthereum_BalanceType.HOPR)
               )
             ),
             to: token.address,
@@ -526,7 +531,7 @@ export async function createChainWrapper(
     const approveTxPayload: TransactionPayload = {
       data: u8aToHex(
         chainCalls.get_approve_payload(
-          Ethereum_Balance.deserialize(amount.serialize_value(), Ethereum_BalanceType.HOPR)
+          CoreEthereum_Balance.deserialize(amount.serialize_value(), CoreEthereum_BalanceType.HOPR)
         )
       ),
       to: token.address,
@@ -555,8 +560,8 @@ export async function createChainWrapper(
     const fundChannelPayload: TransactionPayload = {
       data: u8aToHex(
         chainCalls.get_fund_channel_payload(
-          Ethereum_Address.deserialize(destination.serialize()),
-          Ethereum_Balance.deserialize(amount.serialize_value(), Ethereum_BalanceType.HOPR)
+          CoreEthereum_Address.deserialize(destination.serialize()),
+          CoreEthereum_Balance.deserialize(amount.serialize_value(), CoreEthereum_BalanceType.HOPR)
         )
       ),
       to: channels.address,
@@ -595,7 +600,11 @@ export async function createChainWrapper(
     let error: unknown
 
     const initiateOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(chainCalls.get_intiate_outgoing_channel_closure_payload(counterparty)),
+      data: u8aToHex(
+        chainCalls.get_intiate_outgoing_channel_closure_payload(
+          CoreEthereum_Address.deserialize(counterparty.serialize())
+        )
+      ),
       to: channels.address,
       value: BigNumber.from(0)
     }
@@ -637,7 +646,9 @@ export async function createChainWrapper(
 
     const finalizeOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(
-        chainCalls.get_finalize_outgoing_channel_closure_payload(Ethereum_Address.deserialize(counterparty.serialize()))
+        chainCalls.get_finalize_outgoing_channel_closure_payload(
+          CoreEthereum_Address.deserialize(counterparty.serialize())
+        )
       ),
       to: channels.address,
       value: BigNumber.from(0)
@@ -683,7 +694,7 @@ export async function createChainWrapper(
 
     const redeemTicketEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(
-        chainCalls.get_redeem_ticket_payload(Ethereum_AcknowledgedTicket.deserialize(ackTicket.serialize()))
+        chainCalls.get_redeem_ticket_payload(CoreEthereum_AcknowledgedTicket.deserialize(ackTicket.serialize()))
       ),
       to: channels.address,
       value: BigNumber.from(0)
@@ -726,7 +737,7 @@ export async function createChainWrapper(
 
     const registerSafeByNodeEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(
-        chainCalls.get_register_safe_by_node_payload(Ethereum_Address.deserialize(safeAddress.serialize()))
+        chainCalls.get_register_safe_by_node_payload(CoreEthereum_Address.deserialize(safeAddress.serialize()))
       ),
       to: nodeSafeRegistry.address,
       value: BigNumber.from(0)
@@ -967,6 +978,7 @@ export async function createChainWrapper(
     ) as TransactionManager['getAllUnconfirmedHash'],
     getAllQueuingTransactionRequests: transactions.getAllQueuingTxs.bind(
       transactions
-    ) as TransactionManager['getAllQueuingTxs']
+    ) as TransactionManager['getAllQueuingTxs'],
+    getProvider: () => provider
   }
 }
