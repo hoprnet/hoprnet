@@ -30,7 +30,7 @@ import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './ut
 import { BigNumber, errors } from 'ethers'
 import { Filter, Log } from '@ethersproject/abstract-provider'
 
-import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database, Ethereum_Snapshot } from '../db.js'
+import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database, Ethereum_Snapshot, Ethereum_U256 } from '../db.js'
 
 
 import { Handlers } from '../../../core/lib/core_hopr.js'
@@ -737,9 +737,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       // @TODO: fix type clash
       lastDatabaseSnapshot = new Ethereum_Snapshot(
-        new U256(event.blockNumber.toString()),
-        new U256(event.transactionIndex.toString()),
-        new U256(event.logIndex.toString())
+        new Ethereum_U256(event.blockNumber.toString()),
+        new Ethereum_U256(event.transactionIndex.toString()),
+        new Ethereum_U256(event.logIndex.toString())
       )
 
       log('Event and hash %s', event.transactionHash)
