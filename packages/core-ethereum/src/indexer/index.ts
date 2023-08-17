@@ -736,7 +736,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
 
       // @TODO: fix type clash
-      lastDatabaseSnapshot = new Snapshot(
+      lastDatabaseSnapshot = new Ethereum_Snapshot(
         new U256(event.blockNumber.toString()),
         new U256(event.transactionIndex.toString()),
         new U256(event.logIndex.toString())
