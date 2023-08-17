@@ -209,10 +209,6 @@ contract HoprChannels is
         uint256 porSecret;
     }
 
-    // struct TokensReceivedFundChannel {
-
-    // }
-
     /**
      * Stores channels, indexed by their channelId
      */
