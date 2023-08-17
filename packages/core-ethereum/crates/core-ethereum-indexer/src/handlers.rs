@@ -1410,8 +1410,8 @@ pub mod wasm {
     use core_ethereum_db::db::wasm::Database;
     use core_types::{account::AccountEntry, channels::ChannelEntry};
     use ethers::{core::abi::RawLog, types::H256};
-    use hex::decode_to_slice;
-    use js_sys::{Array, JsString, Uint8Array};
+    use hex::decode;
+    use js_sys::{Array, JsString};
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
@@ -1552,11 +1552,11 @@ pub mod wasm {
             block_number: &str,
             snapshot: &Snapshot,
         ) -> JsResult<()> {
+            utils_log::debug!("{:?} {:?} {:?} {:?}", address, topics, data, block_number);
             let contract_address = Address::from_str(address).unwrap();
             let u32_block_number = u32::from_str(block_number).unwrap();
 
-            let mut decoded_data = Vec::with_capacity(data.len() * 2);
-            ok_or_jserr!(decode_to_slice(data, &mut decoded_data))?;
+            let decoded_data = ok_or_jserr!(decode(data))?;
 
             let val = db.as_ref_counted();
             let mut g = val.write().await;
@@ -1564,14 +1564,10 @@ pub mod wasm {
             let mut decoded_topics: Vec<H256> = vec![];
 
             for topic in topics.iter() {
-                let mut decoded: [u8; 32] = [0u8; 32];
+                println!("topic {:?} {}", topic, JsString::from(topic.clone()));
 
-                ok_or_jserr!(decode_to_slice(
-                    Uint8Array::from(topic.to_owned()).to_vec(),
-                    &mut decoded
-                ))?;
-
-                decoded_topics.push(decoded.to_owned().into());
+                let foo = ok_or_jserr!(decode(String::from(JsString::from(topic))))?;
+                decoded_topics.push(H256::from_slice(&foo));
             }
 
             self.w

@@ -20,7 +20,6 @@ import {
   create_multi_counter,
   create_gauge,
   // create_multi_gauge,
-  U256,
   random_integer
 } from '@hoprnet/hopr-utils'
 
@@ -747,9 +746,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       try {
         await this.handlers.on_event(
           this.db,
-          event.address,
-          event.topics,
-          event.data,
+          event.address.replace("0x", ""),
+          event.topics.map(t => t.replace("0x", "")),
+          event.data.replace("0x", ""),
           blockNumber.toString(),
           lastDatabaseSnapshot
         )
