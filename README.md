@@ -293,6 +293,7 @@ make run-hopr-admin &
 ```
 
 ### Local node with safe staking service (local network)
+
 Running one node in test mode, with safe and module attached (in anvil-localhost network)
 
 ```sh
@@ -328,7 +329,9 @@ make fund-local-all id_dir=`pwd`
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &
 ```
+
 ### Local node with safe staking service (rotsee network)
+
 Running one node in test mode, with safe and module attached (in rotsee network)
 
 ```sh
