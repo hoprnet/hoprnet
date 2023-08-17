@@ -213,7 +213,7 @@ components:
       description: Blockchain-native account address. Can be funded from external wallets (starts with **0x...**). It **can't be used** internally to send / receive messages, open / close payment channels.
       example: 1.339446426793328e+48
     HoprAddress:
-      format: peerId
+      format: peerid
       type: string
       description: HOPR account address, also called a PeerId. Used to send / receive messages, open / close payment channels.
       example: 12Diu2HAmVfV4GKQhdECMqYmUMGLy84RjTJQ
