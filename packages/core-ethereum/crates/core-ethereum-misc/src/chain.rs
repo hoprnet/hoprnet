@@ -63,7 +63,7 @@ impl ChainCalls {
             if ending == "p2p" && !announced_multiaddr.ends_with(&Multiaddr::from_str(expected.as_str())?) {
                 return Err(InvalidArguments(format!(
                     "Received a multiaddr with incorrect PeerId, got {} but expected {}",
-                    announced_multiaddr.to_string(),
+                    announced_multiaddr,
                     expected
                 )));
             }
@@ -215,14 +215,14 @@ impl ChainCalls {
         };
 
         let params = Vrfparameters {
-            vx: U256::from_big_endian(&v[0..32]).into(),
-            vy: U256::from_big_endian(&v[32..64]).into(),
+            vx: U256::from_big_endian(&v[0..32]),
+            vy: U256::from_big_endian(&v[32..64]),
             s: U256::from_big_endian(&vrf_output.s.to_bytes()),
             h: U256::from_big_endian(&vrf_output.h.to_bytes()),
-            s_bx: U256::from_big_endian(&s_b[0..32]).into(),
-            s_by: U256::from_big_endian(&s_b[32..64]).into(),
-            h_vx: U256::from_big_endian(&h_v[0..32]).into(),
-            h_vy: U256::from_big_endian(&h_v[32..64]).into(),
+            s_bx: U256::from_big_endian(&s_b[0..32]),
+            s_by: U256::from_big_endian(&s_b[32..64]),
+            h_vx: U256::from_big_endian(&h_v[0..32]),
+            h_vy: U256::from_big_endian(&h_v[32..64]),
         };
 
         if self.use_safe {
@@ -492,7 +492,7 @@ pub mod wasm {
     use wasm_bindgen::{prelude::*, JsValue};
 
     #[wasm_bindgen]
-    struct ChainCalls {
+    pub struct ChainCalls {
         w: super::ChainCalls,
     }
 

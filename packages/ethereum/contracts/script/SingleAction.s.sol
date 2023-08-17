@@ -315,36 +315,26 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     //   vm.stopBroadcast();
     // }
 
-    // /**
-    //  * @dev On network registry contract, register nodes to a set of addresses. This function should only be called by the owner
-    //  */
-    // function registerNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
-    //   require(stakingAddresses.length == peerIds.length, 'Input lengths are different');
+    /**
+     * @dev On network registry contract, register nodes and safes
+     * This function should only be called by a manager
+     */
+    function registerNodes(address[] calldata stakingAccounts, address[] calldata nodeAddresses) external {
+      require(stakingAccounts.length == nodeAddresses.length, 'Input lengths are different');
 
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+      // 1. get network and msg.sender
+      getNetworkAndMsgSender();
 
-    //   // 2. owner registers nodes, depending on the environment
-    //   if (currentEnvironmentType == EnvironmentType.LOCAL) {
-    //     // call register accounts on HoprDummyProxyForNetworkRegistry
-    //     (bool successRegisterNodesOnDummyProxy, ) = currentNetworkDetail.networkRegistryProxyContractAddress.call(
-    //       abi.encodeWithSignature('ownerBatchAddAccounts(address[])', stakingAddresses)
-    //     );
-    //     if (!successRegisterNodesOnDummyProxy) {
-    //       emit log_string('Cannot add stakingAddresses on to the dummy proxy.');
-    //       revert('Cannot add stakingAddresses on to the dummy proxy.');
-    //     }
-    //   }
-    //   // actual register nodes
-    //   (bool successRegisterNodes, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('ownerRegister(address[],string[])', stakingAddresses, peerIds)
-    //   );
-    //   if (!successRegisterNodes) {
-    //     emit log_string('Cannot register nodes as an owner');
-    //     revert('Cannot register nodes as an owner');
-    //   }
-    //   vm.stopBroadcast();
-    // }
+      // 2. register nodes
+      (bool successRegisterNodes, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+        abi.encodeWithSignature('managerRegister(address[],address[])', stakingAccounts, nodeAddresses)
+      );
+      if (!successRegisterNodes) {
+        emit log_string('Cannot register nodes as a manager');
+        revert('Cannot register nodes as a manager');
+      }
+      vm.stopBroadcast();
+    }
 
     // /**
     //  * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be called by the owner

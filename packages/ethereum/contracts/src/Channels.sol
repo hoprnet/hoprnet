@@ -119,10 +119,10 @@ contract HoprChannels is
 
     // ERC-777 tokensReceived hook, fundChannelMulti
     uint256 public immutable ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE =
-        abi.encode(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
+        abi.encodePacked(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
 
     // ERC-777 tokensReceived hook, fundChannel
-    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encode(address(0), address(0)).length;
+    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encodePacked(address(0), address(0)).length;
 
     string public constant VERSION = "2.0.0";
 
@@ -620,7 +620,17 @@ contract HoprChannels is
 
         // Opens an outgoing channel
         if (userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE) {
-            (address src, address dest) = abi.decode(userData, (address, address));
+            if (amount > type(uint96).max) {
+                revert BalanceExceedsGlobalPerChannelAllowance();
+            }
+
+            address src;
+            address dest;
+
+            assembly {
+                src := shr(96, calldataload(userData.offset))
+                dest := shr(96, calldataload(add(userData.offset, 20)))
+            }
 
             address safeAddress = registry.nodeToSafe(src);
 
@@ -639,8 +649,17 @@ contract HoprChannels is
             _fundChannelInternal(src, dest, Balance.wrap(uint96(amount)));
             // Opens two channels, donating msg.sender's tokens
         } else if (userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE) {
-            (address account1, Balance amount1, address account2, Balance amount2) =
-                abi.decode(userData, (address, Balance, address, Balance));
+            address account1;
+            Balance amount1;
+            address account2;
+            Balance amount2;
+
+            assembly {
+                account1 := shr(96, calldataload(userData.offset))
+                amount1 := shr(160, calldataload(add(0x14, userData.offset)))
+                account2 := shr(96, calldataload(add(0x20, userData.offset)))
+                amount2 := shr(160, calldataload(add(0x34, userData.offset)))
+            }
 
             if (amount == 0 || amount != uint256(Balance.unwrap(amount1)) + uint256(Balance.unwrap(amount2))) {
                 revert InvalidBalance();
