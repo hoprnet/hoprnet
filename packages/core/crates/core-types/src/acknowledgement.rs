@@ -2,7 +2,7 @@ use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAs
 use crate::channels::Ticket;
 use core_crypto::errors::CryptoError::{InvalidChallenge, SignatureVerification};
 use core_crypto::keypairs::OffchainKeypair;
-use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response};
+use core_crypto::types::{HalfKey, HalfKeyChallenge, OffchainPublicKey, OffchainSignature, Response};
 use serde::{Deserialize, Serialize};
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;

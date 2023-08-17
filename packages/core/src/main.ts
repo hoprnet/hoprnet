@@ -22,7 +22,9 @@ import {
   LevelDb,
   ChainKeypair,
   OffchainKeypair,
-  Address as Packet_Address
+  Address as Packet_Address,
+  stringToU8a,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -56,8 +58,10 @@ export async function createLibp2pInstance(
   isAllowedToAccessNetwork: Hopr['isAllowedAccessToNetwork']
 ): Promise<Libp2p> {
   let libp2p: Libp2p
-  // TODO: verify key formatting here
-  const peerId = await peerIdFromKeys(packetKeypair.public().serialize(), packetKeypair.secret())
+
+  // Hack until migrated to rs-libp2p: put the public key to the protobuf format expected by JS PeerId
+  let protoBufPrefixedPubKey = u8aConcat(stringToU8a('08011220'), packetKeypair.public().serialize())
+  const peerId = await peerIdFromKeys(protoBufPrefixedPubKey, packetKeypair.secret())
 
   if (options.testing?.useMockedLibp2p) {
     // Used for quick integration testing
@@ -97,6 +101,7 @@ export async function createLibp2pInstance(
       return { id: env.id, versionRange: env.version_range }
     })
 
+    log(`creating libp2p with peer id ${peerId.toString()}`)
     libp2p = await createLibp2p({
       peerId,
       addresses: { listen: getAddrs(peerId, options).map((x: Multiaddr) => x.toString()) },
@@ -261,12 +266,22 @@ export async function createHoprNode(
   let db = new Database(levelDb, Ethereum_Address.deserialize(chainKeypair.public().to_address().serialize()))
 
   // if safe address or module address is not provided, replace with values stored in the db
-  log(`options.safeModule.safeAddress: ${options.safeModule.safeAddress}`)
-  log(`options.safeModule.moduleAddress: ${options.safeModule.moduleAddress}`)
-  const safeAddress =
-    options.safeModule.safeAddress ?? Packet_Address.deserialize((await db.get_staking_safe_address()).serialize())
-  const moduleAddress =
-    options.safeModule.moduleAddress ?? Packet_Address.deserialize((await db.get_staking_module_address()).serialize())
+  let safeAddress = options.safeModule.safeAddress
+  let moduleAddress = options.safeModule.moduleAddress
+  log(`options.safeModule.safeAddress: ${safeAddress}`)
+  log(`options.safeModule.moduleAddress: ${moduleAddress}`)
+  if (!safeAddress) {
+    safeAddress = await db.get_staking_safe_address()
+    if (safeAddress) {
+      safeAddress = Packet_Address.deserialize(safeAddress.serialize())
+    }
+  }
+  if (!moduleAddress) {
+    moduleAddress = await db.get_staking_module_address()
+    if (moduleAddress) {
+      moduleAddress = Packet_Address.deserialize(moduleAddress.serialize())
+    }
+  }
   if (!safeAddress || !moduleAddress) {
     log(`failed to provide safe or module address:`)
     throw new Error('Hopr Node must be initialized with safe and module address')

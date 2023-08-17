@@ -28,7 +28,6 @@
 - Add `application_tag` into the payload of HOPR protocol, prepare Message Inbox backend ([#5260](https://github.com/hoprnet/hoprnet/pull/5260))
 - Rest API: Replace v2 with v3 which adds message inbox support and compatibility with new smart contracts ([#5297](https://github.com/hoprnet/hoprnet/pull/5297))
 
-
 <a name="1.93"></a>
 
 ## [1.93](https://github.com/hoprnet/hoprnet/compare/release/riga...hoprnet:release/bratislava)
