@@ -579,9 +579,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
     log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
 
-    return this.chain.fundChannel(this.chainKeypair.to_address(), dest, myFund, counterpartyFund, (txHash: string) =>
+    return (await this.chain.fundChannel(dest, counterpartyFund, (txHash: string) =>
+      this.setTxHandler(`token-approved-${txHash}`, txHash), (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
-    )
+      // we are only interested in fundChannel receipt
+    ))[1]
   }
 
   public async registerSafeByNode(): Promise<Receipt> {

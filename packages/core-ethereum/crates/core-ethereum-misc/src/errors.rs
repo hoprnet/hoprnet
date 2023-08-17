@@ -17,6 +17,9 @@ pub enum CoreEthereumError {
     #[error("{0}")]
     InvalidArguments(String),
 
+    #[error("{0}")]
+    InvalidState(String),
+
     #[error("Invalid response to acknowledgement {0}")]
     InvalidResponseToAcknowledgement(String),
 

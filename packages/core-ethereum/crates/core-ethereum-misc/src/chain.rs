@@ -1,5 +1,5 @@
 use crate::errors::{
-    CoreEthereumError::{InvalidArguments, InvalidResponseToAcknowledgement, NotAWinningTicket},
+    CoreEthereumError::{InvalidArguments, InvalidResponseToAcknowledgement, InvalidState, NotAWinningTicket},
     Result,
 };
 use bindings::{
@@ -10,7 +10,8 @@ use bindings::{
         InitiateOutgoingChannelClosureCall, InitiateOutgoingChannelClosureSafeCall, RedeemTicketCall,
         RedeemTicketSafeCall, RedeemableTicket, TicketData, Vrfparameters,
     },
-    hopr_token::ApproveCall,
+    hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
+    hopr_token::{ApproveCall, TransferCall},
 };
 use core_crypto::{
     derivation::derive_vrf_parameters,
@@ -102,6 +103,17 @@ impl ChainCalls {
         .encode())
     }
 
+    pub fn transfer(&self, destination: &Address, amount: &Balance) -> Result<Vec<u8>> {
+        if amount.balance_type() != BalanceType::HOPR {
+            return Err(InvalidArguments("Token transfer must have balance type HOPR".into()));
+        }
+
+        Ok(TransferCall {
+            recipient: H160::from_slice(&destination.to_bytes()),
+            amount: U256::from_big_endian(&amount.amount().to_bytes()),
+        }
+        .encode())
+    }
     pub fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>> {
         if dest.eq(&self.chain_key) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
@@ -242,6 +254,29 @@ impl ChainCalls {
             }
             .encode())
         }
+    }
+
+    pub fn register_safe_by_node(&self, safe_addr: &Address) -> Result<Vec<u8>> {
+        if safe_addr.eq(&self.chain_key) {
+            return Err(InvalidArguments("Safe address must be different from node addr".into()));
+        }
+        Ok(RegisterSafeByNodeCall {
+            safe_addr: H160::from_slice(&safe_addr.to_bytes()),
+        }
+        .encode())
+    }
+
+    pub fn deregister_node_by_safe(&self) -> Result<Vec<u8>> {
+        if !self.use_safe {
+            return Err(InvalidState(
+                "Can only deregister an address if Safe is activated".into(),
+            ));
+        }
+
+        Ok(DeregisterNodeBySafeCall {
+            node_addr: H160::from_slice(&self.chain_key.to_bytes()),
+        }
+        .encode())
     }
 }
 
@@ -446,6 +481,7 @@ pub mod wasm {
     };
     use core_ethereum_db::db::wasm::Database;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use futures::future::ok;
     use js_sys::{Function, JsString};
     use multiaddr::Multiaddr;
     use std::str::FromStr;
@@ -492,6 +528,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
+        pub fn get_transfer_payload(&self, dest: &Address, amount: &Balance) -> JsResult<Vec<u8>> {
+            ok_or_jserr!(self.w.transfer(dest, amount))
+        }
+
+        #[wasm_bindgen]
         pub fn get_fund_channel_payload(&self, dest: &Address, amount: &Balance) -> JsResult<Vec<u8>> {
             ok_or_jserr!(self.w.fund_channel(dest, amount))
         }
@@ -514,6 +555,16 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn get_redeem_ticket_payload(&self, acked_ticket: &AcknowledgedTicket) -> JsResult<Vec<u8>> {
             ok_or_jserr!(self.w.redeem_ticket(acked_ticket))
+        }
+
+        #[wasm_bindgen]
+        pub fn get_register_safe_by_node_payload(&self, safe_addr: &Address) -> JsResult<Vec<u8>> {
+            ok_or_jserr!(self.w.register_safe_by_node(safe_addr))
+        }
+
+        #[wasm_bindgen]
+        pub fn get_deregister_node_by_safe_payload(&self) -> JsResult<Vec<u8>> {
+            ok_or_jserr!(self.w.deregister_node_by_safe())
         }
     }
 
