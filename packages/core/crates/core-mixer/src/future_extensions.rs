@@ -20,13 +20,13 @@ pub struct ThenConcurrent<St, Fut: Future, F> {
     fun: F,
 }
 
-impl<St, Fut, F> Stream for ThenConcurrent<St, Fut, F>
+impl<St, Fut, F, T> Stream for ThenConcurrent<St, Fut, F>
 where
     St: Stream,
-    Fut: Future<Output = St::Item>,
-    F: FnMut(Fut::Output) -> Fut,
+    Fut: Future<Output = T>,
+    F: FnMut(St::Item) -> Fut,
 {
-    type Item = Fut::Output;
+    type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let ThenConcurrentProj {

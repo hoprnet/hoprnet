@@ -1,7 +1,7 @@
 use async_lock::RwLock;
+use core_mixer::future_extensions::StreamThenConcurrentExt;
 use futures::future::{poll_fn, Either};
 use futures::channel::mpsc::{channel, UnboundedSender, Receiver, Sender};
-use futures_lite::stream::StreamExt;
 use std::fmt::{Display, Formatter};
 use std::pin::Pin;
 
@@ -20,7 +20,7 @@ use core_path::errors::PathError::PathNotValid;
 use core_path::path::Path;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
-use futures::{Stream, pin_mut};
+use futures::{stream::Stream, pin_mut, StreamExt};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use std::ops::Mul;
@@ -169,6 +169,12 @@ pub struct AcknowledgementProcessor<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
     pub on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
     pub on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
+}
+
+impl<Db: HoprCoreEthereumDbActions> Clone for AcknowledgementProcessor<Db> {
+    fn clone(&self) -> Self {
+        Self { db: self.db.clone(), on_acknowledgement: self.on_acknowledgement.clone(), on_acknowledged_ticket: self.on_acknowledged_ticket.clone() }
+    }
 }
 
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
@@ -327,25 +333,27 @@ impl AcknowledgementInteraction {
         on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
         on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
     ) -> Self {
-        let (processing_in_tx, mut processing_in_rx) = channel::<AckToProcess>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
-        let (mut processing_out_tx, processing_out_rx) = channel::<AckProcessed>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
+        let (processing_in_tx, processing_in_rx) = channel::<AckToProcess>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
+        let (processing_out_tx, processing_out_rx) = channel::<AckProcessed>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
         
-        let mut processor = AcknowledgementProcessor::new(db, on_acknowledgement, on_acknowledged_ticket);
+        let processor = AcknowledgementProcessor::new(db, on_acknowledgement, on_acknowledged_ticket);
 
-        // background processing pipeline
-        // TODO: make it run in parallel
-        spawn_local(async move {
-            while let Some(value) = processing_in_rx.next().await {
-                let message = match value {
+        let processing_stream = processing_in_rx
+        .then_concurrent(move |event| {
+            let mut processor = processor.clone();
+            let mut processed_tx = processing_out_tx.clone();
+
+            async move {
+                let processed: Option<AckProcessed> = match event {
                     AckToProcess::ToReceive(peer, mut ack) => {
                         if let Ok(remote_pk) = OffchainPublicKey::from_peerid(&peer) {
                             debug!("validating incoming acknowledgement from {}", peer);
                             if ack.validate(&remote_pk) {
                                 match processor.handle_acknowledgement(ack).await {
-                                    Ok(_) => AckProcessed::Receive(peer, Ok(())),
+                                    Ok(_) => Some(AckProcessed::Receive(peer, Ok(()))),
                                     Err(e) => {
                                         error!("Encountered error while handling acknowledgement from peer '{}': {}", &peer, e);
-                                        continue
+                                        None
                                     }
                                 }
                             } else {
@@ -353,29 +361,37 @@ impl AcknowledgementInteraction {
                                     "failed to verify signature on acknowledgement from peer {}",
                                     peer
                                 );
-                                continue
+                                None
                             }
                         } else {
                             error!("invalid remote peer id {}", peer);
-                            continue
+                            None
                         }
                     },
-                    AckToProcess::ToSend(peer, ack) => AckProcessed::Send(peer, ack)
+                    AckToProcess::ToSend(peer, ack) => Some(AckProcessed::Send(peer, ack))
                 };
 
-                match poll_fn(|cx| Pin::new(&mut processing_out_tx).poll_ready(cx)).await {
-                    Ok(_) => {
-                        match processing_out_tx.start_send(message) {
-                            Ok(_) => {},
-                            Err(e) => error!("Failed to pass a processed ack message: {}", e),
+                if let Some(event) = processed {
+                    match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
+                        Ok(_) => {
+                            match processed_tx.start_send(event) {
+                                Ok(_) => {},
+                                Err(e) => error!("Failed to pass a processed ack message: {}", e),
+                            }
+                        },
+                        Err(e) => {
+                            warn!("The receiver for processed ack no longer exists: {}", e);
                         }
-                    },
-                    Err(e) => {
-                        warn!("The receiver for processed ack no longer exists: {}", e);
-                        continue
-                    }
-                };
-            }
+                    };
+                }
+        }});
+
+        spawn_local(async move {
+            processing_stream
+                .map(|x| Ok(x))
+                .forward(futures::sink::drain())
+                .await
+                .unwrap();
         });
 
         Self {
@@ -391,7 +407,8 @@ impl AcknowledgementInteraction {
 impl Stream for AcknowledgementInteraction {
     type Item = AckProcessed;
 
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {        
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {   
+        use futures_lite::stream::StreamExt;     
         return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
     }
 }
@@ -421,8 +438,16 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     db: Arc<RwLock<Db>>,
-    pub mixer: Mixer<Payload>,
     cfg: PacketInteractionConfig,
+}
+
+impl<Db> Clone for PacketProcessor<Db>
+where
+    Db: HoprCoreEthereumDbActions
+{
+    fn clone(&self) -> Self {
+        Self { db: self.db.clone(), cfg: self.cfg.clone() }
+    }
 }
 
 pub enum PacketType {
@@ -430,15 +455,14 @@ pub enum PacketType {
     Forward(Packet, Option<Acknowledgement>, PeerId, PeerId)
 }
 
-impl<Db,> PacketProcessor<Db>
+impl<Db> PacketProcessor<Db>
 where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig, mixer: Mixer<Payload>) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
-            mixer: mixer,
             cfg,
         }
     }
@@ -851,77 +875,83 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, mixer: Mixer<Payload>, mut ack_interaction: AcknowledgementActions, mut on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
-        let (to_process_tx, mut to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
-        let (mut processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
+    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, mixer: Mixer, ack_interaction: AcknowledgementActions, on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
+        let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
+        let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         
-        let processor = PacketProcessor::new(db, cfg, mixer);
+        let processor = PacketProcessor::new(db, cfg);
 
-        // background processing pipeline
-        spawn_local(async move {
-            while let Some(value) = to_process_rx.next().await {
-                let processed = match value {
+        let processing_stream = to_process_rx
+            .then_concurrent(move |event| async move {
+                match event {
+                    MsgToProcess::ToSend(_, _, _)
+                    | MsgToProcess::ToForward(_, _) => { mixer.mix(event).await },
+                    MsgToProcess::ToReceive(_, _) => { event },
+                }
+            })
+            .then_concurrent(move |event| { 
+                let processor = processor.clone();
+                let mut processed_tx = processed_tx.clone();
+                let mut on_final_packet = on_final_packet.clone();
+                let mut ack_interaction = ack_interaction.clone();
+
+                async move {
+                    let processed: Option<MsgProcessed> = match event {
                     MsgToProcess::ToReceive(data, peer) |
                     MsgToProcess::ToForward(data, peer) => {
-                        let packet = match processor.create_packet_from_bytes(&data, &peer) {
-                            Ok(value) => value,
-                            Err(e) => {
-                                error!("Failed to construct a proper packet: {e}");
-                                continue
-                            },
-                        };
-
-                        match processor.handle_mixed_packet(packet).await {
-                            Ok(value) => match value {
-                                PacketType::Final(packet, ack) => {
-                                    // We're the destination of the packet, so emit the packet contents
-                                    let result = match packet.state() {
-                                        PacketState::Final { plain_text, previous_hop, .. } => {
-                                            if let Some(emitter) = &mut on_final_packet {
-                                                if let Err(e) = emitter.try_send(plain_text.clone()) {
-                                                    error!("failed to emit received final packet: {e}");
+                        match processor.create_packet_from_bytes(&data, &peer) {
+                            Ok(packet) => {
+                                match processor.handle_mixed_packet(packet).await {
+                                    Ok(value) => match value {
+                                        PacketType::Final(packet, ack) => {
+                                            // We're the destination of the packet, so emit the packet contents
+                                            match packet.state() {
+                                                PacketState::Final { plain_text, previous_hop, .. } => {
+                                                    if let Some(emitter) = &mut on_final_packet {
+                                                        if let Err(e) = emitter.try_send(plain_text.clone()) {
+                                                            error!("failed to emit received final packet: {e}");
+                                                        }
+                                                    }
+        
+                                                    if let Some(ack) = ack {
+                                                        if let Err(e) = ack_interaction.send_acknowledgement(previous_hop.to_peerid(), ack) {
+                                                            error!("failed to acknowledge relayed packet: {e}");
+                                                        }
+                                                    }
+        
+                                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                                    METRIC_RECV_MESSAGE_COUNT.increment();
+        
+                                                    Some(MsgProcessed::Receive(previous_hop.to_peerid(), plain_text.clone()))
+                                                },
+                                                _ => {
+                                                    error!("A presumed final packet was not in fact final");
+                                                    None
                                                 }
                                             }
-
+                                        },
+                                        PacketType::Forward(packet, ack, previous_peer, next_peer) => {
                                             if let Some(ack) = ack {
-                                                if let Err(e) = ack_interaction.send_acknowledgement(previous_hop.to_peerid(), ack) {
+                                                if let Err(e) = ack_interaction.send_acknowledgement(previous_peer, ack) {
                                                     error!("failed to acknowledge relayed packet: {e}");
                                                 }
                                             }
-
+        
                                             #[cfg(all(feature = "prometheus", not(test)))]
-                                            METRIC_RECV_MESSAGE_COUNT.increment();
-
-                                            Some(MsgProcessed::Receive(previous_hop.to_peerid(), plain_text.clone()))
+                                            METRIC_FWD_MESSAGE_COUNT.increment();
+        
+                                            Some(MsgProcessed::Forward(next_peer, packet.to_bytes()))
                                         },
-                                        _ => {
-                                            error!("A presumed final packet was not in fact final");
-                                            None
-                                        }
-                                    };
-
-                                    if let Some(packet) = result {
-                                        packet
-                                    } else {
-                                        continue
-                                    }
-                                },
-                                PacketType::Forward(packet, ack, previous_peer, next_peer) => {
-                                    if let Some(ack) = ack {
-                                        if let Err(e) = ack_interaction.send_acknowledgement(previous_peer, ack) {
-                                            error!("failed to acknowledge relayed packet: {e}");
-                                        }
-                                    }
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_FWD_MESSAGE_COUNT.increment();
-
-                                    MsgProcessed::Forward(next_peer, packet.to_bytes())
-                                },
+                                    },
+                                    Err(e) => {
+                                        error!("Failed to mix a packet: {}", e);
+                                        None
+                                    },
+                                }
                             },
-                            Err(_) => {
-                                error!("Failed to mix a packet");
-                                continue
+                            Err(e) => {
+                                error!("Failed to construct a proper packet: {:?}", e);
+                                None
                             },
                         }
                     },
@@ -932,29 +962,37 @@ impl PacketInteraction {
                                 METRIC_PACKETS_COUNT.increment();
                                 
                                 finalizer.store_challenge(challenge);
-                                MsgProcessed::Send(payload.remote_peer, payload.data, finalizer)
+                                Some(MsgProcessed::Send(payload.remote_peer, payload.data, finalizer))
                             },
                             Err(e) => {
                                 error!("Encountered error creating a packet to send: {}", e);
-                                continue
+                                None
                             },
                         }
                     },
                 };
 
-                match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
-                    Ok(_) => {
-                        match processed_tx.start_send(processed) {
-                            Ok(_) => {},
-                            Err(e) => error!("Failed to pass a processed ack message: {}", e),
+                if processed.is_some() {
+                    match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
+                        Ok(_) => {
+                            match processed_tx.start_send(processed.unwrap()) {
+                                Ok(_) => {},
+                                Err(e) => error!("Failed to pass a processed ack message: {}", e),
+                            }
+                        },
+                        Err(e) => {
+                            warn!("The receiver for processed packets no longer exists: {}", e);
                         }
-                    },
-                    Err(e) => {
-                        warn!("The receiver for processed packets no longer exists: {}", e);
-                        continue
-                    }
-                };
-            }
+                    };
+                }
+            }});
+
+        spawn_local(async move {
+            processing_stream
+                .map(|x| Ok(x))
+                .forward(futures::sink::drain())
+                .await
+                .unwrap();
         });
 
         Self {
@@ -970,7 +1008,8 @@ impl PacketInteraction {
 impl Stream for PacketInteraction {
     type Item = MsgProcessed;
 
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {        
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {   
+        use futures_lite::stream::StreamExt;     
         return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
     }
 }

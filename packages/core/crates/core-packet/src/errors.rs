@@ -33,6 +33,9 @@ pub enum PacketError {
     #[error("channel {0} is out of funds")]
     OutOfFunds(String),
 
+    #[error("logic error during packet processing: {0}")]
+    LogicError(String),
+
     #[error("tx queue is full, retry later")]
     Retry,
 
