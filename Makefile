@@ -392,7 +392,7 @@ else
 	echo "$$args" > .safe.args && \
 		safe_address=$$(cat .safe.args | awk '{print $$2}') && \
 		make register-nodes network="${network}" environment_type=staging staking_addresses="[${safe_address}]" node_addresses="[${node_address}]"
-
+endif
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
 create-safe-module-all: id_password=local
