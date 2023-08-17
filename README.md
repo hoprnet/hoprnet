@@ -288,7 +288,8 @@ make fund-local-all
 make run-hopr-admin &
 ```
 
-Running one node in test mode, with safe and module attached
+### Local node with safe staking service (local network)
+Running one node in test mode, with safe and module attached (in anvil-localhost network)
 
 ```sh
 # build deps and HOPRd code
@@ -313,6 +314,41 @@ make run-local-with-safe
 
 # fund all your nodes to get started
 make fund-local-all id_dir=`pwd`
+
+# approve tokens for channels to move token. TODO:
+
+# start local HOPR admin in a container (and put into background)
+make run-hopr-admin &
+```
+### Local node with safe staking service (rotsee network)
+Running one node in test mode, with safe and module attached (in rotsee network)
+
+```sh
+# build deps and HOPRd code
+make -j deps && make -j build
+
+# ensure a private key with enough xDAI is set in PRIVATE_KEY
+source .env
+
+# create identity files
+make create-local-identity
+
+# create a safe and a node management module instance,
+# and passing the created safe and module as argument to
+# run a test node local (separate terminal)
+make run-local-with-safe-rotsee
+# or to restart a node and use the same id, safe and module
+# run:
+# make run-local network=rotsee id_path=$(find `pwd` -name ".identity-local*.id" | sort -r | head -n 1)
+
+# fund all your nodes to get started
+make fund-local-rotsee id_dir=`pwd`
+
+# Please use the deployer private key as PRIVATE_KEY in `packages/ethereum/contract/.env`
+source ./packages/ethereum/contract/.env
+# register in network registry. Please supply the local node's Ethereum address
+
+# approve tokens for channels to move token. TODO:
 
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &
