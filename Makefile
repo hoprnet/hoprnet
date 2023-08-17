@@ -477,16 +477,16 @@ endif
 		peer_ids="$(peer_ids)"
 
 register-nodes: ensure-environment-and-network-are-set
-register-nodes: ## owner register given nodes in network registry contract
-ifeq ($(native_addresses),)
-	echo "parameter <native_addresses> missing" >&2 && exit 1
+register-nodes: ## manager register nodes and safes in network registry contract
+ifeq ($(staking_addresses),)
+	echo "parameter <staking_addresses> missing" >&2 && exit 1
 endif
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
+ifeq ($(node_addresses),)
+	echo "parameter <node_addresses> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts register-nodes \
 		network=$(network) environment-type=$(environment_type) \
-		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
+		staking_addresses="$(staking_addresses)" node_addresses="$(node_addresses)"
 
 deregister-nodes: ensure-environment-and-network-are-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
