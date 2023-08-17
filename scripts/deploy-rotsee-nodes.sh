@@ -31,6 +31,7 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 : "${API_TOKEN?"Missing environment variable API_TOKEN"}"
 : "${IDENTITY_PASSWORD?"Missing environment variable IDENTITY_PASSWORD"}"
 declare -a hopr_addrs
+declare -a safe_addrs
 
 run_node() {
   local host
@@ -119,9 +120,10 @@ register_nodes() {
   IFS=','
 
   # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
-  PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${makefile_path}" self-register-node \
+  PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${makefile_path}" register-node \
     network="${NETWORK}" \
-    peer_ids="${hopr_addrs[*]}" \
+    staking_addresses="${safe_addrs[*]}" \
+    node_addresses="${hopr_addrs[*]}" \
     environment_type=production
   unset IFS
 }
@@ -243,6 +245,8 @@ for host in "${ssh_hosts[@]}"; do
   api_wallet_addr="$(get_native_address "${API_TOKEN}@${host}:3001")"
   #api_peer_id="$(get_hopr_address "${API_TOKEN}@${host}:3001")"
   #hopr_addrs+=( "${api_peer_id}" )
+  #safe_address=$("cat /root/hoprd-db/.hopr-id.safe.args | grep -oE '\-\-safeAddress [^[:space:]]+' | awk '{print \$2}'")
+  #safe_addrs+=( "${safe_address}" )
 
   fund_if_empty "${api_wallet_addr}" "${NETWORK}"
 done

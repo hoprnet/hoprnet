@@ -618,7 +618,6 @@ contract HoprChannels is
             return;
         }
 
-
         // Opens an outgoing channel
         if (userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE) {
             if (amount > type(uint96).max) {
@@ -632,7 +631,7 @@ contract HoprChannels is
                 src := shr(96, calldataload(userData.offset))
                 dest := shr(96, calldataload(add(userData.offset, 20)))
             }
-            
+
             address safeAddress = registry.nodeToSafe(src);
 
             // skip the check between `from` and `src` on node-safe registry
@@ -652,7 +651,7 @@ contract HoprChannels is
         } else if (userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE) {
             address account1;
             Balance amount1;
-            address account2; 
+            address account2;
             Balance amount2;
 
             assembly {
@@ -660,7 +659,7 @@ contract HoprChannels is
                 amount1 := shr(160, calldataload(add(0x14, userData.offset)))
                 account2 := shr(96, calldataload(add(0x20, userData.offset)))
                 amount2 := shr(160, calldataload(add(0x34, userData.offset)))
-            }            
+            }
 
             if (amount == 0 || amount != uint256(Balance.unwrap(amount1)) + uint256(Balance.unwrap(amount2))) {
                 revert InvalidBalance();
