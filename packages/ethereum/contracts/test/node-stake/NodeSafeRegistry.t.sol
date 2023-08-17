@@ -5,20 +5,29 @@ import {HoprNodeSafeRegistry, HoprNodeSafeRegistryEvents} from "../../src/node-s
 import {PrecompileUtils} from "../utils/Precompiles.sol";
 import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import {Test} from "forge-std/Test.sol";
-import {stdStorage, StdStorage} from "forge-std/StdCheats.sol";
+
+// proxy contract to manipulate storage
+contract MyNodeSafeRegistry is HoprNodeSafeRegistry {
+    constructor()
+        HoprNodeSafeRegistry()
+    {}
+
+    // Only for testing
+    function _storeSafeAddress(address nodeAddress, address safeAddress) public {
+        HoprNodeSafeRegistry.NodeSafeRecord storage record = _nodeToSafe[nodeAddress];
+        record.safeAddress = safeAddress;
+    }
+}
 
 contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
-    // to alter the storage
-    using stdStorage for StdStorage;
-
     address public safe;
-    HoprNodeSafeRegistry public nodeSafeRegistry;
+    MyNodeSafeRegistry public nodeSafeRegistry;
     address private constant SENTINEL_MODULES = address(0x1);
     uint256 private constant pageSize = 100;
 
     function setUp() public {
         safe = vm.addr(101); // make address(101) a caller
-        nodeSafeRegistry = new HoprNodeSafeRegistry();
+        nodeSafeRegistry = new MyNodeSafeRegistry();
     }
 
     /**
@@ -100,11 +109,8 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
-        vm.store(
-            address(nodeSafeRegistry),
-            bytes32(stdstore.target(address(nodeSafeRegistry)).sig("nodeToSafe(address)").with_key(nodeAddress).find()),
-            bytes32(abi.encode(address(1)))
-        );
+        nodeSafeRegistry._storeSafeAddress(nodeAddress, safeAddress);
+
         vm.prank(nodeAddress);
         vm.expectRevert(HoprNodeSafeRegistry.NodeHasSafe.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
@@ -120,11 +126,8 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         address safeAddress = address(0);
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
-        // vm.store(
-        //     address(nodeSafeRegistry),
-        //     bytes32(stdstore.target(address(nodeSafeRegistry)).sig('nodeToSafe(address)').with_key(nodeAddress).find()),
-        //     bytes32(abi.encode(address(1)))
-        // );
+        nodeSafeRegistry._storeSafeAddress(nodeAddress, address(1));
+
         vm.prank(nodeAddress);
         vm.expectRevert(HoprNodeSafeRegistry.SafeAddressZero.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
@@ -140,11 +143,8 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         address nodeAddress = address(0);
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
-        // vm.store(
-        //     address(nodeSafeRegistry),
-        //     bytes32(stdstore.target(address(nodeSafeRegistry)).sig('nodeToSafe(address)').with_key(nodeAddress).find()),
-        //     bytes32(abi.encode(address(1)))
-        // );
+        nodeSafeRegistry._storeSafeAddress(nodeAddress, address(1));
+
         vm.prank(nodeAddress);
         vm.expectRevert(HoprNodeSafeRegistry.NodeAddressZero.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
@@ -162,11 +162,8 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
 
         _helperMockSafe(safeAddress, nodeAddress, false, false);
 
-        vm.store(
-            address(nodeSafeRegistry),
-            bytes32(stdstore.target(address(nodeSafeRegistry)).sig("nodeToSafe(address)").with_key(nodeAddress).find()),
-            bytes32(abi.encode(address(0)))
-        );
+        nodeSafeRegistry._storeSafeAddress(nodeAddress, address(0));
+
         vm.prank(nodeAddress);
         vm.expectRevert(HoprNodeSafeRegistry.NotSafeOwnerNorNode.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
@@ -204,11 +201,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         vm.prank(nodeAddress);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
 
-        vm.store(
-            address(nodeSafeRegistry),
-            bytes32(stdstore.target(address(nodeSafeRegistry)).sig("nodeToSafe(address)").with_key(nodeAddress).find()),
-            bytes32(abi.encode(address(1)))
-        );
+        nodeSafeRegistry._storeSafeAddress(nodeAddress, address(1));
 
         vm.prank(safeAddress);
         vm.expectRevert(HoprNodeSafeRegistry.NotValidSafe.selector);
