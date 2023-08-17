@@ -5,8 +5,11 @@ const POST: Operation = [
   async (req, res, _next) => {
     const tag = req.body.tag
     const msgs = await req.context.inbox.pop_all(tag)
+    const messages = msgs.map((m) => {
+      return { tag: m.application_tag, body: new TextDecoder().decode(m.plain_text) }
+    })
 
-    return res.status(200).send(msgs)
+    return res.status(200).send({ messages })
   }
 ]
 
@@ -20,6 +23,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['tag'],
           properties: {
             tag: {
               $ref: '#/components/schemas/MessageTag'
