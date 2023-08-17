@@ -10,7 +10,7 @@ import {ERC777} from "openzeppelin-contracts/token/ERC777/ERC777.sol";
 import {HoprNodeSafeRegistry} from "../src/node-stake/NodeSafeRegistry.sol";
 import {HoprCrypto} from "../src/Crypto.sol";
 
-// proxy contract to make modifiers testable
+// proxy contract to make modifiers testable and manipulate storage
 contract MyHoprChannels is HoprChannels {
     constructor(address _token, Timestamp _noticePeriodChannelClosure, HoprNodeSafeRegistry safeRegistry)
         HoprChannels(_token, _noticePeriodChannelClosure, safeRegistry)
@@ -125,8 +125,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             )
         );
 
-        assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(), 128);
-        assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_SIZE(), 64);
+        assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(), 64);
+        assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_SIZE(), 40);
 
         assertEq(hoprChannels.VERSION(), "2.0.0");
 
@@ -1459,7 +1459,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function test_tokensReceived(
+    function test_tokensReceivedSingle(
         address operator,
         address safeContract,
         address src,
@@ -1477,7 +1477,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
 
         vm.prank(address(hoprToken));
-        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountA, abi.encode(src, dest), operatorData);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountA, abi.encodePacked(src, dest), operatorData);
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
@@ -1491,17 +1491,29 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         vm.prank(address(hoprToken));
         hoprChannels.tokensReceived(
-            operator, safeContract, address(hoprChannels), amountA, abi.encode(src, dest), operatorData
+            operator, safeContract, address(hoprChannels), amountA, abi.encodePacked(src, dest), operatorData
         );
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(abi.encode(wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
+    }
 
-        // fundChannelMulti
-        vm.clearMockedCalls();
-        hoprChannels._removeChannel(src, dest);
+    function test_tokensReceivedMulti(
+        address operator,
+        address safeContract,
+        address src,
+        address dest,
+        uint96 amountA,
+        uint96 amountB,
+        bytes memory operatorData
+    ) public {
+        amountA = uint96(bound(amountA, MIN_USED_BALANCE, MAX_USED_BALANCE));
+        amountB = uint96(bound(amountB, MIN_USED_BALANCE, MAX_USED_BALANCE));
+        vm.assume(src != dest && safeContract != src && safeContract != dest);
+        vm.assume(src != address(0) && dest != address(0) && safeContract != address(0));
+        vm.assume(amountA != amountB);
 
         vm.prank(address(hoprToken));
         hoprChannels.tokensReceived(
@@ -1509,7 +1521,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             src,
             address(hoprChannels),
             amountA + amountB,
-            abi.encode(src, amountA, dest, amountB),
+            abi.encodePacked(src, amountA, dest, amountB),
             operatorData
         );
 
@@ -1544,18 +1556,24 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(src != address(0) && dest != address(0));
         vm.assume(someContract != address(hoprChannels));
 
+        _helperNoSafeSetMock(src);
+        vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
+        vm.prank(address(hoprToken));
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount, abi.encodePacked(src, dest), operatorData);
+
         vm.expectRevert(HoprChannels.InvalidBalance.selector);
         vm.prank(address(hoprToken));
-        hoprChannels.tokensReceived(operator, from, to, amount, abi.encode(src, dest), operatorData);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), uint256(0), abi.encodePacked(src, dest), operatorData);
+        vm.clearMockedCalls();
 
         vm.assume(caller != address(hoprToken));
         vm.expectRevert(HoprChannels.WrongToken.selector);
         vm.prank(caller);
-        hoprChannels.tokensReceived(operator, from, to, correctAmount, abi.encode(src, dest), operatorData);
+        hoprChannels.tokensReceived(operator, from, to, correctAmount, abi.encodePacked(src, dest), operatorData);
 
         vm.expectRevert(HoprChannels.InvalidTokenRecipient.selector);
         vm.prank(address(hoprToken));
-        hoprChannels.tokensReceived(operator, from, someContract, correctAmount, abi.encode(src, dest), operatorData);
+        hoprChannels.tokensReceived(operator, from, someContract, correctAmount, abi.encodePacked(src, dest), operatorData);
     }
 
     function testRevert_tokensReceivedWrongABI(
@@ -1567,7 +1585,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
     ) public {
         amount = bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE);
 
-        vm.assume(userData.length != 0 && userData.length != 64 && userData.length != 128);
+        vm.assume(userData.length != 0 && userData.length != 40 && userData.length != 64);
 
         vm.expectRevert(HoprChannels.InvalidTokensReceivedUsage.selector);
         vm.prank(address(hoprToken));
@@ -1579,13 +1597,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         address operator,
         bytes memory operatorData,
         address from,
-        uint256 amountA,
-        uint256 amountB,
+        uint96 amountA,
+        uint96 amountB,
         address src,
         address dest
     ) public {
-        amountA = bound(amountA, MIN_USED_BALANCE, MAX_USED_BALANCE);
-        amountB = bound(amountB, MIN_USED_BALANCE, MAX_USED_BALANCE);
+        amountA = uint96(bound(amountA, MIN_USED_BALANCE, MAX_USED_BALANCE));
+        amountB = uint96(bound(amountB, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
         vm.assume(someAmount < type(uint96).max && someAmount != amountA + amountB);
 
@@ -1595,7 +1613,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.prank(address(hoprToken));
         vm.expectRevert(HoprChannels.InvalidBalance.selector);
         hoprChannels.tokensReceived(
-            operator, from, address(hoprChannels), someAmount, abi.encode(src, amountA, dest, amountB), operatorData
+            operator, from, address(hoprChannels), someAmount, abi.encodePacked(src, amountA, dest, amountB), operatorData
         );
     }
 
@@ -1617,15 +1635,15 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
 
         vm.expectRevert(HoprChannels.InvalidBalance.selector);
-        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooSmall, abi.encode(src, dest), hex"");
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooSmall, abi.encodePacked(src, dest), hex"");
         vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
-        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooLarge, abi.encode(src, dest), hex"");
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooLarge, abi.encodePacked(src, dest), hex"");
 
         // userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
         vm.expectRevert(HoprChannels.InvalidBalance.selector);
-        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooSmall * 2, abi.encode(src, balanceTooSmall, dest, balanceTooSmall), hex"");
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooSmall * 2, abi.encodePacked(src, balanceTooSmall, dest, balanceTooSmall), hex"");
         vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
-        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooLarge * 2, abi.encode(src, balanceTooLarge, dest, balanceTooLarge), hex"");
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amountTooLarge * 2, abi.encodePacked(src, balanceTooLarge, dest, balanceTooLarge), hex"");
 
         // b. from != src (called by Safe)
         vm.clearMockedCalls();
@@ -1635,16 +1653,16 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         // userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE 
         vm.expectRevert(HoprChannels.InvalidBalance.selector);
         hoprChannels.tokensReceived(
-            operator, safeContract, address(hoprChannels), amountTooSmall, abi.encode(safeContract, dest), hex""
+            operator, safeContract, address(hoprChannels), amountTooSmall, abi.encodePacked(safeContract, dest), hex""
         );
         vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
         hoprChannels.tokensReceived(
-            operator, safeContract, address(hoprChannels), amountTooLarge, abi.encode(safeContract, dest), hex""
+            operator, safeContract, address(hoprChannels), amountTooLarge, abi.encodePacked(safeContract, dest), hex""
         );
 
         // userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
         vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
-        hoprChannels.tokensReceived(operator, safeContract, address(hoprChannels), amountTooLarge * 2, abi.encode(src, balanceTooLarge, dest, balanceTooLarge), hex"");
+        hoprChannels.tokensReceived(operator, safeContract, address(hoprChannels), amountTooLarge * 2, abi.encodePacked(src, balanceTooLarge, dest, balanceTooLarge), hex"");
         vm.clearMockedCalls();
         vm.stopPrank();
     }
@@ -1663,14 +1681,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
 
         vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
-        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount, abi.encode(src, src), hex"");
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount, abi.encodePacked(src, src), hex"");
 
         // userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
         vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
-        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount * 2, abi.encode(src, balance, src, balance), hex"");
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount * 2, abi.encodePacked(src, balance, src, balance), hex"");
 
         // b. from != src (called by Safe)
-        vm.clearMockedCalls();
         vm.clearMockedCalls();
         _helperOnlySafeMock(src, safeContract);
         // hoprChannels._removeChannel(src, dest);
@@ -1678,12 +1695,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         // userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE 
         vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
         hoprChannels.tokensReceived(
-            operator, safeContract, address(hoprChannels), amount, abi.encode(src, src), hex""
+            operator, safeContract, address(hoprChannels), amount, abi.encodePacked(src, src), hex""
         );
 
         // userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
         vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
-        hoprChannels.tokensReceived(operator, safeContract, address(hoprChannels), amount * 2, abi.encode(src, balance, src, balance), hex"");
+        hoprChannels.tokensReceived(operator, safeContract, address(hoprChannels), amount * 2, abi.encodePacked(src, balance, src, balance), hex"");
         vm.clearMockedCalls();
         vm.stopPrank();
     }
@@ -1706,14 +1723,14 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperOnlySafeMock(src, safeContract);
         vm.expectRevert(HoprMultiSig.ContractNotResponsible.selector);
         vm.prank(address(hoprToken));
-        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount, abi.encode(src, dest), operatorData);
+        hoprChannels.tokensReceived(operator, src, address(hoprChannels), amount, abi.encodePacked(src, dest), operatorData);
 
         vm.clearMockedCalls();
         _helperNoSafeSetMock(src);
         vm.expectRevert(HoprMultiSig.ContractNotResponsible.selector);
         vm.prank(address(hoprToken));
         hoprChannels.tokensReceived(
-            operator, someAccount, address(hoprChannels), amount, abi.encode(src, dest), operatorData
+            operator, someAccount, address(hoprChannels), amount, abi.encodePacked(src, dest), operatorData
         );
 
         vm.clearMockedCalls();
