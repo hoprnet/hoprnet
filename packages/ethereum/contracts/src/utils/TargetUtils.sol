@@ -207,7 +207,7 @@ library TargetUtils {
         capabilityPermissions = new CapabilityPermission[](NUM_CAPABILITY_PERMISSIONS);
         // decode function permissions. By default, 8 function permissions
         for (uint256 i = 0; i < NUM_CAPABILITY_PERMISSIONS; i++) {
-            // first left offset byt 184 + 8 * i bits 
+            // first left offset byt 184 + 8 * i bits
             // where 184 = 160 (address) + 8 (Clearance) + 8 (TargetType) + 8 (TargetPermission)
             // then RIGHT shift 256 - 8 = 248 bits
             capabilityPermissions[i] = CapabilityPermission(uint8(Target.unwrap(target) << (184 + 8 * i) >> 248));

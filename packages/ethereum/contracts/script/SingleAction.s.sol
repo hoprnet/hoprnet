@@ -320,20 +320,20 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * This function should only be called by a manager
      */
     function registerNodes(address[] calldata stakingAccounts, address[] calldata nodeAddresses) external {
-      require(stakingAccounts.length == nodeAddresses.length, 'Input lengths are different');
+        require(stakingAccounts.length == nodeAddresses.length, "Input lengths are different");
 
-      // 1. get network and msg.sender
-      getNetworkAndMsgSender();
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-      // 2. register nodes
-      (bool successRegisterNodes, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-        abi.encodeWithSignature('managerRegister(address[],address[])', stakingAccounts, nodeAddresses)
-      );
-      if (!successRegisterNodes) {
-        emit log_string('Cannot register nodes as a manager');
-        revert('Cannot register nodes as a manager');
-      }
-      vm.stopBroadcast();
+        // 2. register nodes
+        (bool successRegisterNodes,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+            abi.encodeWithSignature("managerRegister(address[],address[])", stakingAccounts, nodeAddresses)
+        );
+        if (!successRegisterNodes) {
+            emit log_string("Cannot register nodes as a manager");
+            revert("Cannot register nodes as a manager");
+        }
+        vm.stopBroadcast();
     }
 
     // /**

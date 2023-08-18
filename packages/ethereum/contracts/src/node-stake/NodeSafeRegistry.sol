@@ -17,7 +17,7 @@ abstract contract HoprNodeSafeRegistryEvents {
  * This contract is meant to be deployed as a standalone contract
  */
 contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
-        // Node already has mapped to Safe
+    // Node already has mapped to Safe
     error NodeHasSafe();
 
     // Not a valid Safe address;
@@ -44,6 +44,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         address safeAddress;
         address nodeChainKeyAddress;
     }
+
     struct NodeSafeNonce {
         address safeAddress;
         address nodeChainKeyAddress;
@@ -68,11 +69,11 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         updateDomainSeparator();
     }
 
-    function nodeToSafe(address nodeAddress) view external returns (address) {
+    function nodeToSafe(address nodeAddress) external view returns (address) {
         return _nodeToSafe[nodeAddress].safeAddress;
     }
 
-    function nodeSigNonce(address nodeAddress) view external returns (uint256) {
+    function nodeSigNonce(address nodeAddress) external view returns (uint256) {
         return _nodeToSafe[nodeAddress].nodeSigNonce;
     }
 
@@ -84,7 +85,8 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         // check adminKeyAddress has added HOPR tokens to the staking contract.
 
         // following encoding guidelines of EIP712
-        bytes32 hashStruct = keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe, _nodeToSafe[nodeSafe.nodeChainKeyAddress].nodeSigNonce));
+        bytes32 hashStruct =
+            keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe, _nodeToSafe[nodeSafe.nodeChainKeyAddress].nodeSigNonce));
 
         // build typed digest
         bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
