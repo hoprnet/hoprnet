@@ -318,6 +318,7 @@ make create-local-identity
 # run a test node local (separate terminal)
 # It also register the created pairs in network registry, and
 # approve tokens for channels to move token.
+# fund safe with 2k token and 1 native token
 make run-local-with-safe
 # or to restart a node and use the same id, safe and module
 # run:
@@ -351,6 +352,7 @@ make create-local-identity
 # run a test node local (separate terminal)
 # It also register the created pairs in network registry, and
 # approve tokens for channels to move token.
+# fund safe with 2k wxHOPR and 1 xdai
 make run-local-with-safe-rotsee network=rotsee
 # or to restart a node and use the same id, safe and module
 # run:

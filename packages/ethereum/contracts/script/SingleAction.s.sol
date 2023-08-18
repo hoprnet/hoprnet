@@ -198,6 +198,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         _helperGetDeployerInternalKey();
         _registerNodes(stakingSafeAddresses, nodeAddresses);
         vm.stopBroadcast();
+
+        // 5. transfer some tokens to safe
+        transferOrMintHoprAndSendNativeToAmount(safe, 2000000000000000000000, 1000000000000000000);
     }
 
     /**
@@ -712,7 +715,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         address recipient,
         uint256 hoprTokenAmountInWei,
         uint256 nativeTokenAmountInWei
-    ) external payable {
+    ) public payable {
         // 1. get environment and msg.sender
         getNetworkAndMsgSender();
 
