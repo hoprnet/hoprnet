@@ -63,8 +63,7 @@ impl ChainCalls {
             if ending == "p2p" && !announced_multiaddr.ends_with(&Multiaddr::from_str(expected.as_str())?) {
                 return Err(InvalidArguments(format!(
                     "Received a multiaddr with incorrect PeerId, got {} but expected {}",
-                    announced_multiaddr,
-                    expected
+                    announced_multiaddr, expected
                 )));
             }
         }
@@ -511,10 +510,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn get_announce_payload(
-            &self,
-            announced_multiaddr: &str,
-        ) -> JsResult<Vec<u8>> {
+        pub fn get_announce_payload(&self, announced_multiaddr: &str) -> JsResult<Vec<u8>> {
             let ma = match Multiaddr::from_str(announced_multiaddr) {
                 Ok(ma) => ma,
                 Err(e) => return Err(JsValue::from(e.to_string())),

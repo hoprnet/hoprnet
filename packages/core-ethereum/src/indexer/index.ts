@@ -2,7 +2,6 @@ import { setImmediate as setImmediatePromise } from 'timers/promises'
 import BN from 'bn.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
-import chalk from 'chalk'
 import { EventEmitter } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
 import {
@@ -34,10 +33,9 @@ import {
   Ethereum_Address,
   Ethereum_Database,
   Ethereum_Snapshot,
-  Ethereum_U256
+  Ethereum_U256,
+  Handlers
 } from '../db.js'
-
-import { Handlers } from '../../../core/lib/core_hopr.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
@@ -213,7 +211,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     this.status = IndexerStatus.STARTED
     this.emit('status', IndexerStatus.STARTED)
-    log(chalk.green('Indexer started!'))
+    log('Indexer started!')
   }
 
   /**
@@ -233,7 +231,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     this.status = IndexerStatus.STOPPED
     this.emit('status', IndexerStatus.STOPPED)
-    log(chalk.green('Indexer stopped!'))
+    log('Indexer stopped!')
   }
 
   /**
@@ -256,7 +254,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     } catch (err) {
       this.status = IndexerStatus.STOPPED
       this.emit('status', IndexerStatus.STOPPED)
-      log(chalk.red('Failed to restart: %s', err.message))
+      log('Failed to restart: %s', err.message)
       throw err
     }
   }
@@ -409,7 +407,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return
     }
 
-    log(chalk.red(`etherjs error: ${error}`))
+    log(`etherjs error: ${error}`)
 
     try {
       const errorType = [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].filter((err) =>
@@ -420,7 +418,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       if (errorType.length != 0) {
         metric_indexerErrors.increment([errorType[0]])
 
-        log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
+        log('code error falls here', this.chain.getAllQueuingTransactionRequests().length)
         // allow the indexer to restart even there is no transaction in queue
         await retryWithBackoffThenThrow(
           () =>
@@ -521,6 +519,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
               this.indexEvent(`channel-updated-${txHash}`)
             } else if (this.listeners(`node-safe-registered-${txHash}`).length > 0) {
               this.indexEvent(`node-safe-registered-${txHash}`)
+            } else if (this.listeners(`token-approved-${txHash}`).length > 0) {
+              this.indexEvent(`token-approved-${txHash}`)
             }
 
             // update transaction manager
