@@ -98,6 +98,27 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl WasmNetwork {
+        /// Get all registered multiaddresses for a specific peer
+        pub async fn get_peer_multiaddresses(&self, peer: JsString) -> js_sys::Array {
+            let peer: String = peer.into();
+            match PeerId::from_str(&peer) {
+                Ok(p) => {
+                    js_sys::Array::from_iter(self.network.read().await
+                    .get_peer_multiaddresses(&p)
+                    .into_iter()
+                    .map(|ma| JsString::from(ma.to_string())))
+                },
+                Err(err) => {
+                    warn!(
+                        "Failed to parse peer id {}, network assumes it is not present: {}",
+                        peer,
+                        err.to_string()
+                    );
+                    js_sys::Array::new()
+                }
+            }
+        }
+
         #[wasm_bindgen]
         pub async fn contains(&self, peer: JsString) -> bool {
             let peer: String = peer.into();

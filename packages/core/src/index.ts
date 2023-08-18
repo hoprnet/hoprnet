@@ -1,6 +1,6 @@
 import EventEmitter from 'events'
 
-import { Multiaddr, protocols } from '@multiformats/multiaddr'
+import { Multiaddr, multiaddr, protocols } from '@multiformats/multiaddr'
 
 import BN from 'bn.js'
 import { keysPBM } from '@libp2p/crypto/keys'
@@ -93,6 +93,7 @@ import type { ResolvedNetwork } from './network.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
+import { networkInterfaces } from 'node:os'
 
 
 const CODE_P2P = protocols('p2p').code
@@ -357,7 +358,8 @@ export class Hopr extends EventEmitter {
     // TODO: Add secp keypair instead of the string
     let coreApp = new CoreApp(new Packet_OffchainKeypair(this.packetKeypair.secret()), this.db.clone(),
       this.options.networkQualityThreshold, heartbeat_cfg, ping_cfg,
-      onAcknowledgement, onAcknowledgedTicket, packetCfg, onReceivedMessage
+      onAcknowledgement, onAcknowledgedTicket, packetCfg, onReceivedMessage,
+      this.getLocalInterfaceAddresses()
     )
 
     let tools = coreApp.tools()
@@ -432,6 +434,24 @@ export class Hopr extends EventEmitter {
   public async startProcessing() {
     await Promise.all([this.main_loop])
     log(`all interactions finished execution`)
+  }
+
+  private getLocalInterfaceAddresses(): string[] {
+    let results: string[]
+    const nets = networkInterfaces();
+
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+            // 'IPv4' is in Node <= 17, from 18 it's a number 4 or 6
+            const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4
+            if (net.family === familyV4Value && !net.internal) {
+                results.push(net.address);
+            }
+        }
+    }
+
+    return [...new Set(results)]
   }
 
   /*
@@ -663,16 +683,16 @@ export class Hopr extends EventEmitter {
   /**
    * List the addresses on which the node is listening
    */
-  public getListeningAddresses(): Multiaddr[] {
+  public async getListeningAddresses(): Promise<Multiaddr[]> {
     if (this.status !== 'RUNNING') {
       // Not listening to any address unless `hopr` is running
       return []
     }
-    // @TODO find a better way to do this
-    // @ts-ignore undocumented method
+    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(this.id.toString())).map((mas) => multiaddr(mas))
 
-    // TODO: add a listening address here
-    return []
+    return addrs.sort(
+      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
+    )
   }
 
   /**
@@ -682,8 +702,11 @@ export class Hopr extends EventEmitter {
   // TODO: this is needed by the API, but we cannot actually get it from that far
   public async getObservedAddresses(peer: PeerId): Promise<Multiaddr[]> {
     debug('Getting address for peer ' + peer)
-    let addresses = []
-    return addresses.map((addr) => addr.multiaddr)
+    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(peer.toString())).map((mas) => multiaddr(mas))
+
+    return addrs.sort(
+      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
+    )
   }
 
   /**
@@ -846,16 +869,7 @@ export class Hopr extends EventEmitter {
    * @param _timeout [optional] custom timeout for DHT query
    */
   public async getAddressesAnnouncedToDHT(peer: PeerId = this.getId(), _timeout = 5e3): Promise<Multiaddr[]> {
-    let addrs: Multiaddr[]
-
-    if (peer.equals(this.getId())) {
-      // TODO: get thes addresses from the libp2p_swarm
-      // addrs = this.libp2pComponents.getAddressManager().getAddresses()
-    } else {
-      // @TODO add abort controller
-      addrs = await this.getObservedAddresses(peer)
-    }
-    
+    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(peer.toString())).map((mas) => multiaddr(mas))
 
     return addrs.sort(
       this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode

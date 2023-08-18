@@ -26,6 +26,7 @@ async-lock = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = "7.3.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
+multiaddr = { workspace = true }
 js-sys = { workspace = true, optional = true }
 thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }

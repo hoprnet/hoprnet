@@ -84,9 +84,41 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     heartbeat_requests: api::HeartbeatRequester,
     heartbeat_responds: api::HeartbeatResponder,
     manual_ping_requests: api::ManualPingRequester,
-    manual_ping_responds: api::HeartbeatResponder)
+    manual_ping_responds: api::HeartbeatResponder,
+    my_external_addresses: Vec<std::net::Ipv4Addr>)
 {
     let mut swarm = core_p2p::build_p2p_network(me);
+    
+    // Add my peer id with my known listening multiaddresses to the network (temporary STUN replacement)
+    // =====================
+    let external_registered_mas = {
+        let mut net = network.write().await;
+        let me = swarm.local_peer_id();
+
+        let mut addrs: Vec<Multiaddr> = vec![];
+        
+        for ma in swarm.listeners() {
+            addrs.push(ma.clone());
+            for ip4a in my_external_addresses.iter() {
+                let _ma = ma.clone().replace(0, |p| match p {
+                    multiaddr::Protocol::Ip4(_) => Some(multiaddr::Protocol::Ip4(ip4a.clone())),
+                    _ => None
+                }).expect("Should perform a valid ipv4 multiaddress replacement");
+                
+                addrs.push(_ma.clone());
+            }
+        }
+
+        info!("Registering own external multiaddresses: {:?}", addrs);
+        net.store_peer_multiaddresses(me, addrs);
+        net.get_peer_multiaddresses(&me)
+    };
+    
+    for ma in external_registered_mas.into_iter() {
+        swarm.add_external_address(ma)
+    }
+    // =====================
+
     let mut heartbeat_responds = heartbeat_responds;
     let mut manual_ping_responds = manual_ping_responds;
 
@@ -95,7 +127,6 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
 
     let mut active_manual_pings: std::collections::HashSet<libp2p_request_response::RequestId> = std::collections::HashSet::new();
     let mut allowed_peers: std::collections::HashSet<PeerId> = std::collections::HashSet::new();
-    let mut announced_multiaddresses: std::collections::HashMap<PeerId,Vec<Multiaddr>> = std::collections::HashMap::new();
     let mut active_sent_packets: std::collections::HashMap<libp2p_request_response::RequestId, PacketSendFinalizer> = std::collections::HashMap::new();
 
     let mut inputs = (
@@ -171,15 +202,13 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                         }
                     },
                     IndexerProcessed::Announce(peer, multiaddresses) => {
-                        announced_multiaddresses.insert(peer, multiaddresses.clone());
-                        
-                        for multiaddress in multiaddresses.into_iter() {
+                        for multiaddress in multiaddresses.iter() {
                             if !swarm.is_connected(&peer) {
                                 match swarm.dial(multiaddress.clone()) {
                                     Ok(_) => {
                                         swarm.behaviour_mut().heartbeat.add_address(&peer, multiaddress.clone());
                                         swarm.behaviour_mut().msg.add_address(&peer, multiaddress.clone());
-                                        swarm.behaviour_mut().ack.add_address(&peer, multiaddress);
+                                        swarm.behaviour_mut().ack.add_address(&peer, multiaddress.clone());
                                     },
                                     Err(e) => {
                                         error!("Failed to dial an announced peer '{}': {}, skipping the address", &peer, e);
@@ -187,6 +216,9 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                                 }
                             }
                         }
+
+                        // TODO: awaiting in this loop is a malpractice, but this behavior will be handled by STUN later
+                        network.write().await.store_peer_multiaddresses(&peer, multiaddresses)
                     }
                 }
             },

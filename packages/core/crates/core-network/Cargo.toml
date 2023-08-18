@@ -16,6 +16,7 @@ blake2 = "0.10.4"
 futures = { workspace = true }
 futures-lite = { workspace = true }
 libp2p-identity = { workspace = true }
+multiaddr = { workspace = true }
 rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "1.0"

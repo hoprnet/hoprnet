@@ -5,10 +5,9 @@ use std::time::Duration;
 
 use libp2p_identity::PeerId;
 
+use multiaddr::Multiaddr;
 use utils_log::{info, warn};
-use utils_metrics::{
-    metrics::{MultiGauge, SimpleGauge}
-};
+use utils_metrics::metrics::{MultiGauge, SimpleGauge};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -179,6 +178,7 @@ pub struct Network<T: NetworkExternalActions> {
     entries: HashMap<PeerId, PeerStatus>,
     ignored: HashMap<PeerId, u64>, // timestamp
     excluded: HashSet<PeerId>,
+    known_multiaddresses: HashMap<PeerId, Vec<Multiaddr>>,
     good_quality_public: HashSet<PeerId>,
     bad_quality_public: HashSet<PeerId>,
     good_quality_non_public: HashSet<PeerId>,
@@ -218,6 +218,7 @@ impl<T: NetworkExternalActions> Network<T> {
             entries: HashMap::new(),
             ignored: HashMap::new(),
             excluded,
+            known_multiaddresses: HashMap::new(),
             good_quality_public: HashSet::new(),
             bad_quality_public: HashSet::new(),
             good_quality_non_public: HashSet::new(),
@@ -235,6 +236,19 @@ impl<T: NetworkExternalActions> Network<T> {
         };
 
         instance
+    }
+
+    /// Set all registered multiaddresses for a specific peer
+    pub fn store_peer_multiaddresses(&mut self, peer: &PeerId, addrs: Vec<Multiaddr>) {
+        self.known_multiaddresses.insert(peer.clone(), addrs);
+    }
+
+    /// Get all registered multiaddresses for a specific peer
+    pub fn get_peer_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
+        match self.known_multiaddresses.get(peer) {
+            Some(addrs) => addrs.clone(),
+            None => vec![]
+        }
     }
 
     /// Check whether the PeerId is present in the network

@@ -35,6 +35,7 @@ futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
 libp2p-identity = { version = "0.2.2", features = ["peerid", "ed25519"] }
 libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+multiaddr = "0.18.0"
 serde = { version = "1.0" }
 thiserror = "1.0"
 js-sys = "0.3.64"

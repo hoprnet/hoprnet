@@ -128,6 +128,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
     ping_cfg: PingConfig,
     on_acknowledgement: Option<js_sys::Function>, on_acknowledged_ticket: Option<js_sys::Function>,
     packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>,
+    my_external_addresses: Vec<std::net::Ipv4Addr>,             // TODO: needed only because there's no STUN ATM 
 ) -> (HoprTools, impl std::future::Future<Output=()>)
 {
     use core_mixer::mixer::{Mixer, MixerConfig};
@@ -191,6 +192,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
             ack_actions, packet_actions,
             api::HeartbeatRequester::new(hb_ping_rx), api::HeartbeatResponder::new(hb_pong_tx),
             api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx),
+            my_external_addresses
         ).map(|_| HoprLoopComponents::Swarm))
     ];
     let mut futs = helpers::to_futures_unordered(ready_loops);
@@ -207,6 +209,8 @@ pub fn build_components(me: libp2p_identity::Keypair,
 
 #[cfg(feature = "wasm")]
 pub mod wasm_impl {
+    use std::str::FromStr;
+
     use super::*;
     use core_crypto::{types::HalfKeyChallenge, keypairs::OffchainKeypair};
     use core_path::path::Path;
@@ -244,6 +248,7 @@ pub mod wasm_impl {
             network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig,
             on_acknowledgement: Option<js_sys::Function>, on_acknowledged_ticket: Option<js_sys::Function>,
             packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>,
+            my_external_addresses: Vec<js_sys::JsString>
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
@@ -251,6 +256,13 @@ pub mod wasm_impl {
                 network_quality_threshold, hb_cfg, ping_cfg,
                 on_acknowledgement, on_acknowledged_ticket,
                 packet_cfg, on_final_packet,
+                my_external_addresses
+                    .into_iter()
+                    .map(|ip| {
+                        let ip: String = ip.into();
+                        std::net::Ipv4Addr::from_str(ip.as_str()).expect("Should be a valid IPv4 string")
+                    })
+                    .collect::<Vec<_>>()
             );
 
             Self {
