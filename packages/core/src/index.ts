@@ -355,7 +355,7 @@ export class Hopr extends EventEmitter {
     const onReceivedMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
 
     // TODO: Add secp keypair instead of the string
-    let coreApp = new CoreApp("KEYPAIR", this.db.clone(),
+    let coreApp = new CoreApp(new Packet_OffchainKeypair(this.packetKeypair.secret()), this.db.clone(),
       this.options.networkQualityThreshold, heartbeat_cfg, ping_cfg,
       onAcknowledgement, onAcknowledgedTicket, packetCfg, onReceivedMessage
     )

@@ -208,7 +208,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
 #[cfg(feature = "wasm")]
 pub mod wasm_impl {
     use super::*;
-    use core_crypto::types::HalfKeyChallenge;
+    use core_crypto::{types::HalfKeyChallenge, keypairs::OffchainKeypair};
     use core_path::path::Path;
     use wasm_bindgen::prelude::*;
 
@@ -240,12 +240,12 @@ pub mod wasm_impl {
         /// # Arguments
         /// me: A value convertible to the `libp2p_identity::Keypair` needed by the swarm
         #[wasm_bindgen(constructor)]
-        pub fn new(_me: String, db: Database, // TODO: replace the string with the KeyPair
+        pub fn new(me: &OffchainKeypair, db: Database, // TODO: replace the string with the KeyPair
             network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig,
             on_acknowledgement: Option<js_sys::Function>, on_acknowledged_ticket: Option<js_sys::Function>,
             packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>,
         ) -> Self {
-            let me = libp2p_identity::Keypair::generate_ed25519();
+            let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
                 me, db.as_ref_counted(), 
                 network_quality_threshold, hb_cfg, ping_cfg,

@@ -781,10 +781,8 @@ impl PacketSendAwaiter {
             },
             None => Err(TransportError("Packet send process observation already consumed".to_owned())),
         }
-
     }
 }
-
 
 /// External API for feeding Packet actions into the Packet processor
 #[derive(Debug, Clone)]
