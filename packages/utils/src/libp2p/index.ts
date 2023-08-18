@@ -26,7 +26,6 @@ export * from './connection.js'
  */
 export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{45}/i
 
-
 /**
  *
  * Returns true or false if given string does not contain a b58string

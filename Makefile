@@ -280,7 +280,7 @@ lint-ts: ## run linter for TS
 
 .PHONY: lint-rust
 lint-rust: ## run linter for Rust
-	$(foreach c, $(CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
+	$(foreach c, $(LINTABLE_CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
 
 .PHONY: lint-python
 lint-python: ## run linter for Python

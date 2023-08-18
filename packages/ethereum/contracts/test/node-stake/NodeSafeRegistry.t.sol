@@ -8,9 +8,7 @@ import {Test} from "forge-std/Test.sol";
 
 // proxy contract to manipulate storage
 contract MyNodeSafeRegistry is HoprNodeSafeRegistry {
-    constructor()
-        HoprNodeSafeRegistry()
-    {}
+    constructor() HoprNodeSafeRegistry() {}
 
     // Only for testing
     function _storeSafeAddress(address nodeAddress, address safeAddress) public {
