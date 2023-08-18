@@ -627,7 +627,6 @@ __metadata:
     "@types/sinon": 10.0.16
     async-mutex: 0.4.0
     bn.js: 5.2.1
-    chalk: 5.2.0
     debug: 4.3.4
     ethers: 5.7.2
     mocha: 10.2.0
@@ -718,7 +717,6 @@ __metadata:
     bl: 5.1.0
     bn.js: 5.2.1
     chai: 4.3.7
-    chalk: 5.2.0
     debug: 4.3.4
     ethers: 5.7.2
     futoin-hkdf: 1.5.0
