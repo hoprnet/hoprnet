@@ -201,7 +201,9 @@ function setup_node() {
 function generate_local_identities() {
   log "Generate local identities"
 
-  # remove existing identity files, .safe.args TODO:
+  # remove existing identity files, .safe.args
+  rm "${tmp_dir}/*.safe.args" 2>&1 || true
+  rm "${tmp_dir}/*.id" 2>&1 || true
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity \
