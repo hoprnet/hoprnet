@@ -12,7 +12,7 @@ import {
   ChannelStatus,
   ChannelEntry
 } from '../../../../../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate
+hoprd_misc_initialize_crate()
 
 let node = sinon.fake() as any
 node.getTickets = sinon.fake.returns([TICKET_MOCK])
