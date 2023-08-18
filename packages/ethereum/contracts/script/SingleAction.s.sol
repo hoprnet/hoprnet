@@ -107,19 +107,18 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultApproveFunctionPermisson
-         *       CapabilityPermission.SPECIFIC_FALLBACK_BLOCK  // defaultSendFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW  // defaultSendFunctionPermisson
          *     ]
          */
         CapabilityPermission[] memory defaultChannelsCapabilityPermissions = new CapabilityPermission[](9);
         for (uint256 i = 0; i < defaultChannelsCapabilityPermissions.length; i++) {
             defaultChannelsCapabilityPermissions[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
         }
-        defaultChannelsCapabilityPermissions[8] = CapabilityPermission.SPECIFIC_FALLBACK_BLOCK;
         Target defaultModulePermission = TargetUtils.encodeDefaultPermissions(
             currentNetworkDetail.addresses.channelsContractAddress,
             Clearance.FUNCTION,
             TargetType.CHANNELS,
-            TargetPermission.SPECIFIC_FALLBACK_BLOCK,
+            TargetPermission.ALLOW_ALL,
             defaultChannelsCapabilityPermissions
         );
 
