@@ -1,6 +1,8 @@
-import type { Operation } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
+
 import { STATUS_CODES } from '../../utils.js'
+
+import type { Operation } from 'express-openapi'
 import type { State, StateOps } from '../../../../types.js'
 
 /**
@@ -113,7 +115,7 @@ POST.apiDoc = {
           type: 'object',
           required: ['peerId', 'alias'],
           properties: {
-            peerId: { format: 'peerId', type: 'string', description: 'PeerId that we want to set alias to.' },
+            peerId: { format: 'peerid', type: 'string', description: 'PeerId that we want to set alias to.' },
             alias: { type: 'string', description: 'Alias that we want to attach to peerId.' }
           },
           example: {

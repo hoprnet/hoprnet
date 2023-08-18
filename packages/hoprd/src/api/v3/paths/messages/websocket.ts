@@ -13,7 +13,7 @@ GET.apiDoc = {
     `This is a websocket endpoint which exposes a subset of message functions.
 Incoming messages from other nodes are sent to the websocket client.
 A client may also send message by sending the following data:
-  { cmd: "sendmsg", args: { recipient: "SOME_PEER_ID", path: [], hops: 1} }
+  { cmd: "sendmsg", args: { peerAddress: "SOME_PEER_ID", path: [], hops: 1} }
 The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
 `,
     '/messages/websocket'
