@@ -1,4 +1,4 @@
-import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum/lib/db.js'
+import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'

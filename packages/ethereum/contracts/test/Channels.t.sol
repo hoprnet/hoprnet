@@ -1714,6 +1714,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
     function testRevert_tokensReceivedSameParty(address safeContract, address src, uint96 amount) public {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != address(0));
+        vm.assume(safeContract != src);
 
         address operator = address(0);
         HoprChannels.Balance balance = HoprChannels.Balance.wrap(amount);

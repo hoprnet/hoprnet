@@ -1,12 +1,3 @@
-export type DeploymentExtract = {
-  hoprAnnouncementsAddress: string
-  hoprTokenAddress: string
-  hoprChannelsAddress: string
-  hoprNetworkRegistryAddress: string
-  hoprNodeSafeRegistryAddress: string
-  indexerStartBlockNumber: number
-}
-
 // FIXME: Ideally this ABI should be imported dynamically based on the compile of smart contracts.
 // However, to simplify moving pieces during the migraiton, a static copy of ABIs are used.
 export const HOPR_NETWORK_REGISTRY_ABI =
