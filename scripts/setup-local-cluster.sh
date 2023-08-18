@@ -14,6 +14,8 @@ declare HOPR_LOG_ID="setup-local-cluster"
 # shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
+PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
+
 # verify and set parameters
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
@@ -158,7 +160,10 @@ function setup_node() {
     additional_args="--network anvil-localhost ${additional_args}"
   fi
 
+  local safe_args=$(<${dir}.safe.args)
+  log "safe args ${safe_args}"
   # read safe args and append to additional_args TODO:
+  additional_args="${additional_args} ${safe_args}"
 
   log "Additional args: \"${additional_args}\""
 
@@ -196,9 +201,6 @@ function setup_node() {
 function generate_local_identities() {
   log "Generate local identities"
 
-  rm -rf "${tmp_dir}"
-  mkdir -p "${tmp_dir}"
-
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity \
     --action create \
@@ -213,17 +215,23 @@ function create_local_safes() {
   log "Create safe"
 
   # create a loop so safes are created for all the nodes TODO:
-  # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `safe_i.log` for each id
-  # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
-  env \
+  for i in {0..4}; do
+    # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `safe_i.log` for each id
+    # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
+    env \
       ETHERSCAN_API_KEY="" \
       IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
       PRIVATE_KEY="${deployer_private_key}" \
       DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
       hopli create-safe-module \
       --network anvil-localhost \
-      --identity-from-path "${node1_id}" \
+      --identity-from-path "${tmp_dir}/${node_prefix}_${i}.id" \
       --contracts-root "./packages/ethereum/contracts" > safe.log
+
+    # store safe arguments in separate file for later use
+    grep -oE "(\-\-safeAddress.*)" safe.log > "${tmp_dir}/${node_prefix}_${i}.safe.args"
+    rm safe.log
+  done
 }
 
 # --- Log setup info {{{
