@@ -247,11 +247,6 @@ update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
 
-log "Disable network registry"
-env PRIVATE_KEY="${deployer_private_key}" \
-  make -C "${mydir}/.." disable-network-registry \
-  network=anvil-localhost environment_type=local
-
 #  --- Run nodes --- {{{
 setup_node 13301 19091 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"
 setup_node 13302 19092 18082 "${node2_dir}" "${node2_log}" "${node2_id}" "${listen_host}"
