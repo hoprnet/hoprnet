@@ -19,5 +19,3 @@ export function isErrorOutOfFunds(error: any): 'NATIVE' | 'HOPR' | false {
   else if (isErrorOutOfHoprFunds(error)) return 'HOPR'
   return false
 }
-
-export * from './keyPair.js'

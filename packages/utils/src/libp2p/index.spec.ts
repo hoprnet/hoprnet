@@ -3,7 +3,6 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
 import type { Components } from '@libp2p/interfaces/components'
 import type { StreamHandler, IncomingStreamData } from '@libp2p/interface-registrar'
-import { peerIdFromString } from '@libp2p/peer-id'
 import { createSecp256k1PeerId, createEd25519PeerId } from '@libp2p/peer-id-factory'
 import { Multiaddr } from '@multiformats/multiaddr'
 
@@ -11,28 +10,12 @@ import { defer, type DeferType } from '../async/index.js'
 import { u8aEquals } from '../u8a/index.js'
 import {
   isSecp256k1PeerId,
-  convertPubKeyFromPeerId,
-  convertPubKeyFromB58String,
   hasB58String,
   getB58String,
   libp2pSubscribe,
   libp2pSendMessage,
   type LibP2PHandlerArgs
 } from './index.js'
-
-describe(`test convertPubKeyFromPeerId`, function () {
-  it(`should equal to a newly created pubkey from PeerId`, async function () {
-    const id = await createSecp256k1PeerId()
-    const pubKey = convertPubKeyFromPeerId(id)
-    assert(u8aEquals(id.publicKey, pubKey.bytes))
-  })
-  it(`should equal to pubkey from a PeerId CID`, async function () {
-    const testIdB58String = '16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg'
-    const pubKey = convertPubKeyFromB58String(testIdB58String)
-    const id = peerIdFromString(testIdB58String)
-    assert(u8aEquals(id.publicKey, pubKey.bytes))
-  })
-})
 
 describe(`test hasB58String`, function () {
   it(`should return a boolean value`, function () {

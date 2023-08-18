@@ -26,7 +26,6 @@
     "lib"
   ],
   "dependencies": {
-    "@ethersproject/wallet": "5.7.0",
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@libp2p/crypto": "1.0.0",
     "@libp2p/interface-peer-id": "1.0.5",
@@ -38,7 +37,6 @@
     "bn.js": "5.2.1",
     "debug": "4.3.4",
     "ethers": "5.7.2",
-    "futoin-hkdf": "1.5.0",
     "hjson": "3.2.2",
     "it-pipe": "2.0.5",
     "jsonschema": "1.4.1",
