@@ -17,7 +17,7 @@ async-std = { version = "1.12.0", features = ["attributes"] }
 blake2 = { version = "0.10", features = ["reset"] }
 chacha20 = { version = "0.9", features = ["zeroize"] }
 ctr = "0.9"
-curve25519-dalek = { version = "4.0.0-rc.1", features = ["serde"] } # must use 4.0.0-rc.1 due to rs-libp2p (snow)
+curve25519-dalek = { version = "4.0.0", features = ["serde"] } # must use 4.0.0-rc.1 due to rs-libp2p (snow)
 digest = "0.10"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 elliptic-curve = { version = "0.13", features = ["serde"] }
