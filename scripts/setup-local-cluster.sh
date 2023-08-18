@@ -220,7 +220,7 @@ function create_local_safes() {
     # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
     env \
       ETHERSCAN_API_KEY="" \
-      IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
+      IDENTITY_PASSWORD="${password}" \
       PRIVATE_KEY="${deployer_private_key}" \
       DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
       hopli create-safe-module \
