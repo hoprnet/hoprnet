@@ -15,7 +15,7 @@ on:
       - 'docs/**/*'
       - '**/*.md'
 concurrency:
-  group: ${{ github.head_ref }}-lint
+  group: ${{ github.head_ref }}-lint-optional
   cancel-in-progress: true
 jobs:
   shellcheck:
