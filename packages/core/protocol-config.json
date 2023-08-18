@@ -36,10 +36,28 @@
       },
       "tags": []
     },
+    "dufour": {
+      "chain": "xdai",
+      "environment_type": "production",
+      "version_range": "2.0",
+      "indexer_start_block_number": 29472592,
+      "addresses": {
+        "channels": "",
+        "module_implementation": "",
+        "network_registry": "",
+        "network_registry_proxy": "",
+        "node_safe_registry": "",
+        "node_stake_v2_factory": "",
+        "token": "",
+        "ticket_price_oracle": "",
+        "announcements": ""
+      },
+      "tags": ["etherscan"]
+    },
     "rotsee": {
       "chain": "xdai",
       "environment_type": "staging",
-      "version_range": "*",
+      "version_range": "2.0",
       "indexer_start_block_number": 29472592,
       "addresses": {
         "channels": "0x4c3bb6470b72A749Db1bB394c024A92AB60a793e",

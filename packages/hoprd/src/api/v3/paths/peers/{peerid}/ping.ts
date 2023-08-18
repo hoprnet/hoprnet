@@ -44,10 +44,10 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
 const POST: Operation = [
   async (req, res, _next) => {
     const { node }: { node: Hopr } = req.context
-    const { peerId } = req.params
+    const { peerid } = req.params
 
     try {
-      const pingRes = await ping({ peerId, node })
+      const pingRes = await ping({ peerId: peerid, node })
       return res.status(200).send(pingRes)
     } catch (err) {
       const errString = err instanceof Error ? err.message : 'Unknown error'
@@ -67,12 +67,13 @@ POST.apiDoc = {
   operationId: 'peersPingPeer',
   parameters: [
     {
-      name: 'peerId',
+      name: 'peerid',
       in: 'path',
       description: 'Peer id that should be pinged',
       required: true,
       schema: {
-        $ref: '#/components/schemas/HoprAddress'
+        format: 'peerid',
+        type: 'string'
       }
     }
   ],
