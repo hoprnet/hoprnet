@@ -2,15 +2,15 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
+import { LevelDb } from '@hoprnet/hopr-utils'
 
-import { createAuthenticatedTestApiInstance } from './../../fixtures.js'
+import { createAuthenticatedTestApiInstance, ALICE_ETHEREUM_ADDR } from './../../fixtures.js'
 import { STATUS_CODES } from './../../utils.js'
 
-import type { default as Hopr } from '@hoprnet/hopr-core'
-import { LevelDb } from '@hoprnet/hopr-utils'
-import { Address } from '../../../../../lib/hoprd_misc.js'
+import { hoprd_misc_initialize_crate, Database } from '../../../../../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
 
-import { Database } from '../../../../../../core/lib/core_hopr.js'
+import type { default as Hopr } from '@hoprnet/hopr-core'
 
 describe('POST /tokens', function () {
   let node: Hopr
@@ -20,7 +20,7 @@ describe('POST /tokens', function () {
     node = sinon.fake() as any
     let db = new LevelDb()
     await db.backend.open()
-    node.db = new Database(db, Address.from_string('0xf55df5f3ce0ccce707f76ef3e8459adff316ac99'))
+    node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)
 
