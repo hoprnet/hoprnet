@@ -182,7 +182,8 @@ where
                     return Err(CoreEthereumIndexerError::AccountEntrySignatureVerification);
                 }
 
-                db.link_chain_and_packet_keys(&sig.chain_key, &sig.pub_key, snapshot).await?;
+                db.link_chain_and_packet_keys(&sig.chain_key, &sig.pub_key, snapshot)
+                    .await?;
 
                 db.update_account_and_snapshot(&updated_account, snapshot).await?;
 
@@ -341,7 +342,7 @@ where
     where
         T: HoprCoreEthereumDbActions,
     {
-        if let HoprTokenEvents::TransferFilter(transfered)=  HoprTokenEvents::decode_log(log)? {
+        if let HoprTokenEvents::TransferFilter(transfered) = HoprTokenEvents::decode_log(log)? {
             let from: Address = transfered.from.0.try_into()?;
             let to: Address = transfered.to.0.try_into()?;
 
