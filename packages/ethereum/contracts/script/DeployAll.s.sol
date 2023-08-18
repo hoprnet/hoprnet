@@ -19,6 +19,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
     bool internal isHoprChannelsDeployed;
     bool internal isHoprNetworkRegistryDeployed;
+    address private owner;
 
     function setUp() public override(ERC1820RegistryFixtureTest) {}
 
@@ -31,6 +32,12 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // Halt if ERC1820Registry has not been deployed.
         mustHaveErc1820Registry();
         emit log_string(string(abi.encodePacked("Deploying in ", currentNetworkId)));
+        // set owner of network registry depending on the network
+        if (keccak256(abi.encodePacked(currentNetworkId)) == keccak256(abi.encodePacked("stake_hub_test"))) {
+            owner = PRODUCT_MULTISIG_ADDRESS;
+        } else {
+            owner = COMM_MULTISIG_ADDRESS;
+        }
 
         // 2. Get deployer internal key.
         // Set to default when it's in development environment (uint for 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
@@ -198,7 +205,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             currentNetworkDetail.addresses.networkRegistryProxyContractAddress = deployCode(
                 "SafeProxyForNetworkRegistry.sol:HoprSafeProxyForNetworkRegistry",
                 abi.encode(
-                    COMM_MULTISIG_ADDRESS,
+                    owner,
                     deployerAddress,
                     0, // disable self-registry
                     block.number, // latest block number
@@ -224,7 +231,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 "NetworkRegistry.sol:HoprNetworkRegistry",
                 abi.encode(
                     currentNetworkDetail.addresses.networkRegistryProxyContractAddress,
-                    COMM_MULTISIG_ADDRESS,
+                    owner,
                     deployerAddress
                 )
             );

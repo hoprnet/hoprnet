@@ -42,6 +42,7 @@ contract NetworkConfig is Script {
     bytes32 constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     address constant DEV_BANK_ADDRESS = 0x2402da10A6172ED018AEEa22CA60EDe1F766655C;
     address constant COMM_MULTISIG_ADDRESS = 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05;
+    address constant PRODUCT_MULTISIG_ADDRESS = 0xD720099cBC14e669695EaE0708E6Ca614B387921;
 
     string public currentNetworkId;
     EnvironmentType public currentEnvironmentType;
