@@ -1,7 +1,6 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
-import chalk from 'chalk'
 import {
   AcknowledgedTicket,
   Balance,
@@ -206,7 +205,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.chainKeypair.to_address().to_hex()}`)
-        log(chalk.green('Connector started'))
+        log('Connector started')
       } catch (err) {
         log('error: failed to start the indexer', err)
       }
@@ -228,9 +227,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   announce(multiaddr: Multiaddr): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(multiaddr, (txHash: string) =>
-      this.setTxHandler(`announce-${txHash}`, txHash)
-    )
+    return this.chain.announce(multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -583,11 +580,15 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
     log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
 
-    return (await this.chain.fundChannel(dest, counterpartyFund, (txHash: string) =>
-      this.setTxHandler(`token-approved-${txHash}`, txHash), (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
-      // we are only interested in fundChannel receipt
-    ))[1]
+    return (
+      await this.chain.fundChannel(
+        dest,
+        counterpartyFund,
+        (txHash: string) => this.setTxHandler(`token-approved-${txHash}`, txHash),
+        (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
+        // we are only interested in fundChannel receipt
+      )
+    )[1]
   }
 
   public async registerSafeByNode(): Promise<Receipt> {
