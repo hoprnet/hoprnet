@@ -36,10 +36,10 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
 const POST: Operation = [
   async (req, res, _next) => {
     const { node } = req.context
-    const { currency, amount, recipient } = req.body
+    const { currency, amount, ethereumAddress } = req.body
 
     try {
-      const txHash = await withdraw(node, currency, recipient, amount)
+      const txHash = await withdraw(node, currency, ethereumAddress, amount)
       return res.status(200).send({ receipt: txHash })
     } catch (err) {
       const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
@@ -64,7 +64,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['currency', 'amount', 'recipient'],
+          required: ['currency', 'amount', 'ethereumAddress'],
           properties: {
             currency: {
               $ref: '#/components/schemas/Currency'
@@ -75,7 +75,7 @@ POST.apiDoc = {
               description: "Amount to withdraw in the currency's smallest unit.",
               example: '1337'
             },
-            recipient: {
+            ethereumAddress: {
               $ref: '#/components/schemas/NativeAddress'
             }
           }
