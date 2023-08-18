@@ -201,11 +201,13 @@ function setup_node() {
 function generate_local_identities() {
   log "Generate local identities"
 
+  # remove existing identity files TODO:
+
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity \
     --action create \
     --identity-directory "${tmp_dir}" \
-    --identity-prefix "${node_prefix}" \
+    --identity-prefix "${node_prefix}_" \
     --number "5"
 }
 
