@@ -332,11 +332,14 @@ where
 pub mod tests {
     use async_std;
     use bindings::{
-        hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels,
-        hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_token::HoprToken,
+        hopr_announcements::HoprAnnouncements,
+        hopr_channels::{HoprChannels, HoprChannelsErrors},
+        hopr_node_safe_registry::HoprNodeSafeRegistry,
+        hopr_token::HoprToken,
     };
     use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_ethereum_db::db::CoreEthereumDb;
+    use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
     use ethers::{
         abi::{encode, Address, Token, Uint},
         core::utils::{Anvil, AnvilInstance},
@@ -412,24 +415,37 @@ pub mod tests {
         HoprNodeSafeRegistry::deploy(client, ()).unwrap().send().await.unwrap()
     }
 
-    async fn deploy_hopr_token(
+    async fn deploy_hopr_token_and_mint_tokens(
         client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
     ) -> HoprToken<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>> {
-        HoprToken::deploy(client, ()).unwrap().send().await.unwrap()
+        let hopr_token = HoprToken::deploy(client.clone(), ()).unwrap().send().await.unwrap();
+
+        hopr_token
+            .grant_role(hopr_token.minter_role().await.unwrap(), client.address())
+            .send()
+            .await
+            .unwrap();
+        hopr_token
+            .mint(client.address(), 1000.into(), Bytes::new(), Bytes::new())
+            .send()
+            .await
+            .unwrap();
+
+        hopr_token
     }
 
     async fn deploy_hopr_channels(
-        token: Address,
+        token: &Address,
         closure_notice_period: u32,
-        node_safe_registry: Address,
+        node_safe_registry: &Address,
         client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
     ) -> HoprChannels<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>> {
         HoprChannels::deploy(
             client.clone(),
             Token::Tuple(vec![
-                Token::Address(token),
+                Token::Address(*token),
                 Token::Uint(closure_notice_period.into()),
-                Token::Address(node_safe_registry),
+                Token::Address(*node_safe_registry),
             ]),
         )
         .unwrap()
@@ -438,20 +454,42 @@ pub mod tests {
         .unwrap()
     }
 
-    #[tokio::test]
-    async fn test_announce() {
-        let (anvil, client) = get_provider();
-        let hopr_node_safe_registry = HoprNodeSafeRegistry::deploy(client.clone(), ())
+    async fn deploy_hopr_announcements(
+        hopr_node_safe_registry: &Address,
+        client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+    ) -> HoprAnnouncements<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>> {
+        HoprAnnouncements::deploy(client.clone(), Token::Address(*hopr_node_safe_registry))
             .unwrap()
+            .send()
+            .await
+            .unwrap()
+    }
+
+    async fn fund_channel(
+        counterparty: &Address,
+        hopr_token: HoprToken<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+        hopr_channels: HoprChannels<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+    ) {
+        hopr_token
+            .approve(hopr_channels.address(), 1u128.into())
             .send()
             .await
             .unwrap();
 
-        let hopr_announcements = HoprAnnouncements::deploy(client.clone(), hopr_node_safe_registry.address())
-            .unwrap()
+        hopr_channels
+            .fund_channel(*counterparty, 1u128)
             .send()
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_announce() {
+        let (anvil, client) = get_provider();
+
+        let hopr_node_safe_registry = deploy_hopr_node_registry(client.clone()).await;
+
+        let hopr_announcements = deploy_hopr_announcements(&hopr_node_safe_registry.address(), client.clone()).await;
 
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
 
@@ -459,12 +497,12 @@ pub mod tests {
 
         let hopr_node_safe_registry = deploy_hopr_node_registry(client.clone()).await;
 
-        let hopr_token = deploy_hopr_token(client.clone()).await;
+        let hopr_token = deploy_hopr_token_and_mint_tokens(client.clone()).await;
 
         let hopr_channels = deploy_hopr_channels(
-            hopr_token.address(),
+            &hopr_token.address(),
             32u32,
-            hopr_node_safe_registry.address(),
+            &hopr_node_safe_registry.address(),
             client.clone(),
         )
         .await;
@@ -495,12 +533,12 @@ pub mod tests {
 
         let hopr_node_safe_registry = deploy_hopr_node_registry(client.clone()).await;
 
-        let hopr_token = deploy_hopr_token(client.clone()).await;
+        let hopr_token = deploy_hopr_token_and_mint_tokens(client.clone()).await;
 
         let hopr_channels = deploy_hopr_channels(
-            hopr_token.address(),
+            &hopr_token.address(),
             1u32,
-            hopr_node_safe_registry.address(),
+            &hopr_node_safe_registry.address(),
             client.clone(),
         )
         .await;
@@ -510,6 +548,19 @@ pub mod tests {
             ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap(),
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
         );
+
+        let counterparty = Wallet::from_bytes(&COUNTERPARTY_PRIV_KEY).unwrap();
+
+        fund_channel(&counterparty.address(), hopr_token, hopr_channels.clone()).await;
+
+        let mut redeem_ticket_tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+        redeem_ticket_tx.set_to(hopr_channels.address());
+        redeem_ticket_tx.set_data(chain.redeem_ticket(&AcknowledgedTicket::default()).unwrap().into());
+
+        Ticket::new(HoprAddress::from_bytes(&client.address().0).unwrap(), index, amount, win_prob, channel_epoch, signing_key)
+
+        client.send_transaction(redeem_ticket_tx, None).await.map_err(|e| e.to_string()).unwrap();
+        // hopr_channels.redeem_ticket(redeemable, params)
     }
 
     #[async_std::test]
