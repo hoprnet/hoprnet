@@ -228,9 +228,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   announce(multiaddr: Multiaddr): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(multiaddr, (txHash: string) =>
-      this.setTxHandler(`announce-${txHash}`, txHash)
-    )
+    return this.chain.announce(multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -583,11 +581,15 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
     log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
 
-    return (await this.chain.fundChannel(dest, counterpartyFund, (txHash: string) =>
-      this.setTxHandler(`token-approved-${txHash}`, txHash), (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
-      // we are only interested in fundChannel receipt
-    ))[1]
+    return (
+      await this.chain.fundChannel(
+        dest,
+        counterpartyFund,
+        (txHash: string) => this.setTxHandler(`token-approved-${txHash}`, txHash),
+        (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
+        // we are only interested in fundChannel receipt
+      )
+    )[1]
   }
 
   public async registerSafeByNode(): Promise<Receipt> {
