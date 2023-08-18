@@ -182,6 +182,8 @@ where
                     return Err(CoreEthereumIndexerError::AccountEntrySignatureVerification);
                 }
 
+                db.link_chain_and_packet_keys(&sig.chain_key, &sig.pub_key, snapshot).await?;
+
                 db.update_account_and_snapshot(&updated_account, snapshot).await?;
 
                 updated_account
@@ -205,7 +207,7 @@ where
     where
         T: HoprCoreEthereumDbActions,
     {
-        Ok(match HoprChannelsEvents::decode_log(log)? {
+        match HoprChannelsEvents::decode_log(log)? {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
 
@@ -331,41 +333,38 @@ where
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
             }
-        })
+        }
+        Ok(())
     }
 
     async fn on_token_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
-        Ok(match HoprTokenEvents::decode_log(log)? {
-            HoprTokenEvents::TransferFilter(transfered) => {
-                let from: Address = transfered.from.0.try_into()?;
-                let to: Address = transfered.to.0.try_into()?;
+        if let HoprTokenEvents::TransferFilter(transfered)=  HoprTokenEvents::decode_log(log)? {
+            let from: Address = transfered.from.0.try_into()?;
+            let to: Address = transfered.to.0.try_into()?;
 
-                let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
+            let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
 
-                if to.ne(&self.address_to_monitor) && from.ne(&self.address_to_monitor) {
-                    return Ok(());
-                } else if to.eq(&self.address_to_monitor) {
-                    db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
-                        .await?;
-                } else if from.eq(&self.address_to_monitor) {
-                    db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
-                        .await?;
-                }
+            if to.ne(&self.address_to_monitor) && from.ne(&self.address_to_monitor) {
+                return Ok(());
+            } else if to.eq(&self.address_to_monitor) {
+                db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
+                    .await?;
+            } else if from.eq(&self.address_to_monitor) {
+                db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
+                    .await?;
             }
-            _ => {
-                // don't care. Not important to HOPR
-            }
-        })
+        }
+        Ok(())
     }
 
     async fn on_network_registry_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
-        Ok(match HoprNetworkRegistryEvents::decode_log(log)? {
+        match HoprNetworkRegistryEvents::decode_log(log)? {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 db.remove_from_network_registry(
                     &deregistered.staking_account.0.try_into()?,
@@ -417,14 +416,15 @@ where
             _ => {
                 // don't care. Not important to HOPR
             }
-        })
+        }
+        Ok(())
     }
 
     async fn on_node_safe_registry_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
-        Ok(match HoprNodeSafeRegistryEvents::decode_log(log)? {
+        match HoprNodeSafeRegistryEvents::decode_log(log)? {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.eq(&registered.node_address.0.try_into()?) {
                     db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.0.try_into()?), snapshot)
@@ -433,25 +433,27 @@ where
             }
             HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
                 if self.chain_key.eq(&deregistered.node_address.0.try_into()?) {
-                    if let Some(_) = db.is_mfa_protected().await? {
+                    if db.is_mfa_protected().await?.is_some() {
                         db.set_mfa_protected_and_update_snapshot(None, snapshot).await?;
                     } else {
                         return Err(CoreEthereumIndexerError::MFAModuleDoesNotExist);
                     }
                 }
             }
-        })
+        }
+        Ok(())
     }
 
     async fn on_node_management_module_event<T>(&self, _db: &mut T, log: &RawLog, _snapshot: &Snapshot) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
-        Ok(match HoprNodeManagementModuleEvents::decode_log(log)? {
+        match HoprNodeManagementModuleEvents::decode_log(log)? {
             _ => {
                 // don't care at the moment
             }
-        })
+        }
+        Ok(())
     }
 
     pub async fn on_event<T>(
@@ -467,7 +469,7 @@ where
     {
         utils_log::debug!("indexer received log {:?}", log);
 
-        Ok(if address.eq(&self.addresses.announcements) {
+        if address.eq(&self.addresses.announcements) {
             self.on_announcement_event(db, log, block_number, snapshot).await?;
         } else if address.eq(&self.addresses.channels) {
             self.on_channel_event(db, log, snapshot).await?;
@@ -480,8 +482,9 @@ where
         } else if address.eq(&self.addresses.node_management_module) {
             self.on_node_management_module_event(db, log, snapshot).await?
         } else {
-            return Err(CoreEthereumIndexerError::UnknownContract(address.clone()));
-        })
+            return Err(CoreEthereumIndexerError::UnknownContract(*address));
+        }
+        Ok(())
     }
 }
 
@@ -1440,11 +1443,11 @@ pub mod wasm {
         }
 
         fn own_channel_updated(&self, channel_entry: &ChannelEntry) {
-            self.js_own_channel_updated(channel_entry.clone())
+            self.js_own_channel_updated(*channel_entry)
         }
 
         fn not_allowed_to_access_network(&self, address: &Address) {
-            self.js_not_allowed_to_access_network(address.clone())
+            self.js_not_allowed_to_access_network(*address)
         }
     }
 
