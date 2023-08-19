@@ -9,7 +9,7 @@ import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 
-import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum/lib/db.js'
+import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum'
 import { debug, stringToU8a, Address, OffchainPublicKey } from '@hoprnet/hopr-utils'
 import {
   authenticateWsConnection,

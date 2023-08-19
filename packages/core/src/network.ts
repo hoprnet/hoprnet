@@ -6,8 +6,10 @@ import {
   type ResolvedNetwork,
   type Network
 } from '../lib/core_misc.js'
-import { DeploymentExtract } from '@hoprnet/hopr-core-ethereum/src/utils/utils.js'
 core_misc_initialize_crate()
+
+import type { DeploymentExtract } from '@hoprnet/hopr-core-ethereum'
+
 export {
   resolve_network,
   supported_networks,
