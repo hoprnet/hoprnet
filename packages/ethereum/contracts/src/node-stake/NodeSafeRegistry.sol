@@ -32,8 +32,8 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     // Node address is zero
     error NodeAddressZero();
 
-    // Provided address is neither an owner of Safe nor a member of an enabled NodeManagementModule
-    error NotSafeOwnerNorNode();
+    // Provided address is not a member of an enabled NodeManagementModule
+    error NodeNotModuleMember();
 
     struct NodeSafeRecord {
         address safeAddress;
@@ -123,7 +123,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
             revert NotValidSafe();
         }
 
-        // ensure that node is an owner
+        // ensure that node is a member to the module
         ensureNodeIsSafeModuleMember(NodeSafe({safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr}));
 
         // update and emit event
@@ -155,7 +155,8 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     }
 
     /**
-     * @dev internal funciton to store safe-node pair and emit events
+     * @dev Internal function to store a node-safe pair and emit relevant events.
+     * @param nodeSafe The NodeSafe struct containing the safe and node addresses.
      */
     function addNodeSafe(NodeSafe memory nodeSafe) internal {
         // Safe address cannot be zero
@@ -172,7 +173,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
             revert NodeHasSafe();
         }
 
-        // ensure that node is either an owner or a member of the (enabled) NodeManagementModule
+        // ensure that node is a member of the (enabled) NodeManagementModule
         ensureNodeIsSafeModuleMember(nodeSafe);
 
         NodeSafeRecord storage record = _nodeToSafe[nodeSafe.nodeChainKeyAddress];
@@ -186,12 +187,12 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     }
 
     /**
-     * @dev Ensure that the node address is either an owner or a member of
-     * the enebled node management module of the safe
-     * @param nodeSafe struct to check
+     * @dev Ensure that the node address is a member of
+     * the enabled node management module of the safe
+     * @param nodeSafe The NodeSafe struct containing the safe and node addresses.
      */
     function ensureNodeIsSafeModuleMember(NodeSafe memory nodeSafe) internal view {
-        // if nodeChainKeyAddress is not an owner, it must be a member of the enabled node management module
+        // nodeChainKeyAddress must be a member of the enabled node management module
         address nextModule;
         address[] memory modules;
         // there may be many modules, loop through them
@@ -208,7 +209,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
             }
         }
 
-        // if nodeChainKeyAddress is neither an owner nor a member of a valid HoprNodeManagementModule to the safe, revert
-        revert NotSafeOwnerNorNode();
+        // if nodeChainKeyAddress is not a member of a valid HoprNodeManagementModule to the safe, revert
+        revert NodeNotModuleMember();
     }
 }

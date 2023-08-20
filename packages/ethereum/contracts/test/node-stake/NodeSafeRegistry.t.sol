@@ -152,7 +152,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     /**
      * @dev node fail to register a node due to node and safe addresses are random
      */
-    function testRevert_FailToRegisterSafeByNodeDueToNotSafeOwnerNorNode(address safeAddress, address nodeAddress)
+    function testRevert_FailToRegisterSafeByNodeDueToNodeNotModuleMember(address safeAddress, address nodeAddress)
         public
     {
         vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
@@ -163,7 +163,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         nodeSafeRegistry._storeSafeAddress(nodeAddress, address(0));
 
         vm.prank(nodeAddress);
-        vm.expectRevert(HoprNodeSafeRegistry.NotSafeOwnerNorNode.selector);
+        vm.expectRevert(HoprNodeSafeRegistry.NodeNotModuleMember.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
         vm.clearMockedCalls();
     }
