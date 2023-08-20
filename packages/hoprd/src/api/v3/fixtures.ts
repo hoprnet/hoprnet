@@ -2,8 +2,20 @@ import express from 'express'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { Multiaddr } from '@multiformats/multiaddr'
 
-import { Balance, BalanceType, U256, ChannelEntry, ChannelStatus, Address } from '@hoprnet/hopr-utils'
 import { setupRestApi } from '../v3.js'
+import {
+  hoprd_misc_initialize_crate,
+  AccountEntry,
+  OffchainPublicKey,
+  Address,
+  ChannelEntry,
+  ChannelStatus,
+  Balance,
+  BalanceType,
+  U256
+} from '../../../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
+
 import { MessageInbox, MessageInboxConfiguration, hoprd_inbox_initialize_crate } from '../../../lib/hoprd_inbox.js'
 hoprd_inbox_initialize_crate()
 
@@ -20,12 +32,35 @@ const CHARLIE_ETHEREUM_ADDR_STR: string = '0xd08933750bffb86861d1d76e559382658ef
 export const ALICE_PEER_ID: PeerId = peerIdFromString(ALICE_PEER_ID_STR)
 export const ALICE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.196/tcp/9091/p2p/${ALICE_PEER_ID_STR}`)
 export const ALICE_ETHEREUM_ADDR: Address = Address.from_string(ALICE_ETHEREUM_ADDR_STR)
+export const ALICE_OFFCHAIN_PUBKEY: OffchainPublicKey = OffchainPublicKey.from_peerid_str(ALICE_PEER_ID_STR)
+export const ALICE_ACCOUNT_ENTRY: AccountEntry = new AccountEntry(
+  ALICE_OFFCHAIN_PUBKEY,
+  ALICE_ETHEREUM_ADDR.clone(),
+  ALICE_MULTI_ADDR.toString(),
+  Date.now()
+)
 
 export const BOB_PEER_ID: PeerId = peerIdFromString(BOB_PEER_ID_STR)
 export const BOB_MULTI_ADDR = new Multiaddr(`/ip4/34.65.237.197/tcp/9091/p2p/${BOB_PEER_ID_STR}`)
 export const BOB_ETHEREUM_ADDR: Address = Address.from_string(BOB_ETHEREUM_ADDR_STR)
+export const BOB_OFFCHAIN_PUBKEY: OffchainPublicKey = OffchainPublicKey.from_peerid_str(BOB_PEER_ID_STR)
+export const BOB_ACCOUNT_ENTRY: AccountEntry = new AccountEntry(
+  BOB_OFFCHAIN_PUBKEY,
+  BOB_ETHEREUM_ADDR.clone(),
+  BOB_MULTI_ADDR.toString(),
+  Date.now()
+)
+
 export const CHARLIE_PEER_ID: PeerId = peerIdFromString(CHARLIE_PEER_ID_STR)
 export const CHARLIE_ETHEREUM_ADDR: Address = Address.from_string(CHARLIE_ETHEREUM_ADDR_STR)
+export const CHARLIE_MULTI_ADDR = new Multiaddr(`/ip4/34.65.1.197/tcp/9091/p2p/${CHARLIE_PEER_ID_STR}`)
+export const CHARLIE_OFFCHAIN_PUBKEY: OffchainPublicKey = OffchainPublicKey.from_peerid_str(CHARLIE_PEER_ID_STR)
+export const CHARLIE_ACCOUNT_ENTRY: AccountEntry = new AccountEntry(
+  CHARLIE_OFFCHAIN_PUBKEY,
+  CHARLIE_ETHEREUM_ADDR.clone(),
+  CHARLIE_MULTI_ADDR.toString(),
+  Date.now()
+)
 
 export const INVALID_PEER_ID = 'definetly not a valid peerId'
 

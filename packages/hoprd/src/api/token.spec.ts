@@ -2,6 +2,7 @@ import { setTimeout } from 'timers/promises'
 import sinon from 'sinon'
 import chai from 'chai'
 import chaiAsPromised from 'chai-as-promised'
+import { LevelDb } from '@hoprnet/hopr-utils'
 
 import {
   authenticateToken,
@@ -11,12 +12,13 @@ import {
   deleteToken,
   validateTokenCapabilities
 } from './token.js'
+import { ALICE_ETHEREUM_ADDR } from './v3/fixtures.js'
+
+import { hoprd_misc_initialize_crate, Database } from '../../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Capability } from './token.js'
-import { Database, Address, core_hopr_initialize_crate } from '../../../core/lib/core_hopr.js'
-core_hopr_initialize_crate()
-import { LevelDb } from '@hoprnet/hopr-utils'
 
 chai.should()
 chai.use(chaiAsPromised)
@@ -28,7 +30,7 @@ describe('authentication token', function () {
     node = sinon.fake() as any
     let db = new LevelDb()
     await db.backend.open()
-    node.db = new Database(db, Address.from_string('0x2f6e0d674daf9d71ca9703b3f23b4f4af7826112'))
+    node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
   })
 
   it('should be created if parameters are valid', async function () {
@@ -223,7 +225,7 @@ describe('authentication token authorization', function () {
     node = sinon.fake() as any
     let db = new LevelDb()
     await db.backend.open()
-    node.db = new Database(db, Address.from_string('0x2f6e0d674daf9d71ca9703b3f23b4f4af7826112'))
+    node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
   })
 
   it('should succeed if lifetime is unset', async function () {

@@ -2,14 +2,17 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance } from '../../fixtures.js'
-import { privKeyToPeerId } from '@hoprnet/hopr-utils'
-import type Hopr from '@hoprnet/hopr-core'
-import { Health, ResolvedNetwork, health_to_string } from '@hoprnet/hopr-core'
 import { Multiaddr } from '@multiformats/multiaddr'
+import { Health, health_to_string } from '@hoprnet/hopr-core'
+
+import { hoprd_misc_initialize_crate, ResolvedNetwork } from '../../../../../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
+
+import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
+
+import type Hopr from '@hoprnet/hopr-core'
 
 const node = sinon.fake() as any as Hopr
-const nodePeerId = privKeyToPeerId('0x9135f358f94b59e8cdee5545eb9ecc8ff32bc3a79227a09ee2bb6b50f1ad8159')
 
 // Use random checksummed addresses to correctly mimic outputs
 const HOPR_TOKEN_ADDRESS = '0x2be12eE6D553319F01Ea85A353203feC6444928F'
@@ -20,8 +23,8 @@ const MODULE_ADDRESS = '0x0262496080c3916d9afd5904EA3DFd46DfFBfF3D'
 const SAFE_ADDRESS = '0x8D56Ef78c9dfF0d1446A28476653D979336032f9'
 
 const DHT_ADDRESSES = [
-  new Multiaddr(`/ip4/1.2.3.4/tcp/23/p2p/${nodePeerId.toString()}`),
-  new Multiaddr(`/p2p/${nodePeerId.toString()}`)
+  new Multiaddr(`/ip4/1.2.3.4/tcp/23/p2p/${ALICE_PEER_ID.toString()}`),
+  new Multiaddr(`/p2p/${ALICE_PEER_ID.toString()}`)
 ]
 
 const LISTENING_ADDRS = [new Multiaddr(`/ip4/0.0.0.0/tcp/23`)]
@@ -51,7 +54,7 @@ describe('GET /node/info', () => {
     })
     node.getAddressesAnnouncedToDHT = sinon.fake.resolves(DHT_ADDRESSES)
     node.getListeningAddresses = sinon.fake.returns(LISTENING_ADDRS)
-    node.getId = sinon.fake.returns(nodePeerId)
+    node.getId = sinon.fake.returns(ALICE_PEER_ID)
     node.isAllowedAccessToNetwork = sinon.fake.returns(Promise.resolve(true))
     node.getConnectivityHealth = sinon.fake.returns(Health.Green)
 
@@ -69,7 +72,9 @@ describe('GET /node/info', () => {
       hoprNodeSafeRegistry: HOPR_NODE_SAFE_REGISTRY_ADDRESS,
       isEligible: true,
       connectivityStatus: health_to_string(Health.Green),
-      channelClosurePeriod: 1
+      channelClosurePeriod: 1,
+      nodeSafe: SAFE_ADDRESS,
+      nodeManagementModule: MODULE_ADDRESS
     })
   })
 })

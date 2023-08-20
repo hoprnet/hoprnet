@@ -1,5 +1,5 @@
-import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum/lib/db.js'
-import { channel_status_to_string, ChannelStatus, defer, type DeferType } from '@hoprnet/hopr-utils'
+import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum'
+import { channel_status_to_string, stringToU8a, ChannelStatus, defer, type DeferType } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 import { ChannelTopologyInfo, formatChannelTopologyInfo } from '../index.js'
@@ -29,7 +29,8 @@ export async function closeChannel(
       receipt: string
     }
 > {
-  const channel = await node.db.get_channel(Ethereum_Hash.deserialize(new TextEncoder().encode(channelIdStr)))
+  const channelIdHash = Ethereum_Hash.deserialize(stringToU8a(channelIdStr))
+  const channel = await node.db.get_channel(channelIdHash)
   const channelId = channel.get_id()
 
   let closingRequest = closingRequests.get(channelId.to_hex())
@@ -102,7 +103,8 @@ DELETE.apiDoc = {
       name: 'channelid',
       required: true,
       schema: {
-        $ref: '#/components/schemas/ChannelId'
+        format: 'channelid',
+        type: 'string'
       }
     }
   ],

@@ -35,7 +35,6 @@ import {
   HOPR_CHANNELS_ABI,
   HOPR_NETWORK_REGISTRY_ABI,
   HOPR_TOKEN_ABI,
-  DeploymentExtract,
   HOPR_NODE_SAFE_REGISTRY_ABI,
   HOPR_MODULE_ABI
 } from './utils/index.js'
@@ -69,6 +68,15 @@ export type SendTransactionReturn =
   | {
       code: SendTransactionStatus.DUPLICATE
     }
+
+export type DeploymentExtract = {
+  hoprAnnouncementsAddress: string
+  hoprTokenAddress: string
+  hoprChannelsAddress: string
+  hoprNetworkRegistryAddress: string
+  hoprNodeSafeRegistryAddress: string
+  indexerStartBlockNumber: number
+}
 
 export async function createChainWrapper(
   deploymentExtract: DeploymentExtract,

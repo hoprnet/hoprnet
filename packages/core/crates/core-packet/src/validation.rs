@@ -570,7 +570,6 @@ mod tests {
                 let ack = AcknowledgedTicket::new(
                     ticket.ticket,
                     Response::new(&random_bytes::<{ Response::SIZE }>()),
-                    Hash::new(&random_bytes::<{ Hash::SIZE }>()),
                     SENDER_PUB.to_address(),
                 );
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();

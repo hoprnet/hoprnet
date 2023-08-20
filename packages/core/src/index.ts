@@ -3,9 +3,6 @@ import EventEmitter from 'events'
 import { Multiaddr, protocols } from '@multiformats/multiaddr'
 
 import BN from 'bn.js'
-import { keysPBM } from '@libp2p/crypto/keys'
-import { createHash } from 'crypto'
-import secp256k1 from 'secp256k1'
 
 import type { Libp2p as Libp2pType } from 'libp2p'
 import type { Connection } from '@libp2p/interface-connection'
@@ -25,7 +22,6 @@ import {
 import retimer from 'retimer'
 
 import {
-  convertPubKeyFromPeerId,
   create_counter,
   create_gauge,
   create_histogram_with_buckets,
@@ -159,12 +155,6 @@ const metric_strategyMaxChannels = create_gauge(
 
 /// Maximum time to wait for a packet to be pushed to the interaction queue
 const PACKET_QUEUE_TIMEOUT_SECONDS = 15n
-
-export function privateKeyFromPeer(peer: PeerId) {
-  if (peer.privateKey == undefined) throw Error('peer id does not contain a private key')
-
-  return keysPBM.PrivateKey.decode(peer.privateKey).Data
-}
 
 // Using libp2p components directly because it allows us
 // to bypass the API layer
@@ -759,9 +749,8 @@ class Hopr extends EventEmitter {
       addrsToAdd.push(addr.decapsulateCode(CODE_P2P))
     }
 
-    const pubKey = convertPubKeyFromPeerId(peer.id)
     try {
-      await this.libp2pComponents.getPeerStore().keyBook.set(peer.id, pubKey.bytes)
+      await this.libp2pComponents.getPeerStore().keyBook.set(peer.id, peer.id.publicKey)
     } catch (err) {
       log(`Failed to update key peer-store with new peer ${peer.id.toString()} info`, err)
     }
@@ -1607,21 +1596,6 @@ class Hopr extends EventEmitter {
 
   public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return HoprCoreEthereum.getInstance().waitForPublicNodes()
-  }
-
-  // @TODO remove this
-  // NB: The prefix "HOPR Signed Message: " is added as a security precaution.
-  // Without it, the node could be convinced to sign a message like an Ethereum
-  // transaction draining it's connected wallet funds, since they share the key.
-  public signMessage(message: Uint8Array): Uint8Array {
-    const taggedMessage = Uint8Array.from([...new TextEncoder().encode('HOPR Signed Message: '), ...message])
-
-    const signature = secp256k1.ecdsaSign(
-      createHash('sha256').update(taggedMessage).digest(),
-      keysPBM.PrivateKey.decode(this.id.privateKey).Data
-    )
-
-    return signature.signature
   }
 
   public getEthereumAddress(): Address {

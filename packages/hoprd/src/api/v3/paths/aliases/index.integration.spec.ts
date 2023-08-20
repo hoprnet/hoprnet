@@ -2,6 +2,7 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
+
 import { createTestApiInstance, INVALID_PEER_ID, ALICE_PEER_ID } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
 

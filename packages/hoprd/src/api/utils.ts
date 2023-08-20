@@ -83,8 +83,11 @@ export const getStatusCodeForInvalidInputInRequest = (inputPath: string) => {
     case 'outgoingamount':
     case 'incomingamount':
       return STATUS_CODES.INVALID_AMOUNT
-    case 'recipient':
+    case 'ethereumaddress':
+    case 'peeraddress':
       return STATUS_CODES.INVALID_ADDRESS
+    case 'channelid':
+      return STATUS_CODES.INVALID_CHANNELID
     case 'peerid':
       return STATUS_CODES.INVALID_PEERID
     case 'setting':

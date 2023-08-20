@@ -10,8 +10,8 @@ import "safe-contracts/Safe.sol";
 import "safe-contracts/common/Enum.sol";
 
 abstract contract HoprNodeStakeFactoryEvents {
-    event NewHoprNodeStakeModule(address indexed moduleImplementation, address instance);   // Emit when a new module is created
-    event NewHoprNodeStakeSafe(address instance);   // Emit when a new safe proxy is created
+    event NewHoprNodeStakeModule(address indexed moduleImplementation, address instance); // Emit when a new module is created
+    event NewHoprNodeStakeSafe(address instance); // Emit when a new safe proxy is created
 }
 
 contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {

@@ -375,7 +375,7 @@ pub mod test {
         let mut ticket1 = mock_ticket(&pk);
         ticket1.set_challenge(resp.to_challenge().to_ethereum_challenge(), &pk);
 
-        let akt_1 = AcknowledgedTicket::new(ticket1, resp, Hash::create(&[&hex!("deadbeef")]), pub_key.to_address());
+        let akt_1 = AcknowledgedTicket::new(ticket1, resp, pub_key.to_address());
         assert!(akt_1.verify(&pub_key.to_address()).is_ok());
 
         let akt_2 = AcknowledgedTicket::from_bytes(&akt_1.to_bytes()).unwrap();
