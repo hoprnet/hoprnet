@@ -20,7 +20,7 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
-declare hoprd_command="node --experimental-wasm-modules packages/hoprd/lib/main.cjs"
+declare hoprd_command="node --experimental-wasm-modules ${mydir}/../packages/hoprd/lib/main.cjs"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 # first anvil account
@@ -84,33 +84,22 @@ while (( "$#" )); do
   esac
 done
 
+declare tmp_dir node_prefix password anvil_rpc_log env_file
+declare node_api_base_port node_p2p_base_port node_healthcheck_base_port
+declare api_endpoints cluster_size
+declare -a id_files
+
 # find usable tmp dir
-declare tmp_dir="$(find_tmp_dir)"
+tmp_dir="$(find_tmp_dir)"
 
-declare node_prefix="local"
-
-declare node1_dir="${tmp_dir}/${node_prefix}_0"
-declare node2_dir="${tmp_dir}/${node_prefix}_1"
-declare node3_dir="${tmp_dir}/${node_prefix}_2"
-declare node4_dir="${tmp_dir}/${node_prefix}_3"
-declare node5_dir="${tmp_dir}/${node_prefix}_4"
-
-declare node1_log="${node1_dir}.log"
-declare node2_log="${node2_dir}.log"
-declare node3_log="${node3_dir}.log"
-declare node4_log="${node4_dir}.log"
-declare node5_log="${node5_dir}.log"
-
-declare node1_id="${node1_dir}.id"
-declare node2_id="${node2_dir}.id"
-declare node3_id="${node3_dir}.id"
-declare node4_id="${node4_dir}.id"
-declare node5_id="${node5_dir}.id"
-
-declare password="local"
-
-declare anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
-declare env_file="${tmp_dir}/local-cluster.env"
+node_prefix="local"
+password="local"
+anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
+env_file="${tmp_dir}/local-cluster.env"
+node_api_base_port=13301
+node_p2p_base_port=19091
+node_healthcheck_base_port=18081
+cluster_size=5
 
 function cleanup {
   local EXIT_CODE=$?
@@ -121,7 +110,7 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${node4_dir}" "${node5_dir}" "${node7_dir}"
+  find -L "${tmp_dir}" -type d -name "${node_prefix}_*" -exec rm -rf {} +
 
   log "Cleaning up processes"
   for port in 8545 13301 13302 13303 13304 13305 19091 19092 19093 19094 19095; do
@@ -136,31 +125,32 @@ function cleanup {
 
 trap cleanup SIGINT SIGTERM ERR EXIT
 
-# $1 = rest port
-# $2 = node port
-# $3 = healthcheck port
-# $4 = node data directory
-# $5 = node log file
-# $6 = node id file
-# $7 = host to listen on
-# $8 = OPTIONAL: additional args to hoprd
+# $1 = node id
+# $2 = host to listen on
+# $3 = OPTIONAL: additional args to hoprd
 function setup_node() {
-  local api_port=${1}
-  local node_port=${2}
-  local healthcheck_port=${3}
-  local dir=${4}
-  local log=${5}
-  local id=${6}
-  local host=${7}
-  local additional_args=${8:-""}
+  local node_id=${1?"setup_node requires node id"}
+  local host=${2?"setup_node required host"}
+  local additional_args=${3:-""}
 
-  log "Run node ${id} on rest port ${api_port} -> ${log}"
+  local api_port p2p_port healthcheck_port dir log id_file safe_args
+
+  dir="${tmp_dir}/${node_prefix}_${node_id}"
+  log="${dir}.log"
+  id_file="${dir}.id"
+  api_port=$(( node_api_base_port + node_id ))
+  p2p_port=$(( node_p2p_base_port + node_id ))
+  healthcheck_port=$(( node_healthcheck_base_port + node_id ))
+  safe_args="$(<${dir}.safe.args)"
+
+  api_endpoints+="localhost:${api_port} "
+
+  log "Run node ${node_id} on rest port ${api_port} -> ${log}"
 
   if [[ "${additional_args}" != *"--network "* ]]; then
     additional_args="--network anvil-localhost ${additional_args}"
   fi
 
-  local safe_args=$(<${dir}.safe.args)
   log "safe args ${safe_args}"
   # read safe args and append to additional_args TODO:
   additional_args="${additional_args} ${safe_args}"
@@ -168,19 +158,19 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    DEBUG="hopr*" \
+    DEBUG="libp2p*,hopr*" \
     NODE_ENV="${node_env}" \
     HOPRD_HEARTBEAT_INTERVAL=2500 \
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
-    "${hoprd_command}" \
+    ${hoprd_command} \
       --announce \
       --api-token "${api_token}" \
       --data="${dir}" \
-      --host="${host}:${node_port}" \
-      --identity="${id}" \
+      --host="${host}:${p2p_port}" \
+      --identity="${id_file}" \
       --init \
       --password="${password}" \
       --api \
@@ -194,7 +184,7 @@ function setup_node() {
       --healthCheck \
       --healthCheckHost "${host}" \
       --healthCheckPort "${healthcheck_port}" \
-      "${additional_args}" \
+      ${additional_args} \
       > "${log}" 2>&1 &
 }
 
@@ -202,15 +192,15 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  rm "${tmp_dir}/*.safe.args" 2>&1 || true
-  rm "${tmp_dir}/*.id" 2>&1 || true
+  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.safe.args" -delete
+  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" -delete
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity \
     --action create \
     --identity-directory "${tmp_dir}" \
     --identity-prefix "${node_prefix}_" \
-    --number "5"
+    --number "${cluster_size}"
 }
 
 # read the identity file is located at $id_path
@@ -218,8 +208,10 @@ function generate_local_identities() {
 function create_local_safes() {
   log "Create safe"
 
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" | sort)"
+
   # create a loop so safes are created for all the nodes TODO:
-  for i in {0..4}; do
+  for id_file in ${id_files[@]}; do
     # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `safe_i.log` for each id
     # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
     env \
@@ -228,13 +220,13 @@ function create_local_safes() {
       PRIVATE_KEY="${deployer_private_key}" \
       DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
       hopli create-safe-module \
-      --network anvil-localhost \
-      --identity-from-path "${tmp_dir}/${node_prefix}_${i}.id" \
-      --contracts-root "./packages/ethereum/contracts" > safe.log
+        --network anvil-localhost \
+        --identity-from-path "${id_file}" \
+        --contracts-root "./packages/ethereum/contracts" > "${id_file%.id}.safe.log"
 
     # store safe arguments in separate file for later use
-    grep -oE "(\-\-safeAddress.*)" safe.log > "${tmp_dir}/${node_prefix}_${i}.safe.args"
-    rm safe.log
+    grep -oE "\--safeAddress.*--moduleAddress.*" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
+    rm "${id_file%.id}.safe.log"
   done
 }
 
@@ -242,26 +234,15 @@ function create_local_safes() {
 log "Node files and directories"
 log "\tanvil"
 log "\t\tlog: ${anvil_rpc_log}"
-log "\tnode1"
-log "\t\tdata dir: ${node1_dir} (will be removed)"
-log "\t\tlog: ${node1_log}"
-log "\t\tid: ${node1_id}"
-log "\tnode2"
-log "\t\tdata dir: ${node2_dir} (will be removed)"
-log "\t\tlog: ${node2_log}"
-log "\t\tid: ${node2_id}"
-log "\tnode3"
-log "\t\tdata dir: ${node3_dir} (will be removed)"
-log "\t\tlog: ${node3_log}"
-log "\t\tid: ${node3_id}"
-log "\tnode4"
-log "\t\tdata dir: ${node4_dir} (will be removed)"
-log "\t\tlog: ${node4_log}"
-log "\t\tid: ${node4_id}"
-log "\tnode5"
-log "\t\tdata dir: ${node5_dir} (will be removed)"
-log "\t\tlog: ${node5_log}"
-log "\t\tid: ${node5_id}"
+
+for node_id in $(seq 0 $(( cluster_size - 1 ))); do
+  declare id_file
+  id_file="${tmp_dir}/${node_prefix}_${node_id}.id"
+  log "\tnode ${node_prefix}_${node_id}"
+  log "\t\tdata dir: ${id_file%.id} (will be removed)"
+  log "\t\tlog: ${id_file/%.id/.log}"
+  log "\t\tid: ${id_file}"
+done
 # }}}
 
 # --- Check all resources we need are free {{{
@@ -301,20 +282,16 @@ generate_local_identities
 create_local_safes
 
 #  --- Run nodes --- {{{
-setup_node 13301 19091 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"
-setup_node 13302 19092 18082 "${node2_dir}" "${node2_log}" "${node2_id}" "${listen_host}"
-setup_node 13303 19093 18083 "${node3_dir}" "${node3_log}" "${node3_id}" "${listen_host}"
-setup_node 13304 19094 18084 "${node4_dir}" "${node4_log}" "${node4_id}" "${listen_host}"
-setup_node 13305 19095 18085 "${node5_dir}" "${node5_log}" "${node5_id}" "${listen_host}"
-# }}}
+for node_id in ${!id_files[@]}; do
+  setup_node "${node_id}" "${listen_host}"
+done
 
 log "Waiting for nodes bootstrap"
 
-wait_for_regex "${node1_log}" "unfunded"
-wait_for_regex "${node2_log}" "unfunded"
-wait_for_regex "${node3_log}" "unfunded"
-wait_for_regex "${node4_log}" "unfunded"
-wait_for_regex "${node5_log}" "unfunded"
+for node_id in ${!id_files[@]}; do
+  wait_for_regex "${tmp_dir}/${node_prefix}_${node_id}.log" "${listen_host}" "unfunded"
+done
+# }}}
 
 log "Funding nodes"
 
@@ -327,26 +304,20 @@ log "Waiting for nodes startup"
 
 #  --- Wait until started --- {{{
 # Wait until node has recovered its private key
-wait_for_regex "${node1_log}" "using blockchain address"
-wait_for_regex "${node2_log}" "using blockchain address"
-wait_for_regex "${node3_log}" "using blockchain address"
-wait_for_regex "${node4_log}" "using blockchain address"
-wait_for_regex "${node5_log}" "using blockchain address"
+for node_id in ${!id_files[@]}; do
+  wait_for_regex "${tmp_dir}/${node_prefix}_${node_id}.log" "${listen_host}" "using blockchain address"
+done
 # }}}
 
 log "Waiting for port binding"
 
 #  --- Wait for ports to be bound --- {{{
-wait_for_regex "${node1_log}" "STARTED NODE"
-wait_for_regex "${node2_log}" "STARTED NODE"
-wait_for_regex "${node3_log}" "STARTED NODE"
-wait_for_regex "${node4_log}" "STARTED NODE"
-wait_for_regex "${node5_log}" "STARTED NODE"
+for node_id in ${!id_files[@]}; do
+  wait_for_regex "${tmp_dir}/${node_prefix}_${node_id}.log" "${listen_host}" "STARTED NODE"
+done
 # }}}
 
 log "All nodes came up online"
-
-declare endpoints="localhost:13301 localhost:13302 localhost:13303 localhost:13304 localhost:13305"
 
 # --- Call init script--- {{{
 if [ -n "${init_script}" ]; then
@@ -362,7 +333,7 @@ if [ -n "${init_script}" ]; then
   # execute script if a path was found
   if [ -n "${full_init_script}" ]; then
     log "Calling init script ${full_init_script}"
-    HOPRD_API_TOKEN="${api_token}" "${full_init_script}" "${endpoints}"
+    HOPRD_API_TOKEN="${api_token}" "${full_init_script}" "${api_endpoints}"
   else
     log "Error: Could not determine executable path of init script ${init_script}"
   fi
@@ -373,8 +344,9 @@ fi
 
 # --- Get peer ids for reporting --- {{{
 declare -a peers
-for endpoint in ${endpoints}; do
-  declare peer="$(get_hopr_address "${api_token}@${endpoint}")"
+for endpoint in ${api_endpoints}; do
+  declare peer
+  peer="$(get_hopr_address "${api_token}@${endpoint}")"
   peers+=(${peer})
 done
 # }}}
@@ -385,74 +357,37 @@ log "\tThe following links expect HOPR Admin to run at http://localhost:3000"
 log "\tYou may use \`make run-hopr-admin\`"
 log ""
 log "Node port info"
-log "\tnode1"
-log "\t\tPeer Id:\t${peers[0]}"
-log "\t\tRest API:\thttp://localhost:13301/api/v3/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
-log "\t\tHealthcheck:\thttp://localhost:18081/"
-log "\t\tWebSocket:\tws://localhost:13301/api/v3/messages/websocket?apiToken=${api_token}"
-log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13301&apiToken=${api_token}"
-log "\tnode2"
-log "\t\tPeer Id:\t${peers[1]}"
-log "\t\tRest API:\thttp://localhost:13302/api/v3/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
-log "\t\tHealthcheck:\thttp://localhost:18082/"
-log "\t\tWebSocket:\tws://localhost:13302/api/v3/messages/websocket?apiToken=${api_token}"
-log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13302&apiToken=${api_token}"
-log "\tnode3"
-log "\t\tPeer Id:\t${peers[2]}"
-log "\t\tRest API:\thttp://localhost:13303/api/v3/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
-log "\t\tHealthcheck:\thttp://localhost:18083/"
-log "\t\tWebSocket:\tws://localhost:13303/api/v3/messages/websocket?apiToken=${api_token}"
-log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13303&apiToken=${api_token}"
-log "\tnode4"
-log "\t\tPeer Id:\t${peers[3]}"
-log "\t\tRest API:\thttp://localhost:13304/api/v3/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
-log "\t\tHealthcheck:\thttp://localhost:18084/"
-log "\t\tWebSocket:\tws://localhost:13304/api/v3/messages/websocket?apiToken=${api_token}"
-log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13304&apiToken=${api_token}"
-log "\tnode5"
-log "\t\tPeer Id:\t${peers[4]}"
-log "\t\tRest API:\thttp://localhost:13305/api/v3/_swagger"
-log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
-log "\t\tHealthcheck:\thttp://localhost:18085/"
-log "\t\tWebSocket:\tws://localhost:13305/api/v3/messages/websocket?apiToken=${api_token}"
-log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:13305&apiToken=${api_token}"
 
 cat <<EOF > "${env_file}"
 #!/usr/bin/env bash
 export apiToken="${api_token}"
-export HOPR_NODE_1_ADDR=${peers[0]} HOPR_NODE_1_HTTP_URL=http://127.0.0.1:13301 HOPR_NODE_1_WS_URL=ws://127.0.0.1:13301/api/v3/messages/websocket
-export HOPR_NODE_2_ADDR=${peers[1]} HOPR_NODE_2_HTTP_URL=http://127.0.0.1:13302 HOPR_NODE_2_WS_URL=ws://127.0.0.1:13302/api/v3/messages/websocket
-export HOPR_NODE_3_ADDR=${peers[2]} HOPR_NODE_3_HTTP_URL=http://127.0.0.1:13303 HOPR_NODE_3_WS_URL=ws://127.0.0.1:13303/api/v3/messages/websocket
-export HOPR_NODE_4_ADDR=${peers[3]} HOPR_NODE_4_HTTP_URL=http://127.0.0.1:13304 HOPR_NODE_4_WS_URL=ws://127.0.0.1:13304/api/v3/messages/websocket
-export HOPR_NODE_5_ADDR=${peers[4]} HOPR_NODE_5_HTTP_URL=http://127.0.0.1:13305 HOPR_NODE_5_WS_URL=ws://127.0.0.1:13305/api/v3/messages/websocket
-echo -e "\n"
-echo "🌐 Node 1 REST API URL:  \$HOPR_NODE_1_HTTP_URL"
-echo "🔌 Node 1 WebSocket URL: \$HOPR_NODE_1_WS_URL"
-echo "💻 Node 1 HOPR Address:  \$HOPR_NODE_1_ADDR"
-echo "---"
-echo "🌐 Node 2 REST API URL:  \$HOPR_NODE_2_HTTP_URL"
-echo "🔌 Node 2 WebSocket URL: \$HOPR_NODE_2_WS_URL"
-echo "💻 Node 2 HOPR Address:  \$HOPR_NODE_2_ADDR"
-echo "---"
-echo "🌐 Node 3 REST API URL:  \$HOPR_NODE_3_HTTP_URL"
-echo "🔌 Node 3 WebSocket URL: \$HOPR_NODE_3_WS_URL"
-echo "💻 Node 3 HOPR Address:  \$HOPR_NODE_3_ADDR"
-echo "---"
-echo "🌐 Node 4 REST API URL:  \$HOPR_NODE_4_HTTP_URL"
-echo "🔌 Node 4 WebSocket URL: \$HOPR_NODE_4_WS_URL"
-echo "💻 Node 4 HOPR Address:  \$HOPR_NODE_4_ADDR"
-echo "---" ;
-echo "🌐 Node 5 REST API URL:  \$HOPR_NODE_5_HTTP_URL"
-echo "🔌 Node 5 WebSocket URL: \$HOPR_NODE_5_WS_URL"
-echo "💻 Node 5 HOPR Address:  \$HOPR_NODE_5_ADDR"
-echo -e "\n"
 EOF
 
-# GitPod related barrier
+for node_id in ${!id_files[@]}; do
+  declare api_port node_name
+
+  node_name="${node_prefix}_${node_id}"
+  api_port=$(( node_api_base_port + node_id ))
+
+  log "\t${node_name}"
+  log "\t\tPeer Id:\t${peers[$node_id]}"
+  log "\t\tRest API:\thttp://localhost:${api_port}/api/v3/_swagger"
+  log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:${api_port}&apiToken=${api_token}"
+  log "\t\tHealthcheck:\thttp://localhost:$(( node_healthcheck_base_port + node_id ))/"
+  log "\t\tWebSocket:\tws://localhost:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
+  log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:${api_port}&apiToken=${api_token}"
+
+  cat <<EOF >> "${env_file}"
+export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://127.0.0.1:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://127.0.0.1:${api_port}/api/v3/messages/websocket"
+echo "---"
+echo "Node ${node_name} REST API URL:  \$HOPR_NODE_${node_id}_HTTP_URL"
+echo "Node ${node_name} WebSocket URL: \$HOPR_NODE_${node_id}_WS_URL"
+echo "Node ${node_name} HOPR Address:  \$HOPR_NODE_${node_id}_ADDR"
+echo "---"
+EOF
+
+done
+
 if command -v gp; then
   gp sync-done "local-cluster"
 else
