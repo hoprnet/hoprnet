@@ -588,12 +588,13 @@ contract HoprChannels is
      *
      * Channel source and destination are specified by the userData payload.
      *
-     * @dev function reverts if it is a no-op, meaning no state change
-     *
-     * @param from account from which the tokens have been transferred
-     * @param to account to which the the tokens have been transferred
-     * @param amount uint256 amount of tokens that have been transferred
-     * @param userData payload, determines what is supposed to happen
+     * @dev This function reverts if it results in a no-op, i.e., no state change occurs.
+     * @notice The opening of bidirectional channels is currently implemented for internal
+     * and community testing purposes only, and is not intended for production use.
+     * @param from The account from which the tokens have been transferred
+     * @param to The account to which the tokens have been transferred
+     * @param amount The amount of tokens transferred
+     * @param userData The payload that determines the intended action
      */
     function tokensReceived(
         address, // operator not needed

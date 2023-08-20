@@ -197,4 +197,5 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 
 - When funding two channels with `tokenReceived`, if the token balance is zero error `InvalidBalance` gets reverted.
 - Always emit `ChannelBalanceIncreased` in a successful `tokenReceived` call.
-- use tight packing for `HoprChannels.tokensReceived()` payload, meaning 40 bytes for `fundChannel` and 64 bytes for `fundChannelMulti`
+- Use tight packing for `HoprChannels.tokensReceived()` payload, meaning 40 bytes for `fundChannel` and 64 bytes for `fundChannelMulti`
+- Document bidirectional channel funding in /`ERC777.tokensReceived()` is not intended for production use.
