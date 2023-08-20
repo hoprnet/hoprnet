@@ -348,17 +348,11 @@ run-local: ## run HOPRd from local repo
 		$(args)
 
 .PHONY: run-local-with-safe
+run-local-with-safe: network=anvil-localhost
 run-local-with-safe: ## run HOPRd from local repo. use the most recently created id file as node. create a safe and a module for the said node
 	id_path=$$(find $$(pwd) -name ".identity-local*.id" | sort -r | head -n 1) && \
     	args=$$(make create-safe-module id_path="$$id_path" | grep -oE "(\-\-safeAddress.*)") && \
-    	make run-local id_path="$$id_path" args="$$args"
-
-.PHONY: run-local-with-safe-rotsee
-run-local-with-safe-rotsee: ## run HOPRd from local repo. use the most recently created id file as node. create a safe and a module for the said node
-	id_path=$$(find $$(pwd) -name ".identity-local*.id" | sort -r | head -n 1) && \
-    	args=$$(make deploy-safe-module id_path="$$id_path" | grep -oE "(\-\-safeAddress.*)") && \
-		echo "$$args" > .safe.args && \
-    	make run-local id_path="$$id_path" network=rotsee args=$$(cat .safe.args)
+    	make run-local id_path="$$id_path" network="${network}" args="$$args"
 
 run-local-dev-compose: ## run local development Compose setup
 	echo "Starting Anvil on host"

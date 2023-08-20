@@ -202,6 +202,7 @@ deploy_safes() {
       ETHERSCAN_API_KEY="" \
       IDENTITY_PASSWORD="${IDENTITY_PASSWORD}" \
       PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" \
+      DEPLOYER_PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" \
       hopli create-safe-module \
       --network "${NETWORK}" \
       --identity-from-path "${id_path}" \
@@ -234,6 +235,7 @@ generate_local_identities
 
 upload_identities
 
+# deploy safes, register nodes to NR, approve token transfers
 deploy_safes
 
 start_nodes

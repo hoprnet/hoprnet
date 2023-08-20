@@ -205,18 +205,22 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Use tight packing for `HoprChannels.tokensReceived()` payload, meaning 40 bytes for `fundChannel` and 64 bytes for `fundChannelMulti`
 - Document bidirectional channel funding in /`ERC777.tokensReceived()` is not intended for production use.
 
-#### 4. Improve HoprNodeStakeFactory
+#### 4. Bump Safe to v1.4.1
+- Change contract deployment bytecode in `packages/ethereum/contracts/test/utils/SafeSingleton.sol`
+- Update deployed addresses in `packages/ethereum/contracts/src/utils/SafeSuiteLib.sol`
+
+#### 5. Improve HoprNodeStakeFactory
 - Enhance code comments
 - Make imports explicit
 - Make the encoded address of the contract's approver (`r`) immutable
 - Remove duplicated `safeProxyAddr` definition in `clone()`
 
-#### 5. Improve SimplifiedModule
+#### 6. Improve SimplifiedModule
 - Extend comments to explain "avatar"
 
-#### 6. Improve CapabilityPermissions
+#### 7. Improve CapabilityPermissions
 - Import `IERC20`, `IERC777` interfaces for definition of selector
 - Make all the selector definition public
 
-#### 7. Format
+#### 8. Format
 - format all the contracts

@@ -14,6 +14,8 @@ declare HOPR_LOG_ID="setup-local-cluster"
 # shellcheck disable=SC1090
 source "${mydir}/utils.sh"
 
+PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
+
 # verify and set parameters
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
@@ -87,11 +89,11 @@ declare tmp_dir="$(find_tmp_dir)"
 
 declare node_prefix="local"
 
-declare node1_dir="${tmp_dir}/${node_prefix}-1"
-declare node2_dir="${tmp_dir}/${node_prefix}-2"
-declare node3_dir="${tmp_dir}/${node_prefix}-3"
-declare node4_dir="${tmp_dir}/${node_prefix}-4"
-declare node5_dir="${tmp_dir}/${node_prefix}-5"
+declare node1_dir="${tmp_dir}/${node_prefix}_0"
+declare node2_dir="${tmp_dir}/${node_prefix}_1"
+declare node3_dir="${tmp_dir}/${node_prefix}_2"
+declare node4_dir="${tmp_dir}/${node_prefix}_3"
+declare node5_dir="${tmp_dir}/${node_prefix}_4"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -158,6 +160,11 @@ function setup_node() {
     additional_args="--network anvil-localhost ${additional_args}"
   fi
 
+  local safe_args=$(<${dir}.safe.args)
+  log "safe args ${safe_args}"
+  # read safe args and append to additional_args TODO:
+  additional_args="${additional_args} ${safe_args}"
+
   log "Additional args: \"${additional_args}\""
 
   env \
@@ -189,6 +196,46 @@ function setup_node() {
       --healthCheckPort "${healthcheck_port}" \
       "${additional_args}" \
       > "${log}" 2>&1 &
+}
+
+function generate_local_identities() {
+  log "Generate local identities"
+
+  # remove existing identity files, .safe.args
+  rm "${tmp_dir}/*.safe.args" 2>&1 || true
+  rm "${tmp_dir}/*.id" 2>&1 || true
+
+  env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
+    hopli identity \
+    --action create \
+    --identity-directory "${tmp_dir}" \
+    --identity-prefix "${node_prefix}_" \
+    --number "5"
+}
+
+# read the identity file is located at $id_path
+# create safe and module for each identity
+function create_local_safes() {
+  log "Create safe"
+
+  # create a loop so safes are created for all the nodes TODO:
+  for i in {0..4}; do
+    # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `safe_i.log` for each id
+    # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
+    env \
+      ETHERSCAN_API_KEY="" \
+      IDENTITY_PASSWORD="${password}" \
+      PRIVATE_KEY="${deployer_private_key}" \
+      DEPLOYER_PRIVATE_KEY="${deployer_private_key}" \
+      hopli create-safe-module \
+      --network anvil-localhost \
+      --identity-from-path "${tmp_dir}/${node_prefix}_${i}.id" \
+      --contracts-root "./packages/ethereum/contracts" > safe.log
+
+    # store safe arguments in separate file for later use
+    grep -oE "(\-\-safeAddress.*)" safe.log > "${tmp_dir}/${node_prefix}_${i}.safe.args"
+    rm safe.log
+  done
 }
 
 # --- Log setup info {{{
@@ -247,10 +294,11 @@ update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 # }}}
 
-log "Disable network registry"
-env PRIVATE_KEY="${deployer_private_key}" \
-  make -C "${mydir}/.." disable-network-registry \
-  network=anvil-localhost environment_type=local
+# create identity files to node1_id, .... node5_id
+generate_local_identities
+
+# create safe and modules for all the ids, store them in args files
+create_local_safes
 
 #  --- Run nodes --- {{{
 setup_node 13301 19091 18081 "${node1_dir}" "${node1_log}" "${node1_id}" "${listen_host}"
