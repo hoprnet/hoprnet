@@ -45,9 +45,21 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
 
         bytes32 ticketHash;
         {
+            address challenge = vm.addr(args.porSecret);
+            bytes32 rawTicketHash;
+            assembly {
+                let data := mload(0x40)
+
+                mstore(data, redeemable)
+                mstore(add(0x20, data), add(0x20, redeemable))
+                mstore(add(0x40, data), challenge)
+
+                rawTicketHash := keccak256(data, 0x54)
+            }
+
             bytes32 pre_ticketHash = keccak256(
                 abi.encode(
-                    HoprChannels.redeemTicket.selector, keccak256(abi.encode(ticketData, vm.addr(args.porSecret)))
+                    HoprChannels.redeemTicket.selector, rawTicketHash
                 )
             );
             ticketHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), dstHash, pre_ticketHash));

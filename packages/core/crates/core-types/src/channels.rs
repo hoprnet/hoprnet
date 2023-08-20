@@ -1,13 +1,16 @@
+use crate::errors::{CoreTypesError, Result};
+use bindings::hopr_channels::RedeemTicketCall;
 use core_crypto::errors::CryptoError::SignatureVerification;
-use core_crypto::keypairs::ChainKeypair;
-use core_crypto::types::{Hash, PublicKey, Response, Signature};
+use core_crypto::keypairs::{ChainKeypair, Keypair};
+use core_crypto::types::{Hash, PublicKey, Signature};
 use enum_iterator::{all, Sequence};
+use ethers::contract::EthCall;
 use ethnum::u256;
+use hex_literal::hex;
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::fmt::{Display, Formatter};
 use std::ops::{Div, Mul, Sub};
-use utils_types::errors::{GeneralError::ParseError, Result};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -132,14 +135,15 @@ impl std::fmt::Display for ChannelEntry {
 impl BinarySerializable for ChannelEntry {
     const SIZE: usize = Address::SIZE + Address::SIZE + Balance::SIZE + U256::SIZE + 1 + U256::SIZE + U256::SIZE;
 
-    fn from_bytes(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
             let mut b = data.to_vec();
             let source = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
             let destination = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
             let balance = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
             let ticket_index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            let status = ChannelStatus::from_byte(b.drain(0..1).as_ref()[0]).ok_or(ParseError)?;
+            let status = ChannelStatus::from_byte(b.drain(0..1).as_ref()[0])
+                .ok_or(utils_types::errors::GeneralError::ParseError)?;
             let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             Ok(Self {
@@ -152,7 +156,7 @@ impl BinarySerializable for ChannelEntry {
                 closure_time,
             })
         } else {
-            Err(ParseError)
+            Err(utils_types::errors::GeneralError::ParseError)
         }
     }
 
@@ -178,24 +182,26 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Ticket {
-    pub counterparty: Address,
-    pub challenge: EthereumChallenge,
-    pub index: U256,
+    pub channel_id: Hash,
     pub amount: Balance,
-    pub win_prob: U256,
-    pub channel_epoch: U256,
+    pub index: u64,
+    pub index_offset: u32,
+    pub win_prob: f64,
+    pub channel_epoch: u32,
+    pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
 }
 
 impl Default for Ticket {
     fn default() -> Self {
         Self {
-            counterparty: Address::default(),
-            challenge: EthereumChallenge::default(),
-            index: U256::zero(),
+            channel_id: Hash::default(),
             amount: Balance::new(U256::zero(), BalanceType::HOPR),
-            win_prob: U256::max(),
-            channel_epoch: U256::zero(),
+            index: 0u64,
+            index_offset: 1u32,
+            win_prob: 1.0f64,
+            channel_epoch: 1u32,
+            challenge: EthereumChallenge::default(),
             signature: None,
         }
     }
@@ -204,11 +210,13 @@ impl Default for Ticket {
 impl std::fmt::Display for Ticket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Ticket")
-            .field("counterparty", &self.counterparty)
-            .field("challenge", &self.challenge)
-            .field("index", &self.index)
+            .field("channel_id", &self.channel_id)
             .field("amount", &self.amount)
+            .field("index", &self.index)
+            .field("index_offset", &self.index_offset)
+            .field("win_prob", &(&self.win_prob * 100.0))
             .field("channel_epoch", &self.channel_epoch)
+            .field("challenge", &self.challenge)
             .field("signature", &self.signature.as_ref().map(|s| s.to_hex()))
             .finish()
     }
@@ -233,106 +241,137 @@ pub fn ethereum_signed_hash<T: AsRef<[u8]>>(message: T) -> Hash {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Ticket {
+    /// Creates a new Ticket given the raw Challenge and signs it using the given key.
+    pub fn new(
+        own_address: Address,
+        counterparty: Address,
+        amount: Balance,
+        index: U256,
+        index_offset: U256,
+        win_prob: f64,
+        channel_epoch: U256,
+        challenge: EthereumChallenge,
+        signing_key: &ChainKeypair,
+        domain_separator: &Hash,
+    ) -> Result<Ticket> {
+        if own_address.eq(&counterparty) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Source and destination must be different".into(),
+            ));
+        }
+
+        if index.gt(&(1u64 << 48).into()) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Cannot hold ticket indices larger than 2^48".into(),
+            ));
+        }
+
+        if index_offset.gt(&(1u64 << 32).into()) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Cannot hold ticket index offsets larger than 2^32".into(),
+            ));
+        }
+
+        if channel_epoch.gt(&(1u64 << 24).into()) {
+            return Err(CoreTypesError::InvalidInputData(
+                "Cannot hold channel epoch larger than 2^24".into(),
+            ));
+        }
+
+        if win_prob < 0.0 {
+            return Err(CoreTypesError::InvalidInputData(
+                "Cannot use negative winning ptobability".into(),
+            ));
+        }
+
+        let channel_id = generate_channel_id(&own_address, &counterparty);
+
+        let mut ret = Ticket {
+            channel_id,
+            amount,
+            index: index.as_u64(),
+            index_offset: index_offset.as_u32(),
+            channel_epoch: channel_epoch.as_u32(),
+            challenge,
+            win_prob,
+            signature: None,
+        };
+        ret.sign(signing_key, domain_separator);
+
+        Ok(ret)
+    }
+
+    pub fn set_challenge(&mut self, challenge: EthereumChallenge, signing_key: &ChainKeypair, domain_separator: &Hash) {
+        self.challenge = challenge;
+        self.sign(signing_key, domain_separator);
+    }
+
     fn serialize_unsigned_aux(
-        counterparty: &Address,
-        challenge: &EthereumChallenge,
+        channel_id: &Hash,
         amount: &Balance,
-        win_prob: &U256,
-        index: &U256,
-        channel_epoch: &U256,
+        index: u64,
+        index_offset: u32,
+        win_prob: f64,
+        channel_epoch: u32,
+        challenge: &EthereumChallenge,
     ) -> Vec<u8> {
         assert_eq!(BalanceType::HOPR, amount.balance_type(), "invalid balance currency");
         let mut ret = Vec::<u8>::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&counterparty.to_bytes());
+        ret.extend_from_slice(&channel_id.to_bytes());
+        ret.extend_from_slice(&amount.serialize_value()[20..32]);
+        ret.extend_from_slice(&index.to_be_bytes()[2..8]);
+        ret.extend_from_slice(&index_offset.to_be_bytes());
+        // Clear IEEE754 exponent, then copy first 56 bits
+        ret.extend_from_slice(&(win_prob.to_bits() << 53).to_be_bytes()[0..7]);
+        ret.extend_from_slice(&channel_epoch.to_be_bytes()[1..4]);
         ret.extend_from_slice(&challenge.to_bytes());
-        ret.extend_from_slice(&amount.serialize_value());
-        ret.extend_from_slice(&win_prob.to_bytes());
-        ret.extend_from_slice(&index.to_bytes());
-        ret.extend_from_slice(&channel_epoch.to_bytes());
         ret
-    }
-
-    /// Creates a new Ticket given the raw Challenge and signs it using the given key.
-    pub fn new(
-        counterparty: Address,
-        index: U256,
-        amount: Balance,
-        win_prob: U256,
-        channel_epoch: U256,
-        signing_key: &ChainKeypair,
-    ) -> Self {
-        let mut ret = Self {
-            counterparty,
-            challenge: EthereumChallenge::default(),
-            index,
-            amount,
-            win_prob,
-            channel_epoch,
-            signature: None,
-        };
-        ret.sign(signing_key);
-        ret
-    }
-
-    pub fn set_challenge(&mut self, challenge: EthereumChallenge, signing_key: &ChainKeypair) {
-        self.challenge = challenge;
-        self.sign(signing_key);
-    }
-
-    /// Signs the ticket using the given private key.
-    pub fn sign(&mut self, signing_key: &ChainKeypair) {
-        self.signature = Some(Signature::sign_message(&self.get_hash().to_bytes(), signing_key));
-    }
-
-    /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: Address, private_key: &ChainKeypair) -> Self {
-        Self::new(
-            destination,
-            U256::zero(),
-            Balance::new(0u32.into(), BalanceType::HOPR),
-            U256::zero(),
-            U256::zero(),
-            private_key,
-        )
     }
 
     /// Serializes the ticket except the signature
     pub fn serialize_unsigned(&self) -> Box<[u8]> {
         Self::serialize_unsigned_aux(
-            &self.counterparty,
-            &self.challenge,
+            &self.channel_id,
             &self.amount,
-            &self.win_prob,
-            &self.index,
-            &self.channel_epoch,
+            self.index,
+            self.index_offset,
+            self.win_prob,
+            self.channel_epoch,
+            &self.challenge,
         )
         .into_boxed_slice()
     }
 
     /// Computes Ethereum signature hash of the ticket
-    pub fn get_hash(&self) -> Hash {
-        ethereum_signed_hash(Hash::create(&[&self.serialize_unsigned()]).to_bytes())
+    pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
+        let ticket_hash = Hash::create(&[&self.serialize_unsigned()]);
+        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &ticket_hash.to_bytes()]);
+        Hash::create(&[&hex!("1901"), &domain_separator.to_bytes(), &hash_struct.to_bytes()])
     }
 
-    /// Computes a candidate check value to verify if this ticket is winning
-    pub fn get_luck(&self, preimage: &Hash, channel_response: &Response) -> U256 {
-        U256::from_bytes(
-            &Hash::create(&[
-                &self.get_hash().to_bytes(),
-                &preimage.to_bytes(),
-                &channel_response.to_bytes(),
-            ])
-            .to_bytes(),
+    /// Signs the ticket using the given private key.
+    pub fn sign(&mut self, signing_key: &ChainKeypair, domain_separator: &Hash) {
+        self.signature = Some(Signature::sign_message(
+            &self.get_hash(domain_separator).to_bytes(),
+            signing_key,
+        ));
+    }
+
+    /// Convenience method for creating a zero-hop ticket
+    pub fn new_zero_hop(destination: Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Self {
+        Self::new(
+            private_key.public().to_address(),
+            destination,
+            Balance::new(0u32.into(), BalanceType::HOPR),
+            U256::zero(),
+            U256::zero(),
+            0.0,
+            U256::zero(),
+            EthereumChallenge::default(),
+            private_key,
+            domain_separator,
         )
-        .unwrap()
-    }
-
-    /// Decides whether a ticket is a win or not.
-    /// Note that this mimics the on-chain logic.
-    /// Purpose of the function is to check the validity of ticket before we submit it to the blockchain.
-    pub fn is_winning(&self, preimage: &Hash, channel_response: &Response, win_prob: U256) -> bool {
-        let luck = self.get_luck(preimage, channel_response);
-        luck.value().le(win_prob.value())
+        .expect("Failed to create zero-hop ticket")
     }
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
@@ -344,31 +383,43 @@ impl Ticket {
 }
 
 impl BinarySerializable for Ticket {
-    const SIZE: usize =
-        Address::SIZE + EthereumChallenge::SIZE + U256::SIZE + Balance::SIZE + 2 * U256::SIZE + Signature::SIZE;
+    const SIZE: usize = 64 + 20 + Signature::SIZE;
 
-    fn from_bytes(data: &[u8]) -> Result<Self> {
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
-            let mut b = data.to_vec();
-            let counterparty = Address::from_bytes(b.drain(0..Address::SIZE).as_ref())?;
-            let challenge = EthereumChallenge::from_bytes(b.drain(0..EthereumChallenge::SIZE).as_ref())?;
-            let amount = Balance::deserialize(b.drain(0..Balance::SIZE).as_ref(), BalanceType::HOPR)?;
-            let win_prob = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            let index = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            let signature = Signature::from_bytes(b.drain(0..Signature::SIZE).as_ref())?;
+            let channel_id = Hash::from_bytes(&data[0..32])?;
+            let mut amount = [0u8; 32];
+            amount[20..32].copy_from_slice(&data[Hash::SIZE..Hash::SIZE + 12]);
+
+            let mut index = [0u8; 8];
+            index[2..8].copy_from_slice(&data[Hash::SIZE + 12..Hash::SIZE + 12 + 6]);
+
+            let mut index_offset = [0u8; 4];
+            index_offset.copy_from_slice(&data[Hash::SIZE + 12 + 6..Hash::SIZE + 12 + 6 + 4]);
+
+            let mut win_prob = [0u8; 8];
+            win_prob[1..].copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4..Hash::SIZE + 12 + 6 + 4 + 7]);
+
+            let mut channel_epoch = [0u8; 4];
+            channel_epoch[1..].copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4 + 7..Hash::SIZE + 12 + 6 + 4 + 7 + 3]);
+
+            let challenge = EthereumChallenge::from_bytes(&data[64..84])?;
+
+            let signature = Signature::from_bytes(&data[92..156])?;
 
             Ok(Self {
-                counterparty,
+                channel_id,
+                amount: Balance::new(U256::from_bytes(&amount)?, BalanceType::HOPR),
+                index: u64::from_be_bytes(index),
+                index_offset: u32::from_be_bytes(index_offset),
+                win_prob: f64::from_bits((1023u64 << 53) | u64::from_be_bytes(win_prob) >> 53),
+                channel_epoch: u32::from_be_bytes(channel_epoch),
                 challenge,
-                index,
-                amount,
-                win_prob,
-                channel_epoch,
                 signature: Some(signature),
             })
         } else {
-            Err(ParseError)
+            // TODO: make Error a generic
+            Err(utils_types::errors::GeneralError::ParseError)
         }
     }
 
@@ -382,17 +433,17 @@ impl BinarySerializable for Ticket {
 impl Ticket {
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
-    pub fn recover_signer(&self) -> core_crypto::errors::Result<PublicKey> {
+    pub fn recover_signer(&self, domain_separator: &Hash) -> core_crypto::errors::Result<PublicKey> {
         PublicKey::from_signature(
-            &self.get_hash().to_bytes(),
+            &self.get_hash(domain_separator).to_bytes(),
             self.signature.as_ref().expect("ticket not signed"),
         )
     }
 
     /// Verifies the signature of this ticket.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
-    pub fn verify(&self, address: &Address) -> core_crypto::errors::Result<()> {
-        let recovered = self.recover_signer()?;
+    pub fn verify(&self, address: &Address, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
+        let recovered = self.recover_signer(domain_separator)?;
         recovered
             .to_address()
             .eq(address)

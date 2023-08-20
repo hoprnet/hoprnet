@@ -956,6 +956,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
+ "core-ethereum-indexer",
  "core-types",
  "env_logger",
  "ethers",
@@ -1162,15 +1163,18 @@ dependencies = [
 name = "core-types"
 version = "0.3.0"
 dependencies = [
+ "bindings",
  "console_error_panic_hook",
  "core-crypto",
  "enum-iterator",
+ "ethers",
  "ethnum",
  "hex-literal 0.3.4",
  "js-sys",
  "multiaddr",
  "serde",
  "serde_repr",
+ "thiserror",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
