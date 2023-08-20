@@ -229,11 +229,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             // deploy NetworkRegistry contract
             currentNetworkDetail.addresses.networkRegistryContractAddress = deployCode(
                 "NetworkRegistry.sol:HoprNetworkRegistry",
-                abi.encode(
-                    currentNetworkDetail.addresses.networkRegistryProxyContractAddress,
-                    owner,
-                    deployerAddress
-                )
+                abi.encode(currentNetworkDetail.addresses.networkRegistryProxyContractAddress, owner, deployerAddress)
             );
             // NetworkRegistry should be enabled (default behavior) in staging/production, and disabled in development
             if (currentEnvironmentType == EnvironmentType.LOCAL) {

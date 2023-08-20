@@ -91,7 +91,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * @dev create a safe proxy and moodule proxy
      * @notice Deployer is the single owner of safe
      * nonce is the current nonce of deployer account
-     * Default fallback permission for module is to 
+     * Default fallback permission for module is to
      * 1. allow all data to Channels contract
      * 2. allow all data to Token contract
      * 3. allow nodes to send native tokens to itself
@@ -156,11 +156,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         Target[] memory defaultNodeTargets = new Target[](nodeAddresses.length);
         for (uint256 j = 0; j < nodeAddresses.length; j++) {
             defaultNodeTargets[j] = TargetUtils.encodeDefaultPermissions(
-                nodeAddresses[j],
-                Clearance.FUNCTION,
-                TargetType.SEND,
-                TargetPermission.ALLOW_ALL,
-                nodeDefaultPermission
+                nodeAddresses[j], Clearance.FUNCTION, TargetType.SEND, TargetPermission.ALLOW_ALL, nodeDefaultPermission
             );
         }
 
@@ -185,9 +181,12 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         }
 
         // 5. approve token transfer
-        bytes memory approveData =
-            abi.encodeWithSignature("approve(address,uint256)", currentNetworkDetail.addresses.channelsContractAddress, type(uint256).max);
-        _helperSignSafeTxAsOwner(ISafe(safe), currentNetworkDetail.addresses.tokenContractAddress, ISafe(safe).nonce(), approveData);
+        bytes memory approveData = abi.encodeWithSignature(
+            "approve(address,uint256)", currentNetworkDetail.addresses.channelsContractAddress, type(uint256).max
+        );
+        _helperSignSafeTxAsOwner(
+            ISafe(safe), currentNetworkDetail.addresses.tokenContractAddress, ISafe(safe).nonce(), approveData
+        );
 
         vm.stopBroadcast();
         // 6. add nodes and safe to network registry
@@ -205,7 +204,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
     /**
      * @dev get the deployer key
-     * Set to default when it's in development environment 
+     * Set to default when it's in development environment
      * (uint for 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
      */
     function _helperGetDeployerInternalKey() private {
@@ -364,13 +363,13 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * This function should only be called by a manager
      */
     function registerNodes(address[] memory stakingAccounts, address[] memory nodeAddresses) public {
-      // 1. get network and msg.sender
-      getNetworkAndMsgSender();
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-      // 2. call private function that register nodes
-      _registerNodes(stakingAccounts, nodeAddresses);
+        // 2. call private function that register nodes
+        _registerNodes(stakingAccounts, nodeAddresses);
 
-      vm.stopBroadcast();
+        vm.stopBroadcast();
     }
 
     /**
@@ -378,38 +377,39 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * This function should only be called by a manager
      */
     function _registerNodes(address[] memory stakingAccounts, address[] memory nodeAddresses) private {
-      require(stakingAccounts.length == nodeAddresses.length, 'Input lengths are different');
+        require(stakingAccounts.length == nodeAddresses.length, "Input lengths are different");
 
-      // 1. check if nodes have been registered, if so, skip
-      for (uint256 i = 0; i < nodeAddresses.length; i++) {
-        (bool successReadRegisteredNodeAddress, bytes memory returndataRegisteredNodeAddress) = currentNetworkDetail
-            .addresses.networkRegistryContractAddress
-            .staticcall(abi.encodeWithSignature('nodeRegisterdToAccount(address)', nodeAddresses[i]));
-        if (!successReadRegisteredNodeAddress) {
-            revert('Cannot read successReadRegisteredNodeAddress from network registry contract.');
+        // 1. check if nodes have been registered, if so, skip
+        for (uint256 i = 0; i < nodeAddresses.length; i++) {
+            (bool successReadRegisteredNodeAddress, bytes memory returndataRegisteredNodeAddress) = currentNetworkDetail
+                .addresses
+                .networkRegistryContractAddress
+                .staticcall(abi.encodeWithSignature("nodeRegisterdToAccount(address)", nodeAddresses[i]));
+            if (!successReadRegisteredNodeAddress) {
+                revert("Cannot read successReadRegisteredNodeAddress from network registry contract.");
+            }
+            address registeredAccount = abi.decode(returndataRegisteredNodeAddress, (address));
+
+            if (registeredAccount == address(0)) {
+                accounts.push(stakingAccounts[i]);
+                nodes.push(nodeAddresses[i]);
+            }
         }
-        address registeredAccount = abi.decode(returndataRegisteredNodeAddress, (address));
 
-        if (registeredAccount == address(0)) {
-            accounts.push(stakingAccounts[i]);
-            nodes.push(nodeAddresses[i]);
+        // 2. register nodes
+        if (nodes.length > 0) {
+            (bool successRegisterNodes,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+                abi.encodeWithSignature("managerRegister(address[],address[])", accounts, nodes)
+            );
+            if (!successRegisterNodes) {
+                emit log_string("Cannot register nodes as a manager");
+                revert("Cannot register nodes as a manager");
+            }
         }
-      }
 
-      // 2. register nodes
-      if (nodes.length > 0) {
-        (bool successRegisterNodes, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-            abi.encodeWithSignature('managerRegister(address[],address[])', accounts, nodes)
-        );
-        if (!successRegisterNodes) {
-            emit log_string('Cannot register nodes as a manager');
-            revert('Cannot register nodes as a manager');
-        }
-      }
-
-      // reset
-      accounts = new address[](0);
-      nodes = new address[](0);
+        // reset
+        accounts = new address[](0);
+        nodes = new address[](0);
     }
 
     // /**

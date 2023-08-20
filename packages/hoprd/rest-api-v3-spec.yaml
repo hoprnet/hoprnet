@@ -236,11 +236,11 @@ components:
       example: Open
     NativeBalance:
       type: string
-      example: "1000000000000000000"
+      example: '1000000000000000000'
       description: Amount of NATIVE (ETH) balance in the smallest unit. Used only for gas fees on the blockchain the current release is running on. For example, when you will open or close the payment channel, it will use gas fees to execute this action.
     HoprBalance:
       type: string
-      example: "10000000000000000000"
+      example: '10000000000000000000'
       description: Amount of HOPR tokens in the smallest unit. Used for funding payment channels.
     Channel:
       type: object
