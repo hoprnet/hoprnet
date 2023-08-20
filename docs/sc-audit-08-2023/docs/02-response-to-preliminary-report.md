@@ -166,11 +166,15 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 
 #### 6.1 ERC777 Reentrancy in fundChannel
 
-**Status:**
+**Status:** <span style="background-color:#000058">Code Change</span>
 
 **Description of Changes:**
 
-**Commit Hash:** (Not applicable)
+- Restricted `nodeChainKeyAddress` to be an EOA
+- Added `NodeIsContract` error, which gets thrown when the node is a contract
+- Updated tests
+
+**Commit Hash:** [38c33e2a748e3ca2e4fbf456190cdacb272fcc13](https://github.com/hoprnet/hoprnet/commit/38c33e2a748e3ca2e4fbf456190cdacb272fcc13)
 
 ### Others
 
