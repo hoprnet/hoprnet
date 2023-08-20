@@ -1,30 +1,29 @@
 import path from 'path'
 import { mkdir } from 'fs/promises'
 
-import { type Libp2p, createLibp2p } from 'libp2p'
+import { createLibp2p, type Libp2p } from 'libp2p'
 import { LevelDatastore } from 'datastore-level'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { Mplex } from '@libp2p/mplex'
 import { KadDHT } from '@libp2p/kad-dht'
 import { Noise } from '@chainsafe/libp2p-noise'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { AddressSorter, Address } from '@libp2p/interfaces/peer-store'
+import type { Address, AddressSorter } from '@libp2p/interfaces/peer-store'
+import { keysPBM } from '@libp2p/crypto/keys'
 
 import {
-  HoprConnect,
   compareAddressesLocalMode,
-  type PublicNodesEmitter,
-  compareAddressesPublicMode
+  compareAddressesPublicMode,
+  HoprConnect,
+  type PublicNodesEmitter
 } from '@hoprnet/hopr-connect'
 import {
+  Address as Packet_Address,
+  ChainKeypair,
   debug,
   isAddressWithPeerId,
   LevelDb,
-  ChainKeypair,
-  OffchainKeypair,
-  Address as Packet_Address,
-  stringToU8a,
-  u8aConcat
+  OffchainKeypair
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -33,8 +32,9 @@ import { getAddrs } from './identity.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { getContractData, supportedNetworks } from './network.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
-import { Database, Address as Ethereum_Address, core_hopr_initialize_crate } from '../lib/core_hopr.js'
+import { Address as Ethereum_Address, core_hopr_initialize_crate, Database } from '../lib/core_hopr.js'
 import { peerIdFromKeys } from '@libp2p/peer-id'
+
 core_hopr_initialize_crate()
 
 const log = debug(`hopr-core:create-hopr`)
@@ -60,8 +60,9 @@ export async function createLibp2pInstance(
   let libp2p: Libp2p
 
   // Hack until migrated to rs-libp2p: put the public key to the protobuf format expected by JS PeerId
-  let protoBufPrefixedPubKey = u8aConcat(stringToU8a('08011220'), packetKeypair.public().serialize())
-  const peerId = await peerIdFromKeys(protoBufPrefixedPubKey, packetKeypair.secret())
+  let protoBufPrefixedPubKey = keysPBM.PublicKey.encode({ Type: keysPBM.KeyType.Ed25519, Data: packetKeypair.public().serialize() })
+  let protoBufPrefixedPrivKey = keysPBM.PrivateKey.encode( { Type: keysPBM.KeyType.Ed25519, Data: packetKeypair.secret() })
+  const peerId = await peerIdFromKeys(protoBufPrefixedPubKey, protoBufPrefixedPrivKey)
 
   if (options.testing?.useMockedLibp2p) {
     // Used for quick integration testing
