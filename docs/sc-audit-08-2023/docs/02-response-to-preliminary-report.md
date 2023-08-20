@@ -200,5 +200,6 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - use tight packing for `HoprChannels.tokensReceived()` payload, meaning 40 bytes for `fundChannel` and 64 bytes for `fundChannelMulti`
 
 #### 4. Bump Safe to v1.4.1
+
 - Change contract deployment bytecode in `packages/ethereum/contracts/test/utils/SafeSingleton.sol`
 - Update deployed addresses in `packages/ethereum/contracts/src/utils/SafeSuiteLib.sol`
