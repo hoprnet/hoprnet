@@ -140,6 +140,20 @@ impl AcknowledgedTicket {
         .then_some(())
         .ok_or(InvalidChallenge)
     }
+
+
+    /// Computes a candidate check value to verify if this ticket is winning
+    pub fn get_luck(&self, preimage: &Hash, channel_response: &Response) -> U256 {
+        U256::from_bytes(
+            &Hash::create(&[
+                &self.get_hash().to_bytes(),
+                &preimage.to_bytes(),
+                &channel_response.to_bytes(),
+            ])
+            .to_bytes(),
+        )
+        .unwrap()
+    }
 }
 
 impl std::fmt::Display for AcknowledgedTicket {
