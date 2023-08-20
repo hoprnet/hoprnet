@@ -12,6 +12,7 @@ import {
     Clearance,
     CapabilityPermission
 } from "../../utils/TargetUtils.sol";
+import {IERC20, IERC777} from "../../static/openzeppelin-contracts/ERC777.sol";
 
 enum GranularPermission {
     NONE,
@@ -63,16 +64,16 @@ library HoprCapabilityPermissions {
     using EnumerableTargetSet for TargetSet;
 
     // HoprChannels method ids (TargetType.CHANNELS)
-    bytes4 internal constant REDEEM_TICKET_SELECTOR = HoprChannels.redeemTicketSafe.selector;
-    bytes4 internal constant CLOSE_INCOMING_CHANNEL_SELECTOR = HoprChannels.closeIncomingChannelSafe.selector;
-    bytes4 internal constant INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR =
+    bytes4 public constant REDEEM_TICKET_SELECTOR = HoprChannels.redeemTicketSafe.selector;
+    bytes4 public constant CLOSE_INCOMING_CHANNEL_SELECTOR = HoprChannels.closeIncomingChannelSafe.selector;
+    bytes4 public constant INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR =
         HoprChannels.initiateOutgoingChannelClosureSafe.selector;
-    bytes4 internal constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR =
+    bytes4 public constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR =
         HoprChannels.finalizeOutgoingChannelClosureSafe.selector;
-    bytes4 internal constant FUND_CHANNEL_SELECTOR = HoprChannels.fundChannelSafe.selector;
+    bytes4 public constant FUND_CHANNEL_SELECTOR = HoprChannels.fundChannelSafe.selector;
     // HoprToken method ids (TargetType.TOKEN). As HoprToken contract is in production, its ABI is static
-    bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3"; // equivalent to `HoprToken.approve.selector`, for ABI "approve(address,uint256)"
-    bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6"; // equivalent to `HoprToken.send.selector`, for ABI "send(address,uint256,bytes)"
+    bytes4 public constant APPROVE_SELECTOR = IERC20.approve.selector;
+    bytes4 public constant SEND_SELECTOR = IERC777.send.selector;
 
     event RevokedTarget(address indexed targetAddress);
     event ScopedTargetChannels(address indexed targetAddress, Target target);

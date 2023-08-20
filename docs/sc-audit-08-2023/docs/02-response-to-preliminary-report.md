@@ -210,3 +210,10 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Make imports explicit
 - Make the encoded address of the contract's approver (`r`) immutable
 - Remove duplicated `safeProxyAddr` definition in `clone()`
+
+#### 5. Improve SimplifiedModule
+- Extend comments to explain "avatar"
+
+#### 6. Improve CapabilityPermissions
+- Import `IERC20`, `IERC777` interfaces for definition of selector
+- Make all the selector definition public

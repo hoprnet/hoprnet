@@ -9,7 +9,6 @@ import "../../utils/SafeSingleton.sol";
 import "../../../src/interfaces/IAvatar.sol";
 import "../../../src/Crypto.sol";
 import "forge-std/Test.sol";
-import "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 import {SimplifiedModuleEvents} from "../../../src/node-stake/permissioned-module/SimplifiedModule.sol";
 

@@ -22,7 +22,7 @@ abstract contract SimplifiedModuleEvents {
  */
 abstract contract SimplifiedModule is UUPSUpgradeable, OwnableUpgradeable, SimplifiedModuleEvents {
     /**
-     * @dev Passes a transaction to be executed by the avatar.
+     * @dev Passes a transaction to be executed by the programmable account (i.e. "avatar" as per notion used in Zodiac).
      * @notice Can only be called by this contract.
      * @param to Destination address of module transaction.
      * @param value Ether value of module transaction.
