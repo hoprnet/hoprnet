@@ -23,7 +23,8 @@ import {
   debug,
   isAddressWithPeerId,
   LevelDb,
-  OffchainKeypair
+  OffchainKeypair,
+  u8aConcat
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -66,7 +67,7 @@ export async function createLibp2pInstance(
   })
   let protoBufPrefixedPrivKey = keysPBM.PrivateKey.encode({
     Type: keysPBM.KeyType.Ed25519,
-    Data: packetKeypair.secret()
+    Data: u8aConcat(packetKeypair.secret(), packetKeypair.public().serialize())
   })
   const peerId = await peerIdFromKeys(protoBufPrefixedPubKey, protoBufPrefixedPrivKey)
 
