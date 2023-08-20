@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
-import {IAvatar} from "../interfaces/IAvatar.sol";
-import {IHoprNodeManagementModule} from "../interfaces/INodeManagementModule.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
+import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import { IAvatar } from "../interfaces/IAvatar.sol";
+import { IHoprNodeManagementModule } from "../interfaces/INodeManagementModule.sol";
+import { Address } from "openzeppelin-contracts/utils/Address.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {
     event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
@@ -158,7 +158,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         }
 
         // Ensure that node is a member of the module
-        ensureNodeIsSafeModuleMember(NodeSafe({safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr}));
+        ensureNodeIsSafeModuleMember(NodeSafe({ safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr }));
 
         // Update the state and emit the event
         _nodeToSafe[nodeAddr].safeAddress = address(0);
@@ -171,7 +171,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
      * @param safeAddr The address of the Safe to be registered.
      */
     function registerSafeByNode(address safeAddr) external {
-        addNodeSafe(NodeSafe({safeAddress: safeAddr, nodeChainKeyAddress: msg.sender}));
+        addNodeSafe(NodeSafe({ safeAddress: safeAddr, nodeChainKeyAddress: msg.sender }));
     }
 
     /**

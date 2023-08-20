@@ -1,20 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import {Test} from "forge-std/Test.sol";
-import {ERC1820RegistryFixtureTest} from "./utils/ERC1820Registry.sol";
-import {HoprChannels, HoprChannelsEvents} from "../src/Channels.sol";
-import {CryptoUtils} from "./utils/Crypto.sol";
-import {HoprMultiSig} from "../src/MultiSig.sol";
-import {ERC777} from "openzeppelin-contracts/token/ERC777/ERC777.sol";
-import {HoprNodeSafeRegistry} from "../src/node-stake/NodeSafeRegistry.sol";
-import {HoprCrypto} from "../src/Crypto.sol";
+import { Test } from "forge-std/Test.sol";
+import { ERC1820RegistryFixtureTest } from "./utils/ERC1820Registry.sol";
+import { HoprChannels, HoprChannelsEvents } from "../src/Channels.sol";
+import { CryptoUtils } from "./utils/Crypto.sol";
+import { HoprMultiSig } from "../src/MultiSig.sol";
+import { ERC777 } from "openzeppelin-contracts/token/ERC777/ERC777.sol";
+import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
+import { HoprCrypto } from "../src/Crypto.sol";
 
 // proxy contract to make modifiers testable and manipulate storage
 contract MyHoprChannels is HoprChannels {
-    constructor(address _token, Timestamp _noticePeriodChannelClosure, HoprNodeSafeRegistry safeRegistry)
+    constructor(
+        address _token,
+        Timestamp _noticePeriodChannelClosure,
+        HoprNodeSafeRegistry safeRegistry
+    )
         HoprChannels(_token, _noticePeriodChannelClosure, safeRegistry)
-    {}
+    { }
 
     // Only for testing
     function _storeChannelStatus(address src, address dest, HoprChannels.ChannelStatus status) public {
@@ -36,7 +40,9 @@ contract MyHoprChannels is HoprChannels {
         uint256 closureTime,
         uint256 epoch,
         HoprChannels.ChannelStatus status
-    ) public {
+    )
+        public
+    {
         channels[_getChannelId(src, dest)] = HoprChannels.Channel(
             HoprChannels.Balance.wrap(uint96(balance)),
             HoprChannels.TicketIndex.wrap(uint48(ticketIndex)),
@@ -51,12 +57,15 @@ contract MyHoprChannels is HoprChannels {
         delete channels[_getChannelId(src, dest)];
     }
 
-    function myValidateBalance(HoprChannels.Balance balance) public validateBalance(balance) {}
+    function myValidateBalance(HoprChannels.Balance balance) public validateBalance(balance) { }
 
-    function myValidateChannelParties(address source, address destination)
+    function myValidateChannelParties(
+        address source,
+        address destination
+    )
         public
         validateChannelParties(source, destination)
-    {}
+    { }
 }
 
 contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, HoprChannelsEvents {
@@ -96,7 +105,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint48 ticketIndex,
         uint32 closureTime,
         uint24 epoch
-    ) public {
+    )
+        public
+    {
         assertEq(
             HoprChannels.Timestamp.unwrap(hoprChannels.noticePeriodChannelClosure()),
             HoprChannels.Timestamp.unwrap(closureNoticePeriod)
@@ -342,7 +353,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         address safeContract,
         uint96 amount,
         uint48 ticketIndex
-    ) public {
+    )
+        public
+    {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != dest && safeContract != src && safeContract != dest);
 
@@ -410,7 +423,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         address dest,
         uint96 amount,
         uint48 ticketIndex
-    ) public {
+    )
+        public
+    {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != dest);
 
@@ -428,7 +443,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function testRevert_closeIncomingChannelNoFunds(address src, address dest, uint96 amount, uint48 ticketIndex)
+    function testRevert_closeIncomingChannelNoFunds(
+        address src,
+        address dest,
+        uint96 amount,
+        uint48 ticketIndex
+    )
         public
     {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
@@ -454,7 +474,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 amount,
         uint48 ticketIndex,
         uint32 nextTimestamp
-    ) public {
+    )
+        public
+    {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != dest && safeContract != src && safeContract != dest);
 
@@ -576,7 +598,11 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function testRevert_initiateOutgoingChannelClosureWrongChannelState(address src, address dest, uint96 amount)
+    function testRevert_initiateOutgoingChannelClosureWrongChannelState(
+        address src,
+        address dest,
+        uint96 amount
+    )
         public
     {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
@@ -605,7 +631,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint48 ticketIndex,
         uint32 closureTime,
         uint24 epoch
-    ) public {
+    )
+        public
+    {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         closureTime = uint32(
             bound(
@@ -695,7 +723,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint48 ticketIndex,
         uint32 closureTime,
         uint24 epoch
-    ) public {
+    )
+        public
+    {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         closureTime = uint32(
             bound(
@@ -727,7 +757,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint48 ticketIndex,
         uint32 closureTime,
         uint24 epoch
-    ) public {
+    )
+        public
+    {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         closureTime = uint32(
             bound(
@@ -766,7 +798,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -867,7 +901,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 amount,
         uint96 channelAmount,
         uint24 epoch
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -929,7 +965,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -998,7 +1036,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -1053,7 +1093,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -1108,7 +1150,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -1163,7 +1207,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -1221,7 +1267,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint48 maxTicketIndex,
         uint32 indexOffset,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -1274,7 +1322,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -1333,7 +1383,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -1400,7 +1452,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
-    ) public {
+    )
+        public
+    {
         porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
@@ -1466,7 +1520,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 amountA,
         uint96 amountB,
         bytes memory operatorData
-    ) public {
+    )
+        public
+    {
         amountA = uint96(bound(amountA, MIN_USED_BALANCE, MAX_USED_BALANCE));
         amountB = uint96(bound(amountB, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != dest && safeContract != src && safeContract != dest);
@@ -1509,7 +1565,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 amountA,
         uint96 amountB,
         bytes memory operatorData
-    ) public {
+    )
+        public
+    {
         amountA = uint96(bound(amountA, MIN_USED_BALANCE, MAX_USED_BALANCE));
         amountB = uint96(bound(amountB, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != dest && safeContract != src && safeContract != dest);
@@ -1550,7 +1608,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint256 amount,
         address src,
         address dest
-    ) public {
+    )
+        public
+    {
         amount = bound(amount, uint256(type(uint96).max) + 1, type(uint256).max);
         correctAmount = uint96(bound(correctAmount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != dest);
@@ -1589,7 +1649,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         address from,
         uint256 amount,
         bytes memory userData
-    ) public {
+    )
+        public
+    {
         amount = bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE);
 
         vm.assume(userData.length != 0 && userData.length != 40 && userData.length != 64);
@@ -1608,7 +1670,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 amountB,
         address src,
         address dest
-    ) public {
+    )
+        public
+    {
         amountA = uint96(bound(amountA, MIN_USED_BALANCE, MAX_USED_BALANCE));
         amountB = uint96(bound(amountB, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
@@ -1636,7 +1700,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint256 amountTooSmall,
         uint256 amountTooLarge,
         address operator
-    ) public {
+    )
+        public
+    {
         vm.assume(src != dest && src != safeContract && dest != safeContract);
         vm.assume(src != address(0) && dest != address(0));
         vm.assume(safeContract != address(0));
@@ -1767,7 +1833,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint256 amount,
         address src,
         address dest
-    ) public {
+    )
+        public
+    {
         amount = bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE);
 
         vm.assume(src != dest && safeContract != src && safeContract != dest);
@@ -1878,7 +1946,11 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint256 closureTime,
         uint256 epoch,
         HoprChannels.ChannelStatus status
-    ) private pure returns (HoprChannels.Channel memory) {
+    )
+        private
+        pure
+        returns (HoprChannels.Channel memory)
+    {
         return HoprChannels.Channel(
             HoprChannels.Balance.wrap(uint96(balance)),
             HoprChannels.TicketIndex.wrap(uint48(ticketIndex)),

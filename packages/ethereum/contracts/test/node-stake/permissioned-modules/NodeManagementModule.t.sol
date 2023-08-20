@@ -10,7 +10,7 @@ import "../../../src/interfaces/IAvatar.sol";
 import "../../../src/Crypto.sol";
 import "forge-std/Test.sol";
 import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
-import {SimplifiedModuleEvents} from "../../../src/node-stake/permissioned-module/SimplifiedModule.sol";
+import { SimplifiedModuleEvents } from "../../../src/node-stake/permissioned-module/SimplifiedModule.sol";
 
 /**
  * @dev This files tests both HoprNodeManagementModule and the CapabilityPermissions.sol
@@ -107,7 +107,8 @@ contract HoprNodeManagementModuleTest is
     //         ),
     //         abi.encode(_token)
     //     );
-    //     moduleProxy.initialize(abi.encode(address(1), multiaddr, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
+    //     moduleProxy.initialize(abi.encode(address(1), multiaddr,
+    // bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
 
     //     // get implementation address from slot
     //     bytes32 _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
@@ -236,7 +237,10 @@ contract HoprNodeManagementModuleTest is
     /**
      * @dev fail to add channels target(s) when the account has been scopec
      */
-    function testRevert_ScopeExistingTargetChannelsFromModule(address[] memory channelsAddresses, uint256 randomIndex)
+    function testRevert_ScopeExistingTargetChannelsFromModule(
+        address[] memory channelsAddresses,
+        uint256 randomIndex
+    )
         public
     {
         vm.assume(channelsAddresses.length > 0);
@@ -305,7 +309,10 @@ contract HoprNodeManagementModuleTest is
     /**
      * @dev fail to add token target(s) when the account has been scopec
      */
-    function testRevert_ScopeExistingTargetTokenFromModule(address[] memory tokenAddresses, uint256 randomIndex)
+    function testRevert_ScopeExistingTargetTokenFromModule(
+        address[] memory tokenAddresses,
+        uint256 randomIndex
+    )
         public
     {
         vm.assume(tokenAddresses.length > 0);
@@ -1307,7 +1314,10 @@ contract HoprNodeManagementModuleTest is
      * @dev return an array with all unique addresses which does not contain address zeo
      * return a random item
      */
-    function _helperGetUniqueAddressArrayAndRandomItem(address[] memory addrs, uint256 randomIndex)
+    function _helperGetUniqueAddressArrayAndRandomItem(
+        address[] memory addrs,
+        uint256 randomIndex
+    )
         private
         view
         returns (address[] memory, address)
@@ -1340,7 +1350,11 @@ contract HoprNodeManagementModuleTest is
         uint256[] memory txValues,
         uint256[] memory dataLengths,
         bytes[] memory data
-    ) private pure returns (bytes memory) {
+    )
+        private
+        pure
+        returns (bytes memory)
+    {
         bytes memory encodePacked;
         for (uint256 i = 0; i < txOperations.length; i++) {
             encodePacked =
@@ -1353,7 +1367,9 @@ contract HoprNodeManagementModuleTest is
         address caller,
         CapabilityPermission[] memory channelsTokenPermission,
         CapabilityPermission[] memory nodePermission
-    ) private {
+    )
+        private
+    {
         // scope channels and token contract
         Target tokenChannelsTarget = TargetUtils.encodeDefaultPermissions(
             channels,

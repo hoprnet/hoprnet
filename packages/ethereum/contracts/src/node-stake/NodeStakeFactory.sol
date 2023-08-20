@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import {ClonesUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
-import {Address} from "openzeppelin-contracts/utils/Address.sol";
-import {SafeSuiteLib} from "../utils/SafeSuiteLib.sol";
-import {SafeProxy} from "safe-contracts/proxies/SafeProxy.sol";
-import {SafeProxyFactory} from "safe-contracts/proxies/SafeProxyFactory.sol";
-import {Safe} from "safe-contracts/Safe.sol";
-import {Enum} from "safe-contracts/common/Enum.sol";
+import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import { Address } from "openzeppelin-contracts/utils/Address.sol";
+import { SafeSuiteLib } from "../utils/SafeSuiteLib.sol";
+import { SafeProxy } from "safe-contracts/proxies/SafeProxy.sol";
+import { SafeProxyFactory } from "safe-contracts/proxies/SafeProxyFactory.sol";
+import { Safe } from "safe-contracts/Safe.sol";
+import { Enum } from "safe-contracts/common/Enum.sol";
 
 abstract contract HoprNodeStakeFactoryEvents {
-    event NewHoprNodeStakeModule(address indexed moduleImplementation, address instance); // Emit when a new module is created
+    event NewHoprNodeStakeModule(address indexed moduleImplementation, address instance); // Emit when a new module is
+        // created
     event NewHoprNodeStakeSafe(address instance); // Emit when a new safe proxy is created
 }
 
@@ -23,7 +24,8 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {
     using Address for address;
     using ClonesUpgradeable for address;
 
-    // A sentinel address that serves as the start pointer of the owner linked list used in the OwnerManager of safe-contracts
+    // A sentinel address that serves as the start pointer of the owner linked list used in the OwnerManager of
+    // safe-contracts
     address internal constant SENTINEL_OWNERS = address(0x1);
 
     // Encoded address of the contract's approver, used for EIP-1271 signature verification
@@ -36,13 +38,13 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {
     error TooFewOwners();
 
     /**
-    * @dev Constructor function to initialize contract state.
-    * Initializes the encoded address of the contract's approver and the approved hash signature.
-    */
+     * @dev Constructor function to initialize contract state.
+     * Initializes the encoded address of the contract's approver and the approved hash signature.
+     */
     constructor() {
         // Encode the contract's address to be used in EIP-1271 signature verification
         r = bytes32(uint256(uint160(address(this))));
-        
+
         // Encode the EIP-1271 contract signature for approval hash verification
         approvalHashSig = abi.encodePacked(abi.encode(r, bytes32(0)), bytes1(hex"01"));
     }
@@ -56,13 +58,20 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {
 
     /**
      * @dev Deploys a 1-of-n Safe proxy and a module proxy for HOPR node management.
-     * @param moduleSingletonAddress The singleton contract address of the HOPR node management module, as defined in the `HoprNodeManagementModule` contract.
+     * @param moduleSingletonAddress The singleton contract address of the HOPR node management module, as defined in
+     * the `HoprNodeManagementModule` contract.
      * @param admins The list of owners for the Safe proxy. The multisig threshold is 1
      * @param nonce A nonce used to create a salt. Both the safe and module proxies share the same nonce.
-     * @param defaultTarget The default target (refer to TargetUtils.sol) for the current HoprChannels (and HoprToken) contract.
+     * @param defaultTarget The default target (refer to TargetUtils.sol) for the current HoprChannels (and HoprToken)
+     * contract.
      * @return addresses of the deployed module proxy and safe proxy.
      */
-    function clone(address moduleSingletonAddress, address[] memory admins, uint256 nonce, bytes32 defaultTarget)
+    function clone(
+        address moduleSingletonAddress,
+        address[] memory admins,
+        uint256 nonce,
+        bytes32 defaultTarget
+    )
         public
         returns (address, address payable)
     {
@@ -144,12 +153,17 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {
     }
 
     /**
-     * @dev Predicts the deterministic address that would result from deploying a contract instance with a given implementation and salt.
+     * @dev Predicts the deterministic address that would result from deploying a contract instance with a given
+     * implementation and salt.
      * @param implementation The address of the contract's implementation.
      * @param salt A unique value used to compute the deterministic address.
-     * @return predicted The predicted address that the contract instance would have if deployed with the provided implementation and salt.
+     * @return predicted The predicted address that the contract instance would have if deployed with the provided
+     * implementation and salt.
      */
-    function predictDeterministicAddress(address implementation, bytes32 salt)
+    function predictDeterministicAddress(
+        address implementation,
+        bytes32 salt
+    )
         public
         view
         returns (address predicted)

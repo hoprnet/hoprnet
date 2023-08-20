@@ -114,7 +114,8 @@ contract TargetUtilsTest is Test {
         position = bound(position, 0, limit);
 
         uint8 convertedMaskedDefaultPermissionAt = uint8((targetVal << 184 + position * 8) >> 248);
-        vm.assume(convertedMaskedDefaultPermissionAt <= uint8(type(CapabilityPermission).max)); // valid target permission
+        vm.assume(convertedMaskedDefaultPermissionAt <= uint8(type(CapabilityPermission).max)); // valid target
+            // permission
 
         CapabilityPermission permission = targetUtilsMock.getDefaultCapabilityPermissionAt(position);
         assertEq(uint8(permission), convertedMaskedDefaultPermissionAt);
@@ -135,7 +136,9 @@ contract TargetUtilsTest is Test {
         uint8 targetPermission,
         uint8[] memory functionPermissions,
         uint8 asTargetType
-    ) public {
+    )
+        public
+    {
         // bound target type
         asTargetType = uint8(bound(asTargetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
         TargetType newTargetType = TargetType(asTargetType);
@@ -208,7 +211,9 @@ contract TargetUtilsTest is Test {
         uint8 targetType,
         uint8 targetPermission,
         uint8[] memory functionPermissions
-    ) public {
+    )
+        public
+    {
         (
             uint8 boundClearance,
             uint8 boundTargetType,
@@ -231,7 +236,9 @@ contract TargetUtilsTest is Test {
         uint8 targetType,
         uint8 targetPermission,
         uint8[] memory functionPermissions
-    ) public {
+    )
+        public
+    {
         vm.assume(functionPermissions.length > targetUtilsMock.getNumCapabilityPermissions());
         // bound to each enum type
         CapabilityPermission[] memory funcPermissions = new CapabilityPermission[](functionPermissions.length);
@@ -267,7 +274,9 @@ contract TargetUtilsTest is Test {
         uint8 targetType,
         uint8 targetPermission,
         uint8[] memory functionPermissions
-    ) public {
+    )
+        public
+    {
         (
             uint8 boundClearance,
             uint8 boundTargetType,

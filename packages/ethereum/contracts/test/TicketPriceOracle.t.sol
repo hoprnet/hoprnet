@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import {Test} from "forge-std/Test.sol";
-import {HoprTicketPriceOracle, HoprTicketPriceOracleEvents} from "../src/TicketPriceOracle.sol";
+import { Test } from "forge-std/Test.sol";
+import { HoprTicketPriceOracle, HoprTicketPriceOracleEvents } from "../src/TicketPriceOracle.sol";
 
 contract TicketPriceOracleTest is Test, HoprTicketPriceOracleEvents {
     HoprTicketPriceOracle public oracle;

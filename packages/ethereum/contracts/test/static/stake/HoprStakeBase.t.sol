@@ -240,7 +240,8 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
 
         vm.prank(nftAddress);
         vm.expectEmit(true, true, true, false, address(hoprStakeBase));
-        emit Redeemed(accounts[0], tokenId, tokenId == 1 ? false : true); // token of id 1 has the sanme type and rank as token 0
+        emit Redeemed(accounts[0], tokenId, tokenId == 1 ? false : true); // token of id 1 has the sanme type and rank
+            // as token 0
         hoprStakeBase.onERC721Received(accounts[0], accounts[0], tokenId, hex"00");
         vm.clearMockedCalls();
     }
@@ -666,7 +667,8 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
 
     /**
      * @dev Boost NFTs Nr [0, 1, 2, 3, 4]
-     * @notice It's easier to mocke the interface calls than to manipulate the storage as `_boostType` is saved as a tuple
+     * @notice It's easier to mocke the interface calls than to manipulate the storage as `_boostType` is saved as a
+     * tuple
      */
     function _helperMintBoosts() internal {
         // typeOf
@@ -770,6 +772,6 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     function _helperAccountsStakeTokensNFTsProvideRewards() internal {
         _helperAccountsStakeTokensAndNFTs();
         uint256 availableRewardSlot = stdstore.target(address(hoprStakeBase)).sig("availableReward()").find();
-        vm.store(address(hoprStakeBase), bytes32(availableRewardSlot), bytes32(abi.encode(1000000 ether)));
+        vm.store(address(hoprStakeBase), bytes32(availableRewardSlot), bytes32(abi.encode(1_000_000 ether)));
     }
 }
