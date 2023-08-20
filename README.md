@@ -340,7 +340,7 @@ Running one node in test mode, with safe and module attached (in rotsee network)
 make -j deps && make -j build
 
 # ensure a private key with enough xDAI is set as PRIVATE_KEY
-# Please use the deployer private key as PRIVATE_KEY 
+# Please use the deployer private key as PRIVATE_KEY
 # in `packages/ethereum/contract/.env`
 source ./packages/ethereum/contracts/.env
 

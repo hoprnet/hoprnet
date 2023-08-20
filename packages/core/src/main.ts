@@ -60,8 +60,14 @@ export async function createLibp2pInstance(
   let libp2p: Libp2p
 
   // Hack until migrated to rs-libp2p: put the public key to the protobuf format expected by JS PeerId
-  let protoBufPrefixedPubKey = keysPBM.PublicKey.encode({ Type: keysPBM.KeyType.Ed25519, Data: packetKeypair.public().serialize() })
-  let protoBufPrefixedPrivKey = keysPBM.PrivateKey.encode( { Type: keysPBM.KeyType.Ed25519, Data: packetKeypair.secret() })
+  let protoBufPrefixedPubKey = keysPBM.PublicKey.encode({
+    Type: keysPBM.KeyType.Ed25519,
+    Data: packetKeypair.public().serialize()
+  })
+  let protoBufPrefixedPrivKey = keysPBM.PrivateKey.encode({
+    Type: keysPBM.KeyType.Ed25519,
+    Data: packetKeypair.secret()
+  })
   const peerId = await peerIdFromKeys(protoBufPrefixedPubKey, protoBufPrefixedPrivKey)
 
   if (options.testing?.useMockedLibp2p) {
