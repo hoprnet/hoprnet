@@ -32,6 +32,20 @@ struct Role {
 }
 
 /**
+ *    &&&&
+ *    &&&&
+ *    &&&&
+ *    &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
+ *    &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
+ *     &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
+ *     &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
+ *     &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
+ *     %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
+ *    %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *
  * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Permissions.sol` contract,
  * this library is designed to support a single role and offers a set of specific functions
  * for interacting with HoprChannels and HoprToken contracts

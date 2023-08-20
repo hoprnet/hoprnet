@@ -223,4 +223,5 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Make all the selector definition public
 
 #### 8. Format
-- format all the contracts
+- Format all the contracts
+- Include HOPR logo

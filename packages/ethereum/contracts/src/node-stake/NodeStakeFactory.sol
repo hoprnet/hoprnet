@@ -16,6 +16,20 @@ abstract contract HoprNodeStakeFactoryEvents {
 }
 
 /**
+ *    &&&&
+ *    &&&&
+ *    &&&&
+ *    &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
+ *    &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
+ *     &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
+ *     &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
+ *     &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
+ *     %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
+ *    %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *
  * @title HoprNodeStakeFactory
  * @dev This contract is responsible for deploying a 1-of-n Safe proxy and a module proxy for HOPR node management.
  * The factory contract handles the deployment and initialization of these proxies.

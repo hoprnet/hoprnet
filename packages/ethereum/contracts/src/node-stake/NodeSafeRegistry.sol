@@ -12,6 +12,20 @@ abstract contract HoprNodeSafeRegistryEvents {
 }
 
 /**
+ *    &&&&
+ *    &&&&
+ *    &&&&
+ *    &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
+ *    &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
+ *     &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
+ *     &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
+ *     &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
+ *     %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
+ *    %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *
  * @title HoprNodeSafeRegistry
  * @dev Node safe must prove that the Safe is the only authorized controller of
  * the CHAIN_KEY address. This link between the Safe and node's chain-key address
