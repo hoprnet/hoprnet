@@ -269,7 +269,7 @@ lint: ## run linter for TS, Rust, Python, Solidity
 .PHONY: lint-sol
 lint-sol: ## run linter for Solidity
 	for f in $(SOLIDITY_FILES); do \
-		forge fmt --check $${f} || exit 1; \
+		forge fmt --root ./packages/ethereum/contracts --check $${f} || exit 1; \
 	done
 	# FIXME: disabled until all linter errors are resolved
 	# npx solhint $${f} || exit1; \
@@ -293,7 +293,7 @@ fmt: ## run code formatter for TS, Rust, Python, Solidity
 .PHONY: fmt-sol
 fmt-sol: ## run code formatter for Solidity
 	for f in $(SOLIDITY_FILES); do \
-		forge fmt $${f}; \
+		forge fmt $${f} --root ./packages/ethereum/contracts; \
 	done
 
 .PHONY: fmt-ts
