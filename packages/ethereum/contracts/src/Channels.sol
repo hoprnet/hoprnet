@@ -807,15 +807,25 @@ contract HoprChannels is
      * @param redeemable ticket data
      */
     function _getTicketHash(RedeemableTicket calldata redeemable) public view returns (bytes32) {
+        address challenge = HoprCrypto.scalarTimesBasepoint(redeemable.porSecret);
+        bytes32 ticketHash;
+        assembly {
+            let data := mload(0x40)
+
+            mstore(data, redeemable)
+            mstore(add(0x20, data), add(0x20, redeemable))
+            mstore(add(0x40, data), challenge)
+
+            ticketHash := keccak256(data, 0x54)
+        }
+
         // Deviates from EIP712 due to computed property and non-standard struct property encoding
         bytes32 hashStruct = keccak256(
             abi.encode(
                 this.redeemTicket.selector,
-                keccak256(abi.encode(redeemable.data, HoprCrypto.scalarTimesBasepoint(redeemable.porSecret)))
+                ticketHash
             )
         );
-
-        return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
     }
 
     /**
