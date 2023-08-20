@@ -184,6 +184,7 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Renamed `closureInitiationTime` to `closureTime` in `OutgoingChannelClosureInitiated` event.
 - Split event definition of “HoprNetworkRegistry” contract into an abstract contract `HoprNetworkRegistryEvents`. The abstract event contract is inherited by the “HoprNetworkRegistry” contract.
 - Renamed `EnabledNetworkRegistry` event to `NetworkRegistryStatusUpdated`.
+- Renamed error from `NotSafeOwnerNorNode` to `NodeNotModuleMember` in `NodeSafeRegistry.sol`.
 
 #### 2. Add more event in Simplified
 
