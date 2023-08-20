@@ -200,3 +200,9 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Always emit `ChannelBalanceIncreased` in a successful `tokenReceived` call.
 - Use tight packing for `HoprChannels.tokensReceived()` payload, meaning 40 bytes for `fundChannel` and 64 bytes for `fundChannelMulti`
 - Document bidirectional channel funding in /`ERC777.tokensReceived()` is not intended for production use.
+
+#### 4. Improve HoprNodeStakeFactory
+- Enhance code comments
+- Make imports explicit
+- Make the encoded address of the contract's approver (`r`) immutable
+- Remove duplicated `safeProxyAddr` definition in `clone()`
