@@ -125,17 +125,16 @@ components:
             - ticketsGetTickets
             - settingsGetSettings
             - nodeGetVersion
-            - nodeStreamWebsocket
-            - nodePing
             - nodeGetPeers
             - nodeGetMetrics
             - nodeGetInfo
             - nodeGetEntryNodes
             - messagesWebsocket
-            - messagesSign
+            - messagesGetSize
+            - messagesPopAllMessage
+            - messagesPopMessage
             - messagesSendMessage
-            - messageSign
-            - channelsFundChannels
+            - messagesDeleteMessages
             - channelsOpenChannel
             - channelsGetChannels
             - aliasesSetAlias
@@ -146,6 +145,7 @@ components:
             - accountGetAddress
             - tokensDelete
             - settingsSetSetting
+            - peersPingPeer
             - peerInfoGetPeerInfo
             - channelsRedeemTickets
             - channelsGetTickets
@@ -153,6 +153,11 @@ components:
             - channelsCloseChannel
             - aliasesGetAlias
             - aliasesRemoveAlias
+            - nodeStreamWebsocket
+            - nodePing
+            - messagesSign
+            - messageSign
+            - channelsFundChannels
         limits:
           type: array
           minItems: 1
@@ -231,11 +236,11 @@ components:
       example: Open
     NativeBalance:
       type: string
-      example: '1000000000000000000'
+      example: "1000000000000000000"
       description: Amount of NATIVE (ETH) balance in the smallest unit. Used only for gas fees on the blockchain the current release is running on. For example, when you will open or close the payment channel, it will use gas fees to execute this action.
     HoprBalance:
       type: string
-      example: '10000000000000000000'
+      example: "10000000000000000000"
       description: Amount of HOPR tokens in the smallest unit. Used for funding payment channels.
     Channel:
       type: object
@@ -321,7 +326,7 @@ components:
     TransactionReceipt:
       type: string
       description: Receipt identifier for an Ethereum transaction.
-      example: '0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e'
+      example: 0x37954ca4a630aa28f045df2e8e604cae22071046042e557355acf00f4ef20d2e
   securitySchemes:
     keyScheme:
       type: apiKey
