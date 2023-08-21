@@ -22,7 +22,8 @@ services:
       - hopr-net
     ports:
       - '8080:8080'
-      - '9091:9091'
+      - '9091:9091/tcp'
+      - '9091:9091/udp'
       - '3001:3001'
     environment:
       - DEBUG=hopr*
