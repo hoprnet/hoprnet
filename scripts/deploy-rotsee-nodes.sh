@@ -238,6 +238,7 @@ install_nodes(){
 
   upload_identities
 
+  # deploy safes, register nodes to NR, approve token transfers
   deploy_safes
 
   deploy_nodes
