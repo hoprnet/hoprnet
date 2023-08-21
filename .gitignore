@@ -236,6 +236,3 @@ debug-identity
 # technical docs
 /docs/*/.structurizr
 /docs/*/workspace.json
-
-# generated SDK
-/hoprd-sdk-python/

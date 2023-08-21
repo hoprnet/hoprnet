@@ -621,13 +621,6 @@ ifeq ($(script),)
 endif
 	bash "${script}"
 
-.PHONY: generate-python-sdk
-generate-python-sdk: ## generate Python SDK via Swagger Codegen
-	rm -rf ./hoprd-sdk-python
-	docker run --rm -v $$(pwd):/local swaggerapi/swagger-codegen-cli-v3 generate -l python \
-		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
-		-c /local/scripts/python-sdk-config.json
-
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
