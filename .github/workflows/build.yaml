@@ -36,11 +36,7 @@ jobs:
     name: Toolchain
     needs:
       - check_changeset
-    if: |
-      needs.check_changeset.outputs.build_toolchain
-      || needs.check_changeset.outputs.build_hoprd
-      || needs.check_changeset.outputs.build_hopli
-      || needs.check_changeset.outputs.build_anvil
+    if: needs.check_changeset.outputs.build_toolchain
     uses: ./.github/workflows/build-toolchain.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -51,7 +47,7 @@ jobs:
     needs:
       - check_changeset
       - build_toolchain
-    if: needs.check_changeset.outputs.build_hopli
+    if: needs.check_changeset.outputs.build_toolchain || needs.check_changeset.outputs.build_hopli
     uses: ./.github/workflows/build-hopli.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -64,7 +60,7 @@ jobs:
     needs:
       - check_changeset
       - build_toolchain
-    if: needs.check_changeset.outputs.build_hoprd
+    if: needs.check_changeset.outputs.build_toolchain || needs.check_changeset.outputs.build_hoprd
     uses: ./.github/workflows/build-hoprd.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -80,7 +76,7 @@ jobs:
     needs:
       - check_changeset
       - build_toolchain
-    if: needs.check_changeset.outputs.build_anvil
+    if: needs.check_changeset.outputs.build_toolchain || needs.check_changeset.outputs.build_anvil
     uses: ./.github/workflows/build-anvil.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -95,10 +91,6 @@ jobs:
       - build_anvil
       - build_hoprd
       - build_hopli
-    if: |
-      needs.check_changeset.outputs.build_hoprd
-      || needs.check_changeset.outputs.build_hopli
-      || needs.check_changeset.outputs.build_anvil
     uses: ./.github/workflows/build-pluto.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
