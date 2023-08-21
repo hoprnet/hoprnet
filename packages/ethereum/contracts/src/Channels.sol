@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import {Multicall} from "openzeppelin-contracts/utils/Multicall.sol";
-import {IERC1820Registry} from "openzeppelin-contracts/utils/introspection/IERC1820Registry.sol";
-import {ERC1820Implementer} from "openzeppelin-contracts/utils/introspection/ERC1820Implementer.sol";
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {IERC777Recipient} from "openzeppelin-contracts/token/ERC777/IERC777Recipient.sol";
-import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
+import { IERC1820Registry } from "openzeppelin-contracts/utils/introspection/IERC1820Registry.sol";
+import { ERC1820Implementer } from "openzeppelin-contracts/utils/introspection/ERC1820Implementer.sol";
+import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import { IERC777Recipient } from "openzeppelin-contracts/token/ERC777/IERC777Recipient.sol";
+import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 
-import {HoprCrypto} from "./Crypto.sol";
-import {HoprLedger} from "./Ledger.sol";
-import {HoprMultiSig} from "./MultiSig.sol";
-import {HoprNodeSafeRegistry} from "./node-stake/NodeSafeRegistry.sol";
+import { HoprCrypto } from "./Crypto.sol";
+import { HoprLedger } from "./Ledger.sol";
+import { HoprMultiSig } from "./MultiSig.sol";
+import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
 uint256 constant ONE_HOUR = 60 * 60 * 1000; // in milliseconds
 
@@ -253,10 +253,10 @@ contract HoprChannels is
             revert SourceEqualsDestination();
         }
         if (source == address(0)) {
-            revert ZeroAddress({reason: "source must not be empty"});
+            revert ZeroAddress({ reason: "source must not be empty" });
         }
         if (destination == address(0)) {
-            revert ZeroAddress({reason: "destination must not be empty"});
+            revert ZeroAddress({ reason: "destination must not be empty" });
         }
         _;
     }
@@ -294,14 +294,20 @@ contract HoprChannels is
         address self,
         RedeemableTicket calldata redeemable,
         HoprCrypto.VRFParameters calldata params
-    ) external HoprMultiSig.onlySafe(self) {
+    )
+        external
+        HoprMultiSig.onlySafe(self)
+    {
         _redeemTicketInternal(self, redeemable, params);
     }
 
     /**
      * See `_redeemTicketInternal`
      */
-    function redeemTicket(RedeemableTicket calldata redeemable, HoprCrypto.VRFParameters calldata params)
+    function redeemTicket(
+        RedeemableTicket calldata redeemable,
+        HoprCrypto.VRFParameters calldata params
+    )
         external
         HoprMultiSig.noSafeSet()
     {
@@ -353,15 +359,19 @@ contract HoprChannels is
         address self,
         RedeemableTicket calldata redeemable,
         HoprCrypto.VRFParameters calldata params
-    ) internal validateBalance(redeemable.data.amount) HoprCrypto.isFieldElement(redeemable.porSecret) {
+    )
+        internal
+        validateBalance(redeemable.data.amount)
+        HoprCrypto.isFieldElement(redeemable.porSecret)
+    {
         Channel storage spendingChannel = channels[redeemable.data.channelId];
 
         if (spendingChannel.status != ChannelStatus.OPEN && spendingChannel.status != ChannelStatus.PENDING_TO_CLOSE) {
-            revert WrongChannelState({reason: "spending channel must be OPEN or PENDING_TO_CLOSE"});
+            revert WrongChannelState({ reason: "spending channel must be OPEN or PENDING_TO_CLOSE" });
         }
 
         if (ChannelEpoch.unwrap(spendingChannel.epoch) != ChannelEpoch.unwrap(redeemable.data.epoch)) {
-            revert WrongChannelState({reason: "channel epoch must match"});
+            revert WrongChannelState({ reason: "channel epoch must match" });
         }
 
         // Aggregatable Tickets - validity interval:
@@ -431,7 +441,10 @@ contract HoprChannels is
     /**
      * See `_initiateOutgoingChannelClosureInternal`, entrypoint for MultiSig contract
      */
-    function initiateOutgoingChannelClosureSafe(address self, address destination)
+    function initiateOutgoingChannelClosureSafe(
+        address self,
+        address destination
+    )
         external
         HoprMultiSig.onlySafe(self)
     {
@@ -460,7 +473,7 @@ contract HoprChannels is
 
         // calling initiateClosure on a PENDING_TO_CLOSE channel extends the noticePeriod
         if (channel.status == ChannelStatus.CLOSED) {
-            revert WrongChannelState({reason: "channel must have state OPEN or PENDING_TO_CLOSE"});
+            revert WrongChannelState({ reason: "channel must have state OPEN or PENDING_TO_CLOSE" });
         }
 
         channel.closureTime =
@@ -501,7 +514,7 @@ contract HoprChannels is
         Channel storage channel = channels[channelId];
 
         if (channel.status == ChannelStatus.CLOSED) {
-            revert WrongChannelState({reason: "channel must have state OPEN or PENDING_TO_CLOSE"});
+            revert WrongChannelState({ reason: "channel must have state OPEN or PENDING_TO_CLOSE" });
         }
 
         uint256 balance = Balance.unwrap(channel.balance);
@@ -526,7 +539,10 @@ contract HoprChannels is
     /**
      * See `_finalizeOutgoingChannelClosureInternal`, entrypoint for MultiSig contract
      */
-    function finalizeOutgoingChannelClosureSafe(address self, address destination)
+    function finalizeOutgoingChannelClosureSafe(
+        address self,
+        address destination
+    )
         external
         HoprMultiSig.onlySafe(self)
     {
@@ -552,7 +568,7 @@ contract HoprChannels is
         Channel storage channel = channels[channelId];
 
         if (channel.status != ChannelStatus.PENDING_TO_CLOSE) {
-            revert WrongChannelState({reason: "channel state must be PENDING_TO_CLOSE"});
+            revert WrongChannelState({ reason: "channel state must be PENDING_TO_CLOSE" });
         }
 
         if (Timestamp.unwrap(channel.closureTime) >= Timestamp.unwrap(_currentBlockTimestamp())) {
@@ -588,12 +604,13 @@ contract HoprChannels is
      *
      * Channel source and destination are specified by the userData payload.
      *
-     * @dev function reverts if it is a no-op, meaning no state change
-     *
-     * @param from account from which the tokens have been transferred
-     * @param to account to which the the tokens have been transferred
-     * @param amount uint256 amount of tokens that have been transferred
-     * @param userData payload, determines what is supposed to happen
+     * @dev This function reverts if it results in a no-op, i.e., no state change occurs.
+     * @notice The opening of bidirectional channels is currently implemented for internal
+     * and community testing purposes only, and is not intended for production use.
+     * @param from The account from which the tokens have been transferred
+     * @param to The account to which the tokens have been transferred
+     * @param amount The amount of tokens transferred
+     * @param userData The payload that determines the intended action
      */
     function tokensReceived(
         address, // operator not needed
@@ -602,7 +619,10 @@ contract HoprChannels is
         uint256 amount,
         bytes calldata userData,
         bytes calldata // operatorData not needed
-    ) external override {
+    )
+        external
+        override
+    {
         // don't accept any other tokens ;-)
         if (msg.sender != address(token)) {
             revert WrongToken();
@@ -719,7 +739,11 @@ contract HoprChannels is
      * @param account destination address
      * @param amount token amount
      */
-    function _fundChannelInternal(address self, address account, Balance amount)
+    function _fundChannelInternal(
+        address self,
+        address account,
+        Balance amount
+    )
         internal
         validateBalance(amount)
         validateChannelParties(self, account)
@@ -728,7 +752,7 @@ contract HoprChannels is
         Channel storage channel = channels[channelId];
 
         if (channel.status == ChannelStatus.PENDING_TO_CLOSE) {
-            revert WrongChannelState({reason: "cannot fund a channel that will close soon"});
+            revert WrongChannelState({ reason: "cannot fund a channel that will close soon" });
         }
 
         channel.balance = Balance.wrap(Balance.unwrap(channel.balance) + Balance.unwrap(amount));
@@ -808,8 +832,13 @@ contract HoprChannels is
         bytes32 ticketHash,
         RedeemableTicket calldata redeemable,
         HoprCrypto.VRFParameters calldata params
-    ) public pure returns (bool) {
-        // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53 signifcant bits)
+    )
+        public
+        pure
+        returns (bool)
+    {
+        // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53
+        // signifcant bits)
         uint56 ticketProb = (
             uint56(
                 bytes7(

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import {HoprStakingProxyForNetworkRegistry} from "../../src/proxy/StakingProxyForNetworkRegistry.sol";
+import { HoprStakingProxyForNetworkRegistry } from "../../src/proxy/StakingProxyForNetworkRegistry.sol";
 import "forge-std/Test.sol";
 
 contract HoprStakingProxyForNetworkRegistryTest is Test {
@@ -25,10 +25,14 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
     /**
      * Manually import the errors and events
      */
-    event NftTypeAndRankAdded(uint256 indexed nftType, string nftRank); // emit when a new NFT type and rank gets included in the eligibility list
-    event NftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a NFT type and rank gets removed from the eligibility list
-    event SpecialNftTypeAndRankAdded(uint256 indexed nftType, string nftRank, uint256 indexed maxRegistration); // emit when a new special type and rank of NFT gets included in the eligibility list
-    event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a special type and rank of NFT gets removed from the eligibility list
+    event NftTypeAndRankAdded(uint256 indexed nftType, string nftRank); // emit when a new NFT type and rank gets
+        // included in the eligibility list
+    event NftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a NFT type and rank gets removed
+        // from the eligibility list
+    event SpecialNftTypeAndRankAdded(uint256 indexed nftType, string nftRank, uint256 indexed maxRegistration); // emit
+        // when a new special type and rank of NFT gets included in the eligibility list
+    event SpecialNftTypeAndRankRemoved(uint256 indexed nftType, string nftRank); // emit when a special type and rank of
+        // NFT gets removed from the eligibility list
     event ThresholdUpdated(uint256 indexed threshold); // emit when the staking threshold gets updated.
     event StakeContractUpdated(address indexed stakeContract); // emit when the staking threshold gets updated.
 
@@ -508,7 +512,9 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
         bool hasType1Rank0,
         bool hasType1Rank1,
         uint256 stake
-    ) internal {
+    )
+        internal
+    {
         // return if an account has certain NFTs
         vm.mockCall(
             stakeContract,

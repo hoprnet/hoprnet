@@ -21,7 +21,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     bool internal isHoprNetworkRegistryDeployed;
     address private owner;
 
-    function setUp() public override(ERC1820RegistryFixtureTest) {}
+    function setUp() public override(ERC1820RegistryFixtureTest) { }
 
     function run() external {
         // 1. Network check
@@ -40,9 +40,10 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         }
 
         // 2. Get deployer internal key.
-        // Set to default when it's in development environment (uint for 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
+        // Set to default when it's in development environment (uint for
+        // 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
         uint256 deployerPrivateKey = currentEnvironmentType == EnvironmentType.LOCAL
-            ? 77814517325470205911140941194401928579557062014761831930645393041380819009408
+            ? 77_814_517_325_470_205_911_140_941_194_401_928_579_557_062_014_761_831_930_645_393_041_380_819_009_408
             : vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         emit log_named_address("deployerAddress", deployerAddress);
@@ -60,22 +61,26 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // 3.4. HoprToken Contract
         // Only deploy Token contract when no deployed one is detected.
-        // E.g. always in local environment, or should a new token contract be introduced in development/staging/production.
+        // E.g. always in local environment, or should a new token contract be introduced in
+        // development/staging/production.
         _deployHoprTokenAndMintToAddress(deployerAddress, deployerAddress);
 
         // 3.5. HoprChannels Contract
         // Only deploy Channels contract when no deployed one is detected.
-        // E.g. always in local environment, or should a new channel contract be introduced in development/staging/production per meta environment.
+        // E.g. always in local environment, or should a new channel contract be introduced in
+        // development/staging/production per meta environment.
         _deployHoprChannels();
 
         // 3.6. NetworkRegistryProxy Contract
         // Only deploy NetworkRegistryProxy contract when no deployed one is detected.
-        // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in development/staging/production
+        // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in
+        // development/staging/production
         _deployNRProxy(deployerAddress);
 
         // 3.7. NetworkRegistry Contract
         // Only deploy NetworkRegistrycontract when no deployed one is detected.
-        // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in development/staging/production
+        // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in
+        // development/staging/production
         _deployNetworkRegistry(deployerAddress);
 
         // 3.8. TicketPriceOracle
@@ -84,7 +89,8 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         _deployHoprAnnouncements();
 
         // 4. update indexerStartBlockNumber
-        // if both HoprChannels and HoprNetworkRegistry contracts are deployed, update the startup block number for indexer
+        // if both HoprChannels and HoprNetworkRegistry contracts are deployed, update the startup block number for
+        // indexer
         if (isHoprChannelsDeployed && isHoprNetworkRegistryDeployed) {
             currentNetworkDetail.indexerStartBlockNumber = block.number;
         }
@@ -158,7 +164,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             // mint some tokens to the deployer
             (bool successMintTokens,) = currentNetworkDetail.addresses.tokenContractAddress.call(
                 abi.encodeWithSignature(
-                    "mint(address,uint256,bytes,bytes)", recipient, 130000000 ether, hex"00", hex"00"
+                    "mint(address,uint256,bytes,bytes)", recipient, 130_000_000 ether, hex"00", hex"00"
                 )
             );
             if (!successMintTokens) {

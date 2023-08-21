@@ -12,7 +12,10 @@ library BoostUtilsLib {
      * hasIndex bool check if index is occupied
      * boostType string name of boost
      */
-    function getBoostTypeAtIndex(address hoprBoostAddr, uint256 index)
+    function getBoostTypeAtIndex(
+        address hoprBoostAddr,
+        uint256 index
+    )
         public
         view
         returns (bool hasIndex, string memory boostType)
@@ -24,7 +27,8 @@ library BoostUtilsLib {
             return (true, _boostType);
         } catch Panic(uint256 panicCode) {
             // panic code 0x32 (uint256 50): Index out of bounds.
-            // See https://docs.soliditylang.org/en/v0.8.13/control-structures.html#panic-via-assert-and-error-via-require
+            // See
+            // https://docs.soliditylang.org/en/v0.8.13/control-structures.html#panic-via-assert-and-error-via-require
             if (panicCode != 50) {
                 revert("Panic at getBoostTypeAtIndex");
                 // TODO: return the actual panic code
@@ -34,7 +38,8 @@ library BoostUtilsLib {
         }
 
         // Option 2: pure static method
-        // (bool successReadTypeAtIndex, bytes memory returndataReadTypeAtIndex) = currentNetworkDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("typeAt()", index));
+        // (bool successReadTypeAtIndex, bytes memory returndataReadTypeAtIndex) =
+        // currentNetworkDetail.hoprBoostContractAddress.staticcall(abi.encodeWithSignature("typeAt()", index));
         // if (!successReadTypeAtIndex) {
         //     emit log_string("Cannot read Boost type at index");
         // } else {

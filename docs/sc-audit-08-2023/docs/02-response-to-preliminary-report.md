@@ -166,11 +166,15 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 
 #### 6.1 ERC777 Reentrancy in fundChannel
 
-**Status:**
+**Status:** <span style="background-color:#000058">Code Change</span>
 
 **Description of Changes:**
 
-**Commit Hash:** (Not applicable)
+- Restricted `nodeChainKeyAddress` to be an EOA
+- Added `NodeIsContract` error, which gets thrown when the node is a contract
+- Updated tests
+
+**Commit Hash:** [38c33e2a748e3ca2e4fbf456190cdacb272fcc13](https://github.com/hoprnet/hoprnet/commit/38c33e2a748e3ca2e4fbf456190cdacb272fcc13)
 
 ### Others
 
@@ -184,6 +188,7 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Renamed `closureInitiationTime` to `closureTime` in `OutgoingChannelClosureInitiated` event.
 - Split event definition of “HoprNetworkRegistry” contract into an abstract contract `HoprNetworkRegistryEvents`. The abstract event contract is inherited by the “HoprNetworkRegistry” contract.
 - Renamed `EnabledNetworkRegistry` event to `NetworkRegistryStatusUpdated`.
+- Renamed error from `NotSafeOwnerNorNode` to `NodeNotModuleMember` in `NodeSafeRegistry.sol`.
 
 #### 2. Add more event in Simplified
 
@@ -197,9 +202,27 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 
 - When funding two channels with `tokenReceived`, if the token balance is zero error `InvalidBalance` gets reverted.
 - Always emit `ChannelBalanceIncreased` in a successful `tokenReceived` call.
-- use tight packing for `HoprChannels.tokensReceived()` payload, meaning 40 bytes for `fundChannel` and 64 bytes for `fundChannelMulti`
+- Use tight packing for `HoprChannels.tokensReceived()` payload, meaning 40 bytes for `fundChannel` and 64 bytes for `fundChannelMulti`
+- Document bidirectional channel funding in /`ERC777.tokensReceived()` is not intended for production use.
 
 #### 4. Bump Safe to v1.4.1
 
 - Change contract deployment bytecode in `packages/ethereum/contracts/test/utils/SafeSingleton.sol`
 - Update deployed addresses in `packages/ethereum/contracts/src/utils/SafeSuiteLib.sol`
+
+#### 5. Improve HoprNodeStakeFactory
+- Enhance code comments
+- Make imports explicit
+- Make the encoded address of the contract's approver (`r`) immutable
+- Remove duplicated `safeProxyAddr` definition in `clone()`
+
+#### 6. Improve SimplifiedModule
+- Extend comments to explain "avatar"
+
+#### 7. Improve CapabilityPermissions
+- Import `IERC20`, `IERC777` interfaces for definition of selector
+- Make all the selector definition public
+
+#### 8. Format
+- Format all the contracts
+- Include HOPR logo

@@ -5,14 +5,28 @@ pragma solidity ^0.8.0;
  * This contract follows the principle of `zodiac/core/Module.sol`
  * but implement differently in order to overwrite functionalities
  */
-import {Enum} from "safe-contracts/common/Enum.sol";
-import {SimplifiedModule} from "./SimplifiedModule.sol";
-import {HoprCapabilityPermissions, Role, GranularPermission} from "./CapabilityPermissions.sol";
-import {HoprChannels} from "../../Channels.sol";
-import {IHoprNodeManagementModule} from "../../interfaces/INodeManagementModule.sol";
-import {TargetUtils, Target} from "../../utils/TargetUtils.sol";
+import { Enum } from "safe-contracts/common/Enum.sol";
+import { SimplifiedModule } from "./SimplifiedModule.sol";
+import { HoprCapabilityPermissions, Role, GranularPermission } from "./CapabilityPermissions.sol";
+import { HoprChannels } from "../../Channels.sol";
+import { IHoprNodeManagementModule } from "../../interfaces/INodeManagementModule.sol";
+import { TargetUtils, Target } from "../../utils/TargetUtils.sol";
 
 /**
+ *    &&&&
+ *    &&&&
+ *    &&&&
+ *    &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
+ *    &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
+ *     &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
+ *     &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
+ *     &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
+ *     %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
+ *    %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *
  * @title Permissioned capability-based module for HOPR nodes operations
  *
  * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Roles.sol` contract,
@@ -190,7 +204,11 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
      * @param channelId The channelId of the scoped HoprChannels target.
      * @param encodedSigsPermissions The encoded function signatures and permissions
      */
-    function scopeChannelsCapabilities(address targetAddress, bytes32 channelId, bytes32 encodedSigsPermissions)
+    function scopeChannelsCapabilities(
+        address targetAddress,
+        bytes32 channelId,
+        bytes32 encodedSigsPermissions
+    )
         external
         onlyOwner
     {
@@ -212,7 +230,10 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
         address targetAddress,
         address beneficiary,
         bytes32 encodedSigsPermissions
-    ) external onlyOwner {
+    )
+        external
+        onlyOwner
+    {
         HoprCapabilityPermissions.scopeTokenCapabilities(
             role, nodeAddress, targetAddress, beneficiary, encodedSigsPermissions
         );
@@ -224,7 +245,11 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
      * @param beneficiary The beneficiary address for the scoped Send target.
      * @param permission The permission to be set for the specific function.
      */
-    function scopeSendCapability(address nodeAddress, address beneficiary, GranularPermission permission)
+    function scopeSendCapability(
+        address nodeAddress,
+        address beneficiary,
+        GranularPermission permission
+    )
         external
         onlyOwner
     {
@@ -239,7 +264,10 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
      * @param functionSigs array of function signatures on target
      * @param permissions array of granular permissions on target
      */
-    function encodeFunctionSigsAndPermissions(bytes4[] memory functionSigs, GranularPermission[] memory permissions)
+    function encodeFunctionSigsAndPermissions(
+        bytes4[] memory functionSigs,
+        GranularPermission[] memory permissions
+    )
         external
         pure
         returns (bytes32 encoded, uint256 length)
@@ -252,7 +280,10 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
      * @param encoded encode permissions in bytes32
      * @param length length of permissions
      */
-    function decodeFunctionSigsAndPermissions(bytes32 encoded, uint256 length)
+    function decodeFunctionSigsAndPermissions(
+        bytes32 encoded,
+        uint256 length
+    )
         external
         pure
         returns (bytes4[] memory functionSigs, GranularPermission[] memory permissions)
@@ -270,7 +301,12 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     /// @param data Data payload of module transaction
     /// @param operation Operation type of module transaction
     /// @notice Can only be called by enabled modules
-    function execTransactionFromModule(address to, uint256 value, bytes calldata data, Enum.Operation operation)
+    function execTransactionFromModule(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation
+    )
         public
         nodeOnly
         returns (bool success)
@@ -290,7 +326,11 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
         uint256 value,
         bytes calldata data,
         Enum.Operation operation
-    ) public nodeOnly returns (bool, bytes memory) {
+    )
+        public
+        nodeOnly
+        returns (bool, bytes memory)
+    {
         HoprCapabilityPermissions.check(role, multisend, to, value, data, operation);
         return execAndReturnData(to, value, data, operation);
     }

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import {Test} from "forge-std/Test.sol";
-import {AccountsFixtureTest} from "./utils/Accounts.sol";
-import {CryptoUtils} from "./utils/Crypto.sol";
-import {SECP2561k} from "solcrypto/SECP2561k.sol";
-import {HoprCrypto} from "../src/Crypto.sol";
+import { Test } from "forge-std/Test.sol";
+import { AccountsFixtureTest } from "./utils/Accounts.sol";
+import { CryptoUtils } from "./utils/Crypto.sol";
+import { SECP2561k } from "solcrypto/SECP2561k.sol";
+import { HoprCrypto } from "../src/Crypto.sol";
 
 // Use proxy contract to have proper gas measurements for internal functions
 contract CryptoProxy is HoprCrypto {
@@ -25,7 +25,13 @@ contract CryptoProxy is HoprCrypto {
         return scalarTimesBasepoint(scalar);
     }
 
-    function ecAddProxy(uint256 p_x, uint256 p_y, uint256 q_x, uint256 q_y, uint256 a)
+    function ecAddProxy(
+        uint256 p_x,
+        uint256 p_y,
+        uint256 q_x,
+        uint256 q_y,
+        uint256 a
+    )
         public
         view
         returns (uint256 r_x, uint256 r_y)
@@ -416,7 +422,9 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         uint256 hTweaked,
         uint256 privKey,
         bytes32 vrfMessage
-    ) public {
+    )
+        public
+    {
         sTweaked = bound(sTweaked, HoprCrypto.SECP256K1_BASE_FIELD_ORDER, type(uint256).max);
         hTweaked = bound(hTweaked, HoprCrypto.SECP256K1_BASE_FIELD_ORDER, type(uint256).max);
 
@@ -454,7 +462,9 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         uint256 pyTweaked,
         uint256 privKey,
         bytes32 vrfMessage
-    ) public {
+    )
+        public
+    {
         pxTweaked = bound(pxTweaked, 0, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
         pyTweaked = bound(pyTweaked, 0, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
 
@@ -487,7 +497,9 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         uint256 hTweaked,
         uint256 privKey,
         bytes32 vrfMessage
-    ) public {
+    )
+        public
+    {
         sTweaked = bound(sTweaked, 1, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
         hTweaked = bound(hTweaked, 1, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - 1);
 

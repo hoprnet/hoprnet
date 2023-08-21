@@ -26,7 +26,11 @@ abstract contract ISafe {
         address gasToken,
         address refundReceiver,
         uint256 _nonce
-    ) public view virtual returns (bytes32);
+    )
+        public
+        view
+        virtual
+        returns (bytes32);
 
     function execTransaction(
         address to,
@@ -39,13 +43,22 @@ abstract contract ISafe {
         address gasToken,
         address payable refundReceiver,
         bytes memory signatures
-    ) public payable virtual returns (bool success);
+    )
+        public
+        payable
+        virtual
+        returns (bool success);
 
     function nonce() public virtual returns (uint256);
 }
 
 abstract contract IFactory {
-    function clone(address moduleSingletonAddress, address[] memory admins, uint256 nonce, bytes32 defaultTarget)
+    function clone(
+        address moduleSingletonAddress,
+        address[] memory admins,
+        uint256 nonce,
+        bytes32 defaultTarget
+    )
         public
         virtual
         returns (address, address payable);
@@ -56,9 +69,11 @@ abstract contract IFactory {
 error FailureInReadBalance(address token);
 
 /**
- * @dev script to interact with contract(s) of a given environment where the msg.sender comes from the environment variable `PRIVATE_KEY`
+ * @dev script to interact with contract(s) of a given environment where the msg.sender comes from the environment
+ * variable `PRIVATE_KEY`
  * Private key of the caller must be saved under the environment variable `PRIVATE_KEY`
- * Wrapper of contracts (incl. NetworkRegistery, HoprStake) with detection of contract address per network/environment_type
+ * Wrapper of contracts (incl. NetworkRegistery, HoprStake) with detection of contract address per
+ * network/environment_type
  */
 contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     using stdJson for string;
@@ -78,9 +93,10 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         readCurrentNetwork();
 
         // 2. Get private key of caller
-        // Set to default when it's in development environment (uint for 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
+        // Set to default when it's in development environment (uint for
+        // 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
         uint256 privateKey = currentEnvironmentType == EnvironmentType.LOCAL
-            ? 77814517325470205911140941194401928579557062014761831930645393041380819009408
+            ? 77_814_517_325_470_205_911_140_941_194_401_928_579_557_062_014_761_831_930_645_393_041_380_819_009_408
             : vm.envUint("PRIVATE_KEY");
         msgSender = vm.addr(privateKey);
         emit log_named_address("msgSender address", msgSender);
@@ -114,8 +130,10 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // RESERVED
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultCloseIncomingChannelSafeFunctionPermisson
-         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
-         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
          *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultApproveFunctionPermisson
@@ -199,7 +217,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         vm.stopBroadcast();
 
         // 5. transfer some tokens to safe
-        transferOrMintHoprAndSendNativeToAmount(safe, 2000000000000000000000, 1000000000000000000);
+        transferOrMintHoprAndSendNativeToAmount(safe, 2_000_000_000_000_000_000_000, 1_000_000_000_000_000_000);
     }
 
     /**
@@ -209,7 +227,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      */
     function _helperGetDeployerInternalKey() private {
         uint256 deployerPrivateKey = currentEnvironmentType == EnvironmentType.LOCAL
-            ? 77814517325470205911140941194401928579557062014761831930645393041380819009408
+            ? 77_814_517_325_470_205_911_140_941_194_401_928_579_557_062_014_761_831_930_645_393_041_380_819_009_408
             : vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployerAddress = vm.addr(deployerPrivateKey);
         emit log_named_address("deployerAddress", deployerAddress);
@@ -242,7 +260,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     // TODO: reimplement single actions
     // /**
     //  * @dev express node initialization
-    //  * - Check with network registery on the registeration status of a list of peer ids, return the unregistered ones.
+    //  * - Check with network registery on the registeration status of a list of peer ids, return the unregistered
+    // ones.
     //  * - If not all the peer ids are registered, check if the caller can do selfRegister
     //  */
     // function expressInitialization(
@@ -319,7 +338,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
     //     // 3. transfer native balance to the unregisteredIds[numUnRegisteredIndex]
     //     if (nativeTokenAmountInWei > recipient.balance) {
-    //       (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}('');
+    //       (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei -
+    // recipient.balance}('');
     //       require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
     //     }
     //   }
@@ -413,7 +433,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     }
 
     // /**
-    //  * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be called by the owner
+    //  * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be
+    // called by the owner
     //  */
     // function deregisterNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
     //   // 1. get network and msg.sender
@@ -500,7 +521,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     // }
 
     // /**
-    //  * @dev On network registry contract, update eligibility of some staking addresses to the desired . This function should only be called by the owner
+    //  * @dev On network registry contract, update eligibility of some staking addresses to the desired . This function
+    // should only be called by the owner
     //  */
     // function forceEligibilityUpdate(address[] calldata stakingAddresses, bool[] calldata eligibility) external {
     //   require(stakingAddresses.length == eligibility.length, 'Input lengths are different');
@@ -520,7 +542,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     // }
 
     // /**
-    //  * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be called by the owner
+    //  * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be
+    // called by the owner
     //  */
     // function syncEligibility(string[] calldata peerIds) external {
     //   // 1. get network and msg.sender
@@ -545,7 +568,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     //   getNetworkAndMsgSender();
 
     //   // 2. check the staked value. Return if the target has reached
-    //   (bool successReadStaked, bytes memory returndataReadStaked) = currentNetworkDetail.stakeContractAddress.staticcall(
+    //   (bool successReadStaked, bytes memory returndataReadStaked) =
+    // currentNetworkDetail.stakeContractAddress.staticcall(
     //     abi.encodeWithSignature('stakedHoprTokens(address)', msgSender)
     //   );
     //   if (!successReadStaked) {
@@ -703,7 +727,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     // }
 
     /**
-     * @dev This function funds a recipient wallet with HOPR tokens and native tokens, but only when the recipient has not yet received
+     * @dev This function funds a recipient wallet with HOPR tokens and native tokens, but only when the recipient has
+     * not yet received
      * enough value.
      * First, HOPR tokens are prioritized to be transferred than minted to the recipient
      * Native tokens are transferred to the recipient
@@ -715,7 +740,10 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         address recipient,
         uint256 hoprTokenAmountInWei,
         uint256 nativeTokenAmountInWei
-    ) public payable {
+    )
+        public
+        payable
+    {
         // 1. get environment and msg.sender
         getNetworkAndMsgSender();
 
@@ -726,7 +754,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 3. transfer native balance to the recipient
         if (nativeTokenAmountInWei > recipient.balance) {
-            (bool nativeTokenTransferSuccess,) = recipient.call{value: nativeTokenAmountInWei - recipient.balance}("");
+            (bool nativeTokenTransferSuccess,) = recipient.call{ value: nativeTokenAmountInWei - recipient.balance }("");
             require(nativeTokenTransferSuccess, "Cannot send native tokens to the recipient");
         }
         vm.stopBroadcast();
@@ -788,8 +816,10 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     // /**
     //  * ported from HoprStakeBase.sol
     //  * @dev if the given `tokenURI` end with `/substring`
-    //  * @param tokenURI string URI of the HoprBoost NFT. E.g. "https://stake.hoprnet.org/PuzzleHunt_v2/Bronze - Week 5"
-    //  * @param substring string of the `boostRank` or `boostType/boostRank`. E.g. "Bronze - Week 5", "PuzzleHunt_v2/Bronze - Week 5"
+    //  * @param tokenURI string URI of the HoprBoost NFT. E.g. "https://stake.hoprnet.org/PuzzleHunt_v2/Bronze - Week
+    // 5"
+    //  * @param substring string of the `boostRank` or `boostType/boostRank`. E.g. "Bronze - Week 5",
+    // "PuzzleHunt_v2/Bronze - Week 5"
     //  */
     // function _hasSubstring(string memory tokenURI, string memory substring) internal pure returns (bool) {
     //   // convert string to bytes
@@ -805,7 +835,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     //   bytes1 slashPositionContent = tokenURIInBytes[restLen - 1];
 
     //   if (slashPositionContent != 0x2f) {
-    //     // if this position is not a `/`, substring in the tokenURI is for sure neither `boostRank` nor `boostType/boostRank`
+    //     // if this position is not a `/`, substring in the tokenURI is for sure neither `boostRank` nor
+    // `boostType/boostRank`
     //     return false;
     //   }
 
@@ -872,7 +903,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         address hoprTokenContractAddress,
         address recipient,
         uint256 hoprTokenAmountInWei
-    ) private {
+    )
+        private
+    {
         // 1. get recipient balance
         uint256 recipientTokenBalance = _getTokenBalanceOf(hoprTokenContractAddress, recipient);
 

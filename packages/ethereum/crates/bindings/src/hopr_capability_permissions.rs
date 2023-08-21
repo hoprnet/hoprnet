@@ -11,7 +11,7 @@ pub use hopr_capability_permissions::*;
 )]
 pub mod hopr_capability_permissions {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[],\"type\":\"error\",\"name\":\"AddressIsZero\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ArrayTooLong\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ArraysDifferentLength\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"CalldataOutOfBounds\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"DefaultPermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"DelegateCallNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"FunctionSignatureTooShort\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"GranularPermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NoMembership\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NodePermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ParameterNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"PermissionNotConfigured\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"SendNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetAddressNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetIsNotScoped\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetIsScoped\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"UnacceptableMultiSendOffset\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RevokedTarget\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes4\",\"name\":\"selector\",\"type\":\"bytes4\",\"components\":[],\"indexed\":false},{\"internalType\":\"enum GranularPermission\",\"name\":\"permission\",\"type\":\"uint8\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedGranularChannelCapability\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"recipientAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"enum GranularPermission\",\"name\":\"permission\",\"type\":\"uint8\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedGranularSendCapability\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"recipientAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes4\",\"name\":\"selector\",\"type\":\"bytes4\",\"components\":[],\"indexed\":false},{\"internalType\":\"enum GranularPermission\",\"name\":\"permission\",\"type\":\"uint8\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedGranularTokenCapability\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"Target\",\"name\":\"target\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedTargetChannels\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"Target\",\"name\":\"target\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedTargetSend\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"Target\",\"name\":\"target\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedTargetToken\",\"outputs\":[],\"anonymous\":false}]";
+    const __ABI: &str = "[{\"inputs\":[],\"type\":\"error\",\"name\":\"AddressIsZero\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ArrayTooLong\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ArraysDifferentLength\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"CalldataOutOfBounds\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"DefaultPermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"DelegateCallNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"FunctionSignatureTooShort\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"GranularPermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NoMembership\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"NodePermissionRejected\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"ParameterNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"PermissionNotConfigured\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"SendNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetAddressNotAllowed\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetIsNotScoped\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"TargetIsScoped\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"UnacceptableMultiSendOffset\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RevokedTarget\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes4\",\"name\":\"selector\",\"type\":\"bytes4\",\"components\":[],\"indexed\":false},{\"internalType\":\"enum GranularPermission\",\"name\":\"permission\",\"type\":\"uint8\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedGranularChannelCapability\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"recipientAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"enum GranularPermission\",\"name\":\"permission\",\"type\":\"uint8\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedGranularSendCapability\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"recipientAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"bytes4\",\"name\":\"selector\",\"type\":\"bytes4\",\"components\":[],\"indexed\":false},{\"internalType\":\"enum GranularPermission\",\"name\":\"permission\",\"type\":\"uint8\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedGranularTokenCapability\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"Target\",\"name\":\"target\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedTargetChannels\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"Target\",\"name\":\"target\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedTargetSend\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"targetAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"Target\",\"name\":\"target\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ScopedTargetToken\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"APPROVE_SELECTOR\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"CLOSE_INCOMING_CHANNEL_SELECTOR\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"FUND_CHANNEL_SELECTOR\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"REDEEM_TICKET_SELECTOR\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"SEND_SELECTOR\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\",\"components\":[]}]}]";
     ///The parsed JSON ABI of the contract.
     pub static HOPRCAPABILITYPERMISSIONS_ABI: ::ethers::contract::Lazy<
         ::ethers::core::abi::Abi,
@@ -21,10 +21,12 @@ pub mod hopr_capability_permissions {
     });
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = &[
-        96,
-        86,
-        96,
-        55,
+        97,
+        1,
+        49,
+        97,
+        0,
+        58,
         96,
         11,
         130,
@@ -39,8 +41,9 @@ pub mod hopr_capability_permissions {
         96,
         115,
         20,
-        96,
-        42,
+        97,
+        0,
+        45,
         87,
         99,
         78,
@@ -105,9 +108,228 @@ pub mod hopr_capability_permissions {
         64,
         82,
         96,
+        4,
+        54,
+        16,
+        96,
+        126,
+        87,
+        96,
+        0,
+        53,
+        96,
+        224,
+        28,
+        128,
+        99,
+        122,
+        117,
+        113,
+        21,
+        17,
+        96,
+        95,
+        87,
+        128,
+        99,
+        122,
+        117,
+        113,
+        21,
+        20,
+        96,
+        199,
+        87,
+        128,
+        99,
+        129,
+        103,
+        182,
+        126,
+        20,
+        96,
+        212,
+        87,
+        128,
+        99,
+        160,
+        134,
+        88,
+        57,
+        20,
+        96,
+        225,
+        87,
+        128,
+        99,
+        182,
+        119,
+        164,
+        15,
+        20,
+        96,
+        238,
+        87,
+        96,
         0,
         128,
         253,
+        91,
+        128,
+        99,
+        81,
+        210,
+        97,
+        75,
+        20,
+        96,
+        131,
+        87,
+        128,
+        99,
+        93,
+        170,
+        158,
+        36,
+        20,
+        96,
+        173,
+        87,
+        128,
+        99,
+        103,
+        138,
+        94,
+        251,
+        20,
+        96,
+        186,
+        87,
+        91,
+        96,
+        0,
+        128,
+        253,
+        91,
+        96,
+        144,
+        99,
+        6,
+        108,
+        70,
+        185,
+        96,
+        225,
+        27,
+        129,
+        86,
+        91,
+        96,
+        64,
+        81,
+        96,
+        1,
+        96,
+        1,
+        96,
+        224,
+        27,
+        3,
+        25,
+        144,
+        145,
+        22,
+        129,
+        82,
+        96,
+        32,
+        1,
+        96,
+        64,
+        81,
+        128,
+        145,
+        3,
+        144,
+        243,
+        91,
+        96,
+        144,
+        99,
+        189,
+        166,
+        95,
+        69,
+        96,
+        224,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        84,
+        162,
+        237,
+        245,
+        96,
+        224,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        77,
+        236,
+        221,
+        227,
+        96,
+        225,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        101,
+        21,
+        20,
+        191,
+        96,
+        224,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        9,
+        94,
+        167,
+        179,
+        96,
+        224,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        10,
+        190,
+        197,
+        143,
+        96,
+        224,
+        27,
+        129,
+        86,
         254,
         162,
         100,
@@ -119,38 +341,38 @@ pub mod hopr_capability_permissions {
         34,
         18,
         32,
-        27,
-        16,
-        127,
-        197,
-        202,
-        111,
+        245,
+        200,
         218,
-        238,
-        166,
-        72,
-        218,
-        187,
-        116,
-        228,
-        216,
-        217,
-        219,
-        43,
-        106,
-        243,
-        249,
-        5,
-        48,
+        136,
+        64,
         192,
-        185,
-        112,
-        193,
-        80,
-        138,
-        179,
-        71,
-        168,
+        26,
+        72,
+        140,
+        5,
+        194,
+        116,
+        16,
+        142,
+        47,
+        94,
+        230,
+        98,
+        132,
+        25,
+        190,
+        33,
+        59,
+        222,
+        174,
+        156,
+        90,
+        77,
+        176,
+        154,
+        39,
+        103,
         100,
         115,
         111,
@@ -198,9 +420,228 @@ pub mod hopr_capability_permissions {
         64,
         82,
         96,
+        4,
+        54,
+        16,
+        96,
+        126,
+        87,
+        96,
+        0,
+        53,
+        96,
+        224,
+        28,
+        128,
+        99,
+        122,
+        117,
+        113,
+        21,
+        17,
+        96,
+        95,
+        87,
+        128,
+        99,
+        122,
+        117,
+        113,
+        21,
+        20,
+        96,
+        199,
+        87,
+        128,
+        99,
+        129,
+        103,
+        182,
+        126,
+        20,
+        96,
+        212,
+        87,
+        128,
+        99,
+        160,
+        134,
+        88,
+        57,
+        20,
+        96,
+        225,
+        87,
+        128,
+        99,
+        182,
+        119,
+        164,
+        15,
+        20,
+        96,
+        238,
+        87,
+        96,
         0,
         128,
         253,
+        91,
+        128,
+        99,
+        81,
+        210,
+        97,
+        75,
+        20,
+        96,
+        131,
+        87,
+        128,
+        99,
+        93,
+        170,
+        158,
+        36,
+        20,
+        96,
+        173,
+        87,
+        128,
+        99,
+        103,
+        138,
+        94,
+        251,
+        20,
+        96,
+        186,
+        87,
+        91,
+        96,
+        0,
+        128,
+        253,
+        91,
+        96,
+        144,
+        99,
+        6,
+        108,
+        70,
+        185,
+        96,
+        225,
+        27,
+        129,
+        86,
+        91,
+        96,
+        64,
+        81,
+        96,
+        1,
+        96,
+        1,
+        96,
+        224,
+        27,
+        3,
+        25,
+        144,
+        145,
+        22,
+        129,
+        82,
+        96,
+        32,
+        1,
+        96,
+        64,
+        81,
+        128,
+        145,
+        3,
+        144,
+        243,
+        91,
+        96,
+        144,
+        99,
+        189,
+        166,
+        95,
+        69,
+        96,
+        224,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        84,
+        162,
+        237,
+        245,
+        96,
+        224,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        77,
+        236,
+        221,
+        227,
+        96,
+        225,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        101,
+        21,
+        20,
+        191,
+        96,
+        224,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        9,
+        94,
+        167,
+        179,
+        96,
+        224,
+        27,
+        129,
+        86,
+        91,
+        96,
+        144,
+        99,
+        10,
+        190,
+        197,
+        143,
+        96,
+        224,
+        27,
+        129,
+        86,
         254,
         162,
         100,
@@ -212,38 +653,38 @@ pub mod hopr_capability_permissions {
         34,
         18,
         32,
-        27,
-        16,
-        127,
-        197,
-        202,
-        111,
+        245,
+        200,
         218,
-        238,
-        166,
-        72,
-        218,
-        187,
-        116,
-        228,
-        216,
-        217,
-        219,
-        43,
-        106,
-        243,
-        249,
-        5,
-        48,
+        136,
+        64,
         192,
-        185,
-        112,
-        193,
-        80,
-        138,
-        179,
-        71,
-        168,
+        26,
+        72,
+        140,
+        5,
+        194,
+        116,
+        16,
+        142,
+        47,
+        94,
+        230,
+        98,
+        132,
+        25,
+        190,
+        33,
+        59,
+        222,
+        174,
+        156,
+        90,
+        77,
+        176,
+        154,
+        39,
+        103,
         100,
         115,
         111,
@@ -337,6 +778,62 @@ pub mod hopr_capability_permissions {
             let deployer = factory.deploy(constructor_args)?;
             let deployer = ::ethers::contract::ContractDeployer::new(deployer);
             Ok(deployer)
+        }
+        ///Calls the contract's `APPROVE_SELECTOR` (0xa0865839) function
+        pub fn approve_selector(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([160, 134, 88, 57], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `CLOSE_INCOMING_CHANNEL_SELECTOR` (0x678a5efb) function
+        pub fn close_incoming_channel_selector(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([103, 138, 94, 251], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR` (0x8167b67e) function
+        pub fn finalize_outgoing_channel_closure_selector(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([129, 103, 182, 126], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `FUND_CHANNEL_SELECTOR` (0xb677a40f) function
+        pub fn fund_channel_selector(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([182, 119, 164, 15], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR` (0x5daa9e24) function
+        pub fn initiate_outgoing_channel_closure_selector(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([93, 170, 158, 36], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `REDEEM_TICKET_SELECTOR` (0x51d2614b) function
+        pub fn redeem_ticket_selector(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([81, 210, 97, 75], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `SEND_SELECTOR` (0x7a757115) function
+        pub fn send_selector(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, [u8; 4]> {
+            self.0
+                .method_hash([122, 117, 113, 21], ())
+                .expect("method not found (this should never happen)")
         }
         ///Gets the contract's `RevokedTarget` event
         pub fn revoked_target_filter(
@@ -1310,4 +1807,339 @@ pub mod hopr_capability_permissions {
             Self::ScopedTargetTokenFilter(value)
         }
     }
+    ///Container type for all input parameters for the `APPROVE_SELECTOR` function with signature `APPROVE_SELECTOR()` and selector `0xa0865839`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "APPROVE_SELECTOR", abi = "APPROVE_SELECTOR()")]
+    pub struct ApproveSelectorCall;
+    ///Container type for all input parameters for the `CLOSE_INCOMING_CHANNEL_SELECTOR` function with signature `CLOSE_INCOMING_CHANNEL_SELECTOR()` and selector `0x678a5efb`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "CLOSE_INCOMING_CHANNEL_SELECTOR",
+        abi = "CLOSE_INCOMING_CHANNEL_SELECTOR()"
+    )]
+    pub struct CloseIncomingChannelSelectorCall;
+    ///Container type for all input parameters for the `FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR` function with signature `FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()` and selector `0x8167b67e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR",
+        abi = "FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()"
+    )]
+    pub struct FinalizeOutgoingChannelClosureSelectorCall;
+    ///Container type for all input parameters for the `FUND_CHANNEL_SELECTOR` function with signature `FUND_CHANNEL_SELECTOR()` and selector `0xb677a40f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "FUND_CHANNEL_SELECTOR", abi = "FUND_CHANNEL_SELECTOR()")]
+    pub struct FundChannelSelectorCall;
+    ///Container type for all input parameters for the `INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR` function with signature `INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()` and selector `0x5daa9e24`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR",
+        abi = "INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()"
+    )]
+    pub struct InitiateOutgoingChannelClosureSelectorCall;
+    ///Container type for all input parameters for the `REDEEM_TICKET_SELECTOR` function with signature `REDEEM_TICKET_SELECTOR()` and selector `0x51d2614b`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "REDEEM_TICKET_SELECTOR", abi = "REDEEM_TICKET_SELECTOR()")]
+    pub struct RedeemTicketSelectorCall;
+    ///Container type for all input parameters for the `SEND_SELECTOR` function with signature `SEND_SELECTOR()` and selector `0x7a757115`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(name = "SEND_SELECTOR", abi = "SEND_SELECTOR()")]
+    pub struct SendSelectorCall;
+    ///Container type for all of the contract's call
+    #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
+    pub enum HoprCapabilityPermissionsCalls {
+        ApproveSelector(ApproveSelectorCall),
+        CloseIncomingChannelSelector(CloseIncomingChannelSelectorCall),
+        FinalizeOutgoingChannelClosureSelector(
+            FinalizeOutgoingChannelClosureSelectorCall,
+        ),
+        FundChannelSelector(FundChannelSelectorCall),
+        InitiateOutgoingChannelClosureSelector(
+            InitiateOutgoingChannelClosureSelectorCall,
+        ),
+        RedeemTicketSelector(RedeemTicketSelectorCall),
+        SendSelector(SendSelectorCall),
+    }
+    impl ::ethers::core::abi::AbiDecode for HoprCapabilityPermissionsCalls {
+        fn decode(
+            data: impl AsRef<[u8]>,
+        ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
+            let data = data.as_ref();
+            if let Ok(decoded)
+                = <ApproveSelectorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::ApproveSelector(decoded));
+            }
+            if let Ok(decoded)
+                = <CloseIncomingChannelSelectorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::CloseIncomingChannelSelector(decoded));
+            }
+            if let Ok(decoded)
+                = <FinalizeOutgoingChannelClosureSelectorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::FinalizeOutgoingChannelClosureSelector(decoded));
+            }
+            if let Ok(decoded)
+                = <FundChannelSelectorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::FundChannelSelector(decoded));
+            }
+            if let Ok(decoded)
+                = <InitiateOutgoingChannelClosureSelectorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::InitiateOutgoingChannelClosureSelector(decoded));
+            }
+            if let Ok(decoded)
+                = <RedeemTicketSelectorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::RedeemTicketSelector(decoded));
+            }
+            if let Ok(decoded)
+                = <SendSelectorCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::SendSelector(decoded));
+            }
+            Err(::ethers::core::abi::Error::InvalidData.into())
+        }
+    }
+    impl ::ethers::core::abi::AbiEncode for HoprCapabilityPermissionsCalls {
+        fn encode(self) -> Vec<u8> {
+            match self {
+                Self::ApproveSelector(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CloseIncomingChannelSelector(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FinalizeOutgoingChannelClosureSelector(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FundChannelSelector(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InitiateOutgoingChannelClosureSelector(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::RedeemTicketSelector(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SendSelector(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+            }
+        }
+    }
+    impl ::core::fmt::Display for HoprCapabilityPermissionsCalls {
+        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+            match self {
+                Self::ApproveSelector(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CloseIncomingChannelSelector(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::FinalizeOutgoingChannelClosureSelector(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::FundChannelSelector(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InitiateOutgoingChannelClosureSelector(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::RedeemTicketSelector(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::SendSelector(element) => ::core::fmt::Display::fmt(element, f),
+            }
+        }
+    }
+    impl ::core::convert::From<ApproveSelectorCall> for HoprCapabilityPermissionsCalls {
+        fn from(value: ApproveSelectorCall) -> Self {
+            Self::ApproveSelector(value)
+        }
+    }
+    impl ::core::convert::From<CloseIncomingChannelSelectorCall>
+    for HoprCapabilityPermissionsCalls {
+        fn from(value: CloseIncomingChannelSelectorCall) -> Self {
+            Self::CloseIncomingChannelSelector(value)
+        }
+    }
+    impl ::core::convert::From<FinalizeOutgoingChannelClosureSelectorCall>
+    for HoprCapabilityPermissionsCalls {
+        fn from(value: FinalizeOutgoingChannelClosureSelectorCall) -> Self {
+            Self::FinalizeOutgoingChannelClosureSelector(value)
+        }
+    }
+    impl ::core::convert::From<FundChannelSelectorCall>
+    for HoprCapabilityPermissionsCalls {
+        fn from(value: FundChannelSelectorCall) -> Self {
+            Self::FundChannelSelector(value)
+        }
+    }
+    impl ::core::convert::From<InitiateOutgoingChannelClosureSelectorCall>
+    for HoprCapabilityPermissionsCalls {
+        fn from(value: InitiateOutgoingChannelClosureSelectorCall) -> Self {
+            Self::InitiateOutgoingChannelClosureSelector(value)
+        }
+    }
+    impl ::core::convert::From<RedeemTicketSelectorCall>
+    for HoprCapabilityPermissionsCalls {
+        fn from(value: RedeemTicketSelectorCall) -> Self {
+            Self::RedeemTicketSelector(value)
+        }
+    }
+    impl ::core::convert::From<SendSelectorCall> for HoprCapabilityPermissionsCalls {
+        fn from(value: SendSelectorCall) -> Self {
+            Self::SendSelector(value)
+        }
+    }
+    ///Container type for all return fields from the `APPROVE_SELECTOR` function with signature `APPROVE_SELECTOR()` and selector `0xa0865839`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct ApproveSelectorReturn(pub [u8; 4]);
+    ///Container type for all return fields from the `CLOSE_INCOMING_CHANNEL_SELECTOR` function with signature `CLOSE_INCOMING_CHANNEL_SELECTOR()` and selector `0x678a5efb`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct CloseIncomingChannelSelectorReturn(pub [u8; 4]);
+    ///Container type for all return fields from the `FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR` function with signature `FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()` and selector `0x8167b67e`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct FinalizeOutgoingChannelClosureSelectorReturn(pub [u8; 4]);
+    ///Container type for all return fields from the `FUND_CHANNEL_SELECTOR` function with signature `FUND_CHANNEL_SELECTOR()` and selector `0xb677a40f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct FundChannelSelectorReturn(pub [u8; 4]);
+    ///Container type for all return fields from the `INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR` function with signature `INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()` and selector `0x5daa9e24`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct InitiateOutgoingChannelClosureSelectorReturn(pub [u8; 4]);
+    ///Container type for all return fields from the `REDEEM_TICKET_SELECTOR` function with signature `REDEEM_TICKET_SELECTOR()` and selector `0x51d2614b`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct RedeemTicketSelectorReturn(pub [u8; 4]);
+    ///Container type for all return fields from the `SEND_SELECTOR` function with signature `SEND_SELECTOR()` and selector `0x7a757115`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    pub struct SendSelectorReturn(pub [u8; 4]);
 }
