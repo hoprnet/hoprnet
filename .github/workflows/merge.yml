@@ -224,7 +224,6 @@ jobs:
             docker_stable_tag=${base_branch/release\//}
           fi
           echo "${{ vars.HETZNER_ROTSEE_NODES }}" | sed 's/\r//' > ssh_hosts.txt
-          cat ssh_hosts.txt
           ./scripts/deploy-rotsee-nodes.sh ./ssh_hosts.txt deploy "europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${docker_stable_tag}"
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
