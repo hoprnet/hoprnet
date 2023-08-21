@@ -60,23 +60,22 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
                 && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
         );
 
-        HoprNodeSafeRegistry.NodeSafe memory nodeSafe =
-            HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
+        address nodeChainKeyAddress = vm.addr(nodePrivateKey);
 
         // verify the registration is not known beforehand
-        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(safeAddress, nodeChainKeyAddress));
 
-        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeSafe.nodeChainKeyAddress);
-        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, nodeSafe, nodeSigNonce);
+        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeChainKeyAddress);
+        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
         vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
         emit RegisteredNodeSafe(safeAddress, nodeAddress);
-        nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
+        nodeSafeRegistry.registerSafeWithNodeSig(safeAddress, nodeChainKeyAddress, sig);
 
         // verify the registration worked
-        assertTrue(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+        assertTrue(nodeSafeRegistry.isNodeSafeRegistered(safeAddress, nodeChainKeyAddress));
 
         vm.clearMockedCalls();
     }
@@ -91,22 +90,21 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
                 && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
         );
 
-        HoprNodeSafeRegistry.NodeSafe memory nodeSafe =
-            HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
+        address nodeChainKeyAddress = vm.addr(nodePrivateKey);
 
         // verify the registration is not known beforehand
-        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(safeAddress, nodeChainKeyAddress));
 
-        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeSafe.nodeChainKeyAddress);
-        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, nodeSafe, nodeSigNonce);
+        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeChainKeyAddress);
+        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
-        nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
+        nodeSafeRegistry.registerSafeWithNodeSig(safeAddress, nodeChainKeyAddress, sig);
 
         // fail to re-use the signature
         vm.expectRevert(HoprNodeSafeRegistry.NotValidSignatureFromNode.selector);
-        nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
+        nodeSafeRegistry.registerSafeWithNodeSig(safeAddress, nodeChainKeyAddress, sig);
 
         vm.clearMockedCalls();
     }
@@ -335,15 +333,16 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      */
     function _helperBuildSig(
         uint256 mockNodePrivateKey,
-        HoprNodeSafeRegistry.NodeSafe memory nodeSafe,
+        address safeAddress,
+        address nodeChainKeyAddress,
         uint256 nonce
     )
         private
         returns (address, bytes memory)
     {
         HoprNodeSafeRegistry.NodeSafeNonce memory nodeSafeNonce = HoprNodeSafeRegistry.NodeSafeNonce({
-            safeAddress: nodeSafe.safeAddress,
-            nodeChainKeyAddress: nodeSafe.nodeChainKeyAddress,
+            safeAddress: safeAddress,
+            nodeChainKeyAddress: nodeChainKeyAddress,
             nodeSigNonce: nonce
         });
         bytes32 hashStruct = keccak256(abi.encode(nodeSafeRegistry.NODE_SAFE_TYPEHASH(), nodeSafeNonce));

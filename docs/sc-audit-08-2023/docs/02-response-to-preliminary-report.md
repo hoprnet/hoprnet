@@ -224,6 +224,9 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Import `IERC20`, `IERC777` interfaces for definition of selector
 - Make all the selector definition public
 
-#### 8. Format
+#### 8. Improve NodeSafeRegistry
+- Unwrap struct `NodeSafe` into flattened `address safeAddress, address nodeChainKeyAddress`
+
+#### 9. Format
 - Format all the contracts
 - Include HOPR logo
