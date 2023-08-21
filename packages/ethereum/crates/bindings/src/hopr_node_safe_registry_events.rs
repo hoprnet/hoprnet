@@ -11,7 +11,7 @@ pub use hopr_node_safe_registry_events::*;
 )]
 pub mod hopr_node_safe_registry_events {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"DergisteredNodeSafe\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RegisteredNodeSafe\",\"outputs\":[],\"anonymous\":false}]";
+    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"DergisteredNodeSafe\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"domainSeparator\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"DomainSeparatorUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"safeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"nodeAddress\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"RegisteredNodeSafe\",\"outputs\":[],\"anonymous\":false}]";
     ///The parsed JSON ABI of the contract.
     pub static HOPRNODESAFEREGISTRYEVENTS_ABI: ::ethers::contract::Lazy<
         ::ethers::core::abi::Abi,
@@ -65,6 +65,16 @@ pub mod hopr_node_safe_registry_events {
             ::std::sync::Arc<M>,
             M,
             DergisteredNodeSafeFilter,
+        > {
+            self.0.event()
+        }
+        ///Gets the contract's `DomainSeparatorUpdated` event
+        pub fn domain_separator_updated_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            DomainSeparatorUpdatedFilter,
         > {
             self.0.event()
         }
@@ -125,6 +135,21 @@ pub mod hopr_node_safe_registry_events {
         Eq,
         Hash
     )]
+    #[ethevent(name = "DomainSeparatorUpdated", abi = "DomainSeparatorUpdated(bytes32)")]
+    pub struct DomainSeparatorUpdatedFilter {
+        #[ethevent(indexed)]
+        pub domain_separator: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
     #[ethevent(name = "RegisteredNodeSafe", abi = "RegisteredNodeSafe(address,address)")]
     pub struct RegisteredNodeSafeFilter {
         #[ethevent(indexed)]
@@ -136,6 +161,7 @@ pub mod hopr_node_safe_registry_events {
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum HoprNodeSafeRegistryEventsEvents {
         DergisteredNodeSafeFilter(DergisteredNodeSafeFilter),
+        DomainSeparatorUpdatedFilter(DomainSeparatorUpdatedFilter),
         RegisteredNodeSafeFilter(RegisteredNodeSafeFilter),
     }
     impl ::ethers::contract::EthLogDecode for HoprNodeSafeRegistryEventsEvents {
@@ -145,6 +171,13 @@ pub mod hopr_node_safe_registry_events {
             if let Ok(decoded) = DergisteredNodeSafeFilter::decode_log(log) {
                 return Ok(
                     HoprNodeSafeRegistryEventsEvents::DergisteredNodeSafeFilter(decoded),
+                );
+            }
+            if let Ok(decoded) = DomainSeparatorUpdatedFilter::decode_log(log) {
+                return Ok(
+                    HoprNodeSafeRegistryEventsEvents::DomainSeparatorUpdatedFilter(
+                        decoded,
+                    ),
                 );
             }
             if let Ok(decoded) = RegisteredNodeSafeFilter::decode_log(log) {
@@ -161,6 +194,9 @@ pub mod hopr_node_safe_registry_events {
                 Self::DergisteredNodeSafeFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::DomainSeparatorUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RegisteredNodeSafeFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -171,6 +207,12 @@ pub mod hopr_node_safe_registry_events {
     for HoprNodeSafeRegistryEventsEvents {
         fn from(value: DergisteredNodeSafeFilter) -> Self {
             Self::DergisteredNodeSafeFilter(value)
+        }
+    }
+    impl ::core::convert::From<DomainSeparatorUpdatedFilter>
+    for HoprNodeSafeRegistryEventsEvents {
+        fn from(value: DomainSeparatorUpdatedFilter) -> Self {
+            Self::DomainSeparatorUpdatedFilter(value)
         }
     }
     impl ::core::convert::From<RegisteredNodeSafeFilter>
