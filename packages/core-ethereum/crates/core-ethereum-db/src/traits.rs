@@ -155,6 +155,12 @@ pub trait HoprCoreEthereumDbActions {
     /// Set balance as the current balance.
     async fn set_hopr_balance(&mut self, balance: &Balance) -> Result<()>;
 
+    /// Get the domain separator of node-safe-registry contract
+    async fn get_node_safe_registry_domain_separator(&self) -> Result<Option<Hash>>;
+
+    /// Set the domain separator of node-safe-registry contract
+    async fn set_node_safe_registry_domain_separator(&mut self, node_safe_registry_domain_separator: &Hash, snapshot: &Snapshot) -> Result<()>;
+
     /// Get the domain separator of channels contract
     async fn get_channels_domain_separator(&self) -> Result<Option<Hash>>;
 

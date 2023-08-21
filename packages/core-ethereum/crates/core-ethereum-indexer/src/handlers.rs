@@ -453,7 +453,12 @@ where
                     }
                 }
             }
-            _ => todo!()
+            HoprNodeSafeRegistryEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
+                db.set_node_safe_registry_domain_separator(
+                    &Hash::try_from(domain_separator_updated.domain_separator)?,
+                    snapshot
+                ).await?;
+            }
         }
         Ok(())
     }
