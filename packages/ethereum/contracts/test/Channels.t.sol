@@ -4,6 +4,7 @@ pragma solidity >=0.6.0 <0.9.0;
 import { Test } from "forge-std/Test.sol";
 import { ERC1820RegistryFixtureTest } from "./utils/ERC1820Registry.sol";
 import { HoprChannels, HoprChannelsEvents } from "../src/Channels.sol";
+import { HoprLedgerEvents } from "../src/Ledger.sol";
 import { CryptoUtils } from "./utils/Crypto.sol";
 import { HoprMultiSig } from "../src/MultiSig.sol";
 import { ERC777 } from "openzeppelin-contracts/token/ERC777/ERC777.sol";
@@ -68,7 +69,7 @@ contract MyHoprChannels is HoprChannels {
     { }
 }
 
-contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, HoprChannelsEvents {
+contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, HoprChannelsEvents, HoprLedgerEvents {
     HoprChannels.Timestamp constant closureNoticePeriod = HoprChannels.Timestamp.wrap(15);
 
     bytes32 constant PROOF_OF_RELAY_SECRET_0 = keccak256(abi.encodePacked("PROOF_OF_RELAY_SECRET_0"));
@@ -1871,6 +1872,18 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         // call updateDomainSeparator when chainid is different
         vm.chainId(newChaidId);
+        vm.expectEmit(true, true, false, false, address(hoprChannels));
+        emit DomainSeparatorUpdated(
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(bytes("HoprChannels")),
+                    keccak256(bytes(hoprChannels.VERSION())),
+                    newChaidId,
+                    address(hoprChannels)
+                )
+            )
+        );
         hoprChannels.updateDomainSeparator();
         assertTrue(hoprChannels.domainSeparator() != domainSeparatorOnDeployment);
     }
@@ -1886,6 +1899,18 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         // call updateLedgerDomainSeparator when chainid is different
         vm.chainId(newChaidId);
+        vm.expectEmit(true, true, false, false, address(hoprChannels));
+        emit LedgerDomainSeparatorUpdated(
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(bytes("HoprLedger")),
+                    keccak256(bytes(hoprChannels.LEDGER_VERSION())),
+                    newChaidId,
+                    address(hoprChannels)
+                )
+            )
+        );
         hoprChannels.updateLedgerDomainSeparator();
         assertTrue(hoprChannels.ledgerDomainSeparator() != ledgerDomainSeparatorOnDeployment);
     }
