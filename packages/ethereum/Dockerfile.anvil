@@ -11,6 +11,7 @@ LABEL description="Launches an anvil node running a local network with the HOPR 
 COPY packages/ethereum/contracts packages/ethereum/contracts
 COPY scripts/ scripts
 COPY Makefile .
+COPY vendor/solidity vendor/solidity
 
 ENV FOUNDRY_DIR=/app/hoprnet-toolchain/.foundry
 ENV ETHERSCAN_API_KEY="random_giberish"

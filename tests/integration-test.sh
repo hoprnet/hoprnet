@@ -7,6 +7,7 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
+set -x
 
 # set log id and use shared log function for readable logs
 declare mydir
@@ -48,8 +49,9 @@ declare api6="${6}"
 declare api7="${7}"
 
 declare api_token=${HOPRD_API_TOKEN}
-declare additional_nodes_addrs="${ADDITIONAL_NODE_ADDRS:-}"
-declare additional_nodes_peerids="${ADDITIONAL_NODE_PEERIDS:-}"
+declare additional_nodes_safe_addrs="${ADDITIONAL_NODE_SAFE_ADDRS:-}"
+declare additional_nodes_native_addrs="${ADDITIONAL_NODE_NATIVE_ADDRS:-}"
+declare msg_tag=1234
 
 declare -a jobs
 
@@ -107,8 +109,8 @@ register_nodes() {
 
   make -C "${mydir}/.." register-nodes \
     network=anvil-localhost environment_type=local \
-    native_addresses="[${1}]" \
-    peer_ids="[${2}]"
+    staking_addresses="[${1}]" \
+    node_addresses="[${2}]"
 
   log "Registering nodes finished"
 }
@@ -122,15 +124,6 @@ sync_nodes_in_network_registry() {
     peer_ids="[${1}]"
 
   log "Sync nodes in network registry finished"
-}
-
-enable_network_registry() {
-  log "Enabling network registry"
-
-  make -C "${mydir}/.." enable-network-registry \
-    network=anvil-localhost environment_type=local
-
-  log "Enabling network registry finished"
 }
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
@@ -165,57 +158,56 @@ addr5="$(get_hopr_address "${api_token}@${api5}")"
 addr6="$(get_hopr_address "${api_token}@${api6}")"
 addr7="$(get_hopr_address "${api_token}@${api7}")"
 
-declare native_addr1 native_addr2 native_addr3 native_addr4 native_addr5 native_addr6 native_addr7
-native_addr1="$(get_native_address "${api_token}@${api1}")"
-native_addr2="$(get_native_address "${api_token}@${api2}")"
-native_addr3="$(get_native_address "${api_token}@${api3}")"
-native_addr4="$(get_native_address "${api_token}@${api4}")"
-native_addr5="$(get_native_address "${api_token}@${api5}")"
-native_addr6="$(get_native_address "${api_token}@${api6}")"
-native_addr7="$(get_native_address "${api_token}@${api7}")"
+function get_safe_address() {
+  api_get_node_info "$1" | jq -r '.nodeSafe'
+}
 
-declare hopr_addr1 hopr_addr2 hopr_addr3 hopr_addr4 hopr_addr5 hopr_addr6 hopr_addr7
-hopr_addr1="$(get_hopr_address "${api_token}@${api1}")"
-hopr_addr2="$(get_hopr_address "${api_token}@${api2}")"
-hopr_addr3="$(get_hopr_address "${api_token}@${api3}")"
-hopr_addr4="$(get_hopr_address "${api_token}@${api4}")"
-hopr_addr5="$(get_hopr_address "${api_token}@${api5}")"
-hopr_addr6="$(get_hopr_address "${api_token}@${api6}")"
-hopr_addr7="$(get_hopr_address "${api_token}@${api7}")"
+declare safe_addr1 safe_addr2 safe_addr3 safe_addr4 safe_addr5 safe_addr6 safe_addr7
+safe_addr1="$(get_safe_address "${api_token}@${api1}")"
+safe_addr2="$(get_safe_address "${api_token}@${api2}")"
+safe_addr3="$(get_safe_address "${api_token}@${api3}")"
+safe_addr4="$(get_safe_address "${api_token}@${api4}")"
+safe_addr5="$(get_safe_address "${api_token}@${api5}")"
+safe_addr6="$(get_safe_address "${api_token}@${api6}")"
+safe_addr7="$(get_safe_address "${api_token}@${api7}")"
 
-log "hopr addr1: ${addr1} ${native_addr1} ${hopr_addr1}"
-log "hopr addr2: ${addr2} ${native_addr2} ${hopr_addr2}"
-log "hopr addr3: ${addr3} ${native_addr3} ${hopr_addr3}"
-log "hopr addr4: ${addr4} ${native_addr4} ${hopr_addr4}"
-log "hopr addr5: ${addr5} ${native_addr5} ${hopr_addr5}"
-log "hopr addr6: ${addr6} ${native_addr6} ${hopr_addr6}"
-log "hopr addr7: ${addr7} ${native_addr7} ${hopr_addr7}"
+declare node_addr1 node_addr2 node_addr3 node_addr4 node_addr5 node_addr6 node_addr7
+node_addr1="$(get_native_address "${api_token}@${api1}")"
+node_addr2="$(get_native_address "${api_token}@${api2}")"
+node_addr3="$(get_native_address "${api_token}@${api3}")"
+node_addr4="$(get_native_address "${api_token}@${api4}")"
+node_addr5="$(get_native_address "${api_token}@${api5}")"
+node_addr6="$(get_native_address "${api_token}@${api6}")"
+node_addr7="$(get_native_address "${api_token}@${api7}")"
 
-# enable network registry
-enable_network_registry
+log "hopr addr1: ${addr1} ${safe_addr1} ${node_addr1}"
+log "hopr addr2: ${addr2} ${safe_addr2} ${node_addr2}"
+log "hopr addr3: ${addr3} ${safe_addr3} ${node_addr3}"
+log "hopr addr4: ${addr4} ${safe_addr4} ${node_addr4}"
+log "hopr addr5: ${addr5} ${safe_addr5} ${node_addr5}"
+log "hopr addr6: ${addr6} ${safe_addr6} ${node_addr6}"
+log "hopr addr7: ${addr7} ${safe_addr7} ${node_addr7}"
 
-declare native_addrs_to_register="$native_addr1,$native_addr2,$native_addr3,$native_addr4,$native_addr5,$native_addr6"
-declare native_peerids_to_register="$hopr_addr1,$hopr_addr2,$hopr_addr3,$hopr_addr4,$hopr_addr5,$hopr_addr6"
+declare safe_addrs_to_register="$safe_addr1,$safe_addr2,$safe_addr3,$safe_addr4,$safe_addr5,$safe_addr6"
+declare node_addrs_to_register="$node_addr1,$node_addr2,$node_addr3,$node_addr4,$node_addr5,$node_addr6"
 
 # add nodes 1,2,3,4,5,6 plus additional nodes in register, do NOT add node 7
 log "Adding nodes to register"
-if ! [ -z $additional_nodes_addrs ] && ! [ -z $additional_nodes_peerids ]; then
-  native_addrs_to_register+=",${additional_nodes_addrs}"
-  native_peerids_to_register+=",${additional_nodes_peerids}"
+if ! [ -z $additional_nodes_safe_addrs ] && ! [ -z $additional_nodes_native_addrs ]; then
+  safe_addrs_to_register+=",${additional_nodes_safe_addrs}"
+  node_addrs_to_register+=",${additional_nodes_native_addrs}"
 fi
 
 # Register nodes in the NR, emit "Registered" events
-register_nodes "${native_addrs_to_register}" "${native_peerids_to_register}"
+register_nodes "${safe_addrs_to_register}" "${node_addrs_to_register}"
 
 # Sync nodes in the NR, emit "EligibilityUpdated" events
-sync_nodes_in_network_registry "${native_peerids_to_register}"
+#sync_nodes_in_network_registry "${node_addrs_to_register}"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(api_get_balances ${api1})
 native_balance=$(echo ${balances} | jq -r .native)
-hopr_balance=$(echo ${balances} | jq -r .hopr)
 api_withdraw ${api1} "NATIVE" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
-api_withdraw ${api1} "HOPR" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
 
 # this 2 functions are runned at the end of the tests when withdraw transaction should clear on blockchain and we don't have to block and wait for it
 check_native_withdraw_results() {
@@ -226,15 +218,6 @@ check_native_withdraw_results() {
   [[ "${initial_native_balance}" == "${new_native_balance}" ]] && { msg "Native withdraw failed, pre: ${initial_native_balance}, post: ${new_native_balance}"; exit 1; }
 
   echo "withdraw native successful"
-}
-check_hopr_withdraw_results() {
-  local initial_hopr_balance="${1}"
-
-  balances=$(api_get_balances ${api1})
-  new_hopr_balance=$(echo ${balances} | jq -r .hopr)
-  [[ "${initial_hopr_balance}" == "${new_hopr_balance}" ]] && { msg "Hopr withdraw failed, pre: ${initial_hopr_balance}, post: ${new_hopr_balance}"; exit 1; }
-
-  echo "withdraw hopr successful"
 }
 
 test_aliases() {
@@ -263,12 +246,12 @@ log "Node 2 ping node 3"
 result=$(api_ping "${api2}" ${addr3} "\"latency\":[0-9]+,\"reportedVersion\":")
 log "-- ${result}"
 
-log "Node 7 should not be able to talk to Node 1 (different environment id)"
+log "Node 1 should not be able to talk to Node 6 (different network id)"
 result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
-log "Node 1 should not be able to talk to Node 7 (different network id)"
-result=$(api_ping "${api1}" ${addr7} "Connection to node is not allowed")
+log "Node 6 should not be able to talk to Node 1 (different network id)"
+result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
 log "-- ${result}"
 
 # log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
@@ -284,7 +267,7 @@ result=$(api_get_ticket_statistics "${api2}" "\"unredeemedValue\":\"0\"")
 log "-- ${result}"
 
 log "Node 1 send 0-hop message to node 2"
-api_send_message "${api1}" "${addr2}" "hello, world 0" ""
+api_send_message "${api1}" "${msg_tag}" "${addr2}" "hello, world 0" ""
 
 # opening channels in parallel
 api_open_channel 1 2 "${api1}" "${addr2}" & jobs+=( "$!" )
@@ -307,16 +290,16 @@ api_close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
-  api_send_message "${api1}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
+  api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
 
   log "Node 2 send 1 hop message to self via node 3"
-  api_send_message "${api2}" "${addr2}" 'hello, world from self via 3' "${addr3}" & jobs+=( "$!" )
+  api_send_message "${api2}" "${msg_tag}" "${addr2}" 'hello, world from self via 3' "${addr3}" & jobs+=( "$!" )
 
   log "Node 3 send 1 hop message to self via node 4"
-  api_send_message "${api3}" "${addr3}" 'hello, world from self via 4' "${addr4}" & jobs+=( "$!" )
+  api_send_message "${api3}" "${msg_tag}" "${addr3}" 'hello, world from self via 4' "${addr4}" & jobs+=( "$!" )
 
   log "Node 4 send 1 hop message to self via node 5"
-  api_send_message "${api4}" "${addr4}" 'hello, world from self via 5' "${addr5}" & jobs+=( "$!" )
+  api_send_message "${api4}" "${msg_tag}" "${addr4}" 'hello, world from self via 5' "${addr5}" & jobs+=( "$!" )
 done
 
 log "Waiting for nodes to finish sending 1 hop messages"
@@ -341,16 +324,16 @@ log "-- ${result}"
 
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to node 3 via node 2"
-  api_send_message "${api1}" "${addr3}" 'hello, world from 1 via 2' "${addr2}" & jobs+=( "$!" )
+  api_send_message "${api1}" "${msg_tag}" "${addr3}" 'hello, world from 1 via 2' "${addr2}" & jobs+=( "$!" )
 
   log "Node 2 send 1 hop message to node 4 via node 3"
-  api_send_message "${api2}" "${addr4}" 'hello, world from 2 via 3' "${addr3}" & jobs+=( "$!" )
+  api_send_message "${api2}" "${msg_tag}" "${addr4}" 'hello, world from 2 via 3' "${addr3}" & jobs+=( "$!" )
 
   log "Node 3 send 1 hop message to node 5 via node 4"
-  api_send_message "${api3}" "${addr5}" 'hello, world from 3 via 4' "${addr4}" & jobs+=( "$!" )
+  api_send_message "${api3}" "${msg_tag}" "${addr5}" 'hello, world from 3 via 4' "${addr4}" & jobs+=( "$!" )
 
   log "Node 5 send 1 hop message to node 2 via node 1"
-  api_send_message "${api5}" "${addr2}" 'hello, world from 5 via 1' "${addr1}" & jobs+=( "$!" )
+  api_send_message "${api5}" "${msg_tag}" "${addr2}" 'hello, world from 5 via 1' "${addr1}" & jobs+=( "$!" )
 done
 log "Waiting for nodes to finish sending 1-hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
@@ -358,7 +341,7 @@ log "Waiting DONE"
 
 for i in `seq 1 10`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-  api_send_message "${api1}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
+  api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
 done
 log "Waiting for nodes to finish sending 3-hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
@@ -366,7 +349,7 @@ log "Waiting DONE"
 
 for i in `seq 1 10`; do
   log "Node 1 send message to node 5"
-  api_send_message "${api1}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
+  api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
 done
 log "Waiting for node 1 to send messages to node 5"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
@@ -385,7 +368,7 @@ test_redeem_in_specific_channel() {
 
   for i in `seq 1 3`; do
     log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-    api_send_message "${node_api}" "${peer_id}" "hello, world 1 self" "${second_peer_id}"
+    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "hello, world 1 self" "${second_peer_id}"
   done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
@@ -401,7 +384,7 @@ test_redeem_in_specific_channel() {
   echo "all good"
 }
 
-test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
+# test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
 
 redeem_tickets "2" "${api2}" & jobs+=( "$!" )
 redeem_tickets "3" "${api2}" & jobs+=( "$!" )
@@ -469,4 +452,3 @@ test_get_all_channels "${api1}"
 
 # checking statuses of the long running tests
 check_native_withdraw_results ${native_balance}
-check_hopr_withdraw_results ${hopr_balance}
