@@ -808,24 +808,23 @@ contract HoprChannels is
      */
     function _getTicketHash(RedeemableTicket calldata redeemable) public view returns (bytes32) {
         address challenge = HoprCrypto.scalarTimesBasepoint(redeemable.porSecret);
-        bytes32 ticketHash;
-        assembly {
-            let data := mload(0x40)
 
-            mstore(data, redeemable)
-            mstore(add(0x20, data), add(0x20, redeemable))
-            mstore(add(0x40, data), challenge)
-
-            ticketHash := keccak256(data, 0x54)
-        }
+        uint256 secondPart =
+            (uint256(Balance.unwrap(redeemable.data.amount)) << 160) | 
+            (uint256(TicketIndex.unwrap(redeemable.data.ticketIndex)) << 112) | 
+            (uint256(TicketIndexOffset.unwrap(redeemable.data.indexOffset)) << 80) | 
+            (uint256(ChannelEpoch.unwrap(redeemable.data.epoch)) << 56) | 
+            uint256(WinProb.unwrap(redeemable.data.winProb));
 
         // Deviates from EIP712 due to computed property and non-standard struct property encoding
         bytes32 hashStruct = keccak256(
             abi.encode(
                 this.redeemTicket.selector,
-                ticketHash
+                keccak256(abi.encodePacked(redeemable.data.channelId, secondPart, challenge))
             )
         );
+
+        return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
     }
 
     /**
