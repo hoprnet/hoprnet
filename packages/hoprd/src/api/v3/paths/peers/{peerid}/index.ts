@@ -40,7 +40,8 @@ GET.apiDoc = {
       name: 'peerid',
       required: true,
       schema: {
-        $ref: '#/components/schemas/HoprAddress'
+        format: 'peerid',
+        type: 'string'
       }
     }
   ],

@@ -7,7 +7,8 @@ import {
   type Network
 } from '../lib/core_hopr.js'
 core_hopr_initialize_crate()
-import { DeploymentExtract } from '@hoprnet/hopr-core-ethereum/src/utils/utils.js'
+
+import type { DeploymentExtract } from '@hoprnet/hopr-core-ethereum'
 export {
   resolve_network,
   supported_networks,

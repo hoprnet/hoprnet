@@ -16,7 +16,7 @@ where
         return Ok(true);
     }
 
-    db.is_allowed_to_access_network(&chain_address)
+    db.is_allowed_to_access_network(chain_address)
         .await
         .map_err(|e| e.into())
 }

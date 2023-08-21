@@ -485,7 +485,8 @@ contract HoprDistributorTest is Test, ERC1820RegistryFixtureTest {
     /**
      * @dev it should fail to allocate if totalToBeMinted is higher than max mint
      * FIXME: Cannot catch uint128 arithmetic overflow. Encountered error
-     * [FAIL. Reason: Error != expected error: NH{q != NH{q Counterexample: calldata=0x224dafb90000000000000000000000000000000000000000000000000000000000000000, args=[0]]
+     * [FAIL. Reason: Error != expected error: NH{q != NH{q Counterexample:
+     * calldata=0x224dafb90000000000000000000000000000000000000000000000000000000000000000, args=[0]]
      */
     function testFail_ExceedMaxMint(uint128 amount) public {
         _helperAddBasicSchedule();

@@ -27,7 +27,7 @@ contract HoprStakeSeason6Test is Test, ERC1820RegistryFixtureTest, PermittableTo
         super.setUp();
 
         hoprStakeSeason6 = new HoprStakeSeason6(OWNER, NFT_ADDRESS, LOCK_TOKEN_ADDRESS, REWARD_TOKEN_ADDRESS);
-        if (block.chainid == 31337) {
+        if (block.chainid == 31_337) {
             etchPermittableTokenAt(LOCK_TOKEN_ADDRESS);
         }
     }

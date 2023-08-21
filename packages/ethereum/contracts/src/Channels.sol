@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import {Multicall} from "openzeppelin-contracts/utils/Multicall.sol";
-import {IERC1820Registry} from "openzeppelin-contracts/utils/introspection/IERC1820Registry.sol";
-import {ERC1820Implementer} from "openzeppelin-contracts/utils/introspection/ERC1820Implementer.sol";
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import {IERC777Recipient} from "openzeppelin-contracts/token/ERC777/IERC777Recipient.sol";
-import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
+import { IERC1820Registry } from "openzeppelin-contracts/utils/introspection/IERC1820Registry.sol";
+import { ERC1820Implementer } from "openzeppelin-contracts/utils/introspection/ERC1820Implementer.sol";
+import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import { IERC777Recipient } from "openzeppelin-contracts/token/ERC777/IERC777Recipient.sol";
+import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 
-import {HoprCrypto} from "./Crypto.sol";
-import {HoprLedger} from "./Ledger.sol";
-import {HoprMultiSig} from "./MultiSig.sol";
-import {HoprNodeSafeRegistry} from "./node-stake/NodeSafeRegistry.sol";
+import { HoprCrypto } from "./Crypto.sol";
+import { HoprLedger } from "./Ledger.sol";
+import { HoprMultiSig } from "./MultiSig.sol";
+import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
 uint256 constant ONE_HOUR = 60 * 60 * 1000; // in milliseconds
 
@@ -54,6 +54,11 @@ abstract contract HoprChannelsEvents {
      * since this value is necessary for issuing and validating tickets.
      */
     event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTicketIndex);
+
+    /**
+     * Emitted once the domain separator is updated.
+     */
+    event DomainSeparatorUpdated(bytes32 indexed domainSeparator);
 }
 
 /**
@@ -119,10 +124,10 @@ contract HoprChannels is
 
     // ERC-777 tokensReceived hook, fundChannelMulti
     uint256 public immutable ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE =
-        abi.encode(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
+        abi.encodePacked(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
 
     // ERC-777 tokensReceived hook, fundChannel
-    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encode(address(0), address(0)).length;
+    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encodePacked(address(0), address(0)).length;
 
     string public constant VERSION = "2.0.0";
 
@@ -253,10 +258,10 @@ contract HoprChannels is
             revert SourceEqualsDestination();
         }
         if (source == address(0)) {
-            revert ZeroAddress({reason: "source must not be empty"});
+            revert ZeroAddress({ reason: "source must not be empty" });
         }
         if (destination == address(0)) {
-            revert ZeroAddress({reason: "destination must not be empty"});
+            revert ZeroAddress({ reason: "destination must not be empty" });
         }
         _;
     }
@@ -273,10 +278,12 @@ contract HoprChannels is
 
     /**
      * @dev recompute the domain seperator in case of a fork
+     * This function should be called by anyone when required.
+     * An event is emitted when the domain separator is updated
      */
     function updateDomainSeparator() public {
         // following encoding guidelines of EIP712
-        domainSeparator = keccak256(
+        bytes32 newDomainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes("HoprChannels")),
@@ -285,6 +292,11 @@ contract HoprChannels is
                 address(this)
             )
         );
+
+        if (newDomainSeparator != domainSeparator) {
+            domainSeparator = newDomainSeparator;
+            emit DomainSeparatorUpdated(domainSeparator);
+        }
     }
 
     /**
@@ -294,14 +306,20 @@ contract HoprChannels is
         address self,
         RedeemableTicket calldata redeemable,
         HoprCrypto.VRFParameters calldata params
-    ) external HoprMultiSig.onlySafe(self) {
+    )
+        external
+        HoprMultiSig.onlySafe(self)
+    {
         _redeemTicketInternal(self, redeemable, params);
     }
 
     /**
      * See `_redeemTicketInternal`
      */
-    function redeemTicket(RedeemableTicket calldata redeemable, HoprCrypto.VRFParameters calldata params)
+    function redeemTicket(
+        RedeemableTicket calldata redeemable,
+        HoprCrypto.VRFParameters calldata params
+    )
         external
         HoprMultiSig.noSafeSet()
     {
@@ -353,15 +371,19 @@ contract HoprChannels is
         address self,
         RedeemableTicket calldata redeemable,
         HoprCrypto.VRFParameters calldata params
-    ) internal validateBalance(redeemable.data.amount) HoprCrypto.isFieldElement(redeemable.porSecret) {
+    )
+        internal
+        validateBalance(redeemable.data.amount)
+        HoprCrypto.isFieldElement(redeemable.porSecret)
+    {
         Channel storage spendingChannel = channels[redeemable.data.channelId];
 
         if (spendingChannel.status != ChannelStatus.OPEN && spendingChannel.status != ChannelStatus.PENDING_TO_CLOSE) {
-            revert WrongChannelState({reason: "spending channel must be OPEN or PENDING_TO_CLOSE"});
+            revert WrongChannelState({ reason: "spending channel must be OPEN or PENDING_TO_CLOSE" });
         }
 
         if (ChannelEpoch.unwrap(spendingChannel.epoch) != ChannelEpoch.unwrap(redeemable.data.epoch)) {
-            revert WrongChannelState({reason: "channel epoch must match"});
+            revert WrongChannelState({ reason: "channel epoch must match" });
         }
 
         // Aggregatable Tickets - validity interval:
@@ -431,7 +453,10 @@ contract HoprChannels is
     /**
      * See `_initiateOutgoingChannelClosureInternal`, entrypoint for MultiSig contract
      */
-    function initiateOutgoingChannelClosureSafe(address self, address destination)
+    function initiateOutgoingChannelClosureSafe(
+        address self,
+        address destination
+    )
         external
         HoprMultiSig.onlySafe(self)
     {
@@ -460,7 +485,7 @@ contract HoprChannels is
 
         // calling initiateClosure on a PENDING_TO_CLOSE channel extends the noticePeriod
         if (channel.status == ChannelStatus.CLOSED) {
-            revert WrongChannelState({reason: "channel must have state OPEN or PENDING_TO_CLOSE"});
+            revert WrongChannelState({ reason: "channel must have state OPEN or PENDING_TO_CLOSE" });
         }
 
         channel.closureTime =
@@ -501,7 +526,7 @@ contract HoprChannels is
         Channel storage channel = channels[channelId];
 
         if (channel.status == ChannelStatus.CLOSED) {
-            revert WrongChannelState({reason: "channel must have state OPEN or PENDING_TO_CLOSE"});
+            revert WrongChannelState({ reason: "channel must have state OPEN or PENDING_TO_CLOSE" });
         }
 
         uint256 balance = Balance.unwrap(channel.balance);
@@ -526,7 +551,10 @@ contract HoprChannels is
     /**
      * See `_finalizeOutgoingChannelClosureInternal`, entrypoint for MultiSig contract
      */
-    function finalizeOutgoingChannelClosureSafe(address self, address destination)
+    function finalizeOutgoingChannelClosureSafe(
+        address self,
+        address destination
+    )
         external
         HoprMultiSig.onlySafe(self)
     {
@@ -552,7 +580,7 @@ contract HoprChannels is
         Channel storage channel = channels[channelId];
 
         if (channel.status != ChannelStatus.PENDING_TO_CLOSE) {
-            revert WrongChannelState({reason: "channel state must be PENDING_TO_CLOSE"});
+            revert WrongChannelState({ reason: "channel state must be PENDING_TO_CLOSE" });
         }
 
         if (Timestamp.unwrap(channel.closureTime) >= Timestamp.unwrap(_currentBlockTimestamp())) {
@@ -588,12 +616,13 @@ contract HoprChannels is
      *
      * Channel source and destination are specified by the userData payload.
      *
-     * @dev function reverts if it is a no-op, meaning no state change
-     *
-     * @param from account from which the tokens have been transferred
-     * @param to account to which the the tokens have been transferred
-     * @param amount uint256 amount of tokens that have been transferred
-     * @param userData payload, determines what is supposed to happen
+     * @dev This function reverts if it results in a no-op, i.e., no state change occurs.
+     * @notice The opening of bidirectional channels is currently implemented for internal
+     * and community testing purposes only, and is not intended for production use.
+     * @param from The account from which the tokens have been transferred
+     * @param to The account to which the tokens have been transferred
+     * @param amount The amount of tokens transferred
+     * @param userData The payload that determines the intended action
      */
     function tokensReceived(
         address, // operator not needed
@@ -602,7 +631,10 @@ contract HoprChannels is
         uint256 amount,
         bytes calldata userData,
         bytes calldata // operatorData not needed
-    ) external override {
+    )
+        external
+        override
+    {
         // don't accept any other tokens ;-)
         if (msg.sender != address(token)) {
             revert WrongToken();
@@ -620,7 +652,17 @@ contract HoprChannels is
 
         // Opens an outgoing channel
         if (userData.length == ERC777_HOOK_FUND_CHANNEL_SIZE) {
-            (address src, address dest) = abi.decode(userData, (address, address));
+            if (amount > type(uint96).max) {
+                revert BalanceExceedsGlobalPerChannelAllowance();
+            }
+
+            address src;
+            address dest;
+
+            assembly {
+                src := shr(96, calldataload(userData.offset))
+                dest := shr(96, calldataload(add(userData.offset, 20)))
+            }
 
             address safeAddress = registry.nodeToSafe(src);
 
@@ -639,8 +681,17 @@ contract HoprChannels is
             _fundChannelInternal(src, dest, Balance.wrap(uint96(amount)));
             // Opens two channels, donating msg.sender's tokens
         } else if (userData.length == ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE) {
-            (address account1, Balance amount1, address account2, Balance amount2) =
-                abi.decode(userData, (address, Balance, address, Balance));
+            address account1;
+            Balance amount1;
+            address account2;
+            Balance amount2;
+
+            assembly {
+                account1 := shr(96, calldataload(userData.offset))
+                amount1 := shr(160, calldataload(add(0x14, userData.offset)))
+                account2 := shr(96, calldataload(add(0x20, userData.offset)))
+                amount2 := shr(160, calldataload(add(0x34, userData.offset)))
+            }
 
             if (amount == 0 || amount != uint256(Balance.unwrap(amount1)) + uint256(Balance.unwrap(amount2))) {
                 revert InvalidBalance();
@@ -667,10 +718,7 @@ contract HoprChannels is
      * @param account address of the destination
      * @param amount amount to fund for channel
      */
-    function fundChannelSafe(address self, address account, Balance amount)
-        external
-        HoprMultiSig.onlySafe(self)
-    {
+    function fundChannelSafe(address self, address account, Balance amount) external HoprMultiSig.onlySafe(self) {
         _fundChannelInternal(self, account, amount);
 
         // pull tokens from Safe and handle result
@@ -685,10 +733,7 @@ contract HoprChannels is
      * @param account address of the destination
      * @param amount amount to fund for channel
      */
-    function fundChannel(address account, Balance amount)
-        external
-        HoprMultiSig.noSafeSet()
-    {
+    function fundChannel(address account, Balance amount) external HoprMultiSig.noSafeSet() {
         _fundChannelInternal(msg.sender, account, amount);
 
         // pull tokens from funder and handle result
@@ -707,10 +752,11 @@ contract HoprChannels is
      * @param amount token amount
      */
     function _fundChannelInternal(
-        address self, 
+        address self,
         address account,
         Balance amount
-    ) internal 
+    )
+        internal
         validateBalance(amount)
         validateChannelParties(self, account)
     {
@@ -718,7 +764,7 @@ contract HoprChannels is
         Channel storage channel = channels[channelId];
 
         if (channel.status == ChannelStatus.PENDING_TO_CLOSE) {
-            revert WrongChannelState({reason: "cannot fund a channel that will close soon"});
+            revert WrongChannelState({ reason: "cannot fund a channel that will close soon" });
         }
 
         channel.balance = Balance.wrap(Balance.unwrap(channel.balance) + Balance.unwrap(amount));
@@ -733,7 +779,7 @@ contract HoprChannels is
             indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
             emit ChannelOpened(self, account);
         }
-        
+
         indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
         emit ChannelBalanceIncreased(channelId, channel.balance);
     }
@@ -773,11 +819,26 @@ contract HoprChannels is
      * @param redeemable ticket data
      */
     function _getTicketHash(RedeemableTicket calldata redeemable) public view returns (bytes32) {
+        address challenge = HoprCrypto.scalarTimesBasepoint(redeemable.porSecret);
+
+        // TicketData is aligned to exactly 2 EVM words, from which channelId 
+        // takes one. Removing channelId can thus be encoded in 1 EVM word.
+        //
+        // Tickets get signed and transferred in packed encoding, consuming
+        // 148 bytes, including signature and challenge. Using tight encoding 
+        // for ticket hash unifies on-chain and off-chain usage of tickets.
+        uint256 secondPart =
+            (uint256(Balance.unwrap(redeemable.data.amount)) << 160) | 
+            (uint256(TicketIndex.unwrap(redeemable.data.ticketIndex)) << 112) | 
+            (uint256(TicketIndexOffset.unwrap(redeemable.data.indexOffset)) << 80) | 
+            (uint256(ChannelEpoch.unwrap(redeemable.data.epoch)) << 56) | 
+            uint256(WinProb.unwrap(redeemable.data.winProb));
+
         // Deviates from EIP712 due to computed property and non-standard struct property encoding
         bytes32 hashStruct = keccak256(
             abi.encode(
                 this.redeemTicket.selector,
-                keccak256(abi.encode(redeemable.data, HoprCrypto.scalarTimesBasepoint(redeemable.porSecret)))
+                keccak256(abi.encodePacked(redeemable.data.channelId, secondPart, challenge))
             )
         );
 
@@ -798,8 +859,13 @@ contract HoprChannels is
         bytes32 ticketHash,
         RedeemableTicket calldata redeemable,
         HoprCrypto.VRFParameters calldata params
-    ) public pure returns (bool) {
-        // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53 signifcant bits)
+    )
+        public
+        pure
+        returns (bool)
+    {
+        // hash function produces 256 bits output but we require only first 56 bits (IEEE 754 double precision means 53
+        // signifcant bits)
         uint56 ticketProb = (
             uint56(
                 bytes7(

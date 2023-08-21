@@ -11,7 +11,7 @@ pub use hopr_ledger::*;
 )]
 pub mod hopr_ledger {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LEDGER_VERSION\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ledgerDomainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]}]";
+    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"ledgerDomainSeparator\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"LedgerDomainSeparatorUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LEDGER_VERSION\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ledgerDomainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateLedgerDomainSeparator\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
     pub static HOPRLEDGER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
     ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
@@ -68,12 +68,58 @@ pub mod hopr_ledger {
                 .method_hash([201, 102, 196, 254], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `updateLedgerDomainSeparator` (0xdc96fd50) function
+        pub fn update_ledger_domain_separator(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([220, 150, 253, 80], ())
+                .expect("method not found (this should never happen)")
+        }
+        ///Gets the contract's `LedgerDomainSeparatorUpdated` event
+        pub fn ledger_domain_separator_updated_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            LedgerDomainSeparatorUpdatedFilter,
+        > {
+            self.0.event()
+        }
+        /// Returns an `Event` builder for all the events of this contract.
+        pub fn events(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            LedgerDomainSeparatorUpdatedFilter,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
+        }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
     for HoprLedger<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(
+        name = "LedgerDomainSeparatorUpdated",
+        abi = "LedgerDomainSeparatorUpdated(bytes32)"
+    )]
+    pub struct LedgerDomainSeparatorUpdatedFilter {
+        #[ethevent(indexed)]
+        pub ledger_domain_separator: [u8; 32],
     }
     ///Container type for all input parameters for the `LEDGER_VERSION` function with signature `LEDGER_VERSION()` and selector `0xddad1902`
     #[derive(
@@ -101,11 +147,28 @@ pub mod hopr_ledger {
     )]
     #[ethcall(name = "ledgerDomainSeparator", abi = "ledgerDomainSeparator()")]
     pub struct LedgerDomainSeparatorCall;
+    ///Container type for all input parameters for the `updateLedgerDomainSeparator` function with signature `updateLedgerDomainSeparator()` and selector `0xdc96fd50`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethcall(
+        name = "updateLedgerDomainSeparator",
+        abi = "updateLedgerDomainSeparator()"
+    )]
+    pub struct UpdateLedgerDomainSeparatorCall;
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum HoprLedgerCalls {
         LedgerVersion(LedgerVersionCall),
         LedgerDomainSeparator(LedgerDomainSeparatorCall),
+        UpdateLedgerDomainSeparator(UpdateLedgerDomainSeparatorCall),
     }
     impl ::ethers::core::abi::AbiDecode for HoprLedgerCalls {
         fn decode(
@@ -122,6 +185,12 @@ pub mod hopr_ledger {
                 ) {
                 return Ok(Self::LedgerDomainSeparator(decoded));
             }
+            if let Ok(decoded)
+                = <UpdateLedgerDomainSeparatorCall as ::ethers::core::abi::AbiDecode>::decode(
+                    data,
+                ) {
+                return Ok(Self::UpdateLedgerDomainSeparator(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -134,6 +203,9 @@ pub mod hopr_ledger {
                 Self::LedgerDomainSeparator(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::UpdateLedgerDomainSeparator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -142,6 +214,9 @@ pub mod hopr_ledger {
             match self {
                 Self::LedgerVersion(element) => ::core::fmt::Display::fmt(element, f),
                 Self::LedgerDomainSeparator(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::UpdateLedgerDomainSeparator(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
             }
@@ -155,6 +230,11 @@ pub mod hopr_ledger {
     impl ::core::convert::From<LedgerDomainSeparatorCall> for HoprLedgerCalls {
         fn from(value: LedgerDomainSeparatorCall) -> Self {
             Self::LedgerDomainSeparator(value)
+        }
+    }
+    impl ::core::convert::From<UpdateLedgerDomainSeparatorCall> for HoprLedgerCalls {
+        fn from(value: UpdateLedgerDomainSeparatorCall) -> Self {
+            Self::UpdateLedgerDomainSeparator(value)
         }
     }
     ///Container type for all return fields from the `LEDGER_VERSION` function with signature `LEDGER_VERSION()` and selector `0xddad1902`

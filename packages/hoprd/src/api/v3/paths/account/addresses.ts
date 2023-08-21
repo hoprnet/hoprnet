@@ -28,9 +28,7 @@ const GET: Operation = [
       const addresses = getAddresses(node)
 
       return res.status(200).json({
-        nativeAddress: addresses.native,
         native: addresses.native,
-        hoprAddress: addresses.hopr,
         hopr: addresses.hopr
       })
     } catch (err) {
@@ -54,26 +52,6 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              nativeAddress: {
-                allOf: [
-                  {
-                    $ref: '#/components/schemas/NativeAddress'
-                  },
-                  {
-                    deprecated: true
-                  }
-                ]
-              },
-              hoprAddress: {
-                allOf: [
-                  {
-                    $ref: '#/components/schemas/HoprAddress'
-                  },
-                  {
-                    deprecated: true
-                  }
-                ]
-              },
               native: {
                 $ref: '#/components/schemas/NativeAddress'
               },

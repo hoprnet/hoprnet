@@ -194,11 +194,12 @@ endif
 
 .PHONY: build-yarn-watch
 build-yarn-watch: ## build yarn packages (in watch mode)
-build-yarn-watch: build-solidity-types build-cargo
+build-yarn-watch: build-cargo
 	npx tsc --build tsconfig.build.json -w
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
+build-cargo: build-solidity-types
 # build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
@@ -269,7 +270,7 @@ lint: ## run linter for TS, Rust, Python, Solidity
 .PHONY: lint-sol
 lint-sol: ## run linter for Solidity
 	for f in $(SOLIDITY_FILES); do \
-		forge fmt --check $${f} || exit 1; \
+		forge fmt --root ./packages/ethereum/contracts --check $${f} || exit 1; \
 	done
 	# FIXME: disabled until all linter errors are resolved
 	# npx solhint $${f} || exit1; \
@@ -280,7 +281,7 @@ lint-ts: ## run linter for TS
 
 .PHONY: lint-rust
 lint-rust: ## run linter for Rust
-	$(foreach c, $(CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
+	$(foreach c, $(LINTABLE_CRATES_NAMES), cargo fmt --check -p $(c) && ) echo ""
 
 .PHONY: lint-python
 lint-python: ## run linter for Python
@@ -293,7 +294,7 @@ fmt: ## run code formatter for TS, Rust, Python, Solidity
 .PHONY: fmt-sol
 fmt-sol: ## run code formatter for Solidity
 	for f in $(SOLIDITY_FILES); do \
-		forge fmt $${f}; \
+		forge fmt $${f} --root ./packages/ethereum/contracts; \
 	done
 
 .PHONY: fmt-ts
@@ -336,21 +337,23 @@ create-local-identity: ## run HOPRd from local repo
 
 .PHONY: run-local
 run-local: id_path=`pwd`/.identity-local.id
+run-local: network=anvil-localhost
 run-local: args=
 run-local: ## run HOPRd from local repo
 	env NODE_OPTIONS="--experimental-wasm-modules" NODE_ENV=development DEBUG="hopr*" node \
 		packages/hoprd/lib/main.cjs --init --api \
 		--password="local" --identity="${id_path}" \
-		--network anvil-localhost --announce \
+		--network "${network}" --announce \
 		--testUseWeakCrypto --testAnnounceLocalAddresses \
 		--testPreferLocalAddresses --disableApiAuthentication \
 		$(args)
 
 .PHONY: run-local-with-safe
+run-local-with-safe: network=anvil-localhost
 run-local-with-safe: ## run HOPRd from local repo. use the most recently created id file as node. create a safe and a module for the said node
 	id_path=$$(find $$(pwd) -name ".identity-local*.id" | sort -r | head -n 1) && \
     	args=$$(make create-safe-module id_path="$$id_path" | grep -oE "(\-\-safeAddress.*)") && \
-    	make run-local id_path="$$id_path" args="$$args"
+    	make run-local id_path="$$id_path" network="${network}" args="$$args"
 
 run-local-dev-compose: ## run local development Compose setup
 	echo "Starting Anvil on host"
@@ -375,6 +378,16 @@ fund-local-all: ## use faucet script to fund all the local identities
 		--identity-directory "${id_dir}" \
 		--contracts-root "./packages/ethereum/contracts"
 
+.PHONY: fund-local-rotsee
+fund-local-rotsee: network=rotsee
+fund-local-rotsee: ## use faucet script to fund all the local identities
+ifeq ($(node_address),)
+	echo "parameter <node_address> missing" >&2 && exit 1
+else
+	echo "$$args" > .safe.args && \
+		safe_address=$$(cat .safe.args | awk '{print $$2}') && \
+		make register-nodes network="${network}" environment_type=staging staking_addresses="[${safe_address}]" node_addresses="[${node_address}]"
+endif
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
 create-safe-module-all: id_password=local
@@ -396,6 +409,21 @@ create-safe-module: ## create a safe and a module, and add a node to the module
 		--network anvil-localhost \
 		--identity-from-path "${id_path}" \
 		--contracts-root "./packages/ethereum/contracts"
+
+.PHONY: deploy-safe-module
+deploy-safe-module: id_password=local
+deploy-safe-module: id_path=/tmp/local-alice.id
+deploy-safe-module: network=rotsee
+deploy-safe-module: ## Deploy a safe and a module, and add a node to the module
+ifeq ($(origin PRIVATE_KEY),undefined)
+	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
+endif
+	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY="${PRIVATE_KEY}" \
+		hopli create-safe-module \
+		--network "${network}" \
+		--identity-from-path "${id_path}" \
+		--contracts-root "./packages/ethereum/contracts"
+
 
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
@@ -477,16 +505,16 @@ endif
 		peer_ids="$(peer_ids)"
 
 register-nodes: ensure-environment-and-network-are-set
-register-nodes: ## owner register given nodes in network registry contract
-ifeq ($(native_addresses),)
-	echo "parameter <native_addresses> missing" >&2 && exit 1
+register-nodes: ## manager register nodes and safes in network registry contract
+ifeq ($(staking_addresses),)
+	echo "parameter <staking_addresses> missing" >&2 && exit 1
 endif
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
+ifeq ($(node_addresses),)
+	echo "parameter <node_addresses> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts register-nodes \
 		network=$(network) environment-type=$(environment_type) \
-		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
+		staking_addresses="$(staking_addresses)" node_addresses="$(node_addresses)"
 
 deregister-nodes: ensure-environment-and-network-are-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
@@ -593,6 +621,15 @@ ifeq ($(script),)
 	echo "parameter <script> missing" >&2 && exit 1
 endif
 	bash "${script}"
+
+.PHONY: generate-python-sdk
+generate-python-sdk: ## generate Python SDK via Swagger Codegen
+generate-python-sdk: build-docs-api
+	mkdir -p ./hoprd-sdk-python/
+	rm -rf ./hoprd-sdk-python/*
+	docker run --rm -v $$(pwd):/local swaggerapi/swagger-codegen-cli-v3 generate -l python \
+		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
+		-c /local/scripts/python-sdk-config.json
 
 .PHONY: help
 help:

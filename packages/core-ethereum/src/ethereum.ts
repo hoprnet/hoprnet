@@ -1,33 +1,32 @@
 import { setImmediate as setImmediatePromise } from 'timers/promises'
 
-import {
-  providers,
-  utils,
-  errors,
-  BigNumber,
-  ethers,
-  type UnsignedTransaction,
-  type ContractTransaction,
-  type BaseContract
-} from 'ethers'
+import { providers, utils, errors, BigNumber, ethers, type UnsignedTransaction, type ContractTransaction } from 'ethers'
 import {
   Address,
   Balance,
   BalanceType,
-  PublicKey,
   durations,
   type AcknowledgedTicket,
   type DeferType,
-  type Hash,
   create_counter,
   OffchainKeypair,
-  u8aToHex
+  u8aToHex,
+  ChainKeypair
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
-import { CORE_ETHEREUM_CONSTANTS, get_announce_payload } from '../lib/core_ethereum_misc.js'
+import {
+  CORE_ETHEREUM_CONSTANTS,
+  ChainCalls,
+  OffchainKeypair as Ethereum_OffchainKeypair,
+  ChainKeypair as Ethereum_Chainkeypair,
+  Address as CoreEthereum_Address,
+  Balance as CoreEthereum_Balance,
+  BalanceType as CoreEthereum_BalanceType,
+  AcknowledgedTicket as CoreEthereum_AcknowledgedTicket
+} from '../../core/lib/core_hopr.js'
 import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
@@ -36,7 +35,6 @@ import {
   HOPR_CHANNELS_ABI,
   HOPR_NETWORK_REGISTRY_ABI,
   HOPR_TOKEN_ABI,
-  DeploymentExtract,
   HOPR_NODE_SAFE_REGISTRY_ABI,
   HOPR_MODULE_ABI
 } from './utils/index.js'
@@ -48,7 +46,6 @@ import { Multiaddr } from '@multiformats/multiaddr'
 const constants = CORE_ETHEREUM_CONSTANTS()
 
 const log = debug('hopr:core-ethereum:ethereum')
-const abiCoder = new utils.AbiCoder()
 
 // Metrics
 const metric_countSendTransaction = create_counter(
@@ -72,6 +69,15 @@ export type SendTransactionReturn =
       code: SendTransactionStatus.DUPLICATE
     }
 
+export type DeploymentExtract = {
+  hoprAnnouncementsAddress: string
+  hoprTokenAddress: string
+  hoprChannelsAddress: string
+  hoprNetworkRegistryAddress: string
+  hoprNodeSafeRegistryAddress: string
+  indexerStartBlockNumber: number
+}
+
 export async function createChainWrapper(
   deploymentExtract: DeploymentExtract,
   safeModuleOptions: SafeModuleOptions,
@@ -83,7 +89,8 @@ export async function createChainWrapper(
     chain: string
     network: string
   },
-  privateKey: Uint8Array,
+  offchainKeypair: OffchainKeypair,
+  keypair: ChainKeypair,
   checkDuplicate: Boolean = true,
   txTimeout = constants.TX_CONFIRMATION_WAIT
 ) {
@@ -92,7 +99,7 @@ export async function createChainWrapper(
     ? new providers.StaticJsonRpcProvider(networkInfo.provider)
     : new providers.WebSocketProvider(networkInfo.provider)
   log(`[DEBUG] provider ${provider}`)
-  const publicKey = PublicKey.from_privkey(privateKey)
+  const publicKey = keypair.public()
   log(`[DEBUG] publicKey ${publicKey.to_hex(true)}`)
   const address = publicKey.to_address()
   log(`[DEBUG] address ${address.to_string()}`)
@@ -111,6 +118,12 @@ export async function createChainWrapper(
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
 
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
+
+  const chainCalls = new ChainCalls(
+    new Ethereum_OffchainKeypair(offchainKeypair.secret()),
+    new Ethereum_Chainkeypair(keypair.secret()),
+    CoreEthereum_Address.from_string(deploymentExtract.hoprChannelsAddress)
+  )
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -253,36 +266,6 @@ export async function createChainWrapper(
   }
 
   /**
-   * Build an essential transaction payload from contract parameters
-   * @param value amount of native token to send
-   * @param contract destination to send funds to or contract to execute the requested method
-   * @param method contract method
-   * @param rest contract method arguments
-   * @returns TransactionPayload
-   */
-  const buildEssentialTxPayload = <T extends BaseContract>(
-    value: BigNumber | string | number,
-    contract: T | string,
-    method: keyof T['functions'],
-    ...rest: Parameters<T['functions'][keyof T['functions']]>
-  ): TransactionPayload => {
-    if (rest.length > 0 && typeof contract === 'string') {
-      throw Error(`sendTransaction: passing arguments to non-contract instances is not implemented`)
-    }
-
-    const essentialTxPayload: TransactionPayload = {
-      to: typeof contract === 'string' ? contract : contract.address,
-      data:
-        rest.length > 0 && typeof contract !== 'string'
-          ? contract.interface.encodeFunctionData(method as string, rest)
-          : '',
-      value: BigNumber.from(value ?? 0)
-    }
-    log('essentialTxPayload %o', essentialTxPayload)
-    return essentialTxPayload
-  }
-
-  /**
    * Update nonce-tracker and transaction-manager, broadcast the transaction on chain, and listen
    * to the response until reaching block confirmation.
    * Transaction is built on essential transaction payload
@@ -357,7 +340,7 @@ export async function createChainWrapper(
     }
 
     // 3. sign transaction
-    const signingKey = new utils.SigningKey(privateKey)
+    const signingKey = new utils.SigningKey(keypair.secret())
     const signature = signingKey.signDigest(utils.keccak256(utils.serializeTransaction(populatedTx)))
 
     const signedTx = utils.serializeTransaction(populatedTx, signature)
@@ -449,36 +432,30 @@ export async function createChainWrapper(
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (
-    keypair: OffchainKeypair,
-    chain_key: Address,
-    multiaddr: Multiaddr,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<string> => {
-    let confirmationEssentialTxPayload: TransactionPayload
-
-    confirmationEssentialTxPayload.data = u8aToHex(get_announce_payload(keypair, chain_key, multiaddr.toString()))
-    confirmationEssentialTxPayload.to = deploymentExtract.hoprAnnouncementsAddress
-
+  const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+    let confirmationEssentialTxPayload: TransactionPayload = {
+      data: u8aToHex(chainCalls.get_announce_payload(multiaddr.toString())),
+      to: deploymentExtract.hoprAnnouncementsAddress,
+      value: BigNumber.from(0)
+    }
     // @ts-ignore fixme: treat result
     let sendResult: SendTransactionReturn
-    // @ts-ignore fixme: treat result
     let error: unknown
+
     try {
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
     }
 
-    // switch (sendResult.code) {
-    //   case SendTransactionStatus.SUCCESS:
-    //     return sendResult.tx.hash
-    //   case SendTransactionStatus.DUPLICATE:
-    //     throw new Error(`Failed in sending announce transaction because transaction is a duplicate`)
-    //   default:
-    //     throw new Error(`Failed in sending announce transaction due to ${error}`)
-    // }
-    return new Promise(() => '')
+    switch (sendResult.code) {
+      case SendTransactionStatus.SUCCESS:
+        return sendResult.tx.hash
+      case SendTransactionStatus.DUPLICATE:
+        throw new Error(`Failed in sending announce transaction because transaction is a duplicate`)
+      default:
+        throw new Error(`Failed in sending announce transaction due to ${error}`)
+    }
   }
 
   /**
@@ -502,11 +479,24 @@ export async function createChainWrapper(
     try {
       switch (currency) {
         case 'NATIVE':
-          withdrawEssentialTxPayload = buildEssentialTxPayload(amount, recipient, undefined)
+          withdrawEssentialTxPayload = {
+            data: '0x',
+            to: recipient,
+            value: BigNumber.from(amount)
+          }
           sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
           break
         case 'HOPR':
-          withdrawEssentialTxPayload = buildEssentialTxPayload(0, token, 'transfer', recipient, amount)
+          withdrawEssentialTxPayload = {
+            data: u8aToHex(
+              chainCalls.get_transfer_payload(
+                CoreEthereum_Address.from_string(recipient),
+                new CoreEthereum_Balance(amount, CoreEthereum_BalanceType.HOPR)
+              )
+            ),
+            to: token.address,
+            value: BigNumber.from(0)
+          }
           sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
           break
       }
@@ -534,46 +524,72 @@ export async function createChainWrapper(
    * @returns a Promise that resolves wiht the transaction hash
    */
   const fundChannel = async (
-    partyA: Address,
-    partyB: Address,
-    fundsA: Balance,
-    fundsB: Balance,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    const totalFund = fundsA.add(fundsB)
-    log(
-      'Funding channel from %s with %s HOPR to %s with %s HOPR',
-      partyA.to_hex(),
-      fundsA.to_formatted_string(),
-      partyB.to_hex(),
-      fundsB.to_formatted_string()
-    )
-    let sendResult: SendTransactionReturn
-    let error: unknown
-    try {
-      const fundChannelEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        token,
-        'send',
-        channels.address,
-        totalFund.to_string(),
-        abiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256'],
-          [partyA.to_hex(), partyB.to_hex(), fundsA.to_string(), fundsB.to_string()]
+    destination: Address,
+    amount: Balance,
+    txHandlerApprove: (tx: string) => DeferType<string>,
+    txHandlerFundChannel: (tx: string) => DeferType<string>
+  ): Promise<[Receipt, Receipt]> => {
+    let receipts: [Receipt, Receipt] = [undefined, undefined]
+    // do approve, then fundChannel to easily interoperate with Safe
+
+    // first: approve
+    let approveError: unknown
+    let approveResult: SendTransactionReturn
+
+    const approveTxPayload: TransactionPayload = {
+      data: u8aToHex(
+        chainCalls.get_approve_payload(
+          CoreEthereum_Balance.deserialize(amount.serialize_value(), CoreEthereum_BalanceType.HOPR)
         )
-      )
-      sendResult = await sendTransaction(checkDuplicate, fundChannelEssentialTxPayload, txHandler)
+      ),
+      to: token.address,
+      value: BigNumber.from(0)
+    }
+    try {
+      approveResult = await sendTransaction(checkDuplicate, approveTxPayload, txHandlerApprove)
     } catch (err) {
-      error = err
+      approveError = err
     }
 
-    switch (sendResult.code) {
+    switch (approveResult.code) {
       case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
+        receipts[0] = approveResult.tx.hash
+        break
+      case SendTransactionStatus.DUPLICATE:
+        throw new Error(`Failed in approving token transfer because transaction is a duplicate`)
+      default:
+        throw new Error(`Failed in approving token transfer due to ${approveError}`)
+    }
+
+    // second: fundChannel
+    let fundChannelError: unknown
+    let fundChannelResult: SendTransactionReturn
+
+    const fundChannelPayload: TransactionPayload = {
+      data: u8aToHex(
+        chainCalls.get_fund_channel_payload(
+          CoreEthereum_Address.deserialize(destination.serialize()),
+          CoreEthereum_Balance.deserialize(amount.serialize_value(), CoreEthereum_BalanceType.HOPR)
+        )
+      ),
+      to: channels.address,
+      value: BigNumber.from(0)
+    }
+
+    try {
+      fundChannelResult = await sendTransaction(checkDuplicate, fundChannelPayload, txHandlerFundChannel)
+    } catch (err) {
+      fundChannelError = err
+    }
+
+    switch (fundChannelResult.code) {
+      case SendTransactionStatus.SUCCESS:
+        receipts[1] = fundChannelResult.tx.hash
+        return receipts
       case SendTransactionStatus.DUPLICATE:
         throw new Error(`Failed in sending fundChannel transaction because transaction is a duplicate`)
       default:
-        throw new Error(`Failed in sending fundChannel transaction due to ${error}`)
+        throw new Error(`Failed in sending fundChannel transaction due to ${fundChannelError}`)
     }
   }
 
@@ -591,16 +607,20 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
+    const initiateOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
+      data: u8aToHex(
+        chainCalls.get_intiate_outgoing_channel_closure_payload(
+          CoreEthereum_Address.deserialize(counterparty.serialize())
+        )
+      ),
+      to: channels.address,
+      value: BigNumber.from(0)
+    }
+
     try {
-      const initiateOutgoingChannelClosureEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        channels,
-        'initiateOutgoingChannelClosure',
-        counterparty.to_hex()
-      )
       sendResult = await sendTransaction(checkDuplicate, initiateOutgoingChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
-      error
+      error = err
     }
 
     switch (sendResult.code) {
@@ -632,13 +652,17 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
+    const finalizeOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
+      data: u8aToHex(
+        chainCalls.get_finalize_outgoing_channel_closure_payload(
+          CoreEthereum_Address.deserialize(counterparty.serialize())
+        )
+      ),
+      to: channels.address,
+      value: BigNumber.from(0)
+    }
+
     try {
-      const finalizeOutgoingChannelClosureEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        channels,
-        'finalizeOutgoingChannelClosure',
-        counterparty.to_hex()
-      )
       sendResult = await sendTransaction(checkDuplicate, finalizeOutgoingChannelClosureEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
@@ -675,22 +699,16 @@ export async function createChainWrapper(
 
     let sendResult: SendTransactionReturn
     let error: unknown
+
+    const redeemTicketEssentialTxPayload: TransactionPayload = {
+      data: u8aToHex(
+        chainCalls.get_redeem_ticket_payload(CoreEthereum_AcknowledgedTicket.deserialize(ackTicket.serialize()))
+      ),
+      to: channels.address,
+      value: BigNumber.from(0)
+    }
+
     try {
-      const redeemTicketEssentialTxPayload = buildEssentialTxPayload(0, channels, 'redeemTicket', {
-        data: {
-          channelId: counterparty.to_hex(), // FIXME: build channelId with self and counterparty
-          amount: ackTicket.ticket.amount.to_string(),
-          ticketIndex: ackTicket.ticket.index.to_hex(),
-          indexOffset: 0, // FIXME:
-          epoch: ackTicket.ticket.channel_epoch.to_hex(),
-          winProb: ackTicket.ticket.win_prob.to_string()
-        },
-        signature: {
-          r: ackTicket.ticket.signature.to_hex(), // FIXME: get v value
-          vs: ackTicket.ticket.signature.to_hex() // FIXME: get rs value
-        },
-        porSecret: ackTicket.response.to_hex() // FIXME: use POR secret
-      })
       sendResult = await sendTransaction(checkDuplicate, redeemTicketEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
@@ -712,47 +730,6 @@ export async function createChainWrapper(
   }
 
   /**
-   * FIXME: remove this
-   * Initiates a transaction that sets a commitment
-   * @param counterparty second participant of the payment channel
-   * @param commitment value to deposit on-chain
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves with the transaction hash
-   */
-  const setCommitment = async (
-    counterparty: Address,
-    commitment: Hash,
-    _txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    log('Setting commitment %s in channel to %s', commitment.to_hex(), counterparty.to_hex())
-    // let sendResult: SendTransactionReturn
-    // let error: unknown
-
-    // try {
-    //   const setCommitmentEssentialTxPayload = buildEssentialTxPayload(
-    //     0,
-    //     channels,
-    //     'bumpChannel',
-    //     counterparty.to_hex(),
-    //     commitment.to_hex()
-    //   )
-    //   sendResult = await sendTransaction(checkDuplicate, setCommitmentEssentialTxPayload, txHandler)
-    // } catch (err) {
-    //   error = err
-    // }
-
-    // switch (sendResult.code) {
-    //   case SendTransactionStatus.SUCCESS:
-    //     return sendResult.tx.hash
-    //   case SendTransactionStatus.DUPLICATE:
-    //     throw new Error(`Failed in sending commitment transaction because transaction is a duplicate`)
-    //   default:
-    //     throw new Error(`Failed in sending commitment transaction due to ${error}`)
-    // }
-    return new Promise(() => '')
-  }
-
-  /**
    * Initiates a transaction that registers a safe address
    * @param safeAddress address of safe
    * @param txHandler handler to call once the transaction has been published
@@ -766,13 +743,15 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
+    const registerSafeByNodeEssentialTxPayload: TransactionPayload = {
+      data: u8aToHex(
+        chainCalls.get_register_safe_by_node_payload(CoreEthereum_Address.deserialize(safeAddress.serialize()))
+      ),
+      to: nodeSafeRegistry.address,
+      value: BigNumber.from(0)
+    }
+
     try {
-      const registerSafeByNodeEssentialTxPayload = buildEssentialTxPayload(
-        0,
-        nodeSafeRegistry,
-        'registerSafeByNode',
-        safeAddress.to_hex()
-      )
       sendResult = await sendTransaction(checkDuplicate, registerSafeByNodeEssentialTxPayload, txHandler)
     } catch (err) {
       error = err
@@ -958,7 +937,6 @@ export async function createChainWrapper(
     redeemTicket,
     registerSafeByNode,
     getGenesisBlock: () => genesisBlock,
-    setCommitment,
     sendTransaction, //: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber, // TODO: use indexer when it's done syncing
@@ -987,7 +965,7 @@ export async function createChainWrapper(
     getNetworkRegistry: () => networkRegistry,
     getNodeSafeRegistry: () => nodeSafeRegistry,
     getNodeManagementModule: () => nodeManagementModule,
-    getPrivateKey: () => privateKey,
+    getPrivateKey: () => keypair.secret(),
     getPublicKey: () => publicKey,
     getInfo: () => ({
       chain: networkInfo.chain,
@@ -1008,6 +986,7 @@ export async function createChainWrapper(
     ) as TransactionManager['getAllUnconfirmedHash'],
     getAllQueuingTransactionRequests: transactions.getAllQueuingTxs.bind(
       transactions
-    ) as TransactionManager['getAllQueuingTxs']
+    ) as TransactionManager['getAllQueuingTxs'],
+    getProvider: () => provider
   }
 }

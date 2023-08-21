@@ -19,11 +19,11 @@ describe('POST /peers/{peerid}/ping', () => {
     chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
   })
 
-  it('should ping successfuly', async () => {
+  it('should ping successfully', async () => {
     let meta = new Map<string, string>()
     meta.set(PEER_METADATA_PROTOCOL_VERSION, '1.2.3')
 
-    node.ping = sinon.fake.returns({ latency: 10 })
+    node.ping = sinon.fake.resolves({ latency: 10 })
     node.getConnectionInfo = sinon.fake.returns({ metadata: () => meta })
 
     const res = await request(service).post(`/api/v3/peers/${ALICE_PEER_ID.toString()}/ping`).send()

@@ -47,6 +47,7 @@ wasm-bindgen-futures = "0.4.36"
 
 core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
 core-ethereum-misc = { path = "packages/core-ethereum/crates/core-ethereum-misc", default-features = false }
+core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }
 core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
 core-misc = { path = "packages/core/crates/core-misc", default-features = false }
 core-mixer = { path = "packages/core/crates/core-mixer", default-features = false }

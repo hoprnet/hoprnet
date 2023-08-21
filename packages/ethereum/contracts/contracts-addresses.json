@@ -39,7 +39,7 @@
         "network_registry": "0x2f3243adC9805F6dd3E01C9E9ED31675A5B16902",
         "network_registry_proxy": "0x6af01f9B2eE06349a93032e9625D739FD8C199B1",
         "node_safe_registry": "0x3E7c4720934ff6A9FE122Cb761f36a11E9b848D9",
-        "node_stake_v2_factory": "0x15b362617891169F7e448d88322D572F205E3c78",
+        "node_stake_v2_factory": "0xa2e2F71f687914f5DC2010632bC2dEbB1B9FC1D5",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
         "ticket_price_oracle": "0xD47a3FAC305c2e272AD2344C1B718B2F70f81955",
         "announcements": "0xD2C191dd9757D9f19f9815751a1A29B9933FfA63"
@@ -53,7 +53,7 @@
         "network_registry": "0xF4C6e161036bC7CD087642d5601F56e3e2871aa3",
         "network_registry_proxy": "0xa11cc45DDf3564Ac17Da2C15A9E22aD932B66a5a",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-        "node_stake_v2_factory": "0x810c39897b0fB2F7801878dca399e4f92F8AFe5e",
+        "node_stake_v2_factory": "0x75b1e7E99F1cDded81ea3CF162746f68f1EA4D50",
         "node_safe_registry": "0x03a13Cfd79009b56B7D62c68fc3b8fbb3B2b0752",
         "module_implementation": "0xCb8F0Bdb575d5695732A10400E877784504ac853",
         "ticket_price_oracle": "0xC797f94d98f08003D8fB23DAB0982645546CF2E1",

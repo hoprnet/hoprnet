@@ -2,7 +2,6 @@ import { setImmediate as setImmediatePromise } from 'timers/promises'
 import BN from 'bn.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
-import chalk from 'chalk'
 import { EventEmitter } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
 import {
@@ -15,26 +14,28 @@ import {
   debug,
   retryWithBackoffThenThrow,
   ordered,
-  u8aToHex,
   FIFO,
   type DeferType,
   create_multi_counter,
   create_gauge,
   // create_multi_gauge,
-  U256,
   random_integer
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
 import { type IndexerEventEmitter, IndexerStatus, type IndexerEvents } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
-import { BigNumber, type Contract, errors } from 'ethers'
+import { BigNumber, errors } from 'ethers'
+import { Filter, Log } from '@ethersproject/abstract-provider'
 
-import { CORE_ETHEREUM_CONSTANTS, Ethereum_Address, Ethereum_Database } from '../db.js'
-
-import type { TypedEvent, TypedEventFilter } from '../utils/common.js'
-
-import { Handlers } from '../../lib/core_ethereum_indexer.js'
+import {
+  CORE_ETHEREUM_CONSTANTS,
+  Ethereum_Address,
+  Ethereum_Database,
+  Ethereum_Snapshot,
+  Ethereum_U256,
+  Handlers
+} from '../db.js'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
@@ -87,7 +88,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   public startupBlock: number = 0 // blocknumber at which the indexer starts
 
   // Use FIFO + sliding window for many events
-  private unconfirmedEvents: FIFO<TypedEvent<any, any>>
+  private unconfirmedEvents: FIFO<Log>
 
   private chain: ChainWrapper
   private genesisBlock: number
@@ -108,7 +109,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   ) {
     super()
 
-    this.unconfirmedEvents = FIFO<TypedEvent<any, any>>()
+    this.unconfirmedEvents = FIFO<Log>()
   }
 
   /**
@@ -210,7 +211,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     this.status = IndexerStatus.STARTED
     this.emit('status', IndexerStatus.STARTED)
-    log(chalk.green('Indexer started!'))
+    log('Indexer started!')
   }
 
   /**
@@ -230,7 +231,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     this.status = IndexerStatus.STOPPED
     this.emit('status', IndexerStatus.STOPPED)
-    log(chalk.green('Indexer stopped!'))
+    log('Indexer stopped!')
   }
 
   /**
@@ -253,7 +254,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     } catch (err) {
       this.status = IndexerStatus.STOPPED
       this.emit('status', IndexerStatus.STOPPED)
-      log(chalk.red('Failed to restart: %s', err.message))
+      log('Failed to restart: %s', err.message)
       throw err
     }
   }
@@ -273,45 +274,41 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   ): Promise<
     | {
         success: true
-        events: TypedEvent<any, any>[]
+        events: Log[]
       }
     | {
         success: false
       }
   > {
-    let rawEvents: TypedEvent<any, any>[] = []
+    let rawEvents: Log[] = []
 
-    const queries: { contract: Contract; filter: TypedEventFilter<any> }[] = [
-      // HoprChannels
+    const provider = this.chain.getProvider()
+    const contractAddresses = this.chain.getInfo()
+
+    let queries: Filter[] = [
       {
-        contract: this.chain.getChannels() as unknown as Contract,
-        filter: {
-          topics: [
-            [
-              // Relevant channel events
-              // this.chain.getChannels().interface.getEventTopic('Announcement'),
-              // this.chain.getChannels().interface.getEventTopic('ChannelUpdated'),
-              // this.chain.getChannels().interface.getEventTopic('TicketRedeemed')
-            ]
-          ]
-        }
+        address: contractAddresses.hoprAnnouncementsAddress,
+        topics: [this.handlers.get_announcement_topics()],
+        fromBlock,
+        toBlock
       },
-      // HoprNetworkRegistry
       {
-        contract: this.chain.getNetworkRegistry() as unknown as Contract,
-        filter: {
-          topics: [
-            [
-              // Relevant HoprNetworkRegistry events
-              // this.chain.getNetworkRegistry().interface.getEventTopic('Registered'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('Deregistered'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('RegisteredByOwner'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('DeregisteredByOwner'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('EligibilityUpdated'),
-              // this.chain.getNetworkRegistry().interface.getEventTopic('EnabledNetworkRegistry')
-            ]
-          ]
-        }
+        address: contractAddresses.hoprChannelsAddress,
+        topics: [this.handlers.get_channel_topics()],
+        fromBlock,
+        toBlock
+      },
+      {
+        address: contractAddresses.hoprNodeSafeRegistryAddress,
+        topics: [this.handlers.get_node_safe_registry_topics()],
+        fromBlock,
+        toBlock
+      },
+      {
+        address: contractAddresses.hoprNetworkRegistryAddress,
+        topics: [this.handlers.get_network_registry_topics()],
+        fromBlock,
+        toBlock
       }
     ]
 
@@ -321,45 +318,20 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // handle errors produced by internal Ethers.js provider calls
     if (fetchTokenTransactions) {
       queries.push({
-        contract: this.chain.getToken() as unknown as Contract,
-        filter: {
-          topics: [
-            // Token transfer *from* us
-            [this.chain.getToken().interface.getEventTopic('Transfer')],
-            [u8aToHex(this.address.to_bytes32())]
-          ]
-        }
-      })
-      queries.push({
-        contract: this.chain.getToken() as unknown as Contract,
-        filter: {
-          topics: [
-            // Token transfer *towards* us
-            [this.chain.getToken().interface.getEventTopic('Transfer')],
-            null,
-            [u8aToHex(this.address.to_bytes32())]
-          ]
-        }
+        address: contractAddresses.hoprTokenAddress,
+        topics: [this.handlers.get_token_topics()],
+        fromBlock,
+        toBlock
       })
     }
 
     for (const query of queries) {
-      let tmpEvents: TypedEvent<any, any>[]
       try {
-        tmpEvents = (await query.contract.queryFilter(query.filter, fromBlock, toBlock)) as any
+        rawEvents.push(...(await provider.getLogs(query)))
       } catch {
         return {
           success: false
         }
-      }
-
-      for (const event of tmpEvents) {
-        Object.assign(event, query.contract.interface.parseLog(event))
-
-        if (event.event == undefined) {
-          Object.assign(event, { event: (event as any).name })
-        }
-        rawEvents.push(event)
       }
     }
 
@@ -435,7 +407,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       return
     }
 
-    log(chalk.red(`etherjs error: ${error}`))
+    log(`etherjs error: ${error}`)
 
     try {
       const errorType = [errors.SERVER_ERROR, errors.TIMEOUT, 'ECONNRESET', 'ECONNREFUSED'].filter((err) =>
@@ -446,7 +418,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       if (errorType.length != 0) {
         metric_indexerErrors.increment([errorType[0]])
 
-        log(chalk.blue('code error falls here', this.chain.getAllQueuingTransactionRequests().length))
+        log('code error falls here', this.chain.getAllQueuingTransactionRequests().length)
         // allow the indexer to restart even there is no transaction in queue
         await retryWithBackoffThenThrow(
           () =>
@@ -511,7 +483,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     let fetchedSnapshot = await this.db.get_latest_confirmed_snapshot()
     let lastDatabaseSnapshot =
-      fetchedSnapshot === undefined ? fetchedSnapshot : Snapshot.deserialize(fetchedSnapshot.serialize())
+      fetchedSnapshot === undefined ? fetchedSnapshot : Ethereum_Snapshot.deserialize(fetchedSnapshot.serialize())
 
     // settle transactions before processing events
     if (fetchNativeTxs) {
@@ -547,6 +519,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
               this.indexEvent(`channel-updated-${txHash}`)
             } else if (this.listeners(`node-safe-registered-${txHash}`).length > 0) {
               this.indexEvent(`node-safe-registered-${txHash}`)
+            } else if (this.listeners(`token-approved-${txHash}`).length > 0) {
+              this.indexEvent(`token-approved-${txHash}`)
             }
 
             // update transaction manager
@@ -643,7 +617,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @dev ignores events that have been processed before.
    * @param events new unprocessed events
    */
-  private onNewEvents(events: TypedEvent<any, any>[] | undefined): void {
+  private onNewEvents(events: Log[] | undefined): void {
     if (events == undefined || events.length == 0) {
       // Nothing to do
       return
@@ -720,9 +694,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     ) {
       const event = this.unconfirmedEvents.shift()
       log(
-        'Processing event %s blockNumber=%s maxConfirmations=%s',
+        'Processing event at blockNumber=%s maxConfirmations=%s',
         // @TODO: fix type clash
-        event.event,
         blockNumber,
         this.maxConfirmations
       )
@@ -745,25 +718,25 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
 
       // @TODO: fix type clash
-      lastDatabaseSnapshot = new Snapshot(
-        new U256(event.blockNumber.toString()),
-        new U256(event.transactionIndex.toString()),
-        new U256(event.logIndex.toString())
+      lastDatabaseSnapshot = new Ethereum_Snapshot(
+        new Ethereum_U256(event.blockNumber.toString()),
+        new Ethereum_U256(event.transactionIndex.toString()),
+        new Ethereum_U256(event.logIndex.toString())
       )
 
-      log('Event name %s and hash %s', event.event, event.transactionHash)
+      log('Event and hash %s', event.transactionHash)
 
       try {
         await this.handlers.on_event(
           this.db,
-          event.address,
-          event.topics,
-          event.data,
+          event.address.replace('0x', ''),
+          event.topics.map((t) => t.replace('0x', '')),
+          event.data.replace('0x', ''),
           blockNumber.toString(),
           lastDatabaseSnapshot
         )
       } catch (err) {
-        error('Error while processing', event)
+        error('Error while processing', err, event)
       }
     }
   }

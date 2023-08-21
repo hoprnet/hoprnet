@@ -181,16 +181,16 @@ endif
 # E.g. make register-nodes network=anvil-localhost environment-type=local staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: register-nodes
 register-nodes: ensure-environment-and-network-are-set ensure-privatekey-is-set
-register-nodes: ## owner register given nodes in network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
-endif
+register-nodes: ## manager registers nodes and safes in network registry contract
 ifeq ($(staking_addresses),)
 	echo "parameter <staking_addresses> missing" >&2 && exit 1
 endif
+ifeq ($(node_addresses),)
+	echo "parameter <node_addresses> missing" >&2 && exit 1
+endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "registerNodes(address[],string[])" \
-		$(staking_addresses) $(peer_ids)
+		--broadcast --sig "registerNodes(address[],address[])" \
+		$(staking_addresses) $(node_addresses)
 
 # E.g. make deregister-nodes network=anvil-localhost environment-type=local staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: deregister-nodes
@@ -258,9 +258,9 @@ endif
 ensure-etherscan-api-key-is-set:
 ifeq ($(origin ETHERSCAN_API_KEY),undefined)
 # On local testing a dummy key is needed
-	etherscan_api_key=dummyKey
+etherscan_api_key=dummyKey
 else
-	etherscan_api_key=${ETHERSCAN_API_KEY}
+etherscan_api_key=${ETHERSCAN_API_KEY}
 endif
 
 ensure-environment-is-set:

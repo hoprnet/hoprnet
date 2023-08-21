@@ -3,11 +3,11 @@ import { STATUS_CODES } from '../../utils.js'
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const tag = req.body.tag
+    const tag: number = req.body.tag
     const msg = await req.context.inbox.pop(tag)
 
     if (msg) {
-      return res.status(200).send({ tag: msg.application_tag, body: msg.plain_text.toString() })
+      return res.status(200).send({ tag: msg.application_tag, body: new TextDecoder().decode(msg.plain_text) })
     }
     return res.status(404).send()
   }
@@ -23,6 +23,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['tag'],
           properties: {
             tag: {
               $ref: '#/components/schemas/MessageTag'
