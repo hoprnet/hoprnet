@@ -13,6 +13,12 @@ use core_network::{
 use crate::adaptors::network::ExternalNetworkInteractions;
 
 
+/// Implementor of the ping external API.
+/// 
+/// Ping requires functionality from external components in order to obtain
+/// the triggers for its functionality. This class implements the basic API by
+/// aggregating all necessary ping resources without leaking them into the 
+/// `Ping` object and keeping both the adaptor and the ping object OCP and SRP compliant.
 #[derive(Clone)]
 pub struct PingExternalInteractions {
     network: Arc<RwLock<Network<ExternalNetworkInteractions>>>

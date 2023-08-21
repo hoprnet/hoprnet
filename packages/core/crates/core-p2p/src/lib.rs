@@ -1,6 +1,8 @@
 pub mod api;
 pub mod errors;
 
+use std::fmt::Debug;
+
 use libp2p::StreamProtocol;
 
 pub use libp2p::identity;
@@ -13,12 +15,13 @@ use libp2p::noise as libp2p_noise;
 
 use libp2p_identity::PeerId;
 use libp2p_core::{upgrade, Transport};
-use libp2p_swarm::{NetworkBehaviour, SwarmBuilder};
+use libp2p_swarm::{NetworkBehaviour, SwarmBuilder, derive_prelude::Either};
 
 use serde::{Serialize, Deserialize};
 
 use core_network::messaging::ControlMessage;
 use core_types::acknowledgement::Acknowledgement;
+use void::Void;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(pub ControlMessage);
@@ -47,6 +50,14 @@ pub struct HoprNetworkBehavior {
     keep_alive: libp2p_swarm::keep_alive::Behaviour             // run the business logic loop indefinitely
 }
 
+impl Debug for HoprNetworkBehavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoprNetworkBehavior").finish()
+    }
+}
+
+/// Aggregated network behavior inheriting the component behaviors.
+#[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p_request_response::Event<Ping,Pong>),
     Message(libp2p_request_response::Event<Box<[u8]>,()>),
@@ -77,7 +88,6 @@ impl From<libp2p_request_response::Event<Acknowledgement,()>> for HoprNetworkBeh
         Self::Acknowledgement(event)
     }
 }
-
 
 impl Default for HoprNetworkBehavior {
     fn default() -> Self {
@@ -149,6 +159,9 @@ fn build_swarm<T: NetworkBehaviour>(transport: libp2p::core::transport::Boxed<(P
 }
 
 
+/// Build objects comprising the p2p network.
+/// 
+/// @return A built `Swarm` object implementing the HoprNetworkBehavior functionality
 pub fn build_p2p_network(me: libp2p_identity::Keypair) -> libp2p_swarm::Swarm<HoprNetworkBehavior> {
     let transport = build_basic_transport()
         .upgrade(upgrade::Version::V1)

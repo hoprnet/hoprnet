@@ -362,6 +362,15 @@ impl Snapshot {
             log_index,
         }
     }
+
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+    pub fn zero() -> Self {
+        Self {
+            block_number: U256::zero(),
+            transaction_index: U256::zero(),
+            log_index: U256::zero(),
+        }
+    }
 }
 
 impl BinarySerializable for Snapshot {

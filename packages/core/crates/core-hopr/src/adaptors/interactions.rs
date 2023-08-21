@@ -17,6 +17,7 @@ pub mod wasm {
     use utils_log::debug;
     use wasm_bindgen::prelude::*;
 
+    /// Helper loop ensuring conversion and enqueueing of events on acknowledgement
     pub fn spawn_ack_receiver_loop(on_ack: Option<js_sys::Function>) -> Option<UnboundedSender<HalfKeyChallenge>> {
         match on_ack {
             Some(on_ack_fn) => {
@@ -37,6 +38,7 @@ pub mod wasm {
         }
     }
 
+    /// Helper loop ensuring conversion and enqueueing of events on acknowledgement ticket
     pub fn spawn_ack_tkt_receiver_loop(on_ack_tkt: Option<js_sys::Function>) -> Option<UnboundedSender<AcknowledgedTicket>>  {
         match on_ack_tkt {
             Some(on_ack_tkt_fn) => {
@@ -59,6 +61,7 @@ pub mod wasm {
 
     const ON_PACKET_QUEUE_SIZE: usize = 4096;
 
+    /// Helper loop ensuring conversion and enqueueing of events on receiving the final packet
     pub fn spawn_on_final_packet_loop(on_final_packet: Option<js_sys::Function>) -> Option<Sender<Box<[u8]>>>  {
         match on_final_packet {
             Some(on_msg_rcv) => {

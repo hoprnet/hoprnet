@@ -69,6 +69,7 @@ import {
   PeerOrigin,
   PingConfig,
   health_to_string,
+  Snapshot,
 } from '../../core/lib/core_hopr.js'
 core_hopr_initialize_crate()
 registerMetricsCollector(core_hopr_gather_metrics)
@@ -355,7 +356,8 @@ export class Hopr extends EventEmitter {
 
     const onReceivedMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
 
-    // TODO: Add secp keypair instead of the string
+    this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot.zero())
+
     let coreApp = new CoreApp(new Packet_OffchainKeypair(this.packetKeypair.secret()), this.db.clone(),
       this.options.networkQualityThreshold, heartbeat_cfg, ping_cfg,
       onAcknowledgement, onAcknowledgedTicket, packetCfg, onReceivedMessage,
@@ -611,7 +613,7 @@ export class Hopr extends EventEmitter {
       // Perform the strategy tick
       tickResult = this.strategy.tick(
         new BN((await this.getBalance()).to_string()),
-        await get_peers_with_quality(this.networkPeers),
+        await get_peers_with_quality(this.networkPeers, this.db),
         outgoingChannels.map((c) => {
           return {
             address: c.destination.to_string(),

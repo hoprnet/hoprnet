@@ -25,6 +25,8 @@ pub struct HeartbeatResponder {
     sender: HeartbeatResponseTx
 }
 
+
+/// Wrapper around the heartbeat responding functionality used by the heartbeat recorder
 impl HeartbeatResponder {
     pub fn new(sender: HeartbeatResponseTx) -> Self
     {
@@ -55,6 +57,7 @@ impl HeartbeatResponder {
     }
 }
 
+/// Requester of heartbeats implementing the `std::future::Stream` trait.
 pub struct HeartbeatRequester {
     receiver: HeartbeaRequestRx,
 }

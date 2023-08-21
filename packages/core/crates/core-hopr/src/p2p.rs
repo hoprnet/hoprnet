@@ -14,7 +14,7 @@ pub use core_p2p::{libp2p_identity, api};
 use core_p2p::{
     HoprNetworkBehaviorEvent,
     Ping, Pong,
-    libp2p_request_response, libp2p_swarm::{SwarmEvent, derive_prelude::Multiaddr}
+    libp2p_request_response, libp2p_swarm::{SwarmEvent, derive_prelude::Multiaddr}, HoprSwarm
 };
 use utils_log::{debug, info, error};
 
@@ -70,11 +70,12 @@ impl From<IndexerProcessed> for Inputs {
     }
 }
 
-
 /// Main p2p loop that will instantiate a new libp2p::Swarm instance and setup listening and reacting pipelines
 /// running in a neverending loop future.
 /// 
-/// This future can only be resolved by an error or a panic.
+/// The function represents the entirety of the business logic of the hopr daemon related to core operations.
+/// 
+/// This future can only be resolved by an unrecoverable error or a panic.
 pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     network: Arc<RwLock<Network<crate::adaptors::network::ExternalNetworkInteractions>>>,
     network_update_input: Receiver<NetworkEvent>,
@@ -137,8 +138,7 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
         pkt_interactions.map(Inputs::Message),
         indexer_update_input.map(Inputs::Indexer)
     ).merge().fuse();
-    
-    // NOTE: this should be changed to a merged stream as well, maybe `SwarmEvent<HoprNetworkBehaviorEvent>`
+
     loop {
         select! {
             input = inputs.select_next_some() => match input {

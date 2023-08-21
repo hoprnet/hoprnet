@@ -118,8 +118,13 @@ impl std::fmt::Display for HoprLoopComponents {
     }
 }
 
-/// The main core loop containing all of the individual core components running indefinitely
-/// or until the first error/panic.
+/// The main core function building all core components
+/// 
+/// This method creates a group of utilities that can be used to generate triggers for the core application
+/// business logic, as well as the main loop that can be triggered to start event processing.
+/// 
+/// The loop containing all of the individual core components is running indefinitely, it will not stop or return
+/// until the first unrecoverable error/panic is encountered.
 #[cfg(feature = "wasm")]
 pub fn build_components(me: libp2p_identity::Keypair,
     db: Arc<RwLock<CoreEthereumDb<LevelDbShim>>>,
@@ -239,10 +244,7 @@ pub mod wasm_impl {
 
     #[wasm_bindgen]
     impl CoreApp {
-        /// Constructor
-        /// 
-        /// # Arguments
-        /// me: A value convertible to the `libp2p_identity::Keypair` needed by the swarm
+        /// Constructor for the CoreApp
         #[wasm_bindgen(constructor)]
         pub fn new(me: &OffchainKeypair, db: Database, // TODO: replace the string with the KeyPair
             network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig,
