@@ -565,13 +565,30 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.get_or_none::<Hash>(key).await
     }
 
-    async fn set_channels_domain_separator(&mut self, channels_domain_separator: String, snapshot: &Snapshot) -> Result<()> {
-        let domain_separator_hash = Hash::create(&[channels_domain_separator.as_bytes()]);
-
+    async fn set_channels_domain_separator(&mut self, channels_domain_separator: &Hash, snapshot: &Snapshot) -> Result<()> {
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.put(
             utils_db::db::Key::new_from_str(CHANNELS_DOMAIN_SEPARATOR_KEY)?,
-            domain_separator_hash,
+            channels_domain_separator,
+        );
+        batch_ops.put(
+            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
+            snapshot,
+        );
+
+        self.db.batch(batch_ops, true).await
+    }
+
+    async fn get_channels_ledger_domain_separator(&self) -> Result<Option<Hash>> {
+        let key = utils_db::db::Key::new_from_str(CHANNELS_LEDGER_DOMAIN_SEPARATOR_KEY)?;
+        self.db.get_or_none::<Hash>(key).await
+    }
+
+    async fn set_channels_ledger_domain_separator(&mut self, channels_ledger_domain_separator: &Hash, snapshot: &Snapshot) -> Result<()> {
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.put(
+            utils_db::db::Key::new_from_str(CHANNELS_LEDGER_DOMAIN_SEPARATOR_KEY)?,
+            channels_ledger_domain_separator,
         );
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
