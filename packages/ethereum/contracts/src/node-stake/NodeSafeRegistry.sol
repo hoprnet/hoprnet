@@ -7,8 +7,18 @@ import { IHoprNodeManagementModule } from "../interfaces/INodeManagementModule.s
 import { Address } from "openzeppelin-contracts/utils/Address.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {
+    /**
+     * Emitted once a safe and node pair gets registered
+     */
     event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    /**
+     * Emitted once a safe and node pair gets deregistered
+     */
     event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    /**
+     * Emitted once the domain separator is updated.
+     */
+    event DomainSeparatorUpdated(bytes32 indexed domainSeparator);
 }
 
 /**
@@ -67,13 +77,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         uint96 nodeSigNonce;
     }
 
-    // Structure to represent a NodeSafe pair
-    struct NodeSafe {
-        address safeAddress;
-        address nodeChainKeyAddress;
-    }
-
-    // Structure to represent a NodeSafe pair with a nonce
+    // Structure to represent a node-safe pair with a nonce
     struct NodeSafeNonce {
         address safeAddress;
         address nodeChainKeyAddress;
@@ -121,43 +125,48 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     }
 
     /**
-     * @dev Checks whether a specific NodeSafe combination is registered.
-     * @param nodeSafe The NodeSafe struct containing the safe and node addresses.
-     * @return registered Whether the NodeSafe combination is registered.
+     * @dev Checks whether a specific node-safe combination is registered.
+     * @param safeAddress Address of safe
+     * @param nodeChainKeyAddress Address of node
+     * @return registered Whether the node-safe combination is registered.
      */
-    function isNodeSafeRegistered(NodeSafe memory nodeSafe) external view returns (bool) {
+    function isNodeSafeRegistered(address safeAddress, address nodeChainKeyAddress) external view returns (bool) {
         // If node is not registered to any safe, return false
-        if (_nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress == address(0)) {
+        if (_nodeToSafe[nodeChainKeyAddress].safeAddress == address(0)) {
             return false;
         }
 
-        return _nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress == nodeSafe.safeAddress;
+        return _nodeToSafe[nodeChainKeyAddress].safeAddress == safeAddress;
     }
 
     /**
      * @dev Register the Safe with a signature from the node.
      * This function can be called by any party.
-     * @param nodeSafe The NodeSafe struct containing the safe and node addresses.
+     * @param safeAddress Address of safe
+     * @param nodeChainKeyAddress Address of node
      * @param sig The signature provided by the node.
      */
-    function registerSafeWithNodeSig(NodeSafe memory nodeSafe, bytes calldata sig) external {
+    function registerSafeWithNodeSig(address safeAddress, address nodeChainKeyAddress, bytes calldata sig) external {
         // check adminKeyAddress has added HOPR tokens to the staking contract.
 
         // Compute the hash of the struct according to EIP712 guidelines
-        bytes32 hashStruct =
-            keccak256(abi.encode(NODE_SAFE_TYPEHASH, nodeSafe, _nodeToSafe[nodeSafe.nodeChainKeyAddress].nodeSigNonce));
+        bytes32 hashStruct = keccak256(
+            abi.encode(
+                NODE_SAFE_TYPEHASH, safeAddress, nodeChainKeyAddress, _nodeToSafe[nodeChainKeyAddress].nodeSigNonce
+            )
+        );
 
         // Build the typed digest for signature verification
         bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
 
         // Verify that the signature is from nodeChainKeyAddress
         (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(registerHash, sig);
-        if (error != ECDSA.RecoverError.NoError || recovered != nodeSafe.nodeChainKeyAddress) {
+        if (error != ECDSA.RecoverError.NoError || recovered != nodeChainKeyAddress) {
             revert NotValidSignatureFromNode();
         }
 
         // store those state, emit events etc.
-        addNodeSafe(nodeSafe);
+        addNodeSafe(safeAddress, nodeChainKeyAddress);
     }
 
     /**
@@ -172,7 +181,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         }
 
         // Ensure that node is a member of the module
-        ensureNodeIsSafeModuleMember(NodeSafe({ safeAddress: msg.sender, nodeChainKeyAddress: nodeAddr }));
+        ensureNodeIsSafeModuleMember(msg.sender, nodeAddr);
 
         // Update the state and emit the event
         _nodeToSafe[nodeAddr].safeAddress = address(0);
@@ -185,16 +194,17 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
      * @param safeAddr The address of the Safe to be registered.
      */
     function registerSafeByNode(address safeAddr) external {
-        addNodeSafe(NodeSafe({ safeAddress: safeAddr, nodeChainKeyAddress: msg.sender }));
+        addNodeSafe(safeAddr, msg.sender);
     }
 
     /**
      * @dev Recomputes the domain separator in case of a network fork or update.
      * This function should be called by anyone when required.
+     * An event is emitted when the domain separator is updated
      */
     function updateDomainSeparator() public {
         // following encoding guidelines of EIP712
-        domainSeparator = keccak256(
+        bytes32 newDomainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes("NodeSafeRegistry")),
@@ -203,62 +213,68 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
                 address(this)
             )
         );
+        if (newDomainSeparator != domainSeparator) {
+            domainSeparator = newDomainSeparator;
+            emit DomainSeparatorUpdated(domainSeparator);
+        }
     }
 
     /**
      * @dev Internal function to store a node-safe pair and emit relevant events.
-     * @param nodeSafe The NodeSafe struct containing the safe and node addresses.
+     * @param safeAddress Address of safe
+     * @param nodeChainKeyAddress Address of node
      */
-    function addNodeSafe(NodeSafe memory nodeSafe) internal {
+    function addNodeSafe(address safeAddress, address nodeChainKeyAddress) internal {
         // Safe address cannot be zero
-        if (nodeSafe.safeAddress == address(0)) {
+        if (safeAddress == address(0)) {
             revert SafeAddressZero();
         }
         // Safe address cannot be zero
-        if (nodeSafe.nodeChainKeyAddress == address(0)) {
+        if (nodeChainKeyAddress == address(0)) {
             revert NodeAddressZero();
         }
 
         // Ensure that the node address is not a contract address
-        if (nodeSafe.nodeChainKeyAddress.isContract()) {
+        if (nodeChainKeyAddress.isContract()) {
             revert NodeIsContract();
         }
 
         // check this node hasn't been registered ower
-        if (_nodeToSafe[nodeSafe.nodeChainKeyAddress].safeAddress != address(0)) {
+        if (_nodeToSafe[nodeChainKeyAddress].safeAddress != address(0)) {
             revert NodeHasSafe();
         }
 
         // ensure that node is a member of the (enabled) NodeManagementModule
-        ensureNodeIsSafeModuleMember(nodeSafe);
+        ensureNodeIsSafeModuleMember(safeAddress, nodeChainKeyAddress);
 
-        NodeSafeRecord storage record = _nodeToSafe[nodeSafe.nodeChainKeyAddress];
+        NodeSafeRecord storage record = _nodeToSafe[nodeChainKeyAddress];
 
         // update record
-        record.safeAddress = nodeSafe.safeAddress;
+        record.safeAddress = safeAddress;
         record.nodeSigNonce = record.nodeSigNonce + 1; // as of Solidity 0.8, this reverts on overflows
 
         // update and emit event
-        emit RegisteredNodeSafe(nodeSafe.safeAddress, nodeSafe.nodeChainKeyAddress);
+        emit RegisteredNodeSafe(safeAddress, nodeChainKeyAddress);
     }
 
     /**
      * @dev Ensure that the node address is a member of
      * the enabled node management module of the safe
-     * @param nodeSafe The NodeSafe struct containing the safe and node addresses.
+     * @param safeAddress Address of safe
+     * @param nodeChainKeyAddress Address of node
      */
-    function ensureNodeIsSafeModuleMember(NodeSafe memory nodeSafe) internal view {
+    function ensureNodeIsSafeModuleMember(address safeAddress, address nodeChainKeyAddress) internal view {
         // nodeChainKeyAddress must be a member of the enabled node management module
         address nextModule;
         address[] memory modules;
         // there may be many modules, loop through them. Stop at the end point of the linked list
         while (nextModule != SENTINEL_MODULES) {
             // get modules for safe
-            (modules, nextModule) = IAvatar(nodeSafe.safeAddress).getModulesPaginated(SENTINEL_MODULES, pageSize);
+            (modules, nextModule) = IAvatar(safeAddress).getModulesPaginated(SENTINEL_MODULES, pageSize);
             for (uint256 i = 0; i < modules.length; i++) {
                 if (
                     IHoprNodeManagementModule(modules[i]).isHoprNodeManagementModule()
-                        && IHoprNodeManagementModule(modules[i]).isNode(nodeSafe.nodeChainKeyAddress)
+                        && IHoprNodeManagementModule(modules[i]).isNode(nodeChainKeyAddress)
                 ) {
                     return;
                 }

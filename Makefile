@@ -194,11 +194,12 @@ endif
 
 .PHONY: build-yarn-watch
 build-yarn-watch: ## build yarn packages (in watch mode)
-build-yarn-watch: build-solidity-types build-cargo
+build-yarn-watch: build-cargo
 	npx tsc --build tsconfig.build.json -w
 
 .PHONY: build-cargo
 build-cargo: ## build cargo packages and create boilerplate JS code
+build-cargo: build-solidity-types
 # build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
@@ -620,6 +621,15 @@ ifeq ($(script),)
 	echo "parameter <script> missing" >&2 && exit 1
 endif
 	bash "${script}"
+
+.PHONY: generate-python-sdk
+generate-python-sdk: ## generate Python SDK via Swagger Codegen
+generate-python-sdk: build-docs-api
+        mkdir -p ./hoprd-sdk-python/
+	rm -rf ./hoprd-sdk-python/*
+	docker run --rm -v $$(pwd):/local swaggerapi/swagger-codegen-cli-v3 generate -l python \
+		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
+		-c /local/scripts/python-sdk-config.json
 
 .PHONY: help
 help:
