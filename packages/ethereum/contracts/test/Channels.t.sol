@@ -4,6 +4,7 @@ pragma solidity >=0.6.0 <0.9.0;
 import { Test } from "forge-std/Test.sol";
 import { ERC1820RegistryFixtureTest } from "./utils/ERC1820Registry.sol";
 import { HoprChannels, HoprChannelsEvents } from "../src/Channels.sol";
+import { HoprLedgerEvents } from "../src/Ledger.sol";
 import { CryptoUtils } from "./utils/Crypto.sol";
 import { HoprMultiSig } from "../src/MultiSig.sol";
 import { ERC777 } from "openzeppelin-contracts/token/ERC777/ERC777.sol";
@@ -68,7 +69,7 @@ contract MyHoprChannels is HoprChannels {
     { }
 }
 
-contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, HoprChannelsEvents {
+contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, HoprChannelsEvents, HoprLedgerEvents {
     HoprChannels.Timestamp constant closureNoticePeriod = HoprChannels.Timestamp.wrap(15);
 
     bytes32 constant PROOF_OF_RELAY_SECRET_0 = keccak256(abi.encodePacked("PROOF_OF_RELAY_SECRET_0"));
@@ -821,7 +822,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -837,7 +838,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
@@ -924,7 +925,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -940,7 +941,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
@@ -995,7 +996,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1007,7 +1008,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelABAmount - amount));
@@ -1058,7 +1059,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1074,7 +1075,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vm.prank(dest);
 
@@ -1115,7 +1116,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1131,7 +1132,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vm.prank(dest);
 
@@ -1172,7 +1173,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1188,7 +1189,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vm.prank(dest);
 
@@ -1229,7 +1230,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1245,7 +1246,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vm.prank(dest);
 
@@ -1289,7 +1290,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1303,7 +1304,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, 2, HoprChannels.ChannelStatus.OPEN);
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vm.prank(dest);
 
@@ -1344,7 +1345,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1360,7 +1361,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         vrf.h = 1;
         vrf.hVx = vrf.vx;
@@ -1405,7 +1406,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1421,7 +1422,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         (uint8 v, bytes32 r, bytes32 s) =
             CryptoUtils.decompressSignature(redeemable.signature.r, redeemable.signature.vs);
@@ -1474,7 +1475,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
             privKeyA,
             privKeyB,
-            abi.encodePacked(hoprChannels.domainSeparator()),
+            hoprChannels.domainSeparator(),
             src,
             dest,
             amount,
@@ -1490,7 +1491,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args, hoprChannels.domainSeparator());
+            CryptoUtils.getRedeemableTicket(args);
 
         redeemable.data.indexOffset = HoprChannels.TicketIndexOffset.wrap(0);
 
@@ -1871,6 +1872,18 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         // call updateDomainSeparator when chainid is different
         vm.chainId(newChaidId);
+        vm.expectEmit(true, true, false, false, address(hoprChannels));
+        emit DomainSeparatorUpdated(
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(bytes("HoprChannels")),
+                    keccak256(bytes(hoprChannels.VERSION())),
+                    newChaidId,
+                    address(hoprChannels)
+                )
+            )
+        );
         hoprChannels.updateDomainSeparator();
         assertTrue(hoprChannels.domainSeparator() != domainSeparatorOnDeployment);
     }
@@ -1886,6 +1899,18 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         // call updateLedgerDomainSeparator when chainid is different
         vm.chainId(newChaidId);
+        vm.expectEmit(true, true, false, false, address(hoprChannels));
+        emit LedgerDomainSeparatorUpdated(
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(bytes("HoprLedger")),
+                    keccak256(bytes(hoprChannels.LEDGER_VERSION())),
+                    newChaidId,
+                    address(hoprChannels)
+                )
+            )
+        );
         hoprChannels.updateLedgerDomainSeparator();
         assertTrue(hoprChannels.ledgerDomainSeparator() != ledgerDomainSeparatorOnDeployment);
     }

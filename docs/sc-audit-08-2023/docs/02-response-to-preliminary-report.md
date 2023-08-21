@@ -54,6 +54,7 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 
 - Removed the `immutable` keyword from `domainSeparator` in "HoprNodeSafeRegistry" and "HoprChannels" contracts.
 - Introduced publicly callable functions `updateDomainSeparator` and `updateLedgerDomainSeparator` to adjust domain separators in relevant contracts in case of a fork.
+- Emitted an event when the domain separator gets updated to a different value.
 
 **Commit Hash:** [d51ce5d2bec87a81004488327d7282b22f97f38b](https://github.com/hoprnet/hoprnet/commit/d51ce5d2bec87a81004488327d7282b22f97f38b)
 
@@ -204,6 +205,7 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Always emit `ChannelBalanceIncreased` in a successful `tokenReceived` call.
 - Use tight packing for `HoprChannels.tokensReceived()` payload, meaning 40 bytes for `fundChannel` and 64 bytes for `fundChannelMulti`
 - Document bidirectional channel funding in /`ERC777.tokensReceived()` is not intended for production use.
+- Use packet encoding for ticket hashing to align with off-chain ticket usage.
 
 #### 4. Bump Safe to v1.4.1
 
@@ -223,6 +225,9 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Import `IERC20`, `IERC777` interfaces for definition of selector
 - Make all the selector definition public
 
-#### 8. Format
+#### 8. Improve NodeSafeRegistry
+- Unwrap struct `NodeSafe` into flattened `address safeAddress, address nodeChainKeyAddress`
+
+#### 9. Format
 - Format all the contracts
 - Include HOPR logo
