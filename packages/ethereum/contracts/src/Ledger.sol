@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
+abstract contract HoprLedgerEvents {
+    /**
+     * Emitted once the ledger domain separator is updated.
+     */
+    event LedgerDomainSeparatorUpdated(bytes32 indexed ledgerDomainSeparator);
+}
+
 /**
  *    &&&&
  *    &&&&
@@ -18,7 +25,7 @@ pragma solidity 0.8.19;
  *
  * Indexes data trustlessly to allow a fast-sync for nodes in the network.
  */
-abstract contract HoprLedger {
+abstract contract HoprLedger is HoprLedgerEvents {
     string public constant LEDGER_VERSION = "1.0.0";
 
     uint256 immutable snapshotInterval;
@@ -59,7 +66,7 @@ abstract contract HoprLedger {
      */
     function updateLedgerDomainSeparator() public {
         // following encoding guidelines of EIP712
-        ledgerDomainSeparator = keccak256(
+        bytes32 newLedgerDomainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes("HoprLedger")),
@@ -68,6 +75,10 @@ abstract contract HoprLedger {
                 address(this)
             )
         );
+        if (newLedgerDomainSeparator != ledgerDomainSeparator) {
+            ledgerDomainSeparator = newLedgerDomainSeparator;
+            emit LedgerDomainSeparatorUpdated(ledgerDomainSeparator);
+        }
     }
 
     function indexEvent(bytes memory payload) internal {
