@@ -278,6 +278,8 @@ contract HoprChannels is
 
     /**
      * @dev recompute the domain seperator in case of a fork
+     * This function should be called by anyone when required.
+     * An event is emitted when the domain separator is updated
      */
     function updateDomainSeparator() public {
         // following encoding guidelines of EIP712

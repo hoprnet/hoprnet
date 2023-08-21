@@ -63,6 +63,8 @@ abstract contract HoprLedger is HoprLedgerEvents {
 
     /**
      * @dev recompute the domain seperator in case of a fork
+     * This function should be called by anyone when required.
+     * An event is emitted when the domain separator is updated
      */
     function updateLedgerDomainSeparator() public {
         // following encoding guidelines of EIP712

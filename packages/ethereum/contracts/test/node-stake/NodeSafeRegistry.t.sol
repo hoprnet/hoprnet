@@ -294,6 +294,18 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
 
         // call updateDomainSeparator when chainid is different
         vm.chainId(newChaidId);
+            vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
+        emit DomainSeparatorUpdated(
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(bytes("NodeSafeRegistry")),
+                    keccak256(bytes(nodeSafeRegistry.VERSION())),
+                    newChaidId,
+                    address(nodeSafeRegistry)
+                )
+            )
+        );
         nodeSafeRegistry.updateDomainSeparator();
         assertTrue(nodeSafeRegistry.domainSeparator() != domainSeparatorOnDeployment);
     }

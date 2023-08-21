@@ -7,8 +7,18 @@ import { IHoprNodeManagementModule } from "../interfaces/INodeManagementModule.s
 import { Address } from "openzeppelin-contracts/utils/Address.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {
+    /**
+     * Emitted once a safe and node pair gets registered
+     */
     event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    /**
+     * Emitted once a safe and node pair gets deregistered
+     */
     event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    /**
+     * Emitted once the domain separator is updated.
+     */
+    event DomainSeparatorUpdated(bytes32 indexed domainSeparator);
 }
 
 /**
@@ -191,10 +201,11 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     /**
      * @dev Recomputes the domain separator in case of a network fork or update.
      * This function should be called by anyone when required.
+     * An event is emitted when the domain separator is updated
      */
     function updateDomainSeparator() public {
         // following encoding guidelines of EIP712
-        domainSeparator = keccak256(
+        bytes32 newDomainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes("NodeSafeRegistry")),
@@ -203,6 +214,10 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
                 address(this)
             )
         );
+        if (newDomainSeparator != domainSeparator) {
+            domainSeparator = newDomainSeparator;
+            emit DomainSeparatorUpdated(domainSeparator);
+        }
     }
 
     /**
