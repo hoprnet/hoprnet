@@ -66,7 +66,8 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         assertFalse(nodeSafeRegistry.isNodeSafeRegistered(safeAddress, nodeChainKeyAddress));
 
         uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeChainKeyAddress);
-        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
+        (address nodeAddress, bytes memory sig) =
+            _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -96,7 +97,8 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         assertFalse(nodeSafeRegistry.isNodeSafeRegistered(safeAddress, nodeChainKeyAddress));
 
         uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeChainKeyAddress);
-        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
+        (address nodeAddress, bytes memory sig) =
+            _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -292,7 +294,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
 
         // call updateDomainSeparator when chainid is different
         vm.chainId(newChaidId);
-            vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
+        vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
         emit DomainSeparatorUpdated(
             keccak256(
                 abi.encode(

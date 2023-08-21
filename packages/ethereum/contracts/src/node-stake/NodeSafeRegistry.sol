@@ -150,8 +150,11 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         // check adminKeyAddress has added HOPR tokens to the staking contract.
 
         // Compute the hash of the struct according to EIP712 guidelines
-        bytes32 hashStruct =
-            keccak256(abi.encode(NODE_SAFE_TYPEHASH, safeAddress, nodeChainKeyAddress, _nodeToSafe[nodeChainKeyAddress].nodeSigNonce));
+        bytes32 hashStruct = keccak256(
+            abi.encode(
+                NODE_SAFE_TYPEHASH, safeAddress, nodeChainKeyAddress, _nodeToSafe[nodeChainKeyAddress].nodeSigNonce
+            )
+        );
 
         // Build the typed digest for signature verification
         bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
