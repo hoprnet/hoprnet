@@ -1261,6 +1261,40 @@ pub mod tests {
     }
     
     #[test]
+    fn offchain_signature() {
+        let msg = b"test12345";
+        let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
+
+        let key = ed25519_dalek::SecretKey::from_bytes(&PRIVATE_KEY).unwrap();
+        let pk: ed25519_dalek::PublicKey = (&key).into();
+        let kp = ed25519_dalek::Keypair {
+            secret: key,
+            public: pk.clone(),
+        };
+
+        let sgn = kp.sign(msg);
+        assert!(pk.verify_strict(msg, &sgn).is_ok(), "blomp");
+
+        let sgn_1 = OffchainSignature::sign_message(msg, &keypair);
+        let sgn_2 = OffchainSignature::from_bytes(&sgn_1.to_bytes()).unwrap();
+
+        assert!(
+            sgn_1.verify_message(msg, keypair.public()),
+            "cannot verify message via sig 1"
+        );
+        assert!(
+            sgn_2.verify_message(msg, keypair.public()),
+            "cannot verify message via sig 2"
+        );
+        assert_eq!(sgn_1, sgn_2, "signatures must be equal");
+        // let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
+
+        // let sig = OffchainSignature::sign_message("my test msg".as_bytes(), &keypair);
+
+        // assert!(sig.verify_message("my test msg".as_bytes(), keypair.public()));
+    }
+
+    #[test]
     fn public_key_to_hex() {
         let pk = PublicKey::from_privkey(&hex!(
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
