@@ -54,6 +54,11 @@ abstract contract HoprChannelsEvents {
      * since this value is necessary for issuing and validating tickets.
      */
     event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTicketIndex);
+
+    /**
+     * Emitted once the domain separator is updated.
+     */
+    event DomainSeparatorUpdated(bytes32 indexed domainSeparator);
 }
 
 /**
@@ -273,10 +278,12 @@ contract HoprChannels is
 
     /**
      * @dev recompute the domain seperator in case of a fork
+     * This function should be called by anyone when required.
+     * An event is emitted when the domain separator is updated
      */
     function updateDomainSeparator() public {
         // following encoding guidelines of EIP712
-        domainSeparator = keccak256(
+        bytes32 newDomainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes("HoprChannels")),
@@ -285,6 +292,11 @@ contract HoprChannels is
                 address(this)
             )
         );
+
+        if (newDomainSeparator != domainSeparator) {
+            domainSeparator = newDomainSeparator;
+            emit DomainSeparatorUpdated(domainSeparator);
+        }
     }
 
     /**
