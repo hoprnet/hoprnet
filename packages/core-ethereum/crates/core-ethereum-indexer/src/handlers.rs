@@ -334,6 +334,7 @@ where
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
             }
+            _ => todo!()
         }
         Ok(())
     }
@@ -441,6 +442,7 @@ where
                     }
                 }
             }
+            _ => todo!()
         }
         Ok(())
     }

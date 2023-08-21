@@ -155,6 +155,12 @@ pub trait HoprCoreEthereumDbActions {
     /// Set balance as the current balance.
     async fn set_hopr_balance(&mut self, balance: &Balance) -> Result<()>;
 
+    /// Get the domain separator of channels contract
+    async fn get_channels_domain_separator(&self) -> Result<Option<Hash>>;
+
+    /// Set the domain separator of channels contract
+    async fn set_channels_domain_separator(&mut self, channels_domain_separator: String, snapshot: &Snapshot) -> Result<()>;
+
     /// Add balance to the current balance.
     async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()>;
 
