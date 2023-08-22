@@ -3,13 +3,13 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "forge-std/Test.sol";
 
-import {HoprNodeManagementModule} from "../../src/node-stake/permissioned-module/NodeManagementModule.sol";
-import {HoprCapabilityPermissions} from "../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
-import {HoprNodeStakeFactory, HoprNodeStakeFactoryEvents} from "../../src/node-stake/NodeStakeFactory.sol";
-import {Safe} from "safe-contracts/Safe.sol";
-import {SafeSuiteLib} from "../../src/utils/SafeSuiteLib.sol";
-import {SafeSingletonFixtureTest} from "../utils/SafeSingleton.sol";
-import {ClonesUpgradeable} from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import { HoprNodeManagementModule } from "../../src/node-stake/permissioned-module/NodeManagementModule.sol";
+import { HoprCapabilityPermissions } from "../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
+import { HoprNodeStakeFactory, HoprNodeStakeFactoryEvents } from "../../src/node-stake/NodeStakeFactory.sol";
+import { Safe } from "safe-contracts/Safe.sol";
+import { SafeSuiteLib } from "../../src/utils/SafeSuiteLib.sol";
+import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
+import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
 
 contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
     using ClonesUpgradeable for address;

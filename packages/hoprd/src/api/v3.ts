@@ -9,7 +9,8 @@ import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 
-import { debug, Address, OffchainPublicKey } from '@hoprnet/hopr-utils'
+import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum'
+import { debug, stringToU8a, Address, OffchainPublicKey } from '@hoprnet/hopr-utils'
 import {
   authenticateWsConnection,
   getStatusCodeForInvalidInputInRequest,
@@ -45,7 +46,7 @@ async function handleWebsocketMessage(node: Hopr, data: string) {
   switch (cmd) {
     case 'sendmsg':
       const body = encodeMessage(args['body'])
-      const recipient = peerIdFromString(args['recipient'])
+      const recipient = peerIdFromString(args['peerAddress'])
       const hops = args['hops']
 
       // only set path if given, otherwise a path will be chosen by hopr core
@@ -173,7 +174,16 @@ export async function setupRestApi(
     },
     // we use custom formats for particular internal data types
     customFormats: {
-      peerId: (input) => {
+      channelid: (input) => {
+        try {
+          // this call will throw if the input is no hash
+          Ethereum_Hash.deserialize(stringToU8a(input))
+        } catch (err) {
+          return false
+        }
+        return true
+      },
+      peerid: (input) => {
         try {
           // this call will throw if the input is no peer id
           peerIdFromString(input)
@@ -182,7 +192,7 @@ export async function setupRestApi(
         }
         return true
       },
-      address: (input) => {
+      ethereumaddress: (input) => {
         try {
           Address.from_string(input)
         } catch (err) {

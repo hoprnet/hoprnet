@@ -1,7 +1,6 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
-import chalk from 'chalk'
+import { ChainWrapper, createChainWrapper, Receipt, type DeploymentExtract } from './ethereum.js'
 import {
   AcknowledgedTicket,
   Balance,
@@ -37,7 +36,6 @@ import {
 import Indexer from './indexer/index.js'
 import { EventEmitter } from 'events'
 import type { IndexerEvents } from './indexer/types.js'
-import { DeploymentExtract } from './utils/utils.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -206,7 +204,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.chainKeypair.to_address().to_hex()}`)
-        log(chalk.green('Connector started'))
+        log('Connector started')
       } catch (err) {
         log('error: failed to start the indexer', err)
       }
@@ -698,4 +696,4 @@ export default class HoprCoreEthereum extends EventEmitter {
 // export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
-export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper }
+export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper, DeploymentExtract, Ethereum_Hash }

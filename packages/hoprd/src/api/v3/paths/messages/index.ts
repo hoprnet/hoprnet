@@ -33,7 +33,7 @@ const POST: Operation = [
   async (req, res, _next) => {
     const tag: number = req.body.tag
     const message = encodeMessage(req.body.body)
-    const recipient = peerIdFromString(req.body.recipient)
+    const recipient = peerIdFromString(req.body.peerAddress)
     const hops = req.body.hops
 
     // only set path if given, otherwise a path will be chosen by hopr core
@@ -99,7 +99,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['tag', 'body', 'recipient'],
+          required: ['tag', 'body', 'peerAddress'],
           properties: {
             tag: {
               $ref: '#/components/schemas/MessageTag'
@@ -107,10 +107,10 @@ POST.apiDoc = {
             body: {
               $ref: '#/components/schemas/MessageBody'
             },
-            recipient: {
+            peerAddress: {
               description: 'The recipient HOPR peer id, to which the message is sent.',
               type: 'string',
-              format: 'peerId',
+              format: 'peerid',
               example: '12Diu2HAm2SF8EdwwUaaSoYTiZSddnG4hLVF'
             },
             path: {
@@ -120,7 +120,7 @@ POST.apiDoc = {
               items: {
                 description: 'A valid HOPR peer id',
                 type: 'string',
-                format: 'peerId',
+                format: 'peerid',
                 minItems: 1,
                 maxItems: 3,
                 example: '12Diu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMf'

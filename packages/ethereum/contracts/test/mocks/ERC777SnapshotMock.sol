@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import {ERC777Snapshot, ERC777} from "../../src/static/ERC777/ERC777Snapshot.sol";
+import { ERC777Snapshot, ERC777 } from "../../src/static/ERC777/ERC777Snapshot.sol";
 
 contract ERC777SnapshotMock is ERC777Snapshot {
-    constructor(string memory name, string memory symbol, address initialAccount, uint256 initialBalance)
+    constructor(
+        string memory name,
+        string memory symbol,
+        address initialAccount,
+        uint256 initialBalance
+    )
         ERC777(name, symbol, new address[](0))
     {
         _mint(initialAccount, initialBalance, "", "");

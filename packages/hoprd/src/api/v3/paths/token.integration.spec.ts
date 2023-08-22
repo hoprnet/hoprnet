@@ -7,7 +7,8 @@ import { LevelDb } from '@hoprnet/hopr-utils'
 
 import { createToken, storeToken } from '../../token.js'
 import { createAuthenticatedTestApiInstance, ALICE_ETHEREUM_ADDR } from './../fixtures.js'
-import { Database } from '../../../../../core/lib/core_hopr.js'
+import { hoprd_misc_initialize_crate, Database } from '../../../../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 
@@ -19,7 +20,7 @@ describe('GET /token', function () {
     node = sinon.fake() as any
     let db = new LevelDb()
     await db.backend.open()
-    node.db = new Database(db, ALICE_ETHEREUM_ADDR)
+    node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)
 

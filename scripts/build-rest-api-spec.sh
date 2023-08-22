@@ -66,7 +66,7 @@ update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "
 
 log "Start hoprd node"
 env DEBUG="hopr*" CI="true" HOPRD_API_PORT="${api_port}" \
-  make -C "${mydir}/../" run-local > "${node_log_file}" 2>&1 &
+  make -C "${mydir}/../" run-local-with-safe > "${node_log_file}" 2>&1 &
 
 log "Wait 15 seconds for node startup to complete"
 sleep 15

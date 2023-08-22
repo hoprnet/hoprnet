@@ -2,9 +2,9 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 /**
- * library for Safe 1.4.0 addresses
+ * library for Safe 1.4.1 addresses
  * deployed contract addresses on Gnosis Chain from
- * https://github.com/safe-global/safe-deployments/tree/2dc3a9913ccc7a524ccfdacd50a2f864f423cf2b/src/assets/v1.4.0
+ * https://github.com/safe-global/safe-deployments/tree/51efc59d05ddf725478d6472fc67989dfb031b4d/src/assets/v1.4.1
  */
 library SafeSuiteLib {
     address internal constant SAFE_SimulateTxAccessor_ADDRESS = 0x3d4BA2E0884aa488718476ca2FB8Efc291A46199;
@@ -14,7 +14,7 @@ library SafeSuiteLib {
     address internal constant SAFE_CreateCall_ADDRESS = 0x9b35Af71d77eaf8d7e40252370304687390A1A52;
     address internal constant SAFE_MultiSend_ADDRESS = 0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526;
     address internal constant SAFE_MultiSendCallOnly_ADDRESS = 0x9641d764fc13c8B624c04430C7356C1C7C8102e2;
-    address internal constant SAFE_SignMessageLib_ADDRESS = 0x58FCe385Ed16beB4BCE49c8DF34c7d6975807520;
-    address internal constant SAFE_Safe_ADDRESS = 0xc962E67D9490E154D81181879ddf4CD3b65D2132;
-    string internal constant SAFE_VERSION = "1.4.0";
+    address internal constant SAFE_SignMessageLib_ADDRESS = 0xd53cd0aB83D845Ac265BE939c57F53AD838012c9;
+    address internal constant SAFE_Safe_ADDRESS = 0x41675C099F32341bf84BFc5382aF534df5C7461a;
+    string internal constant SAFE_VERSION = "1.4.1";
 }

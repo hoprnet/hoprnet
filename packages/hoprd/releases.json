@@ -27,6 +27,12 @@
     "version_major": "1",
     "version_minor": "93"
   },
+  "providence": {
+    "git_ref": "^(release|staging)/providence$",
+    "network": "dufour",
+    "version_major": "2",
+    "version_minor": "0"
+  },
   "debug-staging": {
     "git_ref": "^debug-deploy/.*",
     "network": "debug-staging"

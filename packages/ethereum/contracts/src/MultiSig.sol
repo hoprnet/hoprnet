@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-import {HoprNodeSafeRegistry} from "./node-stake/NodeSafeRegistry.sol";
+import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
 /**
  *    &&&&

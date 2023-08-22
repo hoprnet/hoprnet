@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import {Test} from "forge-std/Test.sol";
-import {AccountsFixtureTest} from "./utils/Accounts.sol";
+import { Test } from "forge-std/Test.sol";
+import { AccountsFixtureTest } from "./utils/Accounts.sol";
 
-import {HoprMultiSig} from "../src/MultiSig.sol";
-import {HoprNodeSafeRegistry} from "../src/node-stake/NodeSafeRegistry.sol";
+import { HoprMultiSig } from "../src/MultiSig.sol";
+import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 
 // We need this dummy contract to correctly set msg.sender
 // when testing modifiers of abstract contracts
 contract MultiSigContract is HoprMultiSig {
-    function modifierOnlySafe(address self) public onlySafe(self) {}
+    function modifierOnlySafe(address self) public onlySafe(self) { }
 
-    function modifierNoSafeSet() public noSafeSet {}
+    function modifierNoSafeSet() public noSafeSet { }
 
     function mySetNodeSafeRegistry(HoprNodeSafeRegistry registry) public {
         setNodeSafeRegistry(registry);

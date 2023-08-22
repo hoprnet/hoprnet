@@ -2,12 +2,8 @@
  * Add a more usable API on top of LibP2P
  */
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { PublicKey } from '@libp2p/interface-keys'
 import type { Components } from '@libp2p/interfaces/components'
 import type { Connection, ProtocolStream } from '@libp2p/interface-connection'
-
-import { keys } from '@libp2p/crypto'
-import { peerIdFromString } from '@libp2p/peer-id'
 
 import { debug } from '../process/index.js'
 import { pipe } from 'it-pipe'
@@ -29,25 +25,6 @@ export * from './connection.js'
  *
  */
 export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{45}/i
-
-/**
- * Takes a peerId and returns its corresponding public key.
- *
- * @param peerId the PeerId used to generate a public key
- */
-export function convertPubKeyFromPeerId(peerId: PeerId): PublicKey {
-  return keys.unmarshalPublicKey(peerId.publicKey)
-}
-
-/**
- *
- * Takes a B58String and converts them to a PublicKey
- *
- * @param b58string the B58String used to represent the PeerId
- */
-export function convertPubKeyFromB58String(b58string: string): PublicKey {
-  return convertPubKeyFromPeerId(peerIdFromString(b58string))
-}
 
 /**
  *

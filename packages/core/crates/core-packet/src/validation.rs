@@ -191,6 +191,12 @@ mod tests {
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
             async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
+            async fn get_node_safe_registry_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
+            async fn set_node_safe_registry_domain_separator(&mut self, node_safe_registry_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            async fn get_channels_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
+            async fn set_channels_domain_separator(&mut self, channels_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            async fn get_channels_ledger_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
+            async fn set_channels_ledger_domain_separator(&mut self, channels_ledger_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn get_staking_safe_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
             async fn set_staking_safe_address(&mut self, safe_address: &Address) -> core_ethereum_db::errors::Result<()>;
             async fn get_staking_module_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
@@ -570,7 +576,6 @@ mod tests {
                 let ack = AcknowledgedTicket::new(
                     ticket.ticket,
                     Response::new(&random_bytes::<{ Response::SIZE }>()),
-                    Hash::new(&random_bytes::<{ Hash::SIZE }>()),
                     SENDER_PUB.to_address(),
                 );
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();

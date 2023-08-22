@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import {Test} from "forge-std/Test.sol";
-import {HoprAnnouncements, HoprAnnouncementsEvents} from "../src/Announcements.sol";
-import {HoprNodeSafeRegistry} from "../src/node-stake/NodeSafeRegistry.sol";
+import { Test } from "forge-std/Test.sol";
+import { HoprAnnouncements, HoprAnnouncementsEvents } from "../src/Announcements.sol";
+import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 
 // Dummy since there is no verification happening on-chain
 bytes32 constant ed25519_sig_0 = 0x000000000000000000000000000000000000000000000000000000000ed25519;

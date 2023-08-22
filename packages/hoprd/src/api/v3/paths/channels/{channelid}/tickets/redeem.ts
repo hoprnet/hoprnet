@@ -1,4 +1,6 @@
-import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum/lib/db.js'
+import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum'
+import { stringToU8a } from '@hoprnet/hopr-utils'
+
 import { STATUS_CODES } from '../../../../utils.js'
 
 import type { Operation } from 'express-openapi'
@@ -10,7 +12,7 @@ const POST: Operation = [
     const { channelid } = req.params
 
     try {
-      const channelIdHash = Ethereum_Hash.deserialize(new TextEncoder().encode(channelid))
+      const channelIdHash = Ethereum_Hash.deserialize(stringToU8a(channelid))
       const tickets = await node.getTickets(channelIdHash)
       if (tickets.length <= 0) {
         return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
@@ -27,7 +29,7 @@ const POST: Operation = [
 
 POST.apiDoc = {
   description:
-    'Redeems your tickets for this channel. Redeeming will change your tickets into Hopr tokens if they are winning ones. You can check how much tickets given channel has by calling /channels/{peerid}/tickets endpoint. Do this before channel is closed as neglected tickets are no longer valid for redeeming.',
+    'Redeems your tickets for this channel. Redeeming will change your tickets into Hopr tokens if they are winning ones. You can check how much tickets given channel has by calling /channels/{channelid}/tickets endpoint. Do this before channel is closed as neglected tickets are no longer valid for redeeming.',
   tags: ['Channels'],
   operationId: 'channelsRedeemTickets',
   parameters: [
@@ -36,7 +38,8 @@ POST.apiDoc = {
       name: 'channelid',
       required: true,
       schema: {
-        $ref: '#/components/schemas/ChannelId'
+        format: 'channelid',
+        type: 'string'
       }
     }
   ],
@@ -45,14 +48,14 @@ POST.apiDoc = {
       description: 'Tickets redeemed successfully.'
     },
     '400': {
-      description: 'Invalid peerId.',
+      description: 'Invalid channel id.',
       content: {
         'application/json': {
           schema: {
             $ref: '#/components/schemas/RequestStatus'
           },
           example: {
-            status: STATUS_CODES.INVALID_PEERID
+            status: STATUS_CODES.INVALID_CHANNELID
           }
         }
       }
