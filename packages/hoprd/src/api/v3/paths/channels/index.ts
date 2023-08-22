@@ -270,7 +270,10 @@ export async function openChannel(
     return { success: false, reason: validationResult.reason }
   }
 
-  const channelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
+  const channelId = generate_channel_id(
+    Address.deserialize(node.getEthereumAddress().serialize()),
+    validationResult.counterparty
+  )
 
   let openingRequest = openingRequests.get(channelId.to_hex())
 
