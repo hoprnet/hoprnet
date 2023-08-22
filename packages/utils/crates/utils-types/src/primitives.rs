@@ -362,15 +362,6 @@ impl Snapshot {
             log_index,
         }
     }
-
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-    pub fn zero() -> Self {
-        Self {
-            block_number: U256::zero(),
-            transaction_index: U256::zero(),
-            log_index: U256::zero(),
-        }
-    }
 }
 
 impl BinarySerializable for Snapshot {
@@ -867,4 +858,14 @@ pub mod wasm {
             Self::SIZE as u32
         }
     }
+
+    #[wasm_bindgen]
+    impl Snapshot {
+        #[wasm_bindgen(js_name = "default")]
+        pub fn _default() -> Self {
+            Snapshot::default()
+        }
+    }
+
+
 }

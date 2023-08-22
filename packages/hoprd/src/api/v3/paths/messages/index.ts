@@ -35,6 +35,8 @@ const POST: Operation = [
     const recipient = peerIdFromString(req.body.peerAddress)
     const hops = req.body.hops
 
+    const tag = req.body.tag
+
     // only set path if given, otherwise a path will be chosen by hopr core
     let path: OffchainPublicKey[]
     if (req.body.path != undefined) {
@@ -42,8 +44,8 @@ const POST: Operation = [
     }
 
     try {
-      console.log('SEND with tag: ' + req.body.tag)
-      let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops)
+      console.log('SEND with tag: ' + tag)
+      let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops, tag)
       log(`after sending message`)
       metric_successfulSendApiCalls.increment()
       return res.status(202).json(ackChallenge)

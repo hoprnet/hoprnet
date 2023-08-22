@@ -24,14 +24,10 @@ ifneq ($(PACKAGES),)
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) ../lib/
 
 	WASM_EXT_SUFFIX=$$(find ../lib/ -type f -exec grep -oP 'libp2p-wasm-ext-\K\w+' {} \; | uniq); \
-	mkdir -p ../lib/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}; \
-	install ../../../vendor/cargo/libp2p-wasm-ext*/src/*.js ../lib/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/
+	mkdir -p ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
+	install ../../../vendor/cargo/libp2p-wasm-ext*/src/*.js ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
+	echo "{}" >| ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/package.json
 endif
-
-x:
-	WASM_EXT_SUFFIX=$$(find ../lib/ -type f -exec grep -oP 'libp2p-wasm-ext-\K\w+' {} \; | uniq); \
-	mkdir -p ../lib/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}; \
-	install ../../../vendor/cargo/libp2p-wasm-ext*/src/*.js ../lib/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/
 
 clean:
 ifneq ($(PACKAGES),)

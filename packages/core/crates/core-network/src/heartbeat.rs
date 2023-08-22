@@ -48,6 +48,7 @@ impl HeartbeatConfig {
     }
 }
 
+/// API trait for external functionality required by the heartbeat mechanism
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait HeartbeatExternalApi {
@@ -55,6 +56,10 @@ pub trait HeartbeatExternalApi {
 }
 
 
+/// Heartbeat mechanism providing the regular trigger and processing for the heartbeat protocol.
+/// 
+/// This object provides a single public method that can be polled. Once triggered, it will never
+/// return and will only terminate with an unresolvable error or a panic.
 pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     config: HeartbeatConfig,
     pinger: T,
@@ -80,9 +85,10 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
     /// Heartbeat loop responsible for periodically requesting peers to ping around from the 
     /// external API interface.
     /// 
-    /// The loop never ends and will run indefinitely, until the program is explicitly terminated.
-    /// As such, this feature should therefore be joined with other internal loops and awaited
-    /// after all components have been initialized.
+    /// The loop runs indefinitely, until the program is explicitly terminated.
+    /// 
+    /// This feature should be joined with other internal loops and awaited after all 
+    /// components have been initialized.
     pub async fn heartbeat_loop(&mut self) {
         loop {
             let heartbeat_round_timer = if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
@@ -110,7 +116,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
             pin_mut!(timeout, ping);
 
-            let _ = match select(timeout, ping).await {
+            match select(timeout, ping).await {
                 Either::Left(_) => info!("Heartbeat round interrupted by timeout"),
                 Either::Right(_) => info!("Heartbeat round finished for all peers")
             };
@@ -162,7 +168,7 @@ mod tests {
         let mut heartbeat = Heartbeat::new(
             config, DelayingPinger{delay: ping_delay}, mock);
         
-        let _ = futures_lite::future::race(
+        futures_lite::future::race(
             heartbeat.heartbeat_loop(),
             sleep(std::time::Duration::from_millis((1u64 + (expected_loop_count as u64)) * ping_delay - 1u64))
         ).await;  
@@ -184,7 +190,7 @@ mod tests {
         let mut heartbeat = Heartbeat::new(
             config, DelayingPinger{delay: ping_delay}, mock);
         
-        let _ = futures_lite::future::race(
+        futures_lite::future::race(
             heartbeat.heartbeat_loop(),
             sleep(std::time::Duration::from_millis((expected_loop_count as u64) * ping_delay + 1u64))
         ).await;  

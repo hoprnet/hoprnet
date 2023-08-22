@@ -1,6 +1,6 @@
 [package]
 name = "core-crypto"
-version = "0.4.0"
+version = "0.4.1"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"

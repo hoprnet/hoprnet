@@ -6,7 +6,7 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Hopr, type HoprOptions } from './index.js'
 import { getContractData } from './network.js'
-import { Database, core_hopr_initialize_crate, Address as Packet_Address } from '../lib/core_hopr.js'
+import { Database, core_hopr_initialize_crate, Address as Core_Address } from '../lib/core_hopr.js'
 core_hopr_initialize_crate()
 
 const log = debug(`hopr-core:create-hopr`)
@@ -40,7 +40,7 @@ export async function createHoprNode(
     throw err
   }
 
-  let db = new Database(levelDb, chainKeypair.public().to_address())
+  let db = new Database(levelDb, Core_Address.deserialize(chainKeypair.public().to_address().serialize()))
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = options.safeModule.safeAddress
@@ -50,15 +50,17 @@ export async function createHoprNode(
   if (!safeAddress) {
     safeAddress = await db.get_staking_safe_address()
     if (safeAddress) {
-      safeAddress = Packet_Address.deserialize(safeAddress.serialize())
+      safeAddress = Core_Address.deserialize(safeAddress.serialize())
     }
   }
+
   if (!moduleAddress) {
     moduleAddress = await db.get_staking_module_address()
     if (moduleAddress) {
-      moduleAddress = Packet_Address.deserialize(moduleAddress.serialize())
+      moduleAddress = Core_Address.deserialize(moduleAddress.serialize())
     }
   }
+
   if (!safeAddress || !moduleAddress) {
     log(`failed to provide safe or module address:`)
     throw new Error('Hopr Node must be initialized with safe and module address')
@@ -91,6 +93,7 @@ export async function createHoprNode(
     automaticChainCreation
   )
 
+  // TODO: What is this?
   // // Initialize connection to the blockchain
   // await chain.initializeChainWrapper(resolvedContractAddresses)
 
