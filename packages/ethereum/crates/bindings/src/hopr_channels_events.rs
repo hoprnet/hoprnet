@@ -11,7 +11,7 @@ pub use hopr_channels_events::*;
 )]
 pub mod hopr_channels_events {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceDecreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceIncreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelClosed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelOpened\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"closureTime\",\"type\":\"uint32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"OutgoingChannelClosureInitiated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"newTicketIndex\",\"type\":\"uint48\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"TicketRedeemed\",\"outputs\":[],\"anonymous\":false}]";
+    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceDecreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Balance\",\"name\":\"newBalance\",\"type\":\"uint96\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"ChannelBalanceIncreased\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelClosed\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"source\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"address\",\"name\":\"destination\",\"type\":\"address\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"ChannelOpened\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"domainSeparator\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"DomainSeparatorUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.Timestamp\",\"name\":\"closureTime\",\"type\":\"uint32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"OutgoingChannelClosureInitiated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"channelId\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true},{\"internalType\":\"HoprChannels.TicketIndex\",\"name\":\"newTicketIndex\",\"type\":\"uint48\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"TicketRedeemed\",\"outputs\":[],\"anonymous\":false}]";
     ///The parsed JSON ABI of the contract.
     pub static HOPRCHANNELSEVENTS_ABI: ::ethers::contract::Lazy<
         ::ethers::core::abi::Abi,
@@ -93,6 +93,16 @@ pub mod hopr_channels_events {
             ::std::sync::Arc<M>,
             M,
             ChannelOpenedFilter,
+        > {
+            self.0.event()
+        }
+        ///Gets the contract's `DomainSeparatorUpdated` event
+        pub fn domain_separator_updated_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            DomainSeparatorUpdatedFilter,
         > {
             self.0.event()
         }
@@ -213,6 +223,21 @@ pub mod hopr_channels_events {
         Eq,
         Hash
     )]
+    #[ethevent(name = "DomainSeparatorUpdated", abi = "DomainSeparatorUpdated(bytes32)")]
+    pub struct DomainSeparatorUpdatedFilter {
+        #[ethevent(indexed)]
+        pub domain_separator: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
     #[ethevent(
         name = "OutgoingChannelClosureInitiated",
         abi = "OutgoingChannelClosureInitiated(bytes32,uint32)"
@@ -245,6 +270,7 @@ pub mod hopr_channels_events {
         ChannelBalanceIncreasedFilter(ChannelBalanceIncreasedFilter),
         ChannelClosedFilter(ChannelClosedFilter),
         ChannelOpenedFilter(ChannelOpenedFilter),
+        DomainSeparatorUpdatedFilter(DomainSeparatorUpdatedFilter),
         OutgoingChannelClosureInitiatedFilter(OutgoingChannelClosureInitiatedFilter),
         TicketRedeemedFilter(TicketRedeemedFilter),
     }
@@ -267,6 +293,11 @@ pub mod hopr_channels_events {
             }
             if let Ok(decoded) = ChannelOpenedFilter::decode_log(log) {
                 return Ok(HoprChannelsEventsEvents::ChannelOpenedFilter(decoded));
+            }
+            if let Ok(decoded) = DomainSeparatorUpdatedFilter::decode_log(log) {
+                return Ok(
+                    HoprChannelsEventsEvents::DomainSeparatorUpdatedFilter(decoded),
+                );
             }
             if let Ok(decoded) = OutgoingChannelClosureInitiatedFilter::decode_log(log) {
                 return Ok(
@@ -294,6 +325,9 @@ pub mod hopr_channels_events {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::ChannelOpenedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::DomainSeparatorUpdatedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::OutgoingChannelClosureInitiatedFilter(element) => {
@@ -325,6 +359,12 @@ pub mod hopr_channels_events {
     impl ::core::convert::From<ChannelOpenedFilter> for HoprChannelsEventsEvents {
         fn from(value: ChannelOpenedFilter) -> Self {
             Self::ChannelOpenedFilter(value)
+        }
+    }
+    impl ::core::convert::From<DomainSeparatorUpdatedFilter>
+    for HoprChannelsEventsEvents {
+        fn from(value: DomainSeparatorUpdatedFilter) -> Self {
+            Self::DomainSeparatorUpdatedFilter(value)
         }
     }
     impl ::core::convert::From<OutgoingChannelClosureInitiatedFilter>
