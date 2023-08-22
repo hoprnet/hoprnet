@@ -4,7 +4,7 @@ pragma solidity >=0.6.0 <0.9.0;
 import {
     IHoprNetworkRegistryRequirement, HoprNetworkRegistry, HoprNetworkRegistryEvents
 } from "../src/NetworkRegistry.sol";
-import {Test, stdStorage, StdStorage} from "forge-std/Test.sol";
+import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 
 contract HoprNetworkRegistryTest is Test, HoprNetworkRegistryEvents {
     // to alter the storage
@@ -76,7 +76,10 @@ contract HoprNetworkRegistryTest is Test, HoprNetworkRegistryEvents {
      * @dev verify that return value of canOperateFor is correct
      */
 
-    function testFuzz_MockCanOperateFor(uint256[STAKING_ACCOUNTS_SIZE] memory allowances, uint256 accountIndex)
+    function testFuzz_MockCanOperateFor(
+        uint256[STAKING_ACCOUNTS_SIZE] memory allowances,
+        uint256 accountIndex
+    )
         public
     {
         accountIndex = bound(accountIndex, 0, STAKING_ACCOUNTS_SIZE - 1);
@@ -198,7 +201,10 @@ contract HoprNetworkRegistryTest is Test, HoprNetworkRegistryEvents {
      * @dev Register contract for a single time:
      * it can self-register when the requirement is fulfilled and emits true
      */
-    function testFuzz_SelfRegisterAddresses(uint256[STAKING_ACCOUNTS_SIZE] memory allowances, uint256 accountIndex)
+    function testFuzz_SelfRegisterAddresses(
+        uint256[STAKING_ACCOUNTS_SIZE] memory allowances,
+        uint256 accountIndex
+    )
         public
     {
         accountIndex = bound(accountIndex, 0, STAKING_ACCOUNTS_SIZE - 1);
@@ -238,7 +244,9 @@ contract HoprNetworkRegistryTest is Test, HoprNetworkRegistryEvents {
     function testRevert_SelfRegisterTooManyAddresses(
         uint256[STAKING_ACCOUNTS_SIZE] memory allowances,
         uint256 accountIndex
-    ) public {
+    )
+        public
+    {
         accountIndex = bound(accountIndex, 0, STAKING_ACCOUNTS_SIZE - 1);
         // ensure that the allowance at the index is suffiicent
         emit log_named_uint("allowances length", allowances.length);

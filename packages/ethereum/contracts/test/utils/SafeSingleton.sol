@@ -180,7 +180,10 @@ abstract contract SafeSingletonFixtureTest is Test {
      * @dev deploy an arbitrary contract from the Singleton contract
      * without providing the salt, it gets defaut to 0x
      */
-    function deployContractFromSingletonDefault(address expectedAddress, bytes memory contractDeploymentCode)
+    function deployContractFromSingletonDefault(
+        address expectedAddress,
+        bytes memory contractDeploymentCode
+    )
         internal
     {
         // check if contract has been deployed

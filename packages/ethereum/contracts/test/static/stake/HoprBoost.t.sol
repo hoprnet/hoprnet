@@ -17,7 +17,7 @@ contract HoprBoostTest is Test {
     string[2] public types = ["hodlr", "testnet"];
     string[2] public ranks = ["gold", "silver"];
     uint256[3] public numerators = [317, 158, 200];
-    uint256 public DEFAULT_DDL = 1627387200;
+    uint256 public DEFAULT_DDL = 1_627_387_200;
     string public newBaseURI = "hoprboost.eth.limo/";
 
     /**
@@ -209,7 +209,11 @@ contract HoprBoostTest is Test {
         hoprBoost.mint(accounts[0], types[0], ranks[0], numerators[0], DEFAULT_DDL);
     }
 
-    function _helperBuildURI(string memory _base, string memory _type, string memory _rank)
+    function _helperBuildURI(
+        string memory _base,
+        string memory _type,
+        string memory _rank
+    )
         internal
         pure
         returns (string memory)

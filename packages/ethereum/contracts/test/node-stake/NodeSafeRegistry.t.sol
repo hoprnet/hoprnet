@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import {HoprNodeSafeRegistry, HoprNodeSafeRegistryEvents} from "../../src/node-stake/NodeSafeRegistry.sol";
-import {PrecompileUtils} from "../utils/Precompiles.sol";
-import {ECDSA} from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
-import {Test} from "forge-std/Test.sol";
+import { HoprNodeSafeRegistry, HoprNodeSafeRegistryEvents } from "../../src/node-stake/NodeSafeRegistry.sol";
+import { PrecompileUtils } from "../utils/Precompiles.sol";
+import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import { Test } from "forge-std/Test.sol";
 
 // proxy contract to manipulate storage
 contract MyNodeSafeRegistry is HoprNodeSafeRegistry {
-    constructor() HoprNodeSafeRegistry() {}
+    constructor() HoprNodeSafeRegistry() { }
 
     // Only for testing
     function _storeSafeAddress(address nodeAddress, address safeAddress) public {
@@ -32,8 +32,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node can actively register a node
      */
     function testFuzz_RegisterSafeByNode(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0)
+                && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
+        );
+        vm.assume(safeAddress != nodeAddress);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
         vm.prank(nodeAddress);
@@ -48,25 +55,28 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      */
     function testFuzz_RegisterSafeWithNodeSig(uint256 nodePrivateKey, address safeAddress) public {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
 
-        HoprNodeSafeRegistry.NodeSafe memory nodeSafe =
-            HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
+        address nodeChainKeyAddress = vm.addr(nodePrivateKey);
 
         // verify the registration is not known beforehand
-        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(safeAddress, nodeChainKeyAddress));
 
-        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeSafe.nodeChainKeyAddress);
-        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, nodeSafe, nodeSigNonce);
+        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeChainKeyAddress);
+        (address nodeAddress, bytes memory sig) =
+            _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
         vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
         emit RegisteredNodeSafe(safeAddress, nodeAddress);
-        nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
+        nodeSafeRegistry.registerSafeWithNodeSig(safeAddress, nodeChainKeyAddress, sig);
 
         // verify the registration worked
-        assertTrue(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+        assertTrue(nodeSafeRegistry.isNodeSafeRegistered(safeAddress, nodeChainKeyAddress));
 
         vm.clearMockedCalls();
     }
@@ -76,24 +86,27 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      */
     function testRevert_RegisterSafeWithNodeSigNonceReused(uint256 nodePrivateKey, address safeAddress) public {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
 
-        HoprNodeSafeRegistry.NodeSafe memory nodeSafe =
-            HoprNodeSafeRegistry.NodeSafe(safeAddress, vm.addr(nodePrivateKey));
+        address nodeChainKeyAddress = vm.addr(nodePrivateKey);
 
         // verify the registration is not known beforehand
-        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(nodeSafe));
+        assertFalse(nodeSafeRegistry.isNodeSafeRegistered(safeAddress, nodeChainKeyAddress));
 
-        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeSafe.nodeChainKeyAddress);
-        (address nodeAddress, bytes memory sig) = _helperBuildSig(nodePrivateKey, nodeSafe, nodeSigNonce);
+        uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeChainKeyAddress);
+        (address nodeAddress, bytes memory sig) =
+            _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
-        nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
+        nodeSafeRegistry.registerSafeWithNodeSig(safeAddress, nodeChainKeyAddress, sig);
 
         // fail to re-use the signature
         vm.expectRevert(HoprNodeSafeRegistry.NotValidSignatureFromNode.selector);
-        nodeSafeRegistry.registerSafeWithNodeSig(nodeSafe, sig);
+        nodeSafeRegistry.registerSafeWithNodeSig(safeAddress, nodeChainKeyAddress, sig);
 
         vm.clearMockedCalls();
     }
@@ -102,8 +115,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node fail to register a node due to it's registered
      */
     function testRevert_FailToRegisterSafeByNodeDueToRegistered(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0)
+                && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
+        );
+        vm.assume(safeAddress != nodeAddress);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -119,7 +139,10 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node fail to register a node due to the provided safe address is zero
      */
     function testRevert_FailToRegisterSafeByNodeDueToSafeAddressZero(address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0)
+                && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
+        );
 
         address safeAddress = address(0);
         _helperMockSafe(safeAddress, nodeAddress, true, true);
@@ -136,7 +159,10 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node fail to register a node due to the provided node address is zero
      */
     function testRevert_FailToRegisterSafeByNodeDueToNodeAddressZero(address safeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
 
         address nodeAddress = address(0);
         _helperMockSafe(safeAddress, nodeAddress, true, true);
@@ -150,20 +176,55 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     }
 
     /**
+     * @dev node fail to register a node due to the provided node address is a contract
+     */
+    function testRevert_FailToRegisterSafeByNodeDueToNodeIsContract(address safeAddress, address nodeAddress) public {
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0)
+                && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
+        );
+
+        _helperMockSafe(safeAddress, nodeAddress, true, true);
+
+        // mock code at nodeAddress
+        vm.etch(nodeAddress, hex"00010203040506070809");
+
+        vm.prank(nodeAddress);
+        vm.expectRevert(HoprNodeSafeRegistry.NodeIsContract.selector);
+        nodeSafeRegistry.registerSafeByNode(safeAddress);
+        vm.clearMockedCalls();
+        vm.etch(nodeAddress, hex"");
+    }
+
+    /**
      * @dev node fail to register a node due to node and safe addresses are random
      */
-    function testRevert_FailToRegisterSafeByNodeDueToNotSafeOwnerNorNode(address safeAddress, address nodeAddress)
+    function testRevert_FailToRegisterSafeByNodeDueToNodeNotModuleMember(
+        address safeAddress,
+        address nodeAddress
+    )
         public
     {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0)
+                && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
+        );
+        vm.assume(safeAddress != nodeAddress);
 
         _helperMockSafe(safeAddress, nodeAddress, false, false);
 
         nodeSafeRegistry._storeSafeAddress(nodeAddress, address(0));
 
         vm.prank(nodeAddress);
-        vm.expectRevert(HoprNodeSafeRegistry.NotSafeOwnerNorNode.selector);
+        vm.expectRevert(HoprNodeSafeRegistry.NodeNotModuleMember.selector);
         nodeSafeRegistry.registerSafeByNode(safeAddress);
         vm.clearMockedCalls();
     }
@@ -172,8 +233,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev safe can deregister a node by the safe
      */
     function testFuzz_DeregisterNodeBySafe(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0)
+                && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
+        );
+        vm.assume(safeAddress != nodeAddress);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -191,8 +259,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev cannot deregister a random address
      */
     function testRevert_DeregisterNodeBySafeDueToNotValidSafe(address safeAddress, address nodeAddress) public {
-        vm.assume(!PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0));
-        vm.assume(!PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0));
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(safeAddress) && safeAddress != address(0)
+                && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
+        );
+        vm.assume(
+            !PrecompileUtils.isPrecompileAddress(nodeAddress) && nodeAddress != address(0)
+                && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
+        );
+        vm.assume(safeAddress != nodeAddress);
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
@@ -219,6 +294,18 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
 
         // call updateDomainSeparator when chainid is different
         vm.chainId(newChaidId);
+        vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
+        emit DomainSeparatorUpdated(
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256(bytes("NodeSafeRegistry")),
+                    keccak256(bytes(nodeSafeRegistry.VERSION())),
+                    newChaidId,
+                    address(nodeSafeRegistry)
+                )
+            )
+        );
         nodeSafeRegistry.updateDomainSeparator();
         assertTrue(nodeSafeRegistry.domainSeparator() != domainSeparatorOnDeployment);
     }
@@ -246,13 +333,18 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     /**
      * @dev Build a registration signature for node
      */
-    function _helperBuildSig(uint256 mockNodePrivateKey, HoprNodeSafeRegistry.NodeSafe memory nodeSafe, uint256 nonce)
+    function _helperBuildSig(
+        uint256 mockNodePrivateKey,
+        address safeAddress,
+        address nodeChainKeyAddress,
+        uint256 nonce
+    )
         private
         returns (address, bytes memory)
     {
         HoprNodeSafeRegistry.NodeSafeNonce memory nodeSafeNonce = HoprNodeSafeRegistry.NodeSafeNonce({
-            safeAddress: nodeSafe.safeAddress,
-            nodeChainKeyAddress: nodeSafe.nodeChainKeyAddress,
+            safeAddress: safeAddress,
+            nodeChainKeyAddress: nodeChainKeyAddress,
             nodeSigNonce: nonce
         });
         bytes32 hashStruct = keccak256(abi.encode(nodeSafeRegistry.NODE_SAFE_TYPEHASH(), nodeSafeNonce));
