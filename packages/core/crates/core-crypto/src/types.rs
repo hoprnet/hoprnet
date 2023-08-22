@@ -1873,11 +1873,6 @@ pub mod wasm {
         pub fn size() -> u32 {
             Self::SIZE as u32
         }
-
-        #[wasm_bindgen(js_name = "to_string")]
-        pub fn _to_string(&self) -> String {
-            self.to_hex()
-        }
     }
 
     #[wasm_bindgen(getter_with_clone)]
