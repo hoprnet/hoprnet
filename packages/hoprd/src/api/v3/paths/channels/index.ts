@@ -263,7 +263,7 @@ export async function openChannel(
   }
 
   const channelId = generate_channel_id(
-    node.getEthereumAddress(),
+    Address.deserialize(node.getEthereumAddress().serialize()),
     validationResult.counterparty
   )
 
