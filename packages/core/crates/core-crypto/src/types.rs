@@ -508,12 +508,6 @@ impl From<Hash> for [u8; 32] {
 pub struct OffchainPublicKey {
     compressed: CompressedEdwardsY,
 }
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl OffchainPublicKey {
-    pub fn to_string(&self) -> String {
-        self.to_hex()
-    }
-}
 
 impl BinarySerializable for OffchainPublicKey {
     const SIZE: usize = 32;
@@ -1834,6 +1828,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
             self.clone()
+        }
+
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.to_hex()
         }
 
         #[wasm_bindgen]
