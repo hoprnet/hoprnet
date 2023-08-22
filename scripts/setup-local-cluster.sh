@@ -158,7 +158,7 @@ function setup_node() {
   log "Additional args: \"${additional_args}\""
 
   env \
-    DEBUG="libp2p*,hopr*" \
+    DEBUG="hopr*" \
     NODE_ENV="${node_env}" \
     HOPRD_HEARTBEAT_INTERVAL=2500 \
     HOPRD_HEARTBEAT_THRESHOLD=2500 \

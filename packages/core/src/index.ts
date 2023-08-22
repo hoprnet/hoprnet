@@ -1599,7 +1599,7 @@ class Hopr extends EventEmitter {
   }
 
   public getEthereumAddress(): Address {
-    return Address.deserialize(this.chainKeypair.public().to_address().serialize())
+    return this.chainKeypair.public().to_address()
   }
 
   /**
