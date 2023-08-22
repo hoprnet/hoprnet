@@ -58,7 +58,11 @@ contract TargetUtilsMock {
         TargetType targetType,
         TargetPermission targetPermission,
         CapabilityPermission[] memory functionPermissions
-    ) public pure returns (Target) {
+    )
+        public
+        pure
+        returns (Target)
+    {
         return TargetUtils.encodeDefaultPermissions(
             targetAddress, clearance, targetType, targetPermission, functionPermissions
         );

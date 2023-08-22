@@ -1,6 +1,15 @@
 import BN from 'bn.js'
-import { ChannelStatus, defer, generate_channel_id, channel_status_to_string, Address } from '@hoprnet/hopr-utils'
+import { defer } from '@hoprnet/hopr-utils'
+
 import { STATUS_CODES } from '../../utils.js'
+import {
+  hoprd_misc_initialize_crate,
+  generate_channel_id,
+  channel_status_to_string,
+  ChannelStatus,
+  Address
+} from '../../../../../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
 
 import type { Operation } from 'express-openapi'
 import type Hopr from '@hoprnet/hopr-core'
@@ -33,8 +42,8 @@ export interface ChannelTopologyInfo {
  * @returns stringified fields from ChannelEntry and both peer id and address for source/destination
  */
 export const formatChannelTopologyInfo = async (node: Hopr, channel: ChannelEntry): Promise<ChannelTopologyInfo> => {
-  const sourcePeerId = (await node.db.get_account(channel.source)).get_multiaddr_str()
-  const destinationPeerId = (await node.db.get_account(channel.destination)).get_multiaddr_str()
+  const sourcePeerId = (await node.db.get_account(channel.source)).public_key.to_peerid_str()
+  const destinationPeerId = (await node.db.get_account(channel.destination)).public_key.to_peerid_str()
 
   return {
     channelId: channel.get_id().to_hex(),
@@ -218,25 +227,8 @@ async function validateOpenChannelParameters(
       amount: BN
     }
 > {
-  let counterparty: Address
-  try {
-    counterparty = Address.from_string(counterpartyAddressStr)
-  } catch (err) {
-    return {
-      valid: false,
-      reason: STATUS_CODES.INVALID_PEERID
-    }
-  }
-
-  let amount: BN
-  try {
-    amount = new BN(amountStr)
-  } catch {
-    return {
-      valid: false,
-      reason: STATUS_CODES.INVALID_AMOUNT
-    }
-  }
+  const counterparty: Address = Address.from_string(counterpartyAddressStr)
+  const amount: BN = new BN(amountStr)
 
   const balance = await node.getBalance()
   if (amount.lten(0) || balance.lt(balance.of_same(amount.toString()))) {
@@ -347,7 +339,7 @@ POST.apiDoc = {
           required: ['peerAddress', 'amount'],
           properties: {
             peerAddress: {
-              format: 'peerAddress',
+              format: 'ethereumaddress',
               type: 'string',
               description: 'Peer address that we want to transact with using this channel.'
             },

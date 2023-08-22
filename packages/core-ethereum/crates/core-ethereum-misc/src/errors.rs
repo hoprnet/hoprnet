@@ -1,7 +1,7 @@
 use core_crypto::errors::CryptoError;
+use multiaddr::Error as MultiaddrError;
 use thiserror::Error;
 use utils_db::errors::DbError;
-use multiaddr::Error as MultiaddrError;
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumError {
@@ -16,6 +16,9 @@ pub enum CoreEthereumError {
 
     #[error("{0}")]
     InvalidArguments(String),
+
+    #[error("{0}")]
+    InvalidState(String),
 
     #[error("Invalid response to acknowledgement {0}")]
     InvalidResponseToAcknowledgement(String),

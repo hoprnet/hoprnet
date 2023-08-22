@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import {HoprCrypto} from "../../src/Crypto.sol";
-import {HoprChannels} from "../../src/Channels.sol";
-import {SECP2561k} from "solcrypto/SECP2561k.sol";
-import {Test} from "forge-std/Test.sol";
+import { HoprCrypto } from "../../src/Crypto.sol";
+import { HoprChannels } from "../../src/Channels.sol";
+import { SECP2561k } from "solcrypto/SECP2561k.sol";
+import { Test } from "forge-std/Test.sol";
 
 abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
     uint256 constant SECP256K1_HALF_FIELD_ORDER = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0;
@@ -12,7 +12,7 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
     struct RedeemTicketArgBuilder {
         uint256 privKeyA;
         uint256 privKeyB;
-        bytes dst;
+        bytes32 dst;
         address src;
         address dest;
         uint256 amount;
@@ -27,7 +27,9 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         return keccak256(abi.encodePacked(source, destination));
     }
 
-    function getRedeemableTicket(RedeemTicketArgBuilder memory args, bytes32 dstHash)
+    function getRedeemableTicket(
+        RedeemTicketArgBuilder memory args
+    )
         internal
         view
         returns (HoprChannels.RedeemableTicket memory redeemable, VRFParameters memory vrf)
@@ -43,17 +45,27 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
             HoprChannels.WinProb.wrap(uint56(args.winProb))
         );
 
-        bytes32 ticketHash;
-        {
-            bytes32 pre_ticketHash = keccak256(
-                abi.encode(
-                    HoprChannels.redeemTicket.selector, keccak256(abi.encode(ticketData, vm.addr(args.porSecret)))
-                )
-            );
-            ticketHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), dstHash, pre_ticketHash));
-        }
+        address challenge = HoprCrypto.scalarTimesBasepoint(args.porSecret);
+
+        uint256 secondPart =
+            (args.amount << 160) | 
+            (args.maxTicketIndex << 112) | 
+            (args.indexOffset << 80) | 
+            (args.epoch << 56) | 
+            args.winProb;
+
+        // Deviates from EIP712 due to computed property and non-standard struct property encoding
+        bytes32 hashStruct = keccak256(
+            abi.encode(
+                HoprChannels.redeemTicket.selector,
+                keccak256(abi.encodePacked(channelId, secondPart, challenge))
+            )
+        );
+
+        bytes32 ticketHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), args.dst, hashStruct));
 
         CompactSignature memory sig;
+
         {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(args.privKeyA, ticketHash);
 
@@ -62,10 +74,14 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
 
         redeemable = HoprChannels.RedeemableTicket(ticketData, sig, args.porSecret);
 
-        vrf = getVRFParameters(args.privKeyB, args.dst, ticketHash);
+        vrf = getVRFParameters(args.privKeyB, abi.encodePacked(args.dst), ticketHash);
     }
 
-    function toCompactSignature(uint8 v, bytes32 r, bytes32 s)
+    function toCompactSignature(
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    )
         internal
         pure
         returns (HoprCrypto.CompactSignature memory sig)
@@ -77,7 +93,10 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         sig.vs = bytes32(uint256(v - 27) << 255) | s;
     }
 
-    function decompressSignature(bytes32 r, bytes32 vs)
+    function decompressSignature(
+        bytes32 r,
+        bytes32 vs
+    )
         internal
         pure
         returns (uint8 v_out, bytes32 r_out, bytes32 s_out)
@@ -87,7 +106,11 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         r_out = r;
     }
 
-    function getVRFParameters(uint256 privKey, bytes memory dst, bytes32 vrfMessage)
+    function getVRFParameters(
+        uint256 privKey,
+        bytes memory dst,
+        bytes32 vrfMessage
+    )
         internal
         view
         returns (HoprCrypto.VRFParameters memory params)

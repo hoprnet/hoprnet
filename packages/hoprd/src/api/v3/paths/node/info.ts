@@ -126,8 +126,7 @@ GET.apiDoc = {
               nodeManagementModule: {
                 type: 'string',
                 example: '0x0262496080c3916d9afd5904EA3DFd46DfFBfF3D',
-                description:
-                  'Contract address of the Safe module for managing the current hopr node'
+                description: 'Contract address of the Safe module for managing the current hopr node'
               },
               nodeSafe: {
                 type: 'string',

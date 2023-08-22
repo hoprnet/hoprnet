@@ -13,6 +13,7 @@ export enum IndexerStatus {
 
 export type IndexerEvents =
   | `announce-${string}`
+  | `token-approved-${string}`
   | `withdraw-hopr-${string}`
   | `withdraw-native-${string}`
   | `channel-updated-${string}`

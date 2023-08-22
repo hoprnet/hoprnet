@@ -59,8 +59,19 @@ source .env
 // This verifies contract on sourcify
 FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier sourcify script/DeployAll.s.sol:DeployAllContractsScript
 
+// This verifies contract on blockscout
+FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast \
+   --verify --verifier blockscout --verifier-url "https://gnosis.blockscout.com/api?" \
+   --etherscan-api-key "${BLOCKSCOUT_API_KEY}" \
+   --chain 100 --use 0.8.19 \
+   script/DeployAll.s.sol:DeployAllContractsScript
+
 // This deploys contract to staging environment and verifies contracts on Gnosisscan
-FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 --compiler-version <specify_if_other_than_that_in_config> script/DeployAll.s.sol:DeployAllContractsScript
+FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast \
+   --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" \
+   --delay 30 --chain 100 --etherscan-api-key "${ETHERSCAN_API_KEY}" \
+   --use <specify_if_other_than_that_in_config> \
+   script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
 #### Production

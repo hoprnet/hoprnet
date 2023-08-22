@@ -1,7 +1,6 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { ChainWrapper, createChainWrapper, Receipt } from './ethereum.js'
-import chalk from 'chalk'
+import { ChainWrapper, createChainWrapper, Receipt, type DeploymentExtract } from './ethereum.js'
 import {
   AcknowledgedTicket,
   Balance,
@@ -37,7 +36,6 @@ import {
 import Indexer from './indexer/index.js'
 import { EventEmitter } from 'events'
 import type { IndexerEvents } from './indexer/types.js'
-import { DeploymentExtract } from './utils/utils.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -93,6 +91,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private constructor(
     private db: Ethereum_Database,
+    private offchainKeypair: OffchainKeypair,
     private chainKeypair: ChainKeypair,
     private options: ChainOptions,
     private safeModuleOptions: SafeModuleOptions,
@@ -112,6 +111,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public static async createInstance(
     db: Ethereum_Database,
+    offchainKeypair: OffchainKeypair,
     chainKeypair: ChainKeypair,
     options: ChainOptions,
     safeModuleOptions: SafeModuleOptions,
@@ -120,6 +120,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   ) {
     HoprCoreEthereum._instance = new HoprCoreEthereum(
       db,
+      offchainKeypair,
       chainKeypair,
       options,
       safeModuleOptions,
@@ -168,7 +169,8 @@ export default class HoprCoreEthereum extends EventEmitter {
         deploymentAddresses,
         this.safeModuleOptions,
         this.options,
-        this.chainKeypair.secret(),
+        this.offchainKeypair,
+        this.chainKeypair,
         true
       )
     } catch (err) {
@@ -202,7 +204,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.chainKeypair.to_address().to_hex()}`)
-        log(chalk.green('Connector started'))
+        log('Connector started')
       } catch (err) {
         log('error: failed to start the indexer', err)
       }
@@ -222,11 +224,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  announce(multiaddr: Multiaddr, packetKeypair: OffchainKeypair): Promise<string> {
+  announce(multiaddr: Multiaddr): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(packetKeypair, this.chainKeypair.to_address(), multiaddr, (txHash: string) =>
-      this.setTxHandler(`announce-${txHash}`, txHash)
-    )
+    return this.chain.announce(multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -579,9 +579,15 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
     log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
 
-    return this.chain.fundChannel(this.chainKeypair.to_address(), dest, myFund, counterpartyFund, (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
-    )
+    return (
+      await this.chain.fundChannel(
+        dest,
+        counterpartyFund,
+        (txHash: string) => this.setTxHandler(`token-approved-${txHash}`, txHash),
+        (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
+        // we are only interested in fundChannel receipt
+      )
+    )[1]
   }
 
   public async registerSafeByNode(): Promise<Receipt> {
@@ -690,4 +696,4 @@ export default class HoprCoreEthereum extends EventEmitter {
 // export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
-export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper }
+export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper, DeploymentExtract, Ethereum_Hash }

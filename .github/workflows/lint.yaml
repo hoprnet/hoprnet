@@ -81,14 +81,3 @@ jobs:
 
       - name: Run linter
         run: nix develop -c make lint
-
-  shellcheck:
-    name: Shellcheck
-    runs-on: ubuntu-2-core
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
-
-      - name: Check shell scripts (not enforced for now)
-        run: shellcheck -a --norc -s bash -x scripts/*.sh

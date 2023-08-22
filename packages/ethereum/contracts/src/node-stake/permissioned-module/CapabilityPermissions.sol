@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.0 <0.9.0;
 
-import {Enum} from "safe-contracts/common/Enum.sol";
-import {HoprChannels} from "../../Channels.sol";
-import {EnumerableTargetSet, TargetSet} from "../../utils/EnumerableTargetSet.sol";
+import { Enum } from "safe-contracts/common/Enum.sol";
+import { HoprChannels } from "../../Channels.sol";
+import { EnumerableTargetSet, TargetSet } from "../../utils/EnumerableTargetSet.sol";
 import {
     TargetUtils,
     Target,
@@ -12,6 +12,7 @@ import {
     Clearance,
     CapabilityPermission
 } from "../../utils/TargetUtils.sol";
+import { IERC20, IERC777 } from "../../static/openzeppelin-contracts/ERC777.sol";
 
 enum GranularPermission {
     NONE,
@@ -21,14 +22,30 @@ enum GranularPermission {
 
 struct Role {
     TargetSet targets; // target addresses that can be called
-    mapping(address => bool) members; // eligible caller. May be able to receive native tokens (e.g. xDAI), if set to allowed
+    mapping(address => bool) members; // eligible caller. May be able to receive native tokens (e.g. xDAI), if set to
+        // allowed
     // For CHANNELS target: capabilityKey (bytes32) => channel Id (keccak256(src, dest)) => GranularPermission
-    // For TOKEN target: capabilityKey (bytes32) => pair Id (keccak256(node address, spender address)) => GranularPermission
+    // For TOKEN target: capabilityKey (bytes32) => pair Id (keccak256(node address, spender address)) =>
+    // GranularPermission
     // For SEND target:  bytes32(0x00) => pair Id (keccak256(node address, spender address)) => GranularPermission
     mapping(bytes32 => mapping(bytes32 => GranularPermission)) capabilities;
 }
 
 /**
+ *    &&&&
+ *    &&&&
+ *    &&&&
+ *    &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
+ *    &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
+ *     &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
+ *     &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
+ *     &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
+ *     %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
+ *    %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *
  * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Permissions.sol` contract,
  * this library is designed to support a single role and offers a set of specific functions
  * for interacting with HoprChannels and HoprToken contracts
@@ -49,8 +66,10 @@ struct Role {
  * - When calling HoprChannels contracts, permission is check with multiple parameters together
  * - For Channels targets, the default permission is ALLOWED. However, the default value for other targets is BLOCKED.
  * - Permissions are not stored bitwise in `scopeConig` (uint256) due to lack of customization
- * - Utility functions, such as `packLeft`, `packRight`, `unpackFunction`, `unpackParameter`, `checkExecutionOptions` are removed
- * - Specific helper functions, such as `pluckOneStaticAddress`, `pluckTwoStaticAddresses`, `pluckDynamicAddresses`,  `pluckSendPayload` are derived from `pluckStaticValue` and `pluckDynamicValue`
+ * - Utility functions, such as `packLeft`, `packRight`, `unpackFunction`, `unpackParameter`, `checkExecutionOptions`
+ * are removed
+ * - Specific helper functions, such as `pluckOneStaticAddress`, `pluckTwoStaticAddresses`, `pluckDynamicAddresses`,  `pluckSendPayload`
+ * are derived from `pluckStaticValue` and `pluckDynamicValue`
  * - helper functions to encode array of function signatures and their respective permissions are added.
  *
  * @notice Due to the deployed HoprToken.sol imports OpenZeppelin contract library locked at v4.4.2, while
@@ -63,16 +82,16 @@ library HoprCapabilityPermissions {
     using EnumerableTargetSet for TargetSet;
 
     // HoprChannels method ids (TargetType.CHANNELS)
-    bytes4 internal constant REDEEM_TICKET_SELECTOR = HoprChannels.redeemTicketSafe.selector;
-    bytes4 internal constant CLOSE_INCOMING_CHANNEL_SELECTOR = HoprChannels.closeIncomingChannelSafe.selector;
-    bytes4 internal constant INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR =
+    bytes4 public constant REDEEM_TICKET_SELECTOR = HoprChannels.redeemTicketSafe.selector;
+    bytes4 public constant CLOSE_INCOMING_CHANNEL_SELECTOR = HoprChannels.closeIncomingChannelSafe.selector;
+    bytes4 public constant INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR =
         HoprChannels.initiateOutgoingChannelClosureSafe.selector;
-    bytes4 internal constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR =
+    bytes4 public constant FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR =
         HoprChannels.finalizeOutgoingChannelClosureSafe.selector;
-    bytes4 internal constant FUND_CHANNEL_SELECTOR = HoprChannels.fundChannelSafe.selector;
+    bytes4 public constant FUND_CHANNEL_SELECTOR = HoprChannels.fundChannelSafe.selector;
     // HoprToken method ids (TargetType.TOKEN). As HoprToken contract is in production, its ABI is static
-    bytes4 internal constant APPROVE_SELECTOR = hex"095ea7b3"; // equivalent to `HoprToken.approve.selector`, for ABI "approve(address,uint256)"
-    bytes4 internal constant SEND_SELECTOR = hex"9bd9bbc6"; // equivalent to `HoprToken.send.selector`, for ABI "send(address,uint256,bytes)"
+    bytes4 public constant APPROVE_SELECTOR = IERC20.approve.selector;
+    bytes4 public constant SEND_SELECTOR = IERC777.send.selector;
 
     event RevokedTarget(address indexed targetAddress);
     event ScopedTargetChannels(address indexed targetAddress, Target target);
@@ -163,7 +182,10 @@ library HoprCapabilityPermissions {
         uint256 value,
         bytes calldata data,
         Enum.Operation operation
-    ) internal view {
+    )
+        internal
+        view
+    {
         if (multisend == to) {
             // here the operation should be delegate
             checkMultisendTransaction(role, data);
@@ -203,13 +225,15 @@ library HoprCapabilityPermissions {
                 // This will also zero out unused data.
                 operation := shr(0xf8, mload(add(data, i)))
                 // We offset the load address by 1 byte (operation byte)
-                // We shift it right by 96 bits (256 - 160 [20 address bytes]) to right-align the data and zero out unused data.
+                // We shift it right by 96 bits (256 - 160 [20 address bytes]) to right-align the data and zero out
+                // unused data.
                 to := shr(0x60, mload(add(data, add(i, 0x01))))
                 // We offset the load address by 21 byte (operation byte + 20 address bytes)
                 value := mload(add(data, add(i, 0x15)))
                 // We offset the load address by 53 byte (operation byte + 20 address bytes + 32 value bytes)
                 dataLength := mload(add(data, add(i, 0x35)))
-                // load actual transaction data with an offset of 53 byte (operation byte + 20 address bytes + 32 value bytes)
+                // load actual transaction data with an offset of 53 byte (operation byte + 20 address bytes + 32 value
+                // bytes)
                 out := add(data, add(i, 0x35))
             }
             checkTransaction(role, to, value, out, operation);
@@ -230,7 +254,10 @@ library HoprCapabilityPermissions {
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) internal view {
+    )
+        internal
+        view
+    {
         if (data.length != 0 && data.length < 4) {
             revert FunctionSignatureTooShort();
         }
@@ -321,7 +348,11 @@ library HoprCapabilityPermissions {
         bytes32 capabilityKey,
         bytes4 functionSig,
         bytes memory data
-    ) internal view returns (GranularPermission) {
+    )
+        internal
+        view
+        returns (GranularPermission)
+    {
         // check the first two evm slots of data payload
         // according to the following ABIs
         //  - fundChannelSafe(address self, address account, Balance amount)  // src,dst
@@ -363,7 +394,12 @@ library HoprCapabilityPermissions {
      * @param functionSig Function method ID
      * @param data payload (with function signature)
      */
-    function checkHoprTokenParameters(Role storage role, bytes32 capabilityKey, bytes4 functionSig, bytes memory data)
+    function checkHoprTokenParameters(
+        Role storage role,
+        bytes32 capabilityKey,
+        bytes4 functionSig,
+        bytes memory data
+    )
         internal
         view
         returns (GranularPermission)
@@ -398,7 +434,11 @@ library HoprCapabilityPermissions {
      * @param target Taret of the operation
      * @param functionSig bytes4 method Id of the operation
      */
-    function getDefaultPermission(uint256 dataLength, Target target, bytes4 functionSig)
+    function getDefaultPermission(
+        uint256 dataLength,
+        Target target,
+        bytes4 functionSig
+    )
         internal
         pure
         returns (TargetPermission)
@@ -503,7 +543,8 @@ library HoprCapabilityPermissions {
     }
 
     /**
-     * @dev Allows the target address to be scoped as a beneficiary of SEND by setting its clearance and target type accordingly.
+     * @dev Allows the target address to be scoped as a beneficiary of SEND by setting its clearance and target type
+     * accordingly.
      * @notice It overwrites the irrelevant fields in DefaultPermissions struct
      * @param role The storage reference to the Role struct.
      * @param target target to be scoped as a beneficiary of SEND.
@@ -537,7 +578,9 @@ library HoprCapabilityPermissions {
         address targetAddress,
         bytes32 channelId,
         bytes32 encodedSigsPermissions
-    ) internal {
+    )
+        internal
+    {
         (bytes4[] memory functionSigs, GranularPermission[] memory permissions) =
             HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedSigsPermissions, 7);
 
@@ -566,7 +609,9 @@ library HoprCapabilityPermissions {
         address targetAddress,
         address beneficiary,
         bytes32 encodedSigsPermissions
-    ) internal {
+    )
+        internal
+    {
         (bytes4[] memory functionSigs, GranularPermission[] memory permissions) =
             HoprCapabilityPermissions.decodeFunctionSigsAndPermissions(encodedSigsPermissions, 2);
 
@@ -594,7 +639,9 @@ library HoprCapabilityPermissions {
         address nodeAddress,
         address beneficiary,
         GranularPermission permission
-    ) internal {
+    )
+        internal
+    {
         role.capabilities[bytes32(0)][getChannelId(nodeAddress, beneficiary)] = permission;
 
         emit ScopedGranularSendCapability(nodeAddress, beneficiary, permission);
@@ -670,7 +717,10 @@ library HoprCapabilityPermissions {
      * @param functionSigs array of function signatures on target
      * @param permissions array of granular permissions on target
      */
-    function encodeFunctionSigsAndPermissions(bytes4[] memory functionSigs, GranularPermission[] memory permissions)
+    function encodeFunctionSigsAndPermissions(
+        bytes4[] memory functionSigs,
+        GranularPermission[] memory permissions
+    )
         internal
         pure
         returns (bytes32 encoded, uint256 length)
@@ -705,7 +755,10 @@ library HoprCapabilityPermissions {
      * @param encoded encode permissions in bytes32
      * @param length length of permissions
      */
-    function decodeFunctionSigsAndPermissions(bytes32 encoded, uint256 length)
+    function decodeFunctionSigsAndPermissions(
+        bytes32 encoded,
+        uint256 length
+    )
         internal
         pure
         returns (bytes4[] memory functionSigs, GranularPermission[] memory permissions)

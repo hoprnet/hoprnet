@@ -3,8 +3,8 @@ pragma solidity 0.8.19;
 
 import "openzeppelin-contracts/utils/Multicall.sol";
 
-import {HoprMultiSig} from "./MultiSig.sol";
-import {HoprNodeSafeRegistry} from "./node-stake/NodeSafeRegistry.sol";
+import { HoprMultiSig } from "./MultiSig.sol";
+import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
 abstract contract HoprAnnouncementsEvents {
     event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
@@ -48,14 +48,23 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
         setNodeSafeRegistry(safeRegistry);
     }
 
-    function bindKeysSafe(address self, bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key)
+    function bindKeysSafe(
+        address self,
+        bytes32 ed25519_sig_0,
+        bytes32 ed25519_sig_1,
+        bytes32 ed25519_pub_key
+    )
         external
         HoprMultiSig.onlySafe(self)
     {
         _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     }
 
-    function bindKeys(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key)
+    function bindKeys(
+        bytes32 ed25519_sig_0,
+        bytes32 ed25519_sig_1,
+        bytes32 ed25519_pub_key
+    )
         external
         HoprMultiSig.noSafeSet()
     {
@@ -68,7 +77,10 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
         bytes32 ed25519_sig_1,
         bytes32 ed25519_pub_key,
         string calldata baseMultiaddr
-    ) external HoprMultiSig.onlySafe(self) {
+    )
+        external
+        HoprMultiSig.onlySafe(self)
+    {
         _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
         _announceInternal(self, baseMultiaddr);
     }
@@ -81,7 +93,10 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
         bytes32 ed25519_sig_1,
         bytes32 ed25519_pub_key,
         string calldata baseMultiaddr
-    ) external HoprMultiSig.noSafeSet() {
+    )
+        external
+        HoprMultiSig.noSafeSet()
+    {
         _bindKeysInternal(msg.sender, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
         _announceInternal(msg.sender, baseMultiaddr);
     }
@@ -118,7 +133,12 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
      * @param ed25519_sig_1 second component of the EdDSA signature
      * @param ed25519_pub_key EdDSA public key
      */
-    function _bindKeysInternal(address self, bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key)
+    function _bindKeysInternal(
+        address self,
+        bytes32 ed25519_sig_0,
+        bytes32 ed25519_sig_1,
+        bytes32 ed25519_pub_key
+    )
         internal
     {
         emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, self);

@@ -36,13 +36,20 @@ enum CapabilityPermission {
  * (Clearance)            as uint8: clearance
  * (TargetType)           as uint8: targetType
  * (TargetPermission)     as uint8: defaultTargetPermission                                       (for the target)
- * (CapabilityPermission) as uint8: defaultRedeemTicketSafeFunctionPermisson                      (for Channels contract)
- * (CapabilityPermission) as uint8: RESERVED FOR defaultBatchRedeemTicketsSafeFunctionPermisson   (for Channels contract)
- * (CapabilityPermission) as uint8: defaultCloseIncomingChannelSafeFunctionPermisson              (for Channels contract)
- * (CapabilityPermission) as uint8: defaultInitiateOutgoingChannelClosureSafeFunctionPermisson    (for Channels contract)
- * (CapabilityPermission) as uint8: defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson    (for Channels contract)
- * (CapabilityPermission) as uint8: defaultFundChannelMultiFunctionPermisson                      (for Channels contract)
- * (CapabilityPermission) as uint8: defaultSetCommitmentSafeFunctionPermisson                     (for Channels contract)
+ * (CapabilityPermission) as uint8: defaultRedeemTicketSafeFunctionPermisson                      (for Channels
+ * contract)
+ * (CapabilityPermission) as uint8: RESERVED FOR defaultBatchRedeemTicketsSafeFunctionPermisson   (for Channels
+ * contract)
+ * (CapabilityPermission) as uint8: defaultCloseIncomingChannelSafeFunctionPermisson              (for Channels
+ * contract)
+ * (CapabilityPermission) as uint8: defaultInitiateOutgoingChannelClosureSafeFunctionPermisson    (for Channels
+ * contract)
+ * (CapabilityPermission) as uint8: defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson    (for Channels
+ * contract)
+ * (CapabilityPermission) as uint8: defaultFundChannelMultiFunctionPermisson                      (for Channels
+ * contract)
+ * (CapabilityPermission) as uint8: defaultSetCommitmentSafeFunctionPermisson                     (for Channels
+ * contract)
  * (CapabilityPermission) as uint8: defaultApproveFunctionPermisson                               (for Token contract)
  * (CapabilityPermission) as uint8: defaultSendFunctionPermisson                                  (for Token contract)
  */
@@ -85,7 +92,10 @@ library TargetUtils {
         return TargetPermission(uint8((Target.unwrap(target) << 176) >> 248));
     }
 
-    function getDefaultCapabilityPermissionAt(Target target, uint256 position)
+    function getDefaultCapabilityPermissionAt(
+        Target target,
+        uint256 position
+    )
         internal
         pure
         returns (CapabilityPermission)
@@ -157,7 +167,11 @@ library TargetUtils {
         TargetType targetType,
         TargetPermission targetPermission,
         CapabilityPermission[] memory capabilityPermissions
-    ) internal pure returns (Target target) {
+    )
+        internal
+        pure
+        returns (Target target)
+    {
         if (capabilityPermissions.length > NUM_CAPABILITY_PERMISSIONS) {
             revert TooManyCapabilities();
         }
@@ -207,7 +221,7 @@ library TargetUtils {
         capabilityPermissions = new CapabilityPermission[](NUM_CAPABILITY_PERMISSIONS);
         // decode function permissions. By default, 8 function permissions
         for (uint256 i = 0; i < NUM_CAPABILITY_PERMISSIONS; i++) {
-            // first left offset byt 184 + 8 * i bits 
+            // first left offset byt 184 + 8 * i bits
             // where 184 = 160 (address) + 8 (Clearance) + 8 (TargetType) + 8 (TargetPermission)
             // then RIGHT shift 256 - 8 = 248 bits
             capabilityPermissions[i] = CapabilityPermission(uint8(Target.unwrap(target) << (184 + 8 * i) >> 248));

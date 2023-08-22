@@ -3,9 +3,6 @@ import EventEmitter from 'events'
 import { Multiaddr, multiaddr, protocols } from '@multiformats/multiaddr'
 
 import BN from 'bn.js'
-import { keysPBM } from '@libp2p/crypto/keys'
-import { createHash } from 'crypto'
-import secp256k1 from 'secp256k1'
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 // @ts-ignore untyped library
@@ -137,12 +134,6 @@ const metric_strategyMaxChannels = create_gauge(
 
 /// Maximum time to wait for a packet to be pushed to the interaction queue
 const PACKET_QUEUE_TIMEOUT_SECONDS = 15n
-
-export function privateKeyFromPeer(peer: PeerId) {
-  if (peer.privateKey == undefined) throw Error('peer id does not contain a private key')
-
-  return keysPBM.PrivateKey.decode(peer.privateKey).Data
-}
 
 interface NetOptions {
   ip: string
@@ -959,7 +950,7 @@ export class Hopr extends EventEmitter {
         'announcing on-chain %s routable address',
         announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
       )
-      const announceTxHash = await connector.announce(addrToAnnounce, this.packetKeypair)
+      const announceTxHash = await connector.announce(addrToAnnounce)
       log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
     } catch (err) {
       log('announcing address %s failed', addrToAnnounce.toString())
@@ -1274,21 +1265,6 @@ export class Hopr extends EventEmitter {
 
   public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
     return HoprCoreEthereum.getInstance().waitForPublicNodes()
-  }
-
-  // @TODO remove this
-  // NB: The prefix "HOPR Signed Message: " is added as a security precaution.
-  // Without it, the node could be convinced to sign a message like an Ethereum
-  // transaction draining it's connected wallet funds, since they share the key.
-  public signMessage(message: Uint8Array): Uint8Array {
-    const taggedMessage = Uint8Array.from([...new TextEncoder().encode('HOPR Signed Message: '), ...message])
-
-    const signature = secp256k1.ecdsaSign(
-      createHash('sha256').update(taggedMessage).digest(),
-      keysPBM.PrivateKey.decode(this.id.privateKey).Data
-    )
-
-    return signature.signature
   }
 
   public getEthereumAddress(): Address {

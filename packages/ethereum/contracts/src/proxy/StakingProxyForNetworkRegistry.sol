@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
-import {Math} from "openzeppelin-contracts/utils/math/Math.sol";
-import {IHoprNetworkRegistryRequirement} from "../interfaces/INetworkRegistryRequirement.sol";
+import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
+import { IHoprNetworkRegistryRequirement } from "../interfaces/INetworkRegistryRequirement.sol";
 
 /**
  * @dev Interface for staking contract
@@ -14,7 +14,11 @@ import {IHoprNetworkRegistryRequirement} from "../interfaces/INetworkRegistryReq
 interface IHoprStake {
     function stakedHoprTokens(address _account) external view returns (uint256);
 
-    function isNftTypeAndRankRedeemed2(uint256 nftTypeIndex, string memory nftRank, address hodler)
+    function isNftTypeAndRankRedeemed2(
+        uint256 nftTypeIndex,
+        string memory nftRank,
+        address hodler
+    )
         external
         view
         returns (bool);
@@ -129,7 +133,10 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
         uint256[] calldata nftTypes,
         string[] calldata nftRanks,
         uint256[] calldata maxRegistrations
-    ) external onlyOwner {
+    )
+        external
+        onlyOwner
+    {
         if (nftTypes.length != nftRanks.length) revert NftRanksMismatch();
         if (nftTypes.length != maxRegistrations.length) revert MaxRegistrationsMismatch();
         for (uint256 index = 0; index < nftTypes.length; index++) {
@@ -142,7 +149,10 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
      * @param nftTypes Array of type index of the special HoprBoost NFT
      * @param nftRanks Array of HOPR boost rank, which is associated to the special NFT, in string[]
      */
-    function ownerBatchRemoveSpecialNftTypeAndRank(uint256[] calldata nftTypes, string[] calldata nftRanks)
+    function ownerBatchRemoveSpecialNftTypeAndRank(
+        uint256[] calldata nftTypes,
+        string[] calldata nftRanks
+    )
         external
         onlyOwner
     {
@@ -169,7 +179,10 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
      * @param nftTypes Array of type index of the eligible HoprBoost NFT
      * @param nftRanks Array of HOPR boost rank, which is associated to the eligible NFT, in string[]
      */
-    function ownerBatchRemoveNftTypeAndRank(uint256[] calldata nftTypes, string[] calldata nftRanks)
+    function ownerBatchRemoveNftTypeAndRank(
+        uint256[] calldata nftTypes,
+        string[] calldata nftRanks
+    )
         external
         onlyOwner
     {
@@ -236,7 +249,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
             }
         }
         // did not exist, add to the list
-        specialNftTypeAndRank.push(NftTypeAndRank({nftType: nftType, nftRank: nftRank}));
+        specialNftTypeAndRank.push(NftTypeAndRank({ nftType: nftType, nftRank: nftRank }));
         maxRegistrationsPerSpecialNft.push(maxRegistration);
         emit SpecialNftTypeAndRankAdded(nftType, nftRank, maxRegistration);
     }
@@ -281,7 +294,7 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
                 return;
             }
         }
-        eligibleNftTypeAndRank.push(NftTypeAndRank({nftType: nftType, nftRank: nftRank}));
+        eligibleNftTypeAndRank.push(NftTypeAndRank({ nftType: nftType, nftRank: nftRank }));
         emit NftTypeAndRankAdded(nftType, nftRank);
     }
 

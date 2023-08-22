@@ -1,28 +1,38 @@
 import request from 'supertest'
+import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { Balance, ChannelEntry, BalanceType, U256, ChannelStatus } from '@hoprnet/hopr-utils'
+
+import {
+  hoprd_misc_initialize_crate,
+  Balance,
+  ChannelEntry,
+  BalanceType,
+  U256,
+  ChannelStatus
+} from '../../../../../lib/hoprd_misc.js'
+hoprd_misc_initialize_crate()
 
 import {
   createTestApiInstance,
   ALICE_PEER_ID,
   ALICE_ETHEREUM_ADDR,
+  ALICE_ACCOUNT_ENTRY,
   BOB_ETHEREUM_ADDR,
   CHARLIE_ETHEREUM_ADDR,
-  INVALID_PEER_ID,
   channelEntryCreateMock
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
 
-let node = {} as any
-node.getId = () => ALICE_PEER_ID
-node.getEthereumAddress = () => ALICE_ETHEREUM_ADDR
-node.getNativeBalance = () => new Balance('10', BalanceType.Native)
+let node = sinon.fake as any
+node.getId = sinon.fake.returns(ALICE_PEER_ID)
+node.getEthereumAddress = sinon.fake.returns(ALICE_ETHEREUM_ADDR.clone())
+node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.Native))
 node.getBalance = () => new Balance('1', BalanceType.HOPR)
 
 const CHANNEL_ID = channelEntryCreateMock().get_id()
 
-node.openChannel = async () => ({
+node.openChannel = sinon.fake.resolves({
   channelId: CHANNEL_ID,
   receipt: 'testReceipt'
 })
@@ -58,8 +68,11 @@ describe('GET /channels', function () {
   node.getChannelsFrom = async () => [outgoing]
   node.getChannelsTo = async () => [incoming]
   node.getAllChannels = async () => [incoming, outgoing, otherChannel]
+  node.db = sinon.fake()
+  node.db.get_account = sinon.fake.resolves(ALICE_ACCOUNT_ENTRY)
 
   let service: any
+
   before(async function () {
     const loaded = await createTestApiInstance(node)
 
@@ -76,9 +89,10 @@ describe('GET /channels', function () {
     expect(res.body.incoming.length).to.be.equal(1)
     expect(res.body.outgoing.length).to.be.equal(1)
     // expect(res.body.all.length).to.be.equal(0)
-    expect(res.body.incoming[0].channelId).to.deep.equal(incoming.get_id().to_hex())
-    expect(res.body.outgoing[0].channelId).to.deep.equal(outgoing.get_id().to_hex())
+    expect(res.body.incoming[0].id).to.deep.equal(incoming.get_id().to_hex())
+    expect(res.body.outgoing[0].id).to.deep.equal(outgoing.get_id().to_hex())
   })
+
   it('should get channels list excluding closed', async function () {
     const res = await request(service).get('/api/v3/channels')
     expect(res.status).to.equal(200)
@@ -87,6 +101,7 @@ describe('GET /channels', function () {
     expect(res.body.outgoing.length).to.be.equal(0)
     // expect(res.body.all.length).to.be.equal(0)
   })
+
   it('should get all the channels', async function () {
     const res = await request(service).get('/api/v3/channels?fullTopology=true')
     expect(res.status).to.equal(200)
@@ -106,36 +121,39 @@ describe('POST /channels', () => {
     const loaded = await createTestApiInstance(node)
 
     service = loaded.service
+
+    // @ts-ignore ESM / CommonJS compatibility issue
+    chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
   })
 
   it('should open channel', async () => {
     const res = await request(service).post('/api/v3/channels').send({
-      peerId: ALICE_PEER_ID.toString(),
+      peerAddress: ALICE_ETHEREUM_ADDR.to_string(),
       amount: '1'
     })
     expect(res.status).to.equal(201)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
       channelId: CHANNEL_ID.to_hex(),
-      receipt: 'testReceipt'
+      transactionReceipt: 'testReceipt'
     })
   })
 
-  it('should fail on invalid peerId', async () => {
+  it('should fail on invalid counterparty address', async () => {
     const res = await request(service).post('/api/v3/channels').send({
-      peerId: INVALID_PEER_ID,
+      peerAddress: 'invalid address',
       amount: '1'
     })
     expect(res.status).to.equal(400)
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({
-      status: STATUS_CODES.INVALID_PEERID
+      status: STATUS_CODES.INVALID_ADDRESS
     })
   })
 
   it('should fail on invalid amountToFund', async () => {
     const res = await request(service).post('/api/v3/channels').send({
-      peerId: ALICE_PEER_ID.toString(),
+      peerAddress: ALICE_ETHEREUM_ADDR.to_string(),
       amount: 'abc'
     })
     expect(res.status).to.equal(400)
@@ -147,7 +165,7 @@ describe('POST /channels', () => {
 
   it('should fail when out of balance', async () => {
     const res = await request(service).post('/api/v3/channels').send({
-      peerId: ALICE_PEER_ID.toString(),
+      peerAddress: ALICE_ETHEREUM_ADDR.to_string(),
       amount: '10000000'
     })
     expect(res.status).to.equal(403)
@@ -163,7 +181,7 @@ describe('POST /channels', () => {
     }
 
     const res = await request(service).post('/api/v3/channels').send({
-      peerId: ALICE_PEER_ID.toString(),
+      peerAddress: ALICE_ETHEREUM_ADDR.to_string(),
       amount: '1'
     })
     expect(res.status).to.equal(409)
