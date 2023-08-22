@@ -15,7 +15,7 @@ use bindings::{
     hopr_node_safe_registry::{DergisteredNodeSafeFilter, HoprNodeSafeRegistryEvents, RegisteredNodeSafeFilter},
     hopr_token::{ApprovalFilter, HoprTokenEvents, TransferFilter},
 };
-use core_crypto::types::{OffchainSignature, Hash};
+use core_crypto::types::{Hash, OffchainSignature};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     account::{AccountEntry, AccountSignature, AccountType},
@@ -335,16 +335,15 @@ where
                 }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                db.set_channels_domain_separator(
-                    &Hash::try_from(domain_separator_updated.domain_separator)?,
-                    snapshot
-                ).await?;
+                db.set_channels_domain_separator(&Hash::try_from(domain_separator_updated.domain_separator)?, snapshot)
+                    .await?;
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
                 db.set_channels_ledger_domain_separator(
                     &Hash::try_from(ledger_domain_separator_updated.ledger_domain_separator)?,
-                    snapshot
-                ).await?;
+                    snapshot,
+                )
+                .await?;
             }
         }
         Ok(())
@@ -456,8 +455,9 @@ where
             HoprNodeSafeRegistryEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
                 db.set_node_safe_registry_domain_separator(
                     &Hash::try_from(domain_separator_updated.domain_separator)?,
-                    snapshot
-                ).await?;
+                    snapshot,
+                )
+                .await?;
             }
         }
         Ok(())
