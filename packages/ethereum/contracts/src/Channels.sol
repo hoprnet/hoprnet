@@ -819,11 +819,26 @@ contract HoprChannels is
      * @param redeemable ticket data
      */
     function _getTicketHash(RedeemableTicket calldata redeemable) public view returns (bytes32) {
+        address challenge = HoprCrypto.scalarTimesBasepoint(redeemable.porSecret);
+
+        // TicketData is aligned to exactly 2 EVM words, from which channelId 
+        // takes one. Removing channelId can thus be encoded in 1 EVM word.
+        //
+        // Tickets get signed and transferred in packed encoding, consuming
+        // 148 bytes, including signature and challenge. Using tight encoding 
+        // for ticket hash unifies on-chain and off-chain usage of tickets.
+        uint256 secondPart =
+            (uint256(Balance.unwrap(redeemable.data.amount)) << 160) | 
+            (uint256(TicketIndex.unwrap(redeemable.data.ticketIndex)) << 112) | 
+            (uint256(TicketIndexOffset.unwrap(redeemable.data.indexOffset)) << 80) | 
+            (uint256(ChannelEpoch.unwrap(redeemable.data.epoch)) << 56) | 
+            uint256(WinProb.unwrap(redeemable.data.winProb));
+
         // Deviates from EIP712 due to computed property and non-standard struct property encoding
         bytes32 hashStruct = keccak256(
             abi.encode(
                 this.redeemTicket.selector,
-                keccak256(abi.encode(redeemable.data, HoprCrypto.scalarTimesBasepoint(redeemable.porSecret)))
+                keccak256(abi.encodePacked(redeemable.data.channelId, secondPart, challenge))
             )
         );
 

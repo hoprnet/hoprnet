@@ -11,7 +11,7 @@ pub use hopr_ledger::*;
 )]
 pub mod hopr_ledger {
     #[rustfmt::skip]
-    const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LEDGER_VERSION\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ledgerDomainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateLedgerDomainSeparator\",\"outputs\":[]}]";
+    const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"ledgerDomainSeparator\",\"type\":\"bytes32\",\"components\":[],\"indexed\":true}],\"type\":\"event\",\"name\":\"LedgerDomainSeparatorUpdated\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"LEDGER_VERSION\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"ledgerDomainSeparator\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"updateLedgerDomainSeparator\",\"outputs\":[]}]";
     ///The parsed JSON ABI of the contract.
     pub static HOPRLEDGER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
     ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid"));
@@ -76,12 +76,50 @@ pub mod hopr_ledger {
                 .method_hash([220, 150, 253, 80], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Gets the contract's `LedgerDomainSeparatorUpdated` event
+        pub fn ledger_domain_separator_updated_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            LedgerDomainSeparatorUpdatedFilter,
+        > {
+            self.0.event()
+        }
+        /// Returns an `Event` builder for all the events of this contract.
+        pub fn events(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            LedgerDomainSeparatorUpdatedFilter,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
+        }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
     for HoprLedger<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash
+    )]
+    #[ethevent(
+        name = "LedgerDomainSeparatorUpdated",
+        abi = "LedgerDomainSeparatorUpdated(bytes32)"
+    )]
+    pub struct LedgerDomainSeparatorUpdatedFilter {
+        #[ethevent(indexed)]
+        pub ledger_domain_separator: [u8; 32],
     }
     ///Container type for all input parameters for the `LEDGER_VERSION` function with signature `LEDGER_VERSION()` and selector `0xddad1902`
     #[derive(

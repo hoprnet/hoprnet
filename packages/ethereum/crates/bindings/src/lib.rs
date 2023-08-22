@@ -14,6 +14,7 @@ pub mod hopr_distributor;
 pub mod hopr_dummy_proxy_for_network_registry;
 pub mod hopr_forwarder;
 pub mod hopr_ledger;
+pub mod hopr_ledger_events;
 pub mod hopr_multi_sig;
 pub mod hopr_network_registry;
 pub mod hopr_network_registry_events;
