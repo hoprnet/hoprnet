@@ -25,6 +25,7 @@ jobs:
   unit_testing:
     name: Unit
     runs-on: ubuntu-2-core
+    timeout-minutes: 90
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
@@ -95,6 +96,7 @@ jobs:
   e2e_testing:
     name: End to end
     runs-on: ubuntu-8-core
+    timeout-minutes: 120
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
