@@ -273,7 +273,7 @@ lint-sol: ## run linter for Solidity
 		forge fmt --root ./packages/ethereum/contracts --check $${f} || exit 1; \
 	done
 	# FIXME: disabled until all linter errors are resolved
-	# npx solhint $${f} || exit1; \
+	# npx solhint $${f} || exit 1; \
 
 .PHONY: lint-ts
 lint-ts: ## run linter for TS
@@ -625,7 +625,7 @@ endif
 .PHONY: generate-python-sdk
 generate-python-sdk: ## generate Python SDK via Swagger Codegen
 generate-python-sdk: build-docs-api
-        mkdir -p ./hoprd-sdk-python/
+	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
 	docker run --rm -v $$(pwd):/local swaggerapi/swagger-codegen-cli-v3 generate -l python \
 		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
