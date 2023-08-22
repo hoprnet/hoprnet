@@ -27,9 +27,7 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         return keccak256(abi.encodePacked(source, destination));
     }
 
-    function getRedeemableTicket(
-        RedeemTicketArgBuilder memory args
-    )
+    function getRedeemableTicket(RedeemTicketArgBuilder memory args)
         internal
         view
         returns (HoprChannels.RedeemableTicket memory redeemable, VRFParameters memory vrf)
@@ -47,18 +45,13 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
 
         address challenge = HoprCrypto.scalarTimesBasepoint(args.porSecret);
 
-        uint256 secondPart =
-            (args.amount << 160) | 
-            (args.maxTicketIndex << 112) | 
-            (args.indexOffset << 80) | 
-            (args.epoch << 56) | 
-            args.winProb;
+        uint256 secondPart = (args.amount << 160) | (args.maxTicketIndex << 112) | (args.indexOffset << 80)
+            | (args.epoch << 56) | args.winProb;
 
         // Deviates from EIP712 due to computed property and non-standard struct property encoding
         bytes32 hashStruct = keccak256(
             abi.encode(
-                HoprChannels.redeemTicket.selector,
-                keccak256(abi.encodePacked(channelId, secondPart, challenge))
+                HoprChannels.redeemTicket.selector, keccak256(abi.encodePacked(channelId, secondPart, challenge))
             )
         );
 

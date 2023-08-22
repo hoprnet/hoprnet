@@ -262,10 +262,7 @@ export async function openChannel(
     return { success: false, reason: validationResult.reason }
   }
 
-  const channelId = generate_channel_id(
-    node.getEthereumAddress(),
-    validationResult.counterparty
-  )
+  const channelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
 
   let openingRequest = openingRequests.get(channelId.to_hex())
 
@@ -277,10 +274,7 @@ export async function openChannel(
   }
 
   try {
-    const { channelId, receipt } = await node.openChannel(
-      validationResult.counterparty,
-      validationResult.amount
-    )
+    const { channelId, receipt } = await node.openChannel(validationResult.counterparty, validationResult.amount)
     return { success: true, channelId: channelId.to_hex(), receipt }
   } catch (err) {
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE
