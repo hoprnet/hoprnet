@@ -14,14 +14,15 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 # shellcheck disable=SC1091
 source "${mydir}/testnet.sh"
 
-declare docker_image ssh_hosts
+declare action docker_image ssh_hosts
 
 : "${1:?"1st parameter <ssh_hosts_file> missing"}"
 [ -f "${1}" ] || { echo "1st parameters <ssh_hosts_file> does not point to a file"; exit 1; }
 mapfile -t ssh_hosts <<< "$(<${1})"
-docker_image="${2:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
+action="${2:-deploy}"
+docker_image="${3:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
 
-NODE_NAME=hoprd-node-rotsee-providence
+CONTAINER_NAME=hoprd-node-rotsee-providence
 SSH_USER=root
 NETWORK=rotsee
 
@@ -43,12 +44,13 @@ run_node() {
   echo "==="
   echo ""
 
-  ssh "${SSH_USER}@${host}" <<EOF
-  	docker stop ${NODE_NAME} || echo 'HOPRd node was not running'
-    docker rm ${NODE_NAME} || echo 'HOPRd node was not created'
+  ssh -o StrictHostKeyChecking=no "${SSH_USER}@${host}" <<EOF
+    docker pull ${docker_image} || echo 'Hoprd image not found'
+  	docker stop ${CONTAINER_NAME} || echo 'HOPRd node was not running'
+    docker rm -f ${CONTAINER_NAME} || echo 'HOPRd node was not created'
     safe_args=\$(</root/hoprd-db/.hopr-id.safe.args)
 		docker run -d --pull always --restart on-failure -m 4g \
-		  --name "${NODE_NAME}" \
+		  --name "${CONTAINER_NAME}" \
 		  --log-driver json-file --log-opt max-size=1000M --log-opt max-file=5 \
 		  -ti -v /root/hoprd-db:/app/hoprd-db \
 		  -p 9091:9091/tcp -p 9091:9091/udp -p 8080:8080 -p 3001:3001 -e DEBUG="*" \
@@ -75,7 +77,7 @@ test_ssh_connection() {
   echo "==="
   echo ""
 
-  ssh "${SSH_USER}@${host}" hostname
+  ssh -o StrictHostKeyChecking=no "${SSH_USER}@${host}" hostname
 }
 
 update_and_restart_host() {
@@ -217,40 +219,55 @@ deploy_safes() {
   done
 }
 
-start_nodes() {
+# Deploy latest image hoprd on existing nodes
+deploy_nodes() {
   for host in "${ssh_hosts[@]}"; do
     test_ssh_connection "${host}"
     run_node "${host}"
   done
 }
 
-### STARTING
+### Install nodes from scratch
+install_nodes(){
+  for host in "${ssh_hosts[@]}"; do
+    test_ssh_connection "${host}"
+    update_and_restart_host "${host}"
+  done
 
-for host in "${ssh_hosts[@]}"; do
-  test_ssh_connection "${host}"
-  update_and_restart_host "${host}"
-done
+  generate_local_identities
 
-generate_local_identities
+  upload_identities
 
-upload_identities
+  # deploy safes, register nodes to NR, approve token transfers
+  deploy_safes
 
-# deploy safes, register nodes to NR, approve token transfers
-deploy_safes
+  deploy_nodes
 
-start_nodes
+  for host in "${ssh_hosts[@]}"; do
+    test_ssh_connection "${host}"
 
-for host in "${ssh_hosts[@]}"; do
-  test_ssh_connection "${host}"
+    declare api_wallet_addr
+    api_wallet_addr="$(get_native_address "${API_TOKEN}@${host}:3001")"
+    #api_peer_id="$(get_hopr_address "${API_TOKEN}@${host}:3001")"
+    #hopr_addrs+=( "${api_peer_id}" )
+    #safe_address=$("cat /root/hoprd-db/.hopr-id.safe.args | grep -oE '\-\-safeAddress [^[:space:]]+' | awk '{print \$2}'")
+    #safe_addrs+=( "${safe_address}" )
 
-  declare api_wallet_addr
-  api_wallet_addr="$(get_native_address "${API_TOKEN}@${host}:3001")"
-  #api_peer_id="$(get_hopr_address "${API_TOKEN}@${host}:3001")"
-  #hopr_addrs+=( "${api_peer_id}" )
-  #safe_address=$("cat /root/hoprd-db/.hopr-id.safe.args | grep -oE '\-\-safeAddress [^[:space:]]+' | awk '{print \$2}'")
-  #safe_addrs+=( "${safe_address}" )
+    fund_if_empty "${api_wallet_addr}" "${NETWORK}"
+  done
 
-  fund_if_empty "${api_wallet_addr}" "${NETWORK}"
-done
+  # register_nodes
 
-# register_nodes
+}
+
+case "$action" in
+  install)
+    # return early with help info when requested
+    install_nodes
+    ;;
+  deploy)
+    deploy_nodes
+    ;;
+esac
+
+

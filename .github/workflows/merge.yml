@@ -87,44 +87,36 @@ jobs:
           password: ${{ steps.auth.outputs.access_token }}
 
       - name: Docker Tag Toolchain
-        if: |
-          steps.check_pr_changeset.outputs.build_toolchain
-          || steps.check_pr_changeset.outputs.build_hoprd
-          || steps.check_pr_changeset.outputs.build_hopli
-          || steps.check_pr_changeset.outputs.build_anvil
+        if: steps.check_pr_changeset.outputs.build_toolchain
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Hopli
-        if: steps.check_pr_changeset.outputs.build_hopli
+        if: steps.check_pr_changeset.outputs.build_toolchain || steps.check_pr_changeset.outputs.build_hopli
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Hoprd
-        if: steps.check_pr_changeset.outputs.build_hoprd
+        if: steps.check_pr_changeset.outputs.build_toolchain || steps.check_pr_changeset.outputs.build_hoprd
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Anvil
-        if: steps.check_pr_changeset.outputs.build_anvil
+        if: steps.check_pr_changeset.outputs.build_toolchain || steps.check_pr_changeset.outputs.build_anvil
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_STABLE_TAG }}
       - name: Docker Tag Pluto
-        if: |
-          steps.check_pr_changeset.outputs.build_hoprd
-          || steps.check_pr_changeset.outputs.build_hopli
-          || steps.check_pr_changeset.outputs.build_anvil
         run: |
           docker pull ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_PR_TAG }}
           docker tag ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_STABLE_TAG }}
           docker push ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_STABLE_TAG }}
 
-  deploy_prn:
+  deploy_prn_nodes:
     name: Deploy PRN nodes
     runs-on: ubuntu-2-core
     if: needs.tag.result == 'success'
@@ -200,7 +192,7 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
-      - name: Deploy on GCP VM
+      - name: Deploy on GCP
         run: |
           declare base_branch=${{ github.event.pull_request.base.ref }}
           declare docker_stable_tag
@@ -214,6 +206,29 @@ jobs:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
+
+      - name: Add ssh key to deploy to Hetzner
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+            ssh-private-key: ${{ secrets.HETZNER_ROTSEE_SSH_PRIVATE_KEY }}
+
+      - name: Deploy on Hetzner
+        run: |
+          declare base_branch=${{ github.event.pull_request.base.ref }}
+          declare docker_stable_tag
+          if [ "${base_branch}" == "master" ]; then
+            docker_stable_tag=latest
+          else
+            docker_stable_tag=${base_branch/release\//}
+          fi
+          echo "${{ vars.HETZNER_ROTSEE_NODES }}" | sed 's/\r//' > ssh_hosts.txt
+          ./scripts/deploy-rotsee-nodes.sh ./ssh_hosts.txt deploy "europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${docker_stable_tag}"
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          IDENTITY_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
           FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
@@ -231,8 +246,8 @@ jobs:
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
 
-  deploy_nodes:
-    name: Deploy Hoprd nodes
+  deploy_natted_nodes:
+    name: Deploy Natted nodes
     runs-on: ubuntu-2-core
     if: needs.tag.result == 'success'
     needs:
