@@ -1332,7 +1332,7 @@ class Hopr extends EventEmitter {
   /**
    * Open a payment channel
    *
-   * @param counterparty the counterparty's peerId
+   * @param counterparty the counterparty's address
    * @param amountToFund the amount to fund in HOPR(wei)
    */
   public async openChannel(

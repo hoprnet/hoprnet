@@ -260,15 +260,22 @@ api_send_message(){
 # $1 = source node id
 # $2 = destination node id
 # $3 = channel source api endpoint
-# $4 = channel id
-# $5 = OPTIONAL: verify closure strictly
+# $4 = destination address
+# $5 = direction
+# $6 = OPTIONAL: verify closure strictly
 api_close_channel() {
   local source_id="${1}"
   local destination_id="${2}"
   local source_api="${3}"
-  local channel_id="${4}"
-  local close_check="${5:-false}"
-  local result
+  local destination_address="${4}"
+  local direction="${5}"
+  local close_check="${6:-false}"
+  local result channel_id channels_info source_addr
+
+  # fetch channel id from API
+  source_addr="$(get_native_address "${source_api}")"
+  channels_info="$(api_get_all_channels "${source_api}" false)"
+  channel_id="$(echo "${channel_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains("someadd")))[0].id")"
 
   log "Node ${source_id} close channel ${channel_id} to Node ${destination_id}"
 
