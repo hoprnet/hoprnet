@@ -45,7 +45,8 @@ libraries = ["script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b11
 eth_rpc_url = "https://provider-proxy.hoprnet.workers.dev/xdai_mainnet"
 
 [profile.ci]
-  fuzz = { runs = 10_000 }
+  # disabled for now since the CI nodes are not powerful enough
+  # fuzz = { runs = 10_000 }
   verbosity = 4
 
 [fmt]

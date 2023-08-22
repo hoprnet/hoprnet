@@ -14,8 +14,6 @@ def test_hoprd_protocol_integration_tests(setup_7_nodes):
     env_vars = os.environ.copy()
     env_vars.update(
         {
-            "ADDITIONAL_NODE_ADDRS": "0xde913eeed23bce5274ead3de8c196a41176fbd49",
-            "ADDITIONAL_NODE_PEERIDS": "16Uiu2HAm2VD6owCxPEZwP6Moe1jzapqziVeaTXf1h7jVzu5dW1mk",
             "HOPRD_API_TOKEN": f"{DEFAULT_API_TOKEN}",
             "PRIVATE_KEY": f"{anvil_private_key}",
         }

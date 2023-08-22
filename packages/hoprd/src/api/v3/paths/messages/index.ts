@@ -121,7 +121,7 @@ POST.apiDoc = {
                 description: 'A valid HOPR peer id',
                 type: 'string',
                 format: 'peerid',
-                minItems: 1,
+                minItems: 0,
                 maxItems: 3,
                 example: '12Diu2HAm1uV82HyD1iJ5DmwJr4LftmJUeMf'
               }
