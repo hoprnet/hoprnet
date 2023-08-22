@@ -213,21 +213,26 @@ _Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hop
 - Update deployed addresses in `packages/ethereum/contracts/src/utils/SafeSuiteLib.sol`
 
 #### 5. Improve HoprNodeStakeFactory
+
 - Enhance code comments
 - Make imports explicit
 - Make the encoded address of the contract's approver (`r`) immutable
 - Remove duplicated `safeProxyAddr` definition in `clone()`
 
 #### 6. Improve SimplifiedModule
+
 - Extend comments to explain "avatar"
 
 #### 7. Improve CapabilityPermissions
+
 - Import `IERC20`, `IERC777` interfaces for definition of selector
 - Make all the selector definition public
 
 #### 8. Improve NodeSafeRegistry
+
 - Unwrap struct `NodeSafe` into flattened `address safeAddress, address nodeChainKeyAddress`
 
 #### 9. Format
+
 - Format all the contracts
 - Include HOPR logo
