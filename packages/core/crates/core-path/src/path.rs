@@ -292,9 +292,14 @@ mod tests {
             _ => panic!("error must be MissingChannel"),
         };
 
-        match Path::new(vec![peers[1], peers[2], peers[3], peers[4], peers[0], peers[1]], &me, false, &db)
-            .await
-            .expect_err("path 0 -> 1 -> 2 -> 3 -> 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
+        match Path::new(
+            vec![peers[1], peers[2], peers[3], peers[4], peers[0], peers[1]],
+            &me,
+            false,
+            &db,
+        )
+        .await
+        .expect_err("path 0 -> 1 -> 2 -> 3 -> 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
         {
             PathError::ChannelNotOpened(_, _) => {}
             _ => panic!("error must be ChannelNotOpened"),
