@@ -227,7 +227,7 @@ impl std::fmt::Display for Ticket {
 }
 
 impl Ticket {
-    /// Creates a new Ticket given the raw Challenge and signs it using the given key.
+    /// Creates a new Ticket given the raw Challenge and signs it using the given chain keypair.
     pub fn new(
         own_address: Address,
         counterparty: Address,
@@ -267,6 +267,7 @@ impl Ticket {
         Ok(ret)
     }
 
+    /// Creates a ticket with signature attached.
     pub fn new_with_signature(
         own_address: Address,
         counterparty: Address,
@@ -308,6 +309,8 @@ impl Ticket {
         Ok(ret)
     }
 
+    /// Creates a ticket *without* signature and *without* a challenge set.
+    /// This sets a default value as challenge.
     pub fn new_partial(
         own_address: Address,
         counterparty: Address,
@@ -340,6 +343,10 @@ impl Ticket {
             signature: None,
         })
     }
+
+    /// Tickets 2.0 come with meaningful boundaries to fit into 2 EVM slots.
+    /// This method checks whether they are met and prevents from unintended
+    /// usage.
     fn check_value_boundaries(
         own_address: Address,
         counterparty: Address,
@@ -400,11 +407,14 @@ impl Ticket {
         Ok(())
     }
 
+    /// Add the challenge property and signs the finished ticket afterwards
     pub fn set_challenge(&mut self, challenge: EthereumChallenge, signing_key: &ChainKeypair, domain_separator: &Hash) {
         self.challenge = challenge;
         self.sign(signing_key, domain_separator);
     }
 
+    /// Encode winning probability such that it can get used in the smart
+    /// contract
     pub fn encoded_win_prob(&self) -> u64 {
         let mut encoded = [0u8; 8];
         encoded[1..].copy_from_slice(&f64_to_win_prob(self.win_prob).unwrap());
@@ -413,6 +423,9 @@ impl Ticket {
     }
 
     /// Serializes the ticket with or without signature
+    /// 
+    /// Signing requires hashing which requires serialization without signature.
+    /// Transferring ticket requires serialization with signature attached.
     fn to_bytes_internal(&self, with_signature: bool) -> Result<Vec<u8>> {
         let mut ret = Vec::<u8>::with_capacity(if with_signature {
             Self::SIZE
@@ -497,8 +510,12 @@ impl Ticket {
 impl BinarySerializable for Ticket {
     const SIZE: usize = 64 + 20 + Signature::SIZE;
 
+    /// Tickets get sent next to packets, hence they need to be as small as possible.
+    /// Transmitting tickets to the next downstream share the same binary representation
+    /// as used in the smart contract.
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() == Self::SIZE {
+            // TODO: not necessary to transmit over the wire
             let channel_id = Hash::from_bytes(&data[0..32])?;
             let mut amount = [0u8; 32];
             amount[20..32].copy_from_slice(&data[Hash::SIZE..Hash::SIZE + 12]);
@@ -537,6 +554,8 @@ impl BinarySerializable for Ticket {
         }
     }
 
+    /// Serializes the ticket to be transmitted to the next downstream node or handled by the
+    /// smart contract
     fn to_bytes(&self) -> Box<[u8]> {
         self.to_bytes_internal(true)
             .expect("ticket not signed")

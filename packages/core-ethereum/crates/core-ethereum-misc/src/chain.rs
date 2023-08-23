@@ -183,7 +183,7 @@ impl ChainCalls {
         }
     }
 
-    pub fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket) -> Result<Vec<u8>> {
+    pub fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket, domain_separator: &Hash) -> Result<Vec<u8>> {
         let channel_id = generate_channel_id(&acked_ticket.signer, &self.chain_key);
 
         let serialized_signature = match acked_ticket.ticket.signature {
@@ -192,7 +192,11 @@ impl ChainCalls {
         };
 
         // still TODO
-        let vrf_output = derive_vrf_parameters(&acked_ticket.ticket.get_hash().into(), &self.chain_keypair, &[])?;
+        let vrf_output = derive_vrf_parameters(
+            &acked_ticket.ticket.get_hash(domain_separator).into(),
+            &self.chain_keypair,
+            &[],
+        )?;
 
         let v = vrf_output.v.to_bytes();
         let s_b = vrf_output.s_b.to_bytes();
@@ -202,10 +206,10 @@ impl ChainCalls {
             data: TicketData {
                 channel_id: channel_id.into(),
                 amount: acked_ticket.ticket.amount.amount().as_u128(),
-                ticket_index: acked_ticket.ticket.index.as_u64(),
+                ticket_index: acked_ticket.ticket.index,
                 index_offset: 1u32,
-                epoch: acked_ticket.ticket.channel_epoch.as_u32(),
-                win_prob: acked_ticket.ticket.win_prob.as_u64(),
+                epoch: acked_ticket.ticket.channel_epoch,
+                win_prob: acked_ticket.ticket.encoded_win_prob(),
             },
             signature: CompactSignature {
                 r: H256::from_slice(&serialized_signature[0..32]).into(),
@@ -282,62 +286,65 @@ impl ChainCalls {
     }
 }
 
-pub async fn prepare_redeem_ticket<T>(
-    db: &T,
-    counterparty: &Address,
-    _channel_id: &Hash,
-    acked_ticket: &mut AcknowledgedTicket,
-) -> Result<Hash>
-where
-    T: HoprCoreEthereumDbActions,
-{
-    acked_ticket
-        .verify(counterparty)
-        .map_err(|e| InvalidResponseToAcknowledgement(e.to_string()))?;
+// pub async fn prepare_redeem_ticket<T>(
+//     db: &T,
+//     counterparty: &Address,
+//     _channel_id: &Hash,
+//     acked_ticket: &mut AcknowledgedTicket,
+// ) -> Result<Hash>
+// where
+//     T: HoprCoreEthereumDbActions,
+// {
+//     acked_ticket
+//         .verify(counterparty)
+//         .map_err(|e| InvalidResponseToAcknowledgement(e.to_string()))?;
 
-    todo!("Rewrite acked ticket");
+//     todo!("Rewrite acked ticket");
 
-    // if !acked_ticket
-    //     .ticket
-    //     .is_winning(&pre_image, &acked_ticket.response, acked_ticket.ticket.win_prob)
-    // {
-    //     debug!(
-    //         "Failed to submit ticket {}: 'Not a winning ticket.'",
-    //         acked_ticket.response
-    //     );
+//     // if !acked_ticket
+//     //     .ticket
+//     //     .is_winning(&pre_image, &acked_ticket.response, acked_ticket.ticket.win_prob)
+//     // {
+//     //     debug!(
+//     //         "Failed to submit ticket {}: 'Not a winning ticket.'",
+//     //         acked_ticket.response
+//     //     );
 
-    //     return Err(NotAWinningTicket);
-    // }
+//     //     return Err(NotAWinningTicket);
+//     // }
 
-    Ok(Hash::default())
-}
+//     Ok(Hash::default())
+// }
 
-pub async fn after_redeem_ticket<T>(
-    db: &mut T,
-    channel_id: &Hash,
-    pre_image: &Hash,
-    acked_ticket: &AcknowledgedTicket,
-) -> Result<()>
-where
-    T: HoprCoreEthereumDbActions,
-{
-    debug!("Successfully bumped local commitment after {pre_image} for channel {channel_id}");
+// pub async fn after_redeem_ticket<T>(
+//     db: &mut T,
+//     channel_id: &Hash,
+//     pre_image: &Hash,
+//     acked_ticket: &AcknowledgedTicket,
+// ) -> Result<()>
+// where
+//     T: HoprCoreEthereumDbActions,
+// {
+//     debug!("Successfully bumped local commitment after {pre_image} for channel {channel_id}");
 
-    db.mark_redeemed(acked_ticket).await?;
+//     db.mark_redeemed(acked_ticket).await?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 #[cfg(test)]
 pub mod tests {
     use async_std;
     use bindings::{
         hopr_announcements::HoprAnnouncements,
-        hopr_channels::{HoprChannels, HoprChannelsErrors},
+        hopr_channels::{HoprChannels, HoprChannelsErrors, RedeemableTicket, TicketData, CompactSignature},
         hopr_node_safe_registry::HoprNodeSafeRegistry,
         hopr_token::HoprToken,
     };
-    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use core_crypto::{
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        types::{Hash, CurvePoint},
+    };
     use core_ethereum_db::db::CoreEthereumDb;
     use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
     use ethers::{
@@ -362,11 +369,15 @@ pub mod tests {
         sync::{Arc, Mutex},
     };
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
-    use utils_types::{primitives::Address as HoprAddress, traits::BinarySerializable};
+    use utils_types::{
+        primitives::{Address as HoprAddress, Balance, BalanceType, EthereumChallenge, U256 as HoprU256},
+        traits::BinarySerializable,
+    };
 
     use super::ChainCalls;
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
+    const RESPONSE_TO_CHALLENGE: [u8;32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
     const CHAIN_ADDR: [u8; 20] = hex!("2cDD13ddB0346E0F620C8E5826Da5d7230341c6E");
 
     const COUNTERPARTY_PRIV_KEY: [u8; 32] = hex!("6517e3d3245d7a111ba7be5b911adcdec7078ca5191e114e5d087a3ec936a146");
@@ -476,11 +487,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        hopr_channels
-            .fund_channel(*counterparty, 1u128)
-            .send()
-            .await
-            .unwrap();
+        hopr_channels.fund_channel(*counterparty, 1u128).send().await.unwrap();
     }
 
     #[tokio::test]
@@ -543,23 +550,75 @@ pub mod tests {
         )
         .await;
 
+        let keypair = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap();
         let chain = ChainCalls::new(
             OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
-            ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap(),
+            keypair.clone(),
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
         );
 
         let counterparty = Wallet::from_bytes(&COUNTERPARTY_PRIV_KEY).unwrap();
 
-        fund_channel(&counterparty.address(), hopr_token, hopr_channels.clone()).await;
+        let domain_separator: Hash = hopr_channels
+            .domain_separator()
+            .call()
+            .await
+            .unwrap()
+            .try_into()
+            .unwrap();
 
-        let mut redeem_ticket_tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
-        redeem_ticket_tx.set_to(hopr_channels.address());
-        redeem_ticket_tx.set_data(chain.redeem_ticket(&AcknowledgedTicket::default()).unwrap().into());
+        // fund_channel(&counterparty.address(), hopr_token, hopr_channels.clone()).await;
 
-        Ticket::new(HoprAddress::from_bytes(&client.address().0).unwrap(), index, amount, win_prob, channel_epoch, signing_key)
+        // let mut redeem_ticket_tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+        // redeem_ticket_tx.set_to(hopr_channels.address());
+        // redeem_ticket_tx.set_data(
+        //     chain
+        //         .redeem_ticket(&AcknowledgedTicket::default(), &domain_separator)
+        //         .unwrap()
+        //         .into(),
+        // );
 
-        client.send_transaction(redeem_ticket_tx, None).await.map_err(|e| e.to_string()).unwrap();
+        let ticket = Ticket::new(
+            client.address().0.try_into().unwrap(),
+            counterparty.address().0.try_into().unwrap(),
+            Balance::new(HoprU256::one(), BalanceType::HOPR),
+            HoprU256::one(),
+            HoprU256::one(),
+            1.0,
+            HoprU256::one(),
+            EthereumChallenge::from_bytes(&CurvePoint::from_exponent(&RESPONSE_TO_CHALLENGE).unwrap().to_address().to_bytes()).unwrap(),
+            &keypair,
+            &domain_separator,
+        ).unwrap();
+
+        let serialized_signature = ticket.signature.clone().unwrap().to_bytes();
+
+        let redeemable = RedeemableTicket {
+            data: TicketData {
+                channel_id: ticket.channel_id.into(),
+                amount: ticket.amount.amount().as_u128(),
+                ticket_index: ticket.index,
+                index_offset: ticket.index_offset,
+                epoch: ticket.channel_epoch,
+                win_prob: ticket.encoded_win_prob(),
+            },
+            signature: CompactSignature {
+                r: H256::from_slice(&serialized_signature[0..32]).into(),
+                vs: H256::from_slice(&serialized_signature[32..64]).into(),
+            },
+            por_secret: HoprU256::from_bytes(&RESPONSE_TO_CHALLENGE).unwrap().to_bytes().as_ref().into(),
+        };
+
+        let hash: Hash = hopr_channels.get_ticket_hash(redeemable).call().await.unwrap().try_into().unwrap();
+
+        println!("Ethereum hash {}", hash);
+        println!("off-chain hash {}", ticket.get_hash(&domain_separator));
+
+        // client
+        //     .send_transaction(redeem_ticket_tx, None)
+        //     .await
+        //     .map_err(|e| e.to_string())
+        //     .unwrap();
         // hopr_channels.redeem_ticket(redeemable, params)
     }
 
@@ -690,8 +749,12 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn get_redeem_ticket_payload(&self, acked_ticket: &AcknowledgedTicket) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.redeem_ticket(acked_ticket))
+        pub fn get_redeem_ticket_payload(
+            &self,
+            acked_ticket: &AcknowledgedTicket,
+            domain_separator: &Hash,
+        ) -> JsResult<Vec<u8>> {
+            ok_or_jserr!(self.w.redeem_ticket(acked_ticket, domain_separator))
         }
 
         #[wasm_bindgen]
@@ -705,48 +768,48 @@ pub mod wasm {
         }
     }
 
-    #[wasm_bindgen]
-    pub async fn redeem_ticket(
-        db: &Database,
-        counterparty: &Address,
-        channel_id: &Hash,
-        acked_ticket: &mut AcknowledgedTicket,
-        submit_ticket: &Function, // (counterparty: Address, ackedTicket)
-    ) -> JsResult<String> {
-        debug!("redeeming ticket for counterparty {counterparty} in channel {channel_id}");
+    // #[wasm_bindgen]
+    // pub async fn redeem_ticket(
+    //     db: &Database,
+    //     counterparty: &Address,
+    //     channel_id: &Hash,
+    //     acked_ticket: &mut AcknowledgedTicket,
+    //     submit_ticket: &Function, // (counterparty: Address, ackedTicket)
+    // ) -> JsResult<String> {
+    //     debug!("redeeming ticket for counterparty {counterparty} in channel {channel_id}");
 
-        //debug!(">>> READ prepare_redeem_ticket");
-        let pre_image = {
-            let val = db.as_ref_counted();
-            let g = val.read().await;
+    //     //debug!(">>> READ prepare_redeem_ticket");
+    //     let pre_image = {
+    //         let val = db.as_ref_counted();
+    //         let g = val.read().await;
 
-            super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket).await?
-        };
-        //debug!("<<< READ prepare_redeem_ticket");
+    //         super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket).await?
+    //     };
+    //     //debug!("<<< READ prepare_redeem_ticket");
 
-        let this = JsValue::undefined();
-        debug!("submitting tx for ticket redemption in channel {channel_id} to {counterparty}");
-        let res = submit_ticket.call2(
-            &this,
-            &<JsValue as From<Address>>::from(counterparty.to_owned()),
-            &<JsValue as From<AcknowledgedTicket>>::from(acked_ticket.to_owned()),
-        )?;
+    //     let this = JsValue::undefined();
+    //     debug!("submitting tx for ticket redemption in channel {channel_id} to {counterparty}");
+    //     let res = submit_ticket.call2(
+    //         &this,
+    //         &<JsValue as From<Address>>::from(counterparty.to_owned()),
+    //         &<JsValue as From<AcknowledgedTicket>>::from(acked_ticket.to_owned()),
+    //     )?;
 
-        let promise: js_sys::Promise = js_sys::Promise::from(res);
+    //     let promise: js_sys::Promise = js_sys::Promise::from(res);
 
-        let receipt = wasm_bindgen_futures::JsFuture::from(promise)
-            .await
-            .map_err(|e| format!("Error while trying to submit ticket {:?}", e))?;
+    //     let receipt = wasm_bindgen_futures::JsFuture::from(promise)
+    //         .await
+    //         .map_err(|e| format!("Error while trying to submit ticket {:?}", e))?;
 
-        //debug!(">>> WRITE after_redeem_ticket");
-        {
-            let val = db.as_ref_counted();
-            let mut g = val.write().await;
-            super::after_redeem_ticket(&mut *g, channel_id, &pre_image, acked_ticket).await?;
-        }
-        //debug!("<<< WRITE after_redeem_ticket");
-        debug!("Successfully submitted ticket {}", acked_ticket.response);
+    //     //debug!(">>> WRITE after_redeem_ticket");
+    //     {
+    //         let val = db.as_ref_counted();
+    //         let mut g = val.write().await;
+    //         super::after_redeem_ticket(&mut *g, channel_id, &pre_image, acked_ticket).await?;
+    //     }
+    //     //debug!("<<< WRITE after_redeem_ticket");
+    //     debug!("Successfully submitted ticket {}", acked_ticket.response);
 
-        Ok(JsString::from(receipt).as_string().unwrap_or("no receipt given".into()))
-    }
+    //     Ok(JsString::from(receipt).as_string().unwrap_or("no receipt given".into()))
+    // }
 }
