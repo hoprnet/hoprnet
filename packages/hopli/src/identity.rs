@@ -1,5 +1,5 @@
 use crate::identity_input::LocalIdentityArgs;
-use crate::key_pair::{create_identity, read_identities};
+use crate::key_pair::{create_identity, read_identities, NodeIdentity};
 use crate::password::PasswordArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{builder::RangedU64ValueParser, Parser};
@@ -88,7 +88,7 @@ impl IdentityArgs {
                     };
 
                     match create_identity(&id_dir, &pwd, &file_prefix) {
-                        Ok(identity) => node_identities.push(identity),
+                        Ok(identity) => node_identities.push(NodeIdentity::new(identity)),
                         Err(_) => return Err(HelperErrors::UnableToCreateIdentity),
                     }
                 }

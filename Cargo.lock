@@ -2483,6 +2483,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-types",
+ "uuid 1.4.1",
 ]
 
 [[package]]

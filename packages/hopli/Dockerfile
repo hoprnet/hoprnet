@@ -35,18 +35,25 @@ LABEL name="hopli" \
 ENV ETHERSCAN_API_KEY="random_giberish"
 
 # build project sources
-WORKDIR /root
-COPY ./packages/ethereum/contracts /root/contracts
-COPY Makefile /root
+WORKDIR /app/hoprnet
+VOLUME /app/hoprnet/node
+
+COPY packages/ethereum/contracts packages/ethereum/contracts
+COPY Makefile .
+COPY vendor/solidity vendor/solidity
+COPY packages/hopli/entrypoint.sh  /app/hoprnet/entrypoint.sh
+
 COPY --from=builder /app/hoprnet/packages/hopli/target/release/hopli /bin/hopli
 RUN apt-get update && \
-    apt install --no-install-recommends -y git curl ca-certificates make && \
+    apt install --no-install-recommends -y git curl ca-certificates make jq && \
     make install-foundry && \
     echo "export PATH=${PATH}:/root/.foundry/bin/" >> /root/.bashrc && \
     rm -rf /var/lib/apt/lists/* && \
     apt remove -y make && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
-    rm /root/Makefile
+    rm /app/hoprnet/Makefile
 
-ENTRYPOINT ["/bin/hopli"]
-CMD ["--help"]
+#ENTRYPOINT ["/bin/hopli"]
+#CMD ["--help"]
+ENTRYPOINT ["/app/hoprnet/entrypoint.sh"]
+
