@@ -273,7 +273,7 @@ lint-sol: ## run linter for Solidity
 		forge fmt --root ./packages/ethereum/contracts --check $${f} || exit 1; \
 	done
 	# FIXME: disabled until all linter errors are resolved
-	# npx solhint $${f} || exit1; \
+	# npx solhint $${f} || exit 1; \
 
 .PHONY: lint-ts
 lint-ts: ## run linter for TS
