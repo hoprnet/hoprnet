@@ -127,8 +127,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     log(`[DEBUG]contractAddresses...${JSON.stringify(contractAddresses, null, 2)}`)
 
     this.handlers = Handlers.init(
-      // FIXME: change to Safe address if Safe is holding the tokens
-      chain.getPublicKey().to_address().to_string(),
+      safeAddress.to_string(),
       chain.getPublicKey().to_address().to_string(),
       {
         channels: contractAddresses.hoprChannelsAddress,
