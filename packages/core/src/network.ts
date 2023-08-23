@@ -3,8 +3,10 @@ import {
   supported_networks,
   type ChainOptions,
   type ResolvedNetwork,
-  type Network
+  type Network,
+  core_misc_initialize_crate
 } from '../lib/core_misc.js'
+core_misc_initialize_crate()
 
 import type { DeploymentExtract } from '@hoprnet/hopr-core-ethereum'
 

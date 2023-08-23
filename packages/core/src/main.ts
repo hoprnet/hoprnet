@@ -23,7 +23,8 @@ import {
   isAddressWithPeerId,
   LevelDb,
   OffchainKeypair,
-  u8aConcat
+  u8aConcat,
+  Database
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -32,10 +33,7 @@ import { getAddrs } from './identity.js'
 import { createLibp2pMock } from './libp2p.mock.js'
 import { getContractData, supportedNetworks } from './network.js'
 import { MultiaddrConnection } from '@libp2p/interfaces/transport'
-import { Address as Ethereum_Address, core_hopr_initialize_crate, Database } from '../lib/core_hopr.js'
 import { peerIdFromKeys } from '@libp2p/peer-id'
-
-core_hopr_initialize_crate()
 
 const log = debug(`hopr-core:create-hopr`)
 const error = debug(`hopr-core:error`)
@@ -270,7 +268,7 @@ export async function createHoprNode(
     throw err
   }
 
-  let db = new Database(levelDb, Ethereum_Address.deserialize(chainKeypair.public().to_address().serialize()))
+  let db = new Database(levelDb, chainKeypair.public().to_address())
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = options.safeModule.safeAddress

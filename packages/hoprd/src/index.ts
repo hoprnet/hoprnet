@@ -326,8 +326,8 @@ async function main() {
     // 2. Create node instance
     log('Creating HOPR Node')
     node = await createHoprNode(
-      new ChainKeypair(keypair.chain_key.secret()),
-      new OffchainKeypair(keypair.packet_key.secret()),
+      keypair.chain_key,
+      keypair.packet_key,
       options,
       false
     )
