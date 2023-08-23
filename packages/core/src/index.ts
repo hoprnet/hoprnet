@@ -1727,6 +1727,4 @@ export {
 }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
 export { sampleOptions } from './index.mock.js'
-export * from './types.js'
 
-export * from './types.js'

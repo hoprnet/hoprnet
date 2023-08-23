@@ -1,7 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
-import { health_to_string } from '@hoprnet/hopr-core'
+import { health_to_string } from '@hoprnet/hopr-utils'
 
 /**
  * @returns Information about the HOPR Node, including any options it started with.
