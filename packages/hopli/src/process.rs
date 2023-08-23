@@ -133,7 +133,7 @@ pub fn child_process_call_foundry_express_setup_safe_module(
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
         "--broadcast",
         "--sig",
-        "expressSetupSafeModule(address[])",
+        "expressSetupSafeModule(address[],uint256,uint256)",
         &ethereum_address,
         &hopr_amount,
         &native_amount,
