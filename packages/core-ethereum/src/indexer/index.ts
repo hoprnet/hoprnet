@@ -34,6 +34,8 @@ import {
   Ethereum_Database,
   Ethereum_Snapshot,
   Ethereum_U256,
+  Ethereum_Balance,
+  Ethereum_BalanceType,
   Handlers
 } from '../db.js'
 
@@ -93,6 +95,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   private chain: ChainWrapper
   private genesisBlock: number
   private lastSnapshot: IndexerSnapshot | undefined
+  private safeAddress: Address
 
   private blockProcessingLock: DeferType<void> | undefined
 
@@ -115,7 +118,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   /**
    * Starts indexing.
    */
-  public async start(chain: ChainWrapper, genesisBlock: number): Promise<void> {
+  public async start(chain: ChainWrapper, genesisBlock: number, safeAddress: Address): Promise<void> {
     if (this.status === IndexerStatus.STARTED) {
       return
     }
@@ -145,6 +148,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     log(`Starting indexer...`)
     this.chain = chain
     this.genesisBlock = genesisBlock
+    this.safeAddress = safeAddress
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       new BN(await this.db.get_latest_block_number()).toNumber(),
@@ -165,6 +169,21 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // no need to query before HoprChannels or HoprNetworkRegistry existed
     fromBlock = Math.max(fromBlock, this.genesisBlock)
 
+    // update the base valuse of balance and allowance of token for safe
+    // update safe's HOPR token balance
+    const hoprBalance = await this.chain.getBalance(this.safeAddress)
+    await this.db.set_hopr_balance(
+      Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
+    )
+    log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
+      
+    // update safe's HORP token allowance granted to Channels contract
+    const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannels(this.safeAddress)
+    await this.db.set_staking_safe_allowance(
+      Ethereum_Balance.deserialize(safeAllowance.serialize_value(), Ethereum_BalanceType.HOPR)
+    )
+    log(`set safe allowance to ${safeAllowance.to_formatted_string()}`)
+    
     log('Starting to index from block %d, sync progress 0%%', fromBlock)
 
     const orderedBlocks = ordered<number>()
@@ -250,7 +269,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       this.status = IndexerStatus.RESTARTING
 
       this.stop()
-      await this.start(this.chain, this.genesisBlock)
+      await this.start(this.chain, this.genesisBlock, this.safeAddress)
     } catch (err) {
       this.status = IndexerStatus.STOPPED
       this.emit('status', IndexerStatus.STOPPED)

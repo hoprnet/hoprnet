@@ -874,6 +874,30 @@ export async function createChainWrapper(
   }
 
   /**
+   * Get the token allowance granted to the HoprChannels contract address by the caller
+   * @param ownerAddress token owner address
+   */
+  const getTokenAllowanceGrantedToChannels = async (ownerAddress: Address): Promise<Balance> => {
+    const RETRIES = 3
+    let rawAllowance: BigNumber
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        rawAllowance = await token.allowance(ownerAddress.to_hex(),  channels.address);
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        }
+
+        log(`Could not determine current on-chain token allowance using the provider.`)
+        throw Error(`Could not determine on-chain token allowance`)
+      }
+    }
+
+    return new Balance(rawAllowance.toString(), BalanceType.HOPR)
+  }
+
+  /**
    * Gets the registered safe address from node safe registry
    * @param nodeAddress node address
    * @returns a Promise that resolves registered safe address
@@ -925,6 +949,7 @@ export async function createChainWrapper(
   return {
     getBalance,
     getNativeBalance,
+    getTokenAllowanceGrantedToChannels,
     getTransactionsInBlock,
     getTimestamp,
     getSafeFromNodeSafeRegistry,

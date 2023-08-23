@@ -24,8 +24,6 @@ import {
   Ethereum_AcknowledgedTicket,
   Ethereum_Address,
   Ethereum_Database,
-  Ethereum_Balance,
-  Ethereum_BalanceType,
   Ethereum_ChannelEntry,
   Ethereum_Hash,
   CORE_ETHEREUM_CONSTANTS,
@@ -192,15 +190,8 @@ export default class HoprCoreEthereum extends EventEmitter {
       try {
         await this.chain.waitUntilReady()
 
-        // update token balance
-        const hoprBalance = await this.chain.getBalance(this.chainKeypair.to_address())
-        await this.db.set_hopr_balance(
-          Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
-        )
-        log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
-
         // indexer starts
-        await this.indexer.start(this.chain, this.chain.getGenesisBlock())
+        await this.indexer.start(this.chain, this.chain.getGenesisBlock(), this.safeModuleOptions.safeAddress)
 
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.chainKeypair.to_address().to_hex()}`)
