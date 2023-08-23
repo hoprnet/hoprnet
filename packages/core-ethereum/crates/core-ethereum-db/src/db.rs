@@ -1341,7 +1341,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_channels_from(&self, address: Address) -> Result<WasmVecChannelEntry, JsValue> {
+        pub async fn get_channels_from(&self, address: &Address) -> Result<WasmVecChannelEntry, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
@@ -1350,7 +1350,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_channels_to(&self, address: Address) -> Result<WasmVecChannelEntry, JsValue> {
+        pub async fn get_channels_to(&self, address: &Address) -> Result<WasmVecChannelEntry, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
