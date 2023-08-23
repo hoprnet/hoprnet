@@ -21,7 +21,8 @@ import {
   OffchainKeypair,
   is_allowed_to_access_network,
   redeem_ticket,
-  CORE_ETHEREUM_CONSTANTS, Database
+  CORE_ETHEREUM_CONSTANTS,
+  Database
 } from '@hoprnet/hopr-utils'
 
 import Indexer from './indexer/index.js'
@@ -185,9 +186,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         // update token balance
         const hoprBalance = await this.chain.getBalance(this.chainKeypair.to_address())
-        await this.db.set_hopr_balance(
-          hoprBalance
-        )
+        await this.db.set_hopr_balance(hoprBalance)
         log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
         // indexer starts
@@ -316,9 +315,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private async redeemAllTicketsInternalLoop(): Promise<void> {
     try {
-      let channelsTo = await this.db.get_channels_to(
-        this.chainKeypair.to_address()
-      )
+      let channelsTo = await this.db.get_channels_to(this.chainKeypair.to_address())
       while (channelsTo.len() > 0) {
         let channel = channelsTo.next()
         await this.redeemTicketsInChannel(ChannelEntry.deserialize(channel.serialize()))
@@ -497,14 +494,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Initialize incoming channel closure currently is not supported.')
     }
 
-    const c = ChannelEntry.deserialize(
-      (
-        await this.db.get_channel_x(
-          src,
-          dest
-        )
-      ).serialize()
-    )
+    const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
 
     if (c.status !== ChannelStatus.Open) {
       throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
@@ -519,14 +509,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (!this.chainKeypair.to_address().eq(src)) {
       throw Error('Finalizing incoming channel closure currently is not supported.')
     }
-    const c = ChannelEntry.deserialize(
-      (
-        await this.db.get_channel_x(
-          src,
-          dest,
-        )
-      ).serialize()
-    )
+    const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
 
     if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
@@ -610,9 +593,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     log(`>> should update safe and module address`)
     await this.db.set_staking_safe_address(safeAddress)
     log(`>> set staking safe address`)
-    await this.db.set_staking_module_address(
-      this.safeModuleOptions.moduleAddress
-    )
+    await this.db.set_staking_module_address(this.safeModuleOptions.moduleAddress)
     log(`>> set staking module address`)
 
     return receipt

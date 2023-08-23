@@ -17,14 +17,7 @@ import {
   HoprConnect,
   type PublicNodesEmitter
 } from '@hoprnet/hopr-connect'
-import {
-  ChainKeypair,
-  debug,
-  isAddressWithPeerId,
-  LevelDb,
-  OffchainKeypair,
-  u8aConcat
-} from '@hoprnet/hopr-utils'
+import { ChainKeypair, debug, isAddressWithPeerId, LevelDb, OffchainKeypair, u8aConcat } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import Hopr, { type HoprOptions } from './index.js'

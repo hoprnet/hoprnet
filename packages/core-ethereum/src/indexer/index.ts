@@ -22,7 +22,8 @@ import {
   Handlers,
   random_integer,
   OffchainPublicKey,
-  CORE_ETHEREUM_CONSTANTS, U256
+  CORE_ETHEREUM_CONSTANTS,
+  U256
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
