@@ -12,8 +12,6 @@ import {
   pickVersion,
   defer,
   Address,
-  ChainKeypair,
-  OffchainKeypair,
   debug,
   health_to_string
 } from '@hoprnet/hopr-utils'
