@@ -3,15 +3,7 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 
-import {
-  hoprd_misc_initialize_crate,
-  Balance,
-  ChannelEntry,
-  BalanceType,
-  U256,
-  ChannelStatus
-} from '../../../../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
+import { Balance, ChannelEntry, BalanceType, U256, ChannelStatus } from '@hoprnet/hopr-utils'
 
 import {
   createTestApiInstance,

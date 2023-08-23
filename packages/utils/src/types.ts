@@ -124,5 +124,5 @@ export {
   WasmVecAccountEntry,
   WasmVecAcknowledgedTicket,
   WasmVecAddress,
-  WasmVecChannelEntry,
+  WasmVecChannelEntry
 } from '../../hoprd/lib/hoprd_hoprd.js'

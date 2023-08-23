@@ -8,15 +8,7 @@ import {
   BOB_ETHEREUM_ADDR,
   CHARLIE_ETHEREUM_ADDR
 } from '../../../../fixtures.js'
-import {
-  hoprd_misc_initialize_crate,
-  Balance,
-  BalanceType,
-  U256,
-  ChannelStatus,
-  ChannelEntry
-} from '../../../../../../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
+import { Balance, BalanceType, U256, ChannelStatus, ChannelEntry } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../../utils.js'
 

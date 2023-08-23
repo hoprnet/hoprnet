@@ -43,12 +43,15 @@ export {
 
 export type MetricCollector = () => string
 
-let metricCollectors: MetricCollector[] = []
-export { metricCollectors }
+var metricCollectors: MetricCollector[]
 
-export function getMetricsCollectors(): MetricCollector[] {
+function getMetricsCollectors(): MetricCollector[] {
+  metricCollectors ??= []
   return metricCollectors
 }
-export function registerMetricsCollector(collector: MetricCollector) {
+function registerMetricsCollector(collector: MetricCollector) {
+  metricCollectors ??= []
   metricCollectors.push(collector)
 }
+
+export { metricCollectors, getMetricsCollectors, registerMetricsCollector }

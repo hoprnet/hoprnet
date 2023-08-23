@@ -15,7 +15,9 @@ import {
   StrategyTickResult,
   Balance,
   BalanceType,
-  ChannelStatus, AcknowledgedTicket, ChannelEntry
+  ChannelStatus,
+  AcknowledgedTicket,
+  ChannelEntry
 } from '@hoprnet/hopr-utils'
 
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'

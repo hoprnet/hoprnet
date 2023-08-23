@@ -66,7 +66,8 @@ import {
   PeerStatus,
   Health,
   WasmAckInteraction,
-  WasmPacketInteraction, HeartbeatConfig
+  WasmPacketInteraction,
+  HeartbeatConfig
 } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -83,7 +84,7 @@ import {
   OutgoingChannelStatus,
   SaneDefaults,
   Strategy,
-  StrategyFactory,
+  StrategyFactory
 } from './channel-strategy.js'
 
 import type { ResolvedNetwork } from './network.js'
@@ -489,10 +490,7 @@ class Hopr extends EventEmitter {
       }
     })
 
-    let packetCfg = new PacketInteractionConfig(
-      this.packetKeypair,
-      this.chainKeypair
-    )
+    let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
     const onMessage = (data: ApplicationData) => this.emit('hopr:message', data)
@@ -1018,12 +1016,7 @@ class Hopr extends EventEmitter {
       // Validate the manually specified intermediate path
       let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
       try {
-        path = await Path.validated(
-          withDestination,
-          this.chainKeypair.to_address(),
-          true,
-          this.db
-        )
+        path = await Path.validated(withDestination, this.chainKeypair.to_address(), true, this.db)
       } catch (e) {
         metric_sentMessageFailCount.increment()
         throw e
@@ -1391,14 +1384,8 @@ class Hopr extends EventEmitter {
     const connector = HoprCoreEthereum.getInstance()
     const channel = ChannelEntry.deserialize(
       (direction === 'outgoing'
-        ? await this.db.get_channel_x(
-            this.getEthereumAddress(),
-            counterparty
-          )
-        : await this.db.get_channel_x(
-            counterparty,
-            this.getEthereumAddress()
-          )
+        ? await this.db.get_channel_x(this.getEthereumAddress(), counterparty)
+        : await this.db.get_channel_x(counterparty, this.getEthereumAddress())
       ).serialize()
     )
 
@@ -1540,10 +1527,7 @@ class Hopr extends EventEmitter {
    * @returns the channel entry of those two nodes
    */
   public async getChannel(src: Address, dest: Address): Promise<ChannelEntry> {
-    return await this.db.get_channel_x(
-      src,
-      dest
-    )
+    return await this.db.get_channel_x(src, dest)
   }
 
   public async getAllChannels(): Promise<ChannelEntry[]> {
@@ -1727,4 +1711,3 @@ export {
 }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
 export { sampleOptions } from './index.mock.js'
-
