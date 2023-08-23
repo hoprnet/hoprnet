@@ -1,7 +1,10 @@
 use crate::utils::HelperErrors;
 use hoprd_keypair::key_pair::HoprKeys;
 use log::warn;
-use std::{fs, path::{PathBuf, Path}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// Decrypt identity files and returns an vec of PeerIds and Ethereum Addresses
 ///
@@ -17,8 +20,6 @@ pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<Vec<Hop
         let file_str = file
             .to_str()
             .ok_or(HelperErrors::IncorrectFilename(file.to_string_lossy().to_string()))?;
-
-        println!("{}", file_str);
 
         match HoprKeys::read_eth_keystore(file_str, password) {
             Ok((keys, needs_migration)) => {
@@ -43,7 +44,11 @@ pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<Vec<Hop
 /// * `dir_name` - Directory to the storage of an identity file
 /// * `password` - Password to encrypt the identity file
 /// * `name` - Prefix of identity files.
-pub fn create_identity(dir_name: &str, password: &str, maybe_name: &Option<String>) -> Result<HoprKeys, HelperErrors> {
+pub fn create_identity(
+    dir_name: &str,
+    password: &str,
+    maybe_name: &Option<String>,
+) -> Result<(String, HoprKeys), HelperErrors> {
     // create dir if not exist
     fs::create_dir_all(dir_name)?;
 
@@ -68,14 +73,14 @@ pub fn create_identity(dir_name: &str, password: &str, maybe_name: &Option<Strin
         keys.write_eth_keystore(&file_path, password, false)?;
     }
 
-    Ok(keys)
+    Ok((file_path, keys))
 }
 
 #[cfg(test)]
 mod tests {
+    use core_crypto::keypairs::Keypair;
     use std::path::Path;
     use tempfile::tempdir;
-    use core_crypto::keypairs::Keypair;
 
     use super::*;
 
@@ -104,7 +109,10 @@ mod tests {
         let files = get_files(path, &None);
         let read_id = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(read_id.len(), 1);
-        assert_eq!(read_id[0].chain_key.public().0.to_address(), created_id.chain_key.public().0.to_address());
+        assert_eq!(
+            read_id[0].chain_key.public().0.to_address(),
+            created_id.chain_key.public().0.to_address()
+        );
 
         // print the read id
         println!("Debug {:#?}", read_id);

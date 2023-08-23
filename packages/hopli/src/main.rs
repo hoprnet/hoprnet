@@ -1,16 +1,16 @@
+use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
 use crate::initialize_node::InitializeNodeArgs;
-use crate::create_safe_module::CreateSafeModuleArgs;
 use crate::network_registry::RegisterInNetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
+pub mod create_safe_module;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
 pub mod identity_input;
 pub mod initialize_node;
-pub mod create_safe_module;
 pub mod key_pair;
 pub mod network_registry;
 pub mod password;
