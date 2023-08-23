@@ -1,9 +1,12 @@
-use crate::errors::PacketError::{OutOfFunds, TicketValidation};
-use crate::errors::Result;
+use crate::errors::{
+    PacketError::{OutOfFunds, TicketValidation},
+    Result,
+};
+use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
 use utils_log::{debug, info};
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
+use utils_types::primitives::{Address, Balance, BalanceType};
 
 /// Performs validations of the given unacknowledged ticket and channel.
 pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
@@ -12,16 +15,18 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     channel: &ChannelEntry,
     sender: &Address,
     min_ticket_amount: Balance,
-    req_inverse_ticket_win_prob: U256,
+    required_win_prob: f64,
     check_unrealized_balance: bool,
+    domain_separator: &Hash,
 ) -> Result<()> {
-    let required_win_prob = U256::from_inverse_probability(req_inverse_ticket_win_prob)?;
-
-    debug!("validating unack ticket from {}", ticket.counterparty);
+    debug!(
+        "validating unack ticket from {}",
+        ticket.recover_signer(domain_separator)?
+    );
 
     // ticket signer MUST be the sender
     ticket
-        .verify(sender)
+        .verify(sender, &domain_separator)
         .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
 
     // ticket amount MUST be greater or equal to minTicketAmount
@@ -33,9 +38,9 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     }
 
     // ticket MUST have match X winning probability
-    if !ticket.win_prob.eq(&required_win_prob) {
+    if ticket.win_prob < required_win_prob {
         return Err(TicketValidation(format!(
-            "ticket winning probability {} is not equal to {required_win_prob}",
+            "ticket winning probability {} is lower than required winning probability {required_win_prob}",
             ticket.win_prob
         )));
     }
@@ -48,7 +53,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     }
 
     // ticket's channelEpoch MUST match the current channel's epoch
-    if !ticket.channel_epoch.eq(&channel.channel_epoch) {
+    if !channel.channel_epoch.eq(&ticket.channel_epoch.into()) {
         return Err(TicketValidation(format!(
             "ticket was created for a different channel iteration {} != {} of channel {}",
             ticket.channel_epoch,
@@ -64,7 +69,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
             .get_tickets(Some(*sender))
             .await? // all tickets from sender
             .into_iter()
-            .filter(|t| t.channel_epoch.eq(&channel.channel_epoch))
+            .filter(|t| channel.channel_epoch.eq(&t.channel_epoch.into()))
             .fold(Some(channel.balance), |result, t| {
                 result
                     .and_then(|b| b.value().value().checked_sub(*t.amount.value().value()))

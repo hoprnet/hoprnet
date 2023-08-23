@@ -1169,6 +1169,7 @@ dependencies = [
  "enum-iterator",
  "ethers",
  "ethnum",
+ "hex",
  "hex-literal 0.3.4",
  "js-sys",
  "multiaddr",

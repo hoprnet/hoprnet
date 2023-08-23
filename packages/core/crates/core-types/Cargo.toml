@@ -20,13 +20,17 @@ serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
 wasm-bindgen = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
+hex-literal = "0.3"
+hex = "0.4"
+thiserror = "1.0"
+ethers = { version = "2", default-features = false }
 
+
+bindings =  { path = "../../../ethereum/crates/bindings", default-features = false }
 core-crypto = { path = "../../../core/crates/core-crypto", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
-[dev-dependencies]
-hex-literal = "0.3"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false

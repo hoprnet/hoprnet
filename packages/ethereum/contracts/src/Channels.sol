@@ -94,7 +94,6 @@ contract HoprChannels is
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
 
     type Balance is uint96;
-    type TicketEpoch is uint32;
     type TicketIndex is uint48;
     type TicketIndexOffset is uint32;
     type ChannelEpoch is uint24;
@@ -841,6 +840,7 @@ contract HoprChannels is
                 keccak256(abi.encodePacked(redeemable.data.channelId, secondPart, challenge))
             )
         );
+
 
         return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
     }

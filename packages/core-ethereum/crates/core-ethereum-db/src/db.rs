@@ -149,7 +149,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         ack_ticket: AcknowledgedTicket,
     ) -> Result<()> {
         let unack_key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
-        let ack_key = to_acknowledged_ticket_key(&ack_ticket.ticket.challenge, &ack_ticket.ticket.channel_epoch)?;
+        let ack_key = to_acknowledged_ticket_key(&ack_ticket.ticket.challenge, &ack_ticket.ticket.channel_epoch.into())?;
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(unack_key);
@@ -168,7 +168,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 &|ack: &AcknowledgedTicket| match &filter {
                     Some(f) => {
                         f.destination.eq(&self.me)
-                            && ack.ticket.channel_epoch.eq(&f.channel_epoch)
+                            && f.channel_epoch.eq(&ack.ticket.channel_epoch.into())
                             && f.source.eq(&ack.signer)
                     }
                     None => true,
@@ -192,7 +192,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                     PendingAcknowledgement::WaitingAsRelayer(unack) => match &filter {
                         Some(f) => {
                             f.destination.eq(&self.me)
-                                && unack.ticket.channel_epoch.eq(&f.channel_epoch)
+                                && f.channel_epoch.eq(&unack.ticket.channel_epoch.into())
                                 && f.source.eq(&unack.signer)
                         }
                         None => true,
@@ -208,8 +208,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .collect::<Vec<UnacknowledgedTicket>>())
     }
 
-    async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()> {
-        let prefixed_key = utils_db::db::Key::new_with_prefix(&ticket.counterparty, PENDING_TICKETS_COUNT)?;
+    async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> Result<()> {
+        let prefixed_key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self
             .db
             .get_or_none::<Balance>(prefixed_key.clone())
@@ -300,7 +300,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         for ticket in acknowledged_tickets.iter() {
             batch_ops.del(to_acknowledged_ticket_key(
                 &ticket.ticket.challenge,
-                &ticket.ticket.channel_epoch,
+                &ticket.ticket.channel_epoch.into(),
             )?);
         }
 
@@ -433,10 +433,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+    async fn mark_redeemed(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()> {
         debug!(
-            "marking ticket {} in channel with {} as redeemed",
-            ticket.ticket.index, ticket.ticket.counterparty
+            "marking ticket #{} in channel with {} as redeemed",
+            ticket.ticket.index, counterparty
         );
 
         let mut ops = utils_db::db::Batch::new();
@@ -445,7 +445,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
         ops.put(key, count + 1);
 
-        let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
+        let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch.into())?;
         ops.del(key);
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
@@ -458,7 +458,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let new_redeemed_balance = balance.add(&ticket.ticket.amount);
         ops.put(key, new_redeemed_balance);
 
-        let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
+        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
         let pending_balance = self
             .db
             .get_or_none::<Balance>(key.clone())
@@ -471,10 +471,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(ops, true).await
     }
 
-    async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+    async fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()> {
         debug!(
-            "marking ticket {} in channel with {} as losing",
-            ticket.ticket.index, ticket.ticket.counterparty
+            "marking ticket #{} in channel with {} as losing",
+            ticket.ticket.index, counterparty
         );
 
         let mut ops = utils_db::db::Batch::new();
@@ -483,10 +483,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
         ops.put(key, count + 1);
 
-        let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch)?;
+        let key = to_acknowledged_ticket_key(&ticket.ticket.challenge, &ticket.ticket.channel_epoch.into())?;
         ops.del(key);
 
-        let key = utils_db::db::Key::new_with_prefix(&ticket.ticket.counterparty, PENDING_TICKETS_COUNT)?;
+        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self
             .db
             .get_or_none::<Balance>(key.clone())
@@ -1233,11 +1233,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_pending(&self, ticket: &Ticket) -> Result<(), JsValue> {
+        pub async fn mark_pending(&self, counterparty: &Address, ticket: &Ticket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_pending(ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_pending(counterparty, ticket).await)
             //}
         }
 
@@ -1256,11 +1256,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_redeemed(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+        pub async fn mark_redeemed(&self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_redeemed(ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_redeemed(counterparty, ticket).await)
             //}
         }
 
@@ -1275,11 +1275,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_losing_acked_ticket(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+        pub async fn mark_losing_acked_ticket(&self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(counterparty, ticket).await)
             //}
         }
 

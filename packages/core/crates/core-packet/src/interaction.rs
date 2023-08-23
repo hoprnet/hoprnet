@@ -2,13 +2,13 @@ use async_lock::RwLock;
 use std::fmt::{Display, Formatter};
 
 use crate::errors::PacketError::{
-    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, OutOfFunds, PacketConstructionError,
-    PacketDecodingError, PathError, Retry, TagReplay, Timeout, TransportError,
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, MissingDomainSeparator, OutOfFunds,
+    PacketConstructionError, PacketDecodingError, PathError, Retry, TagReplay, Timeout, TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
 use async_std::channel::{bounded, Receiver, Sender, TrySendError};
-use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
+use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_mixer::mixer::{Mixer, MixerConfig};
@@ -515,17 +515,18 @@ where
             return Err(OutOfFunds(format!("{channel_id} with counterparty {destination}")));
         }
 
-        let ticket = Ticket::new(
+        let ticket = Ticket::new_partial(
+            self.cfg.chain_keypair.public().to_address(),
             destination,
-            current_index,
             amount,
-            U256::from_inverse_probability(U256::new(INVERSE_TICKET_WIN_PROB))?,
+            current_index,
+            U256::one(), // unaggregated always have index_offset == 1
+            1.0,         // 100% winning probability
             channel.channel_epoch,
-            &self.cfg.chain_keypair,
-        );
+        )?;
 
         //debug!(">>> WRITE mark_pending lock");
-        self.db.write().await.mark_pending(&ticket).await?;
+        self.db.write().await.mark_pending(&destination, &ticket).await?;
         //debug!("<<< WRITE mark_pending lock");
 
         debug!(
@@ -557,6 +558,14 @@ where
             return Err(PathError(PathNotValid));
         }
 
+        let domain_separator = self
+            .db
+            .read()
+            .await
+            .get_channels_domain_separator()
+            .await?
+            .ok_or(MissingDomainSeparator)?;
+
         let next_peer = self
             .db
             .read()
@@ -567,7 +576,7 @@ where
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, &self.cfg.chain_keypair)
+            Ticket::new_zero_hop(next_peer, &self.cfg.chain_keypair, &domain_separator)
         } else {
             self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
@@ -578,7 +587,13 @@ where
             plain_text: msg.into(),
         };
 
-        let packet = Packet::new(&app_data.to_bytes(), &path, &self.cfg.chain_keypair, next_ticket)?;
+        let packet = Packet::new(
+            &app_data.to_bytes(),
+            &path,
+            &self.cfg.chain_keypair,
+            next_ticket,
+            &domain_separator,
+        )?;
         debug!("packet state {}", packet.state());
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
@@ -647,6 +662,14 @@ where
         let previous_peer;
         let next_peer;
 
+        let domain_separator = self
+            .db
+            .read()
+            .await
+            .get_channels_domain_separator()
+            .await?
+            .ok_or(MissingDomainSeparator)?;
+
         match packet.state() {
             PacketState::Outgoing { .. } => return Err(InvalidPacketState),
 
@@ -705,7 +728,7 @@ where
                 }
                 //debug!("<<< WRITE check_and_set_packet_tag forwarded lock");
 
-                let inverse_win_prob = U256::new(INVERSE_TICKET_WIN_PROB);
+                let default_win_probability = 1.0f64;
 
                 let previous_hop_addr =
                     self.db
@@ -744,8 +767,9 @@ where
                     &channel,
                     &previous_hop_addr,
                     Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
-                    inverse_win_prob,
+                    default_win_probability,
                     self.cfg.check_unrealized_balance,
+                    &domain_separator,
                 )
                 .await
                 {
@@ -759,7 +783,7 @@ where
                 //debug!(">>> WRITE storing pending ack");
                 {
                     let mut g = self.db.write().await;
-                    g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index)
+                    g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index.into())
                         .await?;
 
                     //debug!(">>> <<< updated current ticket index");
@@ -779,11 +803,11 @@ where
 
                 let path_pos = packet
                     .ticket
-                    .get_path_position(U256::new(PRICE_PER_PACKET), inverse_win_prob);
+                    .get_path_position(U256::new(PRICE_PER_PACKET), default_win_probability);
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop_addr, &self.cfg.chain_keypair)
+                    Ticket::new_zero_hop(next_hop_addr, &self.cfg.chain_keypair, &domain_separator)
                 } else {
                     self.create_multihop_ticket(next_hop_addr, path_pos).await?
                 };
@@ -793,7 +817,7 @@ where
         }
 
         // Transform the packet for forwarding using the next ticket
-        packet.forward(&self.cfg.chain_keypair, next_ticket)?;
+        packet.forward(&self.cfg.chain_keypair, next_ticket, &domain_separator)?;
 
         // Forward the packet to the next hop
         message_transport(packet.to_bytes(), next_peer.to_string())
@@ -890,16 +914,20 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::interaction::{
-        AcknowledgementInteraction, ApplicationData, PacketInteraction, PacketInteractionConfig, Payload,
-        PRICE_PER_PACKET,
+    use crate::{
+        interaction::{
+            AcknowledgementInteraction, ApplicationData, PacketInteraction, PacketInteractionConfig, Payload,
+            PRICE_PER_PACKET,
+        },
+        por::ProofOfRelayValues,
     };
-    use crate::por::ProofOfRelayValues;
     use async_std::sync::RwLock;
-    use core_crypto::derivation::derive_ack_key_share;
-    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use core_crypto::shared_keys::SharedSecret;
-    use core_crypto::types::{OffchainPublicKey, PublicKey};
+    use core_crypto::{
+        derivation::derive_ack_key_share,
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        shared_keys::SharedSecret,
+        types::{OffchainPublicKey, PublicKey},
+    };
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_mixer::mixer::MixerConfig;
@@ -917,11 +945,12 @@ mod tests {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use utils_db::db::DB;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
     use utils_log::debug;
-    use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
-    use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+    use utils_types::{
+        primitives::{Balance, BalanceType, Snapshot, U256},
+        traits::{BinarySerializable, PeerIdLike, ToHex},
+    };
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),

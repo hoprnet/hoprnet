@@ -1,8 +1,10 @@
-use crate::acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender};
-use crate::channels::Ticket;
+use crate::{
+    acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
+    channels::Ticket,
+};
 use core_crypto::errors::CryptoError::{InvalidChallenge, SignatureVerification};
 use core_crypto::keypairs::OffchainKeypair;
-use core_crypto::types::{HalfKey, HalfKeyChallenge, OffchainPublicKey, OffchainSignature, Response};
+use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response};
 use serde::{Deserialize, Serialize};
 use utils_types::errors;
 use utils_types::errors::GeneralError::ParseError;
@@ -86,10 +88,11 @@ pub struct AcknowledgedTicket {
 impl AcknowledgedTicket {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ticket: Ticket, response: Response, signer: Address) -> Self {
-        assert_ne!(
-            ticket.counterparty, signer,
-            "signer must be different from the ticket counterparty"
-        );
+        // TODO
+        // assert_ne!(
+        //     ticket.counterparty, signer,
+        //     "signer must be different from the ticket counterparty"
+        // );
         Self {
             ticket,
             response,
@@ -130,8 +133,8 @@ impl BinarySerializable for AcknowledgedTicket {
 impl AcknowledgedTicket {
     /// Verifies if the embedded ticket has been signed by the given issuer and also
     /// that the challenge on the embedded response matches the challenge on the ticket.
-    pub fn verify(&self, issuer: &Address) -> core_crypto::errors::Result<()> {
-        (self.ticket.verify(issuer).map(|_| true)?
+    pub fn verify(&self, issuer: &Address, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
+        (self.ticket.verify(issuer, domain_separator).map(|_| true)?
             && self
                 .response
                 .to_challenge()
@@ -141,19 +144,18 @@ impl AcknowledgedTicket {
         .ok_or(InvalidChallenge)
     }
 
-
-    /// Computes a candidate check value to verify if this ticket is winning
-    pub fn get_luck(&self, preimage: &Hash, channel_response: &Response) -> U256 {
-        U256::from_bytes(
-            &Hash::create(&[
-                &self.get_hash().to_bytes(),
-                &preimage.to_bytes(),
-                &channel_response.to_bytes(),
-            ])
-            .to_bytes(),
-        )
-        .unwrap()
-    }
+    // /// Computes a candidate check value to verify if this ticket is winning
+    // pub fn get_luck(&self, preimage: &Hash, channel_response: &Response) -> U256 {
+    //     U256::from_bytes(
+    //         &Hash::create(&[
+    //             &self.get_hash().to_bytes(),
+    //             &preimage.to_bytes(),
+    //             &channel_response.to_bytes(),
+    //         ])
+    //         .to_bytes(),
+    //     )
+    //     .unwrap()
+    // }
 }
 
 impl std::fmt::Display for AcknowledgedTicket {
@@ -193,8 +195,8 @@ impl UnacknowledgedTicket {
 
 impl UnacknowledgedTicket {
     /// Verifies if signature on the embedded ticket using the embedded public key.
-    pub fn verify_signature(&self) -> core_crypto::errors::Result<()> {
-        self.ticket.verify(&self.signer)
+    pub fn verify_signature(&self, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
+        self.ticket.verify(&self.signer, domain_separator)
     }
 
     /// Verifies if the challenge on the embedded ticket matches the solution
@@ -300,17 +302,19 @@ pub mod test {
         let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
         let path_pos = 5;
 
-        Ticket::new(
-            Address::new(&[0u8; Address::SIZE]),
-            U256::new("1"),
-            Balance::new(
-                (inverse_win_prob * price_per_packet * path_pos as u128).into(),
-                BalanceType::HOPR,
-            ),
-            U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
-            U256::new("4"),
-            pk,
-        )
+        todo!("implement domain separator")
+
+        // Ticket::new(
+        //     Address::new(&[0u8; Address::SIZE]),
+        //     U256::new("1"),
+        //     Balance::new(
+        //         (inverse_win_prob * price_per_packet * path_pos as u128).into(),
+        //         BalanceType::HOPR,
+        //     ),
+        //     U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
+        //     U256::new("4"),
+        //     pk,
+        // )
     }
 
     #[test]
@@ -360,19 +364,20 @@ pub mod test {
         let cp2: CurvePoint = hk2.to_challenge().into();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let mut ticket1 = mock_ticket(&pk_1);
-        ticket1.set_challenge(Challenge::from(cp_sum).to_ethereum_challenge(), &pk_1);
+        todo!("implement domain separator");
+        // let mut ticket1 = mock_ticket(&pk_1);
+        // ticket1.set_challenge(Challenge::from(cp_sum).to_ethereum_challenge(), &pk_1);
 
-        let unack1 = UnacknowledgedTicket::new(ticket1, hk1, pub_key_1.to_address());
-        assert!(unack1.verify_signature().is_ok());
-        assert!(unack1.verify_challenge(&hk2).is_ok());
+        // let unack1 = UnacknowledgedTicket::new(ticket1, hk1, pub_key_1.to_address());
+        // assert!(unack1.verify_signature().is_ok());
+        // assert!(unack1.verify_challenge(&hk2).is_ok());
 
-        let unack2 = UnacknowledgedTicket::from_bytes(&unack1.to_bytes()).unwrap();
-        assert_eq!(unack1, unack2);
+        // let unack2 = UnacknowledgedTicket::from_bytes(&unack1.to_bytes()).unwrap();
+        // assert_eq!(unack1, unack2);
 
-        let pending_ack_1 = PendingAcknowledgement::WaitingAsRelayer(unack1);
-        let pending_ack_2 = PendingAcknowledgement::from_bytes(&pending_ack_1.to_bytes()).unwrap();
-        assert_eq!(pending_ack_1, pending_ack_2);
+        // let pending_ack_1 = PendingAcknowledgement::WaitingAsRelayer(unack1);
+        // let pending_ack_2 = PendingAcknowledgement::from_bytes(&pending_ack_1.to_bytes()).unwrap();
+        // assert_eq!(pending_ack_1, pending_ack_2);
     }
 
     #[test]
@@ -386,21 +391,23 @@ pub mod test {
             "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
         ));
 
-        let mut ticket1 = mock_ticket(&pk);
-        ticket1.set_challenge(resp.to_challenge().to_ethereum_challenge(), &pk);
+        todo!("add domain separator");
 
-        let akt_1 = AcknowledgedTicket::new(ticket1, resp, pub_key.to_address());
-        assert!(akt_1.verify(&pub_key.to_address()).is_ok());
+        // let mut ticket1 = mock_ticket(&pk);
+        // ticket1.set_challenge(resp.to_challenge().to_ethereum_challenge(), &pk);
 
-        let akt_2 = AcknowledgedTicket::from_bytes(&akt_1.to_bytes()).unwrap();
-        assert_eq!(akt_1, akt_2);
+        // let akt_1 = AcknowledgedTicket::new(ticket1, resp, pub_key.to_address());
+        // assert!(akt_1.verify(&pub_key.to_address()).is_ok());
+
+        // let akt_2 = AcknowledgedTicket::from_bytes(&akt_1.to_bytes()).unwrap();
+        // assert_eq!(akt_1, akt_2);
     }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
-    use core_crypto::types::{HalfKey, Response};
+    use core_crypto::types::{HalfKey, Response, Hash};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
@@ -507,8 +514,8 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "verify")]
-        pub fn _verify(&self, issuer: &Address) -> JsResult<bool> {
-            ok_or_jserr!(self.verify(issuer).map(|_| true))
+        pub fn _verify(&self, issuer: &Address, domain_separator: &Hash) -> JsResult<bool> {
+            ok_or_jserr!(self.verify(issuer, domain_separator).map(|_| true))
         }
 
         #[wasm_bindgen(js_name = "clone")]

@@ -37,7 +37,6 @@ export {
   PublicKey,
   PendingAcknowledgement,
   Signature,
-  ethereum_signed_hash,
   generate_channel_id,
   UnacknowledgedTicket,
   channel_status_to_string,

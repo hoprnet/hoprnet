@@ -10,3 +10,10 @@ pub enum CoreTypesError {
 }
 
 pub type Result<T> = core::result::Result<T, CoreTypesError>;
+
+#[cfg(feature = "wasm")]
+impl From<CoreTypesError> for wasm_bindgen::JsValue {
+    fn from(value: CoreTypesError) -> Self {
+        value.to_string().into()
+    }
+}

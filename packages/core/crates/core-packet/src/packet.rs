@@ -1,25 +1,31 @@
 use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
-use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag, PacketTag};
-use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use core_crypto::primitives::{DigestLike, SimpleMac};
-use core_crypto::prp::{PRPParameters, PRP};
-use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
-use core_crypto::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
-use core_crypto::types::OffchainPublicKey;
-use core_crypto::types::{Challenge, HalfKey, HalfKeyChallenge};
+use core_crypto::{
+    derivation::{derive_ack_key_share, derive_packet_tag, PacketTag},
+    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    primitives::{DigestLike, SimpleMac},
+    prp::{PRPParameters, PRP},
+    routing::{forward_header, header_length, ForwardedHeader, RoutingInfo},
+    shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
+    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
+};
 use core_path::path::Path;
-use core_types::acknowledgement::Acknowledgement;
-use core_types::channels::Ticket;
+use core_types::{acknowledgement::Acknowledgement, channels::Ticket};
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use typenum::Unsigned;
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::traits::{BinarySerializable, PeerIdLike};
+use utils_types::{
+    errors::GeneralError::ParseError,
+    traits::{BinarySerializable, PeerIdLike},
+};
 
-use crate::errors::Result;
-use crate::packet::ForwardedMetaPacket::{FinalPacket, RelayedPacket};
-use crate::packet::PacketState::{Final, Forwarded, Outgoing};
-use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH};
+use crate::{
+    errors::Result,
+    packet::{
+        ForwardedMetaPacket::{FinalPacket, RelayedPacket},
+        PacketState::{Final, Forwarded, Outgoing},
+    },
+    por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
+};
 
 /// Currently used ciphersuite for Sphinx
 type CurrentSphinxSuite = core_crypto::ec_groups::X25519Suite;
@@ -299,7 +305,13 @@ impl Packet {
     /// * `path` complete path for the packet to take
     /// * `private_key` private key of the local node
     /// * `first_ticket` ticket for the first hop on the path
-    pub fn new(msg: &[u8], path: &Path, chain_keypair: &ChainKeypair, mut ticket: Ticket) -> Result<Self> {
+    pub fn new(
+        msg: &[u8],
+        path: &Path,
+        chain_keypair: &ChainKeypair,
+        mut ticket: Ticket,
+        domain_separator: &Hash,
+    ) -> Result<Self> {
         let public_keys_path: Vec<OffchainPublicKey> = path.try_into()?;
 
         let shared_keys = CurrentSphinxSuite::new_shared_keys(&public_keys_path)?;
@@ -308,7 +320,7 @@ impl Packet {
 
         // Update the ticket with the challenge
         ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        ticket.sign(chain_keypair);
+        ticket.sign(chain_keypair, domain_separator);
 
         Ok(Self {
             packet: MetaPacket::new(
@@ -400,11 +412,16 @@ impl Packet {
     /// Forwards the packet to the next hop.
     /// Requires private key of the local node and prepared ticket for the next recipient.
     /// Panics if the packet is not meant to be forwarded.
-    pub fn forward(&mut self, chain_keypair: &ChainKeypair, mut next_ticket: Ticket) -> Result<()> {
+    pub fn forward(
+        &mut self,
+        chain_keypair: &ChainKeypair,
+        mut next_ticket: Ticket,
+        domain_separator: &Hash,
+    ) -> Result<()> {
         match &mut self.state {
             Forwarded { next_challenge, .. } => {
                 next_ticket.challenge = next_challenge.to_ethereum_challenge();
-                next_ticket.sign(chain_keypair);
+                next_ticket.sign(chain_keypair, domain_separator);
                 self.ticket = next_ticket;
                 Ok(())
             }

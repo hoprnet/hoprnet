@@ -3,7 +3,7 @@ use getrandom::getrandom;
 use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, Div};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -456,6 +456,16 @@ impl Mul for U256 {
     fn mul(self, rhs: Self) -> Self::Output {
         Self {
             value: self.value.mul(rhs.value),
+        }
+    }
+}
+
+impl Div for U256 {
+    type Output = U256;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.div(rhs.value)
         }
     }
 }

@@ -1,5 +1,6 @@
 use core_crypto::errors::CryptoError;
 use core_path::errors::PathError;
+use core_types::errors::CoreTypesError;
 use thiserror::Error;
 use utils_db::errors::DbError;
 use utils_types::errors::GeneralError;
@@ -50,6 +51,12 @@ pub enum PacketError {
 
     #[error(transparent)]
     PathError(#[from] PathError),
+
+    #[error("No channel domain_separator tag found")]
+    MissingDomainSeparator,
+
+    #[error(transparent)]
+    CoreTypesError(#[from] CoreTypesError),
 
     #[error(transparent)]
     Other(#[from] GeneralError),
