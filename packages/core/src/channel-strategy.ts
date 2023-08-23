@@ -15,14 +15,9 @@ import {
   StrategyTickResult,
   Balance,
   BalanceType,
-  utils_misc_initialize_crate
-} from '../lib/core_strategy.js'
+  ChannelStatus, AcknowledgedTicket, ChannelEntry
+} from '@hoprnet/hopr-utils'
 
-utils_misc_initialize_crate()
-
-export { StrategyTickResult } from '../lib/core_strategy.js'
-
-import { ChannelStatus, AcknowledgedTicket, ChannelEntry } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']

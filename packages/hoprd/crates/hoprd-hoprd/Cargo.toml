@@ -18,6 +18,8 @@ js-sys = { version = "0.3.63", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 core-hopr = { path = "../../../core/crates/core-hopr", default-features = false }
+core-misc = { path = "../../../core/crates/core-misc", default-features = false }
+core-network = { path = "../../../core/crates/core-network", default-features = false }
 core-packet = { path = "../../../core/crates/core-packet", default-features = false }
 core-path = { path = "../../../core/crates/core-path", default-features = false }
 core-strategy = { path = "../../../core/crates/core-strategy", default-features = false }
@@ -30,6 +32,7 @@ hoprd-keypair = { path = "../../../hoprd/crates/hoprd-keypair", default-features
 hoprd-misc = { path = "../../../hoprd/crates/hoprd-misc", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+utils-metrics = { path = "../../../utils/crates/utils-metrics", default-features = false, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
@@ -47,6 +50,8 @@ wasm = [
     "dep:wasm-bindgen",
     "dep:js-sys",
     "core-hopr/wasm",
+    "core-misc/wasm",
+    "core-network/wasm",
     "core-packet/wasm",
     "core-path/wasm",
     "core-strategy/wasm",
@@ -60,5 +65,5 @@ wasm = [
     "utils-log/wasm",
     "utils-misc/wasm"
 ]
-prometheus = ["core-hopr/prometheus"]
+prometheus = ["core-hopr/prometheus", "dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

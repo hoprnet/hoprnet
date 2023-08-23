@@ -8,7 +8,7 @@ import { Mplex } from '@libp2p/mplex'
 import { KadDHT } from '@libp2p/kad-dht'
 import { Noise } from '@chainsafe/libp2p-noise'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Address, AddressSorter } from '@libp2p/interfaces/peer-store'
+import type { Address as p2pAddr, AddressSorter } from '@libp2p/interfaces/peer-store'
 import { keysPBM } from '@libp2p/crypto/keys'
 
 import {
@@ -18,7 +18,6 @@ import {
   type PublicNodesEmitter
 } from '@hoprnet/hopr-connect'
 import {
-  Address as Packet_Address,
   ChainKeypair,
   debug,
   isAddressWithPeerId,
@@ -81,13 +80,13 @@ export async function createLibp2pInstance(
     let addressSorter: AddressSorter
 
     if (options.testing?.preferLocalAddresses) {
-      addressSorter = (a: Address, b: Address) => compareAddressesLocalMode(a.multiaddr, b.multiaddr)
+      addressSorter = (a: p2pAddr, b: p2pAddr) => compareAddressesLocalMode(a.multiaddr, b.multiaddr)
       log('Address sorting: prefer local addresses')
     } else {
       // Overwrite address sorter with identity function since
       // libp2p's own address sorter function is unable to handle
       // p2p addresses, e.g. /p2p/<RELAY>/p2p-circuit/p2p/<DESTINATION>
-      addressSorter = (a: Address, b: Address) => compareAddressesPublicMode(a.multiaddr, b.multiaddr)
+      addressSorter = (a: p2pAddr, b: p2pAddr) => compareAddressesPublicMode(a.multiaddr, b.multiaddr)
       log('Address sorting: start with most promising addresses')
     }
 
@@ -280,15 +279,9 @@ export async function createHoprNode(
   log(`options.safeModule.moduleAddress: ${moduleAddress}`)
   if (!safeAddress) {
     safeAddress = await db.get_staking_safe_address()
-    if (safeAddress) {
-      safeAddress = Packet_Address.deserialize(safeAddress.serialize())
-    }
   }
   if (!moduleAddress) {
     moduleAddress = await db.get_staking_module_address()
-    if (moduleAddress) {
-      moduleAddress = Packet_Address.deserialize(moduleAddress.serialize())
-    }
   }
   if (!safeAddress || !moduleAddress) {
     log(`failed to provide safe or module address:`)

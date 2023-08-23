@@ -38,7 +38,6 @@ import {
   type LibP2PHandlerFunction,
   libp2pSendMessage,
   MIN_NATIVE_BALANCE,
-  registerMetricsCollector,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   safeCloseConnection,
@@ -53,25 +52,24 @@ import {
   Balance,
   BalanceType,
   pickVersion,
-  OffchainPublicKey,
   OffchainKeypair,
-  ChainKeypair
+  ChainKeypair,
+  StrategyTickResult,
+  Database,
+  OffchainPublicKey,
+  ApplicationData,
+  PacketInteractionConfig,
+  Path,
+  Payload,
+  PeerOrigin,
+  PeerNetwork,
+  PeerStatus,
+  Health,
+  WasmAckInteraction,
+  WasmPacketInteraction, HeartbeatConfig
 } from '@hoprnet/hopr-utils'
 
 import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
-
-import {
-  Network,
-  PeerStatus,
-  PeerOrigin,
-  Health,
-  health_to_string,
-  HeartbeatConfig,
-  core_network_initialize_crate,
-  core_network_gather_metrics
-} from '../lib/core_network.js'
-core_network_initialize_crate()
-registerMetricsCollector(core_network_gather_metrics)
 
 import Heartbeat from './network/heartbeat.js'
 
@@ -86,7 +84,6 @@ import {
   SaneDefaults,
   Strategy,
   StrategyFactory,
-  StrategyTickResult
 } from './channel-strategy.js'
 
 import type { ResolvedNetwork } from './network.js'
@@ -94,24 +91,6 @@ import { createLibp2pInstance } from './main.js'
 import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
-import {
-  core_hopr_initialize_crate,
-  core_hopr_gather_metrics,
-  Database,
-  OffchainPublicKey as Ethereum_OffchainPublicKey,
-  ApplicationData,
-  Address as Packet_Address,
-  PacketInteractionConfig,
-  OffchainKeypair as Packet_OffchainKeypair,
-  ChainKeypair as Packet_ChainKeypair,
-  Path,
-  Payload,
-  Balance as Packet_Balance,
-  WasmAckInteraction,
-  WasmPacketInteraction
-} from '../lib/core_hopr.js'
-core_hopr_initialize_crate()
-registerMetricsCollector(core_hopr_gather_metrics)
 
 import pkg from '../package.json' assert { type: 'json' }
 
@@ -264,7 +243,7 @@ class Hopr extends EventEmitter {
 
   private stopPeriodicCheck: (() => void) | undefined
   private strategy: ChannelStrategyInterface
-  private networkPeers: Network
+  private networkPeers: PeerNetwork
   private heartbeat: Heartbeat
   private forward: WasmPacketInteraction
   private acknowledgements: WasmAckInteraction
@@ -391,7 +370,7 @@ class Hopr extends EventEmitter {
 
     // Attach network health measurement functionality
 
-    this.networkPeers = Network.build(
+    this.networkPeers = PeerNetwork.build(
       this.id.toString(),
       this.options.networkQualityThreshold,
       (peer: string) => {
@@ -511,8 +490,8 @@ class Hopr extends EventEmitter {
     })
 
     let packetCfg = new PacketInteractionConfig(
-      new Packet_OffchainKeypair(this.packetKeypair.secret()), // need to be re-serialized due to WASM runtime boundary
-      new Packet_ChainKeypair(this.chainKeypair.secret())
+      this.packetKeypair,
+      this.chainKeypair
     )
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
@@ -800,7 +779,7 @@ class Hopr extends EventEmitter {
   }
 
   private async updateChannelMetrics() {
-    const selfAddr = Packet_Address.deserialize(this.getEthereumAddress().serialize())
+    const selfAddr = this.getEthereumAddress()
 
     try {
       let outgoingChannels = 0
@@ -1041,7 +1020,7 @@ class Hopr extends EventEmitter {
       try {
         path = await Path.validated(
           withDestination,
-          Packet_Address.deserialize(this.chainKeypair.to_address().serialize()),
+          this.chainKeypair.to_address(),
           true,
           this.db
         )
@@ -1413,12 +1392,12 @@ class Hopr extends EventEmitter {
     const channel = ChannelEntry.deserialize(
       (direction === 'outgoing'
         ? await this.db.get_channel_x(
-            Packet_Address.deserialize(this.getEthereumAddress().serialize()),
-            Packet_Address.deserialize(counterparty.serialize())
+            this.getEthereumAddress(),
+            counterparty
           )
         : await this.db.get_channel_x(
-            Packet_Address.deserialize(counterparty.serialize()),
-            Packet_Address.deserialize(this.getEthereumAddress().serialize())
+            counterparty,
+            this.getEthereumAddress()
           )
       ).serialize()
     )
@@ -1518,7 +1497,7 @@ class Hopr extends EventEmitter {
     const pending = await this.db.get_pending_tickets_count()
     const losing = await this.db.get_losing_tickets_count()
 
-    let totalValue = Packet_Balance.zero(BalanceType.HOPR)
+    let totalValue = Balance.zero(BalanceType.HOPR)
     for (let i = 0; i < acked_tickets.len(); i++) {
       totalValue = totalValue.add(acked_tickets.at(i).ticket.amount)
     }
@@ -1562,8 +1541,8 @@ class Hopr extends EventEmitter {
    */
   public async getChannel(src: Address, dest: Address): Promise<ChannelEntry> {
     return await this.db.get_channel_x(
-      Packet_Address.deserialize(src.serialize()),
-      Packet_Address.deserialize(dest.serialize())
+      src,
+      dest
     )
   }
 
@@ -1577,7 +1556,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
-    let list = await this.db.get_channels_from(Packet_Address.deserialize(addr.serialize()))
+    let list = await this.db.get_channels_from(addr)
     let ret: ChannelEntry[] = []
     for (let i = 0; i < list.len(); i++) {
       ret.push(ChannelEntry.deserialize(list.at(i).serialize()))
@@ -1586,7 +1565,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
-    let list = await this.db.get_channels_to(Packet_Address.deserialize(addr.serialize()))
+    let list = await this.db.get_channels_to(addr)
     let ret: ChannelEntry[] = []
     for (let i = 0; i < list.len(); i++) {
       ret.push(ChannelEntry.deserialize(list.at(i).serialize()))
@@ -1622,7 +1601,7 @@ class Hopr extends EventEmitter {
   }
 
   private async peerIdToChainKey(id: PeerId) {
-    let pk = Ethereum_OffchainPublicKey.from_peerid_str(id.toString())
+    let pk = OffchainPublicKey.from_peerid_str(id.toString())
     return await this.db.get_chain_key(pk)
   }
 
@@ -1744,11 +1723,9 @@ export {
   PeerOrigin,
   PeerStatus,
   Health,
-  health_to_string,
   type ChannelStrategyInterface
 }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
-export { CORE_CONSTANTS as CONSTANTS } from '../lib/core_misc.js'
 export { sampleOptions } from './index.mock.js'
 export * from './types.js'
 

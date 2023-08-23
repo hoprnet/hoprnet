@@ -6,13 +6,22 @@ pub mod wasm {
     use core_packet::interaction::wasm::*;
 
     #[allow(unused_imports)]
-    use core_path::wasm::*;
-
-    #[allow(unused_imports)]
     use core_strategy::passive::wasm::*;
 
     #[allow(unused_imports)]
     use core_strategy::promiscuous::wasm::*;
+
+    #[allow(unused_imports)]
+    //use core_misc::constants::wasm::*;
+
+    #[allow(unused_imports)]
+    use core_network::network::wasm::*;
+
+    #[allow(unused_imports)]
+    use core_network::ping::wasm::*;
+
+    #[allow(unused_imports)]
+    use core_network::heartbeat::wasm::*;
 
     #[allow(unused_imports)]
     use core_ethereum_db::db::wasm::*;
@@ -34,6 +43,7 @@ pub mod wasm {
 
     use utils_log::logger::wasm::JsLogger;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use utils_misc::utils::wasm::JsResult;
 
     static LOGGER: JsLogger = JsLogger {};
 
@@ -50,6 +60,11 @@ pub mod wasm {
         // https://github.com/rustwasm/console_error_panic_hook#readme
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
+    }
+
+    #[wasm_bindgen]
+    pub fn hoprd_hoprd_gather_metrics() -> JsResult<String> {
+        utils_metrics::metrics::wasm::gather_all_metrics()
     }
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.

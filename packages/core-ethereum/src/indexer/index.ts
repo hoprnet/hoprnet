@@ -18,8 +18,11 @@ import {
   type DeferType,
   create_multi_counter,
   create_gauge,
-  // create_multi_gauge,
-  random_integer
+  Database,
+  Handlers,
+  random_integer,
+  OffchainPublicKey,
+  CORE_ETHEREUM_CONSTANTS, U256
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -28,18 +31,8 @@ import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './ut
 import { BigNumber, errors } from 'ethers'
 import { Filter, Log } from '@ethersproject/abstract-provider'
 
-import {
-  CORE_ETHEREUM_CONSTANTS,
-  Ethereum_Address,
-  Ethereum_Database,
-  Ethereum_Snapshot,
-  Ethereum_U256,
-  Handlers
-} from '../db.js'
-
 // @ts-ignore untyped library
 import retimer from 'retimer'
-import { OffchainPublicKey } from '../../crates/core-ethereum-db/pkg/core_ethereum_db.js'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -103,7 +96,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
   constructor(
     private address: Address,
-    private db: Ethereum_Database,
+    private db: Database,
     private maxConfirmations: number,
     private blockRange: number
   ) {
@@ -481,9 +474,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.latestBlock = Math.max(this.latestBlock, blockNumber)
     metric_blockNumber.set(this.latestBlock)
 
-    let fetchedSnapshot = await this.db.get_latest_confirmed_snapshot()
-    let lastDatabaseSnapshot =
-      fetchedSnapshot === undefined ? fetchedSnapshot : Ethereum_Snapshot.deserialize(fetchedSnapshot.serialize())
+    let lastDatabaseSnapshot = await this.db.get_latest_confirmed_snapshot()
 
     // settle transactions before processing events
     if (fetchNativeTxs) {
@@ -718,10 +709,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
 
       // @TODO: fix type clash
-      lastDatabaseSnapshot = new Ethereum_Snapshot(
-        new Ethereum_U256(event.blockNumber.toString()),
-        new Ethereum_U256(event.transactionIndex.toString()),
-        new Ethereum_U256(event.logIndex.toString())
+      lastDatabaseSnapshot = new Snapshot(
+        new U256(event.blockNumber.toString()),
+        new U256(event.transactionIndex.toString()),
+        new U256(event.logIndex.toString())
       )
 
       log('Event and hash %s', event.transactionHash)
@@ -802,7 +793,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   public async getAccount(address: Address): Promise<AccountEntry | undefined> {
-    let account = await this.db.get_account(Ethereum_Address.deserialize(address.serialize()))
+    let account = await this.db.get_account(address)
     if (account !== undefined) {
       return AccountEntry.deserialize(account.serialize())
     }
@@ -819,7 +810,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   }
 
   public async getPacketKeyOf(address: Address): Promise<OffchainPublicKey> {
-    const pk = await this.db.get_packet_key(Ethereum_Address.deserialize(address.serialize()))
+    const pk = await this.db.get_packet_key(address)
     if (pk !== undefined) {
       return pk
     }
