@@ -13,7 +13,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use utils_log::info;
+use utils_log::{debug,info};
 use utils_metrics::metrics::SimpleHistogram;
 use utils_metrics::histogram_start_measure;
 
@@ -125,7 +125,12 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 metric_time_to_heartbeat.record_measure(heartbeat_round_timer.unwrap());
             };
 
-            sleep(std::time::Duration::from_millis(0u64.max(current_timestamp() - start))).await
+            let last_heartbeat_duration_in_ms = 0u64.max(current_timestamp() - start);
+            if last_heartbeat_duration_in_ms < self.config.heartbeat_interval as u64 {
+                debug!("Heartbeat sleeping for: {}ms", self.config.heartbeat_interval as u64 - last_heartbeat_duration_in_ms);
+                sleep(std::time::Duration::from_millis(self.config.heartbeat_interval as u64 - last_heartbeat_duration_in_ms)).await
+            }
+            
         }
     }
 } 

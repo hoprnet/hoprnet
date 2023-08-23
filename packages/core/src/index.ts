@@ -220,7 +220,6 @@ export class Hopr extends EventEmitter {
   private index_updater: WasmIndexerInteractions
   private pubKey: PublicKey
   private id: PeerId
-  private knownPublicNodesCache = new Set()
   private main_loop: Promise<void>
 
   public network: ResolvedNetwork
@@ -272,8 +271,6 @@ export class Hopr extends EventEmitter {
    * - Announce address, pubkey, and multiaddr on chain.
    *
    * - Start heartbeat, automatic strategies, etc..
-   *
-   * @param __testingLibp2p use simulated libp2p instance for testing
    */
   public async start(__initialNodes?: { id: PeerId; multiaddrs: Multiaddr[] }[]) {
     this.status = 'INITIALIZING'
@@ -302,15 +299,13 @@ export class Hopr extends EventEmitter {
     verbose('Waiting for indexer to find connected nodes.')
 
     // Add us as public node if announced
-    if (this.options.announce) {
-      this.knownPublicNodesCache.add(this.id)
+    if (! this.options.announce) {
+      throw new Error('Announce option should be turned ON in Providence, only public nodes are supported')
     }
 
     // Fetch previous announcements from database
     const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
-
-    // Add all initial public nodes to public nodes cache
-    initialNodes.forEach((initialNode) => this.knownPublicNodesCache.add(initialNode.id.toString()))
+    log("Using initial nodes: " + initialNodes)
 
     // Fetch all nodes that announce themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
@@ -347,15 +342,17 @@ export class Hopr extends EventEmitter {
 
     const onReceivedMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
 
+    log('Linking chain and packet keys')
     this.db.link_chain_and_packet_keys(
       Core_Address.deserialize(this.chainKeypair.to_address().serialize()),
       Core_OffchainPublicKey.deserialize(this.packetKeypair.public().serialize()),
       Snapshot._default())
 
+    log('Constructing the core application and tools')
     let coreApp = new CoreApp(new Core_OffchainKeypair(this.packetKeypair.secret()), this.db.clone(),
       this.options.networkQualityThreshold, heartbeat_cfg, ping_cfg,
       onAcknowledgement, onAcknowledgedTicket, packetCfg, onReceivedMessage,
-      this.getLocalInterfaceAddresses()
+      this.getLocalMultiaddresses().map((x) => x.toString())
     )
 
     let tools = coreApp.tools()
@@ -432,22 +429,33 @@ export class Hopr extends EventEmitter {
     log(`all interactions finished execution`)
   }
 
-  private getLocalInterfaceAddresses(): string[] {
-    let results: string[]
-    const nets = networkInterfaces();
+  private getLocalMultiaddresses(): Multiaddr[] {
+    let mas: Multiaddr[] = []
+    // TODO: handle IPv6 as well
+    if (this.options.hosts.ip4 == undefined || this.options.hosts.ip4.ip == '0.0.0.0') {
+      let results: string[] = []
+      const nets = networkInterfaces();
+  
+      for (const name of Object.keys(nets)) {
+          for (const net of nets[name]) {
+              // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+              // 'IPv4' is in Node <= 17, from 18 it's a number 4 or 6
+              const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4
+              if (net.family === familyV4Value && !net.internal) {
+                  results.push(net.address);
+              }
+          }
+      }
 
-    for (const name of Object.keys(nets)) {
-        for (const net of nets[name]) {
-            // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
-            // 'IPv4' is in Node <= 17, from 18 it's a number 4 or 6
-            const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4
-            if (net.family === familyV4Value && !net.internal) {
-                results.push(net.address);
-            }
-        }
+      const unique_ipv4s = [...new Set(results)]
+      for (const ip4 of unique_ipv4s) {
+        mas.push(multiaddr(`/ip4/${ip4}/tcp/${this.options.hosts.ip4.port}`))
+      }
+    } else {
+      mas.push(multiaddr(`/ip4/${this.options.hosts.ip4.ip}/tcp/${this.options.hosts.ip4.port}`))
     }
 
-    return [...new Set(results)]
+    return mas
   }
 
   /*
@@ -487,9 +495,11 @@ export class Hopr extends EventEmitter {
   private async onPeerAnnouncement(peer: { id: PeerId; multiaddrs: Multiaddr[] }): Promise<void> {
     if (peer.id.equals(this.id)) {
       // Ignore announcements from ourself
+      log(`Skipping announcements for ${peer}`)
       return
     }
 
+    log(`Processing multiaddresses for peer ${peer.id.toString()}: ${peer.multiaddrs}`)
     const addrsToAdd: Multiaddr[] = []
     for (const addr of peer.multiaddrs) {
       const tuples = addr.tuples()
@@ -504,6 +514,7 @@ export class Hopr extends EventEmitter {
       addrsToAdd.push(addr.decapsulateCode(CODE_P2P))
     }
 
+    log(`Announcing peer '${peer.id.toString()} with multiaddresses: ${addrsToAdd}'`)
     this.index_updater.announce(peer.id.toString(), addrsToAdd)
   }
 
@@ -1176,6 +1187,7 @@ export class Hopr extends EventEmitter {
 
     let result = []
     let current: AcknowledgedTicket | undefined
+
     while (true) {
       current = ackedTickets.next()
 

@@ -15,13 +15,12 @@ use libp2p::noise as libp2p_noise;
 
 use libp2p_identity::PeerId;
 use libp2p_core::{upgrade, Transport};
-use libp2p_swarm::{NetworkBehaviour, SwarmBuilder, derive_prelude::Either};
+use libp2p_swarm::{NetworkBehaviour, SwarmBuilder};
 
 use serde::{Serialize, Deserialize};
 
 use core_network::messaging::ControlMessage;
 use core_types::acknowledgement::Acknowledgement;
-use void::Void;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(pub ControlMessage);

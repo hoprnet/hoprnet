@@ -5,9 +5,9 @@ mod p2p;
 
 use std::sync::Arc;
 
-use adaptors::indexer::IndexerProcessed;
 use async_lock::RwLock;
 use futures::{StreamExt, FutureExt, channel::mpsc::Sender};
+use multiaddr::Multiaddr;
 
 pub use {
     core_network::{
@@ -37,10 +37,11 @@ use core_network::{
 };
 use core_packet::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, PacketActions};
 use core_p2p::libp2p_identity;
-
 use utils_log::error;
 
+use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;
+
 
 #[cfg(feature = "wasm")]
 use {
@@ -133,7 +134,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
     ping_cfg: PingConfig,
     on_acknowledgement: Option<js_sys::Function>, on_acknowledged_ticket: Option<js_sys::Function>,
     packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>,
-    my_external_addresses: Vec<std::net::Ipv4Addr>,             // TODO: needed only because there's no STUN ATM 
+    my_multiaddresses: Vec<Multiaddr>,             // TODO: needed only because there's no STUN ATM 
 ) -> (HoprTools, impl std::future::Future<Output=()>)
 {
     use core_mixer::mixer::{Mixer, MixerConfig};
@@ -197,7 +198,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
             ack_actions, packet_actions,
             api::HeartbeatRequester::new(hb_ping_rx), api::HeartbeatResponder::new(hb_pong_tx),
             api::ManualPingRequester::new(ping_rx), api::HeartbeatResponder::new(pong_tx),
-            my_external_addresses
+            my_multiaddresses
         ).map(|_| HoprLoopComponents::Swarm))
     ];
     let mut futs = helpers::to_futures_unordered(ready_loops);
@@ -250,7 +251,7 @@ pub mod wasm_impl {
             network_quality_threshold: f64, hb_cfg: HeartbeatConfig, ping_cfg: PingConfig,
             on_acknowledgement: Option<js_sys::Function>, on_acknowledged_ticket: Option<js_sys::Function>,
             packet_cfg: PacketInteractionConfig, on_final_packet: Option<js_sys::Function>,
-            my_external_addresses: Vec<js_sys::JsString>
+            my_multiaddresses: Vec<js_sys::JsString>
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
@@ -258,11 +259,11 @@ pub mod wasm_impl {
                 network_quality_threshold, hb_cfg, ping_cfg,
                 on_acknowledgement, on_acknowledged_ticket,
                 packet_cfg, on_final_packet,
-                my_external_addresses
+                my_multiaddresses
                     .into_iter()
-                    .map(|ip| {
-                        let ip: String = ip.into();
-                        std::net::Ipv4Addr::from_str(ip.as_str()).expect("Should be a valid IPv4 string")
+                    .map(|ma| {
+                        let ma: String = ma.into();
+                        multiaddr::Multiaddr::from_str(ma.as_str()).expect("Should be a valid multiaddress string")
                     })
                     .collect::<Vec<_>>()
             );

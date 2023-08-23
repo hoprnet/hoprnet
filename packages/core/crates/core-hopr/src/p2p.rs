@@ -14,7 +14,7 @@ pub use core_p2p::{libp2p_identity, api};
 use core_p2p::{
     HoprNetworkBehaviorEvent,
     Ping, Pong,
-    libp2p_request_response, libp2p_swarm::{SwarmEvent, derive_prelude::Multiaddr}, HoprSwarm
+    libp2p_request_response, libp2p_swarm::{SwarmEvent, derive_prelude::Multiaddr, handler::multi}
 };
 use utils_log::{debug, info, error};
 
@@ -86,39 +86,32 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     heartbeat_responds: api::HeartbeatResponder,
     manual_ping_requests: api::ManualPingRequester,
     manual_ping_responds: api::HeartbeatResponder,
-    my_external_addresses: Vec<std::net::Ipv4Addr>)
+    my_multiaddresses: Vec<multiaddr::Multiaddr>)
 {
     let mut swarm = core_p2p::build_p2p_network(me);
-    
-    // Add my peer id with my known listening multiaddresses to the network (temporary STUN replacement)
-    // =====================
-    let external_registered_mas = {
-        let mut net = network.write().await;
-        let me = swarm.local_peer_id();
 
-        let mut addrs: Vec<Multiaddr> = vec![];
-        
-        for ma in swarm.listeners() {
-            addrs.push(ma.clone());
-            for ip4a in my_external_addresses.iter() {
-                let _ma = ma.clone().replace(0, |p| match p {
-                    multiaddr::Protocol::Ip4(_) => Some(multiaddr::Protocol::Ip4(ip4a.clone())),
-                    _ => None
-                }).expect("Should perform a valid ipv4 multiaddress replacement");
-                
-                addrs.push(_ma.clone());
-            }
+    let mut valid_mas: Vec<multiaddr::Multiaddr> = vec![];
+    for multiaddress in my_multiaddresses.iter() {
+        // NOTE: Due to lack of STUN the passed in multiaddresses are believed to be correct after
+        // the first successful listen. Relevant for Providence, but not beyond.
+        if valid_mas.len() > 0 {
+            valid_mas.push(multiaddress.clone());
+            continue
         }
 
-        info!("Registering own external multiaddresses: {:?}", addrs);
-        net.store_peer_multiaddresses(me, addrs);
-        net.get_peer_multiaddresses(&me)
-    };
-    
-    for ma in external_registered_mas.into_iter() {
-        swarm.add_external_address(ma)
+        match swarm.listen_on(multiaddress.clone()) {
+            Ok(_) => {
+                valid_mas.push(multiaddress.clone());
+                swarm.add_external_address(multiaddress.clone());
+            },
+            Err(e) => {
+                error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
+            },
+        }
     }
-    // =====================
+
+    info!("Registering own external multiaddresses: {:?}", valid_mas);
+    network.write().await.store_peer_multiaddresses(swarm.local_peer_id(), valid_mas);
 
     let mut heartbeat_responds = heartbeat_responds;
     let mut manual_ping_responds = manual_ping_responds;
