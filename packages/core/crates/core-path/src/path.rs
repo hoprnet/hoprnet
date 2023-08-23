@@ -58,7 +58,8 @@ impl Path {
         let mut ticket_receiver;
         let mut ticket_issuer = *self_addr;
 
-        for hop in path.iter() {
+        // Ignore the last hop in the check, because channels are not required for direct messages
+        for hop in path.iter().take(path.len() - 1) {
             ticket_receiver = db
                 .get_chain_key(&OffchainPublicKey::from_peerid(hop)?)
                 .await?
@@ -129,8 +130,7 @@ impl Display for Path {
 mod tests {
     use crate::errors::PathError;
     use crate::path::Path;
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::{Hash, OffchainPublicKey, PublicKey};
+    use core_crypto::types::{OffchainPublicKey, PublicKey};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::channels::{ChannelEntry, ChannelStatus};
@@ -244,6 +244,12 @@ mod tests {
 
         assert_eq!(2, path.length());
 
+        let path = Path::new(vec![peers[2]], &me, false, &db)
+            .await
+            .expect("path 0 -> 2 must be valid, because channel not needed for direct message");
+
+        assert_eq!(1, path.length());
+
         let path = Path::new(vec![peers[1], peers[2], peers[3]], &me, false, &db)
             .await
             .expect("path 0 -> 1 -> 2 -> 3 must be valid");
@@ -256,13 +262,13 @@ mod tests {
 
         assert_eq!(4, path.length());
 
-        let path = Path::new(vec![peers[1], peers[2], peers[2]], &me, true, &db)
+        let path = Path::new(vec![peers[1], peers[2], peers[2], peers[3]], &me, true, &db)
             .await
-            .expect("path 0 -> 1 -> 2 -> 2 must be valid if loops are allowed");
+            .expect("path 0 -> 1 -> 2 -> 2 -> 3 must be valid if loops are allowed");
 
-        assert_eq!(3, path.length()); // still counts as a hop
+        assert_eq!(4, path.length()); // loop still counts as a hop
 
-        match Path::new(vec![peers[1], peers[2], peers[2]], &me, false, &db)
+        match Path::new(vec![peers[1], peers[2], peers[2], peers[3]], &me, false, &db)
             .await
             .expect_err("path 0 -> 1 -> 2 -> 2 must be invalid if loops are not allowed")
         {
@@ -270,34 +276,39 @@ mod tests {
             _ => panic!("error must be LoopsNotAllowed"),
         };
 
-        match Path::new(vec![peers[3]], &me, false, &db)
+        match Path::new(vec![peers[3], peers[4]], &me, false, &db)
             .await
-            .expect_err("path 0 -> 3 must be invalid, because channel is not opened")
+            .expect_err("path 0 -> 3 must be invalid, because channel 0 -> 3 is not opened")
         {
             PathError::MissingChannel(_, _) => {}
             _ => panic!("error must be MissingChannel"),
         };
 
-        match Path::new(vec![peers[1], peers[3]], &me, false, &db)
+        match Path::new(vec![peers[1], peers[3], peers[4]], &me, false, &db)
             .await
-            .expect_err("path 0 -> 1 -> 3 must be invalid, because channel is not opened")
+            .expect_err("path 0 -> 1 -> 3 -> 4 must be invalid, because channel 1 -> 3 is not opened")
         {
             PathError::MissingChannel(_, _) => {}
             _ => panic!("error must be MissingChannel"),
         };
 
-        match Path::new(vec![peers[1], peers[2], peers[3], peers[4], peers[0]], &me, false, &db)
-            .await
-            .expect_err("path 0 -> 1 -> 2 -> 3 -> 4 -> 0 must be invalid, because channel is already closed")
+        match Path::new(
+            vec![peers[1], peers[2], peers[3], peers[4], peers[0], peers[1]],
+            &me,
+            false,
+            &db,
+        )
+        .await
+        .expect_err("path 0 -> 1 -> 2 -> 3 -> 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
         {
             PathError::ChannelNotOpened(_, _) => {}
             _ => panic!("error must be ChannelNotOpened"),
         };
 
         let me = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
-        match Path::new(vec![peers[0]], &me, false, &db)
+        match Path::new(vec![peers[0], peers[1]], &me, false, &db)
             .await
-            .expect_err("path 4 -> 0 must be invalid, because channel is already closed")
+            .expect_err("path 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
         {
             PathError::ChannelNotOpened(_, _) => {}
             _ => panic!("error must be ChannelNotOpened"),
