@@ -15,7 +15,7 @@ import {
   ChainKeypair,
   OffchainKeypair,
   debug,
-  health_to_string,
+  health_to_string
 } from '@hoprnet/hopr-utils'
 import {
   Health,
@@ -40,7 +40,8 @@ hoprd_misc_initialize_crate()
 
 import {
   MessageInbox,
-  HoprKeys, IdentityOptions,
+  HoprKeys,
+  IdentityOptions,
   ApplicationData,
   MessageInboxConfiguration
 } from '@hoprnet/hopr-utils'

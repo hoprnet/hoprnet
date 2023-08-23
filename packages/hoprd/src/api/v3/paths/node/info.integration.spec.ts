@@ -8,7 +8,7 @@ import { Health } from '@hoprnet/hopr-core'
 import { hoprd_misc_initialize_crate, ResolvedNetwork } from '../../../../../lib/hoprd_misc.js'
 hoprd_misc_initialize_crate()
 
-import {health_to_string} from '@hoprnet/hopr-utils'
+import { health_to_string } from '@hoprnet/hopr-utils'
 
 import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 

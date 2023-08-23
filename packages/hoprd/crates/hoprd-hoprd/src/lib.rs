@@ -13,7 +13,6 @@ pub mod wasm {
 
     #[allow(unused_imports)]
     //use core_misc::constants::wasm::*;
-
     #[allow(unused_imports)]
     use core_network::network::wasm::*;
 
@@ -42,8 +41,8 @@ pub mod wasm {
     use hoprd_keypair::key_pair::wasm::*;
 
     use utils_log::logger::wasm::JsLogger;
-    use wasm_bindgen::prelude::wasm_bindgen;
     use utils_misc::utils::wasm::JsResult;
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     static LOGGER: JsLogger = JsLogger {};
 
