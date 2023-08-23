@@ -849,6 +849,32 @@ export async function createChainWrapper(
   }
 
   /**
+   * Gets the token balance of a specific account
+   * @param accountAddress account to query for
+   * @param blockNumber block number at which the query performs
+   * @returns a Promise that resolves with the token balance
+   */
+  const getBalanceAtBlock = async (accountAddress: Address, blockNumber: number): Promise<Balance> => {
+    const RETRIES = 3
+    let rawBalance: BigNumber
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        rawBalance = await token.balanceOf(accountAddress.to_hex(), { blockTag: blockNumber })
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        }
+
+        log(`Could not determine current on-chain token balance using the provider.`)
+        throw Error(`Could not determine on-chain token balance`)
+      }
+    }
+
+    return new Balance(rawBalance.toString(), BalanceType.HOPR)
+  }
+
+  /**
    * Gets the native balance of a specific account
    * @param accountAddress account to query for
    * @returns a Promise that resolves with the native balance of the account
@@ -876,13 +902,19 @@ export async function createChainWrapper(
   /**
    * Get the token allowance granted to the HoprChannels contract address by the caller
    * @param ownerAddress token owner address
+   * @param ownerAddress token owner address
    */
-  const getTokenAllowanceGrantedToChannels = async (ownerAddress: Address): Promise<Balance> => {
+  const getTokenAllowanceGrantedToChannelsAt = async (
+    ownerAddress: Address,
+    blockNumber?: number
+  ): Promise<Balance> => {
     const RETRIES = 3
     let rawAllowance: BigNumber
     for (let i = 0; i < RETRIES; i++) {
       try {
-        rawAllowance = await token.allowance(ownerAddress.to_hex(),  channels.address);
+        rawAllowance = await token.allowance(ownerAddress.to_hex(), channels.address, {
+          blockTag: blockNumber ?? 'latest'
+        })
       } catch (err) {
         if (i + 1 < RETRIES) {
           await setImmediatePromise()
@@ -948,8 +980,9 @@ export async function createChainWrapper(
 
   return {
     getBalance,
+    getBalanceAtBlock,
     getNativeBalance,
-    getTokenAllowanceGrantedToChannels,
+    getTokenAllowanceGrantedToChannelsAt,
     getTransactionsInBlock,
     getTimestamp,
     getSafeFromNodeSafeRegistry,

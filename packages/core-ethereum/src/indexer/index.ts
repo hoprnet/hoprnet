@@ -170,20 +170,23 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     fromBlock = Math.max(fromBlock, this.genesisBlock)
 
     // update the base valuse of balance and allowance of token for safe
-    // update safe's HOPR token balance
-    const hoprBalance = await this.chain.getBalance(this.safeAddress)
-    await this.db.set_hopr_balance(
-      Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
-    )
-    log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
-      
-    // update safe's HORP token allowance granted to Channels contract
-    const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannels(this.safeAddress)
-    await this.db.set_staking_safe_allowance(
-      Ethereum_Balance.deserialize(safeAllowance.serialize_value(), Ethereum_BalanceType.HOPR)
-    )
-    log(`set safe allowance to ${safeAllowance.to_formatted_string()}`)
-    
+    if (!this.lastSnapshot) {
+      // update safe's HOPR token balance
+      const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
+      await this.db.set_hopr_balance(
+        Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
+      )
+      log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
+
+      // update safe's HORP token allowance granted to Channels contract
+      const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
+      await this.db.set_staking_safe_allowance(
+        Ethereum_Balance.deserialize(safeAllowance.serialize_value(), Ethereum_BalanceType.HOPR),
+        new Ethereum_Snapshot(new Ethereum_U256('0'), new Ethereum_U256('0'), new Ethereum_U256('0')) // dummy snapshot
+      )
+      log(`set safe allowance to ${safeAllowance.to_formatted_string()}`)
+    }
+
     log('Starting to index from block %d, sync progress 0%%', fromBlock)
 
     const orderedBlocks = ordered<number>()

@@ -13,13 +13,13 @@ use bindings::{
     },
     hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::{DergisteredNodeSafeFilter, HoprNodeSafeRegistryEvents, RegisteredNodeSafeFilter},
-    hopr_token::{ApprovalFilter, HoprTokenEvents, TransferFilter, AllowanceCall},
+    hopr_token::{AllowanceCall, ApprovalFilter, HoprTokenEvents, TransferFilter},
 };
 use core_crypto::types::{Hash, OffchainSignature};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     account::{AccountEntry, AccountSignature, AccountType},
-    channels::{generate_channel_id, ChannelEntry, ChannelStatus, self},
+    channels::{self, generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{
     contract::{EthEvent, EthLogDecode},
@@ -373,11 +373,11 @@ where
             HoprTokenEvents::ApprovalFilter(approved) => {
                 let owner: Address = approved.owner.0.try_into()?;
                 let spender: Address = approved.spender.0.try_into()?;
-                
+
                 let allowance: U256 = u256::from_be_bytes(approved.value.into()).into();
                 if owner.eq(&self.address_to_monitor) && spender.eq(&self.addresses.channels) {
                     db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)
-                    .await?;
+                        .await?;
                 } else {
                     return Ok(());
                 }
@@ -386,7 +386,7 @@ where
                 todo!("Implement all the other filters for HoprTokenEvents");
             }
         }
-        
+
         Ok(())
     }
 
