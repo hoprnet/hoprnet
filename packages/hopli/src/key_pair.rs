@@ -1,11 +1,71 @@
 use crate::utils::HelperErrors;
+use core_crypto::keypairs::{OffchainKeypair, ChainKeypair, Keypair};
 use hoprd_keypair::key_pair::HoprKeys;
 use log::warn;
-use std::collections::HashMap;
 use std::{
-    fs,
+    fs,collections::HashMap,fmt,
     path::{Path, PathBuf},
 };
+use utils_types::traits::{PeerIdLike, ToHex};
+use serde::{Serialize, Serializer, ser::SerializeStruct};
+use uuid::Uuid;
+
+pub struct NodeIdentity {
+    pub packet_key: OffchainKeypair,
+    pub chain_key: ChainKeypair,
+    id: Uuid,
+    pub ethereum_address: String,
+}
+
+impl NodeIdentity {
+    pub fn new(hopr_key: HoprKeys) -> Self {
+        let packet_key = hopr_key.packet_key.clone();
+        let chain_key = hopr_key.chain_key.clone();
+        let id = hopr_key.id().clone();
+        
+
+        // derive ethereum address
+        let ethereum_address = chain_key.public().to_address().to_string();
+
+        Self { packet_key,  chain_key, id, ethereum_address }
+    }
+}
+
+impl Serialize for NodeIdentity {
+    /// Serialize without private keys
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("NodeIdentity", 4)?;
+        s.serialize_field("packet_key", self.packet_key.public().to_peerid_str().as_str())?;
+        s.serialize_field("chain_key", &self.chain_key.public().to_hex().as_str())?;
+        s.serialize_field("uuid", &self.id)?;
+        s.serialize_field("ethereum_address", &self.ethereum_address)?;
+        s.end()
+    }
+}
+
+impl fmt::Display for NodeIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "packet_key: {}, chain_key: {}, uuid: {}, ethereum_address: {}",
+            self.packet_key.public().to_peerid_str().as_str(), self.chain_key.public().to_hex().as_str(), self.id, self.ethereum_address
+        )
+    }
+}
+
+impl fmt::Debug for NodeIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("NodeIdentity")
+        .field(&self.packet_key.public().to_peerid())
+        .field(&self.chain_key.public().to_hex())
+        .field(&self.id)
+        .field(&self.ethereum_address)
+        .finish()
+    }
+}
 
 /// Decrypt identity files and returns an vec of PeerIds and Ethereum Addresses
 ///
@@ -14,7 +74,7 @@ use std::{
 /// * `identity_directory` - Directory to all the identity files
 /// * `password` - Password to unlock all the identity files
 /// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
-pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<HashMap<String, HoprKeys>, HelperErrors> {
+pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<HashMap<String, NodeIdentity>, HelperErrors> {
     let mut results = HashMap::with_capacity(files.len());
 
     for file in files.iter() {
@@ -28,7 +88,7 @@ pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<HashMap
                     keys.write_eth_keystore(file_str, password, false)?
                 }
                 let file_key = file.file_name().unwrap();
-                results.insert(String::from(file_key.to_str().unwrap()), keys);
+                results.insert(String::from(file_key.to_str().unwrap()), NodeIdentity::new(keys));
             }
             Err(e) => {
                 warn!("Could not decrypt keystore file at {}. {}", file_str, e.to_string())
