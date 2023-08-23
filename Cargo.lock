@@ -2486,6 +2486,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "hoprd-hoprd"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "core-ethereum-db",
+ "core-ethereum-indexer",
+ "core-ethereum-misc",
+ "core-hopr",
+ "core-packet",
+ "core-path",
+ "core-strategy",
+ "core-types",
+ "hoprd-inbox",
+ "hoprd-keypair",
+ "hoprd-misc",
+ "js-sys",
+ "utils-log",
+ "utils-misc",
+ "wasm-bindgen",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "hoprd-inbox"
 version = "0.1.0"
 dependencies = [
