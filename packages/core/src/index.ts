@@ -1286,17 +1286,17 @@ class Hopr extends EventEmitter {
 
   public async getNativeBalance(): Promise<Balance> {
     verbose('Requesting native balance for node')
-    return await HoprCoreEthereum.getInstance().getNativeBalance(true)
+    return await HoprCoreEthereum.getInstance().getNativeBalance(this.getEthereumAddress().to_string(), true)
   }
 
   public async getSafeBalance(): Promise<Balance> {
     verbose('Requesting hopr balance for safe')
-    return await HoprCoreEthereum.getInstance().getSafeBalance(true)
+    return await HoprCoreEthereum.getInstance().getSafeBalance()
   }
 
   public async getSafeNativeBalance(): Promise<Balance> {
     verbose('Requesting native balance from safe')
-    return await HoprCoreEthereum.getInstance().getSafeNativeBalance(true)
+    return await HoprCoreEthereum.getInstance().getNativeBalance(this.smartContractInfo().safeAddress, true)
   }
 
   public smartContractInfo(): {
