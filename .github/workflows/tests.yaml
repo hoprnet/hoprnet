@@ -181,7 +181,7 @@ jobs:
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
           test_path=/tmp/test-e2e-${{ github.run_id }}-${{ github.run_number }}
           mkdir -p ${test_path}
-          cp -r /tmp/hopr-smoke-test* ${test_path}
+          cp -r /tmp/hopr-smoke-test* ${test_path} || echo "no files to copy"
           cd ${test_path}
           tar -czvf ${test_path}.tgz ${test_path}
         working-directory: "/tmp"

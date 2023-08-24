@@ -324,12 +324,7 @@ async function main() {
 
     // 2. Create node instance
     log('Creating HOPR Node')
-    node = await createHoprNode(
-      keypair.chain_key,
-      keypair.packet_key,
-      options,
-      false
-    )
+    node = await createHoprNode(keypair.chain_key, keypair.packet_key, options, false)
     log('Status: PENDING')
 
     // Subscribe to node events
