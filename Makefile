@@ -116,6 +116,7 @@ endif
 
 .PHONY: deps
 deps: ## Installs dependencies for local setup
+deps: build-solidity-types
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
 		corepack enable; \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
@@ -237,6 +238,7 @@ build-docs-api: build
 clean: # Cleanup build directories (lib,build, ...etc.)
 	cargo clean
 	yarn clean
+	find packages/ethereum/crates/bindings/src -type f -delete
 
 .PHONY: reset
 reset: # Performs cleanup & also deletes all "node_modules" directories
