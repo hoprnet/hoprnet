@@ -594,6 +594,9 @@ export class Hopr extends EventEmitter {
       throw new Error('node is not RUNNING')
     }
 
+    verbose('SKIP strategy tick, FIXME')
+    return
+
     let tickResult: StrategyTickResult
     try {
       // Retrieve all outgoing channels
