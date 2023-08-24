@@ -67,6 +67,7 @@ logs.txt
 !/packages/hoprd/src/main.cts
 
 *.id
+!/tests/identities/*.id
 
 # local foundry installation
 /.foundry/
