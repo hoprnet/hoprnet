@@ -6,9 +6,9 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
+use core_crypto::keypairs::Keypair;
 use log::{log, Level};
 use std::env;
-use core_crypto::keypairs::Keypair;
 
 /// CLI arguments for `hopli create-safe-module`
 #[derive(Parser, Default, Debug)]
@@ -62,7 +62,7 @@ impl CreateSafeModuleArgs {
         match read_identities(files, &pwd) {
             Ok(node_identities) => {
                 all_node_addresses = node_identities
-                    .iter()
+                    .values()
                     .map(|ni| ni.chain_key.public().to_address().to_string())
                     .collect();
             }
@@ -80,10 +80,7 @@ impl CreateSafeModuleArgs {
 
         log!(target: "create_safe_module", Level::Debug, "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.
-        child_process_call_foundry_express_setup_safe_module(
-            &network,
-            &format!("[{}]", &&all_node_addresses.join(",")),
-        )
+        child_process_call_foundry_express_setup_safe_module(&network, &format!("[{}]", &&all_node_addresses.join(",")))
     }
 }
 

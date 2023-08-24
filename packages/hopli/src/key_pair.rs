@@ -1,6 +1,7 @@
 use crate::utils::HelperErrors;
 use hoprd_keypair::key_pair::HoprKeys;
 use log::warn;
+use std::collections::HashMap;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -13,8 +14,8 @@ use std::{
 /// * `identity_directory` - Directory to all the identity files
 /// * `password` - Password to unlock all the identity files
 /// * `identity_prefix` - Prefix of identity files. Only identity files with the provided are decrypted with the password
-pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<Vec<HoprKeys>, HelperErrors> {
-    let mut results: Vec<HoprKeys> = Vec::with_capacity(files.len());
+pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<HashMap<String, HoprKeys>, HelperErrors> {
+    let mut results = HashMap::with_capacity(files.len());
 
     for file in files.iter() {
         let file_str = file
@@ -26,7 +27,8 @@ pub fn read_identities(files: Vec<PathBuf>, password: &String) -> Result<Vec<Hop
                 if needs_migration {
                     keys.write_eth_keystore(file_str, password, false)?
                 }
-                results.push(keys)
+                let file_key = file.file_name().unwrap();
+                results.insert(String::from(file_key.to_str().unwrap()), keys);
             }
             Err(e) => {
                 warn!("Could not decrypt keystore file at {}. {}", file_str, e.to_string())
@@ -67,13 +69,14 @@ pub fn create_identity(
         None => format!("{dir_name}/{}.id", { keys.id().to_string() }),
     };
 
-    if Path::new(&file_path).exists() {
+    let path = Path::new(&file_path);
+    if path.exists() {
         return Err(HelperErrors::IdentityFileExists(file_path));
     } else {
         keys.write_eth_keystore(&file_path, password, false)?;
     }
 
-    Ok((file_path, keys))
+    Ok((String::from(path.file_name().unwrap().to_str().unwrap()), keys))
 }
 
 #[cfg(test)]
@@ -103,20 +106,20 @@ mod tests {
 
         let path = tmp.path().to_str().unwrap();
         let pwd = "password";
-        let created_id = create_identity(path, pwd, &None).unwrap();
+        let (_, created_id) = create_identity(path, pwd, &None).unwrap();
 
         // created and the read id is identical
         let files = get_files(path, &None);
         let read_id = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(read_id.len(), 1);
         assert_eq!(
-            read_id[0].chain_key.public().0.to_address(),
+            read_id.values().nth(0).unwrap().chain_key.public().0.to_address(),
             created_id.chain_key.public().0.to_address()
         );
 
         // print the read id
         println!("Debug {:#?}", read_id);
-        println!("Display {}", read_id[0]);
+        println!("Display {}", read_id.values().nth(0).unwrap());
 
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }
