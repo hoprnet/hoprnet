@@ -191,7 +191,8 @@ contract HoprChannels is
         // ticket, used to aggregate tickets off-chain
         TicketIndex ticketIndex;
         // delta by which channel.ticketIndex gets increased when redeeming
-        // the ticket, should be set to 1 if ticket is not aggregated
+        // the ticket, should be set to 1 if ticket is not aggregated, and >1 if
+        // it is aggregated. Must never be <1.
         TicketIndexOffset indexOffset;
         // replay protection, invalidates all tickets once payment channel
         // gets closed
@@ -387,11 +388,13 @@ contract HoprChannels is
         }
 
         // Aggregatable Tickets - validity interval:
-        // ( ticketIndex, ticketIndex + indexOffset ] for indexOffset > 0
-        if (
-            TicketIndex.unwrap(redeemable.data.ticketIndex) <= TicketIndex.unwrap(spendingChannel.ticketIndex)
-                || TicketIndexOffset.unwrap(redeemable.data.indexOffset) == 0
-        ) {
+        // A ticket has a base index and an offset. The offset must be > 0,
+        // while the base index must be >= the currently set ticket index in the
+        // channel.
+        uint48 baseIndex = TicketIndex.unwrap(redeemable.data.ticketIndex);
+        uint32 baseIndexOffset = TicketIndexOffset.unwrap(redeemable.data.indexOffset);
+        uint48 currentIndex = TicketIndex.unwrap(spendingChannel.ticketIndex);
+        if (baseIndexOffset < 1 || baseIndex < currentIndex) {
             revert InvalidAggregatedTicketInterval();
         }
 
@@ -418,9 +421,7 @@ contract HoprChannels is
             revert InvalidTicketSignature();
         }
 
-        spendingChannel.ticketIndex = TicketIndex.wrap(
-            TicketIndex.unwrap(redeemable.data.ticketIndex) + TicketIndexOffset.unwrap(redeemable.data.indexOffset)
-        );
+        spendingChannel.ticketIndex = TicketIndex.wrap(baseIndex + baseIndexOffset);
         spendingChannel.balance =
             Balance.wrap(Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount));
         indexEvent(
@@ -776,7 +777,7 @@ contract HoprChannels is
 
             channel.status = ChannelStatus.OPEN;
 
-            indexEvent(abi.encodePacked(ChannelOpened.selector, self, account, channel.balance));
+            indexEvent(abi.encodePacked(ChannelOpened.selector, self, account));
             emit ChannelOpened(self, account);
         }
 
