@@ -15,7 +15,6 @@ import {
   U256 as Ethereum_U256,
   core_hopr_initialize_crate,
   is_allowed_to_access_network,
-  redeem_ticket,
   Handlers
 } from '../../core/lib/core_hopr.js'
 
@@ -37,6 +36,5 @@ export {
   Ethereum_Hash,
   CORE_ETHEREUM_CONSTANTS,
   is_allowed_to_access_network,
-  redeem_ticket,
   Handlers
 }

@@ -423,7 +423,7 @@ impl Ticket {
     }
 
     /// Serializes the ticket with or without signature
-    /// 
+    ///
     /// Signing requires hashing which requires serialization without signature.
     /// Transferring ticket requires serialization with signature attached.
     fn to_bytes_internal(&self, with_signature: bool) -> Result<Vec<u8>> {
@@ -492,23 +492,55 @@ impl Ticket {
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
     /// relates to.
-    pub fn get_path_position(&self, price_per_packet: U256, win_prob: f64) -> u8 {
-        let base_unit = if win_prob == 1.0 {
-            price_per_packet
-        } else {
-            // win_prob between 0.0 and 1.0
-            let bitmask = hex!("000fffffffffffff"); // clear IEEE754 sign bit and exponent
-            // price_per_packet * IEEE754 significant * 2^-52
-            price_per_packet * ((win_prob + 1.0).to_bits() & u64::from_be_bytes(bitmask)).into()
-                / U256::from(1u64 << 52)
-        };
+    pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
+        Ok((self.get_expected_payout() / price_per_packet)
+            .as_u64()
+            .try_into()
+            .map_err(|_| {
+                CoreTypesError::ArithmeticError(format!(
+                    "Cannot convert {} to u8",
+                    price_per_packet / self.get_expected_payout()
+                ))
+            })?)
+    }
 
-        (*self.amount.value() / base_unit).as_u64().try_into().unwrap()
+    pub fn get_expected_payout(&self) -> U256 {
+        if self.win_prob == 1.0 {
+            // special case: mantisse extraction does not work here
+            self.amount.value().clone()
+        } else if self.win_prob == 0.0 {
+            // special case: prevent from potential underflow errors
+            U256::zero()
+        } else {
+            (self.amount.value().clone()
+                * U256::from((self.win_prob + 1.0 + f64::EPSILON).to_bits() & 0x000fffffffffffffu64))
+                >> U256::from(52u64)
+        }
+    }
+
+    /// Recovers the signer public key from the embedded ticket signature.
+    /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
+    pub fn recover_signer(&self, domain_separator: &Hash) -> core_crypto::errors::Result<PublicKey> {
+        PublicKey::from_signature(
+            &self.get_hash(domain_separator).to_bytes(),
+            self.signature.as_ref().expect("ticket not signed"),
+        )
+    }
+
+    /// Verifies the signature of this ticket.
+    /// The operation can fail if a public key cannot be recovered from the ticket signature.
+    pub fn verify(&self, address: &Address, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
+        let recovered = self.recover_signer(domain_separator)?;
+        recovered
+            .to_address()
+            .eq(address)
+            .then_some(())
+            .ok_or(SignatureVerification)
     }
 }
 
 impl BinarySerializable for Ticket {
-    const SIZE: usize = 64 + 20 + Signature::SIZE;
+    const SIZE: usize = 64 + EthereumChallenge::SIZE + Signature::SIZE;
 
     /// Tickets get sent next to packets, hence they need to be as small as possible.
     /// Transmitting tickets to the next downstream share the same binary representation
@@ -563,28 +595,6 @@ impl BinarySerializable for Ticket {
     }
 }
 
-impl Ticket {
-    /// Recovers the signer public key from the embedded ticket signature.
-    /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
-    pub fn recover_signer(&self, domain_separator: &Hash) -> core_crypto::errors::Result<PublicKey> {
-        PublicKey::from_signature(
-            &self.get_hash(domain_separator).to_bytes(),
-            self.signature.as_ref().expect("ticket not signed"),
-        )
-    }
-
-    /// Verifies the signature of this ticket.
-    /// The operation can fail if a public key cannot be recovered from the ticket signature.
-    pub fn verify(&self, address: &Address, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
-        let recovered = self.recover_signer(domain_separator)?;
-        recovered
-            .to_address()
-            .eq(address)
-            .then_some(())
-            .ok_or(SignatureVerification)
-    }
-}
-
 /// Decodes [0x00000000000000, 0xffffffffffffff] to [0.0f64, 1.0f64]
 pub fn win_prob_to_f64(encoded_win_prob: &[u8; 7]) -> f64 {
     if encoded_win_prob.eq(&hex!("00000000000000")) {
@@ -625,10 +635,10 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<[u8; 7]> {
     let tmp: u64 = (win_prob + 1.0).to_bits();
 
     // // clear sign and exponent
-    let significand: u64 = tmp & u64::from_be_bytes(hex!("000fffffffffffff"));
+    let significand: u64 = tmp & 0x000fffffffffffffu64;
 
     // project interval [0x10000000000000, 0x00000000000010] to [0x0fffffffffffff, 0x0000000000000f]
-    let encoded = ((significand - 1) << 4) | u64::from_be_bytes(hex!("000000000000000f"));
+    let encoded = ((significand - 1) << 4) | 0x000000000000000fu64;
 
     let mut res = [0u8; 7];
     res.copy_from_slice(&encoded.to_be_bytes()[1..]);
@@ -775,57 +785,45 @@ pub mod tests {
             .is_ok());
     }
 
-    // TODO test ticket path position
-    // #[test]
-    // pub fn ticket_test() {
-    //     let inverse_win_prob = u256::new(1u128); // 100 %
-    //     let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
-    //     let path_pos = 5u8;
+    #[test]
+    pub fn test_path_position() {
+        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
+        let bob = ChainKeypair::from_secret(&BOB).unwrap();
+        let mut ticket = Ticket::new_partial(
+            alice.public().to_address(),
+            bob.public().to_address(),
+            Balance::new(U256::one(), BalanceType::HOPR),
+            U256::zero(),
+            U256::one(),
+            1.0,
+            U256::one(),
+        )
+        .unwrap();
 
-    //     let kp = ChainKeypair::from_secret(&SGN_PRIVATE_KEY).unwrap();
+        assert_eq!(1u8, ticket.get_path_position(U256::one()).unwrap());
 
-    //     let ticket1 = Ticket::new(
-    //         Address::new(&[0u8; Address::SIZE]),
-    //         U256::new("1"),
-    //         Balance::new(
-    //             (inverse_win_prob * price_per_packet * path_pos as u128).into(),
-    //             BalanceType::HOPR,
-    //         ),
-    //         U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
-    //         U256::new("4"),
-    //         &kp,
-    //     );
+        ticket.amount = Balance::new(U256::from(34u64), BalanceType::HOPR);
 
-    //     let ticket2 = Ticket::from_bytes(&ticket1.to_bytes()).unwrap();
+        assert_eq!(2u8, ticket.get_path_position(U256::from(17u64)).unwrap());
 
-    //     assert_eq!(ticket1, ticket2, "deserialized ticket does not match");
+        ticket.amount = Balance::new(U256::from(30u64), BalanceType::HOPR);
+        ticket.win_prob = 0.2;
 
-    //     let pub_key = PublicKey::from_privkey(&SGN_PRIVATE_KEY).unwrap();
-    //     assert!(
-    //         ticket1.verify(&pub_key.to_address()).is_ok(),
-    //         "failed to verify signed ticket 1"
-    //     );
-    //     assert!(
-    //         ticket2.verify(&pub_key.to_address()).is_ok(),
-    //         "failed to verify signed ticket 2"
-    //     );
+        assert_eq!(U256::from(6u64), ticket.get_expected_payout());
 
-    //     assert_eq!(
-    //         ticket1.get_path_position(price_per_packet.into(), inverse_win_prob.into()),
-    //         path_pos,
-    //         "invalid path pos"
-    //     );
-    //     assert_eq!(
-    //         ticket2.get_path_position(price_per_packet.into(), inverse_win_prob.into()),
-    //         path_pos,
-    //         "invalid path pos"
-    //     );
-    // }
+        assert_eq!(2u8, ticket.get_path_position(U256::from(3u64)).unwrap());
+
+        ticket.win_prob = 0.0;
+        assert_eq!(U256::zero(), ticket.get_expected_payout());
+    }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::types::{Hash, PublicKey, Signature};
+    use core_crypto::{
+        keypairs::ChainKeypair,
+        types::{Hash, PublicKey},
+    };
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
@@ -888,10 +886,10 @@ pub mod wasm {
             amount: Balance,
             win_prob: f64,
             channel_epoch: U256,
-            signature: Signature,
+            keypair: &ChainKeypair,
             domain_separator: &Hash,
         ) -> JsResult<Ticket> {
-            Ticket::new_with_signature(
+            Ticket::new(
                 own_address,
                 counterparty,
                 amount,
@@ -900,7 +898,7 @@ pub mod wasm {
                 win_prob,
                 channel_epoch,
                 challenge,
-                signature,
+                keypair,
                 domain_separator,
             )
             .map_err(|e| e.into())

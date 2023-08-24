@@ -7,6 +7,9 @@ pub enum CoreTypesError {
 
     #[error("failed to parse/deserialize the data of {0}")]
     ParseError(String),
+
+    #[error("Arithmetic error: {0}")]
+    ArithmeticError(String)
 }
 
 pub type Result<T> = core::result::Result<T, CoreTypesError>;

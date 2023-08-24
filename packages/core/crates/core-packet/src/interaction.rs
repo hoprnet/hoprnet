@@ -803,7 +803,7 @@ where
 
                 let path_pos = packet
                     .ticket
-                    .get_path_position(U256::new(PRICE_PER_PACKET), default_win_probability);
+                    .get_path_position(U256::new(PRICE_PER_PACKET))?;
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
