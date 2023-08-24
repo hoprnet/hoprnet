@@ -20,8 +20,6 @@ import {
   create_gauge,
   // create_multi_gauge,
   random_integer,
-  Balance,
-  BalanceType
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -173,27 +171,17 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     // update the base valuse of balance and allowance of token for safe
     if (!this.lastSnapshot) {
-      let hoprBalance: Balance
-      try {
-        // update safe's HOPR token balance
-        log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
-        hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
-      } catch (error) {
-        hoprBalance = Balance.zero(BalanceType.HOPR)
-      }
+      // update safe's HOPR token balance
+      log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
+      const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
       await this.db.set_hopr_balance(
         Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
       )
       log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
       
-      let safeAllowance: Balance
-      try {
-        // update safe's HORP token allowance granted to Channels contract
-        log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
-        safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
-      } catch (error) {
-        safeAllowance = Balance.zero(BalanceType.HOPR)
-      }
+      // update safe's HORP token allowance granted to Channels contract
+      log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
+      const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
       await this.db.set_staking_safe_allowance(
         Ethereum_Balance.deserialize(safeAllowance.serialize_value(), Ethereum_BalanceType.HOPR),
         new Ethereum_Snapshot(new Ethereum_U256('0'), new Ethereum_U256('0'), new Ethereum_U256('0')) // dummy snapshot

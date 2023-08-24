@@ -868,7 +868,18 @@ export async function createChainWrapper(
         }
 
         log(` ${token.address} balance for account ${accountAddress.to_hex()} at block ${blockNumber} using the provider, due to error ${err}`)
-        throw Error(`Could not determine on-chain token balance`)
+        // generic error but here is good enough to handle the case where code hasn't been deployed at the block
+        const isHandledErr = [err?.code, String(err)].includes(errors.CALL_EXCEPTION)
+        if (isHandledErr) {
+          log(
+            'Cannot get token balance at block %d, due to call exception: %s',
+            blockNumber,
+            err
+          )
+          return new Balance("0", BalanceType.HOPR)
+        } else {
+          throw Error(`Could not determine on-chain token balance`)
+        }
       }
     }
 
@@ -921,9 +932,20 @@ export async function createChainWrapper(
           await setImmediatePromise()
           continue
         }
-
         log(`Could not determine current on-chain token ${token.address} allowance for owner ${ownerAddress.to_hex()} granted to spender ${channels.address} at block ${blockNumber} using the provider.`)
-        throw Error(`Could not determine on-chain token allowance`)
+        // generic error but here is good enough to handle the case where code hasn't been deployed at the block
+        const isHandledErr = [err?.code, String(err)].includes(errors.CALL_EXCEPTION)
+        if (isHandledErr) {
+          log(
+            'Cannot get token allowance at block %d, due to call exception: %s',
+            blockNumber,
+            err
+          )
+          return new Balance("0", BalanceType.HOPR)
+        } else {
+          throw Error(`Could not determine on-chain token allowance`)
+        }
+
       }
     }
 
