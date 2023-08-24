@@ -19,7 +19,9 @@ import {
   create_multi_counter,
   create_gauge,
   // create_multi_gauge,
-  random_integer
+  random_integer,
+  Balance,
+  BalanceType
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -159,6 +161,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     log('Latest saved block %d', latestSavedBlock)
     log('Latest on-chain block %d', latestOnChainBlock)
+    log('Genesis block %d', genesisBlock)
 
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     let fromBlock = latestSavedBlock
@@ -170,15 +173,27 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     // update the base valuse of balance and allowance of token for safe
     if (!this.lastSnapshot) {
-      // update safe's HOPR token balance
-      const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
+      let hoprBalance: Balance
+      try {
+        // update safe's HOPR token balance
+        log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
+        hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
+      } catch (error) {
+        hoprBalance = Balance.zero(BalanceType.HOPR)
+      }
       await this.db.set_hopr_balance(
         Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
       )
       log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
-
-      // update safe's HORP token allowance granted to Channels contract
-      const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
+      
+      let safeAllowance: Balance
+      try {
+        // update safe's HORP token allowance granted to Channels contract
+        log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
+        safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
+      } catch (error) {
+        safeAllowance = Balance.zero(BalanceType.HOPR)
+      }
       await this.db.set_staking_safe_allowance(
         Ethereum_Balance.deserialize(safeAllowance.serialize_value(), Ethereum_BalanceType.HOPR),
         new Ethereum_Snapshot(new Ethereum_U256('0'), new Ethereum_U256('0'), new Ethereum_U256('0')) // dummy snapshot

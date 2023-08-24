@@ -867,7 +867,7 @@ export async function createChainWrapper(
           continue
         }
 
-        log(`Could not determine current on-chain token balance using the provider.`)
+        log(` ${token.address} balance for account ${accountAddress.to_hex()} at block ${blockNumber} using the provider, due to error ${err}`)
         throw Error(`Could not determine on-chain token balance`)
       }
     }
@@ -922,7 +922,7 @@ export async function createChainWrapper(
           continue
         }
 
-        log(`Could not determine current on-chain token allowance using the provider.`)
+        log(`Could not determine current on-chain token ${token.address} allowance for owner ${ownerAddress.to_hex()} granted to spender ${channels.address} at block ${blockNumber} using the provider.`)
         throw Error(`Could not determine on-chain token allowance`)
       }
     }
