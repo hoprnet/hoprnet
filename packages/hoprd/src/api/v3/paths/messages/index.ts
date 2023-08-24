@@ -44,7 +44,6 @@ const POST: Operation = [
     }
 
     try {
-      console.log('SEND with tag: ' + tag)
       let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops, tag)
       log(`after sending message`)
       metric_successfulSendApiCalls.increment()

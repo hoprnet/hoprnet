@@ -78,7 +78,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub async fn get_peers_with_quality(network: &WasmNetwork, db: Database) -> PeerQuality {
+    pub async fn get_peers_with_quality(network: &WasmNetwork, db: &Database) -> PeerQuality {
         let peer_stream = futures::stream::iter(network.as_counted_ref().read().await.all_peers_with_quality().into_iter());
 
         PeerQuality::new(peer_stream

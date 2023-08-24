@@ -67,7 +67,8 @@ import {
   PingConfig,
   health_to_string,
   Snapshot,
-  ApplicationData
+  ApplicationData,
+  StrategyTickResult
 } from '../../core/lib/core_hopr.js'
 core_hopr_initialize_crate()
 registerMetricsCollector(core_hopr_gather_metrics)
@@ -85,7 +86,6 @@ import {
   SaneDefaults,
   Strategy,
   StrategyFactory,
-  StrategyTickResult
 } from './channel-strategy.js'
 
 import type { ResolvedNetwork } from './network.js'
@@ -594,9 +594,6 @@ export class Hopr extends EventEmitter {
     if (this.status != 'RUNNING') {
       throw new Error('node is not RUNNING')
     }
-
-    verbose('SKIP strategy tick, FIXME')
-    return
 
     let tickResult: StrategyTickResult
     try {
