@@ -2,6 +2,12 @@
 
 All relevant test files have been appropriately updated in alignment with the findings outlined below.
 
+Updated Git commit hash under audit is:
+
+```
+e6ac2da904672da5c932b3e95ba6cbc37934643d
+```
+
 ### Findings
 
 #### 5.1 HoprChannels ERC777 Reentrancy
@@ -24,7 +30,7 @@ All relevant test files have been appropriately updated in alignment with the fi
 
 - Modified calculation of `ticketIndex` to be based on `redeemable.data.ticketIndex` in `_redeemTicketInternal`.
 
-_Commit Hash:_ [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hoprnet/hoprnet/commit/2ca5c86d334950c0e40e06d5999f5996c5eccc37)
+**Commit Hash:** [2ca5c86d334950c0e40e06d5999f5996c5eccc37](https://github.com/hoprnet/hoprnet/commit/2ca5c86d334950c0e40e06d5999f5996c5eccc37)
 
 #### 5.3 EIP-712 Incompliant Signed Message
 
