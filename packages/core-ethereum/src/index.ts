@@ -251,7 +251,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   /**
-   * Retrieves HOPR balance, optionally uses the indexer.
+   * Retrieves HOPR balance of the node, optionally uses the indexer.
    * The difference from the two methods is that the latter relys on
    * the coming events which require 8 blocks to be confirmed.
    * @returns HOPR balance
@@ -267,18 +267,28 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   /**
+   * Retrieves HOPR balance of the safe.
+   * @returns HOPR balance
+   */
+  public async getSafeBalance(): Promise<Balance> {
+      return this.chain.getBalance(this.safeModuleOptions.safeAddress)
+  }
+
+  /**
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => {
-    return this.chain.getNativeBalance(this.chainKeypair.to_address())
+  private uncachedGetNativeBalance = (address: string) => {
+    return this.chain.getNativeBalance(Address.from_string(address))
   }
-  private cachedGetNativeBalance = cacheNoArgAsyncFunction<Balance>(
-    this.uncachedGetNativeBalance,
+
+  private cachedGetNativeBalance = (address: string) => cacheNoArgAsyncFunction<Balance>(
+    () => this.uncachedGetNativeBalance(address),
     constants.PROVIDER_CACHE_TTL
   )
-  public async getNativeBalance(useCache: boolean = false): Promise<Balance> {
-    return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
+
+  public async getNativeBalance(address: string, useCache: boolean = false): Promise<Balance> {
+    return useCache ? this.cachedGetNativeBalance(address) : this.uncachedGetNativeBalance(address)
   }
 
   public smartContractInfo(): {
