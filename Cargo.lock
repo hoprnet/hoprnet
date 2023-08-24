@@ -1150,6 +1150,7 @@ dependencies = [
  "futures-concurrency",
  "js-sys",
  "multiaddr",
+ "serde-wasm-bindgen",
  "thiserror",
  "utils-db",
  "utils-log",

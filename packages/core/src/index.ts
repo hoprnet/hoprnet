@@ -67,6 +67,7 @@ import {
   PingConfig,
   health_to_string,
   Snapshot,
+  ApplicationData
 } from '../../core/lib/core_hopr.js'
 core_hopr_initialize_crate()
 registerMetricsCollector(core_hopr_gather_metrics)
@@ -340,7 +341,7 @@ export class Hopr extends EventEmitter {
     )
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
-    const onReceivedMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
+    const onReceivedMessage = (msg: ApplicationData) => this.emit('hopr:message', msg)
 
     log('Linking chain and packet keys')
     this.db.link_chain_and_packet_keys(
@@ -355,12 +356,12 @@ export class Hopr extends EventEmitter {
       this.getLocalMultiaddresses().map((x) => x.toString())
     )
 
-    let tools = coreApp.tools()
+    this.tools = coreApp.tools()
     this.main_loop = coreApp.main_loop()
 
-    this.pinger = tools.ping()
-    this.index_updater = tools.index_updater()
-    this.networkPeers = tools.network()
+    this.pinger = this.tools.ping()
+    this.index_updater = this.tools.index_updater()
+    this.networkPeers = this.tools.network()
 
     connector.indexer.on('network-registry-eligibility-changed',
       async (address: Address, allowed: boolean) => {
@@ -739,9 +740,6 @@ export class Hopr extends EventEmitter {
       throw new Error('Cannot send message until the node is running')
     }
 
-    // TODO: Reimplement application tagging for the inbox
-    console.log("TODO: use application tagging, tag: " + JSON.stringify(applicationTag))
-
     if (msg.length > PACKET_SIZE) {
       metric_sentMessageFailCount.increment()
       throw Error(`Message does not fit into one packet. Please split message into chunks of ${PACKET_SIZE} bytes`)
@@ -775,13 +773,13 @@ export class Hopr extends EventEmitter {
         let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
         path = new Path(withDestination)
       } else {
-        log(``)
+        throw Error(`Failed to obtain chain key for peer id ${destination}`)
       }
     }
 
     metric_pathLength.observe(path.length())
 
-    return (await this.tools.send_message(msg, path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
+    return (await this.tools.send_message(new ApplicationData(applicationTag, msg), path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
   }
 
   /**

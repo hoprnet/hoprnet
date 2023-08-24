@@ -98,6 +98,7 @@ impl HoprTools {
     pub fn index_updater(&self) -> adaptors::indexer::WasmIndexerInteractions {
         self.indexer.clone()
     }
+
 }
 
 /// Enum differentiator for loop component futures.
@@ -221,12 +222,13 @@ pub mod wasm_impl {
     use core_crypto::{types::HalfKeyChallenge, keypairs::OffchainKeypair};
     use core_path::path::Path;
     use wasm_bindgen::prelude::*;
+    use core_packet::interaction::ApplicationData;
 
     #[wasm_bindgen]
     impl HoprTools {
         #[wasm_bindgen]
-        pub async fn send_message(&mut self, msg: &[u8], path: Path, timeout: u64) -> Result<HalfKeyChallenge, JsValue> {
-            match self.pkt_sender.send_packet(msg.into(), path) {
+        pub async fn send_message(&mut self, msg: ApplicationData, path: Path, timeout: u64) -> Result<HalfKeyChallenge, JsValue> {
+            match self.pkt_sender.send_packet(msg, path) {
                 Ok(mut awaiter) => {
                     awaiter.consume_and_wait(std::time::Duration::from_millis(timeout))
                         .await

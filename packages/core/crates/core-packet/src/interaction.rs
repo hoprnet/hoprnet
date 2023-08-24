@@ -789,7 +789,7 @@ pub struct PacketActions {
 /// Pushes the packet with the given payload for sending via the given valid path.
 impl PacketActions {
     /// Pushes a new packet from this node into processing.
-    pub fn send_packet(&mut self, msg: Box<[u8]>, path: Path) -> Result<PacketSendAwaiter> {
+    pub fn send_packet(&mut self, msg: ApplicationData, path: Path) -> Result<PacketSendAwaiter> {
         // Check if the path is valid
         if !path.valid() {
             return Err(PathError(PathNotValid));
@@ -797,7 +797,7 @@ impl PacketActions {
 
         let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
 
-        self.process(MsgToProcess::ToSend(msg, path, PacketSendFinalizer::new(tx)))
+        self.process(MsgToProcess::ToSend(msg.to_bytes(), path, PacketSendFinalizer::new(tx)))
             .map(move |_| {
                 let awaiter: PacketSendAwaiter = rx.into();
                 awaiter
@@ -869,7 +869,7 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, mixer: Mixer, ack_interaction: AcknowledgementActions, on_final_packet: Option<Sender<Box<[u8]>>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, mixer: Mixer, ack_interaction: AcknowledgementActions, on_final_packet: Option<Sender<ApplicationData>>, cfg: PacketInteractionConfig) -> Self {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         
@@ -902,8 +902,13 @@ impl PacketInteraction {
                                             match packet.state() {
                                                 PacketState::Final { plain_text, previous_hop, .. } => {
                                                     if let Some(emitter) = &mut on_final_packet {
-                                                        if let Err(e) = emitter.try_send(plain_text.clone()) {
-                                                            error!("failed to emit received final packet: {e}");
+                                                        match ApplicationData::from_bytes(&plain_text) {
+                                                            Ok(app_data) => {
+                                                                if let Err(e) = emitter.try_send(app_data) {
+                                                                    error!("failed to emit received final packet: {e}");
+                                                                }
+                                                            }
+                                                            Err(e) => error!("failed to reconstruct application data from final packet: {e}")
                                                         }
                                                     }
         
@@ -1056,9 +1061,7 @@ mod wasm {
 
 #[cfg(test)]
 mod tests {
-    use crate::interaction::{
-        AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, PRICE_PER_PACKET, AckProcessed, MsgProcessed,
-    };
+    use crate::interaction::{AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, PRICE_PER_PACKET, AckProcessed, MsgProcessed, ApplicationData};
     use crate::por::ProofOfRelayValues;
     use async_std::sync::RwLock;
     use core_crypto::derivation::derive_ack_key_share;
@@ -1068,6 +1071,7 @@ mod tests {
     use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, AcknowledgedTicket};
     use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use core_crypto::shared_keys::SharedSecret;
+    use core_crypto::random::random_bytes;
     use core_path::path::Path;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::channel::mpsc::{UnboundedSender, Sender};
@@ -1084,7 +1088,7 @@ mod tests {
     use utils_db::leveldb::rusty::RustyLevelDbShim;
     use utils_log::debug;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
-    use utils_types::traits::{PeerIdLike, ToHex};
+    use utils_types::traits::{PeerIdLike, ToHex, BinarySerializable};
 
     use super::{PacketSendFinalizer, PacketSendAwaiter};
 
@@ -1125,8 +1129,6 @@ mod tests {
         hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92"),
         hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc"),
     ];
-
-    const TEST_MESSAGE: [u8; 8] = hex!["deadbeefcafebabe"];
 
     lazy_static! {
         static ref PEERS: Vec<PeerId> = PEERS_PRIVS
@@ -1331,7 +1333,7 @@ mod tests {
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
 
-    async fn peer_setup_for(count: usize, ack_tx: UnboundedSender<AcknowledgedTicket>, pkt_tx: Sender<Box<[u8]>>) -> Vec<(AcknowledgementInteraction, PacketInteraction)> {
+    async fn peer_setup_for(count: usize, ack_tx: UnboundedSender<AcknowledgedTicket>, pkt_tx: Sender<ApplicationData>) -> Vec<(AcknowledgementInteraction, PacketInteraction)> {
         let peer_count = count;
         
         assert!(peer_count <= PEERS.len());
@@ -1380,7 +1382,7 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    async fn emulate_channel_communication(pending_packet_count: usize, mut components: Vec<(AcknowledgementInteraction, PacketInteraction)>) {
+    async fn emulate_channel_communication(pending_packet_count: usize, mut components: Vec<(AcknowledgementInteraction, PacketInteraction)>, expected_msg: ApplicationData) {
         let component_length = components.len();
 
         for _ in 0..pending_packet_count {
@@ -1412,8 +1414,9 @@ mod tests {
                         components[i+1].1.writer().receive_packet(data, PEERS[i]).expect("Send of ack from relayer to receiver should succeed")
                     },
                     MsgProcessed::Receive(_peer, packet) => {
+                        let recv_app_data = ApplicationData::from_bytes(&packet).expect("could not deserialize app data");
                         assert_eq!(i, component_length - 1, "Only the last peer can be a recepient");
-                        assert_eq!(TEST_MESSAGE, packet.as_ref(), "received packet payload must match");
+                        assert_eq!(expected_msg, recv_app_data, "received packet payload must match");
                     }
                     _ => panic!("Should have gotten a send request or a final packet")
                 }
@@ -1426,11 +1429,16 @@ mod tests {
     async fn test_packet_relayer_workflow_3_peers() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let (pkt_tx, mut pkt_rx) = futures::channel::mpsc::channel::<Box<[u8]>>(100);
+        let (pkt_tx, mut pkt_rx) = futures::channel::mpsc::channel::<ApplicationData>(100);
         let (ack_tx, mut ack_rx) = futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
 
         const PENDING_PACKETS: usize = 5;
         const TIMEOUT_SECONDS: u64 = 20;
+
+        let test_msg = ApplicationData {
+            application_tag: Some(10),
+            plain_text: random_bytes::<300>().into()
+        };
 
         let peer_count = 3;
         let components = peer_setup_for(peer_count, ack_tx, pkt_tx).await;
@@ -1443,11 +1451,11 @@ mod tests {
             components[0]
                 .1
                 .writer()
-                .send_packet(Box::from(TEST_MESSAGE), packet_path.clone())
+                .send_packet(test_msg.clone(), packet_path.clone())
                 .expect("Packet should be sent successfully");
         }
 
-        let channel = emulate_channel_communication(PENDING_PACKETS, components);
+        let channel = emulate_channel_communication(PENDING_PACKETS, components, test_msg.clone());
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
         pin_mut!(channel, timeout);
 
@@ -1466,7 +1474,7 @@ mod tests {
                     }
                     Either::Right((pkt, _)) => {
                         let msg = pkt.unwrap();
-                        assert_eq!(TEST_MESSAGE, msg.as_ref(), "received packet payload must match");
+                        assert_eq!(test_msg, msg, "received packet payload must match");
                         pkts += 1;
                     }
                 }
@@ -1494,11 +1502,16 @@ mod tests {
     async fn test_packet_relayer_workflow_5_peers() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let (pkt_tx, mut pkt_rx) = futures::channel::mpsc::channel::<Box<[u8]>>(100);
+        let (pkt_tx, mut pkt_rx) = futures::channel::mpsc::channel::<ApplicationData>(100);
         let (ack_tx, mut ack_rx) = futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
 
         const PENDING_PACKETS: usize = 5;
         const TIMEOUT_SECONDS: u64 = 20;
+
+        let test_msg = ApplicationData {
+            application_tag: Some(10),
+            plain_text: random_bytes::<300>().into()
+        };
 
         let peer_count = 5;
         let components = peer_setup_for(peer_count, ack_tx, pkt_tx).await;
@@ -1511,11 +1524,11 @@ mod tests {
             components[0]
                 .1
                 .writer()
-                .send_packet(Box::from(TEST_MESSAGE), packet_path.clone())
+                .send_packet(test_msg.clone(), packet_path.clone())
                 .expect("Packet should be sent successfully");
         }
 
-        let channel = emulate_channel_communication(PENDING_PACKETS, components);
+        let channel = emulate_channel_communication(PENDING_PACKETS, components, test_msg.clone());
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
         pin_mut!(channel, timeout);
 
@@ -1534,7 +1547,7 @@ mod tests {
                     }
                     Either::Right((pkt, _)) => {
                         let msg = pkt.unwrap();
-                        assert_eq!(TEST_MESSAGE, msg.as_ref(), "received packet payload must match");
+                        assert_eq!(test_msg, msg, "received packet payload must match");
                         pkts += 1;
                     }
                 }

@@ -14,7 +14,7 @@ pub use core_p2p::{libp2p_identity, api};
 use core_p2p::{
     HoprNetworkBehaviorEvent,
     Ping, Pong,
-    libp2p_request_response, libp2p_swarm::{SwarmEvent, derive_prelude::Multiaddr, handler::multi}
+    libp2p_request_response, libp2p_swarm::SwarmEvent
 };
 use utils_log::{debug, info, error};
 

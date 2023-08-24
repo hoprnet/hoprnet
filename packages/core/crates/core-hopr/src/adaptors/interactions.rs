@@ -16,6 +16,7 @@ pub mod wasm {
     use futures::Stream;
     use utils_log::debug;
     use wasm_bindgen::prelude::*;
+    use core_packet::interaction::ApplicationData;
 
     /// Helper loop ensuring conversion and enqueueing of events on acknowledgement
     pub fn spawn_ack_receiver_loop(on_ack: Option<js_sys::Function>) -> Option<UnboundedSender<HalfKeyChallenge>> {
@@ -62,18 +63,21 @@ pub mod wasm {
     const ON_PACKET_QUEUE_SIZE: usize = 4096;
 
     /// Helper loop ensuring conversion and enqueueing of events on receiving the final packet
-    pub fn spawn_on_final_packet_loop(on_final_packet: Option<js_sys::Function>) -> Option<Sender<Box<[u8]>>>  {
+    pub fn spawn_on_final_packet_loop(on_final_packet: Option<js_sys::Function>) -> Option<Sender<ApplicationData>>  {
         match on_final_packet {
             Some(on_msg_rcv) => {
-                let (tx, mut rx) = channel::<Box<[u8]>>(ON_PACKET_QUEUE_SIZE);
+                let (tx, mut rx) = channel::<ApplicationData>(ON_PACKET_QUEUE_SIZE);
 
                 wasm_bindgen_futures::spawn_local(async move {
                     while let Some(packet) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
                         debug!("wasm packet interaction loop received a new packet");
 
-                        let param: JsValue = js_sys::Uint8Array::from(packet.as_ref()).into();
-                        if let Err(e) = on_msg_rcv.call1(&JsValue::null(), &param) {
-                            error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
+                        if let Ok(param) = serde_wasm_bindgen::to_value(&packet) {
+                            if let Err(e) = on_msg_rcv.call1(&JsValue::null(), &param) {
+                                error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
+                            }
+                        } else {
+                            error!("failed to serialize application data to JsValue");
                         }
                     }
                 });
