@@ -99,17 +99,17 @@ $(WORKSPACES_WITH_RUST_MODULES): ## builds all WebAssembly modules
 
 .PHONY: deps-ci
 deps-ci: ## Installs dependencies when running in CI
-deps-ci: build-solidity-types
+# install foundry (cast + forge + anvil)
+	$(MAKE) install-foundry
+	$(MAKE) build-solidity-types
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
 	CI=true yarn workspaces focus ${YARNFLAGS}
-# install foundry (cast + forge + anvil)
-	$(MAKE) install-foundry
 
 .PHONY: deps-docker
 deps-docker: ## Installs dependencies when building Docker images
-deps-docker: build-solidity-types
 # Toolchain dependencies are already installed using scripts/install-toolchain.sh script
+	$(MAKE) build-solidity-types
 ifeq ($(origin PRODUCTION),undefined)
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	$(MAKE) cargo-update
@@ -118,19 +118,19 @@ endif
 
 .PHONY: deps
 deps: ## Installs dependencies for local setup
-deps: build-solidity-types
 	if [[ ! "${name}" =~ nix-shell* ]]; then \
 		corepack enable; \
 		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
 	fi
+# install foundry (cast + forge + anvil)
+	$(MAKE) install-foundry
+	$(MAKE) build-solidity-types
 # we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
 	mkdir -p .cargo/bin
 	$(MAKE) cargo-update
 	command -v wasm-opt || $(cargo) install wasm-opt
 	command -v wasm-pack || $(cargo) install wasm-pack
 	yarn workspaces focus ${YARNFLAGS}
-# install foundry (cast + forge + anvil)
-	$(MAKE) install-foundry
 
 .PHONY: install-foundry
 install-foundry: ## install foundry
