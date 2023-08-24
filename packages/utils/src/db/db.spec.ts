@@ -9,9 +9,9 @@ import {
   PublicKey,
   Address,
   Database,
-  Response,
   ChainKeypair,
-  core_ethereum_db_initialize_crate
+  core_ethereum_db_initialize_crate,
+  EthereumChallenge
 } from '../../../core-ethereum/lib/core_ethereum_db.js'
 core_ethereum_db_initialize_crate()
 
@@ -37,15 +37,18 @@ import fs from 'fs'
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
   let chainKp = new ChainKeypair(signerPrivKey)
-  let tkt = Ticket.new(
+  let tkt = new Ticket(
+    chainKp.public().to_address(),
     counterparty,
+    new EthereumChallenge(new Uint8Array(20)),
     U256.zero(),
-    balance,
-    U256.from_inverse_probability(U256.one()),
     U256.one(),
-    chainKp
+    balance,
+    1.0,
+    U256.one(),
+    chainKp,
+    new Hash(new Uint8Array(32))
   )
-  tkt.set_challenge(new Response(Uint8Array.from(randomBytes(32))).to_challenge().to_ethereum_challenge(), chainKp)
   return tkt
 }
 
