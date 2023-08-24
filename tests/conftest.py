@@ -113,16 +113,19 @@ def check_socket(address, port):
 
 @pytest.fixture(scope="module")
 def setup_7_nodes(request):
-    log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}.log"
+    log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}-setup.log"
     try:
         logging.info("Creating a 7 node cluster from source")
-        subprocess.run(
+        res = subprocess.run(
             f"./scripts/fixture_local_test_setup.sh --skip-cleanup 2>&1 | tee {log_file_path}",
             shell=True,
             capture_output=True,
             check=True,
         )
+        res.check_returncode()
         yield NODES
+    except Exception:
+        logging.info("Creating a 7 node cluster from source - FAILED")
     finally:
         logging.info("Tearing down the 7 node cluster from source")
         subprocess.run(

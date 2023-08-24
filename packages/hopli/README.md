@@ -126,6 +126,7 @@ PRIVATE_KEY=<bank_private_key> \
 hopli create-safe-module --network anvil-localhost \
     --identity-directory "./test" \
     --password-path "/test/.pwd" \
+    --hopr-amount 10 --native-amount 0.1 \
     --contracts-root "../ethereum/contracts"
 ```
 
@@ -224,6 +225,7 @@ PRIVATE_KEY=<bank_private_key> \
     cargo run -- create-safe-module --network anvil-localhost \
     --identity-directory "./test" \
     --password-path "/test/.pwd" \
+    --hopr-amount 10 --native-amount 0.1 \
     --contracts-root "../ethereum/contracts"
 ```
 

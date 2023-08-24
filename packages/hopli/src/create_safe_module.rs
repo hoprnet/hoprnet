@@ -9,6 +9,11 @@ use clap::Parser;
 use log::{log, Level};
 use std::env;
 use core_crypto::keypairs::Keypair;
+use ethers::{
+    types::U256,
+    utils::parse_units, //, types::U256, utils::format_units, ParseUnits
+};
+
 
 /// CLI arguments for `hopli create-safe-module`
 #[derive(Parser, Default, Debug)]
@@ -29,6 +34,24 @@ pub struct CreateSafeModuleArgs {
         default_value = None
     )]
     contracts_root: Option<String>,
+
+    #[clap(
+        help = "Hopr amount in ether, e.g. 10",
+        long,
+        short = 't',
+        value_parser = clap::value_parser!(f64),
+        default_value_t = 2000.0
+    )]
+    hopr_amount: f64,
+
+    #[clap(
+        help = "Native token amount in ether, e.g. 1",
+        long,
+        short = 'n',
+        value_parser = clap::value_parser!(f64),
+        default_value_t = 10.0
+    )]
+    native_amount: f64,
 }
 
 impl CreateSafeModuleArgs {
@@ -41,6 +64,8 @@ impl CreateSafeModuleArgs {
             local_identity,
             password,
             contracts_root,
+            hopr_amount,
+            native_amount,
         } = self;
 
         // 1. `PRIVATE_KEY` - Private key is required to send on-chain transactions
@@ -78,11 +103,19 @@ impl CreateSafeModuleArgs {
             return Err(e);
         }
 
+        // convert hopr_amount and native_amount from f64 to uint256 string
+        let hopr_amount_uint256 = parse_units(hopr_amount, "ether").unwrap();
+        let hopr_amount_uint256_string = U256::from(hopr_amount_uint256).to_string();
+        let native_amount_uint256 = parse_units(native_amount, "ether").unwrap();
+        let native_amount_uint256_string = U256::from(native_amount_uint256).to_string();
+
         log!(target: "create_safe_module", Level::Debug, "Calling foundry...");
         // iterate and collect execution result. If error occurs, the entire operation failes.
         child_process_call_foundry_express_setup_safe_module(
             &network,
             &format!("[{}]", &&all_node_addresses.join(",")),
+            &hopr_amount_uint256_string,
+            &native_amount_uint256_string,
         )
     }
 }
