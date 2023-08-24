@@ -1,5 +1,6 @@
 const Socket = require('node:net').Socket;
 const createServer = require('node:net').createServer;
+const log = require('console').log
 
 module.exports.tcp_transport = () => {
     return {
@@ -36,7 +37,9 @@ const tcp_host_family_port_to_multiaddr = (host, port, family) => {
 }
 
 /// Create a connection object.
-let to_connection = (socket, reader) => {
+let to_connection = (socket, reader, type) => {
+    log('====++> Creating connection (' +  type + ') for ' + socket.remoteAddress + ':' + socket.remotePort + ' using the protocol v' + socket.remoteFamily)
+
     return {
         read: (function* () { while (socket.readyState == 'open') { yield reader.next(); } })(),
         write: (data) => {
@@ -65,8 +68,14 @@ let to_connection = (socket, reader) => {
                 return Promise.reject("Socket is closed");
             }
         },
-        shutdown: () => socket.destroy(),
-        close: () => socket.end()
+        shutdown: () => {
+            log('====> Shutdown (' +  type + ') on the socket ' + socket.remoteAddress + ':' + socket.remotePort)
+            socket.destroy()
+        },
+        close: () => {
+            log('====> Close (' +  type + ') on the socket ' + socket.remoteAddress + ':' + socket.remotePort)
+            socket.end()
+        }
     }
 }
 
@@ -100,7 +109,8 @@ const dial = (addr) => {
         })
 
         socket.on('data', (ev) => reader.inject_array_buffer(ev));
-        socket.connect(target, () => resolve(to_connection(socket, reader)))
+        log('====++> Connecting to ' + target.host + ':' + target.port)
+        socket.connect(target, () => resolve(to_connection(socket, reader, 'client')))
     });
 }
 
@@ -135,6 +145,8 @@ const listen_on = (addr) => {
     const connection_event = (socket) => {
         let reader = read_queue();
 
+        log('====++> got incoming connection from ' + socket.remoteAddress + ':' + socket.remotePort + ' using the protocol v' + socket.remoteFamily)
+
         socket.on('error', (ev) => {
             reader.inject_eof();
             socket.destroy();
@@ -149,14 +161,14 @@ const listen_on = (addr) => {
         socket.on('data', (ev) => reader.inject_array_buffer(ev));
 
         return {
-            connection: to_connection(socket, reader),
+            connection: to_connection(socket, reader, 'server'),
             observed_addr: tcp_host_family_port_to_multiaddr(socket.remoteAddress, socket.remotePort, socket.remoteFamily),
             local_addr: addr
         }
     }
 
     // initiate the socket
-    const port = multiaddr_to_tcp_host_and_port(addr).port
+    const me = multiaddr_to_tcp_host_and_port(addr)
     let server = createServer()
     server.on('listening', () => {
         push_event(listen_event([addr], undefined, undefined))
@@ -164,15 +176,19 @@ const listen_on = (addr) => {
     server.on('connection', (socket) => {
         push_event(listen_event(undefined, undefined, [connection_event(socket)]))
     })
-    server.on('error', (e) => { server.destroy(); })
+    server.on('error', (e) => { 
+        log('====> Server error (destroying)' + e)
+        server.destroy(); })
     server.on('close', () => {
+        log('====> Server close socket ')
         push_event(listen_event(undefined, [addr], undefined))
     })
     server.on('drop', (data) => {
-        console.error("Connection dropped due to incoming connection limit")
+        log("Connection dropped due to incoming connection limit")
     })
 
-    server.listen(port)
+    log('====++> Starting server at (listening only on port)' + me.host + ':' + me.port)
+    server.listen(me.port)
 
     const iterator = {
         next() {

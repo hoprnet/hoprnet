@@ -211,7 +211,14 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                         }
 
                         // TODO: awaiting in this loop is a malpractice, but this behavior will be handled by STUN later
-                        network.write().await.store_peer_multiaddresses(&peer, multiaddresses)
+                        {
+                            let mut net = network.write().await;
+                            net.store_peer_multiaddresses(&peer, multiaddresses);
+                            if &peer != swarm.local_peer_id() {
+                                net.add(&peer, PeerOrigin::Initialization)
+                            }
+                        }
+
                     }
                 }
             },
@@ -347,8 +354,11 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                         }
                     }
                 },
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::InboundFailure {..}))
-                | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::ResponseSent {..})) => {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::InboundFailure {
+                    peer, request_id, error})) => {
+                    debug!("Heartbeat protocol: Encountered inbound failure for peer {} (#{}): {}", peer, request_id, error)
+                }
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::ResponseSent {..})) => {
                     // debug!("Discarded messages not relevant for the protocol!");
                 },
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {
@@ -374,12 +384,14 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                 },
                 SwarmEvent::ConnectionClosed {
                     peer_id,
+                    cause,
                     ..
                     // connection_id,
                     // endpoint,
                     // num_established,
-                    // cause,
-                } => {debug!("Connection closed for peer {:?}", peer_id)},
+                } => {
+                    debug!("Connection closed for peer {:?}: {:?}", peer_id, cause)
+                },
                 SwarmEvent::IncomingConnection {
                     connection_id,
                     local_addr,
@@ -393,7 +405,9 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                     // connection_id,
                     // send_back_addr,
                     // error,
-                } => {debug!("Incoming connection error on {:?}", local_addr)},
+                } => {
+                    debug!("Incoming connection error on {:?}", local_addr)
+                },
                 SwarmEvent::OutgoingConnectionError {
                     connection_id,
                     error,
@@ -426,11 +440,15 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                 SwarmEvent::ListenerError {
                     listener_id,
                     error,
-                } => {debug!("Listener error for the id {:?}: {}", listener_id, error)},
+                } => {
+                    debug!("Listener error for the id {:?}: {}", listener_id, error)
+                },
                 SwarmEvent::Dialing {
                     peer_id,
                     connection_id,
-                } => {debug!("Dialing peer {:?}, connection id: {:?}", peer_id, connection_id)},
+                } => {
+                    debug!("Dialing peer {:?}, connection id: {:?}", peer_id, connection_id)
+                },
             }
         }
     };

@@ -607,6 +607,7 @@ impl AsyncWrite for Connection {
 
     fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         // Shutting down is considered instantaneous.
+        panic!("!!!!!!! ==========++> Got yoo, closer!");
         match self.inner.shutdown() {
             Ok(()) => Poll::Ready(Ok(())),
             Err(err) => Poll::Ready(Err(io::Error::from(JsErr::from(err)))),

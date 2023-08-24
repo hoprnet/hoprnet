@@ -147,7 +147,7 @@ pub fn build_components(me: libp2p_identity::Keypair,
     let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkEvent>(MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
 
     let network = Arc::new(RwLock::new(Network::new(
-        PeerId::from(identity.public()),
+        identity.public().to_peer_id(),
         network_quality_threshold,
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone())
     )));

@@ -514,8 +514,8 @@ export class Hopr extends EventEmitter {
       addrsToAdd.push(addr.decapsulateCode(CODE_P2P))
     }
 
-    log(`Announcing peer '${peer.id.toString()} with multiaddresses: ${addrsToAdd}'`)
-    this.index_updater.announce(peer.id.toString(), addrsToAdd)
+    log(`Registering announced peer '${peer.id.toString()} with multiaddresses: ${addrsToAdd}'`)
+    this.index_updater.announce(peer.id.toString(), addrsToAdd.map((ma) => ma.toString()))
   }
 
   private async strategyOpenChannel(status: OutgoingChannelStatus) {
@@ -920,7 +920,7 @@ export class Hopr extends EventEmitter {
     const connector = HoprCoreEthereum.getInstance()
 
     if (announceRoutableAddress) {
-      let multiaddrs = await this.getAddressesAnnouncedToDHT()
+      let multiaddrs = this.getLocalMultiaddresses()
 
       if (this.options.testing?.announceLocalAddresses) {
         multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))
