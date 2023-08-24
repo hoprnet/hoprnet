@@ -13,13 +13,13 @@ use bindings::{
     },
     hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::{DergisteredNodeSafeFilter, HoprNodeSafeRegistryEvents, RegisteredNodeSafeFilter},
-    hopr_token::{ApprovalFilter, HoprTokenEvents, TransferFilter},
+    hopr_token::{AllowanceCall, ApprovalFilter, HoprTokenEvents, TransferFilter},
 };
 use core_crypto::types::{Hash, OffchainSignature};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     account::{AccountEntry, AccountSignature, AccountType},
-    channels::{generate_channel_id, ChannelEntry, ChannelStatus},
+    channels::{self, generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{
     contract::{EthEvent, EthLogDecode},
@@ -353,22 +353,40 @@ where
     where
         T: HoprCoreEthereumDbActions,
     {
-        if let HoprTokenEvents::TransferFilter(transfered) = HoprTokenEvents::decode_log(log)? {
-            let from: Address = transfered.from.0.try_into()?;
-            let to: Address = transfered.to.0.try_into()?;
+        match HoprTokenEvents::decode_log(log)? {
+            HoprTokenEvents::TransferFilter(transfered) => {
+                let from: Address = transfered.from.0.try_into()?;
+                let to: Address = transfered.to.0.try_into()?;
 
-            let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
+                let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
 
-            if to.ne(&self.address_to_monitor) && from.ne(&self.address_to_monitor) {
-                return Ok(());
-            } else if to.eq(&self.address_to_monitor) {
-                db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
-                    .await?;
-            } else if from.eq(&self.address_to_monitor) {
-                db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
-                    .await?;
+                if to.ne(&self.address_to_monitor) && from.ne(&self.address_to_monitor) {
+                    return Ok(());
+                } else if to.eq(&self.address_to_monitor) {
+                    db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
+                        .await?;
+                } else if from.eq(&self.address_to_monitor) {
+                    db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
+                        .await?;
+                }
+            }
+            HoprTokenEvents::ApprovalFilter(approved) => {
+                let owner: Address = approved.owner.0.try_into()?;
+                let spender: Address = approved.spender.0.try_into()?;
+
+                let allowance: U256 = u256::from_be_bytes(approved.value.into()).into();
+                if owner.eq(&self.address_to_monitor) && spender.eq(&self.addresses.channels) {
+                    db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)
+                        .await?;
+                } else {
+                    return Ok(());
+                }
+            }
+            _ => {
+                todo!("Implement all the other filters for HoprTokenEvents");
             }
         }
+
         Ok(())
     }
 

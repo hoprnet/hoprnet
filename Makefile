@@ -407,11 +407,14 @@ create-safe-module-all: ## create a safe and a module and add all the nodes from
 .PHONY: create-safe-module
 create-safe-module: id_password=local
 create-safe-module: id_path=/tmp/local-alice.id
+create-safe-module: hopr_amount=10
+create-safe-module: native_amount=1
 create-safe-module: ## create a safe and a module, and add a node to the module
 	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli create-safe-module \
 		--network anvil-localhost \
 		--identity-from-path "${id_path}" \
+		--hopr-amount ${hopr_amount} --native-amount ${native_amount} \
 		--contracts-root "./packages/ethereum/contracts"
 
 .PHONY: deploy-safe-module
