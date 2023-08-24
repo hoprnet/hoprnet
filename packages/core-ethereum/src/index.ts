@@ -542,7 +542,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Channel is already opened')
     }
 
-    const myBalance = await this.getBalance()
+    const myBalance = await this.getSafeBalance()
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
@@ -563,7 +563,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public async fundChannel(dest: Address, myFund: Balance, counterpartyFund: Balance): Promise<Receipt> {
     const totalFund = myFund.add(counterpartyFund)
-    const myBalance = await this.getBalance()
+    const myBalance = await this.getSafeBalance()
     if (totalFund.gt(myBalance)) {
       throw Error('We do not have enough balance to fund the channel')
     }

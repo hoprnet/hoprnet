@@ -250,7 +250,6 @@ class Hopr extends EventEmitter {
   private acknowledgements: WasmAckInteraction
   private libp2pComponents: Components
   private stopLibp2p: Libp2p['stop']
-  private pubKey: PublicKey
   private id: PeerId
   private knownPublicNodesCache = new Set()
 
@@ -313,7 +312,7 @@ class Hopr extends EventEmitter {
 
     const connector = HoprCoreEthereum.getInstance()
 
-    const balance = await connector.getNativeBalance(false)
+    const balance = await connector.getNativeBalance(this.getEthereumAddress().to_string())
 
     verbose(
       `Ethereum account ${this.getEthereumAddress().to_hex()} has ${balance.to_formatted_string()}. Mininum balance is ${new Balance(
@@ -844,7 +843,7 @@ class Hopr extends EventEmitter {
 
       // Perform the strategy tick
       tickResult = this.strategy.tick(
-        new BN((await this.getBalance()).to_string()),
+        new BN((await this.getSafeBalance()).to_string()),
         this.networkPeers.all().values(),
         outgoingChannels.map((c) => {
           return {
@@ -1329,7 +1328,7 @@ class Hopr extends EventEmitter {
       throw Error('Cannot open channel to self!')
     }
 
-    const myAvailableTokens = await HoprCoreEthereum.getInstance().getBalance(true)
+    const myAvailableTokens = await HoprCoreEthereum.getInstance().getSafeBalance()
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
@@ -1338,7 +1337,7 @@ class Hopr extends EventEmitter {
       throw Error(
         `You don't have enough tokens: ${amountToFund.toString(
           10
-        )}<${myAvailableTokens.to_string()} at address ${this.pubKey.to_address().to_hex()}`
+        )}<${myAvailableTokens.to_string()} at safe address ${this.smartContractInfo().safeAddress}`
       )
     }
 
@@ -1362,7 +1361,7 @@ class Hopr extends EventEmitter {
    */
   public async fundChannel(counterparty: Address, myFund: BN, counterpartyFund: BN): Promise<string> {
     const connector = HoprCoreEthereum.getInstance()
-    const myBalance = await connector.getBalance(false)
+    const myBalance = await connector.getSafeBalance()
     const totalFund = myFund.add(counterpartyFund)
 
     // validate 'amountToFund'
@@ -1370,10 +1369,7 @@ class Hopr extends EventEmitter {
       throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
     } else if (totalFund.gt(new BN(myBalance.to_string()))) {
       throw Error(
-        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.to_string()} at address ${this.pubKey
-          .to_address()
-          .to_hex()}`
-      )
+        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.to_string()} at safe address ${this.smartContractInfo().safeAddress}`)
     }
 
     try {
@@ -1663,7 +1659,7 @@ class Hopr extends EventEmitter {
             try {
               // call connector directly and don't use cache, since this is
               // most likely outdated during node startup
-              const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(false)
+              const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(this.getEthereumAddress().to_string())
               if (nativeBalance.gte(nativeBalance.of_same(MIN_NATIVE_BALANCE.toString(10)))) {
                 resolve()
               } else {
