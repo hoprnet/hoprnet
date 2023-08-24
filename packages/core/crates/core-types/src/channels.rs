@@ -467,7 +467,7 @@ impl Ticket {
 
     /// Signs the ticket using the given private key.
     pub fn sign(&mut self, signing_key: &ChainKeypair, domain_separator: &Hash) {
-        self.signature = Some(Signature::sign_message(
+        self.signature = Some(Signature::sign_hash(
             &self.get_hash(domain_separator).to_bytes(),
             signing_key,
         ));

@@ -5,13 +5,13 @@ use curve25519_dalek::{
 };
 use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
 use k256::{
-    ecdsa,
     ecdsa::{
+        self,
         signature::{hazmat::PrehashVerifier, Verifier},
         RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
     },
-    elliptic_curve,
     elliptic_curve::{
+        self,
         generic_array::GenericArray,
         sec1::{FromEncodedPoint, ToEncodedPoint},
         CurveArithmetic,
@@ -27,21 +27,20 @@ use std::{
     str::FromStr,
 };
 
-use utils_log::warn;
-use utils_types::errors::GeneralError;
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::{Address, EthereumChallenge};
-use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
-
 use crate::{
     errors::{
-        CryptoError,
-        CryptoError::{CalculationError, InvalidInputValue},
+        CryptoError::{self, CalculationError, InvalidInputValue},
         Result,
     },
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     primitives::{DigestLike, EthDigest},
     random::random_group_element,
+};
+use utils_log::warn;
+use utils_types::{
+    errors::GeneralError::{self, ParseError},
+    primitives::{Address, EthereumChallenge, U256},
+    traits::{BinarySerializable, PeerIdLike, ToHex},
 };
 
 /// Extend support for arbitrary array sizes in serde
@@ -105,7 +104,7 @@ mod arrays {
 }
 
 /// Represent an uncompressed elliptic curve point on the secp256k1 curve
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct CurvePoint {
     affine: AffinePoint,
@@ -118,6 +117,12 @@ impl CurvePoint {
         let serialized = self.to_bytes();
         let hash = Hash::create(&[&serialized[1..]]).to_bytes();
         Address::new(&hash[12..])
+    }
+}
+
+impl Default for CurvePoint {
+    fn default() -> Self {
+        CurvePoint::from_exponent(&U256::one().to_bytes()).unwrap()
     }
 }
 
@@ -815,6 +820,7 @@ impl CompressedPublicKey {
 ///
 /// The VRF is thereby needed because it generates on-demand determinitstic
 /// entropy that can only be derived by the ticket redeemer.
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub v: CurvePoint,

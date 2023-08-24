@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use core_crypto::errors::CryptoError;
+
 #[derive(Error, Debug)]
 pub enum CoreTypesError {
     #[error("{0}")]
@@ -9,7 +11,16 @@ pub enum CoreTypesError {
     ParseError(String),
 
     #[error("Arithmetic error: {0}")]
-    ArithmeticError(String)
+    ArithmeticError(String),
+
+    #[error("Ticket seems to be destined for a different node")]
+    InvalidTicketRecipient,
+
+    #[error(transparent)]
+    CryptoError(#[from] CryptoError),
+
+    #[error("Cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
+    LoopbackTicket,
 }
 
 pub type Result<T> = core::result::Result<T, CoreTypesError>;

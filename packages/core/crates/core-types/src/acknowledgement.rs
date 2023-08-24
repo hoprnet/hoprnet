@@ -1,15 +1,23 @@
 use crate::{
     acknowledgement::PendingAcknowledgement::{WaitingAsRelayer, WaitingAsSender},
-    channels::Ticket,
+    channels::{generate_channel_id, Ticket},
+    errors::{
+        CoreTypesError::{InvalidInputData, InvalidTicketRecipient, LoopbackTicket},
+        Result as CoreTypesResult,
+    },
 };
-use core_crypto::errors::CryptoError::{InvalidChallenge, SignatureVerification};
-use core_crypto::keypairs::OffchainKeypair;
-use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response};
+use core_crypto::{
+    derivation::derive_vrf_parameters,
+    errors::CryptoError::{InvalidChallenge, SignatureVerification},
+    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
+};
 use serde::{Deserialize, Serialize};
-use utils_types::errors;
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::Address;
-use utils_types::traits::BinarySerializable;
+use utils_types::{
+    errors::{GeneralError::ParseError, Result},
+    primitives::Address,
+    traits::BinarySerializable,
+};
 
 /// Represents packet acknowledgement
 #[derive(Clone, Debug, PartialEq)]
@@ -51,7 +59,7 @@ impl Acknowledgement {
 impl BinarySerializable for Acknowledgement {
     const SIZE: usize = OffchainSignature::SIZE + HalfKey::SIZE;
 
-    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> Result<Self> {
         let mut buf = data.to_vec();
         if data.len() == Self::SIZE {
             let ack_signature = OffchainSignature::from_bytes(buf.drain(..OffchainSignature::SIZE).as_ref())?;
@@ -77,60 +85,42 @@ impl BinarySerializable for Acknowledgement {
 
 /// Contains acknowledgment information and the respective ticket
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
     pub response: Response,
+    pub vrf_params: VrfParameters,
     pub signer: Address,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl AcknowledgedTicket {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(ticket: Ticket, response: Response, signer: Address) -> Self {
-        // TODO
-        // assert_ne!(
-        //     ticket.counterparty, signer,
-        //     "signer must be different from the ticket counterparty"
-        // );
-        Self {
+    pub fn new(
+        ticket: Ticket,
+        response: Response,
+        signer: Address,
+        chain_keypair: &ChainKeypair,
+        domain_separator: &Hash,
+    ) -> CoreTypesResult<AcknowledgedTicket> {
+        if signer.eq(&chain_keypair.public().to_address()) {
+            return Err(LoopbackTicket);
+        }
+        if generate_channel_id(&signer, &chain_keypair.public().to_address()).ne(&ticket.channel_id) {
+            return Err(InvalidTicketRecipient);
+        }
+
+        let vrf_params = derive_vrf_parameters(
+            &ticket.get_hash(domain_separator).into(),
+            chain_keypair,
+            &domain_separator.to_bytes(),
+        )?;
+
+        Ok(Self {
             ticket,
             response,
+            vrf_params,
             signer,
-        }
-    }
-}
-
-impl BinarySerializable for AcknowledgedTicket {
-    const SIZE: usize = Ticket::SIZE + Response::SIZE + Address::SIZE;
-
-    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
-        if data.len() == Self::SIZE {
-            let mut buf = data.to_vec();
-            let ticket = Ticket::from_bytes(buf.drain(..Ticket::SIZE).as_ref())?;
-            let response = Response::from_bytes(buf.drain(..Response::SIZE).as_ref())?;
-            let signer = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
-
-            Ok(Self {
-                ticket,
-                response,
-                signer,
-            })
-        } else {
-            Err(ParseError)
-        }
+        })
     }
 
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(&self.ticket.to_bytes());
-        ret.extend_from_slice(&self.response.to_bytes());
-        ret.extend_from_slice(&self.signer.to_bytes());
-        ret.into_boxed_slice()
-    }
-}
-
-impl AcknowledgedTicket {
     /// Verifies if the embedded ticket has been signed by the given issuer and also
     /// that the challenge on the embedded response matches the challenge on the ticket.
     pub fn verify(&self, issuer: &Address, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
@@ -144,18 +134,64 @@ impl AcknowledgedTicket {
         .ok_or(InvalidChallenge)
     }
 
-    // /// Computes a candidate check value to verify if this ticket is winning
-    // pub fn get_luck(&self, preimage: &Hash, channel_response: &Response) -> U256 {
-    //     U256::from_bytes(
-    //         &Hash::create(&[
-    //             &self.get_hash().to_bytes(),
-    //             &preimage.to_bytes(),
-    //             &channel_response.to_bytes(),
-    //         ])
-    //         .to_bytes(),
-    //     )
-    //     .unwrap()
-    // }
+    pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
+        let mut luck = [0u8; 7];
+
+        if let Some(ref signature) = self.ticket.signature {
+            luck.copy_from_slice(
+                &Hash::create(&[
+                    &self.ticket.get_hash(domain_separator).to_bytes(),
+                    &self.vrf_params.v.to_bytes()[1..], // skip prefix
+                    &self.response.to_bytes(),
+                    &signature.to_bytes(),
+                ])
+                .to_bytes()[0..7],
+            );
+        } else {
+            return Err(InvalidInputData(
+                "Cannot compute ticket luck from unsigned ticket".into(),
+            ));
+        }
+
+        // clone bytes
+        Ok(luck)
+    }
+}
+
+impl BinarySerializable for AcknowledgedTicket {
+    const SIZE: usize = Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE;
+
+    fn from_bytes(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
+            let response = Response::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + Response::SIZE])?;
+            let vrf_params = VrfParameters::from_bytes(
+                &data[Ticket::SIZE + Response::SIZE..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE],
+            )?;
+            let signer = Address::from_bytes(
+                &data[Ticket::SIZE + Response::SIZE + VrfParameters::SIZE
+                    ..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE],
+            )?;
+
+            Ok(Self {
+                ticket,
+                response,
+                vrf_params,
+                signer,
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn to_bytes(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(Self::SIZE);
+        ret.extend_from_slice(&self.ticket.to_bytes());
+        ret.extend_from_slice(&self.response.to_bytes());
+        ret.extend_from_slice(&self.vrf_params.to_bytes());
+        ret.extend_from_slice(&self.signer.to_bytes());
+        ret.into_boxed_slice()
+    }
 }
 
 impl std::fmt::Display for AcknowledgedTicket {
@@ -163,6 +199,7 @@ impl std::fmt::Display for AcknowledgedTicket {
         f.debug_struct("AcknowledgedTicket")
             .field("ticket", &self.ticket)
             .field("response", &self.response)
+            .field("vrf_params", &self.vrf_params)
             .field("signer", &self.signer)
             .finish()
     }
@@ -170,16 +207,23 @@ impl std::fmt::Display for AcknowledgedTicket {
 
 /// Wrapper for an unacknowledged ticket
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct UnacknowledgedTicket {
     pub ticket: Ticket,
     pub own_key: HalfKey,
     pub signer: Address,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl std::fmt::Display for UnacknowledgedTicket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AcknowledgedTicket")
+            .field("ticket", &self.ticket)
+            .field("own_key", &self.own_key)
+            .field("signer", &self.signer)
+            .finish()
+    }
+}
+
 impl UnacknowledgedTicket {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ticket: Ticket, own_key: HalfKey, signer: Address) -> Self {
         Self {
             ticket,
@@ -191,9 +235,7 @@ impl UnacknowledgedTicket {
     pub fn get_challenge(&self) -> HalfKeyChallenge {
         self.own_key.to_challenge()
     }
-}
 
-impl UnacknowledgedTicket {
     /// Verifies if signature on the embedded ticket using the embedded public key.
     pub fn verify_signature(&self, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
         self.ticket.verify(&self.signer, domain_separator)
@@ -213,12 +255,29 @@ impl UnacknowledgedTicket {
     pub fn get_response(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<Response> {
         Response::from_half_keys(&self.own_key, acknowledgement)
     }
+
+    pub fn acknowledge(
+        self,
+        acknowledgement: &HalfKey,
+        chain_keypair: &ChainKeypair,
+        domain_separator: &Hash,
+    ) -> CoreTypesResult<AcknowledgedTicket> {
+        AcknowledgedTicket::new(
+            self.ticket,
+            Response::from_half_keys(&self.own_key, acknowledgement)?,
+            self.signer,
+            chain_keypair,
+            domain_separator,
+        )
+    }
 }
+
+impl UnacknowledgedTicket {}
 
 impl BinarySerializable for UnacknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + Address::SIZE;
 
-    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
             let mut buf = data.to_vec();
             let ticket = Ticket::from_bytes(buf.drain(..Ticket::SIZE).as_ref())?;
@@ -261,7 +320,7 @@ impl PendingAcknowledgement {
 impl BinarySerializable for PendingAcknowledgement {
     const SIZE: usize = 1;
 
-    fn from_bytes(data: &[u8]) -> errors::Result<Self> {
+    fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() >= Self::SIZE {
             match data[0] {
                 Self::SENDER_PREFIX => Ok(WaitingAsSender),
@@ -290,31 +349,35 @@ impl BinarySerializable for PendingAcknowledgement {
 pub mod test {
     use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
     use crate::channels::Ticket;
-    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response};
+    use core_crypto::{
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response},
+    };
     use ethnum::u256;
     use hex_literal::hex;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
+    use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
     use utils_types::traits::BinarySerializable;
 
-    fn mock_ticket(pk: &ChainKeypair) -> Ticket {
+    fn mock_ticket(pk: &ChainKeypair, counterparty: &Address, domain_separator: &Hash) -> Ticket {
         let inverse_win_prob = u256::new(1u128); // 100 %
         let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
         let path_pos = 5;
 
-        todo!("implement domain separator")
-
-        // Ticket::new(
-        //     Address::new(&[0u8; Address::SIZE]),
-        //     U256::new("1"),
-        //     Balance::new(
-        //         (inverse_win_prob * price_per_packet * path_pos as u128).into(),
-        //         BalanceType::HOPR,
-        //     ),
-        //     U256::from_inverse_probability(inverse_win_prob.into()).unwrap(),
-        //     U256::new("4"),
-        //     pk,
-        // )
+        Ticket::new(
+            Address::new(&[0u8; Address::SIZE]),
+            counterparty,
+            Balance::new(
+                (inverse_win_prob * price_per_packet * path_pos as u128).into(),
+                BalanceType::HOPR,
+            ),
+            U256::zero(),
+            U256::one(),
+            1.0f64,
+            U256::new("4"),
+            EthereumChallenge::default(),
+            pk,
+            domain_separator,
+        )
     }
 
     #[test]
@@ -407,7 +470,7 @@ pub mod test {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
-    use core_crypto::types::{HalfKey, Response, Hash};
+    use core_crypto::types::{HalfKey, Hash, Response};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
