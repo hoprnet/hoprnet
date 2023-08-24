@@ -19,7 +19,7 @@ import {
   create_multi_counter,
   create_gauge,
   // create_multi_gauge,
-  random_integer,
+  random_integer
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
@@ -178,7 +178,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
       )
       log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
-      
+
       // update safe's HORP token allowance granted to Channels contract
       log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
       const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
