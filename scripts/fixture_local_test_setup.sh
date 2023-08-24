@@ -168,7 +168,7 @@ function generate_local_identities() {
   find -L "${tmp_dir}" -type f -name "${node_prefix}_*.safe.args" -delete
   find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" -delete
 
-  env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
+  env ETHERSCAN_API_KEY="${ETHERSCAN_API_KEY:-}" IDENTITY_PASSWORD="${password}" \
     hopli identity \
     --action create \
     --identity-directory "${tmp_dir}" \
@@ -188,7 +188,7 @@ function create_local_safes() {
     # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `safe_i.log` for each id
     # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
     env \
-      ETHERSCAN_API_KEY="" \
+      ETHERSCAN_API_KEY="${ETHERSCAN_API_KEY:-}" \
       IDENTITY_PASSWORD="${password}" \
       DEPLOYER_PRIVATE_KEY="${PRIVATE_KEY}" \
       hopli create-safe-module \

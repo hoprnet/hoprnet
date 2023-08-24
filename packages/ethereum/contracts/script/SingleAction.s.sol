@@ -116,8 +116,17 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      *
      * Add node safes to network registry, as a manager
      * @param nodeAddresses array of node addresses to be added to the module
+     * @param hoprTokenAmountInWei, The amount of HOPR tokens that recipient is desired to receive
+     * @param nativeTokenAmountInWei The amount of native tokens that recipient is desired to receive
      */
-    function expressSetupSafeModule(address[] memory nodeAddresses) external returns (address safe, address module) {
+    function expressSetupSafeModule(
+        address[] memory nodeAddresses,
+        uint256 hoprTokenAmountInWei,
+        uint256 nativeTokenAmountInWei
+    )
+        external
+        returns (address safe, address module)
+    {
         // 1. get environment and msg.sender
         getNetworkAndMsgSender();
 
@@ -192,10 +201,19 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 4. include node to the module, as an owner of safe
         for (uint256 k = 0; k < nodeAddresses.length; k++) {
-            bytes memory includeNodeData =
-                abi.encodeWithSignature("includeNode(uint256)", Target.unwrap(defaultNodeTargets[k]));
-            uint256 safeNonce = ISafe(safe).nonce();
-            _helperSignSafeTxAsOwner(ISafe(safe), module, safeNonce, includeNodeData);
+            // check if node is included in module
+            (bool successReadIncluded, bytes memory returndataReadIncluded) =
+                module.staticcall(abi.encodeWithSignature("isNode(address)", nodeAddresses[k]));
+            if (!successReadIncluded) {
+                revert("Cannot read isNode from module contract.");
+            }
+            bool included = abi.decode(returndataReadIncluded, (bool));
+            if (!included) {
+                bytes memory includeNodeData =
+                    abi.encodeWithSignature("includeNode(uint256)", Target.unwrap(defaultNodeTargets[k]));
+                uint256 safeNonce = ISafe(safe).nonce();
+                _helperSignSafeTxAsOwner(ISafe(safe), module, safeNonce, includeNodeData);
+            }
         }
 
         // 5. approve token transfer
@@ -207,6 +225,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         );
 
         vm.stopBroadcast();
+
         // 6. add nodes and safe to network registry
         address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
         for (uint256 m = 0; m < nodeAddresses.length; m++) {
@@ -216,8 +235,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         _registerNodes(stakingSafeAddresses, nodeAddresses);
         vm.stopBroadcast();
 
-        // 5. transfer some tokens to safe
-        transferOrMintHoprAndSendNativeToAmount(safe, 2_000_000_000_000_000_000_000, 1_000_000_000_000_000_000);
+        // 7. transfer some tokens to safe
+        transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
     }
 
     /**
@@ -256,96 +275,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             abi.encodePacked(r, s, v)
         );
     }
-
-    // TODO: reimplement single actions
-    // /**
-    //  * @dev express node initialization
-    //  * - Check with network registery on the registeration status of a list of peer ids, return the unregistered
-    // ones.
-    //  * - If not all the peer ids are registered, check if the caller can do selfRegister
-    //  */
-    // function expressInitialization(
-    //   address[] calldata nodeAddrs,
-    //   uint256 hoprTokenAmountInWei,
-    //   uint256 nativeTokenAmountInWei,
-    //   string[] calldata peerIds
-    // ) external {
-    //   // 1. get environment and msg.sender
-    //   getNetworkAndMsgSender();
-
-    //   // 2. loop through nodes and check its registration status
-    //   for (uint256 index = 0; index < peerIds.length; index++) {
-    //     (bool successCheck, bytes memory returndataCheck) = currentNetworkDetail
-    //       .networkRegistryContractAddress
-    //       .staticcall(abi.encodeWithSignature('nodePeerIdToAccount(string)', peerIds[index]));
-    //     if (!successCheck) {
-    //       revert('Cannot read nodePeerIdToAccount from network registry contract.');
-    //     }
-    //     address stakingAccount = abi.decode(returndataCheck, (address));
-    //     if (stakingAccount == address(0)) {
-    //       unregisteredIds.push(peerIds[index]);
-    //     }
-    //   }
-    //   uint256 numUnRegisteredIds = unregisteredIds.length;
-
-    //   // 3. check if need to perform node registeration.
-    //   // As NR is disabled in development, skip it
-    //   if (numUnRegisteredIds > 0 && currentEnvironmentType != EnvironmentType.DEVELOPMENT) {
-    //     // check if the caller can register nodes
-    //     uint256 allowedRegistration = getMaxAllowedRegistrations(
-    //       currentNetworkDetail.networkRegistryProxyContractAddress,
-    //       msgSender
-    //     );
-    //     if (allowedRegistration < numUnRegisteredIds) {
-    //       // try to register developer NFT, community NFT or stake HOPR tokens
-    //       // check if the caller owns developer NFT
-    //       uint256 nftTokenId;
-    //       (bool ownsDevNft, uint256 devTokenId) = _hasNetworkRegistryNft(
-    //         currentNetworkDetail.hoprBoostContractAddress,
-    //         msgSender,
-    //         NETWORK_REGISTRY_RANK1_NAME
-    //       );
-    //       (bool ownsComNft, uint256 comTokenId) = _hasNetworkRegistryNft(
-    //         currentNetworkDetail.hoprBoostContractAddress,
-    //         msgSender,
-    //         NETWORK_REGISTRY_RANK2_NAME
-    //       );
-    //       uint256 hoprBalance = _getTokenBalanceOf(currentNetworkDetail.hoprTokenContractAddress, msgSender);
-
-    //       if (!ownsDevNft && !ownsComNft) {
-    //         // try to stake HOPR tokens
-    //         _stakeXHopr(currentNetworkDetail.xhoprTokenContractAddress, 1000 ether * numUnRegisteredIds);
-    //       } else {
-    //         // try to stake NFT
-    //         nftTokenId = ownsDevNft ? devTokenId : comTokenId;
-    //         _stakeNft(
-    //           currentNetworkDetail.hoprBoostContractAddress,
-    //           msgSender,
-    //           currentNetworkDetail.stakeContractAddress,
-    //           nftTokenId
-    //         );
-    //       }
-    //     }
-    //     // try again registration
-    //     _selfRegisterNodes(currentNetworkDetail.networkRegistryContractAddress, peerIds);
-    //   }
-
-    //   // 4. loop again and check if need to fund nodes
-    //   for (uint256 nodeIndex = 0; nodeIndex < nodeAddrs.length; nodeIndex++) {
-    //     address recipient = nodeAddrs[nodeIndex];
-    //     // transfer or mint hopr tokens
-    //     _transferOrMintHoprToAmount(currentNetworkDetail.hoprTokenContractAddress, recipient, hoprTokenAmountInWei);
-
-    //     // 3. transfer native balance to the unregisteredIds[numUnRegisteredIndex]
-    //     if (nativeTokenAmountInWei > recipient.balance) {
-    //       (bool nativeTokenTransferSuccess, ) = recipient.call{value: nativeTokenAmountInWei -
-    // recipient.balance}('');
-    //       require(nativeTokenTransferSuccess, 'Cannot send native tokens to the recipient');
-    //     }
-    //   }
-
-    //   vm.stopBroadcast();
-    // }
 
     // /**
     //  * @dev On network registry contract, register peers associated with the calling wallet.

@@ -703,6 +703,30 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
+    /// Get the allowance for HoprChannels contract to transfer tokens on behalf of staking safe address
+    async fn get_staking_safe_allowance(&self) -> Result<Balance> {
+        let key = utils_db::db::Key::new_from_str(STAKING_SAFE_ALLOWANCE_KEY)?;
+
+        self.db
+            .get_or_none::<Balance>(key)
+            .await
+            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
+    }
+
+    /// Sets the allowance for HoprChannels contract to transfer tokens on behalf of staking safe address
+    async fn set_staking_safe_allowance(&mut self, allowance: &Balance, snapshot: &Snapshot) -> Result<()> {
+        let key = utils_db::db::Key::new_from_str(STAKING_SAFE_ALLOWANCE_KEY)?;
+
+        let mut batch_ops = utils_db::db::Batch::new();
+        batch_ops.put(key, allowance);
+        batch_ops.put(
+            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
+            snapshot,
+        );
+
+        self.db.batch(batch_ops, true).await
+    }
+
     /// Checks whether network registry is enabled. Default: true
     async fn is_network_registry_enabled(&self) -> Result<bool> {
         let key = utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?;
@@ -1407,6 +1431,24 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_staking_safe_address(safe_address).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_staking_safe_allowance(&self) -> Result<Balance, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_staking_safe_allowance().await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn set_staking_safe_allowance(&self, balance: &Balance, snapshot: &Snapshot) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.set_staking_safe_allowance(balance, snapshot).await)
             //}
         }
 

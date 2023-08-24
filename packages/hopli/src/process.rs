@@ -124,6 +124,8 @@ pub fn child_process_call_foundry_express_initialization(
 pub fn child_process_call_foundry_express_setup_safe_module(
     network: &str,
     ethereum_address: &String,
+    hopr_amount: &str,
+    native_amount: &str,
 ) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let self_register_args = vec![
@@ -131,8 +133,10 @@ pub fn child_process_call_foundry_express_setup_safe_module(
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
         "--broadcast",
         "--sig",
-        "expressSetupSafeModule(address[])",
+        "expressSetupSafeModule(address[],uint256,uint256)",
         &ethereum_address,
+        &hopr_amount,
+        &native_amount,
     ];
 
     child_process_call_foundry(network, &self_register_args)
