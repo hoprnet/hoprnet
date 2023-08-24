@@ -286,6 +286,48 @@ impl ChainCalls {
     }
 }
 
+pub fn convert_vrf_parameters(off_chain: &VrfParameters) -> Vrfparameters {
+    // skip the secp256k1 curvepoint prefix
+    let v = off_chain.v.to_bytes();
+    let s_b = off_chain.s_b.to_bytes();
+    let h_v = off_chain.h_v.to_bytes();
+
+    Vrfparameters {
+        vx: U256::from_big_endian(&v[1..33]),
+        vy: U256::from_big_endian(&v[33..65]),
+        s: U256::from_big_endian(&off_chain.s.to_bytes()),
+        h: U256::from_big_endian(&off_chain.h.to_bytes()),
+        s_bx: U256::from_big_endian(&s_b[1..33]),
+        s_by: U256::from_big_endian(&s_b[33..65]),
+        h_vx: U256::from_big_endian(&h_v[1..33]),
+        h_vy: U256::from_big_endian(&h_v[33..65]),
+    }
+}
+
+pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<RedeemableTicket> {
+    if let Some(ref signature) = off_chain.ticket.signature {
+        let serialized_signature = signature.to_bytes();
+
+        Ok(RedeemableTicket {
+            data: TicketData {
+                channel_id: off_chain.ticket.channel_id.into(),
+                amount: off_chain.ticket.amount.amount().as_u128(),
+                ticket_index: off_chain.ticket.index,
+                index_offset: off_chain.ticket.index_offset,
+                epoch: off_chain.ticket.channel_epoch,
+                win_prob: off_chain.ticket.encoded_win_prob(),
+            },
+            signature: CompactSignature {
+                r: H256::from_slice(&serialized_signature[0..32]).into(),
+                vs: H256::from_slice(&serialized_signature[32..64]).into(),
+            },
+            por_secret: U256::from_big_endian(&off_chain.response.to_bytes()),
+        })
+    } else {
+        return Err(InvalidArguments("Acknowledged ticket must be signed".into()));
+    }
+}
+
 // pub async fn prepare_redeem_ticket<T>(
 //     db: &T,
 //     counterparty: &Address,
@@ -337,18 +379,20 @@ pub mod tests {
     use async_std;
     use bindings::{
         hopr_announcements::HoprAnnouncements,
-        hopr_channels::{HoprChannels, HoprChannelsErrors, RedeemableTicket, TicketData, CompactSignature},
+        hopr_channels::{
+            HoprChannels, HoprChannelsErrors, RedeemTicketCall, RedeemableTicket, TicketData, Vrfparameters,
+        },
         hopr_node_safe_registry::HoprNodeSafeRegistry,
         hopr_token::HoprToken,
     };
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{Hash, CurvePoint},
+        types::{Hash, Response},
     };
     use core_ethereum_db::db::CoreEthereumDb;
     use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
     use ethers::{
-        abi::{encode, Address, Token, Uint},
+        abi::{AbiDecode, AbiEncode, Address, Token, Uint},
         core::utils::{Anvil, AnvilInstance},
         middleware::SignerMiddleware,
         prelude::{k256::ecdsa::SigningKey, ContractDeployer, ContractFactory},
@@ -362,12 +406,7 @@ pub mod tests {
     };
     use hex_literal::hex;
     use multiaddr::Multiaddr;
-    use std::{
-        ops::Add,
-        path::PathBuf,
-        str::FromStr,
-        sync::{Arc, Mutex},
-    };
+    use std::{path::PathBuf, str::FromStr, sync::Arc};
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address as HoprAddress, Balance, BalanceType, EthereumChallenge, U256 as HoprU256},
@@ -377,7 +416,7 @@ pub mod tests {
     use super::ChainCalls;
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
-    const RESPONSE_TO_CHALLENGE: [u8;32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
+    const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
     const CHAIN_ADDR: [u8; 20] = hex!("2cDD13ddB0346E0F620C8E5826Da5d7230341c6E");
 
     const COUNTERPARTY_PRIV_KEY: [u8; 32] = hex!("6517e3d3245d7a111ba7be5b911adcdec7078ca5191e114e5d087a3ec936a146");
@@ -428,6 +467,7 @@ pub mod tests {
 
     async fn deploy_hopr_token_and_mint_tokens(
         client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+        amount: U256,
     ) -> HoprToken<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>> {
         let hopr_token = HoprToken::deploy(client.clone(), ()).unwrap().send().await.unwrap();
 
@@ -437,7 +477,7 @@ pub mod tests {
             .await
             .unwrap();
         hopr_token
-            .mint(client.address(), 1000.into(), Bytes::new(), Bytes::new())
+            .mint(client.address(), amount, Bytes::new(), Bytes::new())
             .send()
             .await
             .unwrap();
@@ -476,6 +516,31 @@ pub mod tests {
             .unwrap()
     }
 
+    async fn fund_node(
+        node: &HoprAddress,
+        native_token: &U256,
+        hopr_token: &U256,
+        hopr_token_contract: HoprToken<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+        client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+    ) -> () {
+        let node_address = H160::from_slice(&node.to_bytes());
+        let native_transfer_tx = Eip1559TransactionRequest::new().to(node_address).value(native_token);
+        client
+            .send_transaction(native_transfer_tx, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+
+        hopr_token_contract
+            .transfer(node_address, hopr_token.clone())
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+    }
+
     async fn fund_channel(
         counterparty: &Address,
         hopr_token: HoprToken<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
@@ -485,9 +550,17 @@ pub mod tests {
             .approve(hopr_channels.address(), 1u128.into())
             .send()
             .await
+            .unwrap()
+            .await
             .unwrap();
 
-        hopr_channels.fund_channel(*counterparty, 1u128).send().await.unwrap();
+        hopr_channels
+            .fund_channel(*counterparty, 1u128)
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -504,7 +577,8 @@ pub mod tests {
 
         let hopr_node_safe_registry = deploy_hopr_node_registry(client.clone()).await;
 
-        let hopr_token = deploy_hopr_token_and_mint_tokens(client.clone()).await;
+        // Mint 1000 Hoprlis
+        let hopr_token = deploy_hopr_token_and_mint_tokens(client.clone(), 1000.into()).await;
 
         let hopr_channels = deploy_hopr_channels(
             &hopr_token.address(),
@@ -540,7 +614,8 @@ pub mod tests {
 
         let hopr_node_safe_registry = deploy_hopr_node_registry(client.clone()).await;
 
-        let hopr_token = deploy_hopr_token_and_mint_tokens(client.clone()).await;
+        // Mint 1000 Hoprlis
+        let hopr_token = deploy_hopr_token_and_mint_tokens(client.clone(), 1000.into()).await;
 
         let hopr_channels = deploy_hopr_channels(
             &hopr_token.address(),
@@ -557,7 +632,7 @@ pub mod tests {
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
         );
 
-        let counterparty = Wallet::from_bytes(&COUNTERPARTY_PRIV_KEY).unwrap();
+        let counterparty = ChainKeypair::from_secret(&anvil.keys()[1].clone().to_bytes()).unwrap();
 
         let domain_separator: Hash = hopr_channels
             .domain_separator()
@@ -567,7 +642,21 @@ pub mod tests {
             .try_into()
             .unwrap();
 
-        // fund_channel(&counterparty.address(), hopr_token, hopr_channels.clone()).await;
+        fund_channel(
+            &H160::from_slice(&counterparty.public().to_address().to_bytes()),
+            hopr_token.clone(),
+            hopr_channels.clone(),
+        )
+        .await;
+
+        fund_node(
+            &counterparty.public().to_address(),
+            &U256::from(1000000000000000000u128),
+            &U256::from(10u64),
+            hopr_token,
+            client.clone(),
+        )
+        .await;
 
         // let mut redeem_ticket_tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
         // redeem_ticket_tx.set_to(hopr_channels.address());
@@ -578,41 +667,79 @@ pub mod tests {
         //         .into(),
         // );
 
+        let response = Response::from_bytes(&RESPONSE_TO_CHALLENGE).unwrap();
+
         let ticket = Ticket::new(
-            client.address().0.try_into().unwrap(),
-            counterparty.address().0.try_into().unwrap(),
+            keypair.public().to_address(),
+            counterparty.public().to_address(),
             Balance::new(HoprU256::one(), BalanceType::HOPR),
             HoprU256::one(),
             HoprU256::one(),
-            1.0,
+            0.7,
             HoprU256::one(),
-            EthereumChallenge::from_bytes(&CurvePoint::from_exponent(&RESPONSE_TO_CHALLENGE).unwrap().to_address().to_bytes()).unwrap(),
+            response.to_challenge().to_ethereum_challenge(),
             &keypair,
             &domain_separator,
-        ).unwrap();
+        )
+        .unwrap();
 
-        let serialized_signature = ticket.signature.clone().unwrap().to_bytes();
+        let acked_ticket = AcknowledgedTicket::new(
+            ticket,
+            response,
+            keypair.public().to_address(),
+            &counterparty,
+            &domain_separator,
+        )
+        .unwrap();
 
-        let redeemable = RedeemableTicket {
-            data: TicketData {
-                channel_id: ticket.channel_id.into(),
-                amount: ticket.amount.amount().as_u128(),
-                ticket_index: ticket.index,
-                index_offset: ticket.index_offset,
-                epoch: ticket.channel_epoch,
-                win_prob: ticket.encoded_win_prob(),
-            },
-            signature: CompactSignature {
-                r: H256::from_slice(&serialized_signature[0..32]).into(),
-                vs: H256::from_slice(&serialized_signature[32..64]).into(),
-            },
-            por_secret: HoprU256::from_bytes(&RESPONSE_TO_CHALLENGE).unwrap().to_bytes().as_ref().into(),
-        };
+        let params = super::convert_vrf_parameters(&acked_ticket.vrf_params);
+        let redeemable = super::convert_acknowledged_ticket(&acked_ticket).unwrap();
 
-        let hash: Hash = hopr_channels.get_ticket_hash(redeemable).call().await.unwrap().try_into().unwrap();
+        let redeem_ticket_tx = Eip1559TransactionRequest::new()
+            .from(H160::from_slice(&counterparty.public().to_address().to_bytes()))
+            .to(hopr_channels.address())
+            .data(RedeemTicketCall { redeemable, params }.encode());
 
-        println!("Ethereum hash {}", hash);
-        println!("off-chain hash {}", ticket.get_hash(&domain_separator));
+        println!(
+            "{:?}",
+            client.send_transaction(redeem_ticket_tx, None).await.unwrap().await
+        );
+
+        // println!(
+        //     "{:?}",
+        //     hopr_channels.redeem_ticket(redeemable, params).send().await // .map_err(|e| {
+        //                                                                  //     println!("{:?}", e.decode_contract_revert::<HoprToken>());
+        //                                                                  // })
+        // );
+
+        // let on_chain_ticket_luck: Hash = hopr_channels
+        //     .get_ticket_luck(
+        //         acked_ticket.ticket.get_hash(&domain_separator).into(),
+        //         redeemable,
+        //         params,
+        //     )
+        //     .call()
+        //     .await
+        //     .unwrap()
+        //     .try_into()
+        //     .unwrap();
+
+        // println!("Ethereum ticket luck {}", on_chain_ticket_luck);
+        // println!(
+        //     "Offchain ticket luck {}",
+        //     hex::encode(acked_ticket.get_luck(&domain_separator).unwrap())
+        // );
+
+        // let hash: Hash = hopr_channels
+        //     .get_ticket_hash(redeemable)
+        //     .call()
+        //     .await
+        //     .unwrap()
+        //     .try_into()
+        //     .unwrap();
+
+        // println!("Ethereum hash {}", hash);
+        // println!("off-chain hash {}", ticket.get_hash(&domain_separator));
 
         // client
         //     .send_transaction(redeem_ticket_tx, None)
