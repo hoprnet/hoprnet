@@ -66,10 +66,11 @@ pub mod wasm {
         /// # Arguments
         /// * `peers` - Vector of String representations of the PeerIds to be pinged.
         #[wasm_bindgen]
-        pub async fn ping(&mut self, peer: js_sys::JsString) {
+        pub async fn ping(&self, peer: js_sys::JsString) {
             let x: String = peer.into();
             if let Some(converted) = core_network::PeerId::from_str(&x).ok() {
-                (*self.ping.write().await).ping(vec![converted]).await;
+                let mut g = self.ping.write().await;
+                (*g).ping(vec![converted]).await;
             }
         }
     }
