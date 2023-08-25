@@ -3,7 +3,7 @@ use getrandom::getrandom;
 use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::ops::{Shr, Add, Mul, Div};
+use std::ops::{Sub, Add, Div, Mul, Shr};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -400,6 +400,25 @@ impl U256 {
     pub fn as_u128(&self) -> u128 {
         self.value.as_u128()
     }
+
+    /// Multiply with float in the interval [0.0, 1.0]
+    pub fn multiply_f64(&self, rhs: f64) -> Result<Self> {
+        if rhs < 0.0 || rhs > 1.0 {
+            return Err(GeneralError::InvalidInput);
+        }
+
+        if rhs == 1.0 {
+            // special case: mantisse extraction does not work here
+            Ok(Self {
+                value: self.value.to_owned(),
+            })
+        } else if rhs == 0.0 {
+            // special case: prevent from potential underflow errors
+            Ok(U256::zero())
+        } else {
+            Ok((*self * U256::from((rhs + 1.0 + f64::EPSILON).to_bits() & 0x000fffffffffffffu64)) >> U256::from(52u64))
+        }
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -465,7 +484,7 @@ impl Div for U256 {
 
     fn div(self, rhs: Self) -> Self::Output {
         Self {
-            value: self.value.div(rhs.value)
+            value: self.value.div(rhs.value),
         }
     }
 }
@@ -475,7 +494,26 @@ impl Shr for U256 {
 
     fn shr(self, rhs: Self) -> Self::Output {
         Self {
-            value: self.value.shr(rhs.value)
+            value: self.value.shr(rhs.value),
+        }
+    }
+}
+
+impl Add for U256 {
+    type Output = U256;
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.add(rhs.value)
+        }
+    }
+}
+
+impl Sub for U256 {
+    type Output = U256;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.sub(rhs.value)
         }
     }
 }

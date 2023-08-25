@@ -8,7 +8,7 @@ use crate::{
 };
 use core_crypto::{
     derivation::derive_vrf_parameters,
-    errors::CryptoError::{InvalidChallenge, SignatureVerification},
+    errors::CryptoError::{InvalidChallenge, InvalidVrfValues, SignatureVerification},
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
@@ -121,17 +121,37 @@ impl AcknowledgedTicket {
         })
     }
 
-    /// Verifies if the embedded ticket has been signed by the given issuer and also
-    /// that the challenge on the embedded response matches the challenge on the ticket.
-    pub fn verify(&self, issuer: &Address, domain_separator: &Hash) -> core_crypto::errors::Result<()> {
-        (self.ticket.verify(issuer, domain_separator).map(|_| true)?
-            && self
-                .response
-                .to_challenge()
-                .to_ethereum_challenge()
-                .eq(&self.ticket.challenge))
-        .then_some(())
-        .ok_or(InvalidChallenge)
+    /// Does a verification of the acknowledged ticket, including:
+    /// - ticket signature
+    /// - ticket challenge (proof-of-relay)
+    /// - VRF values (ticket redemption)
+    pub fn verify(
+        &self,
+        issuer: &Address,
+        recipient: &Address,
+        domain_separator: &Hash,
+    ) -> core_crypto::errors::Result<()> {
+        if self.ticket.verify(issuer, domain_separator).is_err() {
+            return Err(SignatureVerification);
+        }
+
+        if !self.ticket.challenge.eq(&self.response.to_challenge().into()) {
+            return Err(InvalidChallenge);
+        }
+
+        if self
+            .vrf_params
+            .verify(
+                recipient,
+                &self.ticket.get_hash(domain_separator).into(),
+                &domain_separator.to_bytes(),
+            )
+            .is_err()
+        {
+            return Err(InvalidVrfValues);
+        }
+
+        Ok(())
     }
 
     pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
@@ -155,6 +175,16 @@ impl AcknowledgedTicket {
 
         // clone bytes
         Ok(luck)
+    }
+
+    pub fn is_winning_ticket(&self, domain_separator: &Hash) -> bool {
+        let mut signed_ticket_luck = [0u8; 8];
+        signed_ticket_luck[1..].copy_from_slice(&self.ticket.encoded_win_prob);
+
+        let mut computed_ticket_luck = [0u8; 8];
+        computed_ticket_luck[1..].copy_from_slice(&self.get_luck(domain_separator).expect("unsigned ticket"));
+
+        u64::from_be_bytes(signed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
     }
 }
 
@@ -244,18 +274,23 @@ impl UnacknowledgedTicket {
     /// Verifies if the challenge on the embedded ticket matches the solution
     /// from the given acknowledgement and the embedded half key.
     pub fn verify_challenge(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<()> {
-        self.get_response(acknowledgement)?
-            .to_challenge()
-            .to_ethereum_challenge()
-            .eq(&self.ticket.challenge)
-            .then_some(())
-            .ok_or(SignatureVerification)
+        if self
+            .ticket
+            .challenge
+            .eq(&self.get_response(acknowledgement)?.to_challenge().into())
+        {
+            Ok(())
+        } else {
+            Err(InvalidChallenge)
+        }
     }
 
     pub fn get_response(&self, acknowledgement: &HalfKey) -> core_crypto::errors::Result<Response> {
         Response::from_half_keys(&self.own_key, acknowledgement)
     }
 
+    /// Turn an unacknowledged ticket into an acknowledged ticket by adding
+    /// VRF output (requires private key) and the received acknowledgement
     pub fn acknowledge(
         self,
         acknowledgement: &HalfKey,
@@ -272,17 +307,15 @@ impl UnacknowledgedTicket {
     }
 }
 
-impl UnacknowledgedTicket {}
-
 impl BinarySerializable for UnacknowledgedTicket {
     const SIZE: usize = Ticket::SIZE + HalfKey::SIZE + Address::SIZE;
 
     fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let mut buf = data.to_vec();
-            let ticket = Ticket::from_bytes(buf.drain(..Ticket::SIZE).as_ref())?;
-            let own_key = HalfKey::from_bytes(buf.drain(..HalfKey::SIZE).as_ref())?;
-            let signer = Address::from_bytes(buf.drain(..Address::SIZE).as_ref())?;
+            let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
+            let own_key = HalfKey::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + HalfKey::SIZE])?;
+            let signer =
+                Address::from_bytes(&data[Ticket::SIZE + HalfKey::SIZE..Ticket::SIZE + HalfKey::SIZE + Address::SIZE])?;
             Ok(Self {
                 ticket,
                 own_key,
@@ -353,31 +386,39 @@ pub mod test {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response},
     };
-    use ethnum::u256;
     use hex_literal::hex;
     use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
     use utils_types::traits::BinarySerializable;
 
-    fn mock_ticket(pk: &ChainKeypair, counterparty: &Address, domain_separator: &Hash) -> Ticket {
-        let inverse_win_prob = u256::new(1u128); // 100 %
-        let price_per_packet = u256::new(10000000000000000u128); // 0.01 HOPR
-        let path_pos = 5;
+    const ALICE: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
+
+    const BOB: [u8; 32] = hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c");
+
+    fn mock_ticket(
+        pk: &ChainKeypair,
+        counterparty: &Address,
+        domain_separator: Option<Hash>,
+        challenge: Option<EthereumChallenge>,
+    ) -> Ticket {
+        let win_prob = 1.0f64; // 100 %
+        let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
+        let path_pos = 5u64;
 
         Ticket::new(
-            Address::new(&[0u8; Address::SIZE]),
             counterparty,
-            Balance::new(
-                (inverse_win_prob * price_per_packet * path_pos as u128).into(),
+            &Balance::new(
+                price_per_packet.multiply_f64(win_prob).unwrap() * path_pos.into(),
                 BalanceType::HOPR,
             ),
             U256::zero(),
             U256::one(),
             1.0f64,
-            U256::new("4"),
-            EthereumChallenge::default(),
+            4u64.into(),
+            challenge.unwrap_or_default(),
             pk,
-            domain_separator,
+            &domain_separator.unwrap_or_default(),
         )
+        .unwrap()
     }
 
     #[test]
@@ -410,12 +451,40 @@ pub mod test {
     }
 
     #[test]
-    fn test_unacknowledged_ticket() {
-        let pk_1 = ChainKeypair::from_secret(&hex!(
-            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
-        ))
-        .unwrap();
-        let pub_key_1 = pk_1.public().0.clone();
+    fn test_unacknowledged_ticket_serialize_deserialize() {
+        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
+        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
+
+        let unacked_ticket = UnacknowledgedTicket::new(
+            mock_ticket(&keypair, &keypair_counterparty.public().to_address(), None, None),
+            HalfKey::default(),
+            keypair.public().to_address(),
+        );
+
+        assert_eq!(
+            unacked_ticket,
+            UnacknowledgedTicket::from_bytes(&unacked_ticket.to_bytes()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_unacknowledged_ticket_sign_verify() {
+        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
+        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
+
+        let unacked_ticket = UnacknowledgedTicket::new(
+            mock_ticket(&keypair, &keypair_counterparty.public().to_address(), None, None),
+            HalfKey::default(),
+            keypair.public().to_address(),
+        );
+
+        assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());
+    }
+
+    #[test]
+    fn test_unacknowledged_ticket_challenge_response() {
+        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
+        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
 
         let hk1 = HalfKey::new(&hex!(
             "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
@@ -427,43 +496,97 @@ pub mod test {
         let cp2: CurvePoint = hk2.to_challenge().into();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        todo!("implement domain separator");
-        // let mut ticket1 = mock_ticket(&pk_1);
-        // ticket1.set_challenge(Challenge::from(cp_sum).to_ethereum_challenge(), &pk_1);
+        let ticket = mock_ticket(
+            &keypair,
+            &keypair_counterparty.public().to_address(),
+            None,
+            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
+        );
 
-        // let unack1 = UnacknowledgedTicket::new(ticket1, hk1, pub_key_1.to_address());
-        // assert!(unack1.verify_signature().is_ok());
-        // assert!(unack1.verify_challenge(&hk2).is_ok());
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, keypair.public().to_address());
 
-        // let unack2 = UnacknowledgedTicket::from_bytes(&unack1.to_bytes()).unwrap();
-        // assert_eq!(unack1, unack2);
+        assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());
+        assert!(unacked_ticket.verify_challenge(&hk2).is_ok())
+    }
 
-        // let pending_ack_1 = PendingAcknowledgement::WaitingAsRelayer(unack1);
-        // let pending_ack_2 = PendingAcknowledgement::from_bytes(&pending_ack_1.to_bytes()).unwrap();
-        // assert_eq!(pending_ack_1, pending_ack_2);
+    #[test]
+    fn test_unack_transformation() {
+        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
+        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
+
+        let hk1 = HalfKey::new(&hex!(
+            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
+        ));
+        let hk2 = HalfKey::new(&hex!(
+            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
+        ));
+        let cp1: CurvePoint = hk1.to_challenge().into();
+        let cp2: CurvePoint = hk2.to_challenge().into();
+        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+
+        let ticket = mock_ticket(
+            &keypair,
+            &keypair_counterparty.public().to_address(),
+            None,
+            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
+        );
+
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, keypair.public().to_address());
+
+        let acked_ticket = unacked_ticket
+            .acknowledge(&hk2, &keypair_counterparty, &Hash::default())
+            .unwrap();
+
+        assert!(acked_ticket
+            .verify(
+                &keypair.public().to_address(),
+                &keypair_counterparty.public().to_address(),
+                &Hash::default()
+            )
+            .is_ok());
     }
 
     #[test]
     fn test_acknowledged_ticket() {
-        let pk = ChainKeypair::from_secret(&hex!(
-            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
+        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
+
+        let response = Response::from_bytes(&hex!(
+            "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
         ))
         .unwrap();
-        let pub_key = pk.public().0.clone();
-        let resp = Response::new(&hex!(
-            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
-        ));
 
-        todo!("add domain separator");
+        let ticket = mock_ticket(
+            &keypair,
+            &keypair_counterparty.public().to_address(),
+            None,
+            Some(response.to_challenge().into()),
+        );
 
-        // let mut ticket1 = mock_ticket(&pk);
-        // ticket1.set_challenge(resp.to_challenge().to_ethereum_challenge(), &pk);
+        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
+        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
 
-        // let akt_1 = AcknowledgedTicket::new(ticket1, resp, pub_key.to_address());
-        // assert!(akt_1.verify(&pub_key.to_address()).is_ok());
+        let acked_ticket = AcknowledgedTicket::new(
+            ticket,
+            response,
+            keypair.public().to_address(),
+            &keypair_counterparty,
+            &Hash::default(),
+        )
+        .unwrap();
 
-        // let akt_2 = AcknowledgedTicket::from_bytes(&akt_1.to_bytes()).unwrap();
-        // assert_eq!(akt_1, akt_2);
+        assert_eq!(
+            acked_ticket,
+            AcknowledgedTicket::from_bytes(&acked_ticket.to_bytes()).unwrap()
+        );
+
+        assert!(acked_ticket
+            .verify(
+                &keypair.public().to_address(),
+                &keypair_counterparty.public().to_address(),
+                &Hash::default()
+            )
+            .is_ok());
     }
 }
 

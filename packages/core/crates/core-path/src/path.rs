@@ -166,7 +166,7 @@ mod tests {
         ChannelEntry::new(
             source,
             destination,
-            Balance::new(U256::new("1234").mul(U256::new("10000000000000000")), BalanceType::HOPR),
+            Balance::new(1234.into() * 10000000000000000u128.into(), BalanceType::HOPR),
             U256::zero(),
             status,
             U256::zero(),

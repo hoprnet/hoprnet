@@ -7,14 +7,10 @@ use core_crypto::{
 };
 use enum_iterator::{all, Sequence};
 use ethers::contract::EthCall;
-use ethnum::u256;
 use hex_literal::hex;
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
-use std::{
-    fmt::{Display, Formatter},
-    ops::Sub,
-};
+use std::fmt::{Display, Formatter};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -100,20 +96,28 @@ impl ChannelEntry {
 
     /// Checks if the closure time of this channel has passed.
     pub fn closure_time_passed(&self) -> Option<bool> {
-        let now_seconds = current_timestamp() / 1000;
-        (!self.closure_time.eq(&U256::zero())).then(|| self.closure_time.value().lt(&u256::from(now_seconds)))
+        // round clock ms to seconds
+        let now_seconds: U256 = U256::from(current_timestamp()) / 1000u64.into();
+
+        if self.closure_time.eq(&U256::zero()) {
+            None
+        } else {
+            Some(self.closure_time < now_seconds)
+        }
     }
 
     /// Calculates the remaining channel closure grace period.
     pub fn remaining_closure_time(&self) -> Option<u64> {
-        let now_seconds = u256::from(current_timestamp() / 1000);
-        (!self.closure_time.eq(&U256::zero())).then(|| {
-            if now_seconds.ge(self.closure_time.value()) {
-                now_seconds.sub(self.closure_time.value()).as_u64()
-            } else {
-                0
-            }
-        })
+        // round clock ms to seconds
+        let now_seconds = U256::from(current_timestamp()) / 1000u64.into();
+
+        if self.closure_time.eq(&U256::zero()) {
+            None
+        } else if now_seconds >= self.closure_time {
+            Some((now_seconds - self.closure_time).as_u64())
+        } else {
+            Some(0u64)
+        }
     }
 
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
@@ -184,13 +188,12 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 
 /// Contains the overall description of a ticket with a signature
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Ticket {
     pub channel_id: Hash,
     pub amount: Balance,
     pub index: u64,
     pub index_offset: u32,
-    pub win_prob: f64,
+    pub encoded_win_prob: [u8; 7],
     pub channel_epoch: u32,
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
@@ -203,7 +206,7 @@ impl Default for Ticket {
             amount: Balance::new(U256::zero(), BalanceType::HOPR),
             index: 0u64,
             index_offset: 1u32,
-            win_prob: 1.0f64,
+            encoded_win_prob: f64_to_win_prob(1.0f64).expect("failed creating 100% winning probability"),
             channel_epoch: 1u32,
             challenge: EthereumChallenge::default(),
             signature: None,
@@ -218,7 +221,7 @@ impl std::fmt::Display for Ticket {
             .field("amount", &self.amount)
             .field("index", &self.index)
             .field("index_offset", &self.index_offset)
-            .field("win_prob", &format!("{}%", (&self.win_prob * 100.0)))
+            .field("win_prob", &format!("{}%", (&self.win_prob() * 100.0)))
             .field("channel_epoch", &self.channel_epoch)
             .field("challenge", &self.challenge)
             .field("signature", &self.signature.as_ref().map(|s| s.to_hex()))
@@ -229,9 +232,8 @@ impl std::fmt::Display for Ticket {
 impl Ticket {
     /// Creates a new Ticket given the raw Challenge and signs it using the given chain keypair.
     pub fn new(
-        own_address: Address,
-        counterparty: Address,
-        amount: Balance,
+        counterparty: &Address,
+        amount: &Balance,
         index: U256,
         index_offset: U256,
         win_prob: f64,
@@ -240,8 +242,10 @@ impl Ticket {
         signing_key: &ChainKeypair,
         domain_separator: &Hash,
     ) -> Result<Ticket> {
+        let own_address = signing_key.public().to_address();
+
         Ticket::check_value_boundaries(
-            own_address,
+            &own_address,
             counterparty,
             amount,
             index,
@@ -254,12 +258,12 @@ impl Ticket {
 
         let mut ret = Ticket {
             channel_id,
-            amount,
+            amount: amount.to_owned(),
             index: index.as_u64(),
             index_offset: index_offset.as_u32(),
             channel_epoch: channel_epoch.as_u32(),
             challenge,
-            win_prob,
+            encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
         };
         ret.sign(signing_key, domain_separator);
@@ -269,12 +273,12 @@ impl Ticket {
 
     /// Creates a ticket with signature attached.
     pub fn new_with_signature(
-        own_address: Address,
-        counterparty: Address,
-        amount: Balance,
+        own_address: &Address,
+        counterparty: &Address,
+        amount: &Balance,
         index: U256,
         index_offset: U256,
-        win_prob: f64,
+        encoded_win_prob: [u8; 7],
         channel_epoch: U256,
         challenge: EthereumChallenge,
         signature: Signature,
@@ -286,7 +290,7 @@ impl Ticket {
             amount,
             index,
             index_offset,
-            win_prob,
+            win_prob_to_f64(&encoded_win_prob),
             channel_epoch,
         )?;
 
@@ -294,12 +298,12 @@ impl Ticket {
 
         let ret = Ticket {
             channel_id,
-            amount,
+            amount: amount.to_owned(),
             index: index.as_u64(),
             index_offset: index_offset.as_u32(),
             channel_epoch: channel_epoch.as_u32(),
             challenge,
-            win_prob,
+            encoded_win_prob,
             signature: Some(signature),
         };
 
@@ -312,9 +316,9 @@ impl Ticket {
     /// Creates a ticket *without* signature and *without* a challenge set.
     /// This sets a default value as challenge.
     pub fn new_partial(
-        own_address: Address,
-        counterparty: Address,
-        amount: Balance,
+        own_address: &Address,
+        counterparty: &Address,
+        amount: &Balance,
         index: U256,
         index_offset: U256,
         win_prob: f64,
@@ -334,12 +338,12 @@ impl Ticket {
 
         Ok(Ticket {
             channel_id,
-            amount,
+            amount: amount.to_owned(),
             index: index.as_u64(),
             index_offset: index_offset.as_u32(),
             channel_epoch: channel_epoch.as_u32(),
             challenge: EthereumChallenge::default(),
-            win_prob,
+            encoded_win_prob: f64_to_win_prob(win_prob).expect("error encoding winning probability"),
             signature: None,
         })
     }
@@ -348,9 +352,9 @@ impl Ticket {
     /// This method checks whether they are met and prevents from unintended
     /// usage.
     fn check_value_boundaries(
-        own_address: Address,
-        counterparty: Address,
-        amount: Balance,
+        own_address: &Address,
+        counterparty: &Address,
+        amount: &Balance,
         index: U256,
         index_offset: U256,
         win_prob: f64,
@@ -413,13 +417,10 @@ impl Ticket {
         self.sign(signing_key, domain_separator);
     }
 
-    /// Encode winning probability such that it can get used in the smart
-    /// contract
-    pub fn encoded_win_prob(&self) -> u64 {
-        let mut encoded = [0u8; 8];
-        encoded[1..].copy_from_slice(&f64_to_win_prob(self.win_prob).unwrap());
-
-        u64::from_be_bytes(encoded)
+    /// Encode winning probability such that it can get used in
+    /// the smart contract
+    pub fn win_prob(&self) -> f64 {
+        win_prob_to_f64(&self.encoded_win_prob)
     }
 
     /// Serializes the ticket with or without signature
@@ -438,10 +439,7 @@ impl Ticket {
         ret.extend_from_slice(&self.index.to_be_bytes()[2..8]);
         ret.extend_from_slice(&self.index_offset.to_be_bytes());
         ret.extend_from_slice(&self.channel_epoch.to_be_bytes()[1..4]);
-        ret.extend_from_slice(
-            &f64_to_win_prob(self.win_prob)
-                .expect("tried to serialize ticket with winning probability outside of interval [0.0f64, 1.0f64]"),
-        );
+        ret.extend_from_slice(&self.encoded_win_prob);
         ret.extend_from_slice(&self.challenge.to_bytes());
 
         if with_signature {
@@ -474,11 +472,10 @@ impl Ticket {
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Self {
+    pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Self {
         Self::new(
-            private_key.public().to_address(),
             destination,
-            Balance::new(0u32.into(), BalanceType::HOPR),
+            &Balance::new(0u32.into(), BalanceType::HOPR),
             U256::zero(),
             U256::zero(),
             0.0,
@@ -492,10 +489,12 @@ impl Ticket {
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
     /// relates to.
+    ///
+    /// Does not support path lengths greater than 7
     pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
         Ok((self.get_expected_payout() / price_per_packet)
             .as_u64()
-            .try_into()
+            .try_into() // convert to u8
             .map_err(|_| {
                 CoreTypesError::ArithmeticError(format!(
                     "Cannot convert {} to u8",
@@ -505,23 +504,16 @@ impl Ticket {
     }
 
     pub fn get_expected_payout(&self) -> U256 {
-        if self.win_prob == 1.0 {
-            // special case: mantisse extraction does not work here
-            self.amount.value().clone()
-        } else if self.win_prob == 0.0 {
-            // special case: prevent from potential underflow errors
-            U256::zero()
-        } else {
-            (self.amount.value().clone()
-                * U256::from((self.win_prob + 1.0 + f64::EPSILON).to_bits() & 0x000fffffffffffffu64))
-                >> U256::from(52u64)
-        }
+        self.amount
+            .value()
+            .multiply_f64(self.win_prob())
+            .expect("ticket win probability outside of allowed interval of [0.0, 1.0]")
     }
 
     /// Recovers the signer public key from the embedded ticket signature.
     /// This is possible due this specific instantiation of the ECDSA over the secp256k1 curve.
     pub fn recover_signer(&self, domain_separator: &Hash) -> core_crypto::errors::Result<PublicKey> {
-        PublicKey::from_signature(
+        PublicKey::from_signature_hash(
             &self.get_hash(domain_separator).to_bytes(),
             self.signature.as_ref().expect("ticket not signed"),
         )
@@ -558,11 +550,11 @@ impl BinarySerializable for Ticket {
             let mut index_offset = [0u8; 4];
             index_offset.copy_from_slice(&data[Hash::SIZE + 12 + 6..Hash::SIZE + 12 + 6 + 4]);
 
-            let mut win_prob = [0u8; 7];
-            win_prob.copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4..Hash::SIZE + 12 + 6 + 4 + 7]);
-
             let mut channel_epoch = [0u8; 4];
-            channel_epoch[1..].copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4 + 7..Hash::SIZE + 12 + 6 + 4 + 7 + 3]);
+            channel_epoch[1..4].copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4..Hash::SIZE + 12 + 6 + 4 + 3]);
+
+            let mut encoded_win_prob = [0u8; 7];
+            encoded_win_prob.copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4 + 3..Hash::SIZE + 12 + 6 + 4 + 3 + 7]);
 
             let challenge = EthereumChallenge::from_bytes(&data[64..84])?;
 
@@ -573,9 +565,7 @@ impl BinarySerializable for Ticket {
                 amount: Balance::new(U256::from_bytes(&amount)?, BalanceType::HOPR),
                 index: u64::from_be_bytes(index),
                 index_offset: u32::from_be_bytes(index_offset),
-                // shift default exponent (exponent bias 1023) to beginnning,
-                // then append significant bits
-                win_prob: win_prob_to_f64(&win_prob),
+                encoded_win_prob,
                 channel_epoch: u32::from_be_bytes(channel_epoch),
                 challenge,
                 signature: Some(signature),
@@ -620,7 +610,7 @@ pub fn win_prob_to_f64(encoded_win_prob: &[u8; 7]) -> f64 {
 pub fn f64_to_win_prob(win_prob: f64) -> Result<[u8; 7]> {
     if win_prob > 1.0 || win_prob < 0.0 {
         return Err(CoreTypesError::InvalidInputData(
-            "Winning probability must be in (0.0, 1.0]".into(),
+            "Winning probability must be in [0.0, 1.0]".into(),
         ));
     }
 
@@ -648,12 +638,11 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<[u8; 7]> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use crate::channels::{ChannelEntry, ChannelStatus, Ticket, f64_to_win_prob};
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::Hash,
     };
-    use ethnum::u256;
     use hex_literal::hex;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
@@ -670,11 +659,11 @@ pub mod tests {
         let ce1 = ChannelEntry::new(
             Address::from_bytes(&ADDRESS_1).unwrap(),
             Address::from_bytes(&ADDRESS_2).unwrap(),
-            Balance::new(u256::from(10u8).into(), BalanceType::HOPR),
-            U256::new("0"),
+            Balance::new(10u64.into(), BalanceType::HOPR),
+            23u64.into(),
             ChannelStatus::PendingToClose,
-            U256::new("3"),
-            U256::new("4"),
+            3u64.into(),
+            4u64.into(),
         );
 
         let ce2 = ChannelEntry::from_bytes(&ce1.to_bytes()).unwrap();
@@ -706,8 +695,6 @@ pub mod tests {
 
         test_bit_string[0] = 0x1f;
         assert_eq!(0.125f64, super::win_prob_to_f64(&test_bit_string));
-
-        println!("{}", super::win_prob_to_f64(&hex!("ffffffffffffef")));
     }
 
     #[test]
@@ -741,9 +728,8 @@ pub mod tests {
         let bob = ChainKeypair::from_secret(&BOB).unwrap();
 
         let initial_ticket = super::Ticket::new(
-            alice.public().to_address(),
-            bob.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
+            &bob.public().to_address(),
+            &Balance::new(U256::one(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
             1.0,
@@ -765,9 +751,8 @@ pub mod tests {
         let bob = ChainKeypair::from_secret(&BOB).unwrap();
 
         let initial_ticket = super::Ticket::new(
-            alice.public().to_address(),
-            bob.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
+            &bob.public().to_address(),
+            &Balance::new(U256::one(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
             1.0,
@@ -790,9 +775,9 @@ pub mod tests {
         let alice = ChainKeypair::from_secret(&ALICE).unwrap();
         let bob = ChainKeypair::from_secret(&BOB).unwrap();
         let mut ticket = Ticket::new_partial(
-            alice.public().to_address(),
-            bob.public().to_address(),
-            Balance::new(U256::one(), BalanceType::HOPR),
+            &alice.public().to_address(),
+            &bob.public().to_address(),
+            &Balance::new(U256::one(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
             1.0,
@@ -807,13 +792,13 @@ pub mod tests {
         assert_eq!(2u8, ticket.get_path_position(U256::from(17u64)).unwrap());
 
         ticket.amount = Balance::new(U256::from(30u64), BalanceType::HOPR);
-        ticket.win_prob = 0.2;
+        ticket.encoded_win_prob = f64_to_win_prob(0.2).unwrap();
 
         assert_eq!(U256::from(6u64), ticket.get_expected_payout());
 
         assert_eq!(2u8, ticket.get_path_position(U256::from(3u64)).unwrap());
 
-        ticket.win_prob = 0.0;
+        ticket.encoded_win_prob = f64_to_win_prob(0.0).unwrap();
         assert_eq!(U256::zero(), ticket.get_expected_payout());
     }
 }
@@ -878,12 +863,12 @@ pub mod wasm {
     impl Ticket {
         #[wasm_bindgen(constructor)]
         pub fn _new(
-            own_address: Address,
-            counterparty: Address,
+            own_address: &Address,
+            counterparty: &Address,
             challenge: EthereumChallenge,
             index: U256,
             index_offset: U256,
-            amount: Balance,
+            amount: &Balance,
             win_prob: f64,
             channel_epoch: U256,
             keypair: &ChainKeypair,

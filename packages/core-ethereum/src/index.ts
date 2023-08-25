@@ -30,7 +30,6 @@ import {
   Ethereum_Hash,
   CORE_ETHEREUM_CONSTANTS,
   is_allowed_to_access_network,
-  redeem_ticket
 } from './db.js'
 
 import Indexer from './indexer/index.js'

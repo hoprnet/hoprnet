@@ -367,7 +367,10 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementInteraction<Db> {
                 let response = unackowledged.get_response(&ack.ack_key_share)?;
                 debug!("acknowledging ticket using response {}", response.to_hex());
 
-                let ack_ticket = AcknowledgedTicket::new(unackowledged.ticket, response, unackowledged.signer);
+                let domain_separator = self.db.read().await.get_channels_domain_separator().await.unwrap();
+
+                let ack_ticket =
+                    AcknowledgedTicket::new(unackowledged.ticket, response, unackowledged.signer, &domain_separator)?;
 
                 // replace the un-acked ticket with acked ticket.
                 //debug!(">>> WRITE replacing unack with acked");
@@ -516,9 +519,9 @@ where
         }
 
         let ticket = Ticket::new_partial(
-            self.cfg.chain_keypair.public().to_address(),
-            destination,
-            amount,
+            &self.cfg.chain_keypair.public().to_address(),
+            &destination,
+            &amount,
             current_index,
             U256::one(), // unaggregated always have index_offset == 1
             1.0,         // 100% winning probability
@@ -576,7 +579,7 @@ where
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(next_peer, &self.cfg.chain_keypair, &domain_separator)
+            Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)
         } else {
             self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
@@ -801,13 +804,11 @@ where
                 }
                 //debug!("<<< WRITE storing pending ack");
 
-                let path_pos = packet
-                    .ticket
-                    .get_path_position(U256::new(PRICE_PER_PACKET))?;
+                let path_pos = packet.ticket.get_path_position(U256::new(PRICE_PER_PACKET))?;
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
-                    Ticket::new_zero_hop(next_hop_addr, &self.cfg.chain_keypair, &domain_separator)
+                    Ticket::new_zero_hop(&next_hop_addr, &self.cfg.chain_keypair, &domain_separator)
                 } else {
                     self.create_multihop_ticket(next_hop_addr, path_pos).await?
                 };
@@ -1031,7 +1032,7 @@ mod tests {
         ChannelEntry::new(
             source,
             destination,
-            Balance::new(U256::new("1234").mul(U256::new(PRICE_PER_PACKET)), BalanceType::HOPR),
+            Balance::new(1234u64.into() * U256::new(PRICE_PER_PACKET), BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
