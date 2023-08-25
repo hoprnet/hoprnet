@@ -13,6 +13,10 @@ use ethers::{
 };
 use log::{log, Level};
 use std::env;
+use ethers::{
+    types::U256,
+    utils::parse_units, //, types::U256, utils::format_units, ParseUnits
+};
 
 /// CLI arguments for `hopli create-safe-module`
 #[derive(Parser, Default, Debug)]
