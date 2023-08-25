@@ -54,7 +54,6 @@ pub trait Pinging {
 
 pub struct Ping<T: PingExternalAPI> {
     config: PingConfig,
-    active_pings: std::collections::HashMap<PeerId, (u64, ControlMessage, Option<SimpleTimer>)>,
     send_ping: HeartbeatSendPingTx,
     receive_pong: HeartbeatGetPongRx,
     external_api: T,
@@ -62,6 +61,8 @@ pub struct Ping<T: PingExternalAPI> {
     metric_successful_ping_count: Option<SimpleCounter>,
     metric_failed_ping_count: Option<SimpleCounter>,
 }
+
+type PingStartedRecord = (u64, ControlMessage, Option<SimpleTimer>);
 
 impl<T: PingExternalAPI> Ping<T> {
     pub fn new(config: PingConfig, send_ping: HeartbeatSendPingTx, receive_pong: HeartbeatGetPongRx, external_api: T) -> Ping<T> {
@@ -72,7 +73,6 @@ impl<T: PingExternalAPI> Ping<T> {
 
         Ping {
             config,
-            active_pings: std::collections::HashMap::new(),
             send_ping,
             receive_pong,
             external_api,
@@ -95,22 +95,20 @@ impl<T: PingExternalAPI> Ping<T> {
         }
     }
 
-    fn initiate_peer_ping(&mut self, peer: &PeerId) -> bool {
-        if ! self.active_pings.contains_key(&peer) {
-            info!("Pinging peer '{}'", peer);
+    fn initiate_peer_ping(&mut self, peer: &PeerId) -> Result<(u64, ControlMessage, std::option::Option<SimpleTimer>), ()> {
+        info!("Pinging peer '{}'", peer);
 
-            let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();
+        let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();
 
-            let ping_peer_timer = if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
-                Some(histogram_start_measure!(metric_time_to_ping))
-            } else {
-                None
-            };
-            let _ = self.active_pings.insert(peer.clone(), (current_timestamp(), ping_challenge.clone(), ping_peer_timer));
-            return self.send_ping.start_send((peer.clone(), ping_challenge)).is_ok()
-        }
+        let ping_peer_timer = if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
+            Some(histogram_start_measure!(metric_time_to_ping))
+        } else {
+            None
+        };
 
-        false
+        self.send_ping.start_send((peer.clone(), ping_challenge.clone()))
+            .map(move|_| (current_timestamp(), ping_challenge, ping_peer_timer))
+            .map_err(|_| ())
     }
 }
 
@@ -131,6 +129,7 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
         let start_all_peers = current_timestamp();
         let mut peers = peers;
 
+
         if peers.is_empty() {
             debug!("Received an empty peer list, not pinging any peers");
             return ()
@@ -141,70 +140,82 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
             return ()
         }
 
-        let remnants = self.active_pings.len();
-        if remnants > 0 {
-            debug!("{} remnants from previous timeout aborted session are present", remnants)
-        }
+        let mut active_pings: std::collections::HashMap<PeerId, PingStartedRecord> = std::collections::HashMap::new();
 
         let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
         for peer in peers.into_iter() {
-            self.initiate_peer_ping(&peer);
+            if ! active_pings.contains_key(&peer) {
+                match self.initiate_peer_ping(&peer) {
+                    Ok(v) => {
+                        active_pings.insert(peer.clone(), v);
+                    },
+                    Err(_) => {}
+                };
+            }
         }
 
         let mut waiting = std::collections::VecDeque::from(remainder);
-        while let Some((peer, response)) = self.receive_pong.next().await {
-            let (peer, result) = match response {
-                Ok(pong) => {
-                    let record = self.active_pings.remove(&peer);
-                    
-                    if record.is_none() {
-                        error!("Received a pong for an unregistered ping, likely an aborted run");
-                        continue;
-                    }
 
-                    let (start, challenge, timer) = record.expect("Should hold a value at this point");
-                    let duration: std::result::Result<std::time::Duration, ()> = {
-                        if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
-                            info!("Successfully pinged peer {}", peer);
-                            Ok(std::time::Duration::from_millis(current_timestamp() - start))
-                        } else {
-                            error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
-                            Err(())
+        while active_pings.len() > 0 || waiting.len() > 0 {
+            while let Some((peer, response)) = self.receive_pong.next().await {
+                let record = active_pings.remove(&peer);
+                        
+                if record.is_none() {
+                    error!("Received a pong for an unregistered ping, likely an aborted run");
+                    continue
+                }
+
+                let (peer, result) = match response {
+                    Ok(pong) => {
+                        let (start, challenge, timer) = record.expect("Should hold a value at this point");
+                        let duration: std::result::Result<std::time::Duration, ()> = {
+                            if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
+                                info!("Successfully pinged peer {}", peer);
+                                Ok(std::time::Duration::from_millis(current_timestamp() - start))
+                            } else {
+                                error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
+                                Err(())
+                            }
+                        };
+
+                        if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
+                            metric_time_to_ping.record_measure(timer.unwrap());
                         }
-                    };
 
-                    if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
-                        metric_time_to_ping.record_measure(timer.unwrap());
+                        (peer, duration)
+                    },
+                    Err(_) => {
+                        error!("Ping to peer {} timed out", peer);
+                        (peer, Err(()))
                     }
+                };
 
-                    (peer, duration)
-                },
-                Err(_) => {
-                    error!("Ping to peer {} timed out", peer);
-                    (peer, Err(()))
+                match result {
+                    Ok(_) => {
+                        if let Some(metric_successful_ping_count) = &self.metric_successful_ping_count {
+                            metric_successful_ping_count.increment();
+                        };
+                    },
+                    Err(_) => {
+                        if let Some(metric_failed_ping_count) = &self.metric_failed_ping_count {
+                            metric_failed_ping_count.increment();
+                        };
+                    }
                 }
-            };
 
-            match result {
-                Ok(_) => {
-                    if let Some(metric_successful_ping_count) = &self.metric_successful_ping_count {
-                        metric_successful_ping_count.increment();
-                    };
-                },
-                Err(_) => {
-                    if let Some(metric_failed_ping_count) = &self.metric_failed_ping_count {
-                        metric_failed_ping_count.increment();
-                    };
-                }
-            }
+                self.external_api.on_finished_ping(&peer, result.map(|v| v.as_millis() as u64)).await;
 
-            self.external_api.on_finished_ping(&peer, result.map(|v| v.as_millis() as u64)).await;
-
-            let remaining_time = current_timestamp() - start_all_peers;
-            if (remaining_time as u128) < self.config.timeout as u128 {
-                while let Some(peer) = waiting.pop_front() {
-                    if self.initiate_peer_ping(&peer) {
-                        break
+                let remaining_time = current_timestamp() - start_all_peers;
+                if (remaining_time as u128) < self.config.timeout as u128 {
+                    while let Some(peer) = waiting.pop_front() {
+                        if ! active_pings.contains_key(&peer) {
+                            match self.initiate_peer_ping(&peer) {
+                                Ok(v) => {
+                                    active_pings.insert(peer.clone(), v);
+                                },
+                                Err(_) => continue
+                            };
+                        }
                     }
                 }
             }
@@ -311,7 +322,7 @@ mod tests {
             )
             .return_const(());
 
-        // NOTE: timeout is ensure by the libp2p protocol handling, only error arrives
+        // NOTE: timeout is ensured by the libp2p protocol handling, only error arrives
         // from the channel
         let timeout_single_use_channel = async move {
             if let Some((peer, _challenge)) = rx_ping.next().await {
