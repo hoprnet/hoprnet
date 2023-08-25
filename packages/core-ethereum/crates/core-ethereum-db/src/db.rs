@@ -1564,7 +1564,7 @@ mod tests {
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
 
-        db.set_network_registry(false, &Snapshot::default()).await;
+        assert!(db.set_network_registry(false, &Snapshot::default()).await.is_ok());
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(false));
     }

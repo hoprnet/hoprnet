@@ -53,10 +53,10 @@ describe('GET /node/info', () => {
       noticePeriodChannelClosure: 60
     })
     node.getAddressesAnnouncedToDHT = sinon.fake.resolves(DHT_ADDRESSES)
-    node.getListeningAddresses = sinon.fake.returns(LISTENING_ADDRS)
+    node.getListeningAddresses = async () => { return LISTENING_ADDRS }
     node.getId = sinon.fake.returns(ALICE_PEER_ID)
     node.isAllowedAccessToNetwork = sinon.fake.returns(Promise.resolve(true))
-    node.getConnectivityHealth = sinon.fake.returns(Health.Green)
+    node.getConnectivityHealth = async () => { return Health.Green }
 
     const res = await request(service).get(`/api/v3/node/info`)
     expect(res.status).to.equal(200)

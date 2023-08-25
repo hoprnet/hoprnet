@@ -1,7 +1,11 @@
-use crate::errors::Result;
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use utils_types::primitives::Address;
+#[cfg(any(feature = "wasm", test))]
+use {
+    crate::errors::Result,
+    core_ethereum_db::traits::HoprCoreEthereumDbActions,
+    utils_types::primitives::Address
+};
 
+#[cfg(any(feature = "wasm", test))]
 pub async fn is_allowed_to_access_network<T>(db: &T, chain_address: &Address) -> Result<bool>
 where
     T: HoprCoreEthereumDbActions,
@@ -17,7 +21,7 @@ where
         .map_err(|e| e.into())
 }
 
-#[cfg(all(not(target = "wasm32"), test))]
+#[cfg(test)]
 mod tests {
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use hex_literal::hex;

@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::random::{random_bytes, random_group_element};
@@ -68,6 +70,12 @@ impl Keypair for OffchainKeypair {
     }
 }
 
+impl Debug for OffchainKeypair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("OffchainKeypair").field(&self.1).finish()
+    }
+}
+
 impl ConstantTimeEq for OffchainKeypair {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.secret().ct_eq(other.secret())
@@ -125,6 +133,12 @@ impl Keypair for ChainKeypair {
 
     fn public(&self) -> &Self::Public {
         &self.1
+    }
+}
+
+impl Debug for ChainKeypair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ChainKeypair").field(&self.1).finish()
     }
 }
 

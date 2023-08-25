@@ -1,3 +1,4 @@
 vendor/** linguist-generated
+vendor/** binary
 *.html linguist-generated
 packages/ethereum/crates/bindings/** linguist-generated

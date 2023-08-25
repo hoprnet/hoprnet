@@ -20,7 +20,7 @@ use utils_types::{
 };
 
 /// Represents packet acknowledgement
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Acknowledgement {
     ack_signature: OffchainSignature,
@@ -387,8 +387,10 @@ pub mod test {
         types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response},
     };
     use hex_literal::hex;
-    use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
-    use utils_types::traits::BinarySerializable;
+    use utils_types::{
+        primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
+        traits::BinarySerializable,
+    };
 
     const ALICE: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
 

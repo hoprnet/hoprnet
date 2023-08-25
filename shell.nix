@@ -8,6 +8,7 @@ let
   );
   macosPkgs = with pkgs; lib.optional stdenv.isDarwin (
     with darwin.apple_sdk.frameworks; [
+      SystemConfiguration
       # macOS file watcher support
       CoreFoundation
       CoreServices
