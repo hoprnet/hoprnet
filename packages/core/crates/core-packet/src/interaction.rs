@@ -424,7 +424,7 @@ pub enum MsgToProcess {
 #[derive(Debug)]
 pub enum MsgProcessed {
     Receive(PeerId, Box<[u8]>),
-    Send(PeerId, Box<[u8]>, PacketSendFinalizer),
+    Send(PeerId, Box<[u8]>),
     Forward(PeerId, Box<[u8]>,)
 }
 
@@ -715,29 +715,20 @@ where
 #[derive(Debug)]
 pub struct PacketSendFinalizer {
     tx: Option<futures::channel::oneshot::Sender<HalfKeyChallenge>>,
-    challenge: Option<HalfKeyChallenge>
 }
 
 impl PacketSendFinalizer {
     pub fn new(tx: futures::channel::oneshot::Sender<HalfKeyChallenge>) -> Self {
-        Self { tx: Some(tx), challenge: None }
-    }
-        
-    pub fn store_challenge(&mut self, challenge: HalfKeyChallenge) {
-        self.challenge.replace(challenge);
+        Self { tx: Some(tx) }
     }
 
-    pub fn send(mut self) {
+    pub fn finalize(mut self, challenge: HalfKeyChallenge) {
         if let Some(sender) = self.tx.take() {
-            if let Some(challenge) = self.challenge {
-                match sender.send(challenge) {
-                    Ok(_) => {},
-                    Err(_) => {
-                        error!("Failed to notify the awaiter about the successful packet transmission")
-                    },
-                }
-            } else {
-                error!("Missing challenge to report back packet send completed")
+            match sender.send(challenge) {
+                Ok(_) => {},
+                Err(_) => {
+                    error!("Failed to notify the awaiter about the successful packet transmission")
+                },
             }
         } else {
             error!("Sender for packet send signalization is already spent")
@@ -954,14 +945,14 @@ impl PacketInteraction {
                             },
                         }
                     },
-                    MsgToProcess::ToSend(data, path, mut finalizer) => {
+                    MsgToProcess::ToSend(data, path, finalizer) => {
                         match processor.create_packet_from_me(data, path).await {
                             Ok((payload, challenge)) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 METRIC_PACKETS_COUNT.increment();
                                 
-                                finalizer.store_challenge(challenge);
-                                Some(MsgProcessed::Send(payload.remote_peer, payload.data, finalizer))
+                                finalizer.finalize(challenge);
+                                Some(MsgProcessed::Send(payload.remote_peer, payload.data))
                             },
                             Err(e) => {
                                 error!("Encountered error creating a packet to send: {}", e);
@@ -1093,29 +1084,14 @@ mod tests {
     use super::{PacketSendFinalizer, PacketSendAwaiter};
 
     #[async_std::test]
-    pub async fn test_packet_send_finalizer_fails_without_a_stored_challenge() {
-        let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
-
-        let finalizer = PacketSendFinalizer::new(tx);
-        let mut awaiter: PacketSendAwaiter = rx.into();
-
-        finalizer.send();
-
-        let result = awaiter.consume_and_wait(Duration::from_millis(20)).await;
-
-        assert!(result.is_err());
-    }
-
-    #[async_std::test]
     pub async fn test_packet_send_finalizer_succeeds_with_a_stored_challenge() {
         let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
 
         let mut finalizer = PacketSendFinalizer::new(tx);
         let challenge = HalfKeyChallenge::default();
-        finalizer.store_challenge(challenge.clone());
         let mut awaiter: PacketSendAwaiter = rx.into();
 
-        finalizer.send();
+        finalizer.finalize(challenge.clone());
 
         let result = awaiter.consume_and_wait(Duration::from_millis(20)).await;
 
@@ -1387,7 +1363,7 @@ mod tests {
 
         for _ in 0..pending_packet_count {
             match components[0].1.next().await.expect("pkt_sender should have sent a packet") {
-                MsgProcessed::Send(peer, data, _) => {
+                MsgProcessed::Send(peer, data) => {
                     assert_eq!(peer, PEERS[1]);
                     components[1].1.writer().receive_packet(data, PEERS[0]).expect("Send to relayer should succeed")
                 },

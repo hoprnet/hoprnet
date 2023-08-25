@@ -9,7 +9,7 @@ use futures::{
 
 use core_network::network::{Network, NetworkEvent, PeerOrigin};
 use core_types::acknowledgement::Acknowledgement;
-use core_packet::interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction, PacketSendFinalizer};
+use core_packet::interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction};
 pub use core_p2p::{libp2p_identity, api};
 use core_p2p::{
     HoprNetworkBehaviorEvent,
@@ -121,7 +121,6 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
 
     let mut active_manual_pings: std::collections::HashSet<libp2p_request_response::RequestId> = std::collections::HashSet::new();
     let mut allowed_peers: std::collections::HashSet<PeerId> = std::collections::HashSet::new();
-    let mut active_sent_packets: std::collections::HashMap<libp2p_request_response::RequestId, PacketSendFinalizer> = std::collections::HashMap::new();
 
     let mut inputs = (
         heartbeat_requests.map(Inputs::Heartbeat),
@@ -172,9 +171,8 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                     MsgProcessed::Receive(peer, _octets) => {
                         debug!("Nothing needs to be done here, as long as the packet interactions emit the received packet from peer: {peer}")
                     },
-                    MsgProcessed::Send(peer, octets, finalizer) => {
-                        let request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
-                        active_sent_packets.insert(request_id, finalizer);
+                    MsgProcessed::Send(peer, octets) => {
+                        let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
                     },
                     MsgProcessed::Forward(peer, octets) => {
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
@@ -250,15 +248,11 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                     },
                 })) => {
                     debug!("Message protocol: Received a response for sending message with id {} from {}", &request_id, &peer);
-                    if let Some(finalizer) = active_sent_packets.remove(&request_id) {
-                        finalizer.send();
-                    }
                 },
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
                     peer, error, request_id
                 })) => {
-                    error!("Message protocol: Failed to send a message {} with an error: {}", peer, error);
-                    active_sent_packets.remove(&request_id);
+                    error!("Message protocol: Failed to send a message (#{}) to peer {} with an error: {}", request_id, peer, error);
                 },
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<Box<[u8]>, ()>::InboundFailure {..}))
                 | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<Box<[u8]>, ()>::ResponseSent {..})) => {

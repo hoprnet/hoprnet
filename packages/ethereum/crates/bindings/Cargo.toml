@@ -8,7 +8,5 @@ edition = "2021"
 [dependencies]
 ethers = { version = "2", default-features = false, features = ["abigen"] }
 
-
-
 [lib] 
 crate-type = ["cdylib", "rlib"]
