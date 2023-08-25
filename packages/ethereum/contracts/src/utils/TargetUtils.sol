@@ -104,7 +104,7 @@ library TargetUtils {
             revert TooManyCapabilities();
         }
         // left shift 160 + 8 + 8 + 8 + 8 * pos bits then right shift 256 - 8 bits
-        uint256 leftShiftBy = 184 + 8 * position;
+        uint256 leftShiftBy = 184 + (8 * position);
         return CapabilityPermission(uint8((Target.unwrap(target) << leftShiftBy) >> 248));
     }
 
@@ -188,7 +188,7 @@ library TargetUtils {
         // include the CapabilityPermissions to the last 8 * 9 = 72 bits
         for (uint256 i = 0; i < capabilityPermissions.length; i++) {
             // left shift 72 - 8 - 8 * i bits
-            _target |= uint256(capabilityPermissions[i]) << (64 - 8 * i);
+            _target |= uint256(capabilityPermissions[i]) << (64 - (8 * i));
         }
         return Target.wrap(_target);
     }
@@ -215,7 +215,7 @@ library TargetUtils {
         // take the next 8 bits as targetType
         targetType = TargetType(uint8((Target.unwrap(target) << 168) >> 248));
         // decode default target permissions
-        targetPermission = TargetPermission(uint8(Target.unwrap(target) << 176 >> 248));
+        targetPermission = TargetPermission(uint8((Target.unwrap(target) << 176) >> 248));
 
         // there are 1 default target permission and 8 default function permissions
         capabilityPermissions = new CapabilityPermission[](NUM_CAPABILITY_PERMISSIONS);
@@ -224,7 +224,7 @@ library TargetUtils {
             // first left offset byt 184 + 8 * i bits
             // where 184 = 160 (address) + 8 (Clearance) + 8 (TargetType) + 8 (TargetPermission)
             // then RIGHT shift 256 - 8 = 248 bits
-            capabilityPermissions[i] = CapabilityPermission(uint8(Target.unwrap(target) << (184 + 8 * i) >> 248));
+            capabilityPermissions[i] = CapabilityPermission(uint8((Target.unwrap(target) << (184 + (8 * i))) >> 248));
         }
     }
 
