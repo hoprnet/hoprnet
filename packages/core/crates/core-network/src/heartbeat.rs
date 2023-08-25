@@ -175,7 +175,7 @@ mod tests {
         
         futures_lite::future::race(
             heartbeat.heartbeat_loop(),
-            sleep(std::time::Duration::from_millis((1u64 + (expected_loop_count as u64)) * ping_delay - 1u64))
+            sleep(std::time::Duration::from_millis(((expected_loop_count as u64)) * ping_delay))
         ).await;  
     }
 
@@ -193,11 +193,11 @@ mod tests {
             .return_const(vec![PeerId::random(), PeerId::random()]);
 
         let mut heartbeat = Heartbeat::new(
-            config, DelayingPinger{delay: ping_delay}, mock);
+            config.clone(), DelayingPinger{delay: ping_delay}, mock);
         
         futures_lite::future::race(
             heartbeat.heartbeat_loop(),
-            sleep(std::time::Duration::from_millis((expected_loop_count as u64) * ping_delay + 1u64))
+            sleep(std::time::Duration::from_millis((expected_loop_count as u64) * config.heartbeat_interval as u64))
         ).await;  
     }
 }
