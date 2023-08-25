@@ -252,7 +252,7 @@ api_send_message(){
   local peers="${5}"
 
   local path=$(echo "${peers}" | tr -d '\n' | jq -R -s 'split(" ")')
-  local payload='{"body":"'${msg}'","path":'${path}',"peerAddress":"'${peer_address}'","tag":'${tag}'}'
+  local payload='{"body":"'${msg}'","path":'${path}',"peerId":"'${peer_address}'","tag":'${tag}'}'
   # Node might need some time once commitment is set on-chain
   api_call "${source_api}" "/messages" "POST" "${payload}" "202" 90 15 "" true
 }
