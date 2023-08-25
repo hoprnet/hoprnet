@@ -129,14 +129,14 @@ impl ChainCalls {
         if self.use_safe {
             Ok(FundChannelSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
-                amount: amount.value().as_u128(),
                 account: EthereumAddress::from_slice(&dest.to_bytes()),
+                amount: amount.value().as_u128(),
             }
             .encode())
         } else {
             Ok(FundChannelCall {
-                amount: amount.value().as_u128(),
                 account: EthereumAddress::from_slice(&dest.to_bytes()),
+                amount: amount.value().as_u128(),
             }
             .encode())
         }

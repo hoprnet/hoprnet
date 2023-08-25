@@ -360,6 +360,13 @@ where
 
                 let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
 
+                utils_log::debug!(
+                    "on_token_transfer_event - address_to_monitor: {:?} - to: {:?} - from: {:?}",
+                    &self.address_to_monitor.to_string(),
+                    to.to_string(),
+                    from.to_string()
+                );
+
                 if to.ne(&self.address_to_monitor) && from.ne(&self.address_to_monitor) {
                     return Ok(());
                 } else if to.eq(&self.address_to_monitor) {
@@ -375,6 +382,15 @@ where
                 let spender: Address = approved.spender.0.try_into()?;
 
                 let allowance: U256 = u256::from_be_bytes(approved.value.into()).into();
+
+                utils_log::debug!(
+                    "on_token_approval_event - address_to_monitor: {:?} - owner: {:?} - spender: {:?}, allowance: {:?}",
+                    &self.address_to_monitor.to_string(),
+                    owner.to_string(),
+                    spender.to_string(),
+                    allowance.to_string()
+                );
+
                 if owner.eq(&self.address_to_monitor) && spender.eq(&self.addresses.channels) {
                     db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)
                         .await?;
@@ -504,7 +520,11 @@ where
     where
         T: HoprCoreEthereumDbActions,
     {
-        utils_log::debug!("indexer received log {:?}", log);
+        utils_log::debug!(
+            "on_event - address: {:?} - received log: {:?}",
+            address.to_string(),
+            log
+        );
 
         if address.eq(&self.addresses.announcements) {
             self.on_announcement_event(db, log, block_number, snapshot).await?;
@@ -519,6 +539,12 @@ where
         } else if address.eq(&self.addresses.node_management_module) {
             self.on_node_management_module_event(db, log, snapshot).await?
         } else {
+            utils_log::error!(
+                "on_event - unknown contract address: {:?} - received log: {:?}",
+                address.to_string(),
+                log
+            );
+
             return Err(CoreEthereumIndexerError::UnknownContract(*address));
         }
         Ok(())

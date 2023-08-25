@@ -166,13 +166,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // update the base valuse of balance and allowance of token for safe
     if (!this.lastSnapshot) {
       // update safe's HOPR token balance
-      log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
+      log(`get safe ${this.safeAddress.to_string()} HOPR balance at block ${fromBlock}`)
       const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
       await this.db.set_hopr_balance(Balance.deserialize(hoprBalance.serialize_value(), BalanceType.HOPR))
       log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
       // update safe's HORP token allowance granted to Channels contract
-      log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
+      log(`get safe ${this.safeAddress.to_string()} HOPR allowance at block ${fromBlock}`)
       const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
       await this.db.set_staking_safe_allowance(
         Balance.deserialize(safeAllowance.serialize_value(), BalanceType.HOPR),
@@ -343,6 +343,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     for (const query of queries) {
       try {
+        console.log("QUERY: ", query, query.topics)
         rawEvents.push(...(await provider.getLogs(query)))
       } catch {
         return {
@@ -353,6 +354,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     // sort in-place
     rawEvents.sort(snapshotComparator)
+    console.log("RAW EVENTS SORTED: ", rawEvents)
 
     return {
       success: true,
@@ -385,7 +387,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       //   toBlock - fromBlock
       // )
 
-      let res = await this.getEvents(fromBlock, toBlock)
+      let res = await this.getEvents(fromBlock, toBlock, true)
 
       if (res.success) {
         this.onNewEvents(res.events)
@@ -726,7 +728,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         // ideally we would have detected if this snapshot was indeed processed,
         // at the moment we don't keep all events stored as we intend to keep
         // this indexer very simple
-        if (lastSnapshotComparison == 0 || lastSnapshotComparison < 0) {
+        if (lastSnapshotComparison <= 0) {
+          log(`Skipping event, lastSnapshotComparison=${lastSnapshotComparison}`)
           continue
         }
       }
@@ -738,7 +741,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         new U256(event.logIndex.toString())
       )
 
-      log('Event and hash %s', event.transactionHash)
+      log('indexer on_event callback for transaction hash: ',event.transactionHash)
 
       try {
         await this.handlers.on_event(
@@ -750,7 +753,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           lastDatabaseSnapshot
         )
       } catch (err) {
-        error('Error while processing', err, event)
+          error('Error during indexer on_event callback: ',err, event)
       }
     }
   }

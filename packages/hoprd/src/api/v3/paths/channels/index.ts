@@ -282,7 +282,7 @@ export async function openChannel(
 
     if (errString.includes('Channel is already opened')) {
       return { success: false, reason: STATUS_CODES.CHANNEL_ALREADY_OPEN }
-    } else if (errString.includes('not enough allowance')) {
+    } else if (errString.includes('not have enough allowance')) {
       return { success: false, reason: STATUS_CODES.NOT_ENOUGH_ALLOWANCE }
     } else {
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }

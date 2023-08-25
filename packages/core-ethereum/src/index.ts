@@ -579,7 +579,6 @@ export default class HoprCoreEthereum extends EventEmitter {
       await this.chain.fundChannel(
         dest,
         counterpartyFund,
-        // (txHash: string) => this.setTxHandler(`token-approved-${txHash}`, txHash),
         (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
         // we are only interested in fundChannel receipt
       )

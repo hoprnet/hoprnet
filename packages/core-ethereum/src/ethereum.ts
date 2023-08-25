@@ -118,6 +118,9 @@ export async function createChainWrapper(
     Address.from_string(deploymentExtract.hoprChannelsAddress)
   )
 
+  // FIXME: when to enable use safe?
+  // chainCalls.set_use_safe(true)
+
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
     HOPR_NETWORK_REGISTRY_ABI,
@@ -556,6 +559,7 @@ export async function createChainWrapper(
     let fundChannelError: unknown
     let fundChannelResult: SendTransactionReturn
 
+    // FIXME: tx should be sent to the Safe Module
     const fundChannelPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_fund_channel_payload(destination, amount)),
       to: channels.address,
