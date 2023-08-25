@@ -866,6 +866,4 @@ pub mod wasm {
             Snapshot::default()
         }
     }
-
-
 }

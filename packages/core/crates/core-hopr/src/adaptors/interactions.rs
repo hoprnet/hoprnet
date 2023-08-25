@@ -1,4 +1,4 @@
-use futures::channel::mpsc::{channel, Sender, unbounded, UnboundedSender};
+use futures::channel::mpsc::{channel, unbounded, Sender, UnboundedSender};
 use futures::future::poll_fn;
 
 use core_crypto::types::HalfKeyChallenge;
@@ -6,17 +6,16 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use utils_log::error;
 use utils_types::traits::BinarySerializable;
 
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use std::pin::Pin;
 
     use super::*;
 
+    use core_packet::interaction::ApplicationData;
     use futures::Stream;
     use utils_log::debug;
     use wasm_bindgen::prelude::*;
-    use core_packet::interaction::ApplicationData;
 
     /// Helper loop ensuring conversion and enqueueing of events on acknowledgement
     pub fn spawn_ack_receiver_loop(on_ack: Option<js_sys::Function>) -> Option<UnboundedSender<HalfKeyChallenge>> {
@@ -34,13 +33,15 @@ pub mod wasm {
                 });
 
                 Some(tx)
-            },
+            }
             None => None,
         }
     }
 
     /// Helper loop ensuring conversion and enqueueing of events on acknowledgement ticket
-    pub fn spawn_ack_tkt_receiver_loop(on_ack_tkt: Option<js_sys::Function>) -> Option<UnboundedSender<AcknowledgedTicket>>  {
+    pub fn spawn_ack_tkt_receiver_loop(
+        on_ack_tkt: Option<js_sys::Function>,
+    ) -> Option<UnboundedSender<AcknowledgedTicket>> {
         match on_ack_tkt {
             Some(on_ack_tkt_fn) => {
                 let (tx, mut rx) = unbounded::<AcknowledgedTicket>();
@@ -55,7 +56,7 @@ pub mod wasm {
                 });
 
                 Some(tx)
-            },
+            }
             None => None,
         }
     }
@@ -63,7 +64,7 @@ pub mod wasm {
     const ON_PACKET_QUEUE_SIZE: usize = 4096;
 
     /// Helper loop ensuring conversion and enqueueing of events on receiving the final packet
-    pub fn spawn_on_final_packet_loop(on_final_packet: Option<js_sys::Function>) -> Option<Sender<ApplicationData>>  {
+    pub fn spawn_on_final_packet_loop(on_final_packet: Option<js_sys::Function>) -> Option<Sender<ApplicationData>> {
         match on_final_packet {
             Some(on_msg_rcv) => {
                 let (tx, mut rx) = channel::<ApplicationData>(ON_PACKET_QUEUE_SIZE);
@@ -83,10 +84,8 @@ pub mod wasm {
                 });
 
                 Some(tx)
-            },
+            }
             None => None,
         }
     }
 }
-
-

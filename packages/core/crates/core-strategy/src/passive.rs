@@ -15,8 +15,7 @@ impl ChannelStrategy for PassiveStrategy {
         _balance: Balance,
         _addresses: impl Iterator<Item = (Address, f64)>,
         _outgoing_channels: Vec<OutgoingChannelStatus>,
-    ) -> StrategyTickResult
-    {
+    ) -> StrategyTickResult {
         debug!("using passive strategy that does nothing");
         StrategyTickResult::new(0, vec![], vec![])
     }

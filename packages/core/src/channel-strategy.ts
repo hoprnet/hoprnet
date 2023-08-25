@@ -47,11 +47,7 @@ export interface ChannelStrategyInterface {
 
   configure(settings: any): void
 
-  tick(
-    balance: BN,
-    network_addresses: PeerQuality,
-    outgoing_channel: OutgoingChannelStatus[],
-  ): StrategyTickResult
+  tick(balance: BN, network_addresses: PeerQuality, outgoing_channel: OutgoingChannelStatus[]): StrategyTickResult
 
   onChannelWillClose(channel: ChannelEntry): Promise<void> // Before a channel closes
   onAckedTicket(t: AcknowledgedTicket): Promise<void>
@@ -112,7 +108,7 @@ interface RustStrategyInterface {
   tick: (
     balance: Balance,
     network_addresses: PeerQuality,
-    outgoing_channels: OutgoingChannelStatus[],
+    outgoing_channels: OutgoingChannelStatus[]
   ) => StrategyTickResult
   name: string
 }
@@ -134,16 +130,8 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
     this.autoRedeemTickets = settings.auto_redeem_tickets ?? false
   }
 
-  tick(
-    balance: BN,
-    network_addresses: PeerQuality,
-    outgoing_channels: OutgoingChannelStatus[],
-  ): StrategyTickResult {
-    return this.strategy.tick(
-      new Balance(balance.toString(), BalanceType.HOPR),
-      network_addresses,
-      outgoing_channels,
-    )
+  tick(balance: BN, network_addresses: PeerQuality, outgoing_channels: OutgoingChannelStatus[]): StrategyTickResult {
+    return this.strategy.tick(new Balance(balance.toString(), BalanceType.HOPR), network_addresses, outgoing_channels)
   }
 
   get name() {

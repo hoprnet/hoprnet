@@ -1,28 +1,17 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
+use futures::{channel::mpsc::Receiver, select, StreamExt};
 use futures_concurrency::stream::Merge;
-use futures::{
-    select, StreamExt,
-    channel::mpsc::Receiver
-};
 
 use core_network::network::{Network, NetworkEvent, PeerOrigin};
-use core_types::acknowledgement::Acknowledgement;
+pub use core_p2p::{api, libp2p_identity};
+use core_p2p::{libp2p_request_response, libp2p_swarm::SwarmEvent, HoprNetworkBehaviorEvent, Ping, Pong};
 use core_packet::interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction};
-pub use core_p2p::{libp2p_identity, api};
-use core_p2p::{
-    HoprNetworkBehaviorEvent,
-    Ping, Pong,
-    libp2p_request_response, libp2p_swarm::SwarmEvent
-};
-use utils_log::{debug, info, error};
+use core_types::acknowledgement::Acknowledgement;
+use utils_log::{debug, error, info};
 
-use crate::{
-    PeerId,
-    adaptors::indexer::IndexerProcessed
-};
-
+use crate::{adaptors::indexer::IndexerProcessed, PeerId};
 
 #[derive(Debug)]
 pub enum Inputs {
@@ -31,7 +20,7 @@ pub enum Inputs {
     NetworkUpdate(NetworkEvent),
     Message(MsgProcessed),
     Acknowledgement(AckProcessed),
-    Indexer(IndexerProcessed)
+    Indexer(IndexerProcessed),
 }
 
 impl From<api::HeartbeatChallenge> for Inputs {
@@ -72,11 +61,12 @@ impl From<IndexerProcessed> for Inputs {
 
 /// Main p2p loop that will instantiate a new libp2p::Swarm instance and setup listening and reacting pipelines
 /// running in a neverending loop future.
-/// 
+///
 /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
-/// 
+///
 /// This future can only be resolved by an unrecoverable error or a panic.
-pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
+pub(crate) async fn p2p_loop(
+    me: libp2p_identity::Keypair,
     network: Arc<RwLock<Network<crate::adaptors::network::ExternalNetworkInteractions>>>,
     network_update_input: Receiver<NetworkEvent>,
     indexer_update_input: Receiver<IndexerProcessed>,
@@ -86,8 +76,8 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     heartbeat_responds: api::HeartbeatResponder,
     manual_ping_requests: api::ManualPingRequester,
     manual_ping_responds: api::HeartbeatResponder,
-    my_multiaddresses: Vec<multiaddr::Multiaddr>)
-{
+    my_multiaddresses: Vec<multiaddr::Multiaddr>,
+) {
     let mut swarm = core_p2p::build_p2p_network(me);
 
     let mut valid_mas: Vec<multiaddr::Multiaddr> = vec![];
@@ -96,22 +86,25 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
         // the first successful listen. Relevant for Providence, but not beyond.
         if valid_mas.len() > 0 {
             valid_mas.push(multiaddress.clone());
-            continue
+            continue;
         }
 
         match swarm.listen_on(multiaddress.clone()) {
             Ok(_) => {
                 valid_mas.push(multiaddress.clone());
                 swarm.add_external_address(multiaddress.clone());
-            },
+            }
             Err(e) => {
                 error!("Failed to listen_on using the multiaddress '{}': {}", multiaddress, e);
-            },
+            }
         }
     }
 
     info!("Registering own external multiaddresses: {:?}", valid_mas);
-    network.write().await.store_peer_multiaddresses(swarm.local_peer_id(), valid_mas);
+    network
+        .write()
+        .await
+        .store_peer_multiaddresses(swarm.local_peer_id(), valid_mas);
 
     let mut heartbeat_responds = heartbeat_responds;
     let mut manual_ping_responds = manual_ping_responds;
@@ -119,7 +112,8 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
     let mut ack_writer = ack_interactions.writer();
     let mut pkt_writer = pkt_interactions.writer();
 
-    let mut active_manual_pings: std::collections::HashSet<libp2p_request_response::RequestId> = std::collections::HashSet::new();
+    let mut active_manual_pings: std::collections::HashSet<libp2p_request_response::RequestId> =
+        std::collections::HashSet::new();
     let mut allowed_peers: std::collections::HashSet<PeerId> = std::collections::HashSet::new();
 
     let mut inputs = (
@@ -128,8 +122,10 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
         network_update_input.map(Inputs::NetworkUpdate),
         ack_interactions.map(Inputs::Acknowledgement),
         pkt_interactions.map(Inputs::Message),
-        indexer_update_input.map(Inputs::Indexer)
-    ).merge().fuse();
+        indexer_update_input.map(Inputs::Indexer),
+    )
+        .merge()
+        .fuse();
 
     loop {
         select! {
@@ -310,7 +306,7 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                         Ok(_) => {},
                         Err(_) => {
                             error!("An error occured during the ping response, channel is either closed or timed out.");
-                        }    
+                        }
                     };
                 },
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::Message {
@@ -451,5 +447,5 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                 },
             }
         }
-    };
+    }
 }

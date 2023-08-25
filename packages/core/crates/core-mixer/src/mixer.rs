@@ -7,10 +7,7 @@ use rand::Rng;
 use utils_log::debug;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    lazy_static::lazy_static,
-    utils_metrics::metrics::SimpleGauge
-};
+use {lazy_static::lazy_static, utils_metrics::metrics::SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static! {
@@ -134,9 +131,9 @@ impl Mixer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use more_asserts::*;
-    use futures_lite::stream::StreamExt;
     use crate::future_extensions::StreamThenConcurrentExt;
+    use futures_lite::stream::StreamExt;
+    use more_asserts::*;
 
     type Packet = Box<[u8]>;
 

@@ -73,27 +73,27 @@ export async function getPeers(
       } catch {}
     }
 
-    let connected_peers = await node.getConnectedPeers();
+    let connected_peers = await node.getConnectedPeers()
 
     const connected = []
 
-      for (const peerId of connected_peers) {
-        const peerIdStr = peerId.toString()
+    for (const peerId of connected_peers) {
+      const peerIdStr = peerId.toString()
 
-        // already exists in announced, we use this because it contains multiaddr already
-        if (announcedMap.has(peerIdStr)) {
-          connected.push(announcedMap.get(peerIdStr)) 
-        } else {
-          try {
-            const info = await node.getConnectionInfo(peerId)
-            // exclude if quality is less than the one wanted
-            if (info === undefined || info.quality < quality) {
-              continue
-            }
-            connected.push(toPeerInfoFormat(info))
-          } catch {}
-        }
+      // already exists in announced, we use this because it contains multiaddr already
+      if (announcedMap.has(peerIdStr)) {
+        connected.push(announcedMap.get(peerIdStr))
+      } else {
+        try {
+          const info = await node.getConnectionInfo(peerId)
+          // exclude if quality is less than the one wanted
+          if (info === undefined || info.quality < quality) {
+            continue
+          }
+          connected.push(toPeerInfoFormat(info))
+        } catch {}
       }
+    }
 
     return {
       connected,

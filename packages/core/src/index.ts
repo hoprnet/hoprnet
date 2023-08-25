@@ -8,10 +8,7 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 // @ts-ignore untyped library
 import retimer from 'retimer'
 
-import {
-  compareAddressesLocalMode,
-  compareAddressesPublicMode,
-} from '@hoprnet/hopr-connect'
+import { compareAddressesLocalMode, compareAddressesPublicMode } from '@hoprnet/hopr-connect'
 
 import {
   create_counter,
@@ -85,7 +82,7 @@ import {
   OutgoingChannelStatus,
   SaneDefaults,
   Strategy,
-  StrategyFactory,
+  StrategyFactory
 } from './channel-strategy.js'
 
 import type { ResolvedNetwork } from './network.js'
@@ -93,7 +90,6 @@ import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { networkInterfaces } from 'node:os'
-
 
 const CODE_P2P = protocols('p2p').code
 
@@ -242,7 +238,7 @@ export class Hopr extends EventEmitter {
     private chainKeypair: ChainKeypair,
     private packetKeypair: OffchainKeypair,
     public db: Database,
-    private options: HoprOptions,
+    private options: HoprOptions
   ) {
     super()
 
@@ -300,13 +296,13 @@ export class Hopr extends EventEmitter {
     verbose('Waiting for indexer to find connected nodes.')
 
     // Add us as public node if announced
-    if (! this.options.announce) {
+    if (!this.options.announce) {
       throw new Error('Announce option should be turned ON in Providence, only public nodes are supported')
     }
 
     // Fetch previous announcements from database
     const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
-    log("Using initial nodes: " + initialNodes)
+    log('Using initial nodes: ' + initialNodes)
 
     // Fetch all nodes that announce themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
@@ -319,9 +315,9 @@ export class Hopr extends EventEmitter {
       BigInt(this.options?.heartbeatThreshold)
     )
 
-
     let ping_cfg = new PingConfig(
-      MAX_PARALLEL_PINGS, BigInt(2000)   // in millis
+      MAX_PARALLEL_PINGS,
+      BigInt(2000) // in millis
     )
 
     const onAcknowledgement = (ackChallenge: Uint8Array) => {
@@ -348,12 +344,20 @@ export class Hopr extends EventEmitter {
     this.db.link_chain_and_packet_keys(
       Core_Address.deserialize(this.chainKeypair.to_address().serialize()),
       Core_OffchainPublicKey.deserialize(this.packetKeypair.public().serialize()),
-      Snapshot._default())
+      Snapshot._default()
+    )
 
     log('Constructing the core application and tools')
-    let coreApp = new CoreApp(new Core_OffchainKeypair(this.packetKeypair.secret()), this.db.clone(),
-      this.options.networkQualityThreshold, heartbeat_cfg, ping_cfg,
-      onAcknowledgement, onAcknowledgedTicket, packetCfg, onReceivedMessage,
+    let coreApp = new CoreApp(
+      new Core_OffchainKeypair(this.packetKeypair.secret()),
+      this.db.clone(),
+      this.options.networkQualityThreshold,
+      heartbeat_cfg,
+      ping_cfg,
+      onAcknowledgement,
+      onAcknowledgedTicket,
+      packetCfg,
+      onReceivedMessage,
       this.getLocalMultiaddresses().map((x) => x.toString())
     )
 
@@ -364,23 +368,21 @@ export class Hopr extends EventEmitter {
     this.index_updater = this.tools.index_updater()
     this.networkPeers = this.tools.network()
 
-    connector.indexer.on('network-registry-eligibility-changed',
-      async (address: Address, allowed: boolean) => {
-        // If account is no longer eligible to register nodes, we might need to close existing connections,
-        // otherwise there is nothing to do
-        if (!allowed) {
-            let pk: OffchainPublicKey
-            try {
-              pk = await connector.getPacketKeyOf(address)
-            } catch (err) {
-              // node has not announced itself, so we don't need to care
-              return
-            }
-
-            await this.networkPeers.unregister(pk.to_peerid_str())
+    connector.indexer.on('network-registry-eligibility-changed', async (address: Address, allowed: boolean) => {
+      // If account is no longer eligible to register nodes, we might need to close existing connections,
+      // otherwise there is nothing to do
+      if (!allowed) {
+        let pk: OffchainPublicKey
+        try {
+          pk = await connector.getPacketKeyOf(address)
+        } catch (err) {
+          // node has not announced itself, so we don't need to care
+          return
         }
+
+        await this.networkPeers.unregister(pk.to_peerid_str())
       }
-    )
+    })
 
     connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
@@ -397,7 +399,7 @@ export class Hopr extends EventEmitter {
       console.error(`Observed error:`, err)
       process.exit(1)
     }
-    
+
     try {
       // register node-safe pair to NodeSafeRegistry
       log(`check node-safe registry`)
@@ -436,17 +438,17 @@ export class Hopr extends EventEmitter {
     // TODO: handle IPv6 as well
     if (this.options.hosts.ip4 == undefined || this.options.hosts.ip4.ip == '0.0.0.0') {
       let results: string[] = []
-      const nets = networkInterfaces();
-  
+      const nets = networkInterfaces()
+
       for (const name of Object.keys(nets)) {
-          for (const net of nets[name]) {
-              // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
-              // 'IPv4' is in Node <= 17, from 18 it's a number 4 or 6
-              const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4
-              if (net.family === familyV4Value && !net.internal) {
-                  results.push(net.address);
-              }
+        for (const net of nets[name]) {
+          // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
+          // 'IPv4' is in Node <= 17, from 18 it's a number 4 or 6
+          const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4
+          if (net.family === familyV4Value && !net.internal) {
+            results.push(net.address)
           }
+        }
       }
 
       const unique_ipv4s = [...new Set(results)]
@@ -517,7 +519,10 @@ export class Hopr extends EventEmitter {
     }
 
     log(`Registering announced peer '${peer.id.toString()} with multiaddresses: ${addrsToAdd}'`)
-    this.index_updater.announce(peer.id.toString(), addrsToAdd.map((ma) => ma.toString()))
+    this.index_updater.announce(
+      peer.id.toString(),
+      addrsToAdd.map((ma) => ma.toString())
+    )
   }
 
   private async strategyOpenChannel(status: OutgoingChannelStatus) {
@@ -627,7 +632,7 @@ export class Hopr extends EventEmitter {
             stake_str: c.balance.to_string(),
             status: c.status
           }
-        }),
+        })
       )
       metric_strategyTicks.increment()
       metric_strategyMaxChannels.set(tickResult.max_auto_channels)
@@ -697,7 +702,9 @@ export class Hopr extends EventEmitter {
       // Not listening to any address unless `hopr` is running
       return []
     }
-    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(this.id.toString())).map((mas) => multiaddr(mas))
+    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(this.id.toString())).map((mas) =>
+      multiaddr(mas)
+    )
 
     return addrs.sort(
       this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
@@ -711,7 +718,9 @@ export class Hopr extends EventEmitter {
   // TODO: this is needed by the API, but we cannot actually get it from that far
   public async getObservedAddresses(peer: PeerId): Promise<Multiaddr[]> {
     debug('Getting address for peer ' + peer)
-    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(peer.toString())).map((mas) => multiaddr(mas))
+    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(peer.toString())).map((mas) =>
+      multiaddr(mas)
+    )
 
     return addrs.sort(
       this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
@@ -777,7 +786,9 @@ export class Hopr extends EventEmitter {
 
     metric_pathLength.observe(path.length())
 
-    return (await this.tools.send_message(new ApplicationData(applicationTag, msg), path, PACKET_QUEUE_TIMEOUT_MILLISECONDS)).to_hex()
+    return (
+      await this.tools.send_message(new ApplicationData(applicationTag, msg), path, PACKET_QUEUE_TIMEOUT_MILLISECONDS)
+    ).to_hex()
   }
 
   /**
@@ -793,7 +804,7 @@ export class Hopr extends EventEmitter {
     }
 
     let dest = destination.toString()
-    if (!await this.networkPeers.contains(dest)) {
+    if (!(await this.networkPeers.contains(dest))) {
       await this.networkPeers.register(dest, PeerOrigin.ManualPing)
     }
 
@@ -879,7 +890,9 @@ export class Hopr extends EventEmitter {
    * @param _timeout [optional] custom timeout for DHT query
    */
   public async getAddressesAnnouncedToDHT(peer: PeerId = this.getId(), _timeout = 5e3): Promise<Multiaddr[]> {
-    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(peer.toString())).map((mas) => multiaddr(mas))
+    let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(peer.toString())).map((mas) =>
+      multiaddr(mas)
+    )
 
     return addrs.sort(
       this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
@@ -1151,8 +1164,8 @@ export class Hopr extends EventEmitter {
             `ignoring finalizing closure of channel ${channel
               .get_id()
               .to_hex()} because closure window is still active. Need to wait ${channel
-                .remaining_closure_time()
-                .toString(10)} seconds.`
+              .remaining_closure_time()
+              .toString(10)} seconds.`
           )
         }
       }

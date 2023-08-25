@@ -76,8 +76,7 @@ impl ChannelStrategy for PromiscuousStrategy {
         balance: Balance,
         addresses: impl Iterator<Item = (Address, f64)>,
         outgoing_channels: Vec<OutgoingChannelStatus>,
-    ) -> StrategyTickResult
-    {
+    ) -> StrategyTickResult {
         let mut to_open: Vec<OutgoingChannelStatus> = vec![];
         let mut to_close: Vec<Address> = vec![];
         let mut new_channel_candidates: Vec<(Address, f64)> = vec![];
@@ -137,7 +136,9 @@ impl ChannelStrategy for PromiscuousStrategy {
         outgoing_channels
             .iter()
             .filter(|c| c.status == PendingToClose)
-            .for_each(|c| { to_close.push(c.address.clone()); });
+            .for_each(|c| {
+                to_close.push(c.address.clone());
+            });
         debug!(
             "{} channels are in PendingToClose, so strategy will mark them for closing too",
             outgoing_channels.len() - before_pending
@@ -176,7 +177,8 @@ impl ChannelStrategy for PromiscuousStrategy {
 
             // Sort by quality, lowest-quality first
             sorted_channels.sort_unstable_by(|p1, p2| {
-                active_addresses.get(&p1.address)
+                active_addresses
+                    .get(&p1.address)
                     .zip(active_addresses.get(&p2.address))
                     .and_then(|(q1, q2)| q1.partial_cmp(&q2))
                     .expect(format!("failed to retrieve quality of {} or {}", p1.address, p2.address).as_str())
@@ -186,7 +188,9 @@ impl ChannelStrategy for PromiscuousStrategy {
             sorted_channels
                 .into_iter()
                 .take(occupied - max_auto_channels)
-                .for_each(|c| { to_close.push(c.address); });
+                .for_each(|c| {
+                    to_close.push(c.address);
+                });
         }
 
         if max_auto_channels > occupied {
@@ -291,7 +295,11 @@ mod tests {
         strat.sma.add_sample(peers.len());
         strat.sma.add_sample(peers.len());
 
-        let results = strat.tick(balance, peers.iter().map(|(x, q)| (x.clone(), q.clone())), outgoing_channels);
+        let results = strat.tick(
+            balance,
+            peers.iter().map(|(x, q)| (x.clone(), q.clone())),
+            outgoing_channels,
+        );
 
         assert_eq!(results.max_auto_channels(), 4);
 
@@ -356,8 +364,8 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::generic::{wasm::StrategyTickResult, PeerQuality};
     use crate::generic::ChannelStrategy;
+    use crate::generic::{wasm::StrategyTickResult, PeerQuality};
     use crate::promiscuous::PromiscuousStrategy;
     use crate::strategy_tick;
     use utils_misc::utils::wasm::JsResult;

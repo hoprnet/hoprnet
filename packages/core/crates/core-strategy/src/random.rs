@@ -14,8 +14,7 @@ impl ChannelStrategy for RandomStrategy {
         _balance: Balance,
         _addresses: impl Iterator<Item = (Address, f64)>,
         _outgoing_channels: Vec<OutgoingChannelStatus>,
-    ) -> StrategyTickResult
-    {
+    ) -> StrategyTickResult {
         unimplemented!("Cover Traffic Strategy (Random strategy) not yet implemented!");
     }
 }

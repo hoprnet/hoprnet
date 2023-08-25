@@ -1259,7 +1259,7 @@ pub mod tests {
         let deserialized = Signature::from_bytes(&sgn.to_bytes()).unwrap();
         assert_eq!(sgn, deserialized, "signatures don't match");
     }
-    
+
     #[test]
     fn offchain_signature() {
         let msg = b"test12345";
