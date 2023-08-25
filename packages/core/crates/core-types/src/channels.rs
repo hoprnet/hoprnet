@@ -21,6 +21,10 @@ use utils_misc::time::native::current_timestamp;
 
 use utils_types::traits::{BinarySerializable, ToHex};
 
+/// Size-optimized encoding of the ticket, used for both,
+/// network transfer and in the smart contract.
+const ENCODED_TICKET_LENGTH: u64 = 64;
+
 /// Describes status of a channel
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
@@ -532,7 +536,7 @@ impl Ticket {
 }
 
 impl BinarySerializable for Ticket {
-    const SIZE: usize = 64 + EthereumChallenge::SIZE + Signature::SIZE;
+    const SIZE: usize = ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE;
 
     /// Tickets get sent next to packets, hence they need to be as small as possible.
     /// Transmitting tickets to the next downstream share the same binary representation
@@ -556,9 +560,12 @@ impl BinarySerializable for Ticket {
             let mut encoded_win_prob = [0u8; 7];
             encoded_win_prob.copy_from_slice(&data[Hash::SIZE + 12 + 6 + 4 + 3..Hash::SIZE + 12 + 6 + 4 + 3 + 7]);
 
-            let challenge = EthereumChallenge::from_bytes(&data[64..84])?;
+            let challenge = EthereumChallenge::from_bytes(
+                &data[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE],
+            )?;
 
-            let signature = Signature::from_bytes(&data[84..148])?;
+            let signature =
+                Signature::from_bytes(&data[ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE..Signature::SIZE])?;
 
             Ok(Self {
                 channel_id,
@@ -638,7 +645,7 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<[u8; 7]> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::channels::{ChannelEntry, ChannelStatus, Ticket, f64_to_win_prob};
+    use crate::channels::{f64_to_win_prob, ChannelEntry, ChannelStatus, Ticket};
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::Hash,
