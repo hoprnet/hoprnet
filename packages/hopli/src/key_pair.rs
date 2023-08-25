@@ -76,7 +76,10 @@ pub fn create_identity(
         keys.write_eth_keystore(&file_path, password, false)?;
     }
 
-    Ok((String::from(path.file_name().unwrap().to_str().unwrap()), keys))
+path.file_name()
+        .and_then(|p| p.to_str())
+        .map(|s| (String::from(s), keys))
+        .ok_or(HelperErrors::UnableToCreateIdentity)
 }
 
 #[cfg(test)]
