@@ -431,7 +431,6 @@ endif
 		--identity-from-path "${id_path}" \
 		--contracts-root "./packages/ethereum/contracts"
 
-
 .PHONY: docker-build-local
 docker-build-local: ## build Docker images locally, or single image if image= is set
 ifeq ($(image),)

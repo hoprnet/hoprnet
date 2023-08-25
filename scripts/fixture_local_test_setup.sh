@@ -161,6 +161,37 @@ if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
+function reuse_pregenerated_identities() {
+  log "Reuse pre-generated identities"
+
+  # remove existing identity files in tmp folder, .safe.args
+  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.safe.args" -delete
+  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" -delete
+
+  local ready_id_files
+  mapfile -t ready_id_files <<< "$(find -L "${mydir}/../tests/identities" -type f -name "*.id" | sort)"
+
+  # we copy and rename the files according to the expected file name format and
+  # destination folder
+
+  local ids_info
+  ids_info="$(ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" hopli identity -a read -d tests/identities)"
+
+  log "ADDRESSES INFORMATION"
+  for i in ${!ready_id_files[@]}; do
+    cp "${ready_id_files[$i]}" "${tmp_dir}/${node_prefix}_${i}.id"
+
+    local peer_id native_address id_file
+    id_file="$(basename ${ready_id_files[$i]})"
+    peer_id="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.peer_id")"
+    native_address="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.native_address")"
+
+    log "\tnode1"
+    log "\t\tpeer id: ${peer_id}"
+    log "\t\tnative address: ${native_address}"
+  done
+}
+
 function generate_local_identities() {
   log "Generate local identities"
 
@@ -338,7 +369,8 @@ update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "
 # }}}
 
 # create identity files to node1_id, .... node7_id
-generate_local_identities
+# generate_local_identities
+reuse_pregenerated_identities
 
 # create safe and modules for all the ids, store them in args files
 create_local_safes
