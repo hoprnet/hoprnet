@@ -38,10 +38,10 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
     }
 
     // ticket must have at least required winning probability
-    if ticket.win_prob < required_win_prob {
+    if ticket.win_prob() < required_win_prob {
         return Err(TicketValidation(format!(
             "ticket winning probability {} is lower than required winning probability {required_win_prob}",
-            ticket.win_prob
+            ticket.win_prob()
         )));
     }
 

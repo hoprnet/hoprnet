@@ -594,152 +594,40 @@ pub mod test {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, UnacknowledgedTicket};
-    use core_crypto::types::{HalfKey, Hash, Response};
-    use utils_misc::ok_or_jserr;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Address;
-    use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
-    pub struct PendingAcknowledgement {
-        w: super::PendingAcknowledgement,
+    pub struct AcknowledgedTicket {
+        w: super::AcknowledgedTicket,
     }
 
-    #[wasm_bindgen]
-    impl PendingAcknowledgement {
-        #[wasm_bindgen(constructor)]
-        pub fn new(is_sender: bool, ticket: Option<UnacknowledgedTicket>) -> Self {
-            if is_sender {
-                Self {
-                    w: super::PendingAcknowledgement::WaitingAsSender,
-                }
-            } else {
-                Self {
-                    w: super::PendingAcknowledgement::WaitingAsRelayer(ticket.unwrap()),
-                }
-            }
-        }
-
-        pub fn is_msg_sender(&self) -> bool {
-            match &self.w {
-                super::PendingAcknowledgement::WaitingAsSender => true,
-                super::PendingAcknowledgement::WaitingAsRelayer(_) => false,
-            }
-        }
-
-        pub fn ticket(&self) -> Option<UnacknowledgedTicket> {
-            match &self.w {
-                super::PendingAcknowledgement::WaitingAsSender => None,
-                super::PendingAcknowledgement::WaitingAsRelayer(ticket) => Some(ticket.clone()),
-            }
-        }
-
-        pub fn deserialize(data: &[u8]) -> JsResult<PendingAcknowledgement> {
-            Ok(Self {
-                w: ok_or_jserr!(super::PendingAcknowledgement::from_bytes(data))?,
-            })
-        }
-
-        pub fn serialize(&self) -> Box<[u8]> {
-            self.w.to_bytes()
-        }
-    }
-
-    #[wasm_bindgen]
-    impl UnacknowledgedTicket {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<UnacknowledgedTicket> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "get_response")]
-        pub fn _get_response(&self, acknowledgement: &HalfKey) -> JsResult<Response> {
-            ok_or_jserr!(self.get_response(acknowledgement))
-        }
-
-        #[wasm_bindgen(js_name = "verify_challenge")]
-        pub fn _verify_challenge(&self, acknowledgement: &HalfKey) -> JsResult<bool> {
-            ok_or_jserr!(self.verify_challenge(acknowledgement).map(|_| true))
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &UnacknowledgedTicket) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-    }
-
-    #[wasm_bindgen]
     impl AcknowledgedTicket {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<AcknowledgedTicket> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &AcknowledgedTicket) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "verify")]
-        pub fn _verify(&self, issuer: &Address, domain_separator: &Hash) -> JsResult<bool> {
-            ok_or_jserr!(self.verify(issuer, domain_separator).map(|_| true))
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
+        pub fn clone(&self) -> AcknowledgedTicket {
+            Self { w: self.w.clone() }
         }
     }
 
-    #[wasm_bindgen]
-    impl Acknowledgement {
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<Acknowledgement> {
-            ok_or_jserr!(Self::from_bytes(data))
+    impl From<super::AcknowledgedTicket> for AcknowledgedTicket {
+        fn from(value: super::AcknowledgedTicket) -> Self {
+            Self { w: value }
         }
+    }
 
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
+    impl From<&super::AcknowledgedTicket> for AcknowledgedTicket {
+        fn from(value: &super::AcknowledgedTicket) -> Self {
+            Self { w: value.clone() }
         }
+    }
 
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &Acknowledgement) -> bool {
-            self.eq(other)
+    impl From<AcknowledgedTicket> for super::AcknowledgedTicket {
+        fn from(value: AcknowledgedTicket) -> Self {
+            value.w
         }
+    }
 
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
+    impl From<&AcknowledgedTicket> for super::AcknowledgedTicket {
+        fn from(value: &AcknowledgedTicket) -> Self {
+            value.w.clone()
         }
     }
 }

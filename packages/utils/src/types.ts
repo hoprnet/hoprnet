@@ -11,7 +11,6 @@ import { webcrypto } from 'node:crypto'
 globalThis.crypto = webcrypto
 
 export {
-  Acknowledgement,
   AccountEntry,
   AcknowledgedTicket,
   Address,
@@ -35,10 +34,8 @@ export {
   OffchainKeypair,
   OffchainSignature,
   PublicKey,
-  PendingAcknowledgement,
   Signature,
   generate_channel_id,
-  UnacknowledgedTicket,
   channel_status_to_string,
   random_integer,
   random_big_integer,

@@ -149,7 +149,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         ack_ticket: AcknowledgedTicket,
     ) -> Result<()> {
         let unack_key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
-        let ack_key = to_acknowledged_ticket_key(&ack_ticket.ticket.challenge, &ack_ticket.ticket.channel_epoch.into())?;
+        let ack_key =
+            to_acknowledged_ticket_key(&ack_ticket.ticket.challenge, &ack_ticket.ticket.channel_epoch.into())?;
 
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.del(unack_key);
@@ -969,8 +970,8 @@ pub mod wasm {
     use core_crypto::types::{Hash, OffchainPublicKey};
     use core_types::{
         account::AccountEntry,
-        acknowledgement::AcknowledgedTicket,
-        channels::{ChannelEntry, Ticket},
+        acknowledgement::wasm::AcknowledgedTicket,
+        channels::{wasm::Ticket, ChannelEntry},
     };
     use js_sys::Uint8Array;
     use std::sync::Arc;
@@ -1089,7 +1090,11 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_acknowledged_tickets(filter).await).map(WasmVecAcknowledgedTicket::from)
+            utils_misc::ok_or_jserr!(db
+                .get_acknowledged_tickets(filter)
+                .await
+                .map(|x| { x.into_iter().map(AcknowledgedTicket::from).collect::<Vec<_>>() })
+                .map(WasmVecAcknowledgedTicket::from))
             //}
         }
 
@@ -1273,7 +1278,7 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_pending(counterparty, ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_pending(counterparty, &ticket.into()).await)
             //}
         }
 
@@ -1292,11 +1297,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_redeemed(&self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+        pub async fn mark_redeemed(&self, counterparty: &Address, acked_ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_redeemed(counterparty, ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_redeemed(counterparty, &acked_ticket.into()).await)
             //}
         }
 
@@ -1306,16 +1311,20 @@ pub mod wasm {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_rejected(ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_rejected(&ticket.into()).await)
             //}
         }
 
         #[wasm_bindgen]
-        pub async fn mark_losing_acked_ticket(&self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+        pub async fn mark_losing_acked_ticket(
+            &self,
+            counterparty: &Address,
+            ticket: &AcknowledgedTicket,
+        ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(counterparty, ticket).await)
+            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(counterparty, &ticket.into()).await)
             //}
         }
 

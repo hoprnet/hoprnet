@@ -721,6 +721,12 @@ mod tests {
         assert_eq!(Ordering::Less, u_3.cmp(&u_4));
         assert_eq!(Ordering::Greater, u_4.cmp(&u_3));
     }
+
+    #[test]
+    fn u256_float_tests() {
+        assert_eq!(U256::one(), U256::one().multiply_f64(1.0f64).unwrap());
+        assert_eq!(U256::one(), U256::from(10u64).multiply_f64(0.1f64).unwrap());
+    }
 }
 
 #[cfg(feature = "wasm")]

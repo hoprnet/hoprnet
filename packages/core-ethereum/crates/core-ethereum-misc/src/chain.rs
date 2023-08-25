@@ -276,6 +276,9 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
     if let Some(ref signature) = off_chain.ticket.signature {
         let serialized_signature = signature.to_bytes();
 
+        let mut encoded_win_prob = [0u8; 8];
+        encoded_win_prob[1..].copy_from_slice(&off_chain.ticket.encoded_win_prob);
+
         Ok(RedeemableTicket {
             data: TicketData {
                 channel_id: off_chain.ticket.channel_id.into(),
@@ -283,7 +286,7 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
                 ticket_index: off_chain.ticket.index,
                 index_offset: off_chain.ticket.index_offset,
                 epoch: off_chain.ticket.channel_epoch,
-                win_prob: off_chain.ticket.encoded_win_prob(),
+                win_prob: u64::from_be_bytes(encoded_win_prob),
             },
             signature: CompactSignature {
                 r: H256::from_slice(&serialized_signature[0..32]).into(),
@@ -595,16 +598,10 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::{
-        keypairs::{ChainKeypair, OffchainKeypair},
-        types::Hash,
-    };
-    use core_ethereum_db::db::wasm::Database;
-    use core_types::acknowledgement::AcknowledgedTicket;
-    use js_sys::{Function, JsString};
+    use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
+    use core_types::acknowledgement::wasm::AcknowledgedTicket;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
-    use utils_log::debug;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::primitives::{Address, Balance};
     use wasm_bindgen::{prelude::*, JsValue};
@@ -668,12 +665,8 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn get_redeem_ticket_payload(
-            &self,
-            acked_ticket: &AcknowledgedTicket,
-            domain_separator: &Hash,
-        ) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.redeem_ticket(acked_ticket, domain_separator))
+        pub fn get_redeem_ticket_payload(&self, acked_ticket: &AcknowledgedTicket) -> JsResult<Vec<u8>> {
+            ok_or_jserr!(self.w.redeem_ticket(&acked_ticket.into()))
         }
 
         #[wasm_bindgen]

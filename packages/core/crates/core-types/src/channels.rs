@@ -23,7 +23,7 @@ use utils_types::traits::{BinarySerializable, ToHex};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
-const ENCODED_TICKET_LENGTH: u64 = 64;
+const ENCODED_TICKET_LENGTH: usize = 64;
 
 /// Describes status of a channel
 #[repr(u8)]
@@ -494,7 +494,7 @@ impl Ticket {
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
     /// relates to.
     ///
-    /// Does not support path lengths greater than 7
+    /// Does not support path lengths greater than 255
     pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
         Ok((self.get_expected_payout() / price_per_packet)
             .as_u64()
@@ -564,8 +564,10 @@ impl BinarySerializable for Ticket {
                 &data[ENCODED_TICKET_LENGTH..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE],
             )?;
 
-            let signature =
-                Signature::from_bytes(&data[ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE..Signature::SIZE])?;
+            let signature = Signature::from_bytes(
+                &data[ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE
+                    ..ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Signature::SIZE],
+            )?;
 
             Ok(Self {
                 channel_id,
@@ -808,21 +810,34 @@ pub mod tests {
         ticket.encoded_win_prob = f64_to_win_prob(0.0).unwrap();
         assert_eq!(U256::zero(), ticket.get_expected_payout());
     }
+
+    #[test]
+    pub fn test_path_position_bad_examples() {
+        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
+        let bob = ChainKeypair::from_secret(&BOB).unwrap();
+        let ticket = Ticket::new_partial(
+            &alice.public().to_address(),
+            &bob.public().to_address(),
+            &Balance::new(256u64.into(), BalanceType::HOPR),
+            U256::zero(),
+            U256::one(),
+            1.0,
+            U256::one(),
+        )
+        .unwrap();
+
+        assert!(ticket.get_path_position(U256::from(1u64)).is_err());
+    }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::{
-        keypairs::ChainKeypair,
-        types::{Hash, PublicKey},
-    };
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::{Address, Balance, EthereumChallenge, U256};
-    use utils_types::traits::{BinarySerializable, ToHex};
+    use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::wasm_bindgen;
 
-    use crate::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use crate::channels::{ChannelEntry, ChannelStatus};
 
     #[wasm_bindgen]
     pub fn channel_status_to_number(status: ChannelStatus) -> u8 {
@@ -867,77 +882,37 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
+    pub struct Ticket {
+        w: super::Ticket,
+    }
+
     impl Ticket {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(
-            own_address: &Address,
-            counterparty: &Address,
-            challenge: EthereumChallenge,
-            index: U256,
-            index_offset: U256,
-            amount: &Balance,
-            win_prob: f64,
-            channel_epoch: U256,
-            keypair: &ChainKeypair,
-            domain_separator: &Hash,
-        ) -> JsResult<Ticket> {
-            Ticket::new(
-                own_address,
-                counterparty,
-                amount,
-                index,
-                index_offset,
-                win_prob,
-                channel_epoch,
-                challenge,
-                keypair,
-                domain_separator,
-            )
-            .map_err(|e| e.into())
+        pub fn clone(&self) -> Ticket {
+            Self { w: self.w.clone() }
         }
+    }
 
-        #[wasm_bindgen(js_name = "recover_signer")]
-        pub fn _recover_signer(&self, domain_separator: &Hash) -> JsResult<PublicKey> {
-            ok_or_jserr!(self.recover_signer(domain_separator))
+    impl From<super::Ticket> for Ticket {
+        fn from(value: super::Ticket) -> Self {
+            Self { w: value }
         }
+    }
 
-        #[wasm_bindgen(js_name = "verify")]
-        pub fn _verify(&self, address: &Address, domain_separator: &Hash) -> JsResult<bool> {
-            ok_or_jserr!(self.verify(address, domain_separator).map(|_| true))
+    impl From<&super::Ticket> for Ticket {
+        fn from(value: &super::Ticket) -> Self {
+            Self { w: value.clone() }
         }
+    }
 
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(bytes: &[u8]) -> JsResult<Ticket> {
-            ok_or_jserr!(Self::from_bytes(bytes))
+    impl From<Ticket> for super::Ticket {
+        fn from(value: Ticket) -> Self {
+            value.w
         }
+    }
 
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "to_hex")]
-        pub fn _to_hex(&self) -> String {
-            self.to_hex()
-        }
-
-        #[wasm_bindgen(js_name = "eq")]
-        pub fn _eq(&self, other: &Ticket) -> bool {
-            self.eq(other)
-        }
-
-        #[wasm_bindgen(js_name = "clone")]
-        pub fn _clone(&self) -> Self {
-            self.clone()
-        }
-
-        #[wasm_bindgen(js_name = "to_string")]
-        pub fn _to_string(&self) -> String {
-            self.to_string()
-        }
-
-        pub fn size() -> u32 {
-            Self::SIZE as u32
+    impl From<&Ticket> for super::Ticket {
+        fn from(value: &Ticket) -> Self {
+            value.w.clone()
         }
     }
 }
