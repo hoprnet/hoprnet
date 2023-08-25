@@ -5,7 +5,7 @@ All relevant test files have been appropriately updated in alignment with the fi
 Updated Git commit hash under audit is:
 
 ```
-83929b72730ff7264e7728567135fc8274693ed9
+5d5d3a0648d6b70789192a8f198f0cf19e049316
 ```
 
 ### Findings
