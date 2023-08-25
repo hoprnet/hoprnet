@@ -185,12 +185,12 @@ export default class HoprCoreEthereum extends EventEmitter {
         await this.chain.waitUntilReady()
 
         // update token balance
-        const hoprBalance = await this.chain.getBalance(this.chainKeypair.to_address())
-        await this.db.set_hopr_balance(hoprBalance)
-        log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
+        //const hoprBalance = await this.chain.getBalance(this.chainKeypair.to_address())
+        //await this.db.set_hopr_balance(hoprBalance)
+        //log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
         // indexer starts
-        await this.indexer.start(this.chain, this.chain.getGenesisBlock())
+        await this.indexer.start(this.chain, this.chain.getGenesisBlock(), this.safeModuleOptions.safeAddress)
 
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.chainKeypair.to_address().to_hex()}`)
@@ -539,6 +539,14 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
 
+    const allowance = Balance.deserialize(
+      (await this.db.get_staking_safe_allowance()).serialize_value(),
+      BalanceType.HOPR
+    )
+    if (allowance.lt(myBalance)) {
+      throw Error('We do not have enough allowance to fund the channel')
+    }
+
     const receipt = await this.fundChannel(dest, amount, Balance.zero(BalanceType.HOPR))
     return { channelId: generate_channel_id(this.chainKeypair.to_address(), dest), receipt }
   }
@@ -551,11 +559,18 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
     log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
 
+    const allowance = Balance.deserialize(
+      (await this.db.get_staking_safe_allowance()).serialize_value(),
+      BalanceType.HOPR
+    )
+    if (allowance.lt(myBalance)) {
+      throw Error('We do not have enough allowance to fund the channel')
+    }
     return (
       await this.chain.fundChannel(
         dest,
         counterpartyFund,
-        (txHash: string) => this.setTxHandler(`token-approved-${txHash}`, txHash),
+        // (txHash: string) => this.setTxHandler(`token-approved-${txHash}`, txHash),
         (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
         // we are only interested in fundChannel receipt
       )

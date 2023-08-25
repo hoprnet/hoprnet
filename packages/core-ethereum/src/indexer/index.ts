@@ -87,6 +87,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   private chain: ChainWrapper
   private genesisBlock: number
   private lastSnapshot: IndexerSnapshot | undefined
+  private safeAddress: Address
 
   private blockProcessingLock: DeferType<void> | undefined
 
@@ -109,7 +110,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   /**
    * Starts indexing.
    */
-  public async start(chain: ChainWrapper, genesisBlock: number): Promise<void> {
+  public async start(chain: ChainWrapper, genesisBlock: number, safeAddress: Address): Promise<void> {
     if (this.status === IndexerStatus.STARTED) {
       return
     }
@@ -118,8 +119,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     log(`[DEBUG]contractAddresses...${JSON.stringify(contractAddresses, null, 2)}`)
 
     this.handlers = Handlers.init(
-      // FIXME: change to Safe address if Safe is holding the tokens
-      chain.getPublicKey().to_address().to_string(),
+      safeAddress.to_string(),
       chain.getPublicKey().to_address().to_string(),
       {
         channels: contractAddresses.hoprChannelsAddress,
@@ -139,6 +139,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     log(`Starting indexer...`)
     this.chain = chain
     this.genesisBlock = genesisBlock
+    this.safeAddress = safeAddress
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       new BN(await this.db.get_latest_block_number()).toNumber(),
@@ -150,6 +151,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     log('Latest saved block %d', latestSavedBlock)
     log('Latest on-chain block %d', latestOnChainBlock)
+    log('Genesis block %d', genesisBlock)
 
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     let fromBlock = latestSavedBlock
@@ -158,6 +160,26 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
     // no need to query before HoprChannels or HoprNetworkRegistry existed
     fromBlock = Math.max(fromBlock, this.genesisBlock)
+
+    // update the base valuse of balance and allowance of token for safe
+    if (!this.lastSnapshot) {
+      // update safe's HOPR token balance
+      log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
+      const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
+      await this.db.set_hopr_balance(
+        Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
+      )
+      log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
+
+      // update safe's HORP token allowance granted to Channels contract
+      log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
+      const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
+      await this.db.set_staking_safe_allowance(
+        Ethereum_Balance.deserialize(safeAllowance.serialize_value(), Ethereum_BalanceType.HOPR),
+        new Ethereum_Snapshot(new Ethereum_U256('0'), new Ethereum_U256('0'), new Ethereum_U256('0')) // dummy snapshot
+      )
+      log(`set safe allowance to ${safeAllowance.to_formatted_string()}`)
+    }
 
     log('Starting to index from block %d, sync progress 0%%', fromBlock)
 
@@ -244,7 +266,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       this.status = IndexerStatus.RESTARTING
 
       this.stop()
-      await this.start(this.chain, this.genesisBlock)
+      await this.start(this.chain, this.genesisBlock, this.safeAddress)
     } catch (err) {
       this.status = IndexerStatus.STOPPED
       this.emit('status', IndexerStatus.STOPPED)
