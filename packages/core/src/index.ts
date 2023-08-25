@@ -1335,9 +1335,9 @@ class Hopr extends EventEmitter {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
     } else if (amountToFund.gt(new BN(myAvailableTokens.to_string()))) {
       throw Error(
-        `You don't have enough tokens: ${amountToFund.toString(
-          10
-        )}<${myAvailableTokens.to_string()} at safe address ${this.smartContractInfo().safeAddress}`
+        `You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.to_string()} at safe address ${
+          this.smartContractInfo().safeAddress
+        }`
       )
     }
 
@@ -1369,7 +1369,10 @@ class Hopr extends EventEmitter {
       throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
     } else if (totalFund.gt(new BN(myBalance.to_string()))) {
       throw Error(
-        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.to_string()} at safe address ${this.smartContractInfo().safeAddress}`)
+        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.to_string()} at safe address ${
+          this.smartContractInfo().safeAddress
+        }`
+      )
     }
 
     try {
@@ -1659,7 +1662,9 @@ class Hopr extends EventEmitter {
             try {
               // call connector directly and don't use cache, since this is
               // most likely outdated during node startup
-              const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(this.getEthereumAddress().to_string())
+              const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(
+                this.getEthereumAddress().to_string()
+              )
               if (nativeBalance.gte(nativeBalance.of_same(MIN_NATIVE_BALANCE.toString(10)))) {
                 resolve()
               } else {

@@ -76,7 +76,7 @@ pub fn create_identity(
         keys.write_eth_keystore(&file_path, password, false)?;
     }
 
-path.file_name()
+    path.file_name()
         .and_then(|p| p.to_str())
         .map(|s| (String::from(s), keys))
         .ok_or(HelperErrors::UnableToCreateIdentity)
@@ -236,7 +236,17 @@ mod tests {
         let files = get_files(path, &None);
         let val = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(val.len(), 1);
-        assert_eq!(val[0].chain_key.public().0.to_address().to_string(), alice_address);
+        assert_eq!(
+            val.values()
+                .nth(0)
+                .unwrap()
+                .chain_key
+                .public()
+                .0
+                .to_address()
+                .to_string(),
+            alice_address
+        );
 
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }

@@ -271,7 +271,7 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns HOPR balance
    */
   public async getSafeBalance(): Promise<Balance> {
-      return this.chain.getBalance(this.safeModuleOptions.safeAddress)
+    return this.chain.getBalance(this.safeModuleOptions.safeAddress)
   }
 
   /**
@@ -282,10 +282,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.chain.getNativeBalance(Address.from_string(address))
   }
 
-  private cachedGetNativeBalance = (address: string) => cacheNoArgAsyncFunction<Balance>(
-    () => this.uncachedGetNativeBalance(address),
-    constants.PROVIDER_CACHE_TTL
-  )
+  private cachedGetNativeBalance = (address: string) =>
+    cacheNoArgAsyncFunction<Balance>(() => this.uncachedGetNativeBalance(address), constants.PROVIDER_CACHE_TTL)
 
   public async getNativeBalance(address: string, useCache: boolean = false): Promise<Balance> {
     return useCache ? this.cachedGetNativeBalance(address)() : this.uncachedGetNativeBalance(address)
@@ -553,6 +551,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       (await this.db.get_staking_safe_allowance()).serialize_value(),
       BalanceType.HOPR
     )
+    console.log('ALLOWANCE', allowance.to_string(), myBalance.to_string())
     if (allowance.lt(myBalance)) {
       throw Error('We do not have enough allowance to fund the channel')
     }

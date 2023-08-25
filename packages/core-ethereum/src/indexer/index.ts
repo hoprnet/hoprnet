@@ -10,6 +10,8 @@ import {
   Address,
   ChannelEntry,
   AccountEntry,
+  Balance,
+  BalanceType,
   Snapshot,
   debug,
   retryWithBackoffThenThrow,
@@ -167,7 +169,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
       const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
       await this.db.set_hopr_balance(
-        Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
+        Balance.deserialize(hoprBalance.serialize_value(), BalanceType.HOPR)
       )
       log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
@@ -175,8 +177,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
       const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
       await this.db.set_staking_safe_allowance(
-        Ethereum_Balance.deserialize(safeAllowance.serialize_value(), Ethereum_BalanceType.HOPR),
-        new Ethereum_Snapshot(new Ethereum_U256('0'), new Ethereum_U256('0'), new Ethereum_U256('0')) // dummy snapshot
+        Balance.deserialize(safeAllowance.serialize_value(), BalanceType.HOPR),
+        new Snapshot(new U256('0'), new U256('0'), new U256('0')) // dummy snapshot
       )
       log(`set safe allowance to ${safeAllowance.to_formatted_string()}`)
     }
@@ -783,7 +785,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   //     }
   //     const outstandingBalance = Balance.deserialize(
   //       (
-  //         await this.db.get_pending_balance_to(Ethereum_Address.deserialize(partialTicket.counterparty.serialize()))
+  //         await this.db.get_pending_balance_to(Address.deserialize(partialTicket.counterparty.serialize()))
   //       ).serialize_value(),
   //       BalanceType.HOPR
   //     )
@@ -798,9 +800,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   //         ? Balance.zero(BalanceType.HOPR)
   //         : outstandingBalance
   //       await this.db.resolve_pending(
-  //         Ethereum_Address.deserialize(partialTicket.counterparty.serialize()),
-  //         Ethereum_Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
-  //         Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+  //         Address.deserialize(partialTicket.counterparty.serialize()),
+  //         Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
+  //         Snapshot.deserialize(lastSnapshot.serialize())
   //       )
   //       metric_ticketsRedeemed.increment()
   //     } catch (error) {

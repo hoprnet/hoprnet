@@ -7,7 +7,12 @@ import type { Operation } from 'express-openapi'
  * @returns Current HOPR and native balance.
  */
 export const getBalances = async (node: Hopr) => {
-  const [nativeBalance, hoprBalance, safeNativeBalance, safeHoprBalance] = await Promise.all([await node.getNativeBalance(), await node.getBalance(), await node.getSafeNativeBalance(), await node.getSafeBalance()])
+  const [nativeBalance, hoprBalance, safeNativeBalance, safeHoprBalance] = await Promise.all([
+    await node.getNativeBalance(),
+    await node.getBalance(),
+    await node.getSafeNativeBalance(),
+    await node.getSafeBalance()
+  ])
 
   return {
     native: nativeBalance.to_string(),
