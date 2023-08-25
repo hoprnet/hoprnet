@@ -12,7 +12,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.1 HoprChannels ERC777 Reentrancy
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -24,7 +24,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.2 Winning Ticket Can Be Redeemed Multiple Times
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -34,7 +34,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.3 EIP-712 Incompliant Signed Message
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -44,7 +44,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.4 Dependencies Between Source File Folders
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -54,7 +54,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.5 DomainSeparator Is Not Recomputed After a Change of Chain ID
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -66,7 +66,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.6 HoprNodeSafeRegistry Is Not an INodeSafeRegistry
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -78,7 +78,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.7 HoprNodeStakeFactory Can Clone Any Module
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -89,7 +89,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.8 IHoprNodeSafeRegistry Is a Contract and Not an Interface
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -99,7 +99,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.9 Incorrect Flag Position Upper Bound
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -109,7 +109,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.10 Incorrect Specifications and Comments
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -119,7 +119,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.11 Missing Input Checks at tokensReceived
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -130,7 +130,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.12 Signatures Can Be Replayed
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -140,7 +140,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.13 TargetUtils Incorrect Iterator Bound
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -151,7 +151,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.14 Timestamp Is Not Updated With Snapshot
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -161,7 +161,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 5.15 isNodeSafeRegistered Returns True for Unregistered Pairs if safeAddress==0
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 
@@ -173,7 +173,7 @@ e6ac2da904672da5c932b3e95ba6cbc37934643d
 
 #### 6.1 ERC777 Reentrancy in fundChannel
 
-**Status:** <span style="background-color:#000058">Code Change</span>
+**Status:** <span style="background-color:#4cbb17">Code Change</span>
 
 **Description of Changes:**
 

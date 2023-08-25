@@ -6,9 +6,9 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
+use core_crypto::keypairs::Keypair;
 use log::{log, Level};
 use std::env;
-use core_crypto::keypairs::Keypair;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -76,7 +76,11 @@ impl RegisterInNetworkRegistryArgs {
             // read all the identities from the directory
             match read_identities(local_files, &pwd) {
                 Ok(node_identities) => {
-                    all_chain_addrs.extend(node_identities.iter().map(|ni| ni.chain_key.public().0.to_address().to_string()));
+                    all_chain_addrs.extend(
+                        node_identities
+                            .values()
+                            .map(|ni| ni.chain_key.public().0.to_address().to_string()),
+                    );
                 }
                 Err(e) => {
                     println!("error {:?}", e);

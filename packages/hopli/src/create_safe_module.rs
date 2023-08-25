@@ -6,14 +6,17 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
-use log::{log, Level};
-use std::env;
 use core_crypto::keypairs::Keypair;
 use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
-
+use log::{log, Level};
+use std::env;
+use ethers::{
+    types::U256,
+    utils::parse_units, //, types::U256, utils::format_units, ParseUnits
+};
 
 /// CLI arguments for `hopli create-safe-module`
 #[derive(Parser, Default, Debug)]
@@ -87,7 +90,7 @@ impl CreateSafeModuleArgs {
         match read_identities(files, &pwd) {
             Ok(node_identities) => {
                 all_node_addresses = node_identities
-                    .iter()
+                    .values()
                     .map(|ni| ni.chain_key.public().to_address().to_string())
                     .collect();
             }

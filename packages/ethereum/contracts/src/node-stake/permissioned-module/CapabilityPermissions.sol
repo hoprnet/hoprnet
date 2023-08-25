@@ -738,11 +738,11 @@ library HoprCapabilityPermissions {
         for (uint256 i = 0; i < len; i++) {
             // first right shift (32 - 4) * 8 = 224 bits
             // then left shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
-            val |= (bytes32(functionSigs[i]) >> 224) << (224 - 32 * i);
+            val |= (bytes32(functionSigs[i]) >> 224) << (224 - (32 * i));
         }
         for (uint256 i = 0; i < len; i++) {
             // shift by two bits
-            val |= bytes32(uint256(permissions[i])) << 2 * i;
+            val |= bytes32(uint256(permissions[i])) << (2 * i);
         }
         return (val, len);
     }
@@ -772,13 +772,13 @@ library HoprCapabilityPermissions {
         for (uint256 i = 0; i < length; i++) {
             // first right shift (32 - 4 * i - 4) * 8 = (224 - 32 * i) bits
             // then left shift (32 - 4) * 8 = 224 bits
-            functionSigs[i] = bytes4((encoded >> (224 - 32 * i)) << 224);
+            functionSigs[i] = bytes4((encoded >> (224 - (32 * i))) << 224);
         }
         // decode permissions
         for (uint256 j = 0; j < length; j++) {
             // first left shift 256 - 2 - 2 * j = 254 - 2 * j bits
             // then right shift 256 - 2 = 254 bits
-            permissions[j] = GranularPermission(uint8((uint256(encoded) << (254 - 2 * j)) >> 254));
+            permissions[j] = GranularPermission(uint8((uint256(encoded) << (254 - (2 * j)))) >> 254);
         }
     }
 }
