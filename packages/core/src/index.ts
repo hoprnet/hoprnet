@@ -133,8 +133,8 @@ const metric_strategyMaxChannels = create_gauge(
   'Maximum number of channels the current strategy can open'
 )
 
-/// Maximum time to wait for a packet to be pushed to the interaction queue
-const PACKET_QUEUE_TIMEOUT_SECONDS = 15n
+/// Maximum time to wait for a packet to be pushed to the interaction queue in milliseconds
+const PACKET_QUEUE_TIMEOUT_MILLISECONDS = 15000n
 
 interface NetOptions {
   ip: string
@@ -776,7 +776,7 @@ export class Hopr extends EventEmitter {
 
     metric_pathLength.observe(path.length())
 
-    return (await this.tools.send_message(new ApplicationData(applicationTag, msg), path, PACKET_QUEUE_TIMEOUT_SECONDS)).to_hex()
+    return (await this.tools.send_message(new ApplicationData(applicationTag, msg), path, PACKET_QUEUE_TIMEOUT_MILLISECONDS)).to_hex()
   }
 
   /**

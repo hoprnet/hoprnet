@@ -227,15 +227,17 @@ pub mod wasm_impl {
     #[wasm_bindgen]
     impl HoprTools {
         #[wasm_bindgen]
-        pub async fn send_message(&mut self, msg: ApplicationData, path: Path, timeout: u64) -> Result<HalfKeyChallenge, JsValue> {
+        pub async fn send_message(&mut self, msg: ApplicationData, path: Path, timeout_in_millis: u64) -> Result<HalfKeyChallenge, JsValue> {
             match self.pkt_sender.send_packet(msg, path) {
                 Ok(mut awaiter) => {
-                    awaiter.consume_and_wait(std::time::Duration::from_millis(timeout))
+                    utils_log::debug!("Awaiting the HalfKeyChallenge");
+                    awaiter.consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
                         .await
                         .map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))
                 },
                 Err(e) => Err(wasm_bindgen::JsValue::from(e.to_string()))
             }
+            
         }
     } 
 
