@@ -6,13 +6,13 @@ use crate::{
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
+use core_crypto::keypairs::Keypair;
 use ethers::{
     types::U256,
     utils::parse_units, //, types::U256, utils::format_units, ParseUnits
 };
 use log::{log, Level};
 use std::env;
-use core_crypto::keypairs::Keypair;
 
 /// CLI arguments for `hopli register-in-network-registry`
 #[derive(Parser, Default, Debug)]
@@ -90,7 +90,7 @@ impl InitializeNodeArgs {
         match read_identities(files, &pwd) {
             Ok(node_identities) => {
                 all_node_addresses = node_identities
-                    .iter()
+                    .values()
                     .map(|ni| ni.chain_key.public().0.to_address().to_string())
                     .collect();
             }

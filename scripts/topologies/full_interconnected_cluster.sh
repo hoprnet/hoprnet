@@ -36,6 +36,10 @@ test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1
 declare endpoints="$@"
 declare api_token=${HOPRD_API_TOKEN}
 
+# put 0.5 HOPR token into each channel
+declare amount_per_channel
+amount_per_channel="500000000000000000"
+
 log "Using endpoints: ${endpoints}"
 
 for endpoint in ${endpoints}; do
@@ -51,14 +55,24 @@ for endpoint in ${endpoints}; do
 done
 
 declare -A peers
+declare -A peer_addrs
+declare -a endpoints_arr
+endpoints_arr=( ${endpoints} )
+
 for endpoint in ${endpoints}; do
+  declare peer_id peer_addr
+
   log "Get peer id for ${endpoint}"
-  declare peer="$(get_hopr_address "${api_token}@${endpoint}")"
-  peers["${endpoint}"]="${peer}"
-  log "Get peer id for ${endpoint} - OK ${peer}"
+  peer_id="$(get_hopr_address "${api_token}@${endpoint}")"
+  peers["${endpoint}"]="${peer_id}"
+  log "Get peer id for ${endpoint} - OK ${peer_id}"
+
+  log "Get peer address for ${endpoint}"
+  peer_addr="$(get_native_address "${api_token}@${endpoint}")"
+  peer_addrs["${endpoint}"]="${peer_addr}"
+  log "Get peer address for ${endpoint} - OK ${peer_addr}"
 done
 
-declare endpoints_arr=( ${endpoints} )
 log "Check peers announcements"
 result=$(api_peers "${endpoints_arr[1]}")
 log "-- ${result}"
@@ -76,17 +90,16 @@ done
 
 log "Opening channels in background to parallelize operations"
 
-# put 0.5 HOPR token into each channel
-declare amount_per_channel="500000000000000000"
-
 for endpoint in ${endpoints}; do
   for other_endpoint in ${endpoints}; do
     # only perform operation if endpoints differ
     if [ "${endpoint}" != "${other_endpoint}" ]; then
       log "${endpoint} opening channel to other node at ${other_endpoint}"
-      declare src="${peers["${endpoint}"]}"
-      declare dst="${peers["${other_endpoint}"]}"
-      api_open_channel "${src}" "${dst}" "${endpoint}" "${dst}" "${amount_per_channel}" &
+      declare src dst dst_addr
+      src="${peers["${endpoint}"]}"
+      dst="${peers["${other_endpoint}"]}"
+      dst_addr="${peer_addrs["${other_endpoint}"]}"
+      api_open_channel "${src}" "${dst}" "${endpoint}" "${dst_addr}" "${amount_per_channel}" &
     fi
   done
 done
