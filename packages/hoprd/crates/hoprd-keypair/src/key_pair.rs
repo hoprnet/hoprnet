@@ -102,8 +102,10 @@ impl Serialize for HoprKeys {
         S: Serializer,
     {
         let mut s = serializer.serialize_struct("HoprKeys", 3)?;
-        s.serialize_field("packet_key", self.packet_key.public().to_peerid_str().as_str())?;
+        s.serialize_field("peer_id", self.packet_key.public().to_peerid_str().as_str())?;
+        s.serialize_field("packet_key", self.packet_key.public().to_hex().as_str())?;
         s.serialize_field("chain_key", &self.chain_key.public().to_hex().as_str())?;
+        s.serialize_field("native_address", &self.chain_key.public().to_address().to_string())?;
         s.serialize_field("uuid", &self.id)?;
         s.end()
     }

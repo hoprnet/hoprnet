@@ -20,6 +20,7 @@ pub const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
 pub const HOPR_BALANCE_KEY: &str = "hopr-balance";
 pub const STAKING_SAFE_ADDRESS_KEY: &str = "staking:safe-address";
 pub const STAKING_MODULE_ADDRESS_KEY: &str = "staking:module-address";
+pub const STAKING_SAFE_ALLOWANCE_KEY: &str = "staking:safe-allowance";
 pub const NODE_SAFE_REGISTRY_DOMAIN_SEPARATOR_KEY: &str = "nodeSafeRegistry:domainSeparator";
 pub const NETWORK_REGISTRY_ALLOWED_PREFIX: &str = "networkRegistry:allowed-";
 pub const NETWORK_REGISTRY_ENABLED_PREFIX: &str = "networkRegistry:enabled";

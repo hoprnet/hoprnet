@@ -203,6 +203,12 @@ pub trait HoprCoreEthereumDbActions {
     /// Sets the staking module address
     async fn set_staking_module_address(&mut self, module_address: &Address) -> Result<()>;
 
+    /// Get the allowance for HoprChannels contract to transfer tokens on behalf of staking safe address
+    async fn get_staking_safe_allowance(&self) -> Result<Balance>;
+
+    /// Sets the allowance for HoprChannels contract to transfer tokens on behalf of staking safe address
+    async fn set_staking_safe_allowance(&mut self, allowance: &Balance, snapshot: &Snapshot) -> Result<()>;
+
     /// Check whether the Network Registry is enabled.
     async fn is_network_registry_enabled(&self) -> Result<bool>;
 
