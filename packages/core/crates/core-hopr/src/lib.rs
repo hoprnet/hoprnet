@@ -163,8 +163,6 @@ pub fn build_components(me: libp2p_identity::Keypair,
         db.clone(), Mixer::new_with_gloo_timers(MixerConfig::default()),ack_actions.writer(), on_final_packet_tx, packet_cfg
     );
 
-    // packet processing
-
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (pong_tx, pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
     

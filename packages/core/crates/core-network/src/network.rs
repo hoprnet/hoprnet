@@ -112,7 +112,7 @@ pub enum NetworkEvent {
     CloseConnection(PeerId),
     PeerOffline(PeerId),
     Register(PeerId, PeerOrigin),
-    Unregister(PeerId), 
+    Unregister(PeerId),
 }
 
 impl std::fmt::Display for NetworkEvent {
@@ -268,6 +268,7 @@ impl<T: NetworkExternalActions> Network<T> {
     /// Each PeerId must have an origin specification.
     pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
         let now = current_timestamp();
+        utils_log::debug!("Registering peer '{}' with origin {}", peer, origin);
 
         // assumes disjoint sets
         let has_entry = self.entries.contains_key(peer);
@@ -351,7 +352,7 @@ impl<T: NetworkExternalActions> Network<T> {
                     self.network_actions_api.emit(NetworkEvent::PeerOffline(entry.id.clone()));
                 }
             } else {
-                entry.last_seen = ping_result.ok().unwrap();
+                entry.last_seen = current_timestamp();
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
                 entry.backoff = self.cfg.backoff_min;
                 entry.quality = 1.0_f64.min(entry.quality + self.cfg.quality_step);

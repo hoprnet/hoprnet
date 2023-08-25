@@ -296,6 +296,7 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                     // debug!("Discarded messages not relevant for the protocol!");
                 },
                 // --------------
+                // heartbeat protocol
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(libp2p_request_response::Event::<Ping,Pong>::Message {
                     peer,
                     message:
@@ -303,7 +304,7 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                         request_id, request, channel
                     },
                 })) => {
-                    info!("Received a heartbeat Ping request {} from {}", request_id, peer);
+                    info!("Received a Ping request {} from {}", request_id, peer);
                     let challenge_response = api::HeartbeatResponder::generate_challenge_response(&request.0);
                     match swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response)) {
                         Ok(_) => {},
@@ -319,8 +320,8 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                         request_id, response
                     },
                 })) => {
-                    info!("Heartbeat protocol: Received a Pong response for request {} from {}", request_id, peer);
-                    if let Some(_) = active_manual_pings.take(&request_id) {
+                    info!("Received a Pong response from {} (#{}) ", peer, request_id);
+                    if active_manual_pings.take(&request_id).is_some() {
                         debug!("Processing manual ping response from peer {}", peer);
                         match manual_ping_responds.record_pong((peer, Ok(response.0))).await {
                             Ok(_) => {},
@@ -329,6 +330,7 @@ pub(crate) async fn p2p_loop(me: libp2p_identity::Keypair,
                             }
                         }
                     } else {
+                        debug!("Processing heartbeat ping response from peer {}", peer);
                         match heartbeat_responds.record_pong((peer, Ok(response.0))).await {
                             Ok(_) => {},
                             Err(e) => {

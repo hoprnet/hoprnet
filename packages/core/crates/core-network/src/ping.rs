@@ -123,7 +123,6 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
     /// # Arguments
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
-    /// * `send_msg` - The send function producing a Future with the reply of the pinged peer
     async fn ping(&mut self, peers: Vec<PeerId>)
     {
         let start_all_peers = current_timestamp();
@@ -156,68 +155,70 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
 
         let mut waiting = std::collections::VecDeque::from(remainder);
 
-        while active_pings.len() > 0 || waiting.len() > 0 {
-            while let Some((peer, response)) = self.receive_pong.next().await {
-                let record = active_pings.remove(&peer);
-                        
-                if record.is_none() {
-                    error!("Received a pong for an unregistered ping, likely an aborted run");
-                    continue
-                }
+        while let Some((peer, response)) = self.receive_pong.next().await {
+            let record = active_pings.remove(&peer);
+                    
+            if record.is_none() {
+                error!("Received a pong for an unregistered ping, likely an aborted run");
+                continue
+            }
 
-                let (peer, result) = match response {
-                    Ok(pong) => {
-                        let (start, challenge, timer) = record.expect("Should hold a value at this point");
-                        let duration: std::result::Result<std::time::Duration, ()> = {
-                            if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
-                                info!("Successfully pinged peer {}", peer);
-                                Ok(std::time::Duration::from_millis(current_timestamp() - start))
-                            } else {
-                                error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
-                                Err(())
-                            }
-                        };
-
-                        if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
-                            metric_time_to_ping.record_measure(timer.unwrap());
+            let (peer, result) = match response {
+                Ok(pong) => {
+                    let (start, challenge, timer) = record.expect("Should hold a value at this point");
+                    let duration: std::result::Result<std::time::Duration, ()> = {
+                        if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
+                            info!("Successfully pinged peer {}", peer);
+                            Ok(std::time::Duration::from_millis(current_timestamp() - start))
+                        } else {
+                            error!("Failed to verify the challenge for ping to peer: {}", peer.to_string());
+                            Err(())
                         }
+                    };
 
-                        (peer, duration)
-                    },
-                    Err(_) => {
-                        error!("Ping to peer {} timed out", peer);
-                        (peer, Err(()))
+                    if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
+                        metric_time_to_ping.record_measure(timer.unwrap());
                     }
-                };
 
-                match result {
-                    Ok(_) => {
-                        if let Some(metric_successful_ping_count) = &self.metric_successful_ping_count {
-                            metric_successful_ping_count.increment();
-                        };
-                    },
-                    Err(_) => {
-                        if let Some(metric_failed_ping_count) = &self.metric_failed_ping_count {
-                            metric_failed_ping_count.increment();
+                    (peer, duration)
+                },
+                Err(_) => {
+                    error!("Ping to peer {} timed out", peer);
+                    (peer, Err(()))
+                }
+            };
+
+            match result {
+                Ok(_) => {
+                    if let Some(metric_successful_ping_count) = &self.metric_successful_ping_count {
+                        metric_successful_ping_count.increment();
+                    };
+                },
+                Err(_) => {
+                    if let Some(metric_failed_ping_count) = &self.metric_failed_ping_count {
+                        metric_failed_ping_count.increment();
+                    };
+                }
+            }
+
+            self.external_api.on_finished_ping(&peer, result.map(|v| v.as_millis() as u64)).await;
+
+            let remaining_time = current_timestamp() - start_all_peers;
+            if (remaining_time as u128) < self.config.timeout as u128 {
+                while let Some(peer) = waiting.pop_front() {
+                    if ! active_pings.contains_key(&peer) {
+                        match self.initiate_peer_ping(&peer) {
+                            Ok(v) => {
+                                active_pings.insert(peer.clone(), v);
+                            },
+                            Err(_) => continue
                         };
                     }
                 }
+            }
 
-                self.external_api.on_finished_ping(&peer, result.map(|v| v.as_millis() as u64)).await;
-
-                let remaining_time = current_timestamp() - start_all_peers;
-                if (remaining_time as u128) < self.config.timeout as u128 {
-                    while let Some(peer) = waiting.pop_front() {
-                        if ! active_pings.contains_key(&peer) {
-                            match self.initiate_peer_ping(&peer) {
-                                Ok(v) => {
-                                    active_pings.insert(peer.clone(), v);
-                                },
-                                Err(_) => continue
-                            };
-                        }
-                    }
-                }
+            if active_pings.len() == 0 && waiting.len() == 0 {
+                break
             }
         }
     }

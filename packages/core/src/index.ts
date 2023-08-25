@@ -319,8 +319,9 @@ export class Hopr extends EventEmitter {
       BigInt(this.options?.heartbeatThreshold)
     )
 
+
     let ping_cfg = new PingConfig(
-      MAX_PARALLEL_PINGS, BigInt(60)    // TODO: is it even used at this point? Should this be configurable?
+      MAX_PARALLEL_PINGS, BigInt(2000)   // in millis
     )
 
     const onAcknowledgement = (ackChallenge: Uint8Array) => {
