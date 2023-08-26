@@ -12,6 +12,8 @@ import {
   AccountEntry,
   Snapshot,
   debug,
+  Balance,
+  BalanceType,
   retryWithBackoffThenThrow,
   ordered,
   FIFO,
@@ -167,7 +169,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
       const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
       await this.db.set_hopr_balance(
-        Ethereum_Balance.deserialize(hoprBalance.serialize_value(), Ethereum_BalanceType.HOPR)
+        Balance.deserialize(hoprBalance.serialize_value(), BalanceType.HOPR)
       )
       log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
@@ -175,8 +177,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
       const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
       await this.db.set_staking_safe_allowance(
-        Ethereum_Balance.deserialize(safeAllowance.serialize_value(), Ethereum_BalanceType.HOPR),
-        new Ethereum_Snapshot(new Ethereum_U256('0'), new Ethereum_U256('0'), new Ethereum_U256('0')) // dummy snapshot
+        Balance.deserialize(safeAllowance.serialize_value(), BalanceType.HOPR),
+        new Snapshot(new U256('0'), new U256('0'), new U256('0')) // dummy snapshot
       )
       log(`set safe allowance to ${safeAllowance.to_formatted_string()}`)
     }

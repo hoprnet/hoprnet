@@ -236,7 +236,7 @@ mod tests {
         let files = get_files(path, &None);
         let val = read_identities(files, &pwd.to_string()).unwrap();
         assert_eq!(val.len(), 1);
-        assert_eq!(val[0].chain_key.public().0.to_address().to_string(), alice_address);
+        assert_eq!(val.values().next().unwrap().chain_key.public().0.to_address().to_string(), alice_address);
 
         remove_json_keystore(path).map_err(|err| println!("{:?}", err)).ok();
     }

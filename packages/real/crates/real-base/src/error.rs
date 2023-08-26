@@ -5,6 +5,7 @@ use wasm_bindgen::JsValue;
 
 #[derive(Error, Debug)]
 pub enum RealError {
+    #[cfg(feature = "wasm")]
     #[error("javascript error: {0}")]
     JsError(String),
 

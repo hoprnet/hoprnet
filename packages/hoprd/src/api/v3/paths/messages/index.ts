@@ -31,10 +31,11 @@ const DELETE: Operation = [
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const tag: number = req.body.tag
     const message = encodeMessage(req.body.body)
     const recipient = peerIdFromString(req.body.peerAddress)
     const hops = req.body.hops
+
+    const tag = req.body.tag
 
     // only set path if given, otherwise a path will be chosen by hopr core
     let path: OffchainPublicKey[]

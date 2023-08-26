@@ -6,5 +6,6 @@
   },
   "solidity.formatter": "forge",
   "editor.formatOnSave": false,
-  "git.ignoreLimitWarning": true
+  "git.ignoreLimitWarning": true,
+  "rust-analyzer.showUnlinkedFileNotification": false
 }
