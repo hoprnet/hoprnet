@@ -1,8 +1,9 @@
 use crate::identity_input::LocalIdentityArgs;
-use crate::key_pair::{create_identity, read_identities, NodeIdentity};
+use crate::key_pair::{create_identity, read_identities};
 use crate::password::PasswordArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{builder::RangedU64ValueParser, Parser};
+use hoprd_keypair::key_pair::HoprKeys;
 use log::{debug, error, info};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -69,7 +70,7 @@ impl IdentityArgs {
             Err(e) => return Err(e),
         };
 
-        let mut node_identities: HashMap<String, NodeIdentity> = HashMap::new();
+        let mut node_identities: HashMap<String, HoprKeys> = HashMap::new();
 
         match action {
             IdentityActionType::Create => {
@@ -87,7 +88,7 @@ impl IdentityArgs {
                     };
 
                     match create_identity(&id_dir, &pwd, &file_prefix) {
-                        Ok((id_filename, identity)) => _ = node_identities.insert(id_filename, NodeIdentity::new(identity)),
+                        Ok((id_filename, identity)) => _ = node_identities.insert(id_filename, identity),
                         Err(_) => return Err(HelperErrors::UnableToCreateIdentity),
                     }
                 }
