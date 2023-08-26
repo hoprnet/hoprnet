@@ -115,7 +115,8 @@ export async function createChainWrapper(
   const chainCalls = new ChainCalls(
     offchainKeypair,
     keypair,
-    Address.from_string(deploymentExtract.hoprChannelsAddress)
+    Address.from_string(deploymentExtract.hoprChannelsAddress),
+    Address.from_string(deploymentExtract.hoprAnnouncementsAddress)
   )
 
   // FIXME: when to enable use safe?
@@ -424,14 +425,16 @@ export async function createChainWrapper(
   /**
    * FIXME: annouce is in a separate contract
    * Initiates a transaction that announces nodes on-chain.
+   * Node directly announce, regardless if Safe is used
    * @param data prepared announcement data
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
   const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+    let is_safe_set = chainCalls.get_use_safe()
     let confirmationEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_announce_payload(multiaddr.toString())),
-      to: deploymentExtract.hoprAnnouncementsAddress,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : deploymentExtract.hoprAnnouncementsAddress,
       value: BigNumber.from(0)
     }
     // @ts-ignore fixme: treat result
@@ -560,9 +563,10 @@ export async function createChainWrapper(
     let fundChannelResult: SendTransactionReturn
 
     // FIXME: tx should be sent to the Safe Module
+    let is_safe_set = chainCalls.get_use_safe()
     const fundChannelPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_fund_channel_payload(destination, amount)),
-      to: channels.address,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
 
@@ -597,9 +601,10 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
+    let is_safe_set = chainCalls.get_use_safe()
     const initiateOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_intiate_outgoing_channel_closure_payload(counterparty)),
-      to: channels.address,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
 
@@ -638,9 +643,10 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
+    let is_safe_set = chainCalls.get_use_safe()
     const finalizeOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_finalize_outgoing_channel_closure_payload(counterparty)),
-      to: channels.address,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
 
@@ -681,10 +687,11 @@ export async function createChainWrapper(
 
     let sendResult: SendTransactionReturn
     let error: unknown
+    let is_safe_set = chainCalls.get_use_safe()
 
     const redeemTicketEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_redeem_ticket_payload(ackTicket)),
-      to: channels.address,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
 
@@ -711,6 +718,7 @@ export async function createChainWrapper(
 
   /**
    * Initiates a transaction that registers a safe address
+   * This function should not be called through safe/module
    * @param safeAddress address of safe
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
@@ -737,6 +745,8 @@ export async function createChainWrapper(
 
     switch (sendResult.code) {
       case SendTransactionStatus.SUCCESS:
+        // when node is registered, other transactions must be sent through safe
+        chainCalls.set_use_safe(true)
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
         throw new Error(`Failed in sending registerSafeByNode transaction because transaction is a duplicate`)

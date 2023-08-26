@@ -343,7 +343,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     for (const query of queries) {
       try {
-        console.log("QUERY: ", query, query.topics)
+        console.log('QUERY: ', query, query.topics)
         rawEvents.push(...(await provider.getLogs(query)))
       } catch {
         return {
@@ -354,7 +354,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     // sort in-place
     rawEvents.sort(snapshotComparator)
-    console.log("RAW EVENTS SORTED: ", rawEvents)
+    console.log('RAW EVENTS SORTED: ', rawEvents)
 
     return {
       success: true,
@@ -741,7 +741,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         new U256(event.logIndex.toString())
       )
 
-      log('indexer on_event callback for transaction hash: ',event.transactionHash)
+      log('indexer on_event callback for transaction hash: ', event.transactionHash)
 
       try {
         await this.handlers.on_event(
@@ -753,7 +753,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           lastDatabaseSnapshot
         )
       } catch (err) {
-          error('Error during indexer on_event callback: ',err, event)
+        error('Error during indexer on_event callback: ', err, event)
       }
     }
   }
