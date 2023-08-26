@@ -41,11 +41,11 @@ struct ChainCalls {
 }
 
 impl ChainCalls {
-    pub fn new(offchain_keypair: OffchainKeypair, chain_keypair: ChainKeypair, hopr_channels: Address) -> Self {
+    pub fn new(offchain_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, hopr_channels: Address) -> Self {
         Self {
-            offchain_keypair,
+            offchain_keypair: offchain_keypair.clone(),
             chain_key: chain_keypair.public().to_address(),
-            chain_keypair,
+            chain_keypair: chain_keypair.clone(),
             hopr_channels,
             use_safe: false,
         }
@@ -381,8 +381,8 @@ pub mod tests {
         let wallet: LocalWallet = anvil.keys()[0].clone().into();
 
         let chain = ChainCalls::new(
-            OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
-            ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap(),
+            &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
+            &ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap(),
             Address::default(),
         );
 
@@ -498,7 +498,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl ChainCalls {
         #[wasm_bindgen(constructor)]
-        pub fn new(offchain_keypair: OffchainKeypair, chain_keypair: ChainKeypair, hopr_channels: Address) -> Self {
+        pub fn new(offchain_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, hopr_channels: Address) -> Self {
             Self {
                 w: super::ChainCalls::new(offchain_keypair, chain_keypair, hopr_channels),
             }

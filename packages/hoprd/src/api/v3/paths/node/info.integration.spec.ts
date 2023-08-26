@@ -3,10 +3,12 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 import { Multiaddr } from '@multiformats/multiaddr'
-import { Health, health_to_string } from '@hoprnet/hopr-core'
+import { Health } from '@hoprnet/hopr-core'
 
 import { hoprd_misc_initialize_crate, ResolvedNetwork } from '../../../../../lib/hoprd_misc.js'
 hoprd_misc_initialize_crate()
+
+import { health_to_string } from '@hoprnet/hopr-utils'
 
 import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 

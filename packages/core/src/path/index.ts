@@ -1,10 +1,9 @@
 import HeapPackage from 'heap-js'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS, PATH_RANDOMNESS, MAX_HOPS } from '../constants.js'
 import { type ChannelEntry, type Address } from '@hoprnet/hopr-utils'
-import { debug } from '@hoprnet/hopr-utils'
+import { debug, random_float } from '@hoprnet/hopr-utils'
 
 import BN from 'bn.js'
-import { random_float } from '../cryptography.js'
 
 const { Heap } = HeapPackage
 

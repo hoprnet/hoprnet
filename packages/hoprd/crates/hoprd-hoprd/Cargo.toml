@@ -1,0 +1,69 @@
+[package]
+name = "hoprd-hoprd"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Contains the main entry point of HOPR daemon application"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+# TODO: change this to a binary crate once the migration is complete
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+console_error_panic_hook = { version = "0.1.7", optional = true }
+js-sys = { version = "0.3.63", optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+core-hopr = { path = "../../../core/crates/core-hopr", default-features = false }
+core-misc = { path = "../../../core/crates/core-misc", default-features = false }
+core-network = { path = "../../../core/crates/core-network", default-features = false }
+core-packet = { path = "../../../core/crates/core-packet", default-features = false }
+core-path = { path = "../../../core/crates/core-path", default-features = false }
+core-strategy = { path = "../../../core/crates/core-strategy", default-features = false }
+core-types = { path = "../../../core/crates/core-types", default-features = false }
+core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
+core-ethereum-indexer = { path = "../../../core-ethereum/crates/core-ethereum-indexer", default-features = false }
+core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc", default-features = false }
+hoprd-inbox = { path = "../../../hoprd/crates/hoprd-inbox", default-features = false }
+hoprd-keypair = { path = "../../../hoprd/crates/hoprd-keypair", default-features = false }
+hoprd-misc = { path = "../../../hoprd/crates/hoprd-misc", default-features = false }
+utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
+utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+utils-metrics = { path = "../../../utils/crates/utils-metrics", default-features = false, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm", "prometheus"]
+wasm = [
+    "dep:wasm-bindgen",
+    "dep:js-sys",
+    "core-hopr/wasm",
+    "core-misc/wasm",
+    "core-network/wasm",
+    "core-packet/wasm",
+    "core-path/wasm",
+    "core-strategy/wasm",
+    "core-types/wasm",
+    "core-ethereum-db/wasm",
+    "core-ethereum-indexer/wasm",
+    "core-ethereum-misc/wasm",
+    "hoprd-inbox/wasm",
+    "hoprd-keypair/wasm",
+    "hoprd-misc/wasm",
+    "utils-log/wasm",
+    "utils-misc/wasm"
+]
+prometheus = ["core-hopr/prometheus", "dep:utils-metrics"]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]

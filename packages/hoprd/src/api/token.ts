@@ -5,8 +5,7 @@ import { createHash } from 'crypto'
 // List of endpoints which are supported as capabilitities.
 // Each entry also specifies supported endpoint-specific limits.
 import supportedCapabilities from './../supported-api-capabilities.json' assert { type: 'json' }
-import { hoprd_misc_initialize_crate, AuthorizationToken, Database } from '../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
+import { AuthorizationToken, Database } from '@hoprnet/hopr-utils'
 
 enum LimitType {
   calls
