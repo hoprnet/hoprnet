@@ -171,7 +171,7 @@ jobs:
           fi
           echo "Restarting hosts: ${hosts}"
           for host in ${hosts[@]}; do
-            ssh root@${host} "service hoprd restart"
+            ssh -o StrictHostKeyChecking=no root@${host} "service hoprd restart"
           done
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
