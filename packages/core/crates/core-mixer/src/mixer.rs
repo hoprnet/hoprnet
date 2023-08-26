@@ -1,20 +1,13 @@
 use std::future::Future;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::time::Duration;
 
-use futures::stream::Stream;
-use futures_lite::stream::StreamExt;
 use rand::Rng;
-
-use crate::future_extensions::StreamThenConcurrentExt;
 
 use utils_log::debug;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use lazy_static::lazy_static;
-#[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::SimpleGauge;
+use {lazy_static::lazy_static, utils_metrics::metrics::SimpleGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static! {
@@ -77,21 +70,22 @@ impl MixerConfig {
     }
 }
 
+type SleepFn = fn(Duration) -> Box<dyn Future<Output = ()>>;
+
 /// Mixer implementation using Async instead of a real queue to provide the packet mixing functionality
-pub struct Mixer<T> {
+#[derive(Copy, Clone)]
+pub struct Mixer {
     pub cfg: MixerConfig,
-    sleep: Box<dyn Fn(Duration) -> Box<dyn Future<Output = ()>>>,
-    _data: PhantomData<T>,
+    sleep: SleepFn,
 }
 
-impl<T> Mixer<T> {
+impl Mixer {
     /// Creates new mixer with standard sleep function.
     /// This constructor is not suitable for WASM context and will panic.
     pub fn new(cfg: MixerConfig) -> Self {
         Self {
-            sleep: Box::new(|d| Box::new(async_std::task::sleep(d))),
+            sleep: |d| Box::new(async_std::task::sleep(d)),
             cfg,
-            _data: PhantomData,
         }
     }
 
@@ -100,20 +94,19 @@ impl<T> Mixer<T> {
     #[cfg(feature = "wasm")]
     pub fn new_with_gloo_timers(cfg: MixerConfig) -> Self {
         Self {
-            sleep: Box::new(|d| Box::new(gloo_timers::future::sleep(d))),
+            sleep: |d| Box::new(gloo_timers::future::sleep(d)),
             cfg,
-            _data: PhantomData,
         }
     }
 
     /// Async mixing operation on the packet.
     ///
     /// # Arguments
-    /// * packet: Packet contents or an error
+    /// * data: Data ontent to be time mixed
     ///
     /// # Returns
-    /// The same packet as ingested on input postponed by a random delay
-    pub async fn mix(&self, packet: T) -> T {
+    /// The same data as ingested on input postponed by a random delay
+    pub async fn mix<T>(&self, data: T) -> T {
         let random_delay = self.cfg.random_delay();
         debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
 
@@ -131,56 +124,15 @@ impl<T> Mixer<T> {
                 .set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_AVERAGE_DELAY.get()));
         }
 
-        packet
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use super::*;
-    use js_sys::AsyncIterator;
-    use utils_misc::async_iterable::wasm::{to_box_u8_stream, to_jsvalue_stream};
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsValue;
-    use wasm_bindgen_futures::stream::JsStream;
-
-    #[wasm_bindgen]
-    pub struct AsyncIterableHelperMixer {
-        stream: Box<dyn Stream<Item = Result<Box<[u8]>, String>> + Unpin>,
-    }
-
-    /// A mixer wrapper around the core functionality
-    ///
-    /// Async closure interaction was inspired by: https://www.fpcomplete.com/blog/captures-closures-async/
-    #[wasm_bindgen]
-    pub fn new_mixer(packet_input: AsyncIterator) -> Result<AsyncIterableHelperMixer, JsValue> {
-        let mixer = std::sync::Arc::new(Mixer::<Result<Box<[u8]>, String>>::new_with_gloo_timers(
-            MixerConfig::default(),
-        ));
-
-        Ok(AsyncIterableHelperMixer {
-            stream: Box::new(
-                JsStream::from(packet_input)
-                    .map(to_box_u8_stream)
-                    .then_concurrent(move |packet| {
-                        let mixer_clone = mixer.clone();
-                        async move { mixer_clone.clone().as_ref().mix(packet).await }
-                    }),
-            ),
-        })
-    }
-
-    #[wasm_bindgen]
-    impl AsyncIterableHelperMixer {
-        pub async fn next(&mut self) -> Result<JsValue, JsValue> {
-            to_jsvalue_stream(self.stream.as_mut().next().await)
-        }
+        data
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::future_extensions::StreamThenConcurrentExt;
+    use futures_lite::stream::StreamExt;
     use more_asserts::*;
 
     type Packet = Box<[u8]>;

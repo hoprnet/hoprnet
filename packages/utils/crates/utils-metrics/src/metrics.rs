@@ -168,6 +168,7 @@ impl MultiCounter {
 /// Represents a simple gauge with floating point values.
 /// Wrapper for Gauge type
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug)]
 pub struct SimpleGauge {
     name: String,
     gg: Gauge,
@@ -214,6 +215,7 @@ impl SimpleGauge {
 /// Represents a vector of gauges with floating point values.
 /// Wrapper for GaugeVec type
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug)]
 pub struct MultiGauge {
     name: String,
     labels: Vec<String>,

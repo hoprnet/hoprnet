@@ -27,14 +27,45 @@ members = [
 ]
 
 [workspace.dependencies]
-libp2p-identity = { version = "0.2.2", features = ["peerid", "ed25519"] }
-js-sys = "0.3.64"
+async-lock = "2.7.0"
+async-std = { version = "1.12.0", features = ["attributes"] }
+async-trait = "0.1"
+futures = "0.3.28"
+futures-lite = "1.12.0"
+futures-concurrency = "7.3.0"
 getrandom = "0.2.10"
+js-sys = "0.3.64"
+libp2p-identity = { version = "0.2.2", features = ["peerid", "ed25519"] }
+libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+multiaddr = "0.18.0"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+validator = { version = "0.16.0", features = ["derive"] }
 wasm-pack = "0.12.0"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.86"
+wasm-bindgen-futures = "0.4.36"
+
+core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
+core-ethereum-misc = { path = "packages/core-ethereum/crates/core-ethereum-misc", default-features = false }
+core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }
+core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
+core-hopr = { path = "packages/core/crates/core-hopr", default-features = false }
+core-misc = { path = "packages/core/crates/core-misc", default-features = false }
+core-mixer = { path = "packages/core/crates/core-mixer", default-features = false }
+core-network = { path = "packages/core/crates/core-network", default-features = false }
+core-packet = { path = "packages/core/crates/core-packet", default-features = false }
+core-path = { path = "packages/core/crates/core-path", default-features = false }
+core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
+core-strategy = { path = "packages/core/crates/core-strategy", default-features = false }
+core-types = { path = "packages/core/crates/core-types", default-features = false }
+utils-db = { path = "packages/utils/crates/utils-db", default-features = false }
+utils-log = { path = "packages/utils/crates/utils-log", default-features = false }
+utils-misc = { path = "packages/utils/crates/utils-misc", default-features = false}
+utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
+utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
+
 
 [profile.release]
-# Tell `rustc` to optimize for small code size.
-opt-level = "s"
+opt-level = "s"     # optimize for small code size
 #debug=true

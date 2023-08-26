@@ -462,6 +462,7 @@ pub struct CliArgs {
 
 impl CliArgs {
     /// Add values of those CLI arguments whose structure is known at runtime
+    #[cfg(feature = "wasm")]
     fn augment_runtime_args(&mut self, m: &ArgMatches) {
         self.network = m.get_one::<String>("network").unwrap().to_owned();
         self.data = m.get_one::<String>("data").unwrap().to_owned();
@@ -469,6 +470,7 @@ impl CliArgs {
     }
 
     /// Creates a new instance using custom cli_args and custom network variables
+    #[cfg(feature = "wasm")]
     fn new_from(
         cli_args: Vec<&str>,
         env_vars: HashMap<OsString, OsString>,

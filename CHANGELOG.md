@@ -25,6 +25,7 @@
 - Change `core-ethereum` to operate on Ethereum `Address`es rather than `PublicKey`s ([#5189](https://github.com/hoprnet/hoprnet/pull/5189))
 - Change the ticket auto redeem and check unrealized balance cli arguments ([#5235](https://github.com/hoprnet/hoprnet/pull/5235))
 - Fixed DB deadlocks and changed the DB backend & fixed channel and ticket issues in the DB ([#5229](https://github.com/hoprnet/hoprnet/pull/5229))
+- Replace the js-libp2p connection mechanism with the rust-libp2p ([#5153](https://github.com/hoprnet/hoprnet/pull/5153))
 - Add `application_tag` into the payload of HOPR protocol, prepare Message Inbox backend ([#5260](https://github.com/hoprnet/hoprnet/pull/5260))
 - Rest API: Replace v2 with v3 which adds message inbox support and compatibility with new smart contracts ([#5297](https://github.com/hoprnet/hoprnet/pull/5297))
 
