@@ -40,7 +40,7 @@ libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release
 multiaddr = "0.18.0"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
-validator = { version = "0.16.0", features = ["derive"] }
+validator = { version = "0.16.1", features = ["derive"] }
 wasm-pack = "0.12.0"
 wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.86"
