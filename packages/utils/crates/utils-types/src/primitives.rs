@@ -858,4 +858,12 @@ pub mod wasm {
             Self::SIZE as u32
         }
     }
+
+    #[wasm_bindgen]
+    impl Snapshot {
+        #[wasm_bindgen(js_name = "default")]
+        pub fn _default() -> Self {
+            Snapshot::default()
+        }
+    }
 }

@@ -3,7 +3,8 @@ pub mod heartbeat;
 pub mod messaging;
 pub mod network;
 pub mod ping;
-pub(crate) mod types;
+pub mod types;
+pub use libp2p_identity::PeerId;
 
 #[allow(dead_code)]
 #[cfg(feature = "wasm")]

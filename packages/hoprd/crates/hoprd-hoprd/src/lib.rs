@@ -3,9 +3,6 @@ pub mod wasm {
     // Temporarily re-export crates
 
     #[allow(unused_imports)]
-    use core_packet::interaction::wasm::*;
-
-    #[allow(unused_imports)]
     use core_strategy::passive::wasm::*;
 
     #[allow(unused_imports)]
@@ -15,12 +12,6 @@ pub mod wasm {
     //use core_misc::constants::wasm::*;
     #[allow(unused_imports)]
     use core_network::network::wasm::*;
-
-    #[allow(unused_imports)]
-    use core_network::ping::wasm::*;
-
-    #[allow(unused_imports)]
-    use core_network::heartbeat::wasm::*;
 
     #[allow(unused_imports)]
     use core_ethereum_db::db::wasm::*;
@@ -33,6 +24,9 @@ pub mod wasm {
 
     #[allow(unused_imports)]
     use core_ethereum_indexer::handlers::wasm::*;
+
+    #[allow(unused_imports)]
+    use core_hopr::wasm::*;
 
     #[allow(unused_imports)]
     use hoprd_inbox::inbox::wasm::*;

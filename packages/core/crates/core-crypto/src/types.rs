@@ -1302,7 +1302,7 @@ pub mod tests {
         .unwrap();
 
         assert_eq!("0x39d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e428804340d4c949a029846f682711d046920b4ca8b8ebeb9d1192b5bdaa54dba",
-                   pk.to_hex(false));
+            pk.to_hex(false));
         assert_eq!(
             "0x0239d1bc2291826eaed86567d225cf243ebc637275e0a5aedb0d6b1dc82136a38e",
             pk.to_hex(true)
@@ -1864,14 +1864,14 @@ pub mod wasm {
             self.clone()
         }
 
-        #[wasm_bindgen]
-        pub fn size() -> u32 {
-            Self::SIZE as u32
-        }
-
         #[wasm_bindgen(js_name = "to_string")]
         pub fn _to_string(&self) -> String {
             self.to_hex()
+        }
+
+        #[wasm_bindgen]
+        pub fn size() -> u32 {
+            Self::SIZE as u32
         }
     }
 

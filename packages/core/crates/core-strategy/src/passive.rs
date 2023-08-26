@@ -10,16 +10,12 @@ pub struct PassiveStrategy;
 impl ChannelStrategy for PassiveStrategy {
     const NAME: &'static str = "passive";
 
-    fn tick<Q>(
+    fn tick(
         &mut self,
         _balance: Balance,
-        _addresses: impl Iterator<Item = Address>,
+        _addresses: impl Iterator<Item = (Address, f64)>,
         _outgoing_channels: Vec<OutgoingChannelStatus>,
-        _quality_of: Q,
-    ) -> StrategyTickResult
-    where
-        Q: Fn(&str) -> Option<f64>,
-    {
+    ) -> StrategyTickResult {
         debug!("using passive strategy that does nothing");
         StrategyTickResult::new(0, vec![], vec![])
     }
@@ -40,12 +36,11 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::generic::wasm::StrategyTickResult;
-    use crate::generic::ChannelStrategy;
+    use crate::generic::{ChannelStrategy, PeerQuality};
     use crate::passive::PassiveStrategy;
     use crate::strategy_tick;
-    use std::str::FromStr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::{Address, Balance};
+    use utils_types::primitives::Balance;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
@@ -65,11 +60,10 @@ pub mod wasm {
         pub fn _tick(
             &mut self,
             balance: Balance,
-            peer_ids: &js_sys::Iterator,
+            mut peers: PeerQuality,
             outgoing_channels: JsValue,
-            quality_of: &js_sys::Function,
         ) -> JsResult<StrategyTickResult> {
-            strategy_tick!(self, balance, peer_ids, outgoing_channels, quality_of)
+            strategy_tick!(self, balance, peers, outgoing_channels)
         }
     }
 }
