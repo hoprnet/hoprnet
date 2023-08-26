@@ -418,6 +418,16 @@ wait_for_port 19096 "127.0.0.1" "${node6_log}"
 wait_for_regex "${node7_log}" "STARTED NODE"
 # }}}
 
+log "Sleep for 30 seconds to ensure announcements are confirmed on-chain"
+sleep 30
+
+log "Restarting node 1 to ensure restart works as expected"
+#  --- Restart check --- {{{
+lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+wait_for_regex "${node1_log}" "STARTED NODE"
+# }}}
+
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
   declare node_dir_db="${node_dir}/db/db.sqlite"

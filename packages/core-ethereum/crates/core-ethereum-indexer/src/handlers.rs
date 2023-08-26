@@ -137,13 +137,19 @@ where
         log: &RawLog,
         block_number: u32,
         snapshot: &Snapshot,
-    ) -> Result<AccountEntry>
+    ) -> Result<()>
     where
         T: HoprCoreEthereumDbActions,
     {
-        Ok(match HoprAnnouncementsEvents::decode_log(log)? {
+        match HoprAnnouncementsEvents::decode_log(log)? {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 let maybe_account = db.get_account(&address_announcement.node.try_into()?).await?;
+
+                utils_log::debug!(
+                    "on_announcement_event - multiaddr: {:?} - node: {:?}",
+                    &address_announcement.base_multiaddr,
+                    &address_announcement.node.to_string()
+                );
 
                 if let Some(mut account) = maybe_account {
                     let new_entry_type = AccountType::Announced {
@@ -155,8 +161,6 @@ where
                     db.update_account_and_snapshot(&account, snapshot).await?;
 
                     self.cbs.new_announcement(&account);
-
-                    account
                 } else {
                     return Err(CoreEthereumIndexerError::AnnounceBeforeKeyBinding);
                 }
@@ -186,8 +190,6 @@ where
                     .await?;
 
                 db.update_account_and_snapshot(&updated_account, snapshot).await?;
-
-                updated_account
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
                 let maybe_account = db.get_account(&revocation.node.try_into()?).await?;
@@ -195,13 +197,13 @@ where
                 if let Some(mut account) = maybe_account {
                     account.update(AccountType::NotAnnounced);
                     db.update_account_and_snapshot(&account, snapshot).await?;
-
-                    account
                 } else {
                     return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
                 }
             }
-        })
+            _ => todo!("Implement all the other filters for HoprAnnouncementsEvents"),
+        };
+        Ok(())
     }
 
     async fn on_channel_event<T>(&self, db: &mut T, log: &RawLog, snapshot: &Snapshot) -> Result<()>
@@ -345,6 +347,7 @@ where
                 )
                 .await?;
             }
+            _ => todo!("Implement all the other filters for HoprChannelsEvents"),
         }
         Ok(())
     }
@@ -398,9 +401,7 @@ where
                     return Ok(());
                 }
             }
-            _ => {
-                todo!("Implement all the other filters for HoprTokenEvents");
-            }
+            _ => todo!("Implement all the other filters for HoprTokenEvents"),
         }
 
         Ok(())
@@ -493,6 +494,7 @@ where
                 )
                 .await?;
             }
+            _ => todo!("Implement all the other filters for HoprNodeSafeRegistryEvents"),
         }
         Ok(())
     }
@@ -527,27 +529,26 @@ where
         );
 
         if address.eq(&self.addresses.announcements) {
-            self.on_announcement_event(db, log, block_number, snapshot).await?;
+            return self.on_announcement_event(db, log, block_number, snapshot).await;
         } else if address.eq(&self.addresses.channels) {
-            self.on_channel_event(db, log, snapshot).await?;
+            return self.on_channel_event(db, log, snapshot).await;
         } else if address.eq(&self.addresses.network_registry) {
-            self.on_network_registry_event(db, log, snapshot).await?;
+            return self.on_network_registry_event(db, log, snapshot).await;
         } else if address.eq(&self.addresses.token) {
-            self.on_token_event(db, log, snapshot).await?;
+            return self.on_token_event(db, log, snapshot).await;
         } else if address.eq(&self.addresses.node_safe_registry) {
-            self.on_node_safe_registry_event(db, log, snapshot).await?
+            return self.on_node_safe_registry_event(db, log, snapshot).await;
         } else if address.eq(&self.addresses.node_management_module) {
-            self.on_node_management_module_event(db, log, snapshot).await?
+            return self.on_node_management_module_event(db, log, snapshot).await;
         } else {
             utils_log::error!(
-                "on_event - unknown contract address: {:?} - received log: {:?}",
+                "on_event error - unknown contract address: {:?} - received log: {:?}",
                 address.to_string(),
                 log
             );
 
             return Err(CoreEthereumIndexerError::UnknownContract(*address));
         }
-        Ok(())
     }
 }
 
@@ -1645,7 +1646,10 @@ pub mod wasm {
                     snapshot,
                 )
                 .await
-                .map_err(|e| JsValue::from(e.to_string()))
+                .map_err(|e| {
+                    utils_log::error!("on_event error - {:?}", e.to_string());
+                    JsValue::from(e.to_string())
+                })
         }
     }
 }

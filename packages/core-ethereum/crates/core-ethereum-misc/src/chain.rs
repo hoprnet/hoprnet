@@ -92,10 +92,10 @@ impl ChainCalls {
         if self.use_safe {
             let call_data = BindKeysAnnounceSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
-                base_multiaddr: announced_multiaddr.to_string(),
-                ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
                 ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                 ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
+                ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
+                base_multiaddr: announced_multiaddr.to_string(),
             }
             .encode();
             Ok(ExecTransactionFromModuleCall {

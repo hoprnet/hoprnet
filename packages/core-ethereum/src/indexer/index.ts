@@ -14,8 +14,6 @@ import {
   AccountEntry,
   Snapshot,
   debug,
-  Balance,
-  BalanceType,
   retryWithBackoffThenThrow,
   ordered,
   FIFO,

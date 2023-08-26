@@ -27,7 +27,6 @@ import {
   AcknowledgedTicket,
   ChannelStatus,
   ChannelEntry,
-  PublicKey,
   Ticket,
   Hash,
   HalfKeyChallenge,
@@ -371,20 +370,22 @@ export class Hopr extends EventEmitter {
       await this.onPeerAnnouncement(announcedNode)
     }
 
+    // Register node-safe pair to NodeSafeRegistry before announcing to prevent
+    // a race-condition later. That way the announcement always uses the path
+    // with a safe already set.
     try {
-      await this.announce(this.options.announce)
+      log(`check node-safe registry`)
+      await this.registerSafeByNode()
     } catch (err) {
-      console.error(`Could not announce self on-chain`)
+      console.error(`Could not register node with safe`)
       console.error(`Observed error:`, err)
       process.exit(1)
     }
 
     try {
-      // register node-safe pair to NodeSafeRegistry
-      log(`check node-safe registry`)
-      await this.registerSafeByNode()
+      await this.announce(this.options.announce)
     } catch (err) {
-      console.error(`Could not register node with safe`)
+      console.error(`Could not announce self on-chain`)
       console.error(`Observed error:`, err)
       process.exit(1)
     }
@@ -953,7 +954,8 @@ export class Hopr extends EventEmitter {
     try {
       log(
         'announcing on-chain %s routable address %s',
-        announceRoutableAddress && routableAddressAvailable ? 'with' : 'without', addrToAnnounce.toString()
+        announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
+        addrToAnnounce.toString()
       )
       const announceTxHash = await connector.announce(addrToAnnounce)
       log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)

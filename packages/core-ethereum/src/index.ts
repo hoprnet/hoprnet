@@ -597,27 +597,25 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
 
     const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
+    log('Currently registered Safe address in NodeSafeRegistry = %s', registeredAddress.to_string())
 
     let receipt = undefined
     if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
-      // if the node is not associated with any safe address, register it
+      log('Node is not associated with a Safe in NodeSafeRegistry yet')
       receipt = await this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
         this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
       )
     } else if (!registeredAddress.eq(Address.deserialize(safeAddress.serialize()))) {
       // the node has been associated with a differnt safe address
+      log('Node is associated with a different Safe in NodeSafeRegistry')
       throw Error('Node has been registered with a different safe')
+    } else {
+      log('Node is associated with correct Safe in NodeSafeRegistry')
     }
 
-    // the node has been associated with the provided safe address
-    log(`====> registerSafeByNode registeredAddress: is safeAddress`)
-
-    // update safe and module address
-    log(`>> should update safe and module address`)
+    log('update safe and module addresses in database')
     await this.db.set_staking_safe_address(safeAddress)
-    log(`>> set staking safe address`)
     await this.db.set_staking_module_address(this.safeModuleOptions.moduleAddress)
-    log(`>> set staking module address`)
 
     return receipt
   }

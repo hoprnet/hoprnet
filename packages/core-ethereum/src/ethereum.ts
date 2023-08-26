@@ -119,8 +119,8 @@ export async function createChainWrapper(
     Address.from_string(deploymentExtract.hoprAnnouncementsAddress)
   )
 
-  // FIXME: when to enable use safe?
-  // chainCalls.set_use_safe(true)
+  // Use safe variants of SC calls from the start.
+  chainCalls.set_use_safe(true)
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -425,16 +425,21 @@ export async function createChainWrapper(
   /**
    * FIXME: annouce is in a separate contract
    * Initiates a transaction that announces nodes on-chain.
-   * Node directly announce, regardless if Safe is used
    * @param data prepared announcement data
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
   const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
     let is_safe_set = chainCalls.get_use_safe()
+    let to = deploymentExtract.hoprAnnouncementsAddress
+    let data = u8aToHex(chainCalls.get_announce_payload(multiaddr.toString()))
+    if (is_safe_set) {
+      to = safeModuleOptions.moduleAddress.to_hex()
+    }
+
     let confirmationEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(chainCalls.get_announce_payload(multiaddr.toString())),
-      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : deploymentExtract.hoprAnnouncementsAddress,
+      data,
+      to,
       value: BigNumber.from(0)
     }
     // @ts-ignore fixme: treat result
@@ -745,8 +750,6 @@ export async function createChainWrapper(
 
     switch (sendResult.code) {
       case SendTransactionStatus.SUCCESS:
-        // when node is registered, other transactions must be sent through safe
-        chainCalls.set_use_safe(true)
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
         throw new Error(`Failed in sending registerSafeByNode transaction because transaction is a duplicate`)
