@@ -165,7 +165,7 @@ jobs:
           declare base_branch=${{ github.event.pull_request.base.ref }}
           declare docker_stable_tag
           if [ "${base_branch}" == "master" ]; then
-            hosts=($(echo "${{ vars.HETZNER_ROTSEE_NODES }}" | sed 's/\n/ /'))
+            hosts=($(echo "${{ vars.HETZNER_ROTSEE_NODES }}" | sed 's/\r//'  | sed 's/\n/ /'))
           else
             hosts=""
           fi
