@@ -3,7 +3,7 @@ name: Merge
 on:
   pull_request:
     types:
-      - closed
+      # - closed
       - synchronize
 
 concurrency:
