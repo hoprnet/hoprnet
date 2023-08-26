@@ -10,6 +10,7 @@ use bindings::{
         InitiateOutgoingChannelClosureCall, InitiateOutgoingChannelClosureSafeCall, RedeemTicketCall,
         RedeemTicketSafeCall, RedeemableTicket, TicketData, Vrfparameters,
     },
+    hopr_node_management_module::ExecTransactionFromModuleCall,
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
     hopr_token::{ApproveCall, TransferCall},
 };
@@ -22,7 +23,7 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{account::AccountSignature, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
 use ethers::{
     abi::AbiEncode,
-    types::{Address as EthereumAddress, H160, H256, U256},
+    types::{Address as EthereumAddress, Bytes, H160, H256, U256},
 };
 use multiaddr::Multiaddr;
 use std::str::FromStr;
@@ -32,27 +33,45 @@ use utils_types::{
     traits::{BinarySerializable, PeerIdLike},
 };
 
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum Operation {
+    Call = 0,
+    DelegateCall = 1,
+}
+
 struct ChainCalls {
     offchain_keypair: OffchainKeypair,
     chain_keypair: ChainKeypair,
     chain_key: Address,
     hopr_channels: Address,
+    hopr_announcements: Address,
     use_safe: bool,
 }
 
 impl ChainCalls {
-    pub fn new(offchain_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, hopr_channels: Address) -> Self {
+    pub fn new(
+        offchain_keypair: &OffchainKeypair,
+        chain_keypair: &ChainKeypair,
+        hopr_channels: Address,
+        hopr_announcements: Address,
+    ) -> Self {
         Self {
             offchain_keypair: offchain_keypair.clone(),
             chain_key: chain_keypair.public().to_address(),
             chain_keypair: chain_keypair.clone(),
             hopr_channels,
+            hopr_announcements,
             use_safe: false,
         }
     }
 
     pub fn set_use_safe(&mut self, enabled: bool) {
         self.use_safe = enabled;
+    }
+
+    pub fn get_use_safe(&mut self) -> bool {
+        return self.use_safe;
     }
 
     pub fn announce(&self, announced_multiaddr: &Multiaddr) -> Result<Vec<u8>> {
@@ -71,12 +90,19 @@ impl ChainCalls {
         let serialized_signature = account_sig.signature.to_bytes();
 
         if self.use_safe {
-            Ok(BindKeysAnnounceSafeCall {
+            let call_data = BindKeysAnnounceSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 base_multiaddr: announced_multiaddr.to_string(),
                 ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
                 ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                 ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_announcements.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -127,10 +153,17 @@ impl ChainCalls {
         }
 
         if self.use_safe {
-            Ok(FundChannelSafeCall {
+            let call_data = FundChannelSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 account: EthereumAddress::from_slice(&dest.to_bytes()),
                 amount: amount.value().as_u128(),
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_channels.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -169,9 +202,16 @@ impl ChainCalls {
         }
 
         if self.use_safe {
-            Ok(InitiateOutgoingChannelClosureSafeCall {
+            let call_data = InitiateOutgoingChannelClosureSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 destination: EthereumAddress::from_slice(&destination.to_bytes()),
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_channels.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -225,10 +265,17 @@ impl ChainCalls {
         };
 
         if self.use_safe {
-            Ok(RedeemTicketSafeCall {
+            let call_data = RedeemTicketSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 redeemable,
                 params,
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_channels.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -244,9 +291,16 @@ impl ChainCalls {
         }
 
         if self.use_safe {
-            Ok(FinalizeOutgoingChannelClosureSafeCall {
+            let call_data = FinalizeOutgoingChannelClosureSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 destination: H160::from_slice(&destination.to_bytes()),
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_channels.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -498,15 +552,25 @@ pub mod wasm {
     #[wasm_bindgen]
     impl ChainCalls {
         #[wasm_bindgen(constructor)]
-        pub fn new(offchain_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, hopr_channels: Address) -> Self {
+        pub fn new(
+            offchain_keypair: &OffchainKeypair,
+            chain_keypair: &ChainKeypair,
+            hopr_channels: Address,
+            hopr_announcements: Address,
+        ) -> Self {
             Self {
-                w: super::ChainCalls::new(offchain_keypair, chain_keypair, hopr_channels),
+                w: super::ChainCalls::new(offchain_keypair, chain_keypair, hopr_channels, hopr_announcements),
             }
         }
 
         #[wasm_bindgen]
         pub fn set_use_safe(&mut self, enabled: bool) {
             self.w.set_use_safe(enabled)
+        }
+
+        #[wasm_bindgen]
+        pub fn get_use_safe(&mut self) -> bool {
+            self.w.get_use_safe()
         }
 
         #[wasm_bindgen]
