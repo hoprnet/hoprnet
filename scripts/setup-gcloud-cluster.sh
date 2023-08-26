@@ -28,52 +28,33 @@ usage() {
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg
-  msg "Usage: $0 <network> [<init_script> [<cluster_id> [<docker_image> [<cluster_size> [<instance_template_name> [<announce_on_chain>]]]]]"
+  msg "Usage: $0 <network> [<cluster_template_name> [<cluster_size>]]"
   msg
   msg "where <network>\t\tthe network id from which the smart contract addresses are derived"
-  msg "      <init_script>\t\tpath to a script which is called with all node API endpoints as parameters"
   msg "      <cluster_id>\t\tuses a random value as default"
-  msg "      <docker_image>\t\tuses 'gcr.io/hoprassociation/hoprd:<network>' as default"
   msg "      <cluster_size>\t\tnumber of nodes in the deployed cluster, default is 6."
-  msg "      <instance_template_name>\t\tname of the gcloud instance template to use, default is <cluster_id>"
-  msg "      <announce_on_chain>\t\tset to 'true' so started nodes should announce themselves, default is ''"
   msg
   msg "Required environment variables"
   msg "------------------------------"
   msg
-  msg "FAUCET_SECRET_API_KEY\t\tsets the api key used to authenticate with the funding faucet"
-  msg
   msg "Optional environment variables"
   msg "------------------------------"
   msg
-  msg "HOPRD_API_TOKEN\t\t\tused as api token for all nodes, defaults to a random value"
-  msg "HOPRD_PASSWORD\t\t\tused as password for all nodes, defaults to a random value"
   msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
-  msg "HOPRD_RESET_METADATA\t\tset to 'true' to trigger metadata reset on instances"
   msg
 }
 
 # return early with help info when requested
 { [[ "${1:-}" = "-h" ]] || [[ "${1:-}" = "--help" ]]; } && { usage; exit 0; }
 
-# verify and set parameters
-: "${FAUCET_SECRET_API_KEY?"Missing environment variable FAUCET_SECRET_API_KEY"}"
-: "${DEPLOYER_PRIVATE_KEY?"Missing environment variable DEPLOYER_PRIVATE_KEY"}"
 
 declare network="${1?"missing parameter <network>"}"
-declare init_script=${2:-}
-declare cluster_id="${3:-${network}-topology-${RANDOM}-${RANDOM}}"
-declare docker_image=${4:-gcr.io/hoprassociation/hoprd:${network}}
-declare cluster_size=${5:-6}
-declare instance_template_name=${6:-${cluster_id}}
-declare announce_on_chain=${7:-}
+declare cluster_template_name="${2:-${network}-topology-${RANDOM}-${RANDOM}}"
+declare cluster_size=${3-6}
 
-declare api_token="${HOPRD_API_TOKEN:-Token${RANDOM}^${RANDOM}^${RANDOM}Token}"
-declare password="${HOPRD_PASSWORD:-pw${RANDOM}${RANDOM}${RANDOM}pw}"
+
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"
-declare show_prestartinfo="${HOPRD_SHOW_PRESTART_INFO:-false}"
-declare reset_metadata="${HOPRD_RESET_METADATA:-false}"
 
 function cleanup {
   local EXIT_CODE=$?
@@ -84,7 +65,7 @@ function cleanup {
   if [[ ${EXIT_CODE} -ne 0 ]] || [[ "${perform_cleanup}" = "true" ]] || [[ "${perform_cleanup}" = "1" ]]; then
     # Cleaning up everything upon failure
     gcloud_delete_managed_instance_group "${cluster_id}"
-    gcloud_delete_instance_template "${instance_template_name}"
+    gcloud_delete_instance_template "${cluster_template_name}"
   fi
 
   exit $EXIT_CODE
@@ -97,151 +78,16 @@ if [[ "${perform_cleanup}" = "1" ]] || [[ "${perform_cleanup}" = "true" ]]; then
   exit
 fi
 
-# --- Log test info {{{
-if [[ "${show_prestartinfo}" = "1" ]] || [[ "${show_prestartinfo}" = "true" ]]; then
-  log "Pre-Start Info"
-  log "\tdocker_image: ${docker_image}"
-  log "\tcluster_id: ${cluster_id}"
-  log "\tinstance_template_name: ${instance_template_name}"
-  log "\tannounce_on_chain: ${announce_on_chain}"
-  log "\tinit_script: ${init_script}"
-  log "\tnetwork: ${network}"
-  log "\tapi_token: ${api_token}"
-  log "\tpassword: ${password}"
-  log "\tperform_cleanup: ${perform_cleanup}"
-  log "\tshow_prestartinfo: ${show_prestartinfo}"
-fi
-# }}}
+
 
 # create instance template
 # announce on-chain with routable address
-gcloud_create_instance_template \
-  "${instance_template_name}" \
-  "${docker_image}" \
-  "${network}" \
-  "${api_token}" \
-  "${password}" \
-  "${announce_on_chain}"
+gcloud_create_instance_template "${cluster_template_name}" 
 
 # start nodes
 gcloud_create_or_update_managed_instance_group  \
-  "${cluster_id}" \
+  "${cluster_template_name}" \
   "${cluster_size}" \
-  "${instance_template_name}"
-
-declare environment_type
-environment_type="$(get_environment_type "${network}")"
-
-# Deployer CI wallet should ideally be "eligible". To be eligible:
-# 1. The wallet should have obtained a "Network_registry" NFT of `developer` rank (wallet should already have this)
-# 2. The wallet should have sent one above-mentioned NFT to the staking contract
-# FIXME: Correctly format the condition (in line with *meta* environment), so that the following lines are skipped for most of the time, and only be executed when:
-# - the CI nodes wants to perform `selfRegister`
-# This can be called always, because the "stake" task is idempotent given the same arguments
-# CI wallet stakes a developer NR NFT
-PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." stake-nrnft network="${network}" nftrank=developer environment_type="${environment_type}"
-
-# Get names of all instances in this cluster
-# TODO: now `native-addresses` (a.k.a. `hopr_addrs`) doesn't need to contain unique values. The array can contain repetitive addresses
-declare instance_names
-instance_names="$(gcloud_get_managed_instance_group_instances_names "${cluster_id}")"
-declare -a instance_names_arr
-IFS="," read -r -a instance_names_arr <<< "$(echo "${instance_names}" | jq -r '@csv' | tr -d '\"')"
-
-# These arrays will hold IP addresses and peer IDs
-# for instance VMs in the encounter order of the `instance_names` array
-declare -a ip_addrs
-declare -a hopr_addrs
-
-# Iterate through all VM instances
-# The loop should be parallelized in future to accommodate better with larger clusters
-for instance_idx in "${!instance_names_arr[@]}" ; do
-  # Firstly, retrieve the IP address of this VM instance
-  instance_name="${instance_names_arr[instance_idx]}"
-  node_ip=$(gcloud_get_ip "${instance_name}")
-
-  wait_until_node_is_ready "${node_ip}"
-
-  if [[ "${reset_metadata}" = "true" ]]; then
-    gcloud_remove_instance_metadata "${instance_name}" "HOPRD_PEER_ID,HOPRD_WALLET_ADDR,HOPRD_STAKING_STATUS"
-  fi
-
-  # All VM instances in the deployed cluster will get a special metadata entries
-  # which contain all information about the HOPR instance running in the VM.
-  # These currently include:
-  # - node wallet address
-  # - node peer ID
-  # - staking status
-  # This information is constant during the lifetime of the VM and
-  # does not change during re-deployment once set.
-  declare instance_metadata
-  instance_metadata="$(gcloud_get_node_info_metadata "${instance_name}")"
-
-  # known metadata keys
-  declare wallet_addr peer_id staking_status
-  wallet_addr="$(echo "${instance_metadata}" | jq -r '."HOPRD_WALLET_ADDR" // empty')"
-  peer_id="$(echo "${instance_metadata}" | jq -r '."HOPRD_PEER_ID" // empty')"
-  staking_status="$(echo "${instance_metadata}" | jq -r '."HOPRD_STAKING_STATUS" // empty')"
-
-  # data from the node's API for verification or initialization
-  declare api_wallet_addr api_peer_id
-  api_wallet_addr="$(get_native_address "${api_token}@${node_ip}:3001")"
-  api_peer_id="$(get_hopr_address "${api_token}@${node_ip}:3001")"
-
-  if [[ -z "${staking_status}" ]]; then
-
-    # Save the metadata
-    declare new_metadata="HOPRD_WALLET_ADDR=${api_wallet_addr},HOPRD_PEER_ID=${api_peer_id},HOPRD_STAKING_STATUS=${staking_status}"
-    gcloud_add_instance_metadata "${instance_name}" "${new_metadata}"
-    gcloud_execute_command_instance "${instance_name}" 'sudo /opt/hoprd/startup-script.sh >> /tmp/startup-script-`date +%Y%m%d-%H%M%S`.log'
-  else
-    # cross-check data, and log discrepancies, we keep going though and leave
-    # the reconciliation for another process to do
-    if [[ "${api_wallet_addr}" != "${wallet_addr}" ]]; then
-      log "ERROR: instance ${instance_name} has changed wallet addr from original ${wallet_addr} to ${api_wallet_addr}"
-    fi
-    if [[ "${api_peer_id}" != "${peer_id}" ]]; then
-      log "ERROR: instance ${instance_name} has changed peer id from original ${peer_id} to ${api_peer_id}"
-    fi
-  fi
-
-  ip_addrs+=( "${node_ip}" )
-
-  # Build an array of hopr_addrs to be staked
-  hopr_addrs+=( "${api_peer_id}" )
+  "${cluster_template_name}"
 
 
-  # Fund the node as well
-  fund_if_empty "${api_wallet_addr}" "${network}"
-done
-
-if [ ! -z "${hopr_addrs}" ]; then
-  # Register all nodes in cluster
-  IFS=','
-  # use CI wallet to register VM instances. This action may fail if nodes were previously linked to other staking accounts
-  PRIVATE_KEY="${DEPLOYER_PRIVATE_KEY}" make -C "${mydir}/.." self-register-node \
-    network="${network}" \
-    peer_ids="${hopr_addrs[*]}" \
-    environment_type="${environment_type}"
-  unset IFS
-fi
-
-# Finally wait for the public nodes to come up, for NAT nodes this isn't possible
-# because the P2P port is not exposed.
-if [[ "${instance_template_name}" != *-nat* ]]; then
-  for ip in "${ip_addrs[@]}"; do
-    wait_for_port "9091" "${ip}"
-  done
-fi
-# }}}
-
-# --- Call init script--- {{{
-if [[ -n "${init_script}" ]] && [[ -x "${init_script}" ]]; then
-  # shellcheck disable=SC2068
-  HOPRD_API_TOKEN="${api_token}" \
-    "${init_script}" \
-    ${ip_addrs[@]/%/:3001}
-fi
-# }}}
-
-log "finished"

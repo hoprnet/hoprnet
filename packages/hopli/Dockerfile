@@ -53,7 +53,6 @@ RUN apt-get update && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
     rm /app/hoprnet/Makefile
 
-#ENTRYPOINT ["/bin/hopli"]
-#CMD ["--help"]
-ENTRYPOINT ["/app/hoprnet/entrypoint.sh"]
+ENTRYPOINT ["/bin/hopli"]
+CMD ["--help"]
 

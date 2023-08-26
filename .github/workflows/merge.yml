@@ -197,11 +197,11 @@ jobs:
           declare base_branch=${{ github.event.pull_request.base.ref }}
           declare docker_stable_tag
           if [ "${base_branch}" == "master" ]; then
-            docker_stable_tag=latest
+            cluster_template_name="providence-rotsee"
           else
-            docker_stable_tag=${base_branch/release\//}
+            cluster_template_name="providence-dufour"
           fi
-          ./scripts/deploy.sh "europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${docker_stable_tag}" 3 ${base_branch}
+          ./scripts/deploy.sh ${cluster_template_name}
         env:
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
