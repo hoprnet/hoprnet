@@ -16,7 +16,7 @@ core-crypto = { path = "../core/crates/core-crypto", default-features = false }
 hoprd-keypair = { path = "../hoprd/crates/hoprd-keypair", default-features = false }
 utils-types = { path = "../utils/crates/utils-types", default-features = false }
 thiserror = "1.0"
-log = "0.4.17"
+log = "0.4.20"
 
 [dev-dependencies]
 tempfile = "3"
