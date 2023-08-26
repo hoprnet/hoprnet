@@ -20,9 +20,7 @@ import {
   ChannelEntry
 } from '@hoprnet/hopr-utils'
 
-  import {
-  PeerQuality
-} from '../lib/core_hopr.js'
+import { PeerQuality } from '../lib/core_hopr.js'
 
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 

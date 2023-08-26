@@ -48,7 +48,7 @@ import {
   Snapshot,
   HeartbeatConfig,
   CoreApp,
-get_peers_with_quality,
+  get_peers_with_quality,
   HoprTools,
   WasmNetwork,
   WasmPing,
@@ -325,11 +325,7 @@ export class Hopr extends EventEmitter {
     const onReceivedMessage = (msg: ApplicationData) => this.emit('hopr:message', msg)
 
     log('Linking chain and packet keys')
-    this.db.link_chain_and_packet_keys(
-      this.chainKeypair.to_address(),
-      this.packetKeypair.public(),
-      Snapshot._default()
-    )
+    this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot._default())
 
     log('Constructing the core application and tools')
     let coreApp = new CoreApp(

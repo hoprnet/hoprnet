@@ -842,10 +842,10 @@ pub struct PacketInteractionConfig {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PacketInteractionConfig {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(packet_keypair: OffchainKeypair, chain_keypair: ChainKeypair) -> Self {
+    pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair) -> Self {
         Self {
-            packet_keypair,
-            chain_keypair,
+            packet_keypair: packet_keypair.clone(),
+            chain_keypair: chain_keypair.clone(),
             check_unrealized_balance: true,
             mixer: MixerConfig::default(),
         }

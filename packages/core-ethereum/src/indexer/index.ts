@@ -168,9 +168,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       // update safe's HOPR token balance
       log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
       const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
-      await this.db.set_hopr_balance(
-        Balance.deserialize(hoprBalance.serialize_value(), BalanceType.HOPR)
-      )
+      await this.db.set_hopr_balance(Balance.deserialize(hoprBalance.serialize_value(), BalanceType.HOPR))
       log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
       // update safe's HORP token allowance granted to Channels contract
