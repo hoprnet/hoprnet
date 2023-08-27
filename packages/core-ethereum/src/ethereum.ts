@@ -425,7 +425,6 @@ export async function createChainWrapper(
   }
 
   /**
-   * FIXME: annouce is in a separate contract
    * Initiates a transaction that announces nodes on-chain.
    * @param multiaddr Multiaddress to announce
    * @param useSafe use Safe-variant for call if true
@@ -573,7 +572,6 @@ export async function createChainWrapper(
     let fundChannelError: unknown
     let fundChannelResult: SendTransactionReturn
 
-    // FIXME: tx should be sent to the Safe Module
     let is_safe_set = chainCalls.get_use_safe()
     const fundChannelPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_fund_channel_payload(destination, amount)),
