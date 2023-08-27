@@ -10,7 +10,7 @@ import { SimplifiedModule } from "./SimplifiedModule.sol";
 import { HoprCapabilityPermissions, Role, GranularPermission } from "./CapabilityPermissions.sol";
 import { HoprChannels } from "../../Channels.sol";
 import { IHoprNodeManagementModule } from "../../interfaces/INodeManagementModule.sol";
-import { TargetUtils, Target } from "../../utils/TargetUtils.sol";
+import { EnumerableTargetSet, TargetSet, TargetUtils, Target } from "../../utils/EnumerableTargetSet.sol";
 
 /**
  *    &&&&
@@ -40,6 +40,7 @@ import { TargetUtils, Target } from "../../utils/TargetUtils.sol";
  */
 contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule {
     using TargetUtils for Target;
+    using EnumerableTargetSet for TargetSet;
 
     bool public constant isHoprNodeManagementModule = true;
     // address to send delegated multisend calls to
@@ -100,6 +101,30 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     }
 
     /**
+     * @dev try to get target given a target address. It does not revert if `targetAddress` is not scoped
+     * @param targetAddress Address of target
+     */
+    function tryGetTarget(address targetAddress) external view returns (bool, Target) {
+        return role.targets.tryGet(targetAddress);
+    }
+
+    /**
+     * @dev get all the scoped targets
+     */
+    function getTargets() external view returns (Target[] memory) {
+        return role.targets.values();
+    }
+
+    /**
+     * @dev get the granular permission
+     * @param capabilityKey Key to the capability.
+     * @param pairId hashed value of the pair of concern, e.g. for channel `keccak256(src,dst)`, for token and send `keccak256(owner,spender)`
+     */
+    function getGranularPermissions(bytes32 capabilityKey, bytes32 pairId) external returns (GranularPermission) {
+        return role.capabilities[capabilityKey][pairId];
+    }
+
+    /**
      * @dev check if an address has been included as a member (NODE_CHAIN_KEY)
      * @param nodeAddress address to be checked
      */
@@ -109,6 +134,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
     /**
      * @dev Add a node to be able to execute this module, to the target
+     * @param nodeAddress address of node
      */
     function addNode(address nodeAddress) external onlyOwner {
         _addNode(nodeAddress);
@@ -116,6 +142,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
     /**
      * @dev Remove a node from being able to execute this module, to the target
+     * @param nodeAddress address of node
      */
     function removeNode(address nodeAddress) external onlyOwner {
         // cannot move a node that's not added
