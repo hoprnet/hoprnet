@@ -21,7 +21,6 @@ use core_types::channels::Ticket;
 use futures::{stream::Stream, pin_mut, StreamExt};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
-use std::ops::Mul;
 use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
@@ -64,10 +63,12 @@ lazy_static::lazy_static! {
         SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
 }
 
-/// Fixed price per packet to 0.01 HOPR
-pub const PRICE_PER_PACKET: &str = "10000000000000000";
+lazy_static::lazy_static! {
+    /// Fixed price per packet to 0.01 HOPR
+    static ref PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
+}
 /// Fixed inverse ticket winning probability
-pub const INVERSE_TICKET_WIN_PROB: &str = "1";
+pub const TICKET_WIN_PROB: f64 = 1.0f64;
 
 /// Represents a payload (packet or acknowledgement) at the transport level.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -165,19 +166,20 @@ pub enum AckProcessed {
 /// Implements protocol acknowledgement logic for acknowledgements
 pub struct AcknowledgementProcessor<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
+    chain_key: ChainKeypair,
     pub on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
     pub on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
 }
 
 impl<Db: HoprCoreEthereumDbActions> Clone for AcknowledgementProcessor<Db> {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone(), on_acknowledgement: self.on_acknowledgement.clone(), on_acknowledged_ticket: self.on_acknowledged_ticket.clone() }
+        Self { db: self.db.clone(), chain_key: self.chain_key.clone(), on_acknowledgement: self.on_acknowledgement.clone(), on_acknowledged_ticket: self.on_acknowledged_ticket.clone() }
     }
 }
 
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
-    pub fn new(db: Arc<RwLock<Db>>, on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>, on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>) -> Self {
-        Self { db, on_acknowledgement, on_acknowledged_ticket }
+    pub fn new(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair, on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>, on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>) -> Self {
+        Self { db, on_acknowledgement, chain_key: chain_key.clone(), on_acknowledged_ticket }
     }
 
     pub async fn handle_acknowledgement(&mut self, ack: Acknowledgement) -> Result<()> {
@@ -249,10 +251,10 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 let response = unackowledged.get_response(&ack.ack_key_share)?;
                 debug!("acknowledging ticket using response {}", response.to_hex());
 
-                let domain_separator = self.db.read().await.get_channels_domain_separator().await.unwrap();
+                let domain_separator = self.db.read().await.get_channels_domain_separator().await.unwrap().ok_or(MissingDomainSeparator)?;
 
                 let ack_ticket =
-                    AcknowledgedTicket::new(unackowledged.ticket, response, unackowledged.signer, &domain_separator)?;
+                    AcknowledgedTicket::new(unackowledged.ticket, response, unackowledged.signer, &self.chain_key, &domain_separator)?;
 
                 // replace the un-acked ticket with acked ticket.
                 self.db
@@ -327,13 +329,14 @@ impl AcknowledgementInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
         db: Arc<RwLock<Db>>,
+        chain_key: &ChainKeypair,
         on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
         on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
     ) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<AckToProcess>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
         let (processing_out_tx, processing_out_rx) = channel::<AckProcessed>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
         
-        let processor = AcknowledgementProcessor::new(db, on_acknowledgement, on_acknowledged_ticket);
+        let processor = AcknowledgementProcessor::new(db, chain_key, on_acknowledgement, on_acknowledged_ticket);
 
         let processing_stream = processing_in_rx
         .then_concurrent(move |event| {
@@ -476,7 +479,7 @@ where
         self.db
             .write()
             .await
-            .set_current_ticket_index(channel_id, current_ticket_index.addn(1))
+            .set_current_ticket_index(channel_id, current_ticket_index + 1u64.into())
             .await?;
 
         Ok(current_ticket_index)
@@ -495,12 +498,7 @@ where
         let channel_id = channel.get_id();
         debug!("going to bump ticket index for channel id {channel_id}");
         let current_index = self.bump_ticket_index(&channel_id).await?;
-        let amount = Balance::new(
-            U256::new(PRICE_PER_PACKET)
-                .mul(U256::new(INVERSE_TICKET_WIN_PROB))
-                .muln(path_pos as u32 - 1),
-            BalanceType::HOPR,
-        );
+        let amount = Balance::new(PRICE_PER_PACKET.divide_f64(TICKET_WIN_PROB).expect("winning probability outside of allowed interval (0.0, 1.0]") * U256::from(path_pos - 1), BalanceType::HOPR);
 
         debug!("retrieving pending balance to {destination}");
         let outstanding_balance = self.db.read().await.get_pending_balance_to(&destination).await?;
@@ -548,6 +546,8 @@ where
             .await?
             .ok_or(PacketConstructionError)?;
 
+        let domain_separator = self.db.read().await.get_channels_domain_separator().await?.ok_or(PacketConstructionError)?;
+
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
             Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)
@@ -556,7 +556,7 @@ where
         };
 
         // Create the packet
-        let packet = Packet::new(&data, &path, &self.cfg.chain_keypair, next_ticket)?;
+        let packet = Packet::new(&data, &path, &self.cfg.chain_keypair, next_ticket, &domain_separator)?;
         debug!("packet state {}", packet.state());
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
@@ -664,7 +664,7 @@ where
                     &packet.ticket,
                     &channel,
                     &previous_hop_addr,
-                    Balance::from_str(PRICE_PER_PACKET, BalanceType::HOPR),
+                    Balance::new(*PRICE_PER_PACKET, BalanceType::HOPR),
                     default_win_probability,
                     self.cfg.check_unrealized_balance,
                     &domain_separator,
@@ -693,7 +693,7 @@ where
                     .await?;
                 }
 
-                let path_pos = packet.ticket.get_path_position(U256::new(PRICE_PER_PACKET))?;
+                let path_pos = packet.ticket.get_path_position(U256::from(*PRICE_PER_PACKET))?;
 
                 // Create next ticket for the packet
                 next_ticket = if path_pos == 1 {
@@ -1074,11 +1074,11 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         random::random_bytes,
         shared_keys::SharedSecret,
-        types::{OffchainPublicKey, PublicKey, HalfKeyChallenge},
+        types::{Hash, PublicKey},
     };
     use core_ethereum_db::{db::CoreEthereumDb,traits::HoprCoreEthereumDbActions};
     use core_mixer::mixer::{MixerConfig, Mixer};
-s    use core_path::path::Path;
+    use core_path::path::Path;
     use core_types::{channels::{ChannelEntry, ChannelStatus}, acknowledgement::{Acknowledgement, PendingAcknowledgement, AcknowledgedTicket}};
     use futures::channel::mpsc::{UnboundedSender, Sender};
     use futures::future::{select, Either};
@@ -1087,11 +1087,11 @@ s    use core_path::path::Path;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
     use serial_test::serial;
-    use std::{ops::Mul,sync::{Arc, Mutex},time::Duration};
+    use std::{sync::{Arc, Mutex},time::Duration};
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
     use utils_log::debug;
     use utils_types::{
-        primitives::{Balance, BalanceType, Snapshot, U256},
+        primitives::{Balance, BalanceType, Snapshot, U256, Address},
         traits::{BinarySerializable, PeerIdLike, ToHex},
     };
 
@@ -1103,29 +1103,33 @@ s    use core_path::path::Path;
         hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc"),
     ];
 
+    const PEERS_CHAIN_PRIVS: [[u8; 32]; 5] = [
+        hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056"),
+        hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b"),
+        hex!("99facd2cd33664d65826ad220920a6b356e31d18c1ce1734303b70a962664d71"),
+        hex!("62b362fd3295caf8657b8cf4f65d6e2cbb1ef81754f7bdff65e510220611afc2"),
+        hex!("40ed717eb285dea3921a8346155d988b7ed5bf751bc4eee3cd3a64f4c692396f"),
+    ];
+
     lazy_static! {
-        static ref PEERS: Vec<PeerId> = PEERS_PRIVS
+        static ref PEERS: Vec<OffchainKeypair> = PEERS_PRIVS
             .iter()
-            .map(|private| OffchainPublicKey::from_privkey(private).unwrap().to_peerid())
+            .map(|private| OffchainKeypair::from_secret(private).unwrap())
             .collect();
     }
 
-    async fn create_dummy_channel(db: &CoreEthereumDb<RustyLevelDbShim>, from: &PeerId, to: &PeerId) -> ChannelEntry {
-        let source = db
-            .get_chain_key(&OffchainPublicKey::from_peerid(from).unwrap())
-            .await
-            .unwrap()
-            .expect("failed to retrieve source address");
-        let destination = db
-            .get_chain_key(&OffchainPublicKey::from_peerid(to).unwrap())
-            .await
-            .unwrap()
-            .expect("failed to retrieve destination address");
+    lazy_static! {
+        static ref PEERS_CHAIN: Vec<ChainKeypair> = PEERS_CHAIN_PRIVS
+            .iter()
+            .map(|private| ChainKeypair::from_secret(private).unwrap())
+            .collect();
+    }
 
+    async fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
         ChannelEntry::new(
-            source,
-            destination,
-            Balance::new(1234u64.into() * U256::new(PRICE_PER_PACKET), BalanceType::HOPR),
+            from,
+            to,
+            Balance::new(U256::from(1234u64) * U256::from(*PRICE_PER_PACKET), BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
@@ -1149,7 +1153,7 @@ s    use core_path::path::Path;
             .map(|(i, db)| {
                 Arc::new(RwLock::new(CoreEthereumDb::new(
                     DB::new(RustyLevelDbShim::new(db.clone())),
-                    PublicKey::from_privkey(&PEERS_PRIVS[i]).unwrap().to_address(),
+                    PublicKey::from_privkey(&PEERS_CHAIN_PRIVS[i]).unwrap().to_address(),
                 )))
             })
             .collect::<Vec<_>>()
@@ -1159,25 +1163,25 @@ s    use core_path::path::Path;
         let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
-        for (index, peer_key) in PEERS_PRIVS.iter().enumerate().take(dbs.len()) {
+        for index in 0..dbs.len() {
             let mut db = CoreEthereumDb::new(
                 DB::new(RustyLevelDbShim::new(dbs[index].clone())),
-                PublicKey::from_privkey(peer_key)?.to_address(),
+                PEERS_CHAIN[index].public().to_address(),
             );
 
             // Link all the node keys and chain keys from the simulated announcements
-            for peer_key in PEERS_PRIVS {
-                let node_key = OffchainPublicKey::from_privkey(&peer_key)?;
-                let chain_key = PublicKey::from_privkey(&peer_key)?;
-                db.link_chain_and_packet_keys(&chain_key.to_address(), &node_key, &Snapshot::default())
+            for i in 0..PEERS_PRIVS.len() {
+                let node_key = PEERS[i].public();
+                let chain_key = PEERS_CHAIN[i].public();
+                db.link_chain_and_packet_keys(&chain_key.to_address(), node_key, &Snapshot::default())
                     .await?;
             }
 
             let mut channel: Option<ChannelEntry> = None;
-            let this_peer = OffchainPublicKey::from_privkey(peer_key)?.to_peerid();
+            let this_peer_chain = &PEERS_CHAIN[index];
 
             if index < PEERS.len() - 1 {
-                channel = Some(create_dummy_channel(&db, &this_peer, &PEERS[index + 1]).await);
+                channel = Some(create_dummy_channel(this_peer_chain.public().to_address(), PEERS_CHAIN[index + 1].public().to_address()).await);
 
                 db.update_channel_and_snapshot(
                     &channel.clone().unwrap().get_id(),
@@ -1219,8 +1223,8 @@ s    use core_path::path::Path;
         let core_dbs = create_core_dbs(&dbs);
 
         // Begin test
-        debug!("peer 1 (sender)    = {}", PEERS[0]);
-        debug!("peer 2 (recipient) = {}", PEERS[1]);
+        debug!("peer 1 (sender)    = {}", PEERS[0].public().to_peerid_str());
+        debug!("peer 2 (recipient) = {}", PEERS[1].public().to_peerid_str());
 
         const PENDING_ACKS: usize = 5;
         let mut sent_challenges = Vec::with_capacity(PENDING_ACKS);
@@ -1245,6 +1249,7 @@ s    use core_path::path::Path;
         // Peer 1: ACK interaction of the packet sender, hookup receiving of acknowledgements and start processing them
         let ack_interaction_sender = AcknowledgementInteraction::new(
             core_dbs[0].clone(),
+            &PEERS_CHAIN[0],
             Some(done_tx),
             None,
         );
@@ -1252,6 +1257,7 @@ s    use core_path::path::Path;
         // Peer 2: Recipient of the packet and sender of the acknowledgement
         let mut ack_interaction_counterparty = AcknowledgementInteraction::new(
             core_dbs[1].clone(),
+            &PEERS_CHAIN[1],
             None,
             None,
         );
@@ -1261,7 +1267,7 @@ s    use core_path::path::Path;
             ack_interaction_counterparty
                 .writer()
                 .send_acknowledgement(
-                    PEERS[0].clone(),
+                    PEERS[0].public().to_peerid(),
                     Acknowledgement::new(ack_key, &OffchainKeypair::from_secret(&PEERS_PRIVS[1]).unwrap()),
                 )
                 .expect("failed to send ack");
@@ -1270,7 +1276,7 @@ s    use core_path::path::Path;
             match ack_interaction_counterparty.next().await {
                 Some(value) => match value {
                     AckProcessed::Send(_, ack) => {
-                        ack_interaction_sender.writer().receive_acknowledgement(PEERS[1].clone(), ack).expect("Should succeed")
+                        ack_interaction_sender.writer().receive_acknowledgement(PEERS[1].public().to_peerid(), ack).expect("Should succeed")
                     },
                     _ => panic!("Unexpected incoming acknowledgement detected")
                 }
@@ -1319,13 +1325,17 @@ s    use core_path::path::Path;
 
         let core_dbs = create_core_dbs(&dbs);
 
+        for core_db in &core_dbs {
+            core_db.write().await.set_channels_domain_separator(&Hash::default(), &Snapshot::default()).await.unwrap();
+        }
+
         // Begin tests
         for i in 0..peer_count {
             let peer_type = {
                 if i == 0 { "sender" } else if i == (peer_count - 1) { "recipient" } else { "relayer" }
             };
 
-            debug!("peer {i} ({peer_type})    = {}", PEERS[i]);
+            debug!("peer {i} ({peer_type})    = {}", PEERS[i].public().to_peerid_str());
         }
 
         core_dbs
@@ -1334,6 +1344,7 @@ s    use core_path::path::Path;
             .map(|(i, db)| {
                 let ack = AcknowledgementInteraction::new(
                     db.clone(),
+                    &PEERS_CHAIN[i],
                     None,
                     if i == peer_count - 2 { Some(ack_tx.clone()) } else { None }
                 );
@@ -1345,7 +1356,7 @@ s    use core_path::path::Path;
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
                         packet_keypair: OffchainKeypair::from_secret(&PEERS_PRIVS[i]).unwrap(),
-                        chain_keypair: ChainKeypair::from_secret(&PEERS_PRIVS[i]).unwrap(),
+                        chain_keypair: ChainKeypair::from_secret(&PEERS_CHAIN_PRIVS[i]).unwrap(),
                         mixer: MixerConfig::default(),      // TODO: unnecessary, can be removed
                     },
                 );
@@ -1361,8 +1372,8 @@ s    use core_path::path::Path;
         for _ in 0..pending_packet_count {
             match components[0].1.next().await.expect("pkt_sender should have sent a packet") {
                 MsgProcessed::Send(peer, data) => {
-                    assert_eq!(peer, PEERS[1]);
-                    components[1].1.writer().receive_packet(data, PEERS[0]).expect("Send to relayer should succeed")
+                    assert_eq!(peer, PEERS[1].public().to_peerid());
+                    components[1].1.writer().receive_packet(data, PEERS[0].public().to_peerid()).expect("Send to relayer should succeed")
                 },
                 _ => panic!("Should have gotten a send request")
             }
@@ -1372,8 +1383,8 @@ s    use core_path::path::Path;
             for _ in 0..pending_packet_count {
                 match components[i].0.next().await.expect("ACK relayer should send an ack to the previous") {
                     AckProcessed::Send(peer, ack) => {
-                        assert_eq!(peer, PEERS[i-1]);
-                        components[i-1].0.writer().receive_acknowledgement(PEERS[i], ack).expect("Send of ack from relayer to sender should succeed")
+                        assert_eq!(peer, PEERS[i-1].public().to_peerid());
+                        components[i-1].0.writer().receive_acknowledgement(PEERS[i].public().to_peerid(), ack).expect("Send of ack from relayer to sender should succeed")
                     },
                     _ => panic!("Should have gotten a send request")
                 }
@@ -1382,9 +1393,9 @@ s    use core_path::path::Path;
             for _ in 0..pending_packet_count {
                 match components[i].1.next().await.expect("MSG relayer should forward a msg to the next") {
                     MsgProcessed::Forward(peer, data) => {
-                        assert_eq!(peer, PEERS[i+1]);
+                        assert_eq!(peer, PEERS[i+1].public().to_peerid());
                         assert!(i != component_length - 1, "Only intermediate peers can serve as a forwarder");
-                        components[i+1].1.writer().receive_packet(data, PEERS[i]).expect("Send of ack from relayer to receiver should succeed")
+                        components[i+1].1.writer().receive_packet(data, PEERS[i].public().to_peerid()).expect("Send of ack from relayer to receiver should succeed")
                     },
                     MsgProcessed::Receive(_peer, packet) => {
                         let recv_app_data = ApplicationData::from_bytes(&packet).expect("could not deserialize app data");
@@ -1417,7 +1428,7 @@ s    use core_path::path::Path;
         let components = peer_setup_for(peer_count, ack_tx, pkt_tx).await;
 
         // Peer 1: start sending out packets
-        let packet_path = Path::new_valid(PEERS[1..peer_count].to_vec());
+        let packet_path = Path::new_valid(PEERS[1..peer_count].iter().map(|p| p.public().to_peerid()).collect::<Vec<PeerId>>());
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
         for _ in 0..PENDING_PACKETS {
@@ -1490,7 +1501,7 @@ s    use core_path::path::Path;
         let components = peer_setup_for(peer_count, ack_tx, pkt_tx).await;
 
         // Peer 1: start sending out packets
-        let packet_path = Path::new_valid(PEERS[1..peer_count].to_vec());
+        let packet_path = Path::new_valid(PEERS[1..peer_count].iter().map(|p| p.public().to_peerid()).collect::<Vec<PeerId>>());
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
         for _ in 0..PENDING_PACKETS {

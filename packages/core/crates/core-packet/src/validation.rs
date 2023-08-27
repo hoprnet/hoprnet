@@ -107,7 +107,7 @@ mod tests {
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket};
-    use core_types::channels::ChannelStatus;
+    use core_types::channels::{f64_to_win_prob, ChannelStatus};
     use core_types::{
         account::AccountEntry,
         channels::{ChannelEntry, Ticket},
@@ -118,7 +118,9 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
-    use utils_types::primitives::{Address, AuthorizationToken, Balance, BalanceType, Snapshot, U256};
+    use utils_types::primitives::{
+        Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256,
+    };
     use utils_types::traits::BinarySerializable;
 
     const SENDER_PRIV_BYTES: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
@@ -157,7 +159,7 @@ mod tests {
             ) -> core_ethereum_db::errors::Result<()>;
             async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
-            async fn mark_pending(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
+            async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_balance_to(&self, counterparty: &Address) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_channel_to(&self, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn get_channel_from(&self, src: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
@@ -186,8 +188,8 @@ mod tests {
             async fn get_pending_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_losing_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
-            async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
+            async fn mark_redeemed(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
+            async fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_rejected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_channel_x(&self, src: &Address, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
@@ -239,20 +241,23 @@ mod tests {
 
     fn create_valid_ticket() -> Ticket {
         Ticket::new(
-            TARGET_ADDR.clone(),
-            U256::one(),
-            Balance::new(U256::one(), BalanceType::HOPR),
-            U256::from_inverse_probability(U256::one()).unwrap(),
-            U256::one(),
+            &TARGET_ADDR,
+            &Balance::new(1u64.into(), BalanceType::HOPR),
+            1u64.into(),
+            1u64.into(),
+            1.0f64,
+            1u64.into(),
+            EthereumChallenge::default(),
             &SENDER_PRIV_KEY,
-        )
+            &Hash::default(),
+        ).unwrap()
     }
 
     fn create_channel_entry() -> ChannelEntry {
         ChannelEntry::new(
             TARGET_ADDR.clone(),
             TARGET_ADDR.clone(),
-            Balance::from_str("100", BalanceType::HOPR),
+            Balance::new(100u64.into(), BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
             U256::one(),
@@ -274,8 +279,9 @@ mod tests {
             &channel,
             &SENDER_PUB.to_address(),
             Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
         assert!(ret.is_ok());
@@ -294,9 +300,10 @@ mod tests {
             &ticket,
             &channel,
             &TARGET_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -320,9 +327,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("2", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(2u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -339,8 +347,8 @@ mod tests {
         db.expect_get_tickets().returning(|_| Ok(Vec::<Ticket>::new()));
 
         let mut ticket = create_valid_ticket();
-        ticket.win_prob = U256::from_inverse_probability(2u32.into()).unwrap();
-        ticket.sign(&SENDER_PRIV_KEY);
+        ticket.encoded_win_prob = f64_to_win_prob(0.5f64).unwrap();
+        ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
 
         let channel = create_channel_entry();
 
@@ -349,9 +357,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -376,9 +385,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -396,7 +406,7 @@ mod tests {
 
         let mut ticket = create_valid_ticket();
         ticket.channel_epoch = 2u32.into();
-        ticket.sign(&SENDER_PRIV_KEY);
+        ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
 
         let channel = create_channel_entry();
 
@@ -405,9 +415,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -432,9 +443,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -446,7 +458,7 @@ mod tests {
         let mut db_ticket = create_valid_ticket();
         db_ticket.amount = Balance::from_str("100", BalanceType::HOPR);
         db_ticket.index = 2u32.into();
-        db_ticket.sign(&SENDER_PRIV_KEY);
+        db_ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
 
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
@@ -460,9 +472,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -483,9 +496,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -499,8 +513,8 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_validation_fail_if_does_not_have_funds_including_unredeemed() {
         let mut db_ticket = create_valid_ticket();
-        db_ticket.amount = Balance::from_str("200", BalanceType::HOPR);
-        db_ticket.sign(&SENDER_PRIV_KEY);
+        db_ticket.amount = Balance::new(200u64.into(), BalanceType::HOPR);
+        db_ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
 
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
@@ -513,9 +527,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             true,
+            &Hash::default(),
         )
         .await;
 
@@ -529,8 +544,8 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_validation_ok_if_does_not_have_funds_including_unredeemed() {
         let mut db_ticket = create_valid_ticket();
-        db_ticket.amount = Balance::from_str("200", BalanceType::HOPR);
-        db_ticket.sign(&SENDER_PRIV_KEY);
+        db_ticket.amount = Balance::new(200u64.into(), BalanceType::HOPR);
+        db_ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
 
         let mut db = MockDb::new();
         db.expect_get_tickets().returning(move |_| Ok(vec![db_ticket.clone()]));
@@ -543,9 +558,10 @@ mod tests {
             &ticket,
             &channel,
             &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
-            U256::one(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1.0f64,
             false,
+            &Hash::default(),
         )
         .await;
 
@@ -584,7 +600,9 @@ mod tests {
                     ticket.ticket,
                     Response::new(&random_bytes::<{ Response::SIZE }>()),
                     SENDER_PUB.to_address(),
-                );
+                    &TARGET_PRIV_KEY,
+                    &Hash::default(),
+                ).unwrap();
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();
 
                 let num_tickets = db.get_tickets(None).await.unwrap().len();

@@ -25,6 +25,8 @@ use utils_types::traits::{BinarySerializable, ToHex};
 /// network transfer and in the smart contract.
 const ENCODED_TICKET_LENGTH: usize = 64;
 
+pub type EncodedWinProb = [u8; 7];
+
 /// Describes status of a channel
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
@@ -197,7 +199,7 @@ pub struct Ticket {
     pub amount: Balance,
     pub index: u64,
     pub index_offset: u32,
-    pub encoded_win_prob: [u8; 7],
+    pub encoded_win_prob: EncodedWinProb,
     pub channel_epoch: u32,
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
@@ -282,7 +284,7 @@ impl Ticket {
         amount: &Balance,
         index: U256,
         index_offset: U256,
-        encoded_win_prob: [u8; 7],
+        encoded_win_prob: EncodedWinProb,
         channel_epoch: U256,
         challenge: EthereumChallenge,
         signature: Signature,
@@ -508,10 +510,14 @@ impl Ticket {
     }
 
     pub fn get_expected_payout(&self) -> U256 {
-        self.amount
-            .value()
-            .multiply_f64(self.win_prob())
-            .expect("ticket win probability outside of allowed interval of [0.0, 1.0]")
+        let mut win_prob = [0u8; 8];
+        win_prob[1..].copy_from_slice(&self.encoded_win_prob);
+
+        // Add + 1 to project interval [0x00ffffffffffff, 0x00000000000000] to [0x00000000000001, 0x01000000000000]
+        // Add + 1 to "round to next integer"
+        let win_prob = (u64::from_be_bytes(win_prob) >> 4) + 1 + 1;
+
+        (*self.amount.value() * win_prob.into()) >> U256::from(52u64)
     }
 
     /// Recovers the signer public key from the embedded ticket signature.
@@ -595,7 +601,7 @@ impl BinarySerializable for Ticket {
 }
 
 /// Decodes [0x00000000000000, 0xffffffffffffff] to [0.0f64, 1.0f64]
-pub fn win_prob_to_f64(encoded_win_prob: &[u8; 7]) -> f64 {
+pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
     if encoded_win_prob.eq(&hex!("00000000000000")) {
         return 0.0;
     }
@@ -609,14 +615,14 @@ pub fn win_prob_to_f64(encoded_win_prob: &[u8; 7]) -> f64 {
 
     let tmp = u64::from_be_bytes(tmp);
 
-    // project interval [0x0fffffffffffff, 0x0000000000000f] to [0x10000000000000, 0x00000000000010]
+    // project interval [0x0fffffffffffff, 0x0000000000000f] to [0x00000000000010, 0x10000000000000]
     let significand: u64 = tmp + 1;
 
     f64::from_bits(1023u64 << 52 | significand >> 4) - 1.0
 }
 
 /// Encodes [0.0f64, 1.0f64] to [0x00000000000000, 0xffffffffffffff]
-pub fn f64_to_win_prob(win_prob: f64) -> Result<[u8; 7]> {
+pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
     if win_prob > 1.0 || win_prob < 0.0 {
         return Err(CoreTypesError::InvalidInputData(
             "Winning probability must be in [0.0, 1.0]".into(),
@@ -636,7 +642,7 @@ pub fn f64_to_win_prob(win_prob: f64) -> Result<[u8; 7]> {
     // // clear sign and exponent
     let significand: u64 = tmp & 0x000fffffffffffffu64;
 
-    // project interval [0x10000000000000, 0x00000000000010] to [0x0fffffffffffff, 0x0000000000000f]
+    // project interval [0x10000000000000, 0x00000000000010] to [0x0000000000000f, 0x0fffffffffffff]
     let encoded = ((significand - 1) << 4) | 0x000000000000000fu64;
 
     let mut res = [0u8; 7];
@@ -777,6 +783,33 @@ pub mod tests {
         assert!(initial_ticket
             .verify(&alice.public().to_address(), &Hash::default())
             .is_ok());
+    }
+
+    #[test]
+    pub fn test_ticket_expected_payout() {
+        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
+        let bob = ChainKeypair::from_secret(&BOB).unwrap();
+
+        let mut ticket = Ticket::new_partial(
+            &alice.public().to_address(),
+            &bob.public().to_address(),
+            &Balance::new(U256::one(), BalanceType::HOPR),
+            U256::zero(),
+            U256::one(),
+            1.0,
+            U256::one(),
+        )
+        .unwrap();
+
+        assert_eq!(U256::one(), ticket.get_expected_payout());
+
+        ticket.encoded_win_prob = f64_to_win_prob(0.0).unwrap();
+        assert_eq!(U256::zero(), ticket.get_expected_payout());
+
+        ticket.amount = Balance::new(100000000000u64.into(), BalanceType::HOPR);
+        ticket.encoded_win_prob = f64_to_win_prob(0.00000000001f64).unwrap();
+
+        assert_eq!(U256::one(), ticket.get_expected_payout());
     }
 
     #[test]

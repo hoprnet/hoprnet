@@ -457,15 +457,19 @@ mod tests {
         PADDING_TAG,
     };
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use core_crypto::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
-    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use core_crypto::shared_keys::SphinxSuite;
-    use core_crypto::types::PublicKey;
+    use core_crypto::{
+        ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite},
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        shared_keys::SphinxSuite,
+        types::{Hash, PublicKey},
+    };
     use core_path::path::Path;
     use core_types::channels::Ticket;
     use parameterized::parameterized;
-    use utils_types::primitives::{Balance, BalanceType, U256};
-    use utils_types::traits::PeerIdLike;
+    use utils_types::{
+        primitives::{Balance, BalanceType, EthereumChallenge, U256},
+        traits::PeerIdLike,
+    };
 
     #[test]
     fn test_padding() {
@@ -542,23 +546,27 @@ mod tests {
 
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
         assert!(path_len > 0);
-        const PRICE_PER_PACKET: u128 = 10000000000000000u128;
-        const INVERSE_TICKET_WIN_PROB: u128 = 1;
+        let price_per_packet: U256 = 10000000000000000u128.into();
+        let ticket_win_prob = 1.0f64;
 
         if path_len > 1 {
             Ticket::new(
-                next_peer_channel_key.to_address(),
-                U256::zero(),
-                Balance::new(
-                    (PRICE_PER_PACKET * INVERSE_TICKET_WIN_PROB * (path_len - 1) as u128).into(),
+                &next_peer_channel_key.to_address(),
+                &Balance::new(
+                    price_per_packet.divide_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
                     BalanceType::HOPR,
                 ),
-                U256::one(),
-                U256::zero(),
+                1u64.into(),
+                1u64.into(),
+                ticket_win_prob,
+                1u64.into(),
+                EthereumChallenge::default(),
                 private_key,
+                &Hash::default(),
             )
+            .unwrap()
         } else {
-            Ticket::new_zero_hop(next_peer_channel_key.clone().to_address(), private_key)
+            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default())
         }
     }
 
@@ -578,7 +586,8 @@ mod tests {
 
         let test_message = b"some testing message";
         let path = Path::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
-        let mut packet = Packet::new(test_message, &path, &own_channel_kp, ticket).expect("failed to construct packet");
+        let mut packet = Packet::new(test_message, &path, &own_channel_kp, ticket, &Hash::default())
+            .expect("failed to construct packet");
 
         match &packet.state() {
             PacketState::Outgoing { .. } => {}
@@ -604,7 +613,7 @@ mod tests {
                         keypairs.len() - i - 1,
                         &channel_pairs[i],
                     );
-                    packet.forward(&channel_pairs[i], ticket).unwrap();
+                    packet.forward(&channel_pairs[i], ticket, &Hash::default()).unwrap();
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),
             }

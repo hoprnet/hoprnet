@@ -409,7 +409,7 @@ pub mod test {
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.multiply_f64(win_prob).unwrap() * path_pos.into(),
+                price_per_packet.divide_f64(win_prob).unwrap() * path_pos.into(),
                 BalanceType::HOPR,
             ),
             U256::zero(),
