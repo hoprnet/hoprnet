@@ -147,8 +147,10 @@ add-all-allowed-target: ensure-environment-and-network-are-set ensure-privatekey
 add-all-allowed-target: ## create a new safe and a new node management module, include the provided node address
 ifeq ($(target_address),)
 	echo "parameter <target_address> missing" >&2 && exit 1
+endif
 ifeq ($(safe_address),)
 	echo "parameter <safe_address> missing" >&2 && exit 1
+endif
 ifeq ($(module_address),)
 	echo "parameter <module_address> missing" >&2 && exit 1
 endif

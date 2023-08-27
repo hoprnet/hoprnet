@@ -106,7 +106,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     }
 
     /**
-     * @dev create a safe proxy and moodule proxy. 
+     * @dev create a safe proxy and moodule proxy.
      * Perform the following actions as the owner of safe:
      * - include nodes to the module
      * - approve token transfer
@@ -192,7 +192,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 6. add announcement contract as target, as an owner of safe
         addAllAllowedTargetToModuleBySafe(currentNetworkDetail.addresses.announcements, safe, module);
-        // bytes memory 
+        // bytes memory
         vm.stopBroadcast();
 
         // 7. add nodes and safe to network registry, as a manager of network registry
@@ -277,7 +277,10 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             "approve(address,uint256)", currentNetworkDetail.addresses.channelsContractAddress, type(uint256).max
         );
         _helperSignSafeTxAsOwner(
-            ISafe(payable(safe)), currentNetworkDetail.addresses.tokenContractAddress, ISafe(payable(safe)).nonce(), approveData
+            ISafe(payable(safe)),
+            currentNetworkDetail.addresses.tokenContractAddress,
+            ISafe(payable(safe)).nonce(),
+            approveData
         );
     }
 
@@ -323,14 +326,12 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         if (!successReadTryGetTarget) {
             revert("Cannot read tryGetTarget from module contract.");
         }
-        (bool included, ) = abi.decode(returndataTryGetTarget, (bool, uint256));
+        (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
         if (!included) {
-            bytes memory scopeTargetData =
-                abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
+            bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
             uint256 safeNonce = ISafe(payable(safe)).nonce();
 
             _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
-
         }
     }
 

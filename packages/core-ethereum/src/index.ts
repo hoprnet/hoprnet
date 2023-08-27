@@ -1,6 +1,7 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt, type DeploymentExtract } from './ethereum.js'
+import { BigNumber } from 'ethers'
 import {
   AcknowledgedTicket,
   Balance,
@@ -589,7 +590,18 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async isSafeAnnouncementAllowed(): Promise<boolean> {
-    return true
+    // the position comes from the order of values in the smart contract
+    const ALLOW_ALL_ENUM_POSITION = 3
+    const targetAddress = this.chain.getInfo().hoprAnnouncementsAddress
+    const target = await this.chain.getNodeManagementModuleTargetInfo(targetAddress)
+    if (target) {
+      const targetAddress2 = target.shr(96)
+      const targetPermission = target.shl(176).shr(248)
+      const addressMatches = BigNumber.from(targetAddress).eq(targetAddress2)
+      const permissionIsAllowAll = BigInt.asUintN(8, targetPermission.toBigInt()) == BigInt(ALLOW_ALL_ENUM_POSITION)
+      return addressMatches && permissionIsAllowAll
+    }
+    return false
   }
 
   public async isNodeSafeRegisteredCorrectly(): Promise<boolean> {

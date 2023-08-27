@@ -949,6 +949,31 @@ export async function createChainWrapper(
     return new Balance(rawAllowance.toString(), BalanceType.HOPR)
   }
 
+  /*
+   * Gets the target information of a registered target from the node management
+   * module.
+   * @param targetAddress address of the target
+   * @returns a Promise that resolves the target in BigNumber format
+   */
+  const getNodeManagementModuleTargetInfo = async (targetAddress: string): Promise<BigNumber> => {
+    const RETRIES = 3
+    let response
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        response = await nodeManagementModule.tryGetTarget(targetAddress)
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        }
+
+        log(`Could not get the target info using the provider.`)
+        throw Error(`Could not get the target info due to ${err}`)
+      }
+    }
+    return response[1]
+  }
+
   /**
    * Gets the registered safe address from node safe registry
    * @param nodeAddress node address
@@ -1005,6 +1030,7 @@ export async function createChainWrapper(
     getTokenAllowanceGrantedToChannelsAt,
     getTransactionsInBlock,
     getTimestamp,
+    getNodeManagementModuleTargetInfo,
     getSafeFromNodeSafeRegistry,
     getModuleTargetAddress,
     announce,
