@@ -26,7 +26,7 @@ declare gcloud_region="--region=europe-west4"
 declare gcloud_disk_name="hoprd-data-disk"
 
 # use CPU optimized machine type
-GCLOUD_MACHINE="--machine-type=c2d-highcpu-2"
+GCLOUD_MACHINE="--machine-type=n2-standard-2"
 GCLOUD_META="--metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true --maintenance-policy=MIGRATE"
 GCLOUD_TAGS="--tags=hopr-node,web-client,rest-client,portainer,healthcheck"
 GCLOUD_BOOTDISK="--boot-disk-size=20GB --boot-disk-type=pd-standard"
@@ -122,7 +122,7 @@ gcloud_create_instance_template() {
 
   log "creating instance template ${name}"
   eval gcloud compute instance-templates create "${name}" \
-      --machine-type=e2-medium \
+      ${GCLOUD_MACHINE} \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
       --boot-disk-device-name=boot-disk \
