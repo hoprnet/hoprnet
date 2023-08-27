@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # prevent sourcing of this script, only allow execution
+# shellcheck disable=SC2091
 $(return >/dev/null 2>&1)
 test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
@@ -13,12 +14,19 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 source "${mydir}/gcloud.sh"
 
 declare cluster_template_name=${1?"Missing parameter cluster_template"}
+declare identities_path="${2?"missing parameter <identities_path>"}"
+
+identities=($(ls ${identities_path}))
 instances=($(gcloud compute instance-groups list-instances ${cluster_template_name} ${gcloud_region} --format=json | jq 'map(.instance)' | sed 's/.*zones\//"/' | sed 's/\/instances\//;/' | jq -r '@csv' | tr -d '\"' | sed 's/,/ /g'))
 
-restart(){
+setup_node(){
   zone=${1}
   instance=${2}
-  echo "Restarting ${instance}"
+  identity=${3}
+  echo "Setting up ${instance} with $identities_path/$identity"
+  gcloud compute ssh --zone ${zone} ${instance} --command 'sudo rm -f /opt/hoprd/{.hoprd.id,.env}'
+  gcloud compute scp --zone ${zone}  $identities_path/$identity/{.hoprd.id,.env} ${instance}:/opt/hoprd/
+  gcloud compute ssh --zone ${zone} ${instance} --command 'sudo chown root:root -R /opt/hoprd'
   gcloud compute ssh --zone ${zone} ${instance} --command 'sudo service hoprd restart'
 }
 
@@ -26,7 +34,8 @@ restart(){
 for index in "${!instances[@]}"; do
   zone=$(echo "${instances[$index]}" | cut -d ";" -f 1)
   instance=$(echo "${instances[$index]}" | cut -d ";" -f 2)
-  restart ${zone} ${instance} &
+  identity="${identities[$index]}"
+  setup_node ${zone} ${instance} ${identity} &
 done
 
 wait

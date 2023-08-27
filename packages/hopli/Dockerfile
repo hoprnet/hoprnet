@@ -14,8 +14,11 @@ ENV SYSROOT=/dummy
 ENV OPENSSL_STATIC=1
 ENV OPENSSL_INCLUDE_DIR=/usr/include/openssl
 
-COPY ./Cargo.toml ./Cargo.toml
+COPY Makefile Cargo.toml Cargo.lock ./
+COPY vendor vendor/
 COPY packages packages/
+
+RUN make build-solidity-types
 
 WORKDIR /app/hoprnet/packages/hopli
 
@@ -35,9 +38,13 @@ LABEL name="hopli" \
 ENV ETHERSCAN_API_KEY="random_giberish"
 
 # build project sources
-WORKDIR /root
-COPY ./packages/ethereum/contracts /root/contracts
-COPY Makefile /root
+WORKDIR /app/hoprnet
+VOLUME /app/hoprnet/node
+
+COPY packages/ethereum/contracts packages/ethereum/contracts
+COPY Makefile .
+COPY vendor/solidity vendor/solidity
+
 COPY --from=builder /app/hoprnet/packages/hopli/target/release/hopli /bin/hopli
 RUN apt-get update && \
     apt install --no-install-recommends -y git curl ca-certificates make && \
@@ -46,7 +53,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     apt remove -y make && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
-    rm /root/Makefile
+    rm /app/hoprnet/Makefile
 
 ENTRYPOINT ["/bin/hopli"]
 CMD ["--help"]
+
