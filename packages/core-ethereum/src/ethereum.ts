@@ -425,15 +425,15 @@ export async function createChainWrapper(
   /**
    * FIXME: annouce is in a separate contract
    * Initiates a transaction that announces nodes on-chain.
-   * @param data prepared announcement data
+   * @param multiaddr Multiaddress to announce
+   * @param useSafe use Safe-variant for call if true
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
-    let is_safe_set = chainCalls.get_use_safe()
+  const announce = async (multiaddr: Multiaddr, useSafe: boolean, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
     let to = deploymentExtract.hoprAnnouncementsAddress
-    let data = u8aToHex(chainCalls.get_announce_payload(multiaddr.toString()))
-    if (is_safe_set) {
+    let data = u8aToHex(chainCalls.get_announce_payload(multiaddr.toString(), useSafe))
+    if (useSafe) {
       to = safeModuleOptions.moduleAddress.to_hex()
     }
 

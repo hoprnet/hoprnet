@@ -287,7 +287,7 @@ export class Hopr extends EventEmitter {
 
     // Fetch previous announcements from database
     const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
-    log('Using initial nodes: ' + initialNodes)
+    log('Using initial nodes: ', initialNodes.map((n) => n.id.toString()))
 
     // Fetch all nodes that announce themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
@@ -364,29 +364,44 @@ export class Hopr extends EventEmitter {
 
     connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
-    // Add all entry nodes that were announced during startup
+    // Add all entry nodes that were announced during startup or were already
+    // known in the database.
     connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
+    for (const announcedNode of initialNodes) {
+      await this.onPeerAnnouncement(announcedNode)
+    }
     for (const announcedNode of recentlyAnnouncedNodes) {
       await this.onPeerAnnouncement(announcedNode)
     }
 
-    // Register node-safe pair to NodeSafeRegistry before announcing to prevent
-    // a race-condition later. That way the announcement always uses the path
-    // with a safe already set.
+    // If this is the first time the node starts up it has not registered a safe
+    // yet, therefore it may announce directly. Trying that to get the first
+    // announcement through. Otherwise, it may announce with the safe variant.
+    if (await connector.isNodeSafeNotRegistered()) {
+      log('No NodeSafeRegistry entry yet, proceeding with direct announcement')
+      try {
+        await this.announce(this.options.announce)
+      } catch (err) {
+        console.error('Could not announce directly self on-chain: ', err)
+        process.exit(1)
+      }
+    } else {
+      log('NodeSafeRegistry entry already present, proceeding with Safe-Module announcement')
+      try {
+        await this.announce(this.options.announce, true)
+      } catch (err) {
+        console.error('Could not announce through Safe-Module self on-chain: ', err)
+        process.exit(1)
+      }
+    }
+
+    // Possibly register node-safe pair to NodeSafeRegistry. Following that the
+    // connector is set to use safe tx variants.
     try {
       log(`check node-safe registry`)
       await this.registerSafeByNode()
     } catch (err) {
-      console.error(`Could not register node with safe`)
-      console.error(`Observed error:`, err)
-      process.exit(1)
-    }
-
-    try {
-      await this.announce(this.options.announce)
-    } catch (err) {
-      console.error(`Could not announce self on-chain`)
-      console.error(`Observed error:`, err)
+      console.error('Could not register node with safe: ', err)
       process.exit(1)
     }
 
@@ -897,9 +912,10 @@ export class Hopr extends EventEmitter {
    * Announces address of node on-chain to be reachable by other nodes.
    * @dev Promise resolves before own announcement appears in the indexer
    * @param announceRoutableAddress publish routable address if true
+   * @param useSafe use Safe-variant of call if true
    * @returns a Promise that resolves once announce transaction has been published
    */
-  private async announce(announceRoutableAddress = false): Promise<void> {
+  private async announce(announceRoutableAddress = false, useSafe = false): Promise<void> {
     let routableAddressAvailable = false
 
     // Address that we will announce soon
@@ -951,14 +967,34 @@ export class Hopr extends EventEmitter {
       return
     }
 
+    // only announce when:
+    // (1) directly, safe is not used
+    // (2) safe is used, correctly set, and target has been configured with ALLOW_ALL
     try {
-      log(
-        'announcing on-chain %s routable address %s',
-        announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
-        addrToAnnounce.toString()
-      )
-      const announceTxHash = await connector.announce(addrToAnnounce)
-      log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
+      if (!useSafe) {
+        log(
+          'announcing directy on-chain %s routable address %s',
+          announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
+          addrToAnnounce.toString()
+        )
+        const announceTxHash = await connector.announce(addrToAnnounce)
+        log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
+      } else {
+        const isRegisteredCorrectly = await connector.isNodeSafeRegisteredCorrectly()
+        const isAnnouncementAllowed = await connector.isSafeAnnouncementAllowed()
+        if (isRegisteredCorrectly && isAnnouncementAllowed) {
+          log(
+            'announcing via Safe-Module on-chain %s routable address %s',
+            announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
+            addrToAnnounce.toString()
+          )
+          const announceTxHash = await connector.announce(addrToAnnounce, true)
+          log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
+        } else {
+          // FIXME: implement path through the Safe as delegate
+          error('Cannot announce new multiaddress because Safe-Module configuration does not allow it')
+        }
+      }
     } catch (err) {
       log('announcing address %s failed', addrToAnnounce.toString())
       this.maybeEmitFundsEmptyEvent(err)

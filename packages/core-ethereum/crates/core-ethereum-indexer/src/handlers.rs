@@ -275,6 +275,13 @@ where
                 let channel_id = generate_channel_id(&source, &destination);
 
                 let maybe_channel = db.get_channel(&channel_id).await?;
+                utils_log::debug!(
+                    "on_open_channel_event - source: {:?} - destination: {:?} - channel_id: {:?}, channel known: {:?}",
+                    source.to_string(),
+                    destination.to_string(),
+                    channel_id.to_string(),
+                    maybe_channel.is_some()
+                );
 
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::Open;

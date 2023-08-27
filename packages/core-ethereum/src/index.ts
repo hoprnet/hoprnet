@@ -214,9 +214,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  announce(multiaddr: Multiaddr): Promise<string> {
+  announce(multiaddr: Multiaddr, useSafe: boolean = false): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
+    return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -583,6 +583,25 @@ export default class HoprCoreEthereum extends EventEmitter {
         // we are only interested in fundChannel receipt
       )
     )[1]
+  }
+
+  public async isSafeAnnouncementAllowed(): Promise<boolean> {
+    return true
+  }
+
+  public async isNodeSafeRegisteredCorrectly(): Promise<boolean> {
+    const nodeAddress = this.chainKeypair.to_address()
+    const safeAddress = this.safeModuleOptions.safeAddress
+    const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
+    log('Currently registered Safe address in NodeSafeRegistry = %s', registeredAddress.to_string())
+    return registeredAddress.eq(Address.deserialize(safeAddress.serialize()))
+  }
+
+  public async isNodeSafeNotRegistered(): Promise<boolean> {
+    const nodeAddress = this.chainKeypair.to_address()
+    const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
+    log('Currently registered Safe address in NodeSafeRegistry = %s', registeredAddress.to_string())
+    return registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))
   }
 
   public async registerSafeByNode(): Promise<Receipt> {

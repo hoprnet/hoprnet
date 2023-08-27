@@ -74,7 +74,7 @@ impl ChainCalls {
         return self.use_safe;
     }
 
-    pub fn announce(&self, announced_multiaddr: &Multiaddr) -> Result<Vec<u8>> {
+    pub fn announce(&self, announced_multiaddr: &Multiaddr, use_safe: bool) -> Result<Vec<u8>> {
         let account_sig = AccountSignature::new(&self.offchain_keypair, &self.chain_key);
 
         if let Some(ending) = announced_multiaddr.protocol_stack().last() {
@@ -89,7 +89,7 @@ impl ChainCalls {
 
         let serialized_signature = account_sig.signature.to_bytes();
 
-        if self.use_safe {
+        if use_safe {
             let call_data = BindKeysAnnounceSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
@@ -574,12 +574,12 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn get_announce_payload(&self, announced_multiaddr: &str) -> JsResult<Vec<u8>> {
+        pub fn get_announce_payload(&self, announced_multiaddr: &str, use_safe: bool) -> JsResult<Vec<u8>> {
             let ma = match Multiaddr::from_str(announced_multiaddr) {
                 Ok(ma) => ma,
                 Err(e) => return Err(JsValue::from(e.to_string())),
             };
-            ok_or_jserr!(self.w.announce(&ma))
+            ok_or_jserr!(self.w.announce(&ma, use_safe))
         }
 
         #[wasm_bindgen]

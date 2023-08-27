@@ -7,7 +7,6 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
-set -x
 
 # set log id and use shared log function for readable logs
 declare mydir
