@@ -7,17 +7,17 @@ use libp2p::StreamProtocol;
 
 pub use libp2p::identity;
 
-pub use libp2p::identity as libp2p_identity;
-pub use libp2p::swarm as libp2p_swarm;
-pub use libp2p::request_response as libp2p_request_response;
 use libp2p::core as libp2p_core;
+pub use libp2p::identity as libp2p_identity;
 use libp2p::noise as libp2p_noise;
+pub use libp2p::request_response as libp2p_request_response;
+pub use libp2p::swarm as libp2p_swarm;
 
-use libp2p_identity::PeerId;
 use libp2p_core::{upgrade, Transport};
+use libp2p_identity::PeerId;
 use libp2p_swarm::{NetworkBehaviour, SwarmBuilder};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use core_network::messaging::ControlMessage;
 use core_types::acknowledgement::Acknowledgement;
@@ -31,13 +31,13 @@ pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
 pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";
 pub const HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0: &str = "/hopr/ack/0.1.0";
 
-const HOPR_HEARTBEAT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600);      // 1 hour
+const HOPR_HEARTBEAT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_HEARTBEAT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-const HOPR_MESSAGE_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600);        // 1 hour
+const HOPR_MESSAGE_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_MESSAGE_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
-const HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600);       // 1 hour
+const HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(NetworkBehaviour)]
@@ -46,7 +46,7 @@ pub struct HoprNetworkBehavior {
     pub heartbeat: libp2p_request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p_request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p_request_response::cbor::Behaviour<Acknowledgement, ()>,
-    keep_alive: libp2p_swarm::keep_alive::Behaviour             // run the business logic loop indefinitely
+    keep_alive: libp2p_swarm::keep_alive::Behaviour, // run the business logic loop indefinitely
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -58,10 +58,10 @@ impl Debug for HoprNetworkBehavior {
 /// Aggregated network behavior inheriting the component behaviors.
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
-    Heartbeat(libp2p_request_response::Event<Ping,Pong>),
-    Message(libp2p_request_response::Event<Box<[u8]>,()>),
-    Acknowledgement(libp2p_request_response::Event<Acknowledgement,()>),
-    KeepAlive(void::Void)
+    Heartbeat(libp2p_request_response::Event<Ping, Pong>),
+    Message(libp2p_request_response::Event<Box<[u8]>, ()>),
+    Acknowledgement(libp2p_request_response::Event<Acknowledgement, ()>),
+    KeepAlive(void::Void),
 }
 
 impl From<void::Void> for HoprNetworkBehaviorEvent {
@@ -70,20 +70,20 @@ impl From<void::Void> for HoprNetworkBehaviorEvent {
     }
 }
 
-impl From<libp2p_request_response::Event<Ping,Pong>> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p_request_response::Event<Ping,Pong>) -> Self {
+impl From<libp2p_request_response::Event<Ping, Pong>> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p_request_response::Event<Ping, Pong>) -> Self {
         Self::Heartbeat(event)
     }
 }
 
-impl From<libp2p_request_response::Event<Box<[u8]>,()>> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p_request_response::Event<Box<[u8]>,()>) -> Self {
+impl From<libp2p_request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p_request_response::Event<Box<[u8]>, ()>) -> Self {
         Self::Message(event)
     }
 }
 
-impl From<libp2p_request_response::Event<Acknowledgement,()>> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p_request_response::Event<Acknowledgement,()>) -> Self {
+impl From<libp2p_request_response::Event<Acknowledgement, ()>> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p_request_response::Event<Acknowledgement, ()>) -> Self {
         Self::Acknowledgement(event)
     }
 }
@@ -127,11 +127,10 @@ impl Default for HoprNetworkBehavior {
                     cfg
                 },
             ),
-            keep_alive: libp2p_swarm::keep_alive::Behaviour::default()
+            keep_alive: libp2p_swarm::keep_alive::Behaviour::default(),
         }
     }
 }
-
 
 /// Build wasm variant of `Transport` for the Node environment
 #[cfg(all(feature = "wasm", not(test)))]
@@ -141,7 +140,11 @@ pub fn build_basic_transport() -> libp2p_wasm_ext::ExtTransport {
 
 /// Build wasm variant of `Swarm`
 #[cfg(all(feature = "wasm", not(test)))]
-pub fn build_swarm<T: NetworkBehaviour>(transport: libp2p::core::transport::Boxed<(PeerId, libp2p::core::muxing::StreamMuxerBox)>, behavior: T, me: PeerId) -> libp2p_swarm::Swarm<T> {
+pub fn build_swarm<T: NetworkBehaviour>(
+    transport: libp2p::core::transport::Boxed<(PeerId, libp2p::core::muxing::StreamMuxerBox)>,
+    behavior: T,
+    me: PeerId,
+) -> libp2p_swarm::Swarm<T> {
     SwarmBuilder::with_wasm_executor(transport, behavior, me).build()
 }
 
@@ -153,13 +156,16 @@ fn build_basic_transport() -> libp2p::tcp::Transport<libp2p::tcp::async_io::Tcp>
 
 /// Build native `Swarm`
 #[cfg(any(not(feature = "wasm"), test))]
-fn build_swarm<T: NetworkBehaviour>(transport: libp2p::core::transport::Boxed<(PeerId, libp2p::core::muxing::StreamMuxerBox)>, behavior: T, me: PeerId) -> libp2p_swarm::Swarm<T> {
+fn build_swarm<T: NetworkBehaviour>(
+    transport: libp2p::core::transport::Boxed<(PeerId, libp2p::core::muxing::StreamMuxerBox)>,
+    behavior: T,
+    me: PeerId,
+) -> libp2p_swarm::Swarm<T> {
     SwarmBuilder::with_async_std_executor(transport, behavior, me).build()
 }
 
-
 /// Build objects comprising the p2p network.
-/// 
+///
 /// @return A built `Swarm` object implementing the HoprNetworkBehavior functionality
 pub fn build_p2p_network(me: libp2p_identity::Keypair) -> libp2p_swarm::Swarm<HoprNetworkBehavior> {
     let transport = build_basic_transport()

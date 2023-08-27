@@ -6,8 +6,7 @@ import chai, { expect } from 'chai'
 import { createTestApiInstance, ALICE_ETHEREUM_ADDR } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
 
-import { hoprd_misc_initialize_crate, Balance, BalanceType } from '../../../../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
+import { Balance, BalanceType } from '@hoprnet/hopr-utils'
 
 let node = sinon.fake() as any
 node.withdraw = sinon.fake.returns('receipt')

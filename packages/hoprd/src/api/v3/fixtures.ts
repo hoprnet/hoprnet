@@ -4,7 +4,6 @@ import { Multiaddr } from '@multiformats/multiaddr'
 
 import { setupRestApi } from '../v3.js'
 import {
-  hoprd_misc_initialize_crate,
   AccountEntry,
   OffchainPublicKey,
   Address,
@@ -13,8 +12,7 @@ import {
   Balance,
   BalanceType,
   U256
-} from '../../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
+} from '@hoprnet/hopr-utils'
 
 import { MessageInbox, MessageInboxConfiguration, hoprd_inbox_initialize_crate } from '../../../lib/hoprd_inbox.js'
 hoprd_inbox_initialize_crate()

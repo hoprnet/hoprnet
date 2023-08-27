@@ -44,9 +44,9 @@ struct ChainCalls {
 }
 
 impl ChainCalls {
-    pub fn new(offchain_keypair: OffchainKeypair, chain_keypair: ChainKeypair, hopr_channels: Address) -> Self {
+    pub fn new(offchain_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, hopr_channels: Address) -> Self {
         Self {
-            offchain_keypair,
+            offchain_keypair: offchain_keypair.clone(),
             chain_key: chain_keypair.public().to_address(),
             hopr_channels,
             use_safe: false,
@@ -614,7 +614,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl ChainCalls {
         #[wasm_bindgen(constructor)]
-        pub fn new(offchain_keypair: OffchainKeypair, chain_keypair: ChainKeypair, hopr_channels: Address) -> Self {
+        pub fn new(offchain_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, hopr_channels: Address) -> Self {
             Self {
                 w: super::ChainCalls::new(offchain_keypair, chain_keypair, hopr_channels),
             }

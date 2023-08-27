@@ -865,9 +865,13 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use core_crypto::{keypairs::ChainKeypair, types::Hash};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::traits::BinarySerializable;
+    use utils_types::{
+        primitives::{Address, Balance, EthereumChallenge, U256},
+        traits::BinarySerializable,
+    };
     use wasm_bindgen::prelude::wasm_bindgen;
 
     use crate::channels::{ChannelEntry, ChannelStatus};
@@ -917,6 +921,71 @@ pub mod wasm {
     #[wasm_bindgen]
     pub struct Ticket {
         w: super::Ticket,
+    }
+
+    #[wasm_bindgen]
+    impl Ticket {
+        #[wasm_bindgen(constructor)]
+        pub fn new(
+            counterparty: &Address,
+            balance: &Balance,
+            index: U256,
+            index_offset: U256,
+            win_prob: f64,
+            epoch: U256,
+            challenge: EthereumChallenge,
+            chain_key: &ChainKeypair,
+            domain_separator: &Hash,
+        ) -> JsResult<Ticket> {
+            Ok(Self {
+                w: ok_or_jserr!(super::Ticket::new(
+                    counterparty,
+                    balance,
+                    index,
+                    index_offset,
+                    win_prob,
+                    epoch,
+                    challenge,
+                    chain_key,
+                    domain_separator
+                ))?,
+            })
+        }
+
+        #[wasm_bindgen(getter)]
+        pub fn amount(&self) -> Balance {
+            self.w.amount.clone()
+        }
+ 
+        #[wasm_bindgen(getter)]
+        pub fn index(&self) -> U256 {
+            self.w.index.into()
+        }
+
+        #[wasm_bindgen(getter)]
+        pub fn index_offset(&self) -> U256 {
+            self.w.index_offset.into()
+        }
+
+        #[wasm_bindgen(getter)]
+        pub fn win_prob(&self) -> f64 {
+            self.w.win_prob()
+        }
+
+        #[wasm_bindgen(getter)]
+        pub fn channel_epoch(&self) -> U256 {
+            self.w.channel_epoch.into()
+        }
+
+        #[wasm_bindgen(getter)]
+        pub fn challenge(&self) -> EthereumChallenge {
+            self.w.challenge.clone()
+        }
+
+        #[wasm_bindgen]
+        pub fn to_string(&self) -> String {
+            format!("{}", self.w)
+        }
     }
 
     impl Ticket {

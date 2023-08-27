@@ -2,7 +2,7 @@ import { setTimeout } from 'timers/promises'
 import sinon from 'sinon'
 import chai from 'chai'
 import chaiAsPromised from 'chai-as-promised'
-import { LevelDb } from '@hoprnet/hopr-utils'
+import { LevelDb, Database } from '@hoprnet/hopr-utils'
 
 import {
   authenticateToken,
@@ -13,9 +13,6 @@ import {
   validateTokenCapabilities
 } from './token.js'
 import { ALICE_ETHEREUM_ADDR } from './v3/fixtures.js'
-
-import { hoprd_misc_initialize_crate, Database } from '../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { Capability } from './token.js'

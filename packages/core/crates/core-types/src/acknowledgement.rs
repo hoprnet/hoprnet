@@ -595,10 +595,32 @@ pub mod test {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use wasm_bindgen::prelude::*;
+    use core_crypto::types::Response;
+    use utils_types::primitives::Address;
+
+    use crate::channels::wasm::Ticket;
 
     #[wasm_bindgen]
     pub struct AcknowledgedTicket {
         w: super::AcknowledgedTicket,
+    }
+
+    #[wasm_bindgen]
+    impl AcknowledgedTicket {
+        #[wasm_bindgen(getter)]
+        pub fn response(&self) -> Response {
+            self.w.response.clone()
+        }
+
+        #[wasm_bindgen(getter)]
+        pub fn ticket(&self) -> Ticket {
+            self.w.ticket.clone().into()
+        }
+
+        #[wasm_bindgen(getter)]
+        pub fn signer(&self) -> Address {
+            self.w.signer.clone()
+        }
     }
 
     impl AcknowledgedTicket {

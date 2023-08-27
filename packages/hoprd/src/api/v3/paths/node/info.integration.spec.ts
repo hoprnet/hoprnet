@@ -3,10 +3,12 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 import { Multiaddr } from '@multiformats/multiaddr'
-import { Health, health_to_string } from '@hoprnet/hopr-core'
+import { Health } from '@hoprnet/hopr-core'
 
 import { hoprd_misc_initialize_crate, ResolvedNetwork } from '../../../../../lib/hoprd_misc.js'
 hoprd_misc_initialize_crate()
+
+import { health_to_string } from '@hoprnet/hopr-utils'
 
 import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 
@@ -53,10 +55,14 @@ describe('GET /node/info', () => {
       noticePeriodChannelClosure: 60
     })
     node.getAddressesAnnouncedToDHT = sinon.fake.resolves(DHT_ADDRESSES)
-    node.getListeningAddresses = async () => { return LISTENING_ADDRS }
+    node.getListeningAddresses = async () => {
+      return LISTENING_ADDRS
+    }
     node.getId = sinon.fake.returns(ALICE_PEER_ID)
     node.isAllowedAccessToNetwork = sinon.fake.returns(Promise.resolve(true))
-    node.getConnectivityHealth = async () => { return Health.Green }
+    node.getConnectivityHealth = async () => {
+      return Health.Green
+    }
 
     const res = await request(service).get(`/api/v3/node/info`)
     expect(res.status).to.equal(200)

@@ -4,6 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import { HoprNodeSafeRegistry, HoprNodeSafeRegistryEvents } from "../../src/node-stake/NodeSafeRegistry.sol";
 import { PrecompileUtils } from "../utils/Precompiles.sol";
 import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import { Address } from "openzeppelin-contracts/utils/Address.sol";
 import { Test } from "forge-std/Test.sol";
 
 // proxy contract to manipulate storage
@@ -102,10 +103,17 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
 
         _helperMockSafe(safeAddress, nodeAddress, true, true);
 
+        if (Address.isContract(nodeChainKeyAddress)) {
+            vm.expectRevert(HoprNodeSafeRegistry.NodeIsContract.selector);
+        }
         nodeSafeRegistry.registerSafeWithNodeSig(safeAddress, nodeChainKeyAddress, sig);
 
         // fail to re-use the signature
-        vm.expectRevert(HoprNodeSafeRegistry.NotValidSignatureFromNode.selector);
+        if (Address.isContract(nodeChainKeyAddress)) {
+            vm.expectRevert(HoprNodeSafeRegistry.NodeIsContract.selector);
+        } else {
+            vm.expectRevert(HoprNodeSafeRegistry.NotValidSignatureFromNode.selector);
+        }
         nodeSafeRegistry.registerSafeWithNodeSig(safeAddress, nodeChainKeyAddress, sig);
 
         vm.clearMockedCalls();

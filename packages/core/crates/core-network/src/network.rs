@@ -1,6 +1,6 @@
-use std::collections::VecDeque;
 use std::collections::hash_map::{Entry, HashMap};
 use std::collections::hash_set::HashSet;
+use std::collections::VecDeque;
 use std::time::Duration;
 
 use libp2p_identity::PeerId;
@@ -17,7 +17,6 @@ use utils_misc::time::native::current_timestamp;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
-
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -106,13 +105,12 @@ impl std::fmt::Display for Health {
     }
 }
 
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum NetworkEvent {
     CloseConnection(PeerId),
     PeerOffline(PeerId),
     Register(PeerId, PeerOrigin),
-    Unregister(PeerId), 
+    Unregister(PeerId),
 }
 
 impl std::fmt::Display for NetworkEvent {
@@ -191,11 +189,7 @@ pub struct Network<T: NetworkExternalActions> {
 }
 
 impl<T: NetworkExternalActions> Network<T> {
-    pub fn new(
-        my_peer_id: PeerId,
-        network_quality_threshold: f64,
-        network_actions_api: T,
-    ) -> Self {
+    pub fn new(my_peer_id: PeerId, network_quality_threshold: f64, network_actions_api: T) -> Self {
         let cfg = NetworkConfig {
             quality_offline_threshold: network_quality_threshold,
             ..NetworkConfig::default()
@@ -247,7 +241,7 @@ impl<T: NetworkExternalActions> Network<T> {
     pub fn get_peer_multiaddresses(&self, peer: &PeerId) -> Vec<Multiaddr> {
         match self.known_multiaddresses.get(peer) {
             Some(addrs) => addrs.clone(),
-            None => vec![]
+            None => vec![],
         }
     }
 
@@ -268,6 +262,7 @@ impl<T: NetworkExternalActions> Network<T> {
     /// Each PeerId must have an origin specification.
     pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
         let now = current_timestamp();
+        utils_log::debug!("Registering peer '{}' with origin {}", peer, origin);
 
         // assumes disjoint sets
         let has_entry = self.entries.contains_key(peer);
@@ -341,17 +336,19 @@ impl<T: NetworkExternalActions> Network<T> {
                 entry.quality = 0.0_f64.max(entry.quality - self.cfg.quality_step);
 
                 if entry.quality < (self.cfg.quality_step / 2.0) {
-                    self.network_actions_api.emit(NetworkEvent::CloseConnection(entry.id.clone()));
+                    self.network_actions_api
+                        .emit(NetworkEvent::CloseConnection(entry.id.clone()));
                     self.prune_from_network_status(&entry.id);
                     self.entries.remove(&entry.id);
                     return;
                 } else if entry.quality < self.cfg.quality_bad_threshold {
                     self.ignored.insert(entry.id, current_timestamp());
                 } else if entry.quality < self.cfg.quality_offline_threshold {
-                    self.network_actions_api.emit(NetworkEvent::PeerOffline(entry.id.clone()));
+                    self.network_actions_api
+                        .emit(NetworkEvent::PeerOffline(entry.id.clone()));
                 }
             } else {
-                entry.last_seen = ping_result.ok().unwrap();
+                entry.last_seen = current_timestamp();
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
                 entry.backoff = self.cfg.backoff_min;
                 entry.quality = 1.0_f64.min(entry.quality + self.cfg.quality_step);
@@ -458,13 +455,10 @@ impl<T: NetworkExternalActions> Network<T> {
             .collect::<Vec<_>>()
     }
 
-    pub fn all_peers_with_quality(&self) -> Vec<(PeerId, f64)>
-    {
+    pub fn all_peers_with_quality(&self) -> Vec<(PeerId, f64)> {
         self.entries
             .values()
-            .map(|status: &PeerStatus| {
-                (status.id, status.quality)
-            })
+            .map(|status: &PeerStatus| (status.id, status.quality))
             .collect::<Vec<_>>()
     }
 
@@ -476,9 +470,7 @@ impl<T: NetworkExternalActions> Network<T> {
             (v.last_seen + (delay.as_millis() as u64)) < threshold
         });
         data.sort_by(|a, b| {
-            if self.entries.get(a).unwrap().last_seen
-                < self.entries.get(b).unwrap().last_seen
-            {
+            if self.entries.get(a).unwrap().last_seen < self.entries.get(b).unwrap().last_seen {
                 std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Greater
@@ -589,11 +581,11 @@ mod tests {
             false
         }
 
-        fn emit(&mut self, _: NetworkEvent) { }
+        fn emit(&mut self, _: NetworkEvent) {}
     }
 
     fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction> {
-        Network::new(my_id.clone(), 0.6, DummyNetworkAction{})
+        Network::new(my_id.clone(), 0.6, DummyNetworkAction {})
     }
 
     #[test]

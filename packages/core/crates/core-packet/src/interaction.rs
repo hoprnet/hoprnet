@@ -1,26 +1,26 @@
-use async_lock::RwLock;
-use core_mixer::future_extensions::StreamThenConcurrentExt;
-use futures::future::{poll_fn, Either};
-use futures::channel::mpsc::{channel, UnboundedSender, Receiver, Sender};
-use std::fmt::{Display, Formatter};
-use std::pin::Pin;
 use crate::errors::PacketError::{
     AcknowledgementValidation, ChannelNotFound, InvalidPacketState, MissingDomainSeparator, OutOfFunds,
     PacketConstructionError, PacketDecodingError, PathError, Retry, TagReplay, TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
+use async_lock::RwLock;
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_mixer::future_extensions::StreamThenConcurrentExt;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_path::errors::PathError::PathNotValid;
 use core_path::path::Path;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
-use futures::{stream::Stream, pin_mut, StreamExt};
+use futures::channel::mpsc::{channel, Receiver, Sender, UnboundedSender};
+use futures::future::{poll_fn, Either};
+use futures::{pin_mut, stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use std::pin::Pin;
 use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
@@ -160,7 +160,7 @@ pub enum AckToProcess {
 #[derive(Debug)]
 pub enum AckProcessed {
     Receive(PeerId, Result<()>),
-    Send(PeerId, Acknowledgement)
+    Send(PeerId, Acknowledgement),
 }
 
 /// Implements protocol acknowledgement logic for acknowledgements
@@ -173,13 +173,28 @@ pub struct AcknowledgementProcessor<Db: HoprCoreEthereumDbActions> {
 
 impl<Db: HoprCoreEthereumDbActions> Clone for AcknowledgementProcessor<Db> {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone(), chain_key: self.chain_key.clone(), on_acknowledgement: self.on_acknowledgement.clone(), on_acknowledged_ticket: self.on_acknowledged_ticket.clone() }
+        Self {
+            db: self.db.clone(),
+            chain_key: self.chain_key.clone(),
+            on_acknowledgement: self.on_acknowledgement.clone(),
+            on_acknowledged_ticket: self.on_acknowledged_ticket.clone(),
+        }
     }
 }
 
 impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
-    pub fn new(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair, on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>, on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>) -> Self {
-        Self { db, on_acknowledgement, chain_key: chain_key.clone(), on_acknowledged_ticket }
+    pub fn new(
+        db: Arc<RwLock<Db>>,
+        chain_key: &ChainKeypair,
+        on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
+        on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
+    ) -> Self {
+        Self {
+            db,
+            on_acknowledgement,
+            chain_key: chain_key.clone(),
+            on_acknowledged_ticket,
+        }
     }
 
     pub async fn handle_acknowledgement(&mut self, ack: Acknowledgement) -> Result<()> {
@@ -251,10 +266,22 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 let response = unackowledged.get_response(&ack.ack_key_share)?;
                 debug!("acknowledging ticket using response {}", response.to_hex());
 
-                let domain_separator = self.db.read().await.get_channels_domain_separator().await.unwrap().ok_or(MissingDomainSeparator)?;
+                let domain_separator = self
+                    .db
+                    .read()
+                    .await
+                    .get_channels_domain_separator()
+                    .await
+                    .unwrap()
+                    .ok_or(MissingDomainSeparator)?;
 
-                let ack_ticket =
-                    AcknowledgedTicket::new(unackowledged.ticket, response, unackowledged.signer, &self.chain_key, &domain_separator)?;
+                let ack_ticket = AcknowledgedTicket::new(
+                    unackowledged.ticket,
+                    response,
+                    unackowledged.signer,
+                    &self.chain_key,
+                    &domain_separator,
+                )?;
 
                 // replace the un-acked ticket with acked ticket.
                 self.db
@@ -281,7 +308,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
 /// processing the elements independently in the background.
 #[derive(Debug, Clone)]
 pub struct AcknowledgementActions {
-    pub queue: Sender<AckToProcess>
+    pub queue: Sender<AckToProcess>,
 }
 
 impl AcknowledgementActions {
@@ -299,17 +326,15 @@ impl AcknowledgementActions {
     }
 
     fn process(&mut self, event: AckToProcess) -> Result<()> {
-        self.queue
-            .try_send(event)
-            .map_err(|e| {
-                if e.is_full() {
-                    Retry
-                } else if e.is_disconnected() {
-                    TransportError("queue is closed".to_string())
-                } else {
-                    TransportError(format!("Unknown error: {}", e))
-                }
-            })
+        self.queue.try_send(event).map_err(|e| {
+            if e.is_full() {
+                Retry
+            } else if e.is_disconnected() {
+                TransportError("queue is closed".to_string())
+            } else {
+                TransportError(format!("Unknown error: {}", e))
+            }
+        })
     }
 }
 
@@ -317,7 +342,7 @@ impl AcknowledgementActions {
 ///
 /// When a new acknowledgement is delivered from the transport the `receive_acknowledgement`
 /// method is used to push it into the processing queue of incoming acknowledgements.
-/// 
+///
 /// Acknowledgments issued by this node are generated using the `send_acknowledgement` method.
 ///
 /// The result of processing the acknowledgements can be extracted as a stream.
@@ -335,11 +360,10 @@ impl AcknowledgementInteraction {
     ) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<AckToProcess>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
         let (processing_out_tx, processing_out_rx) = channel::<AckProcessed>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
-        
+
         let processor = AcknowledgementProcessor::new(db, chain_key, on_acknowledgement, on_acknowledged_ticket);
 
-        let processing_stream = processing_in_rx
-        .then_concurrent(move |event| {
+        let processing_stream = processing_in_rx.then_concurrent(move |event| {
             let mut processor = processor.clone();
             let mut processed_tx = processing_out_tx.clone();
 
@@ -352,39 +376,38 @@ impl AcknowledgementInteraction {
                                 match processor.handle_acknowledgement(ack).await {
                                     Ok(_) => Some(AckProcessed::Receive(peer, Ok(()))),
                                     Err(e) => {
-                                        error!("Encountered error while handling acknowledgement from peer '{}': {}", &peer, e);
+                                        error!(
+                                            "Encountered error while handling acknowledgement from peer '{}': {}",
+                                            &peer, e
+                                        );
                                         None
                                     }
                                 }
                             } else {
-                                error!(
-                                    "failed to verify signature on acknowledgement from peer {}",
-                                    peer
-                                );
+                                error!("failed to verify signature on acknowledgement from peer {}", peer);
                                 None
                             }
                         } else {
                             error!("invalid remote peer id {}", peer);
                             None
                         }
-                    },
-                    AckToProcess::ToSend(peer, ack) => Some(AckProcessed::Send(peer, ack))
+                    }
+                    AckToProcess::ToSend(peer, ack) => Some(AckProcessed::Send(peer, ack)),
                 };
 
                 if let Some(event) = processed {
                     match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
-                        Ok(_) => {
-                            match processed_tx.start_send(event) {
-                                Ok(_) => {},
-                                Err(e) => error!("Failed to pass a processed ack message: {}", e),
-                            }
+                        Ok(_) => match processed_tx.start_send(event) {
+                            Ok(_) => {}
+                            Err(e) => error!("Failed to pass a processed ack message: {}", e),
                         },
                         Err(e) => {
                             warn!("The receiver for processed ack no longer exists: {}", e);
                         }
                     };
                 }
-        }});
+            }
+        });
 
         spawn_local(async move {
             processing_stream
@@ -400,19 +423,23 @@ impl AcknowledgementInteraction {
     }
 
     pub fn writer(&self) -> AcknowledgementActions {
-        AcknowledgementActions { queue: self.ack_event_queue.0.clone() }
+        AcknowledgementActions {
+            queue: self.ack_event_queue.0.clone(),
+        }
     }
 }
 
 impl Stream for AcknowledgementInteraction {
     type Item = AckProcessed;
 
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {   
-        use futures_lite::stream::StreamExt;     
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        use futures_lite::stream::StreamExt;
         return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
     }
 }
-
 
 // Default sizes of the packet queues
 const PACKET_TX_QUEUE_SIZE: usize = 2048;
@@ -422,14 +449,14 @@ const PACKET_RX_QUEUE_SIZE: usize = 2048;
 pub enum MsgToProcess {
     ToReceive(Box<[u8]>, PeerId),
     ToSend(Box<[u8]>, Path, PacketSendFinalizer),
-    ToForward(Box<[u8]>, PeerId)
+    ToForward(Box<[u8]>, PeerId),
 }
 
 #[derive(Debug)]
 pub enum MsgProcessed {
     Receive(PeerId, Box<[u8]>),
     Send(PeerId, Box<[u8]>),
-    Forward(PeerId, Box<[u8]>,)
+    Forward(PeerId, Box<[u8]>),
 }
 
 /// Implements protocol acknowledgement logic for msg packets
@@ -443,16 +470,19 @@ where
 
 impl<Db> Clone for PacketProcessor<Db>
 where
-    Db: HoprCoreEthereumDbActions
+    Db: HoprCoreEthereumDbActions,
 {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone(), cfg: self.cfg.clone() }
+        Self {
+            db: self.db.clone(),
+            cfg: self.cfg.clone(),
+        }
     }
 }
 
 pub enum PacketType {
     Final(Packet, Option<Acknowledgement>),
-    Forward(Packet, Option<Acknowledgement>, PeerId, PeerId)
+    Forward(Packet, Option<Acknowledgement>, PeerId, PeerId),
 }
 
 impl<Db> PacketProcessor<Db>
@@ -461,10 +491,7 @@ where
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
-        Self {
-            db,
-            cfg,
-        }
+        Self { db, cfg }
     }
 
     async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
@@ -498,7 +525,13 @@ where
         let channel_id = channel.get_id();
         debug!("going to bump ticket index for channel id {channel_id}");
         let current_index = self.bump_ticket_index(&channel_id).await?;
-        let amount = Balance::new(PRICE_PER_PACKET.divide_f64(TICKET_WIN_PROB).expect("winning probability outside of allowed interval (0.0, 1.0]") * U256::from(path_pos - 1), BalanceType::HOPR);
+        let amount = Balance::new(
+            PRICE_PER_PACKET
+                .divide_f64(TICKET_WIN_PROB)
+                .expect("winning probability outside of allowed interval (0.0, 1.0]")
+                * U256::from(path_pos - 1),
+            BalanceType::HOPR,
+        );
 
         debug!("retrieving pending balance to {destination}");
         let outstanding_balance = self.db.read().await.get_pending_balance_to(&destination).await?;
@@ -525,7 +558,7 @@ where
         )?;
 
         self.db.write().await.mark_pending(&destination, &ticket).await?;
-        
+
         debug!(
             "Creating ticket in channel {channel_id}. Ticket data: {}",
             ticket.to_hex()
@@ -546,7 +579,13 @@ where
             .await?
             .ok_or(PacketConstructionError)?;
 
-        let domain_separator = self.db.read().await.get_channels_domain_separator().await?.ok_or(PacketConstructionError)?;
+        let domain_separator = self
+            .db
+            .read()
+            .await
+            .get_channels_domain_separator()
+            .await?
+            .ok_or(PacketConstructionError)?;
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
@@ -566,10 +605,13 @@ where
                     .store_pending_acknowledgment(*ack_challenge, PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
-                Ok((Payload {
-                    remote_peer: path.hops()[0],
-                    data: packet.to_bytes(),
-                }, ack_challenge.clone()))
+                Ok((
+                    Payload {
+                        remote_peer: path.hops()[0],
+                        data: packet.to_bytes(),
+                    },
+                    ack_challenge.clone(),
+                ))
             }
             _ => {
                 debug!("invalid packet state {:?}", packet.state());
@@ -600,17 +642,14 @@ where
         match packet.state() {
             PacketState::Outgoing { .. } => return Err(InvalidPacketState),
 
-            PacketState::Final {
-                packet_tag,
-                ..
-            } => {
+            PacketState::Final { packet_tag, .. } => {
                 // Validate if it's not a replayed packet
                 if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
 
                 let ack = packet.create_acknowledgement(&self.cfg.packet_keypair);
-                return Ok(PacketType::Final(packet, ack))
+                return Ok(PacketType::Final(packet, ack));
             }
 
             PacketState::Forwarded {
@@ -714,12 +753,11 @@ where
     }
 }
 
-
 /// Packet send finalizer notifying the awaiting future once the send has been acknowledged.
-/// 
+///
 /// This is a remnant of the original logic that assumed that the p2p transport is invokable
 /// and its result can be directly polled. As the `send_packet` logic is the only part visible
-/// outside the communication loop from the protocol side, it is retained pending a larger 
+/// outside the communication loop from the protocol side, it is retained pending a larger
 /// architectural overhaul of the hopr daemon.
 #[derive(Debug)]
 pub struct PacketSendFinalizer {
@@ -734,10 +772,10 @@ impl PacketSendFinalizer {
     pub fn finalize(mut self, challenge: HalfKeyChallenge) {
         if let Some(sender) = self.tx.take() {
             match sender.send(challenge) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(_) => {
                     error!("Failed to notify the awaiter about the successful packet transmission")
-                },
+                }
             }
         } else {
             error!("Sender for packet send signalization is already spent")
@@ -748,7 +786,7 @@ impl PacketSendFinalizer {
 /// Await on future until the confirmation of packet reception is received
 #[derive(Debug)]
 pub struct PacketSendAwaiter {
-    rx: Option<futures::channel::oneshot::Receiver<HalfKeyChallenge>>
+    rx: Option<futures::channel::oneshot::Receiver<HalfKeyChallenge>>,
 }
 
 impl From<futures::channel::oneshot::Receiver<HalfKeyChallenge>> for PacketSendAwaiter {
@@ -757,10 +795,10 @@ impl From<futures::channel::oneshot::Receiver<HalfKeyChallenge>> for PacketSendA
     }
 }
 
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
+#[cfg(all(feature = "wasm", not(test)))]
+use gloo_timers::future::sleep;
 
 impl PacketSendAwaiter {
     pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<HalfKeyChallenge> {
@@ -769,13 +807,13 @@ impl PacketSendAwaiter {
                 let timeout = sleep(until_timeout);
                 pin_mut!(resolve, timeout);
                 match futures::future::select(resolve, timeout).await {
-                    Either::Left((challenge, _)) => {
-                        challenge.map_err(|_| TransportError("Canceled".to_owned()))
-                    },
+                    Either::Left((challenge, _)) => challenge.map_err(|_| TransportError("Canceled".to_owned())),
                     Either::Right(_) => Err(TransportError("Timed out on sending a packet".to_owned())),
                 }
-            },
-            None => Err(TransportError("Packet send process observation already consumed".to_owned())),
+            }
+            None => Err(TransportError(
+                "Packet send process observation already consumed".to_owned(),
+            )),
         }
     }
 }
@@ -783,7 +821,7 @@ impl PacketSendAwaiter {
 /// External API for feeding Packet actions into the Packet processor
 #[derive(Debug, Clone)]
 pub struct PacketActions {
-    pub queue: Sender<MsgToProcess>
+    pub queue: Sender<MsgToProcess>,
 }
 
 /// Pushes the packet with the given payload for sending via the given valid path.
@@ -815,17 +853,15 @@ impl PacketActions {
     }
 
     fn process(&mut self, event: MsgToProcess) -> Result<()> {
-        self.queue
-            .try_send(event)
-            .map_err(|e| {
-                if e.is_full() {
-                    Retry
-                } else if e.is_disconnected() {
-                    TransportError("queue is closed".to_string())
-                } else {
-                    TransportError(format!("Unknown error: {}", e))
-                }
-            })
+        self.queue.try_send(event).map_err(|e| {
+            if e.is_full() {
+                Retry
+            } else if e.is_disconnected() {
+                TransportError("queue is closed".to_string())
+            } else {
+                TransportError(format!("Unknown error: {}", e))
+            }
+        })
     }
 }
 
@@ -842,10 +878,10 @@ pub struct PacketInteractionConfig {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl PacketInteractionConfig {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(packet_keypair: OffchainKeypair, chain_keypair: ChainKeypair) -> Self {
+    pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair) -> Self {
         Self {
-            packet_keypair,
-            chain_keypair,
+            packet_keypair: packet_keypair.clone(),
+            chain_keypair: chain_keypair.clone(),
             check_unrealized_balance: true,
             mixer: MixerConfig::default(),
         }
@@ -857,11 +893,11 @@ impl PacketInteractionConfig {
 /// Packet processing logic:
 /// * When a new packet is delivered from the transport the `receive_packet` method is used
 /// to push it into the processing queue of incoming packets.
-/// * When a new packet is delivered from the transport and is designated for forwarding, 
+/// * When a new packet is delivered from the transport and is designated for forwarding,
 /// the `forward_packet` method is used.
 /// * When a packet is generated to be sent over the network the `send_packet` is used to
 /// push it into the processing queue.
-/// 
+///
 /// The result of packet processing can be extracted as a stream.
 pub struct PacketInteraction {
     ack_event_queue: (Sender<MsgToProcess>, Receiver<MsgProcessed>),
@@ -869,10 +905,16 @@ pub struct PacketInteraction {
 
 impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, mixer: Mixer, ack_interaction: AcknowledgementActions, on_final_packet: Option<Sender<ApplicationData>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
+        db: Arc<RwLock<Db>>,
+        mixer: Mixer,
+        ack_interaction: AcknowledgementActions,
+        on_final_packet: Option<Sender<ApplicationData>>,
+        cfg: PacketInteractionConfig,
+    ) -> Self {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
-        
+
         let processor = PacketProcessor::new(db, cfg);
 
         let processing_stream = to_process_rx
@@ -883,7 +925,7 @@ impl PacketInteraction {
                     MsgToProcess::ToReceive(_, _) => { event },
                 }
             })
-            .then_concurrent(move |event| { 
+            .then_concurrent(move |event| {
                 let processor = processor.clone();
                 let mut processed_tx = processed_tx.clone();
                 let mut on_final_packet = on_final_packet.clone();
@@ -911,16 +953,16 @@ impl PacketInteraction {
                                                             Err(e) => error!("failed to reconstruct application data from final packet: {e}")
                                                         }
                                                     }
-        
+
                                                     if let Some(ack) = ack {
                                                         if let Err(e) = ack_interaction.send_acknowledgement(previous_hop.to_peerid(), ack) {
                                                             error!("failed to acknowledge relayed packet: {e}");
                                                         }
                                                     }
-        
+
                                                     #[cfg(all(feature = "prometheus", not(test)))]
                                                     METRIC_RECV_MESSAGE_COUNT.increment();
-        
+
                                                     Some(MsgProcessed::Receive(previous_hop.to_peerid(), plain_text.clone()))
                                                 },
                                                 _ => {
@@ -935,10 +977,10 @@ impl PacketInteraction {
                                                     error!("failed to acknowledge relayed packet: {e}");
                                                 }
                                             }
-        
+
                                             #[cfg(all(feature = "prometheus", not(test)))]
                                             METRIC_FWD_MESSAGE_COUNT.increment();
-        
+
                                             Some(MsgProcessed::Forward(next_peer, packet.to_bytes()))
                                         },
                                     },
@@ -959,7 +1001,7 @@ impl PacketInteraction {
                             Ok((payload, challenge)) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 METRIC_PACKETS_COUNT.increment();
-                                
+
                                 finalizer.finalize(challenge);
                                 Some(MsgProcessed::Send(payload.remote_peer, payload.data))
                             },
@@ -1000,19 +1042,23 @@ impl PacketInteraction {
     }
 
     pub fn writer(&self) -> PacketActions {
-        PacketActions { queue: self.ack_event_queue.0.clone() }
+        PacketActions {
+            queue: self.ack_event_queue.0.clone(),
+        }
     }
 }
 
 impl Stream for PacketInteraction {
     type Item = MsgProcessed;
 
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {   
-        use futures_lite::stream::StreamExt;     
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        use futures_lite::stream::StreamExt;
         return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
     }
 }
-
 
 #[cfg(feature = "wasm")]
 mod wasm {
@@ -1022,7 +1068,7 @@ mod wasm {
 
     use super::ApplicationData;
     use libp2p_identity::PeerId;
-    use utils_misc::{utils::wasm::JsResult, ok_or_jserr};
+    use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
 
@@ -1063,8 +1109,8 @@ mod wasm {
 mod tests {
     use crate::{
         interaction::{
-            AcknowledgementInteraction, PacketInteraction, PacketInteractionConfig, AckProcessed, MsgProcessed, ApplicationData,
-            PRICE_PER_PACKET,
+            AckProcessed, AcknowledgementInteraction, ApplicationData, MsgProcessed, PacketInteraction,
+            PacketInteractionConfig, PRICE_PER_PACKET,
         },
         por::ProofOfRelayValues,
     };
@@ -1074,26 +1120,49 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         random::random_bytes,
         shared_keys::SharedSecret,
-        types::{Hash, PublicKey},
+        types::{Hash, PublicKey, HalfKeyChallenge},
     };
-    use core_ethereum_db::{db::CoreEthereumDb,traits::HoprCoreEthereumDbActions};
-    use core_mixer::mixer::{MixerConfig, Mixer};
+    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use core_mixer::mixer::{Mixer, MixerConfig};
     use core_path::path::Path;
-    use core_types::{channels::{ChannelEntry, ChannelStatus}, acknowledgement::{Acknowledgement, PendingAcknowledgement, AcknowledgedTicket}};
-    use futures::channel::mpsc::{UnboundedSender, Sender};
+    use core_types::{
+        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
+        channels::{ChannelEntry, ChannelStatus},
+    };
+    use futures::channel::mpsc::{Sender, UnboundedSender};
     use futures::future::{select, Either};
     use futures::{pin_mut, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
     use serial_test::serial;
-    use std::{sync::{Arc, Mutex},time::Duration};
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
     use utils_log::debug;
     use utils_types::{
-        primitives::{Balance, BalanceType, Snapshot, U256, Address},
+        primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::{BinarySerializable, PeerIdLike, ToHex},
     };
+
+    use super::{PacketSendAwaiter, PacketSendFinalizer};
+
+    #[async_std::test]
+    pub async fn test_packet_send_finalizer_succeeds_with_a_stored_challenge() {
+        let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
+
+        let finalizer = PacketSendFinalizer::new(tx);
+        let challenge = HalfKeyChallenge::default();
+        let mut awaiter: PacketSendAwaiter = rx.into();
+
+        finalizer.finalize(challenge.clone());
+
+        let result = awaiter.consume_and_wait(Duration::from_millis(20)).await;
+
+        assert_eq!(challenge, result.expect("HalfKeyChallange should be transmitted"));
+    }
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
@@ -1181,7 +1250,13 @@ mod tests {
             let this_peer_chain = &PEERS_CHAIN[index];
 
             if index < PEERS.len() - 1 {
-                channel = Some(create_dummy_channel(this_peer_chain.public().to_address(), PEERS_CHAIN[index + 1].public().to_address()).await);
+                channel = Some(
+                    create_dummy_channel(
+                        this_peer_chain.public().to_address(),
+                        PEERS_CHAIN[index + 1].public().to_address(),
+                    )
+                    .await,
+                );
 
                 db.update_channel_and_snapshot(
                     &channel.clone().unwrap().get_id(),
@@ -1247,20 +1322,12 @@ mod tests {
         }
 
         // Peer 1: ACK interaction of the packet sender, hookup receiving of acknowledgements and start processing them
-        let ack_interaction_sender = AcknowledgementInteraction::new(
-            core_dbs[0].clone(),
-            &PEERS_CHAIN[0],
-            Some(done_tx),
-            None,
-        );
+        let ack_interaction_sender =
+            AcknowledgementInteraction::new(core_dbs[0].clone(), &PEERS_CHAIN[0], Some(done_tx), None);
 
         // Peer 2: Recipient of the packet and sender of the acknowledgement
-        let mut ack_interaction_counterparty = AcknowledgementInteraction::new(
-            core_dbs[1].clone(),
-            &PEERS_CHAIN[1],
-            None,
-            None,
-        );
+        let mut ack_interaction_counterparty =
+            AcknowledgementInteraction::new(core_dbs[1].clone(), &PEERS_CHAIN[1], None, None);
 
         // Peer 2: start sending out outgoing acknowledgement
         for (ack_key, _) in sent_challenges.clone() {
@@ -1275,12 +1342,13 @@ mod tests {
             // emulate channel to another peer
             match ack_interaction_counterparty.next().await {
                 Some(value) => match value {
-                    AckProcessed::Send(_, ack) => {
-                        ack_interaction_sender.writer().receive_acknowledgement(PEERS[1].public().to_peerid(), ack).expect("Should succeed")
-                    },
-                    _ => panic!("Unexpected incoming acknowledgement detected")
-                }
-                None => panic!("There should have been an acknowledgment to send")
+                    AckProcessed::Send(_, ack) => ack_interaction_sender
+                        .writer()
+                        .receive_acknowledgement(PEERS[1].public().to_peerid(), ack)
+                        .expect("Should succeed"),
+                    _ => panic!("Unexpected incoming acknowledgement detected"),
+                },
+                None => panic!("There should have been an acknowledgment to send"),
             }
         }
 
@@ -1312,9 +1380,13 @@ mod tests {
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
 
-    async fn peer_setup_for(count: usize, ack_tx: UnboundedSender<AcknowledgedTicket>, pkt_tx: Sender<ApplicationData>) -> Vec<(AcknowledgementInteraction, PacketInteraction)> {
+    async fn peer_setup_for(
+        count: usize,
+        ack_tx: UnboundedSender<AcknowledgedTicket>,
+        pkt_tx: Sender<ApplicationData>,
+    ) -> Vec<(AcknowledgementInteraction, PacketInteraction)> {
         let peer_count = count;
-        
+
         assert!(peer_count <= PEERS.len());
         assert!(peer_count >= 3);
         let dbs = create_dbs(peer_count);
@@ -1326,13 +1398,24 @@ mod tests {
         let core_dbs = create_core_dbs(&dbs);
 
         for core_db in &core_dbs {
-            core_db.write().await.set_channels_domain_separator(&Hash::default(), &Snapshot::default()).await.unwrap();
+            core_db
+                .write()
+                .await
+                .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
+                .await
+                .unwrap();
         }
 
         // Begin tests
         for i in 0..peer_count {
             let peer_type = {
-                if i == 0 { "sender" } else if i == (peer_count - 1) { "recipient" } else { "relayer" }
+                if i == 0 {
+                    "sender"
+                } else if i == (peer_count - 1) {
+                    "recipient"
+                } else {
+                    "relayer"
+                }
             };
 
             debug!("peer {i} ({peer_type})    = {}", PEERS[i].public().to_peerid_str());
@@ -1346,18 +1429,26 @@ mod tests {
                     db.clone(),
                     &PEERS_CHAIN[i],
                     None,
-                    if i == peer_count - 2 { Some(ack_tx.clone()) } else { None }
+                    if i == peer_count - 2 {
+                        Some(ack_tx.clone())
+                    } else {
+                        None
+                    },
                 );
                 let pkt = PacketInteraction::new(
                     db.clone(),
                     Mixer::new(MixerConfig::default()),
                     ack.writer(),
-                    if i == peer_count - 1 { Some(pkt_tx.clone()) } else { None },
+                    if i == peer_count - 1 {
+                        Some(pkt_tx.clone())
+                    } else {
+                        None
+                    },
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
                         packet_keypair: OffchainKeypair::from_secret(&PEERS_PRIVS[i]).unwrap(),
                         chain_keypair: ChainKeypair::from_secret(&PEERS_CHAIN_PRIVS[i]).unwrap(),
-                        mixer: MixerConfig::default(),      // TODO: unnecessary, can be removed
+                        mixer: MixerConfig::default(), // TODO: unnecessary, can be removed
                     },
                 );
 
@@ -1366,43 +1457,78 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    async fn emulate_channel_communication(pending_packet_count: usize, mut components: Vec<(AcknowledgementInteraction, PacketInteraction)>, expected_msg: ApplicationData) {
+    async fn emulate_channel_communication(
+        pending_packet_count: usize,
+        mut components: Vec<(AcknowledgementInteraction, PacketInteraction)>,
+        expected_msg: ApplicationData,
+    ) {
         let component_length = components.len();
 
         for _ in 0..pending_packet_count {
-            match components[0].1.next().await.expect("pkt_sender should have sent a packet") {
+            match components[0]
+                .1
+                .next()
+                .await
+                .expect("pkt_sender should have sent a packet")
+            {
                 MsgProcessed::Send(peer, data) => {
                     assert_eq!(peer, PEERS[1].public().to_peerid());
-                    components[1].1.writer().receive_packet(data, PEERS[0].public().to_peerid()).expect("Send to relayer should succeed")
-                },
-                _ => panic!("Should have gotten a send request")
+                    components[1]
+                        .1
+                        .writer()
+                        .receive_packet(data, PEERS[0].public().to_peerid())
+                        .expect("Send to relayer should succeed")
+                }
+                _ => panic!("Should have gotten a send request"),
             }
         }
 
         for i in 1..components.len() {
             for _ in 0..pending_packet_count {
-                match components[i].0.next().await.expect("ACK relayer should send an ack to the previous") {
+                match components[i]
+                    .0
+                    .next()
+                    .await
+                    .expect("ACK relayer should send an ack to the previous")
+                {
                     AckProcessed::Send(peer, ack) => {
-                        assert_eq!(peer, PEERS[i-1].public().to_peerid());
-                        components[i-1].0.writer().receive_acknowledgement(PEERS[i].public().to_peerid(), ack).expect("Send of ack from relayer to sender should succeed")
-                    },
-                    _ => panic!("Should have gotten a send request")
+                        assert_eq!(peer, PEERS[i - 1].public().to_peerid());
+                        components[i - 1]
+                            .0
+                            .writer()
+                            .receive_acknowledgement(PEERS[i].public().to_peerid(), ack)
+                            .expect("Send of ack from relayer to sender should succeed")
+                    }
+                    _ => panic!("Should have gotten a send request"),
                 }
             }
 
             for _ in 0..pending_packet_count {
-                match components[i].1.next().await.expect("MSG relayer should forward a msg to the next") {
+                match components[i]
+                    .1
+                    .next()
+                    .await
+                    .expect("MSG relayer should forward a msg to the next")
+                {
                     MsgProcessed::Forward(peer, data) => {
-                        assert_eq!(peer, PEERS[i+1].public().to_peerid());
-                        assert!(i != component_length - 1, "Only intermediate peers can serve as a forwarder");
-                        components[i+1].1.writer().receive_packet(data, PEERS[i].public().to_peerid()).expect("Send of ack from relayer to receiver should succeed")
-                    },
+                        assert_eq!(peer, PEERS[i + 1].public().to_peerid());
+                        assert!(
+                            i != component_length - 1,
+                            "Only intermediate peers can serve as a forwarder"
+                        );
+                        components[i + 1]
+                            .1
+                            .writer()
+                            .receive_packet(data, PEERS[i].public().to_peerid())
+                            .expect("Send of ack from relayer to receiver should succeed")
+                    }
                     MsgProcessed::Receive(_peer, packet) => {
-                        let recv_app_data = ApplicationData::from_bytes(&packet).expect("could not deserialize app data");
+                        let recv_app_data =
+                            ApplicationData::from_bytes(&packet).expect("could not deserialize app data");
                         assert_eq!(i, component_length - 1, "Only the last peer can be a recepient");
                         assert_eq!(expected_msg, recv_app_data, "received packet payload must match");
                     }
-                    _ => panic!("Should have gotten a send request or a final packet")
+                    _ => panic!("Should have gotten a send request or a final packet"),
                 }
             }
         }
@@ -1421,14 +1547,19 @@ mod tests {
 
         let test_msg = ApplicationData {
             application_tag: Some(10),
-            plain_text: random_bytes::<300>().into()
+            plain_text: random_bytes::<300>().into(),
         };
 
         let peer_count = 3;
         let components = peer_setup_for(peer_count, ack_tx, pkt_tx).await;
 
         // Peer 1: start sending out packets
-        let packet_path = Path::new_valid(PEERS[1..peer_count].iter().map(|p| p.public().to_peerid()).collect::<Vec<PeerId>>());
+        let packet_path = Path::new_valid(
+            PEERS[1..peer_count]
+                .iter()
+                .map(|p| p.public().to_peerid())
+                .collect::<Vec<PeerId>>(),
+        );
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
         for _ in 0..PENDING_PACKETS {
@@ -1494,14 +1625,19 @@ mod tests {
 
         let test_msg = ApplicationData {
             application_tag: Some(10),
-            plain_text: random_bytes::<300>().into()
+            plain_text: random_bytes::<300>().into(),
         };
 
         let peer_count = 5;
         let components = peer_setup_for(peer_count, ack_tx, pkt_tx).await;
 
         // Peer 1: start sending out packets
-        let packet_path = Path::new_valid(PEERS[1..peer_count].iter().map(|p| p.public().to_peerid()).collect::<Vec<PeerId>>());
+        let packet_path = Path::new_valid(
+            PEERS[1..peer_count]
+                .iter()
+                .map(|p| p.public().to_peerid())
+                .collect::<Vec<PeerId>>(),
+        );
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
         for _ in 0..PENDING_PACKETS {

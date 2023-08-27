@@ -3,15 +3,15 @@ use std::sync::Arc;
 use async_lock::RwLock;
 use futures::channel::mpsc::Sender;
 
-use core_strategy::generic::PeerQuality;
 use core_network::{
+    network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerStatus},
     PeerId,
-    network::{Network, NetworkExternalActions, PeerStatus, NetworkEvent, Health}
 };
-use utils_log::{warn,error};
+use core_strategy::generic::PeerQuality;
+use utils_log::{error, warn};
 
 pub struct ExternalNetworkInteractions {
-    emitter: Sender<NetworkEvent>
+    emitter: Sender<NetworkEvent>,
 }
 
 impl ExternalNetworkInteractions {
@@ -36,7 +36,7 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
 /// Wrapper object necessary for async wasm function return value
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct WasmHealth {
-    h: Health
+    h: Health,
 }
 
 impl From<Health> for WasmHealth {
@@ -47,12 +47,12 @@ impl From<Health> for WasmHealth {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::{str::FromStr, pin::Pin};
+    use std::{pin::Pin, str::FromStr};
 
     use super::*;
     use core_crypto::types::OffchainPublicKey;
     use core_ethereum_db::{db::wasm::Database, traits::HoprCoreEthereumDbActions};
-    use core_network::network::{PeerOrigin, Health};
+    use core_network::network::{Health, PeerOrigin};
     use futures::{future::poll_fn, StreamExt};
     use js_sys::JsString;
     use utils_types::traits::PeerIdLike;
@@ -64,52 +64,68 @@ pub mod wasm {
     #[derive(Clone)]
     pub struct WasmNetwork {
         network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
-        change_notifier: Sender<NetworkEvent>
+        change_notifier: Sender<NetworkEvent>,
     }
 
     impl WasmNetwork {
-        pub(crate) fn new(network: Arc<RwLock<Network<ExternalNetworkInteractions>>>, change_notifier: Sender<NetworkEvent>) -> Self {
-            Self { network, change_notifier }
+        pub(crate) fn new(
+            network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
+            change_notifier: Sender<NetworkEvent>,
+        ) -> Self {
+            Self {
+                network,
+                change_notifier,
+            }
         }
 
-        pub fn as_counted_ref(&self) -> Arc<RwLock<Network<ExternalNetworkInteractions>>>{
+        pub fn as_counted_ref(&self) -> Arc<RwLock<Network<ExternalNetworkInteractions>>> {
             self.network.clone()
         }
     }
 
     #[wasm_bindgen]
     pub async fn get_peers_with_quality(network: &WasmNetwork, db: &Database) -> PeerQuality {
-        let peer_stream = futures::stream::iter(network.as_counted_ref().read().await.all_peers_with_quality().into_iter());
+        let peer_stream = futures::stream::iter(
+            network
+                .as_counted_ref()
+                .read()
+                .await
+                .all_peers_with_quality()
+                .into_iter(),
+        );
 
-        PeerQuality::new(peer_stream
-            .filter_map(|(p, q)| async move {
-                OffchainPublicKey::from_peerid(&p)
-                    .map(|key| (key, q))
-                    .ok()
+        PeerQuality::new(
+            peer_stream
+                .filter_map(|(p, q)| async move { OffchainPublicKey::from_peerid(&p).map(|key| (key, q)).ok() })
+                .then(move |(key, quality)| {
+                    let db_clone = db.as_ref_counted();
+
+                    async move {
+                        db_clone
+                            .read()
+                            .await
+                            .get_chain_key(&key)
+                            .await
+                            .map(|address| (address, quality))
+                    }
                 })
-            .then(move |(key, quality)| {
-                let db_clone = db.as_ref_counted();
-            
-                async move {
-                    db_clone.read().await
-                        .get_chain_key(&key)
-                        .await
-                        .map(|address| (address, quality))
+                .filter_map(|v| async move {
+                    match v {
+                        Ok((a, q)) => {
+                            if a.is_some() {
+                                Some((a.unwrap(), q))
+                            } else {
+                                None
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to get the address mapping for peer: {}", e);
+                            None
+                        }
                     }
-                }
-            )
-            .filter_map(|v| async move {
-                match v {
-                    Ok((a,q)) => {
-                        if a.is_some() { Some((a.unwrap(), q)) } else { None }
-                    },
-                    Err(e) => {
-                        error!("Failed to get the address mapping for peer: {}", e);
-                        None
-                    }
-                }})
-            .collect::<Vec<_>>()
-            .await
+                })
+                .collect::<Vec<_>>()
+                .await,
         )
     }
 
@@ -127,12 +143,14 @@ pub mod wasm {
         pub async fn get_peer_multiaddresses(&self, peer: JsString) -> js_sys::Array {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
-                Ok(p) => {
-                    js_sys::Array::from_iter(self.network.read().await
-                    .get_peer_multiaddresses(&p)
-                    .into_iter()
-                    .map(|ma| JsString::from(ma.to_string())))
-                },
+                Ok(p) => js_sys::Array::from_iter(
+                    self.network
+                        .read()
+                        .await
+                        .get_peer_multiaddresses(&p)
+                        .into_iter()
+                        .map(|ma| JsString::from(ma.to_string())),
+                ),
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network assumes it is not present: {}",
@@ -151,7 +169,7 @@ pub mod wasm {
                 Ok(p) => {
                     let reader = self.network.read().await;
                     (*reader).has(&p)
-                },
+                }
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network assumes it is not present: {}",
@@ -189,10 +207,12 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub async fn all(&self) -> js_sys::Array {
-            js_sys::Array::from_iter((*self.network.read().await)
-                .filter(|_| true)
-                .iter()
-                .map(|x| JsValue::from(x.to_base58())))
+            js_sys::Array::from_iter(
+                (*self.network.read().await)
+                    .filter(|_| true)
+                    .iter()
+                    .map(|x| JsValue::from(x.to_base58())),
+            )
         }
 
         #[wasm_bindgen]
@@ -210,10 +230,11 @@ pub mod wasm {
                 }
             }
         }
-    
+
         #[wasm_bindgen]
         pub async fn register(&mut self, peer: JsString, origin: PeerOrigin) {
-            self.register_with_metadata(peer, origin, &js_sys::Map::from(JsValue::undefined())).await
+            self.register_with_metadata(peer, origin, &js_sys::Map::from(JsValue::undefined()))
+                .await
         }
 
         #[wasm_bindgen]
@@ -224,15 +245,13 @@ pub mod wasm {
                     // TODO: ignoring metadata for now
                     // self.add_with_metadata(&p, origin, js_map_to_hash_map(metadata))
                     match poll_fn(|cx| Pin::new(&mut self.change_notifier).poll_ready(cx)).await {
-                        Ok(_) => {
-                            match self.change_notifier.start_send(NetworkEvent::Register(p, origin)) {
-                                Ok(_) => {},
-                                Err(e) => error!("Failed to sent network update 'register' to the receiver: {}", e),
-                            }
-                        }
-                        Err(e) => error!("The receiver for network updates was dropped: {}", e)
+                        Ok(_) => match self.change_notifier.start_send(NetworkEvent::Register(p, origin)) {
+                            Ok(_) => {}
+                            Err(e) => error!("Failed to sent network update 'register' to the receiver: {}", e),
+                        },
+                        Err(e) => error!("The receiver for network updates was dropped: {}", e),
                     }
-                },
+                }
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network ignores the register attempt: {}",
@@ -247,17 +266,13 @@ pub mod wasm {
         pub async fn unregister(&mut self, peer: JsString) {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
-                Ok(p) => {
-                    match poll_fn(|cx| Pin::new(&mut self.change_notifier).poll_ready(cx)).await {
-                        Ok(_) => {
-                            match self.change_notifier.start_send(NetworkEvent::Unregister(p)) {
-                                Ok(_) => {},
-                                Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
-                            }
-                        }
-                        Err(e) => error!("The receiver for network updates was dropped: {}", e)
-                    }
-                }
+                Ok(p) => match poll_fn(|cx| Pin::new(&mut self.change_notifier).poll_ready(cx)).await {
+                    Ok(_) => match self.change_notifier.start_send(NetworkEvent::Unregister(p)) {
+                        Ok(_) => {}
+                        Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
+                    },
+                    Err(e) => error!("The receiver for network updates was dropped: {}", e),
+                },
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network ignores the unregister attempt: {}",

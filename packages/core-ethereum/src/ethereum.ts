@@ -6,27 +6,20 @@ import {
   Balance,
   BalanceType,
   durations,
-  type AcknowledgedTicket,
+  AcknowledgedTicket,
   type DeferType,
   create_counter,
   OffchainKeypair,
   u8aToHex,
-  ChainKeypair
+  ChainKeypair,
+  CORE_ETHEREUM_CONSTANTS,
+  ChainCalls
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
 import { debug } from '@hoprnet/hopr-utils'
-import {
-  CORE_ETHEREUM_CONSTANTS,
-  ChainCalls,
-  OffchainKeypair as Ethereum_OffchainKeypair,
-  ChainKeypair as Ethereum_Chainkeypair,
-  Address as CoreEthereum_Address,
-  Balance as CoreEthereum_Balance,
-  BalanceType as CoreEthereum_BalanceType,
-  AcknowledgedTicket as CoreEthereum_AcknowledgedTicket
-} from '../../core/lib/core_hopr.js'
+
 import type { Block } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
@@ -120,9 +113,9 @@ export async function createChainWrapper(
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
 
   const chainCalls = new ChainCalls(
-    new Ethereum_OffchainKeypair(offchainKeypair.secret()),
-    new Ethereum_Chainkeypair(keypair.secret()),
-    CoreEthereum_Address.from_string(deploymentExtract.hoprChannelsAddress)
+    offchainKeypair,
+    keypair,
+    Address.from_string(deploymentExtract.hoprChannelsAddress)
   )
 
   const networkRegistry = new ethers.Contract(
@@ -489,10 +482,7 @@ export async function createChainWrapper(
         case 'HOPR':
           withdrawEssentialTxPayload = {
             data: u8aToHex(
-              chainCalls.get_transfer_payload(
-                CoreEthereum_Address.from_string(recipient),
-                new CoreEthereum_Balance(amount, CoreEthereum_BalanceType.HOPR)
-              )
+              chainCalls.get_transfer_payload(Address.from_string(recipient), new Balance(amount, BalanceType.HOPR))
             ),
             to: token.address,
             value: BigNumber.from(0)
@@ -540,7 +530,7 @@ export async function createChainWrapper(
     // const approveTxPayload: TransactionPayload = {
     //   data: u8aToHex(
     //     chainCalls.get_approve_payload(
-    //       CoreEthereum_Balance.deserialize(amount.serialize_value(), CoreEthereum_BalanceType.HOPR)
+    //       amount
     //     )
     //   ),
     //   to: token.address,
@@ -567,12 +557,7 @@ export async function createChainWrapper(
     let fundChannelResult: SendTransactionReturn
 
     const fundChannelPayload: TransactionPayload = {
-      data: u8aToHex(
-        chainCalls.get_fund_channel_payload(
-          CoreEthereum_Address.deserialize(destination.serialize()),
-          CoreEthereum_Balance.deserialize(amount.serialize_value(), CoreEthereum_BalanceType.HOPR)
-        )
-      ),
+      data: u8aToHex(chainCalls.get_fund_channel_payload(destination, amount)),
       to: channels.address,
       value: BigNumber.from(0)
     }
@@ -609,11 +594,7 @@ export async function createChainWrapper(
     let error: unknown
 
     const initiateOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(
-        chainCalls.get_intiate_outgoing_channel_closure_payload(
-          CoreEthereum_Address.deserialize(counterparty.serialize())
-        )
-      ),
+      data: u8aToHex(chainCalls.get_intiate_outgoing_channel_closure_payload(counterparty)),
       to: channels.address,
       value: BigNumber.from(0)
     }
@@ -654,11 +635,7 @@ export async function createChainWrapper(
     let error: unknown
 
     const finalizeOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(
-        chainCalls.get_finalize_outgoing_channel_closure_payload(
-          CoreEthereum_Address.deserialize(counterparty.serialize())
-        )
-      ),
+      data: u8aToHex(chainCalls.get_finalize_outgoing_channel_closure_payload(counterparty)),
       to: channels.address,
       value: BigNumber.from(0)
     }
@@ -702,9 +679,7 @@ export async function createChainWrapper(
     let error: unknown
 
     const redeemTicketEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(
-        chainCalls.get_redeem_ticket_payload(CoreEthereum_AcknowledgedTicket.deserialize(ackTicket.serialize()))
-      ),
+      data: u8aToHex(chainCalls.get_redeem_ticket_payload(ackTicket)),
       to: channels.address,
       value: BigNumber.from(0)
     }
@@ -745,9 +720,7 @@ export async function createChainWrapper(
     let error: unknown
 
     const registerSafeByNodeEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(
-        chainCalls.get_register_safe_by_node_payload(CoreEthereum_Address.deserialize(safeAddress.serialize()))
-      ),
+      data: u8aToHex(chainCalls.get_register_safe_by_node_payload(safeAddress)),
       to: nodeSafeRegistry.address,
       value: BigNumber.from(0)
     }

@@ -94,7 +94,9 @@ const BOB_PEER_INFO = toJsonDict(BOB_ENTRY, true, BOB_MULTI_ADDR.toString())
 const CHARLIE_PEER_INFO = toJsonDict(CHARLIE_ENTRY, false, undefined)
 
 let node = sinon.fake() as any as Hopr
-node.getConnectedPeers = async () => { return [ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID] }
+node.getConnectedPeers = async () => {
+  return [ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID]
+}
 node.getAddressesAnnouncedOnChain = async function* () {
   yield ALICE_MULTI_ADDR
   yield BOB_MULTI_ADDR

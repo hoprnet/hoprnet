@@ -307,7 +307,6 @@ macro_rules! histogram_start_measure {
     };
 }
 
-
 enum TimerVariant {
     Native(HistogramTimer),
     #[cfg(feature = "wasm")]

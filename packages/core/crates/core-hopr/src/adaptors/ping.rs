@@ -4,24 +4,23 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 
 use core_network::{
-    PeerId,
     network::Network,
     ping::{Ping, PingExternalAPI},
-    types::Result
+    types::Result,
+    PeerId,
 };
 
 use crate::adaptors::network::ExternalNetworkInteractions;
 
-
 /// Implementor of the ping external API.
-/// 
+///
 /// Ping requires functionality from external components in order to obtain
 /// the triggers for its functionality. This class implements the basic API by
-/// aggregating all necessary ping resources without leaking them into the 
+/// aggregating all necessary ping resources without leaking them into the
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP compliant.
 #[derive(Clone)]
 pub struct PingExternalInteractions {
-    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>
+    network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
 }
 
 impl PingExternalInteractions {
@@ -38,12 +37,11 @@ impl PingExternalAPI for PingExternalInteractions {
     }
 }
 
-
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::*;
-    use std::str::FromStr;
     use core_network::ping::Pinging;
+    use std::str::FromStr;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
@@ -58,7 +56,7 @@ pub mod wasm {
         }
     }
 
-    #[wasm_bindgen] 
+    #[wasm_bindgen]
     impl WasmPing {
         /// Ping the peers represented as a Vec<JsString> values that are converted into usable
         /// PeerIds.

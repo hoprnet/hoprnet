@@ -519,23 +519,23 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.get_or_none(key).await
     }
 
-    async fn get_channels_from(&self, address: Address) -> Result<Vec<ChannelEntry>> {
+    async fn get_channels_from(&self, address: &Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
             .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await?
             .into_iter()
-            .filter(move |x| x.source == address)
+            .filter(move |x| x.source.eq(address))
             .collect())
     }
 
-    async fn get_channels_to(&self, address: Address) -> Result<Vec<ChannelEntry>> {
+    async fn get_channels_to(&self, address: &Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
             .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
             .await?
             .into_iter()
-            .filter(move |x| x.destination == address)
+            .filter(move |x| x.destination.eq(address))
             .collect())
     }
 
@@ -1374,7 +1374,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_channels_from(&self, address: Address) -> Result<WasmVecChannelEntry, JsValue> {
+        pub async fn get_channels_from(&self, address: &Address) -> Result<WasmVecChannelEntry, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
@@ -1383,7 +1383,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_channels_to(&self, address: Address) -> Result<WasmVecChannelEntry, JsValue> {
+        pub async fn get_channels_to(&self, address: &Address) -> Result<WasmVecChannelEntry, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
