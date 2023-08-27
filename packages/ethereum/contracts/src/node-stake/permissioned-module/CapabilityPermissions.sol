@@ -778,7 +778,7 @@ library HoprCapabilityPermissions {
         for (uint256 j = 0; j < length; j++) {
             // first left shift 256 - 2 - 2 * j = 254 - 2 * j bits
             // then right shift 256 - 2 = 254 bits
-            permissions[j] = GranularPermission(uint8((uint256(encoded) << (254 - (2 * j)))) >> 254);
+            permissions[j] = GranularPermission(uint8((uint256(encoded) << (254 - (2 * j))) >> 254));
         }
     }
 }
