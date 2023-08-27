@@ -28,7 +28,9 @@ RUN make deps-docker package=hoprd && \
     # As we are on *nix, use hardlinks in node_modules to save some space
     yarn config set nmMode hardlinks-local && \
     # Install without devDependencies
-    PRODUCTION=true make deps-docker package=hoprd
+    PRODUCTION=true make deps-docker package=hoprd && \
+    # Everything that we don't need in ethereum package
+    rm -R packages/ethereum/contracts
 
 # Debian 11.7
 # https://hub.docker.com/layers/library/debian/11.7-slim/images/sha256-b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3?context=explore
