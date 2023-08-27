@@ -551,7 +551,6 @@ export default class HoprCoreEthereum extends EventEmitter {
       (await this.db.get_staking_safe_allowance()).serialize_value(),
       BalanceType.HOPR
     )
-    console.log('ALLOWANCE', allowance.to_string(), myBalance.to_string())
     if (allowance.lt(myBalance)) {
       throw Error('We do not have enough allowance to fund the channel')
     }
@@ -566,13 +565,17 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (totalFund.gt(myBalance)) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()} amount: ${myFund.to_string()} ${counterpartyFund.to_string()}`)
+    log(
+      `====> fundChannel: src: ${this.chainKeypair
+        .to_address()
+        .to_string()} dest: ${dest.to_string()} amount: ${myFund.to_string()} | ${counterpartyFund.to_string()}`
+    )
 
     const allowance = Balance.deserialize(
       (await this.db.get_staking_safe_allowance()).serialize_value(),
       BalanceType.HOPR
     )
-    if (allowance.lt(myBalance)) {
+    if (allowance.lt(myFund)) {
       throw Error('We do not have enough allowance to fund the channel')
     }
     return (

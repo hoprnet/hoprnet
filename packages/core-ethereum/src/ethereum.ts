@@ -432,7 +432,11 @@ export async function createChainWrapper(
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (multiaddr: Multiaddr, useSafe: boolean, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+  const announce = async (
+    multiaddr: Multiaddr,
+    useSafe: boolean,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<string> => {
     let to = deploymentExtract.hoprAnnouncementsAddress
     let data = u8aToHex(chainCalls.get_announce_payload(multiaddr.toString(), useSafe))
     if (useSafe) {

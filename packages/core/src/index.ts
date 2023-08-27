@@ -287,7 +287,10 @@ export class Hopr extends EventEmitter {
 
     // Fetch previous announcements from database
     const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
-    log('Using initial nodes: ', initialNodes.map((n) => n.id.toString()))
+    log(
+      'Using initial nodes: ',
+      initialNodes.map((n) => n.id.toString())
+    )
 
     // Fetch all nodes that announce themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
