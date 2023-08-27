@@ -9,7 +9,8 @@ import {
   PublicKey,
   Address,
   Database,
-  ChainKeypair,  EthereumChallenge
+  ChainKeypair,
+  EthereumChallenge
 } from '../types.js'
 
 import BN from 'bn.js'
