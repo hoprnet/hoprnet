@@ -28,12 +28,12 @@ random="${RANDOM}"
 for (( i=1; i<=${number}; i++ )) do
     echo "Generating identity $i"
     declare identity_directory
-    identity_directory="${workspace_dir}/dist/identity-${random}/$i"
+    identity_directory="${workspace_dir}/identities/identity-${random}/$i"
     mkdir -p ${identity_directory}
 
     hopli identity --action create --identity-directory "${identity_directory}" --identity-prefix .hoprd
     mv "${identity_directory}/.hoprd0.id" "${identity_directory}/.hoprd.id"
-    hopli identity --action read --identity-directory "${identity_directory}" | jq -r ' .[0]' | tee "${identity_directory}/hoprd.json"
+    hopli identity --action read --identity-directory "${identity_directory}" | tee "${identity_directory}/hoprd.json"
 
     echo "Generate safes"
     hopli create-safe-module --network "${network}" --contracts-root "${workspace_dir}/packages/ethereum/contracts" --identity-from-path "${identity_directory}/.hoprd.id" --hopr-amount 20 --native-amount 0.1 | tee "${identity_directory}/safe.log"

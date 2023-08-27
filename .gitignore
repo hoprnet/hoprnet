@@ -89,6 +89,7 @@ __pycache__/
 .Python
 develop-eggs/
 dist/
+identities/
 downloads/
 eggs/
 .eggs/

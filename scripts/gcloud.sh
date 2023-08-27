@@ -122,7 +122,7 @@ gcloud_create_instance_template() {
 
   log "creating instance template ${name}"
   eval gcloud compute instance-templates create "${name}" \
-      --machine-type=c2d-highcpu-2 \
+      --machine-type=e2-medium \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
       --boot-disk-device-name=boot-disk \

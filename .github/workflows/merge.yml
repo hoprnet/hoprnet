@@ -142,7 +142,7 @@ jobs:
         run: |
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [[ "${base_branch}" == "master" ]]; then
-            ./scripts/deploy.sh providence-rotsee
+            ./scripts/deploy.sh rotsee
           elif [[ "${base_branch}" =~ ^"release" ]]; then
             ./scripts/deploy.sh "${base_branch/release\/}-dufour"
           else
