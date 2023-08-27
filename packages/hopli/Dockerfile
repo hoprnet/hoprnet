@@ -18,7 +18,7 @@ COPY Makefile Cargo.toml Cargo.lock ./
 COPY vendor vendor/
 COPY packages packages/
 
-RUN make deps
+RUN make build-solidity-types
 
 WORKDIR /app/hoprnet/packages/hopli
 
