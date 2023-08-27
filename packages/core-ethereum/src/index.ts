@@ -566,7 +566,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     if (totalFund.gt(myBalance)) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
+    log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()} amount: ${myFund.to_string()} ${counterpartyFund.to_string()}`)
 
     const allowance = Balance.deserialize(
       (await this.db.get_staking_safe_allowance()).serialize_value(),
@@ -578,7 +578,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     return (
       await this.chain.fundChannel(
         dest,
-        counterpartyFund,
+        myFund,
         (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
         // we are only interested in fundChannel receipt
       )

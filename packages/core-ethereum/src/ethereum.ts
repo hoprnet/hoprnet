@@ -301,6 +301,8 @@ export async function createChainWrapper(
       nonce
     })
 
+    log('Sending transaction payload %o', essentialTxPayload)
+
     // breakdown steps in ethersjs
     // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
     // 1. omit this._checkProvider("sendTransaction");

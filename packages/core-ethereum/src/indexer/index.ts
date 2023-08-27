@@ -133,7 +133,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       },
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
-        onOwnChannelUpdated: this.onOwnChannelUpdated.bind(this),
+        ownChannelUpdated: this.onOwnChannelUpdated.bind(this),
         notAllowedToAccessNetwork: this.onNotAllowedToAccessNetwork.bind(this)
       }
     )
