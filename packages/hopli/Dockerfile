@@ -16,6 +16,8 @@ ENV OPENSSL_INCLUDE_DIR=/usr/include/openssl
 
 COPY ./Cargo.toml ./Cargo.toml
 COPY packages packages/
+COPY Makefile .
+RUN make deps
 
 WORKDIR /app/hoprnet/packages/hopli
 
