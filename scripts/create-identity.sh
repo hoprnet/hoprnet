@@ -23,6 +23,8 @@ fi
 network=${1:-rotsee}
 number=${2:-1}
 docker_tag=${3:-latest}
+hopr_amount=${4:-20}
+native_amount=${5:-0.1}
 random="${RANDOM}"
 
 for (( i=1; i<=${number}; i++ )) do
@@ -36,7 +38,7 @@ for (( i=1; i<=${number}; i++ )) do
     hopli identity --action read --identity-directory "${identity_directory}" | tee "${identity_directory}/hoprd.json"
 
     echo "Generate safes"
-    hopli create-safe-module --network "${network}" --contracts-root "${workspace_dir}/packages/ethereum/contracts" --identity-from-path "${identity_directory}/.hoprd.id" --hopr-amount 20 --native-amount 0.1 | tee "${identity_directory}/safe.log"
+    hopli create-safe-module --network "${network}" --contracts-root "${workspace_dir}/packages/ethereum/contracts" --identity-from-path "${identity_directory}/.hoprd.id" --hopr-amount "${hopr_amount}" --native-amount "${native_amount}" | tee "${identity_directory}/safe.log"
 
     declare -a safe_address
     safe_address=$(grep "Logs" -A 3 "${identity_directory}/safe.log" | grep safeAddress | cut -d ' ' -f 4)
