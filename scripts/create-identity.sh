@@ -13,6 +13,7 @@ workspace_dir="${script_dir}/.."
 
 : "${DEPLOYER_PRIVATE_KEY?"Missing environment variable DEPLOYER_PRIVATE_KEY"}"
 : "${IDENTITY_PASSWORD?"Missing environment variable IDENTITY_PASSWORD"}"
+: "${HOPRD_API_TOKEN?"Missing environment variable HOPRD_API_TOKEN"}"
 export PRIVATE_KEY=${DEPLOYER_PRIVATE_KEY}
 
 if ! command -v hopli; then
@@ -22,7 +23,6 @@ fi
 network=${1:-rotsee}
 number=${2:-1}
 docker_tag=${3:-latest}
-api_token=${4:-^FOUR2viasj292981FJFKSOAAmnba^}
 random="${RANDOM}"
 
 for (( i=1; i<=${number}; i++ )) do
@@ -48,7 +48,7 @@ for (( i=1; i<=${number}; i++ )) do
 HOPRD_NETWORK=${network}
 HOPRD_DOCKER_IMAGE=europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${docker_tag}
 HOPRD_PASSWORD=${IDENTITY_PASSWORD}
-HOPRD_API_TOKEN=${api_token}
+HOPRD_API_TOKEN=${HOPRD_API_TOKEN}
 HOPRD_SAFE_ADDRESS=${safe_address}
 HOPRD_MODULE_ADDRESS=${module_address}
 EOF
