@@ -141,6 +141,20 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "expressSetupSafeModule(address[],uint256,uint256)" [$(node_address)]  $(or $(hopramount),20000000000000000000000) $(or $(nativeamount),10000000000000000000)
 
+# E.g. make add-all-allowed-target network=anvil-localhost environment-type=local target_address=0xcb192a4ba9abea8579c59231b8a57e3f0591e02b safe_address=0x3A0A80BD107A4E029154286293296e62d235a4ce module_address=0xcE594ED193F314d66bC3Af9b53930CD9Ea87cc6E
+.PHONY: add-all-allowed-target
+add-all-allowed-target: ensure-environment-and-network-are-set ensure-privatekey-is-set
+add-all-allowed-target: ## create a new safe and a new node management module, include the provided node address
+ifeq ($(target_address),)
+	echo "parameter <target_address> missing" >&2 && exit 1
+ifeq ($(safe_address),)
+	echo "parameter <safe_address> missing" >&2 && exit 1
+ifeq ($(module_address),)
+	echo "parameter <module_address> missing" >&2 && exit 1
+endif
+	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
+		--broadcast --sig "addAllAllowedTargetToModuleBySafe(address,address,address)" $(target_address) $(safe_address) $(module_address)
+
 # E.g. make stake-funds network=anvil-localhost environment-type=local
 .PHONY: stake-funds
 stake-funds: ensure-environment-and-network-are-set ensure-privatekey-is-set
