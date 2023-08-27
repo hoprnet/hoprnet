@@ -1,5 +1,4 @@
-import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum'
-import { stringToU8a } from '@hoprnet/hopr-utils'
+import { Hash, stringToU8a } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 import { formatTicket } from '../../tickets/index.js'
@@ -13,7 +12,7 @@ const GET: Operation = [
     const { channelid } = req.params
 
     try {
-      const channelIdHash = Ethereum_Hash.deserialize(stringToU8a(channelid))
+      const channelIdHash = Hash.deserialize(stringToU8a(channelid))
       const tickets = await node.getTickets(channelIdHash)
       if (tickets.length <= 0) {
         return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })

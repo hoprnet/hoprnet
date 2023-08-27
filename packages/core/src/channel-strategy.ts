@@ -15,10 +15,13 @@ import {
   StrategyTickResult,
   Balance,
   BalanceType,
-  PeerQuality
-} from '../lib/core_hopr.js'
+  ChannelStatus,
+  AcknowledgedTicket,
+  ChannelEntry
+} from '@hoprnet/hopr-utils'
 
-import { ChannelStatus, AcknowledgedTicket, ChannelEntry } from '@hoprnet/hopr-utils'
+import { PeerQuality } from '../lib/core_hopr.js'
+
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']

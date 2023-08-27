@@ -9,8 +9,7 @@ import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 
-import { Ethereum_Hash } from '@hoprnet/hopr-core-ethereum'
-import { debug, stringToU8a, Address, OffchainPublicKey } from '@hoprnet/hopr-utils'
+import { Hash, debug, stringToU8a, Address, OffchainPublicKey } from '@hoprnet/hopr-utils'
 import {
   authenticateWsConnection,
   getStatusCodeForInvalidInputInRequest,
@@ -177,7 +176,7 @@ export async function setupRestApi(
       channelid: (input) => {
         try {
           // this call will throw if the input is no hash
-          Ethereum_Hash.deserialize(stringToU8a(input))
+          Hash.deserialize(stringToU8a(input))
         } catch (err) {
           return false
         }

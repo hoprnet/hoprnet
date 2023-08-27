@@ -1,4 +1,4 @@
-mod adaptors;
+pub mod adaptors;
 pub mod errors;
 mod helpers;
 mod p2p;

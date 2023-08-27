@@ -2,13 +2,10 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { LevelDb } from '@hoprnet/hopr-utils'
+import { LevelDb, Database } from '@hoprnet/hopr-utils'
 
 import { createAuthenticatedTestApiInstance, ALICE_ETHEREUM_ADDR } from './../../fixtures.js'
 import { STATUS_CODES } from './../../utils.js'
-
-import { hoprd_misc_initialize_crate, Database } from '../../../../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 

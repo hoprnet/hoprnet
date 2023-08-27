@@ -1,13 +1,11 @@
 import path from 'path'
 
-import { debug, LevelDb, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-utils'
+import { debug, Database, LevelDb, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-utils'
 
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Hopr, type HoprOptions } from './index.js'
 import { getContractData } from './network.js'
-import { Database, core_hopr_initialize_crate, Address as Core_Address } from '../lib/core_hopr.js'
-core_hopr_initialize_crate()
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -40,7 +38,7 @@ export async function createHoprNode(
     throw err
   }
 
-  let db = new Database(levelDb, Core_Address.deserialize(chainKeypair.public().to_address().serialize()))
+  let db = new Database(levelDb, chainKeypair.public().to_address())
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = options.safeModule.safeAddress
@@ -49,16 +47,10 @@ export async function createHoprNode(
   log(`options.safeModule.moduleAddress: ${moduleAddress}`)
   if (!safeAddress) {
     safeAddress = await db.get_staking_safe_address()
-    if (safeAddress) {
-      safeAddress = Core_Address.deserialize(safeAddress.serialize())
-    }
   }
 
   if (!moduleAddress) {
     moduleAddress = await db.get_staking_module_address()
-    if (moduleAddress) {
-      moduleAddress = Core_Address.deserialize(moduleAddress.serialize())
-    }
   }
 
   if (!safeAddress || !moduleAddress) {

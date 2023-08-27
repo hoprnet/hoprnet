@@ -12,13 +12,11 @@ import {
   pickVersion,
   defer,
   Address,
-  ChainKeypair,
-  OffchainKeypair,
-  debug
+  debug,
+  health_to_string
 } from '@hoprnet/hopr-utils'
 import {
   Health,
-  health_to_string,
   createHoprNode,
   default as Hopr,
   type HoprOptions,
@@ -40,18 +38,16 @@ hoprd_misc_initialize_crate()
 
 import {
   MessageInbox,
-  hoprd_inbox_initialize_crate,
+  HoprKeys,
+  IdentityOptions,
   ApplicationData,
   MessageInboxConfiguration
-} from '../lib/hoprd_inbox.js'
-hoprd_inbox_initialize_crate()
+} from '@hoprnet/hopr-utils'
 
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
 
-import { HoprKeys, IdentityOptions, hoprd_keypair_set_panic_hook } from '../lib/hoprd_keypair.js'
-hoprd_keypair_set_panic_hook()
 import { decodeMessage } from './api/utils.js'
 import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
@@ -328,12 +324,7 @@ async function main() {
 
     // 2. Create node instance
     log('Creating HOPR Node')
-    node = await createHoprNode(
-      new ChainKeypair(keypair.chain_key.secret()),
-      new OffchainKeypair(keypair.packet_key.secret()),
-      options,
-      false
-    )
+    node = await createHoprNode(keypair.chain_key, keypair.packet_key, options, false)
     log('Status: PENDING')
 
     // Subscribe to node events
