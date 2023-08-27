@@ -14,9 +14,10 @@ ENV SYSROOT=/dummy
 ENV OPENSSL_STATIC=1
 ENV OPENSSL_INCLUDE_DIR=/usr/include/openssl
 
-COPY ./Cargo.toml ./Cargo.toml
+COPY Makefile Cargo.toml Cargo.lock ./
+COPY vendor vendor/
 COPY packages packages/
-COPY Makefile .
+
 RUN make deps
 
 WORKDIR /app/hoprnet/packages/hopli
