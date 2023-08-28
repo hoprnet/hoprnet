@@ -126,8 +126,6 @@ pub fn child_process_call_foundry_migrate_safe_module(
     ethereum_address: &String,
     safe_address: &str,
     module_address: &str,
-    hopr_amount: &str,
-    native_amount: &str,
 ) -> Result<(), HelperErrors> {
     // add brackets to around the string
     let self_register_args = vec![
@@ -139,8 +137,6 @@ pub fn child_process_call_foundry_migrate_safe_module(
         &ethereum_address,
         &safe_address,
         &module_address,
-        &hopr_amount,
-        &native_amount,
     ];
 
     child_process_call_foundry(network, &self_register_args)

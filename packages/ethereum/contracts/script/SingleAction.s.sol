@@ -220,9 +220,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * - approve token transfer
      * - add announcement contract as target
      * As manager of network registry, add nodes and safe to network registry
-     * Perform the following actions, as deployer
-     * - transfer some tokens to safe
-     * - transfer some xDAI to nodes
      *
      * @notice Deployer is the single owner of safe
      * nonce is the current nonce of deployer account
@@ -235,15 +232,13 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      *
      * Add node safes to network registry, as a manager
      * @param nodeAddresses array of node addresses to be added to the module
-     * @param hoprTokenAmountInWei, The amount of HOPR tokens that recipient is desired to receive
-     * @param nativeTokenAmountInWei The amount of native tokens that recipient is desired to receive
+     * @param safe safe address of node
+     * @param module module address of node
      */
     function migrateSafeModule(
         address[] memory nodeAddresses,
         address safe,
-        address module,
-        uint256 hoprTokenAmountInWei,
-        uint256 nativeTokenAmountInWei
+        address module
     )
         external
     {
@@ -269,14 +264,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         _helperGetDeployerInternalKey();
         _registerNodes(stakingSafeAddresses, nodeAddresses);
         vm.stopBroadcast();
-
-        // 6. transfer some tokens to safe
-        transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
-
-        // 7. transfer some xDAI to nodes
-        for (uint256 n = 0; n < nodeAddresses.length; n++) {
-            transferOrMintHoprAndSendNativeToAmount(safe, 0, nativeTokenAmountInWei);
-        }
     }
 
     function includeNodesToModuleBySafe(address[] memory nodeAddresses, address safe, address module) public {
