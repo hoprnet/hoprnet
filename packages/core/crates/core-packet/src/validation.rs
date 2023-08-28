@@ -247,7 +247,8 @@ mod tests {
             EthereumChallenge::default(),
             &SENDER_PRIV_KEY,
             &Hash::default(),
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn create_channel_entry() -> ChannelEntry {
@@ -570,7 +571,10 @@ mod tests {
         let level_db = Arc::new(Mutex::new(
             rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
         ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PRIV_KEY.public().to_address());
+        let mut db = CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new(level_db)),
+            SENDER_PRIV_KEY.public().to_address(),
+        );
 
         let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
         let unack = UnacknowledgedTicket::new(
@@ -593,7 +597,9 @@ mod tests {
         match pending {
             PendingAcknowledgement::WaitingAsSender => panic!("must not be pending as sender"),
             PendingAcknowledgement::WaitingAsRelayer(ticket) => {
-                let ack = ticket.acknowledge(&HalfKey::default(), &TARGET_PRIV_KEY, &Hash::default()).unwrap();
+                let ack = ticket
+                    .acknowledge(&HalfKey::default(), &TARGET_PRIV_KEY, &Hash::default())
+                    .unwrap();
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();
 
                 let num_tickets = db.get_tickets(None).await.unwrap().len();
@@ -611,7 +617,10 @@ mod tests {
         let level_db = Arc::new(Mutex::new(
             rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
         ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PRIV_KEY.public().to_address());
+        let mut db = CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new(level_db)),
+            SENDER_PRIV_KEY.public().to_address(),
+        );
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
         let dummy_index = U256::one();

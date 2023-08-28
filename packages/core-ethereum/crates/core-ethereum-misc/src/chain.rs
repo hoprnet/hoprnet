@@ -16,7 +16,7 @@ use bindings::{
 };
 use core_crypto::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::{VrfParameters},
+    types::VrfParameters,
 };
 use core_types::{account::AccountSignature, acknowledgement::AcknowledgedTicket};
 use ethers::{

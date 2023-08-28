@@ -551,9 +551,7 @@ where
 
         self.db.write().await.mark_pending(&destination, &ticket).await?;
 
-        debug!(
-            "Creating ticket in channel {channel_id}.",
-        );
+        debug!("Creating ticket in channel {channel_id}.",);
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_TICKETS_COUNT.increment();
@@ -1111,7 +1109,7 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         random::random_bytes,
         shared_keys::SharedSecret,
-        types::{Hash, PublicKey, HalfKeyChallenge},
+        types::{HalfKeyChallenge, Hash, PublicKey},
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_mixer::mixer::{Mixer, MixerConfig};

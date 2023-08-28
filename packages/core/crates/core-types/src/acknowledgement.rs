@@ -301,13 +301,7 @@ impl UnacknowledgedTicket {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
         debug!("acknowledging ticket using response {}", response.to_hex());
 
-        AcknowledgedTicket::new(
-            self.ticket,
-            response,
-            self.signer,
-            chain_keypair,
-            domain_separator,
-        )
+        AcknowledgedTicket::new(self.ticket, response, self.signer, chain_keypair, domain_separator)
     }
 }
 
@@ -598,9 +592,9 @@ pub mod test {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::*;
     use core_crypto::types::Response;
     use utils_types::primitives::Address;
+    use wasm_bindgen::prelude::*;
 
     use crate::channels::wasm::Ticket;
 

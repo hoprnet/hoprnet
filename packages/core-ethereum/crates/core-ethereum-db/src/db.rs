@@ -1297,7 +1297,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_redeemed(&self, counterparty: &Address, acked_ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+        pub async fn mark_redeemed(
+            &self,
+            counterparty: &Address,
+            acked_ticket: &AcknowledgedTicket,
+        ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;

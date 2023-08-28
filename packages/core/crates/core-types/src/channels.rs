@@ -956,7 +956,7 @@ pub mod wasm {
         pub fn amount(&self) -> Balance {
             self.w.amount.clone()
         }
- 
+
         #[wasm_bindgen(getter)]
         pub fn index(&self) -> U256 {
             self.w.index.into()
