@@ -203,12 +203,11 @@ build-cargo: build-solidity-types
 # build-cargo: build-solidity-types ## build cargo packages and create boilerplate JS code
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
-# First compile Rust crates and create bindings
-# filter out proc-macro crates since they need no compilation
-	$(MAKE) -j 1 $(filter-out %proc-macros/,$(CRATES))
+# Compile whole Cargo workspace to WASM
+	cargo build -r --target wasm32-unknown-unknown
 # Copy bindings to their destination
-# filter out proc-macro crates since they need no compilation
-	$(MAKE) $(filter-out %proc-macros/,$(WORKSPACES_WITH_RUST_MODULES))
+	WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 wasm-pack build --target=bundler `pwd`/packages/core/crates/core-misc
+	WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 wasm-pack build --target=bundler `pwd`/packages/hoprd/crates/hoprd-hoprd
 ifeq ($(origin NO_HOPLI),undefined)
 # build hopli
 	$(MAKE) $(HOPLI_CRATE)
