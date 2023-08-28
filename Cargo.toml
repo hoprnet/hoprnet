@@ -37,8 +37,10 @@ futures-concurrency = "7.3.0"
 getrandom = "0.2.10"
 js-sys = "0.3.64"
 gloo-timers = { version = "0.3.0", features = ["futures"] }
-libp2p-identity = { version = "0.2.2", features = ["peerid", "ed25519"] }
-libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+libp2p-identity = { version = "0.2.3", features = ["peerid", "ed25519"] }
+libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
+libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
+libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
 multiaddr = "0.18.0"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
