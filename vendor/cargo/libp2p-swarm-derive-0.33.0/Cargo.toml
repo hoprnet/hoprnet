@@ -49,7 +49,7 @@ proc-macro2 = "1.0"
 quote = "1.0"
 
 [dependencies.syn]
-version = "2.0.28"
+version = "2.0.29"
 features = [
     "clone-impls",
     "derive",

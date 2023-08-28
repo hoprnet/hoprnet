@@ -65,7 +65,7 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.2"
+version = "0.2.3"
 
 [dependencies.libp2p-swarm]
 version = "0.43.3"
@@ -97,7 +97,7 @@ version = "0.40.0"
 path = "../../core"
 
 [dev-dependencies.libp2p-noise]
-version = "0.43.0"
+version = "0.43.1"
 path = "../../transports/noise"
 
 [dev-dependencies.libp2p-swarm-test]
