@@ -1120,7 +1120,7 @@ mod tests {
     };
     use futures::channel::mpsc::{Sender, UnboundedSender};
     use futures::future::{select, Either};
-    use futures::{pin_mut, StreamExt};
+    use futures::{pin_mut, stream, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
@@ -1551,12 +1551,16 @@ mod tests {
         );
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
+        let mut packet_awaiters = Vec::new();
+
         for _ in 0..PENDING_PACKETS {
-            components[0]
+            let awaiter = components[0]
                 .1
                 .writer()
                 .send_packet(test_msg.clone(), packet_path.clone())
                 .expect("Packet should be sent successfully");
+            let challenge = awaiter.rx.unwrap().await.expect("missing packet send challenge");
+            packet_awaiters.push(challenge);
         }
 
         let channel = emulate_channel_communication(PENDING_PACKETS, components, test_msg.clone());
@@ -1629,12 +1633,16 @@ mod tests {
         );
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
+        let mut packet_awaiters = Vec::new();
+
         for _ in 0..PENDING_PACKETS {
-            components[0]
+            let awaiter = components[0]
                 .1
                 .writer()
                 .send_packet(test_msg.clone(), packet_path.clone())
                 .expect("Packet should be sent successfully");
+            let challenge = awaiter.rx.unwrap().await.expect("missing packet send challenge");
+            packet_awaiters.push(challenge);
         }
 
         let channel = emulate_channel_communication(PENDING_PACKETS, components, test_msg.clone());
@@ -1657,6 +1665,7 @@ mod tests {
                     Either::Right((pkt, _)) => {
                         let msg = pkt.unwrap();
                         assert_eq!(test_msg, msg, "received packet payload must match");
+
                         pkts += 1;
                     }
                 }
