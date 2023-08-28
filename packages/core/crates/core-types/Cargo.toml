@@ -1,6 +1,6 @@
 [package]
 name = "core-types"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types required by the Core package, which are not generic enough to be in the utils-types crate"
 edition = "2021"

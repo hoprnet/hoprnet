@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-misc"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
