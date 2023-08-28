@@ -45,7 +45,7 @@ async function handleWebsocketMessage(node: Hopr, data: string) {
   switch (cmd) {
     case 'sendmsg':
       const body = encodeMessage(args['body'])
-      const recipient = peerIdFromString(args['peerAddress'])
+      const recipient = peerIdFromString(args['peerId'])
       const hops = args['hops']
 
       // only set path if given, otherwise a path will be chosen by hopr core

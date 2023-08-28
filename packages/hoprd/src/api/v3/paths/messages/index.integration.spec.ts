@@ -84,12 +84,12 @@ describe('POST /messages', function () {
   it('should work when parameters are correct', async function () {
     const tag = 112
     const body = 'hello world'
-    const peerAddress = ALICE_PEER_ID.toString()
+    const peerId = ALICE_PEER_ID.toString()
     const hops = 1
 
     expect(await inbox.size(tag)).to.equal(0)
 
-    const res = await request(service).post(`/api/v3/messages`).send({ tag, body, peerAddress, hops })
+    const res = await request(service).post(`/api/v3/messages`).send({ tag, body, peerId, hops })
     expect(res.status).to.equal(202)
     expect(await inbox.size(tag)).to.equal(0)
   })
@@ -97,24 +97,24 @@ describe('POST /messages', function () {
   it('should not work when parameters are incorrect', async function () {
     const tag = 112
     const body = 'hello world'
-    const peerAddress = ALICE_PEER_ID.toString()
+    const peerId = ALICE_PEER_ID.toString()
     const hops = 1
 
     expect(await inbox.size(tag)).to.equal(0)
 
-    const res1 = await request(service).post(`/api/v3/messages`).send({ tag, body, peerAddress, hops: 0 })
+    const res1 = await request(service).post(`/api/v3/messages`).send({ tag, body, peerId, hops: 0 })
     expect(res1.status).to.equal(400)
 
-    const res2 = await request(service).post(`/api/v3/messages`).send({ tag, body, peerAddress, hops: 4 })
+    const res2 = await request(service).post(`/api/v3/messages`).send({ tag, body, peerId, hops: 4 })
     expect(res2.status).to.equal(400)
 
-    const res3 = await request(service).post(`/api/v3/messages`).send({ tag: 70000, body, peerAddress, hops })
+    const res3 = await request(service).post(`/api/v3/messages`).send({ tag: 70000, body, peerId, hops })
     expect(res3.status).to.equal(400)
 
-    const res4 = await request(service).post(`/api/v3/messages`).send({ tag: -1, body, peerAddress, hops })
+    const res4 = await request(service).post(`/api/v3/messages`).send({ tag: -1, body, peerId, hops })
     expect(res4.status).to.equal(400)
 
-    const res5 = await request(service).post(`/api/v3/messages`).send({ tag, body, peerAddress: 'hello peer id', hops })
+    const res5 = await request(service).post(`/api/v3/messages`).send({ tag, body, peerId: 'hello peer id', hops })
     expect(res5.status).to.equal(400)
   })
 })

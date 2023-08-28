@@ -115,8 +115,12 @@ export async function createChainWrapper(
   const chainCalls = new ChainCalls(
     offchainKeypair,
     keypair,
-    Address.from_string(deploymentExtract.hoprChannelsAddress)
+    Address.from_string(deploymentExtract.hoprChannelsAddress),
+    Address.from_string(deploymentExtract.hoprAnnouncementsAddress)
   )
+
+  // Use safe variants of SC calls from the start.
+  chainCalls.set_use_safe(true)
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -297,6 +301,8 @@ export async function createChainWrapper(
       nonce
     })
 
+    log('Sending transaction payload %o', essentialTxPayload)
+
     // breakdown steps in ethersjs
     // https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L122
     // 1. omit this._checkProvider("sendTransaction");
@@ -419,16 +425,26 @@ export async function createChainWrapper(
   }
 
   /**
-   * FIXME: annouce is in a separate contract
    * Initiates a transaction that announces nodes on-chain.
-   * @param data prepared announcement data
+   * @param multiaddr Multiaddress to announce
+   * @param useSafe use Safe-variant for call if true
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
    */
-  const announce = async (multiaddr: Multiaddr, txHandler: (tx: string) => DeferType<string>): Promise<string> => {
+  const announce = async (
+    multiaddr: Multiaddr,
+    useSafe: boolean,
+    txHandler: (tx: string) => DeferType<string>
+  ): Promise<string> => {
+    let to = deploymentExtract.hoprAnnouncementsAddress
+    let data = u8aToHex(chainCalls.get_announce_payload(multiaddr.toString(), useSafe))
+    if (useSafe) {
+      to = safeModuleOptions.moduleAddress.to_hex()
+    }
+
     let confirmationEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(chainCalls.get_announce_payload(multiaddr.toString())),
-      to: deploymentExtract.hoprAnnouncementsAddress,
+      data,
+      to,
       value: BigNumber.from(0)
     }
     // @ts-ignore fixme: treat result
@@ -556,9 +572,10 @@ export async function createChainWrapper(
     let fundChannelError: unknown
     let fundChannelResult: SendTransactionReturn
 
+    let is_safe_set = chainCalls.get_use_safe()
     const fundChannelPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_fund_channel_payload(destination, amount)),
-      to: channels.address,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
 
@@ -593,9 +610,10 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
+    let is_safe_set = chainCalls.get_use_safe()
     const initiateOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_intiate_outgoing_channel_closure_payload(counterparty)),
-      to: channels.address,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
 
@@ -634,9 +652,10 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
+    let is_safe_set = chainCalls.get_use_safe()
     const finalizeOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_finalize_outgoing_channel_closure_payload(counterparty)),
-      to: channels.address,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
 
@@ -677,10 +696,11 @@ export async function createChainWrapper(
 
     let sendResult: SendTransactionReturn
     let error: unknown
+    let is_safe_set = chainCalls.get_use_safe()
 
     const redeemTicketEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(chainCalls.get_redeem_ticket_payload(ackTicket)),
-      to: channels.address,
+      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
 
@@ -707,6 +727,7 @@ export async function createChainWrapper(
 
   /**
    * Initiates a transaction that registers a safe address
+   * This function should not be called through safe/module
    * @param safeAddress address of safe
    * @param txHandler handler to call once the transaction has been published
    * @returns a Promise that resolves with the transaction hash
@@ -926,6 +947,31 @@ export async function createChainWrapper(
     return new Balance(rawAllowance.toString(), BalanceType.HOPR)
   }
 
+  /*
+   * Gets the target information of a registered target from the node management
+   * module.
+   * @param targetAddress address of the target
+   * @returns a Promise that resolves the target in BigNumber format
+   */
+  const getNodeManagementModuleTargetInfo = async (targetAddress: string): Promise<BigNumber> => {
+    const RETRIES = 3
+    let response
+    for (let i = 0; i < RETRIES; i++) {
+      try {
+        response = await nodeManagementModule.tryGetTarget(targetAddress)
+      } catch (err) {
+        if (i + 1 < RETRIES) {
+          await setImmediatePromise()
+          continue
+        }
+
+        log(`Could not get the target info using the provider.`)
+        throw Error(`Could not get the target info due to ${err}`)
+      }
+    }
+    return response[1]
+  }
+
   /**
    * Gets the registered safe address from node safe registry
    * @param nodeAddress node address
@@ -982,6 +1028,7 @@ export async function createChainWrapper(
     getTokenAllowanceGrantedToChannelsAt,
     getTransactionsInBlock,
     getTimestamp,
+    getNodeManagementModuleTargetInfo,
     getSafeFromNodeSafeRegistry,
     getModuleTargetAddress,
     announce,

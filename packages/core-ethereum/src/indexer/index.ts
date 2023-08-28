@@ -7,13 +7,13 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import {
   defer,
   ChannelStatus,
+  Balance,
+  BalanceType,
   Address,
   ChannelEntry,
   AccountEntry,
   Snapshot,
   debug,
-  Balance,
-  BalanceType,
   retryWithBackoffThenThrow,
   ordered,
   FIFO,
@@ -133,7 +133,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       },
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
-        onOwnChannelUpdated: this.onOwnChannelUpdated.bind(this),
+        ownChannelUpdated: this.onOwnChannelUpdated.bind(this),
         notAllowedToAccessNetwork: this.onNotAllowedToAccessNetwork.bind(this)
       }
     )
@@ -166,13 +166,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     // update the base valuse of balance and allowance of token for safe
     if (!this.lastSnapshot) {
       // update safe's HOPR token balance
-      log(`get safe ${this.safeAddress} HOPR balance at block ${fromBlock}`)
+      log(`get safe ${this.safeAddress.to_string()} HOPR balance at block ${fromBlock}`)
       const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
       await this.db.set_hopr_balance(Balance.deserialize(hoprBalance.serialize_value(), BalanceType.HOPR))
       log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
 
       // update safe's HORP token allowance granted to Channels contract
-      log(`get safe ${this.safeAddress} HOPR allowance at block ${fromBlock}`)
+      log(`get safe ${this.safeAddress.to_string()} HOPR allowance at block ${fromBlock}`)
       const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
       await this.db.set_staking_safe_allowance(
         Balance.deserialize(safeAllowance.serialize_value(), BalanceType.HOPR),
@@ -385,7 +385,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       //   toBlock - fromBlock
       // )
 
-      let res = await this.getEvents(fromBlock, toBlock)
+      let res = await this.getEvents(fromBlock, toBlock, true)
 
       if (res.success) {
         this.onNewEvents(res.events)
@@ -726,7 +726,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         // ideally we would have detected if this snapshot was indeed processed,
         // at the moment we don't keep all events stored as we intend to keep
         // this indexer very simple
-        if (lastSnapshotComparison == 0 || lastSnapshotComparison < 0) {
+        if (lastSnapshotComparison <= 0) {
+          log(`Skipping event, lastSnapshotComparison=${lastSnapshotComparison}`)
           continue
         }
       }
@@ -738,7 +739,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         new U256(event.logIndex.toString())
       )
 
-      log('Event and hash %s', event.transactionHash)
+      log('indexer on_event callback for transaction hash: ', event.transactionHash)
 
       try {
         await this.handlers.on_event(
@@ -750,7 +751,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           lastDatabaseSnapshot
         )
       } catch (err) {
-        error('Error while processing', err, event)
+        error('Error during indexer on_event callback: ', err, event)
       }
     }
   }
@@ -783,7 +784,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   //     }
   //     const outstandingBalance = Balance.deserialize(
   //       (
-  //         await this.db.get_pending_balance_to(Ethereum_Address.deserialize(partialTicket.counterparty.serialize()))
+  //         await this.db.get_pending_balance_to(Address.deserialize(partialTicket.counterparty.serialize()))
   //       ).serialize_value(),
   //       BalanceType.HOPR
   //     )
@@ -798,9 +799,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   //         ? Balance.zero(BalanceType.HOPR)
   //         : outstandingBalance
   //       await this.db.resolve_pending(
-  //         Ethereum_Address.deserialize(partialTicket.counterparty.serialize()),
-  //         Ethereum_Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
-  //         Ethereum_Snapshot.deserialize(lastSnapshot.serialize())
+  //         Address.deserialize(partialTicket.counterparty.serialize()),
+  //         Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
+  //         Snapshot.deserialize(lastSnapshot.serialize())
   //       )
   //       metric_ticketsRedeemed.increment()
   //     } catch (error) {

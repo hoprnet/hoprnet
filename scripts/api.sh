@@ -252,7 +252,7 @@ api_send_message(){
   local peers="${5}"
 
   local path=$(echo "${peers}" | tr -d '\n' | jq -R -s 'split(" ")')
-  local payload='{"body":"'${msg}'","path":'${path}',"peerAddress":"'${peer_address}'","tag":'${tag}'}'
+  local payload='{"body":"'${msg}'","path":'${path}',"peerId":"'${peer_address}'","tag":'${tag}'}'
   # Node might need some time once commitment is set on-chain
   api_call "${source_api}" "/messages" "POST" "${payload}" "202" 90 15 "" true
 }
@@ -273,9 +273,8 @@ api_close_channel() {
   local result channel_id channels_info source_addr
 
   # fetch channel id from API
-  source_addr="$(get_native_address "${source_api}")"
   channels_info="$(api_get_all_channels "${source_api}" false)"
-  channel_id="$(echo "${channel_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains("someadd")))[0].id")"
+  channel_id="$(echo "${channel_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains("${destination_address}")))[0].id")"
 
   log "Node ${source_id} close channel ${channel_id} to Node ${destination_id}"
 
