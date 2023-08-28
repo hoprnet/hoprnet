@@ -840,7 +840,6 @@ contract HoprChannels is
             )
         );
 
-
         return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
     }
 
