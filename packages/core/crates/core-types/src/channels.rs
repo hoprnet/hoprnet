@@ -968,11 +968,6 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(getter)]
-        pub fn channel_id(&self) -> Hash {
-            self.w.channel_id.clone()
-        }
-
-        #[wasm_bindgen(getter)]
         pub fn amount(&self) -> Balance {
             self.w.amount.clone()
         }
