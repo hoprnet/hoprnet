@@ -216,7 +216,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     /**
      * @dev Given existing node(s), safe and module, migrate them to a different network
      * Perform the following actions as the owner of safe:
-     * - scope new channel contract 
+     * - scope new channel contract
      * - approve token transfer
      * - add announcement contract as target
      * As manager of network registry, add nodes and safe to network registry
@@ -235,13 +235,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * @param safe safe address of node
      * @param module module address of node
      */
-    function migrateSafeModule(
-        address[] memory nodeAddresses,
-        address safe,
-        address module
-    )
-        external
-    {
+    function migrateSafeModule(address[] memory nodeAddresses, address safe, address module) external {
         // 1. get environment and msg.sender
         getNetworkAndMsgSender();
 
@@ -436,7 +430,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         }
         (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
         if (!included) {
-            bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
+            bytes memory scopeTargetData =
+                abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
             uint256 safeNonce = ISafe(payable(safe)).nonce();
 
             _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
