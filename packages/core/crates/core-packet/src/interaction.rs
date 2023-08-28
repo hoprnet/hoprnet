@@ -1595,7 +1595,10 @@ mod tests {
                 }
 
                 assert_eq!(ack_tkts.len(), PENDING_PACKETS, "did not receive all acknowledgement tickets");
+
                 assert_eq!(pkts.len(), PENDING_PACKETS, "did not receive all packets");
+                assert!(pkts.iter().all(|p| test_msg.eq(p)), "invalid packet message");
+
                 true
             }
             Either::Right(_) => false,
@@ -1672,7 +1675,10 @@ mod tests {
                 }
 
                 assert_eq!(ack_tkts.len(), PENDING_PACKETS, "did not receive all acknowledgement tickets");
+
                 assert_eq!(pkts.len(), PENDING_PACKETS, "did not receive all packets");
+                assert!(pkts.iter().all(|p| test_msg.eq(p)), "invalid packet message");
+
                 true
             }
             Either::Right(_) => false,
