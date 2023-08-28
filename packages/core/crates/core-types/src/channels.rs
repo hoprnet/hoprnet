@@ -952,6 +952,13 @@ pub mod wasm {
             })
         }
 
+        #[wasm_bindgen]
+        pub fn default() -> Ticket {
+            Self {
+                w: super::Ticket::default()
+            }
+        }
+
         #[wasm_bindgen(getter)]
         pub fn channel_id(&self) -> Hash {
             self.w.channel_id.clone()

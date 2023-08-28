@@ -62,16 +62,6 @@ export const CHARLIE_ACCOUNT_ENTRY: AccountEntry = new AccountEntry(
 
 export const INVALID_PEER_ID = 'definetly not a valid peerId'
 
-export const TICKET_MOCK = {
-  counterparty: { to_hex: () => '', to_string: () => '' },
-  challenge: { to_hex: () => '', to_string: () => '' },
-  epoch: { to_hex: () => '', to_string: () => '' },
-  index: { to_hex: () => '', to_string: () => '' },
-  amount: { to_hex: () => '', to_string: () => '' },
-  win_prob: { to_hex: () => '', to_string: () => '' },
-  channel_epoch: { to_hex: () => '', to_string: () => '' },
-  signature: { to_hex: () => '', to_string: () => '' }
-}
 
 export function channelEntryCreateMock(): ChannelEntry {
   const src = Address.from_string('0x4a34f4c1f1defceaa88f1dd22a8d9c2db70b21eb')
