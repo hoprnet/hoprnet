@@ -4,7 +4,6 @@ use futures::future::poll_fn;
 use core_crypto::types::HalfKeyChallenge;
 use core_types::acknowledgement::AcknowledgedTicket;
 use utils_log::error;
-use utils_types::traits::BinarySerializable;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -25,8 +24,7 @@ pub mod wasm {
 
                 wasm_bindgen_futures::spawn_local(async move {
                     while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                        let param: JsValue = js_sys::Uint8Array::from(ack.to_bytes().as_ref()).into();
-                        if let Err(e) = on_ack_fn.call1(&JsValue::null(), &param) {
+                        if let Err(e) = on_ack_fn.call1(&JsValue::null(), &ack.into()) {
                             error!("failed to call on_ack closure: {:?}", e.as_string());
                         }
                     }
@@ -48,8 +46,10 @@ pub mod wasm {
 
                 wasm_bindgen_futures::spawn_local(async move {
                     while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                        let param: JsValue = js_sys::Uint8Array::from(ack.to_bytes().as_ref()).into();
-                        if let Err(e) = on_ack_tkt_fn.call1(&JsValue::null(), &param) {
+                        if let Err(e) = on_ack_tkt_fn.call1(
+                            &JsValue::null(),
+                            &core_types::acknowledgement::wasm::AcknowledgedTicket::from(ack).into(),
+                        ) {
                             error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
                         }
                     }

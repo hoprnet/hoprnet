@@ -155,7 +155,7 @@ pub fn build_components(
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
     )));
 
-    let ack_actions = AcknowledgementInteraction::new(db.clone(), on_ack_tx, on_ack_tkt_tx);
+    let ack_actions = AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, on_ack_tkt_tx);
 
     let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 

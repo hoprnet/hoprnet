@@ -1,25 +1,31 @@
 use crate::errors::PacketError::{InvalidPacketState, PacketDecodingError};
-use core_crypto::derivation::{derive_ack_key_share, derive_packet_tag, PacketTag};
-use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-use core_crypto::primitives::{DigestLike, SimpleMac};
-use core_crypto::prp::{PRPParameters, PRP};
-use core_crypto::routing::{forward_header, header_length, ForwardedHeader, RoutingInfo};
-use core_crypto::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
-use core_crypto::types::OffchainPublicKey;
-use core_crypto::types::{Challenge, HalfKey, HalfKeyChallenge};
+use core_crypto::{
+    derivation::{derive_ack_key_share, derive_packet_tag, PacketTag},
+    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    primitives::{DigestLike, SimpleMac},
+    prp::{PRPParameters, PRP},
+    routing::{forward_header, header_length, ForwardedHeader, RoutingInfo},
+    shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
+    types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
+};
 use core_path::path::Path;
-use core_types::acknowledgement::Acknowledgement;
-use core_types::channels::Ticket;
+use core_types::{acknowledgement::Acknowledgement, channels::Ticket};
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use typenum::Unsigned;
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::traits::{BinarySerializable, PeerIdLike};
+use utils_types::{
+    errors::GeneralError::ParseError,
+    traits::{BinarySerializable, PeerIdLike},
+};
 
-use crate::errors::Result;
-use crate::packet::ForwardedMetaPacket::{FinalPacket, RelayedPacket};
-use crate::packet::PacketState::{Final, Forwarded, Outgoing};
-use crate::por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH};
+use crate::{
+    errors::Result,
+    packet::{
+        ForwardedMetaPacket::{FinalPacket, RelayedPacket},
+        PacketState::{Final, Forwarded, Outgoing},
+    },
+    por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
+};
 
 /// Currently used ciphersuite for Sphinx
 type CurrentSphinxSuite = core_crypto::ec_groups::X25519Suite;
@@ -299,7 +305,13 @@ impl Packet {
     /// * `path` complete path for the packet to take
     /// * `private_key` private key of the local node
     /// * `first_ticket` ticket for the first hop on the path
-    pub fn new(msg: &[u8], path: &Path, chain_keypair: &ChainKeypair, mut ticket: Ticket) -> Result<Self> {
+    pub fn new(
+        msg: &[u8],
+        path: &Path,
+        chain_keypair: &ChainKeypair,
+        mut ticket: Ticket,
+        domain_separator: &Hash,
+    ) -> Result<Self> {
         let public_keys_path: Vec<OffchainPublicKey> = path.try_into()?;
 
         let shared_keys = CurrentSphinxSuite::new_shared_keys(&public_keys_path)?;
@@ -308,7 +320,7 @@ impl Packet {
 
         // Update the ticket with the challenge
         ticket.challenge = por_values.ticket_challenge.to_ethereum_challenge();
-        ticket.sign(chain_keypair);
+        ticket.sign(chain_keypair, domain_separator);
 
         Ok(Self {
             packet: MetaPacket::new(
@@ -400,11 +412,16 @@ impl Packet {
     /// Forwards the packet to the next hop.
     /// Requires private key of the local node and prepared ticket for the next recipient.
     /// Panics if the packet is not meant to be forwarded.
-    pub fn forward(&mut self, chain_keypair: &ChainKeypair, mut next_ticket: Ticket) -> Result<()> {
+    pub fn forward(
+        &mut self,
+        chain_keypair: &ChainKeypair,
+        mut next_ticket: Ticket,
+        domain_separator: &Hash,
+    ) -> Result<()> {
         match &mut self.state {
             Forwarded { next_challenge, .. } => {
                 next_ticket.challenge = next_challenge.to_ethereum_challenge();
-                next_ticket.sign(chain_keypair);
+                next_ticket.sign(chain_keypair, domain_separator);
                 self.ticket = next_ticket;
                 Ok(())
             }
@@ -440,15 +457,19 @@ mod tests {
         PADDING_TAG,
     };
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use core_crypto::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
-    use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use core_crypto::shared_keys::SphinxSuite;
-    use core_crypto::types::PublicKey;
+    use core_crypto::{
+        ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite},
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+        shared_keys::SphinxSuite,
+        types::{Hash, PublicKey},
+    };
     use core_path::path::Path;
     use core_types::channels::Ticket;
     use parameterized::parameterized;
-    use utils_types::primitives::{Balance, BalanceType, U256};
-    use utils_types::traits::PeerIdLike;
+    use utils_types::{
+        primitives::{Balance, BalanceType, EthereumChallenge, U256},
+        traits::PeerIdLike,
+    };
 
     #[test]
     fn test_padding() {
@@ -525,23 +546,27 @@ mod tests {
 
     fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize, private_key: &ChainKeypair) -> Ticket {
         assert!(path_len > 0);
-        const PRICE_PER_PACKET: u128 = 10000000000000000u128;
-        const INVERSE_TICKET_WIN_PROB: u128 = 1;
+        let price_per_packet: U256 = 10000000000000000u128.into();
+        let ticket_win_prob = 1.0f64;
 
         if path_len > 1 {
             Ticket::new(
-                next_peer_channel_key.to_address(),
-                U256::zero(),
-                Balance::new(
-                    (PRICE_PER_PACKET * INVERSE_TICKET_WIN_PROB * (path_len - 1) as u128).into(),
+                &next_peer_channel_key.to_address(),
+                &Balance::new(
+                    price_per_packet.divide_f64(ticket_win_prob).unwrap() * U256::from(path_len as u64 - 1),
                     BalanceType::HOPR,
                 ),
-                U256::one(),
-                U256::zero(),
+                1u64.into(),
+                1u64.into(),
+                ticket_win_prob,
+                1u64.into(),
+                EthereumChallenge::default(),
                 private_key,
+                &Hash::default(),
             )
+            .unwrap()
         } else {
-            Ticket::new_zero_hop(next_peer_channel_key.clone().to_address(), private_key)
+            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default())
         }
     }
 
@@ -561,7 +586,8 @@ mod tests {
 
         let test_message = b"some testing message";
         let path = Path::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
-        let mut packet = Packet::new(test_message, &path, &own_channel_kp, ticket).expect("failed to construct packet");
+        let mut packet = Packet::new(test_message, &path, &own_channel_kp, ticket, &Hash::default())
+            .expect("failed to construct packet");
 
         match &packet.state() {
             PacketState::Outgoing { .. } => {}
@@ -587,7 +613,7 @@ mod tests {
                         keypairs.len() - i - 1,
                         &channel_pairs[i],
                     );
-                    packet.forward(&channel_pairs[i], ticket).unwrap();
+                    packet.forward(&channel_pairs[i], ticket, &Hash::default()).unwrap();
                 }
                 PacketState::Outgoing { .. } => panic!("invalid packet state"),
             }

@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-misc"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -33,7 +33,6 @@ utils-misc = { path = "../../../utils/crates/utils-misc", default-features = fal
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
-
 [dev-dependencies]
 env_logger = "0.10"
 mockall = "0.11.4"
@@ -44,6 +43,7 @@ tokio = "1"
 rusty-leveldb = "1.0"
 svm-rs = "0.2.23"
 semver = "1.0"
+hex = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
