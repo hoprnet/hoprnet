@@ -201,7 +201,7 @@ where
                     return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
                 }
             }
-            _ => todo!("Implement all the other filters for HoprAnnouncementsEvents"),
+            _ => debug!("Implement all the other filters for HoprAnnouncementsEvents"),
         };
         Ok(())
     }
@@ -354,7 +354,7 @@ where
                 )
                 .await?;
             }
-            _ => todo!("Implement all the other filters for HoprChannelsEvents"),
+            _ => debug!("Implement all the other filters for HoprChannelsEvents"),
         }
         Ok(())
     }
@@ -408,7 +408,7 @@ where
                     return Ok(());
                 }
             }
-            _ => todo!("Implement all the other filters for HoprTokenEvents"),
+            _ => debug!("Implement all the other filters for HoprTokenEvents"),
         }
 
         Ok(())
@@ -501,7 +501,7 @@ where
                 )
                 .await?;
             }
-            _ => todo!("Implement all the other filters for HoprNodeSafeRegistryEvents"),
+            _ => debug!("Implement all the other filters for HoprNodeSafeRegistryEvents"),
         }
         Ok(())
     }
