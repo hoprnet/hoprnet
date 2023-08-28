@@ -258,12 +258,12 @@ pub mod wasm_impl {
     impl HoprTools {
         #[wasm_bindgen]
         pub async fn send_message(
-            &mut self,
+            &self,
             msg: &ApplicationData,
             path: &Path,
             timeout_in_millis: u64,
         ) -> Result<HalfKeyChallenge, JsValue> {
-            match self.pkt_sender.send_packet(msg.clone(), path.clone()) {
+            match self.pkt_sender.clone().send_packet(msg.clone(), path.clone()) {
                 Ok(mut awaiter) => {
                     utils_log::debug!("Awaiting the HalfKeyChallenge");
                     awaiter
