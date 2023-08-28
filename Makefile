@@ -477,7 +477,6 @@ ifeq ($(nftrank),)
 endif
 	make -C packages/ethereum/contracts stake-nrnft network=$(network) environment-type=$(environment_type) nftrank=$(nftrank)
 
-
 enable-network-registry: ensure-environment-and-network-are-set
 enable-network-registry: ## owner enables network registry (smart contract) globally
 	make -C packages/ethereum/contracts enable-network-registry network=$(network) environment-type=$(environment_type)
@@ -488,12 +487,12 @@ disable-network-registry: ## owner disables network registry (smart contract) gl
 
 sync-eligibility: ensure-environment-and-network-are-set
 sync-eligibility: ## owner sync eligibility of peers
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
+ifeq ($(staking_addresses),)
+	echo "parameter <staking_addresses> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts sync-eligibility \
 		network=$(network) environment-type=$(environment_type) \
-		peer_ids="$(peer_ids)"
+		staking_addresses="$(staking_addresses)"
 
 register-nodes: ensure-environment-and-network-are-set
 register-nodes: ## manager register nodes and safes in network registry contract
@@ -515,26 +514,6 @@ endif
 	make -C packages/ethereum/contracts deregister-nodes \
 		network=$(network) environment-type=$(environment_type) \
 		node_addresses="$(node_addresses)"
-
-.PHONY: self-register-node
-self-register-node: ensure-environment-and-network-are-set
-self-register-node: ## staker register a node in network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
-endif
-	make -C packages/ethereum/contracts self-register-node \
-		network=$(network) environment-type=$(environment_type) \
-		peer_ids="$(peer_ids)"
-
-.PHONY: self-deregister-node
-self-deregister-node: ensure-environment-and-network-are-set
-self-deregister-node: ## staker deregister a node in network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
-endif
-	make -C packages/ethereum/contracts self-deregister-node \
-		network=$(network) environment-type=$(environment_type) \
-		peer_ids="$(peer_ids)"
 
 .PHONY: register-node-with-nft
 # node_api?=localhost:3001 provide endpoint of hoprd, with a default value 'localhost:3001'

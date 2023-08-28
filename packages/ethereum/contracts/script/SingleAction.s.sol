@@ -276,37 +276,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         );
     }
 
-    // /**
-    //  * @dev On network registry contract, register peers associated with the calling wallet.
-    //  */
-    // function selfRegisterNodes(string[] calldata peerIds) external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
-
-    //   // 2. call hoprNetworkRegistry.selfRegister(peerIds);
-    //   _selfRegisterNodes(currentNetworkDetail.networkRegistryContractAddress, peerIds);
-
-    //   vm.stopBroadcast();
-    // }
-
-    // /**
-    //  * @dev On network registry contract, deregister peers associated with the calling wallet.
-    //  */
-    // function selfDeregisterNodes(string[] calldata peerIds) external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
-
-    //   // 2. call hoprNetworkRegistry.selfDeregister(peerIds);
-    //   (bool successSelfDeregister, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('selfDeregister(string[])', peerIds)
-    //   );
-    //   if (!successSelfDeregister) {
-    //     emit log_string('Cannot deregister peers');
-    //     revert('Cannot deregister peers');
-    //   }
-    //   vm.stopBroadcast();
-    // }
-
     /**
      * @dev On network registry contract, register nodes and safes
      * This function should only be called by a manager
@@ -461,24 +430,24 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
       }
     }
 
-    // /**
-    //  * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be
-    // called by the owner
-    //  */
-    // function syncEligibility(string[] calldata peerIds) external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+    /**
+     * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be
+    called by a manager
+     */
+    function syncEligibility(address[] calldata stakingAccounts) external {
+      // 1. get network and msg.sender
+      getNetworkAndMsgSender();
 
-    //   // 2. sync peers eligibility according to the latest requirement of its current state
-    //   (bool successSyncEligibility, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('sync(string[])', peerIds)
-    //   );
-    //   if (!successSyncEligibility) {
-    //     emit log_string('Cannot sync eligibility as an owner');
-    //     revert('Cannot sync eligibility as an owner');
-    //   }
-    //   vm.stopBroadcast();
-    // }
+      // 2. sync peers eligibility according to the latest requirement of its current state
+      (bool successSyncEligibility, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+        abi.encodeWithSignature('managerSync(address[])', stakingAccounts)
+      );
+      if (!successSyncEligibility) {
+        emit log_string('Cannot sync eligibility as a manager');
+        revert('Cannot sync eligibility as a manager');
+      }
+      vm.stopBroadcast();
+    }
 
     // /**
     //  * @dev On stake contract, stake xHopr to the target value

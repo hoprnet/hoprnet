@@ -158,26 +158,6 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "stakeNetworkRegistryNft(string)" $(nftrank)
 
-# E.g. make self-register-node network=anvil-localhost environment-type=local peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
-.PHONY: self-register-node
-self-register-node: ensure-environment-and-network-are-set ensure-privatekey-is-set
-self-register-node: ## staker register a node in network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
-endif
-	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "selfRegisterNodes(string[])" [$(peer_ids)]
-
-# E.g. make self-deregister-node network=anvil-localhost environment-type=local peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
-.PHONY: self-deregister-node
-self-deregister-node: ensure-environment-and-network-are-set ensure-privatekey-is-set
-self-deregister-node: ## staker deregister a node in network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
-endif
-	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "selfDeregisterNodes(string[])" $(peer_ids)
-
 # E.g. make register-nodes network=anvil-localhost environment-type=local staking_addresses="[0x3A0A80BD107A4E029154286293296e62d235a4ce,0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C]" node_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0x70997970c51812dc3a010c7d01b50e0d17dc79c8]"
 .PHONY: register-nodes
 register-nodes: ensure-environment-and-network-are-set ensure-privatekey-is-set
@@ -217,15 +197,15 @@ disable-network-registry: ## owner disables network registry (smart contract) gl
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "disableNetworkRegistry()"
 
-# E.g. make sync-eligibility network=anvil-localhost environment-type=local peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
+# E.g. make sync-eligibility network=anvil-localhost environment-type=local staking_addresses="[0x3A0A80BD107A4E029154286293296e62d235a4ce,0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C]"
 .PHONY: sync-eligibility
 sync-eligibility: ensure-environment-and-network-are-set ensure-privatekey-is-set
 sync-eligibility: ## owner sync eligibility of peers
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
+ifeq ($(staking_addresses),)
+	echo "parameter <staking_addresses> missing" >&2 && exit 1
 endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "syncEligibility(string[])" $(peer_ids)
+		--broadcast --sig "syncEligibility(address[])" $(staking_addresses)
 
 # These targets needs to be splitted in macOs systems
 ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set ensure-etherscan-api-key-is-set
