@@ -332,7 +332,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
     /**
      * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be
-    called by a manager
+     * called by a manager
      */
     function deregisterNodes(address[] calldata nodeAddresses) external {
         // 1. get network and msg.sender
@@ -368,7 +368,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         // reset
         accounts = new address[](0);
         nodes = new address[](0);
-    
+
         vm.stopBroadcast();
     }
 
@@ -376,77 +376,79 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * @dev On network registry contract, disable it. This function should only be called by the owner
      */
     function disableNetworkRegistry() external {
-      // 1. get network and msg.sender
-      getNetworkAndMsgSender();
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-      // 2. check if current NR is enabled.
-      (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
-        .addresses
-        .networkRegistryContractAddress
-        .staticcall(abi.encodeWithSignature('enabled()'));
-      if (!successReadEnabled) {
-        revert('Cannot read enabled from network registry contract.');
-      }
-      bool isEnabled = abi.decode(returndataReadEnabled, (bool));
-
-      // 3. disable if needed
-      if (isEnabled) {
-        (bool successDisableNetworkRegistry, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-          abi.encodeWithSignature('disableRegistry()')
-        );
-        if (!successDisableNetworkRegistry) {
-          emit log_string('Cannot disable network registery as a manager');
-          revert('Cannotdisable network registery as a manager');
+        // 2. check if current NR is enabled.
+        (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
+            .addresses
+            .networkRegistryContractAddress
+            .staticcall(abi.encodeWithSignature("enabled()"));
+        if (!successReadEnabled) {
+            revert("Cannot read enabled from network registry contract.");
         }
-        vm.stopBroadcast();
-      }
+        bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+
+        // 3. disable if needed
+        if (isEnabled) {
+            (bool successDisableNetworkRegistry,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+                abi.encodeWithSignature("disableRegistry()")
+            );
+            if (!successDisableNetworkRegistry) {
+                emit log_string("Cannot disable network registery as a manager");
+                revert("Cannotdisable network registery as a manager");
+            }
+            vm.stopBroadcast();
+        }
     }
 
     /**
      * @dev On network registry contract, enable it. This function should only be called by a manager
      */
     function enableNetworkRegistry() external {
-      // 1. get network and msg.sender
-      getNetworkAndMsgSender();
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-      // 2. check if current NR is enabled.
-      (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail.addresses.networkRegistryContractAddress
-        .staticcall(abi.encodeWithSignature('enabled()'));
-      if (!successReadEnabled) {
-        revert('Cannot read enabled from network registry contract.');
-      }
-      bool isEnabled = abi.decode(returndataReadEnabled, (bool));
-
-      // 3. enable if needed
-      if (!isEnabled) {
-        (bool successEnableNetworkRegistry, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-          abi.encodeWithSignature('enableRegistry()')
-        );
-        if (!successEnableNetworkRegistry) {
-          emit log_string('Cannot enable network registery as a manager');
-          revert('Cannot enable network registery as a manager');
+        // 2. check if current NR is enabled.
+        (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
+            .addresses
+            .networkRegistryContractAddress
+            .staticcall(abi.encodeWithSignature("enabled()"));
+        if (!successReadEnabled) {
+            revert("Cannot read enabled from network registry contract.");
         }
-        vm.stopBroadcast();
-      }
+        bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+
+        // 3. enable if needed
+        if (!isEnabled) {
+            (bool successEnableNetworkRegistry,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+                abi.encodeWithSignature("enableRegistry()")
+            );
+            if (!successEnableNetworkRegistry) {
+                emit log_string("Cannot enable network registery as a manager");
+                revert("Cannot enable network registery as a manager");
+            }
+            vm.stopBroadcast();
+        }
     }
 
     /**
      * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be
-    called by a manager
+     * called by a manager
      */
     function syncEligibility(address[] calldata stakingAccounts) external {
-      // 1. get network and msg.sender
-      getNetworkAndMsgSender();
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-      // 2. sync peers eligibility according to the latest requirement of its current state
-      (bool successSyncEligibility, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-        abi.encodeWithSignature('managerSync(address[])', stakingAccounts)
-      );
-      if (!successSyncEligibility) {
-        emit log_string('Cannot sync eligibility as a manager');
-        revert('Cannot sync eligibility as a manager');
-      }
-      vm.stopBroadcast();
+        // 2. sync peers eligibility according to the latest requirement of its current state
+        (bool successSyncEligibility,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+            abi.encodeWithSignature("managerSync(address[])", stakingAccounts)
+        );
+        if (!successSyncEligibility) {
+            emit log_string("Cannot sync eligibility as a manager");
+            revert("Cannot sync eligibility as a manager");
+        }
+        vm.stopBroadcast();
     }
 
     // /**

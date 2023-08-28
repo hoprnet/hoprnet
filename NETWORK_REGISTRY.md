@@ -20,7 +20,9 @@ Relevant smart contracts are listed below, per environment **(to be updated)**:
 | HoprNetworkRegistryProxy | [0x3ee6e1eaE59C44EC30bc5e8FEeE587f95C9F2626](https://goerli.etherscan.io/address/0x3ee6e1eaE59C44EC30bc5e8FEeE587f95C9F2626) |                                                                                                                                      |
 
 ## Register a node by the runner
+
 To be updated
+
 <!-- ### Eligibility
 
 A node can be registered by its runner if the runner is eligible. There are two ways to become an eligible account:
@@ -54,7 +56,7 @@ PRIVATE_KEY<private key of "account"> make stake-nrnft network=rotsee environmen
 
 ### Register a node
 
-An eligible node runner can call `selfRegister(address[] nodeAddresses)` method on `HoprNetworkRegistry` smart contract to register one or multiple HOPR node(s). 
+An eligible node runner can call `selfRegister(address[] nodeAddresses)` method on `HoprNetworkRegistry` smart contract to register one or multiple HOPR node(s).
 This function should be called from the Safe holding HOPR token assets.
 
 ## Deregister a node
