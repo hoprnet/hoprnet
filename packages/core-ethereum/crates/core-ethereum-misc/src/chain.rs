@@ -1,5 +1,5 @@
 use crate::errors::{
-    CoreEthereumError::{InvalidArguments, InvalidResponseToAcknowledgement, InvalidState, NotAWinningTicket},
+    CoreEthereumError::{InvalidArguments, InvalidResponseToAcknowledgement, InvalidState},
     Result,
 };
 use bindings::{
@@ -17,13 +17,13 @@ use bindings::{
 use core_crypto::{
     derivation::derive_vrf_parameters,
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::{Hash, VrfParameters},
+    types::Hash,
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{account::AccountSignature, acknowledgement::AcknowledgedTicket, channels::generate_channel_id};
 use ethers::{
     abi::AbiEncode,
-    types::{Address as EthereumAddress, Bytes, H160, H256, U256},
+    types::{Address as EthereumAddress, H160, H256, U256},
 };
 use multiaddr::Multiaddr;
 use std::str::FromStr;
@@ -336,7 +336,7 @@ impl ChainCalls {
 }
 
 pub async fn prepare_redeem_ticket<T>(
-    db: &T,
+    _db: &T,
     counterparty: &Address,
     _channel_id: &Hash,
     acked_ticket: &mut AcknowledgedTicket,
@@ -535,7 +535,6 @@ pub mod wasm {
     };
     use core_ethereum_db::db::wasm::Database;
     use core_types::acknowledgement::AcknowledgedTicket;
-    use futures::future::ok;
     use js_sys::{Function, JsString};
     use multiaddr::Multiaddr;
     use std::str::FromStr;

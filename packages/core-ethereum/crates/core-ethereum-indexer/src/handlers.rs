@@ -19,7 +19,7 @@ use core_crypto::types::{Hash, OffchainSignature};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     account::{AccountEntry, AccountSignature, AccountType},
-    channels::{self, generate_channel_id, ChannelEntry, ChannelStatus},
+    channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{
     contract::{EthEvent, EthLogDecode},
@@ -30,6 +30,7 @@ use ethnum::u256;
 use multiaddr::Multiaddr;
 use serde::Deserialize;
 use std::str::FromStr;
+use utils_log::{debug, error};
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 /// Holds addresses of deployed HOPR contracts
@@ -145,7 +146,7 @@ where
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
                 let maybe_account = db.get_account(&address_announcement.node.try_into()?).await?;
 
-                utils_log::debug!(
+                debug!(
                     "on_announcement_event - multiaddr: {:?} - node: {:?}",
                     &address_announcement.base_multiaddr,
                     &address_announcement.node.to_string()
@@ -201,7 +202,6 @@ where
                     return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
                 }
             }
-            _ => debug!("Implement all the other filters for HoprAnnouncementsEvents"),
         };
         Ok(())
     }
@@ -275,7 +275,7 @@ where
                 let channel_id = generate_channel_id(&source, &destination);
 
                 let maybe_channel = db.get_channel(&channel_id).await?;
-                utils_log::debug!(
+                debug!(
                     "on_open_channel_event - source: {:?} - destination: {:?} - channel_id: {:?}, channel known: {:?}",
                     source.to_string(),
                     destination.to_string(),
@@ -354,7 +354,6 @@ where
                 )
                 .await?;
             }
-            _ => debug!("Implement all the other filters for HoprChannelsEvents"),
         }
         Ok(())
     }
@@ -370,7 +369,7 @@ where
 
                 let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
 
-                utils_log::debug!(
+                debug!(
                     "on_token_transfer_event - address_to_monitor: {:?} - to: {:?} - from: {:?}",
                     &self.address_to_monitor.to_string(),
                     to.to_string(),
@@ -393,7 +392,7 @@ where
 
                 let allowance: U256 = u256::from_be_bytes(approved.value.into()).into();
 
-                utils_log::debug!(
+                debug!(
                     "on_token_approval_event - address_to_monitor: {:?} - owner: {:?} - spender: {:?}, allowance: {:?}",
                     &self.address_to_monitor.to_string(),
                     owner.to_string(),
@@ -501,7 +500,6 @@ where
                 )
                 .await?;
             }
-            _ => debug!("Implement all the other filters for HoprNodeSafeRegistryEvents"),
         }
         Ok(())
     }
@@ -529,7 +527,7 @@ where
     where
         T: HoprCoreEthereumDbActions,
     {
-        utils_log::debug!(
+        debug!(
             "on_event - address: {:?} - received log: {:?}",
             address.to_string(),
             log
@@ -548,7 +546,7 @@ where
         } else if address.eq(&self.addresses.node_management_module) {
             return self.on_node_management_module_event(db, log, snapshot).await;
         } else {
-            utils_log::error!(
+            error!(
                 "on_event error - unknown contract address: {:?} - received log: {:?}",
                 address.to_string(),
                 log
@@ -1488,6 +1486,7 @@ pub mod wasm {
     use js_sys::{Array, JsString};
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
+    use utils_log::error;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::primitives::{Address, Snapshot};
     use wasm_bindgen::{prelude::*, JsValue};
@@ -1654,7 +1653,7 @@ pub mod wasm {
                 )
                 .await
                 .map_err(|e| {
-                    utils_log::error!("on_event error - {:?}", e.to_string());
+                    error!("on_event error - {:?}", e.to_string());
                     JsValue::from(e.to_string())
                 })
         }
