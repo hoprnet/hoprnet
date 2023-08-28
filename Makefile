@@ -521,12 +521,12 @@ endif
 
 deregister-nodes: ensure-environment-and-network-are-set
 deregister-nodes: ## owner de-register given nodes in network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
+ifeq ($(node_addresses),)
+	echo "parameter <node_addresses> missing" >&2 && exit 1
 endif
 	make -C packages/ethereum/contracts deregister-nodes \
 		network=$(network) environment-type=$(environment_type) \
-		staking_addresses="$(native_addresses)" peer_ids="$(peer_ids)"
+		node_addresses="$(node_addresses)"
 
 .PHONY: self-register-node
 self-register-node: ensure-environment-and-network-are-set

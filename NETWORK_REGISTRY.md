@@ -92,7 +92,7 @@ make force-eligibility-update network=rotsee environment_type=staging native_add
 Owner can call `ownerDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to remove a list of nodes.
 
 ```
-make deregister-nodes network=rotsee environment_type=staging peer_ids=<peerId1,peerId2,peerId3,peerId4>
+make deregister-nodes network=rotsee environment_type=staging node_addresses=<nodeAddress1,nodeAddress2>
 ```
 
 ## Enable and disable globally

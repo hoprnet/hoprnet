@@ -361,93 +361,105 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         nodes = new address[](0);
     }
 
-    // /**
-    //  * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be
-    // called by the owner
-    //  */
-    // function deregisterNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+    /**
+     * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be
+    called by a manager
+     */
+    function deregisterNodes(address[] calldata nodeAddresses) external {
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-    //   // 2. owner registers nodes, depending on the environment
-    //   if (currentEnvironmentType == EnvironmentType.LOCAL) {
-    //     // call deregister accounts on HoprDummyProxyForNetworkRegistry
-    //     (bool successDeregisterNodesOnDummyProxy, ) = currentNetworkDetail.networkRegistryProxyContractAddress.call(
-    //       abi.encodeWithSignature('ownerBatchRemoveAccounts(address[])', stakingAddresses)
-    //     );
-    //     if (!successDeregisterNodesOnDummyProxy) {
-    //       emit log_string('Cannot remove stakingAddresses from the dummy proxy.');
-    //       revert('Cannot remove stakingAddresses from the dummy proxy.');
-    //     }
-    //   }
-    //   // actual deregister nodes
-    //   (bool successDeregisterNodes, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('ownerDeregister(string[])', peerIds)
-    //   );
-    //   if (!successDeregisterNodes) {
-    //     emit log_string('Cannot rdeegister nodes as an owner');
-    //     revert('Cannot deregister nodes as an owner');
-    //   }
-    //   vm.stopBroadcast();
-    // }
+        // 2. check if nodes have been registered, if not, skip
+        for (uint256 i = 0; i < nodeAddresses.length; i++) {
+            (bool successReadRegisteredNodeAddress, bytes memory returndataRegisteredNodeAddress) = currentNetworkDetail
+                .addresses
+                .networkRegistryContractAddress
+                .staticcall(abi.encodeWithSignature("nodeRegisterdToAccount(address)", nodeAddresses[i]));
+            if (!successReadRegisteredNodeAddress) {
+                revert("Cannot read successReadRegisteredNodeAddress from network registry contract.");
+            }
+            address registeredAccount = abi.decode(returndataRegisteredNodeAddress, (address));
 
-    // /**
-    //  * @dev On network registry contract, disable it. This function should only be called by the owner
-    //  */
-    // function disableNetworkRegistry() external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+            if (registeredAccount != address(0)) {
+                nodes.push(nodeAddresses[i]);
+            }
+        }
 
-    //   // 2. check if current NR is enabled.
-    //   (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
-    //     .networkRegistryContractAddress
-    //     .staticcall(abi.encodeWithSignature('enabled()'));
-    //   if (!successReadEnabled) {
-    //     revert('Cannot read enabled from network registry contract.');
-    //   }
-    //   bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+        // 2. deregister nodes
+        if (nodes.length > 0) {
+            (bool successDeregisterNodes,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+                abi.encodeWithSignature("managerDeregister(address[])", nodes)
+            );
+            if (!successDeregisterNodes) {
+                emit log_string("Cannot deregister nodes as a manager");
+                revert("Cannot deregister nodes as a manager");
+            }
+        }
 
-    //   // 3. disable if needed
-    //   if (isEnabled) {
-    //     (bool successDisableNetworkRegistry, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //       abi.encodeWithSignature('disableRegistry()')
-    //     );
-    //     if (!successDisableNetworkRegistry) {
-    //       emit log_string('Cannot disable network registery as an owner');
-    //       revert('Cannotdisable network registery as an owner');
-    //     }
-    //     vm.stopBroadcast();
-    //   }
-    // }
+        // reset
+        accounts = new address[](0);
+        nodes = new address[](0);
+    
+        vm.stopBroadcast();
+    }
 
-    // /**
-    //  * @dev On network registry contract, enable it. This function should only be called by the owner
-    //  */
-    // function enableNetworkRegistry() external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+    /**
+     * @dev On network registry contract, disable it. This function should only be called by the owner
+     */
+    function disableNetworkRegistry() external {
+      // 1. get network and msg.sender
+      getNetworkAndMsgSender();
 
-    //   // 2. check if current NR is enabled.
-    //   (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
-    //     .networkRegistryContractAddress
-    //     .staticcall(abi.encodeWithSignature('enabled()'));
-    //   if (!successReadEnabled) {
-    //     revert('Cannot read enabled from network registry contract.');
-    //   }
-    //   bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+      // 2. check if current NR is enabled.
+      (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
+        .addresses
+        .networkRegistryContractAddress
+        .staticcall(abi.encodeWithSignature('enabled()'));
+      if (!successReadEnabled) {
+        revert('Cannot read enabled from network registry contract.');
+      }
+      bool isEnabled = abi.decode(returndataReadEnabled, (bool));
 
-    //   // 3. enable if needed
-    //   if (!isEnabled) {
-    //     (bool successEnableNetworkRegistry, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //       abi.encodeWithSignature('enableRegistry()')
-    //     );
-    //     if (!successEnableNetworkRegistry) {
-    //       emit log_string('Cannot enable network registery as an owner');
-    //       revert('Cannot enable network registery as an owner');
-    //     }
-    //     vm.stopBroadcast();
-    //   }
-    // }
+      // 3. disable if needed
+      if (isEnabled) {
+        (bool successDisableNetworkRegistry, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+          abi.encodeWithSignature('disableRegistry()')
+        );
+        if (!successDisableNetworkRegistry) {
+          emit log_string('Cannot disable network registery as a manager');
+          revert('Cannotdisable network registery as a manager');
+        }
+        vm.stopBroadcast();
+      }
+    }
+
+    /**
+     * @dev On network registry contract, enable it. This function should only be called by a manager
+     */
+    function enableNetworkRegistry() external {
+      // 1. get network and msg.sender
+      getNetworkAndMsgSender();
+
+      // 2. check if current NR is enabled.
+      (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail.addresses.networkRegistryContractAddress
+        .staticcall(abi.encodeWithSignature('enabled()'));
+      if (!successReadEnabled) {
+        revert('Cannot read enabled from network registry contract.');
+      }
+      bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+
+      // 3. enable if needed
+      if (!isEnabled) {
+        (bool successEnableNetworkRegistry, ) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+          abi.encodeWithSignature('enableRegistry()')
+        );
+        if (!successEnableNetworkRegistry) {
+          emit log_string('Cannot enable network registery as a manager');
+          revert('Cannot enable network registery as a manager');
+        }
+        vm.stopBroadcast();
+      }
+    }
 
     // /**
     //  * @dev On network registry contract, update eligibility of some staking addresses to the desired . This function
