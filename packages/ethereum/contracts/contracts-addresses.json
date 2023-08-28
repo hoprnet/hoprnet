@@ -46,18 +46,18 @@
       }
     },
     "debug-staging": {
-      "indexer_start_block_number": 0,
+      "indexer_start_block_number": 29690235,
       "environment_type": "staging",
       "addresses": {
-        "channels": "0x0000000000000000000000000000000000000000",
-        "network_registry": "0x0000000000000000000000000000000000000000",
-        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
+        "channels": "0xc060582564b12335cD804339842F5509dbF6F74d",
+        "network_registry": "0xf08E27C3A09627D605bFd164459f7caF18D1d25f",
+        "network_registry_proxy": "0x0D1a8f1b13FD1d64696c5E03dd45Cd139e40dE0c",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
-        "node_safe_registry": "0x0000000000000000000000000000000000000000",
-        "module_implementation": "0x0000000000000000000000000000000000000000",
-        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
-        "announcements": "0x0000000000000000000000000000000000000000"
+        "node_stake_v2_factory": "0x5F5b459db681996292Ad58cc10e88027033149B8",
+        "node_safe_registry": "0x0bf6bd25ac47FE9D41A99B135Cb439B89138F05a",
+        "module_implementation": "0xe8d914Ef66b4FF086C6fbCb1E0ea97c0A9D2f3de",
+        "ticket_price_oracle": "0x281a91FeA199a3bAB5D7d5f05833B257E2fd7741",
+        "announcements": "0xD78BCa8452B8Ea281a659f380E0eF710C64EB85b"
       }
     },
     "monte_rosa": {
