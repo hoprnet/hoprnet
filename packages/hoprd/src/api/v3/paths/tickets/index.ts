@@ -5,13 +5,13 @@ import { STATUS_CODES } from '../../utils.js'
 
 export var formatTicket = (ticket: Ticket) => {
   return {
-    counterparty: ticket.counterparty.to_hex(),
-    challenge: ticket.challenge.to_hex(),
+    channel_id: ticket.channel_id.to_hex(),
+    amount: ticket.amount.to_formatted_string(),
     index: ticket.index.to_string(),
-    amount: ticket.amount.to_string(),
-    winProb: ticket.win_prob.to_string(),
+    index_offset: ticket.index_offset.to_string(),
+    winProb: ticket.win_prob,
     channelEpoch: ticket.channel_epoch.to_string(),
-    signature: ticket.signature.to_hex()
+    signature: ticket.signature?.to_hex()
   }
 }
 
@@ -35,7 +35,6 @@ const GET: Operation = [
   }
 ]
 
-// TODO: tickets missing param ???
 GET.apiDoc = {
   description: 'Get all tickets earned by relaying data packets by your node from every channel.',
   tags: ['Tickets'],
