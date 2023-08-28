@@ -32,9 +32,9 @@ import {
   HoprdConfig,
   type Api,
   type CliArgs,
-  hoprd_misc_initialize_crate
-} from '../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
+  hoprd_hoprd_initialize_crate
+} from '../lib/hoprd_hoprd.js'
+hoprd_hoprd_initialize_crate()
 
 import {
   MessageInbox,

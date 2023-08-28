@@ -26,7 +26,13 @@ pub mod wasm {
     use core_ethereum_indexer::handlers::wasm::*;
 
     #[allow(unused_imports)]
+    use core_misc::environment::wasm::*;
+    
+    #[allow(unused_imports)]
     use core_hopr::wasm::*;
+
+    #[allow(unused_imports)]
+    use hoprd_misc::cli::wasm::*;
 
     #[allow(unused_imports)]
     use hoprd_inbox::inbox::wasm::*;
