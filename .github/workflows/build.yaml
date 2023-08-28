@@ -100,11 +100,17 @@ jobs:
     name: Pluto
     needs:
       - check_changeset
+      - build_toolchain
       - build_anvil
       - build_hoprd
       - build_hopli
     # Required to add `always()` due to skipped needs
-    if: always() 
+    if: |
+        always() &&
+        (needs.build_toolchain.result == 'success' || needs.build_toolchain.result == 'skipped') &&
+        (needs.build_anvil.result == 'success' || needs.build_anvil.result == 'skipped') &&
+        (needs.build_hoprd.result == 'success' || needs.build_hoprd.result == 'skipped') &&
+        (needs.build_hopli.result == 'success' || needs.build_hopli.result == 'skipped')
     uses: ./.github/workflows/build-pluto.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
