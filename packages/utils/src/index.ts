@@ -30,7 +30,7 @@ export {
   SimpleTimer,
   merge_encoded_metrics,
   gather_all_metrics,
-  get_package_version,
+  get_package_version
 } from '../../hoprd/lib/hoprd_hoprd.js'
 
 export type MetricCollector = () => string

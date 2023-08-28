@@ -308,7 +308,6 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
-
     #[wasm_bindgen]
     pub fn supported_networks(mono_repo_path: &str) -> JsResult<JsValue> {
         clean_mono_repo_path!(mono_repo_path, cleaned_mono_repo_path);

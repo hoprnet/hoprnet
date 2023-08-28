@@ -27,7 +27,7 @@ pub mod wasm {
 
     #[allow(unused_imports)]
     use core_misc::environment::wasm::*;
-    
+
     #[allow(unused_imports)]
     use core_hopr::wasm::*;
 
