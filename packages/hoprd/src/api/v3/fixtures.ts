@@ -62,7 +62,6 @@ export const CHARLIE_ACCOUNT_ENTRY: AccountEntry = new AccountEntry(
 
 export const INVALID_PEER_ID = 'definetly not a valid peerId'
 
-
 export function channelEntryCreateMock(): ChannelEntry {
   const src = Address.from_string('0x4a34f4c1f1defceaa88f1dd22a8d9c2db70b21eb')
   const dest = Address.from_string('0xe1ad1f04979209f61e64a2a87bde502b465ade50')

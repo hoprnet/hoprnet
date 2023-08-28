@@ -865,7 +865,10 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::{keypairs::ChainKeypair, types::{Hash, Signature}};
+    use core_crypto::{
+        keypairs::ChainKeypair,
+        types::{Hash, Signature},
+    };
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::{
@@ -955,7 +958,7 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn default() -> Ticket {
             Self {
-                w: super::Ticket::default()
+                w: super::Ticket::default(),
             }
         }
 
