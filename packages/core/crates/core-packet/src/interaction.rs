@@ -1119,7 +1119,7 @@ mod tests {
         channels::{ChannelEntry, ChannelStatus},
     };
     use futures::channel::mpsc::{Sender, UnboundedSender};
-    use futures::future::{select, Either, join3};
+    use futures::future::{join3, select, Either};
     use futures::{pin_mut, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
@@ -1418,11 +1418,7 @@ mod tests {
                 let ack = AcknowledgementInteraction::new(
                     db.clone(),
                     &PEERS_CHAIN[i],
-                    if i == 0 {
-                        Some(ack_tx.clone())
-                    } else {
-                        None
-                    },
+                    if i == 0 { Some(ack_tx.clone()) } else { None },
                     if i == peer_count - 2 {
                         Some(ack_tkt_tx.clone())
                     } else {
@@ -1578,31 +1574,45 @@ mod tests {
         };
 
         // Check that we received all acknowledgements and packets
-        let finish = join3(ack_rx.collect::<Vec<_>>(), ack_tkt_rx.collect::<Vec<_>>(), pkt_rx.collect::<Vec<_>>());
+        let finish = join3(
+            ack_rx.collect::<Vec<_>>(),
+            ack_tkt_rx.collect::<Vec<_>>(),
+            pkt_rx.collect::<Vec<_>>(),
+        );
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
         pin_mut!(finish, timeout);
 
-        let succeeded = succeeded && match select(finish, timeout).await {
-            Either::Left(((acks, ack_tkts, pkts), _)) => {
-                debug!("acks: {}, ack_tkts: {}, pkts: {}", acks.len(), ack_tkts.len(), pkts.len());
-                assert_eq!(acks.len(), PENDING_PACKETS, "did not receive all acknowledgements");
-                for ack in acks {
-                    let pos = packet_challenges
-                        .iter()
-                        .position(|c| c.eq(&ack))
-                        .expect("received unknown acknowledgement");
-                    packet_challenges.remove(pos);
+        let succeeded = succeeded
+            && match select(finish, timeout).await {
+                Either::Left(((acks, ack_tkts, pkts), _)) => {
+                    debug!(
+                        "acks: {}, ack_tkts: {}, pkts: {}",
+                        acks.len(),
+                        ack_tkts.len(),
+                        pkts.len()
+                    );
+                    assert_eq!(acks.len(), PENDING_PACKETS, "did not receive all acknowledgements");
+                    for ack in acks {
+                        let pos = packet_challenges
+                            .iter()
+                            .position(|c| c.eq(&ack))
+                            .expect("received unknown acknowledgement");
+                        packet_challenges.remove(pos);
+                    }
+
+                    assert_eq!(
+                        ack_tkts.len(),
+                        PENDING_PACKETS,
+                        "did not receive all acknowledgement tickets"
+                    );
+
+                    assert_eq!(pkts.len(), PENDING_PACKETS, "did not receive all packets");
+                    assert!(pkts.iter().all(|p| test_msg.eq(p)), "invalid packet message");
+
+                    true
                 }
-
-                assert_eq!(ack_tkts.len(), PENDING_PACKETS, "did not receive all acknowledgement tickets");
-
-                assert_eq!(pkts.len(), PENDING_PACKETS, "did not receive all packets");
-                assert!(pkts.iter().all(|p| test_msg.eq(p)), "invalid packet message");
-
-                true
-            }
-            Either::Right(_) => false,
-        };
+                Either::Right(_) => false,
+            };
 
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
@@ -1658,31 +1668,45 @@ mod tests {
         };
 
         // Check that we received all acknowledgements and packets
-        let finish = join3(ack_rx.collect::<Vec<_>>(), ack_tkt_rx.collect::<Vec<_>>(), pkt_rx.collect::<Vec<_>>());
+        let finish = join3(
+            ack_rx.collect::<Vec<_>>(),
+            ack_tkt_rx.collect::<Vec<_>>(),
+            pkt_rx.collect::<Vec<_>>(),
+        );
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
         pin_mut!(finish, timeout);
 
-        let succeeded = succeeded && match select(finish, timeout).await {
-            Either::Left(((acks, ack_tkts, pkts), _)) => {
-                debug!("acks: {}, ack_tkts: {}, pkts: {}", acks.len(), ack_tkts.len(), pkts.len());
-                assert_eq!(acks.len(), PENDING_PACKETS, "did not receive all acknowledgements");
-                for ack in acks {
-                    let pos = packet_challenges
-                        .iter()
-                        .position(|c| c.eq(&ack))
-                        .expect("received unknown acknowledgement");
-                    packet_challenges.remove(pos);
+        let succeeded = succeeded
+            && match select(finish, timeout).await {
+                Either::Left(((acks, ack_tkts, pkts), _)) => {
+                    debug!(
+                        "acks: {}, ack_tkts: {}, pkts: {}",
+                        acks.len(),
+                        ack_tkts.len(),
+                        pkts.len()
+                    );
+                    assert_eq!(acks.len(), PENDING_PACKETS, "did not receive all acknowledgements");
+                    for ack in acks {
+                        let pos = packet_challenges
+                            .iter()
+                            .position(|c| c.eq(&ack))
+                            .expect("received unknown acknowledgement");
+                        packet_challenges.remove(pos);
+                    }
+
+                    assert_eq!(
+                        ack_tkts.len(),
+                        PENDING_PACKETS,
+                        "did not receive all acknowledgement tickets"
+                    );
+
+                    assert_eq!(pkts.len(), PENDING_PACKETS, "did not receive all packets");
+                    assert!(pkts.iter().all(|p| test_msg.eq(p)), "invalid packet message");
+
+                    true
                 }
-
-                assert_eq!(ack_tkts.len(), PENDING_PACKETS, "did not receive all acknowledgement tickets");
-
-                assert_eq!(pkts.len(), PENDING_PACKETS, "did not receive all packets");
-                assert!(pkts.iter().all(|p| test_msg.eq(p)), "invalid packet message");
-
-                true
-            }
-            Either::Right(_) => false,
-        };
+                Either::Right(_) => false,
+            };
 
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }

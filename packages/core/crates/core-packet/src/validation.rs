@@ -98,8 +98,8 @@ mod tests {
     use crate::validation::validate_unacknowledged_ticket;
     use async_trait::async_trait;
     use core_crypto::random::random_bytes;
+    use core_crypto::types::HalfKey;
     use core_crypto::types::OffchainPublicKey;
-    use core_crypto::types::{HalfKey};
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair},
         types::{HalfKeyChallenge, Hash},
