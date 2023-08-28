@@ -26,7 +26,7 @@ declare gcloud_region="--region=europe-west4"
 declare gcloud_disk_name="hoprd-data-disk"
 
 # use CPU optimized machine type
-GCLOUD_MACHINE="--machine-type=c2d-highcpu-2"
+GCLOUD_MACHINE="--machine-type=n2-standard-2"
 GCLOUD_META="--metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true --maintenance-policy=MIGRATE"
 GCLOUD_TAGS="--tags=hopr-node,web-client,rest-client,portainer,healthcheck"
 GCLOUD_BOOTDISK="--boot-disk-size=20GB --boot-disk-type=pd-standard"
@@ -111,24 +111,8 @@ gcloud_cleanup_docker_images() {
 }
 
 # $1 - template name
-# $2 - container image
-# $3 - optional: network id
-# $4 - optional: api token
-# $5 - optional: password
-# $6 - optional: announce
-# $7 - optional: private key
 gcloud_create_instance_template() {
   local name="${1}"
-  local image="${2}"
-  local network="${3:-}"
-  # these parameters are only used by hoprd nodes
-  local api_token="${4:-}"
-  local password="${5:-}"
-  # if set, let the node announce with a routable address on-chain
-  local announce="${6:-}"
-  # this parameter is mostly used on by CT nodes, although hoprd nodes also support it
-  local private_key="${7:-}"
-  local metadata_value=""
 
   log "checking for instance template ${name}"
   if gcloud compute instance-templates describe "${name}" --quiet 2> /dev/null; then
@@ -136,42 +120,9 @@ gcloud_create_instance_template() {
     return 0
   fi
 
-  metadata_value="google-logging-enabled=true"
-  metadata_value="${metadata_value},google-monitoring-enabled=true"
-  metadata_value="${metadata_value},enable-oslogin=true"
-  metadata_value="${metadata_value},startup-script='/opt/hoprd/startup-script.sh > /tmp/startup-script-$(date +%Y%m%d-%H%M%S).log'"
-  metadata_value="${metadata_value},HOPRD_DOCKER_IMAGE=${image}"
-
-  if [ -n "${password}" ]; then
-    metadata_value="${metadata_value},HOPRD_PASSWORD=${password}"
-  fi
-
-  if [ -n "${api_token}" ]; then
-    metadata_value="${metadata_value},HOPRD_API_TOKEN=${api_token}"
-  fi
-
-  # the network is optional, since each docker image has a default network set
-  if [ -n "${network}" ]; then
-    metadata_value="${metadata_value},HOPRD_NETWORK=${network}"
-  fi
-
-  if [ -n "${private_key}" ]; then
-    metadata_value="${metadata_value},HOPRD_PRIVATE_KEY=\"--privateKey ${private_key}\""
-  fi
-
-  if [ -n "${announce}" ]; then
-    metadata_value="${metadata_value},HOPRD_ANNOUNCE=--announce"
-  fi
-
-  if [[ "${name}" == *'-nat'* ]]; then
-    metadata_value="${metadata_value},HOPRD_NAT=true"
-  fi
-
-  log "Metadata Fields: ${metadata_value}"
-
   log "creating instance template ${name}"
   eval gcloud compute instance-templates create "${name}" \
-      --machine-type=c2d-highcpu-2 \
+      ${GCLOUD_MACHINE} \
       --maintenance-policy=MIGRATE \
       --tags=hopr-node,web-client,rest-client,portainer,healthcheck \
       --boot-disk-device-name=boot-disk \
@@ -179,8 +130,7 @@ gcloud_create_instance_template() {
       --boot-disk-type=pd-balanced \
       --image-family=debian-11 \
       --image-project=hoprassociation \
-      --maintenance-policy=MIGRATE \
-      --metadata="${metadata_value}"
+      --maintenance-policy=MIGRATE
 }
 
 # $1 - template name
@@ -193,17 +143,15 @@ gcloud_delete_instance_template() {
 
 # $1=group name
 # $2=group size
-# $3=template name
 gcloud_create_or_update_managed_instance_group() {
   local name="${1}"
   local size="${2}"
-  local template="${3}"
 
   log "checking for managed instance group ${name}"
   if gcloud compute instance-groups managed describe "${name}" ${gcloud_region} --quiet 2> /dev/null; then
     # get current instance template name
     local first_instance_name="$(gcloud compute instance-groups list-instances \
-      "${name}" ${gcloud_region} --format=json | jq '.[0].instance' | tr -d '"')"
+      "${name}" ${gcloud_region} --format=json | jq -r '.[0].instance')"
     local previous_template="$(gcloud compute instances describe \
       "${first_instance_name}" --format=json | \
       jq '.metadata.items[] | select(.key=="instance-template") | .value' | \
@@ -214,22 +162,17 @@ gcloud_create_or_update_managed_instance_group() {
     # ensure instances are not replaced to prevent IP re-assignments
     gcloud beta compute instance-groups managed rolling-action start-update \
       "${name}"\
-      --version=template="${template}" \
+      --version=template="${name}" \
       --minimal-action=restart \
       --most-disruptive-allowed-action=restart \
       --replacement-method=recreate \
       ${gcloud_region}
-
-    # delete previous template if different
-    if [ "${previous_template}" != "${template}" ]; then
-      gcloud_delete_instance_template "${previous_template}"
-    fi
   else
     log "creating managed instance group ${name}"
     gcloud compute instance-groups managed create "${name}" \
       --base-instance-name "${name}-vm" \
       --size "${size}" \
-      --template "${template}" \
+      --template "${name}" \
       --instance-redistribution-type=NONE \
       --stateful-disk "device-name=boot-disk,auto-delete=on-permanent-instance-deletion" \
       ${gcloud_region}
