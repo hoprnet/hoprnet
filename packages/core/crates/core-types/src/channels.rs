@@ -193,7 +193,7 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 }
 
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ticket {
     pub channel_id: Hash,
     pub amount: Balance,
@@ -220,7 +220,7 @@ impl Default for Ticket {
     }
 }
 
-impl std::fmt::Display for Ticket {
+impl std::fmt::Debug for Ticket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Ticket")
             .field("channel_id", &self.channel_id)
@@ -865,7 +865,7 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::{keypairs::ChainKeypair, types::Hash};
+    use core_crypto::{keypairs::ChainKeypair, types::{Hash, Signature}};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::{
@@ -953,6 +953,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(getter)]
+        pub fn channel_id(&self) -> Hash {
+            self.w.channel_id.clone()
+        }
+
+        #[wasm_bindgen(getter)]
         pub fn amount(&self) -> Balance {
             self.w.amount.clone()
         }
@@ -982,9 +987,14 @@ pub mod wasm {
             self.w.challenge.clone()
         }
 
+        #[wasm_bindgen(getter)]
+        pub fn signature(&self) -> Option<Signature> {
+            self.w.signature.clone()
+        }
+
         #[wasm_bindgen]
         pub fn to_string(&self) -> String {
-            format!("{}", self.w)
+            format!("{:?}", self.w)
         }
     }
 
