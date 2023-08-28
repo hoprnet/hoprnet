@@ -308,16 +308,14 @@ export class Hopr extends EventEmitter {
       BigInt(2000) // in millis
     )
 
-    const onAcknowledgement = (ackChallenge: Uint8Array) => {
-      let chal = HalfKeyChallenge.deserialize(ackChallenge)
+    const onAcknowledgement = (ackChallenge: HalfKeyChallenge) => {
       // Can subscribe to both: per specific message or all message acknowledgments
-      this.emit(`hopr:message-acknowledged:${chal.to_hex()}`)
-      this.emit('hopr:message-acknowledged', chal.to_hex())
+      this.emit(`hopr:message-acknowledged:${ackChallenge.to_hex()}`)
+      this.emit('hopr:message-acknowledged', ackChallenge.to_hex())
     }
 
-    const onAcknowledgedTicket = (ackTicket: Uint8Array) => {
-      let tkt = AcknowledgedTicket.deserialize(ackTicket)
-      connector.emit('ticket:acknowledged', tkt)
+    const onAcknowledgedTicket = (ackTicket: AcknowledgedTicket) => {
+      connector.emit('ticket:acknowledged', ackTicket)
     }
 
     let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
@@ -1203,7 +1201,7 @@ export class Hopr extends EventEmitter {
     let list = await this.db.get_acknowledged_tickets()
     let ret: Ticket[] = []
     for (let i = 0; i < list.len(); i++) {
-      ret.push(Ticket.deserialize(list.at(i).ticket.serialize()))
+      ret.push(list.at(i).ticket)
     }
     return ret
   }

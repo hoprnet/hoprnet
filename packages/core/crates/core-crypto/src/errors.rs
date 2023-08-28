@@ -27,6 +27,9 @@ pub enum CryptoError {
     #[error("ethereum challenge on the ticket is invalid")]
     InvalidChallenge,
 
+    #[error("invalid vrf values")]
+    InvalidVrfValues,
+
     #[error("lower-level error: {0}")]
     Other(#[from] GeneralError),
 }

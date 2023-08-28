@@ -47,7 +47,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>>;
 
     /// Mark the ticket as pending.
-    async fn mark_pending(&mut self, ticket: &Ticket) -> Result<()>;
+    async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> Result<()>;
 
     /// Get pending balance to a counter party's address.
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
@@ -129,10 +129,10 @@ pub trait HoprCoreEthereumDbActions {
     async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance, snapshot: &Snapshot) -> Result<()>;
 
     /// Mark the ticket as redeemed.
-    async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
+    async fn mark_redeemed(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()>;
 
     /// Mark an acknowledged ticket as losing.
-    async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
+    async fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()>;
 
     /// Get the total value of all rejected tickets.
     async fn get_rejected_tickets_value(&self) -> Result<Balance>;

@@ -21,7 +21,6 @@ import {
   ChainKeypair,
   OffchainKeypair,
   is_allowed_to_access_network,
-  redeem_ticket,
   CORE_ETHEREUM_CONSTANTS,
   Database
 } from '@hoprnet/hopr-utils'
@@ -467,16 +466,11 @@ export default class HoprCoreEthereum extends EventEmitter {
       log(
         `Performing ticket redemption ticket for counterparty ${counterparty.to_hex()} in channel ${channelId.to_hex()}`
       )
-      receipt = await redeem_ticket(
-        this.db,
-        counterparty,
-        channelId,
-        ackTicket,
-        async () =>
-          await this.chain.redeemTicket(counterparty, ackTicket, (txHash: string) =>
-            this.setTxHandler(`channel-updated-${txHash}`, txHash)
-          )
+      await this.chain.redeemTicket(counterparty, ackTicket, (txHash: string) =>
+        this.setTxHandler(`channel-updated-${txHash}`, txHash)
       )
+      await this.db.mark_redeemed(counterparty, ackTicket)
+
       log(`redeemed ticket for counterparty ${counterparty.to_hex()}`)
     } catch (err) {
       log(`ticket redemption error: ${err.toString()}`)

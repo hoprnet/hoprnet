@@ -3,7 +3,7 @@ use getrandom::getrandom;
 use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Mul};
+use std::ops::{Add, Div, Mul, Shl, Shr, Sub};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -400,6 +400,43 @@ impl U256 {
     pub fn as_u128(&self) -> u128 {
         self.value.as_u128()
     }
+
+    /// Multiply with float in the interval [0.0, 1.0]
+    pub fn multiply_f64(&self, rhs: f64) -> Result<Self> {
+        if rhs < 0.0 || rhs > 1.0 {
+            return Err(GeneralError::InvalidInput);
+        }
+
+        if rhs == 1.0 {
+            // special case: mantisse extraction does not work here
+            Ok(Self {
+                value: self.value.to_owned(),
+            })
+        } else if rhs == 0.0 {
+            // special case: prevent from potential underflow errors
+            Ok(U256::zero())
+        } else {
+            Ok((*self * U256::from((rhs + 1.0 + f64::EPSILON).to_bits() & 0x000fffffffffffffu64)) >> U256::from(52u64))
+        }
+    }
+
+    /// Divide by float in the interval (0.0, 1.0]
+    pub fn divide_f64(&self, rhs: f64) -> Result<Self> {
+        if rhs <= 0.0 || rhs > 1.0 {
+            return Err(GeneralError::InvalidInput);
+        }
+
+        if rhs == 1.0 {
+            Ok(Self {
+                value: self.value().to_owned(),
+            })
+        } else {
+            let nom = *self << U256::from(52u64);
+            let denom = U256::from((rhs + 1.0).to_bits() & 0x000fffffffffffffu64);
+
+            Ok(nom / denom)
+        }
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -460,6 +497,55 @@ impl Mul for U256 {
     }
 }
 
+impl Div for U256 {
+    type Output = U256;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.div(rhs.value),
+        }
+    }
+}
+
+impl Shr for U256 {
+    type Output = U256;
+
+    fn shr(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.shr(rhs.value),
+        }
+    }
+}
+
+impl Shl for U256 {
+    type Output = U256;
+
+    fn shl(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.shl(rhs.value),
+        }
+    }
+}
+
+impl Add for U256 {
+    type Output = U256;
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.add(rhs.value),
+        }
+    }
+}
+
+impl Sub for U256 {
+    type Output = U256;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value.sub(rhs.value),
+        }
+    }
+}
+
 impl BinarySerializable for U256 {
     const SIZE: usize = 32;
 
@@ -476,13 +562,13 @@ impl BinarySerializable for U256 {
 
 impl From<u256> for U256 {
     fn from(value: u256) -> Self {
-        U256 { value }
+        Self { value }
     }
 }
 
 impl From<u128> for U256 {
     fn from(value: u128) -> Self {
-        U256 {
+        Self {
             value: u256::from(value),
         }
     }
@@ -490,7 +576,7 @@ impl From<u128> for U256 {
 
 impl From<u64> for U256 {
     fn from(value: u64) -> Self {
-        U256 {
+        Self {
             value: u256::from(value),
         }
     }
@@ -498,7 +584,23 @@ impl From<u64> for U256 {
 
 impl From<u32> for U256 {
     fn from(value: u32) -> Self {
-        U256 {
+        Self {
+            value: u256::from(value),
+        }
+    }
+}
+
+impl From<u16> for U256 {
+    fn from(value: u16) -> Self {
+        Self {
+            value: u256::from(value),
+        }
+    }
+}
+
+impl From<u8> for U256 {
+    fn from(value: u8) -> Self {
+        Self {
             value: u256::from(value),
         }
     }
@@ -662,6 +764,28 @@ mod tests {
         let u_4 = U256::new("3");
         assert_eq!(Ordering::Less, u_3.cmp(&u_4));
         assert_eq!(Ordering::Greater, u_4.cmp(&u_3));
+    }
+
+    #[test]
+    fn u256_float_multiply() {
+        assert_eq!(U256::one(), U256::one().multiply_f64(1.0f64).unwrap());
+        assert_eq!(U256::one(), U256::from(10u64).multiply_f64(0.1f64).unwrap());
+
+        // bad examples
+        assert!(U256::one().multiply_f64(-1.0).is_err());
+        assert!(U256::one().multiply_f64(1.1).is_err());
+    }
+
+    #[test]
+    fn u256_float_divide() {
+        assert_eq!(U256::one(), U256::one().divide_f64(1.0f64).unwrap());
+
+        assert_eq!(U256::from(2u64), U256::one().divide_f64(0.5f64).unwrap());
+        assert_eq!(U256::from(10000u64), U256::one().divide_f64(0.0001f64).unwrap());
+
+        // bad examples
+        assert!(U256::one().divide_f64(0.0).is_err());
+        assert!(U256::one().divide_f64(1.1).is_err());
     }
 }
 

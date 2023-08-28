@@ -135,7 +135,6 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use hex_literal::hex;
     use libp2p_identity::PeerId;
-    use std::ops::Mul;
     use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::leveldb::rusty::RustyLevelDbShim;
@@ -165,7 +164,7 @@ mod tests {
         ChannelEntry::new(
             source,
             destination,
-            Balance::new(U256::new("1234").mul(U256::new("10000000000000000")), BalanceType::HOPR),
+            Balance::new(U256::from(1234 * 10000000000000000u128), BalanceType::HOPR),
             U256::zero(),
             status,
             U256::zero(),
