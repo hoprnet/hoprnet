@@ -213,6 +213,72 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         }
     }
 
+    /**
+     * @dev Given existing node(s), safe and module, migrate them to a different network
+     * Perform the following actions as the owner of safe:
+     * - scope new channel contract 
+     * - approve token transfer
+     * - add announcement contract as target
+     * As manager of network registry, add nodes and safe to network registry
+     * Perform the following actions, as deployer
+     * - transfer some tokens to safe
+     * - transfer some xDAI to nodes
+     *
+     * @notice Deployer is the single owner of safe
+     * nonce is the current nonce of deployer account
+     * Default fallback permission for module is to
+     * 1. allow all data to Channels contract
+     * 2. allow all data to Token contract
+     * 3. allow nodes to send native tokens to itself
+     *
+     * Give Channels max allowance to transfer Token for safe
+     *
+     * Add node safes to network registry, as a manager
+     * @param nodeAddresses array of node addresses to be added to the module
+     * @param hoprTokenAmountInWei, The amount of HOPR tokens that recipient is desired to receive
+     * @param nativeTokenAmountInWei The amount of native tokens that recipient is desired to receive
+     */
+    function migrateSafeModule(
+        address[] memory nodeAddresses,
+        address safe,
+        address module,
+        uint256 hoprTokenAmountInWei,
+        uint256 nativeTokenAmountInWei
+    )
+        external
+    {
+        // 1. get environment and msg.sender
+        getNetworkAndMsgSender();
+
+        // 2. scope channel contract of the new network
+        addNetworkChannelsTargetToModuleBySafe(safe, module);
+
+        // 3. approve token transfer, as an owner of safe
+        approveChannelsForTokenTransferBySafe(safe);
+
+        // 4. add announcement contract as target, as an owner of safe
+        addAllAllowedTargetToModuleBySafe(currentNetworkDetail.addresses.announcements, safe, module);
+        // bytes memory
+        vm.stopBroadcast();
+
+        // 5. add nodes and safe to network registry, as a manager of network registry
+        address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
+        for (uint256 m = 0; m < nodeAddresses.length; m++) {
+            stakingSafeAddresses[m] = safe;
+        }
+        _helperGetDeployerInternalKey();
+        _registerNodes(stakingSafeAddresses, nodeAddresses);
+        vm.stopBroadcast();
+
+        // 6. transfer some tokens to safe
+        transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
+
+        // 7. transfer some xDAI to nodes
+        for (uint256 n = 0; n < nodeAddresses.length; n++) {
+            transferOrMintHoprAndSendNativeToAmount(safe, 0, nativeTokenAmountInWei);
+        }
+    }
+
     function includeNodesToModuleBySafe(address[] memory nodeAddresses, address safe, address module) public {
         // 1. get the msgSender if not set. This msgSender should be the owner of safe to execute the tx
         if (msgSender == address(0)) {
@@ -329,6 +395,61 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
         if (!included) {
             bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
+            uint256 safeNonce = ISafe(payable(safe)).nonce();
+
+            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+        }
+    }
+
+    /**
+     * add an ALL_ALLOWED Channels target of the current network's channels contract to the module, by the safe
+     */
+    function addNetworkChannelsTargetToModuleBySafe(address safe, address module) public {
+        // 1. get the msgSender if not set. This msgSender should be the owner of safe to execute the tx
+        if (msgSender == address(0)) {
+            // get environment and msg.sender
+            getNetworkAndMsgSender();
+        }
+        address targetAddress = currentNetworkDetail.addresses.channelsContractAddress;
+        // 2. scope channel contract
+        /**
+         * Array of capability permissions
+         *     [
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // RESERVED
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultCloseIncomingChannelSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultApproveFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW  // defaultSendFunctionPermisson
+         *     ]
+         */
+        CapabilityPermission[] memory channelsCapabilityPermissions = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsCapabilityPermissions.length; i++) {
+            channelsCapabilityPermissions[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        Target target = TargetUtils.encodeDefaultPermissions(
+            targetAddress,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.ALLOW_ALL,
+            channelsCapabilityPermissions
+        );
+
+        // 3. include the target to the module, as an owner of safe
+        // check if target has been included in module.
+        (bool successReadTryGetTarget, bytes memory returndataTryGetTarget) =
+            module.staticcall(abi.encodeWithSignature("tryGetTarget(address)", targetAddress));
+        if (!successReadTryGetTarget) {
+            revert("Cannot read tryGetTarget from module contract.");
+        }
+        (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
+        if (!included) {
+            bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
             uint256 safeNonce = ISafe(payable(safe)).nonce();
 
             _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);

@@ -141,6 +141,22 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "expressSetupSafeModule(address[],uint256,uint256)" [$(node_address)]  $(or $(hopramount),20000000000000000000000) $(or $(nativeamount),10000000000000000000)
 
+# E.g. make migrate-safe-module network=anvil-localhost environment-type=local node_address="0xcb192a4ba9abea8579c59231b8a57e3f0591e02b" safe_address=0x3A0A80BD107A4E029154286293296e62d235a4ce module_address=0xcE594ED193F314d66bC3Af9b53930CD9Ea87cc6E hopramount=1000000000000000000 nativeamount=1000000000000000000
+.PHONY: migrate-safe-module
+migrate-safe-module: ensure-environment-and-network-are-set ensure-privatekey-is-set
+migrate-safe-module: ## create a new safe and a new node management module, include the provided node address
+ifeq ($(node_address),)
+	echo "parameter <node_address> missing" >&2 && exit 1
+endif
+ifeq ($(safe_address),)
+	echo "parameter <safe_address> missing" >&2 && exit 1
+endif
+ifeq ($(module_address),)
+	echo "parameter <module_address> missing" >&2 && exit 1
+endif
+	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
+		--broadcast --sig "migrateSafeModule(address[],address,address,uint256,uint256)" [$(node_address)] $(safe_address) $(module_address) $(or $(hopramount),20000000000000000000000) $(or $(nativeamount),10000000000000000000)
+
 # E.g. make add-all-allowed-target network=anvil-localhost environment-type=local target_address=0xcb192a4ba9abea8579c59231b8a57e3f0591e02b safe_address=0x3A0A80BD107A4E029154286293296e62d235a4ce module_address=0xcE594ED193F314d66bC3Af9b53930CD9Ea87cc6E
 .PHONY: add-all-allowed-target
 add-all-allowed-target: ensure-environment-and-network-are-set ensure-privatekey-is-set
