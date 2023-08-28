@@ -5,13 +5,13 @@ import { STATUS_CODES } from '../../utils.js'
 
 export function formatTicket(ticket: Ticket) {
   return {
-    channel_id: ticket.channel_id.to_hex(),
+    channelId: ticket.channel_id.to_hex(),
     amount: ticket.amount.to_formatted_string(),
     index: ticket.index.to_string(),
     indexOffset: ticket.index_offset.to_string(),
     winProb: ticket.win_prob.toString(),
     channelEpoch: ticket.channel_epoch.to_string(),
-    signature: ticket.signature?.to_hex()
+    signature: ticket.signature.to_hex()
   }
 }
 
