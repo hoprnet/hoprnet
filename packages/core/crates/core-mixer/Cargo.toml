@@ -17,7 +17,7 @@ rand = "0.8.5"
 pin-project = "1.0.12"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 getrandom = { workspace = true }
-gloo-timers = { version = "0.2.6", optional = true }
+gloo-timers = { workspace = true, optional = true }
 js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
