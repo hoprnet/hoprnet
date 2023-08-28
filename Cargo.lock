@@ -1366,6 +1366,7 @@ dependencies = [
  "serde",
  "serde_repr",
  "thiserror",
+ "utils-log",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",

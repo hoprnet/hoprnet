@@ -263,8 +263,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                             "acknowledgement received for channel that does not exist, {e}"
                         ))
                     })?;
-                let response = unackowledged.get_response(&ack.ack_key_share)?;
-                debug!("acknowledging ticket using response {}", response.to_hex());
 
                 let domain_separator = self
                     .db
@@ -275,13 +273,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     .unwrap()
                     .ok_or(MissingDomainSeparator)?;
 
-                let ack_ticket = AcknowledgedTicket::new(
-                    unackowledged.ticket,
-                    response,
-                    unackowledged.signer,
-                    &self.chain_key,
-                    &domain_separator,
-                )?;
+                let ack_ticket = unackowledged.acknowledge(&ack.ack_key_share, &self.chain_key, &domain_separator)?;
 
                 // replace the un-acked ticket with acked ticket.
                 self.db

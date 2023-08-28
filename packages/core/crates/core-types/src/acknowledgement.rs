@@ -13,10 +13,11 @@ use core_crypto::{
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
 use serde::{Deserialize, Serialize};
+use utils_log::debug;
 use utils_types::{
     errors::{GeneralError::ParseError, Result},
     primitives::Address,
-    traits::BinarySerializable,
+    traits::{BinarySerializable, ToHex},
 };
 
 /// Represents packet acknowledgement
@@ -297,9 +298,12 @@ impl UnacknowledgedTicket {
         chain_keypair: &ChainKeypair,
         domain_separator: &Hash,
     ) -> CoreTypesResult<AcknowledgedTicket> {
+        let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
+        debug!("acknowledging ticket using response {}", response.to_hex());
+
         AcknowledgedTicket::new(
             self.ticket,
-            Response::from_half_keys(&self.own_key, acknowledgement)?,
+            response,
             self.signer,
             chain_keypair,
             domain_separator,
