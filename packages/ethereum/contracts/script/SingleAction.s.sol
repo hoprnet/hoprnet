@@ -462,27 +462,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     }
 
     // /**
-    //  * @dev On network registry contract, update eligibility of some staking addresses to the desired . This function
-    // should only be called by the owner
-    //  */
-    // function forceEligibilityUpdate(address[] calldata stakingAddresses, bool[] calldata eligibility) external {
-    //   require(stakingAddresses.length == eligibility.length, 'Input lengths are different');
-
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
-
-    //   // 2. update emit EligibilityUpdate events by the owner
-    //   (bool successForceEligibilityUpdate, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('ownerForceEligibility(address[],bool[])', stakingAddresses, eligibility)
-    //   );
-    //   if (!successForceEligibilityUpdate) {
-    //     emit log_string('Cannot force update eligibility as an owner');
-    //     revert('Cannot force update eligibility as an owner');
-    //   }
-    //   vm.stopBroadcast();
-    // }
-
-    // /**
     //  * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be
     // called by the owner
     //  */

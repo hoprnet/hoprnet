@@ -84,7 +84,6 @@ Owner can call `ownerRegister(address[] accounts, string[] hoprPeerIds)` method 
 
 ```
 make register-nodes network=rotsee environment_type=staging native_addresses=<address1,address2,address3,address4> peer_ids=<peerid1,peerid2,peerid3,peerid4>
-make force-eligibility-update network=rotsee environment_type=staging native_addresses=<address1,address2,address3,address4> eligibility=<true,false,true,true, etc>
 ```
 
 ## Deregister a node

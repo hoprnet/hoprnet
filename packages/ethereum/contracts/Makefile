@@ -217,20 +217,6 @@ disable-network-registry: ## owner disables network registry (smart contract) gl
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "disableNetworkRegistry()"
 
-# E.g. make force-eligibility-update network=anvil-localhost environment-type=local staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" eligibility="[true,false]"
-.PHONY: force-eligibility-update
-force-eligibility-update: ensure-environment-and-network-are-set ensure-privatekey-is-set
-force-eligibility-update: ## owner forces eligibility update
-ifeq ($(staking_addresses),)
-	echo "parameter <staking_addresses> missing" >&2 && exit 1
-endif
-ifeq ($(eligibility),)
-	echo "parameter <eligibility> missing" >&2 && exit 1
-endif
-	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "forceEligibilityUpdate(address[],bool[])" \
-		$(staking_addresses) $(eligibility)
-
 # E.g. make sync-eligibility network=anvil-localhost environment-type=local peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
 .PHONY: sync-eligibility
 sync-eligibility: ensure-environment-and-network-are-set ensure-privatekey-is-set

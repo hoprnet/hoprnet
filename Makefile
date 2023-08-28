@@ -486,18 +486,6 @@ disable-network-registry: ensure-environment-and-network-are-set
 disable-network-registry: ## owner disables network registry (smart contract) globally
 	make -C packages/ethereum/contracts disable-network-registry network=$(network) environment-type=$(environment_type)
 
-force-eligibility-update: ensure-environment-and-network-are-set
-force-eligibility-update: ## owner forces eligibility update
-ifeq ($(native_addresses),)
-	echo "parameter <native_addresses> missing" >&2 && exit 1
-endif
-ifeq ($(eligibility),)
-	echo "parameter <eligibility> missing" >&2 && exit 1
-endif
-	make -C packages/ethereum/contracts force-eligibility-update \
-		network=$(network) environment-type=$(environment_type) \
-		staking_addresses="$(native_addresses)" eligibility="$(eligibility)"
-
 sync-eligibility: ensure-environment-and-network-are-set
 sync-eligibility: ## owner sync eligibility of peers
 ifeq ($(peer_ids),)
