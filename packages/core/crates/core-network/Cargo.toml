@@ -20,8 +20,8 @@ multiaddr = { workspace = true }
 rand = { version = "0.8.5", features = ["std_rng"] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "1.0"
-validator = { version = "0.16.0", features = ["derive"] }
-gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
+validator = { version = "0.16.1", features = ["derive"] }
+gloo-timers = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 getrandom = { workspace = true }
 js-sys = { workspace = true, optional = true }

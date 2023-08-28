@@ -5,7 +5,7 @@ import { isExpired } from '../index.js'
 // ie.
 //
 // let cachedFunction = cacheNoArgAsyncFunction<ReturnType>(expensiveAsyncFunction, 500)
-export function cacheNoArgAsyncFunction<T>(func: () => Promise<T>, expiry: number) {
+export function cacheNoArgAsyncFunction<T>(func: () => Promise<T>, expiry: number): () => Promise<T> {
   let cachedValue: T
   let updatedAt: number
   return async function (): Promise<T> {

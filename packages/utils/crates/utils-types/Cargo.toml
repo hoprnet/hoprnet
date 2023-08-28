@@ -1,6 +1,6 @@
 [package]
 name = "utils-types"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Generic types used through the entire code base"

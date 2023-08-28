@@ -1,6 +1,6 @@
 [package]
 name = "core-packet"
-version = "0.5.0"
+version = "0.6.0"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -29,7 +29,7 @@ thiserror = "1.0"
 typenum = "1.16"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
-gloo-timers = { version = "0.2.6", optional = true , features = ["futures"]}
+gloo-timers = { workspace = true, optional = true}
 
 core-crypto = { path = "../core-crypto", default-features = false }
 core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }

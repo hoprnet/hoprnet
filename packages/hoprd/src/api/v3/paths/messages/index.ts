@@ -32,7 +32,7 @@ const DELETE: Operation = [
 const POST: Operation = [
   async (req, res, _next) => {
     const message = encodeMessage(req.body.body)
-    const recipient = peerIdFromString(req.body.peerAddress)
+    const recipient = peerIdFromString(req.body.peerId)
     const hops = req.body.hops
 
     const tag = req.body.tag
@@ -100,7 +100,7 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['tag', 'body', 'peerAddress'],
+          required: ['tag', 'body', 'peerId'],
           properties: {
             tag: {
               $ref: '#/components/schemas/MessageTag'
@@ -108,7 +108,7 @@ POST.apiDoc = {
             body: {
               $ref: '#/components/schemas/MessageBody'
             },
-            peerAddress: {
+            peerId: {
               description: 'The recipient HOPR peer id, to which the message is sent.',
               type: 'string',
               format: 'peerid',

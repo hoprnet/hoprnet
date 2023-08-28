@@ -77,6 +77,8 @@ error FailureInReadBalance(address token);
  */
 contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     using stdJson for string;
+    using stdStorage for StdStorage;
+
     using BoostUtilsLib for address;
     using TargetUtils for Target;
 
@@ -104,7 +106,16 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     }
 
     /**
-     * @dev create a safe proxy and moodule proxy
+     * @dev create a safe proxy and moodule proxy.
+     * Perform the following actions as the owner of safe:
+     * - include nodes to the module
+     * - approve token transfer
+     * - add announcement contract as target
+     * As manager of network registry, add nodes and safe to network registry
+     * Perform the following actions, as deployer
+     * - transfer some tokens to safe
+     * - transfer some xDAI to nodes
+     *
      * @notice Deployer is the single owner of safe
      * nonce is the current nonce of deployer account
      * Default fallback permission for module is to
@@ -161,6 +172,55 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             defaultChannelsCapabilityPermissions
         );
 
+        // 3. deploy two proxy instances
+        (module, safe) = IFactory(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress).clone(
+            currentNetworkDetail.addresses.moduleImplementationAddress,
+            admins,
+            vm.getNonce(msgSender),
+            bytes32(Target.unwrap(defaultModulePermission))
+        );
+
+        emit log_string(
+            string(abi.encodePacked("--safeAddress ", vm.toString(safe), " --moduleAddress ", vm.toString(module)))
+        );
+
+        // 4. include nodes to the module, as an owner of safe
+        includeNodesToModuleBySafe(nodeAddresses, safe, module);
+
+        // 5. approve token transfer, as an owner of safe
+        approveChannelsForTokenTransferBySafe(safe);
+
+        // 6. add announcement contract as target, as an owner of safe
+        addAllAllowedTargetToModuleBySafe(currentNetworkDetail.addresses.announcements, safe, module);
+        // bytes memory
+        vm.stopBroadcast();
+
+        // 7. add nodes and safe to network registry, as a manager of network registry
+        address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
+        for (uint256 m = 0; m < nodeAddresses.length; m++) {
+            stakingSafeAddresses[m] = safe;
+        }
+        _helperGetDeployerInternalKey();
+        _registerNodes(stakingSafeAddresses, nodeAddresses);
+        vm.stopBroadcast();
+
+        // 8. transfer some tokens to safe
+        transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
+
+        // 9. transfer some xDAI to nodes
+        for (uint256 n = 0; n < nodeAddresses.length; n++) {
+            transferOrMintHoprAndSendNativeToAmount(safe, 0, nativeTokenAmountInWei);
+        }
+    }
+
+    function includeNodesToModuleBySafe(address[] memory nodeAddresses, address safe, address module) public {
+        // 1. get the msgSender if not set. This msgSender should be the owner of safe to execute the tx
+        if (msgSender == address(0)) {
+            // get environment and msg.sender
+            getNetworkAndMsgSender();
+        }
+
+        // 2. prepare target permission data
         /**
          * Array of node permissions, where nothing is specified and falls back to the default
          *     [
@@ -187,19 +247,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             );
         }
 
-        // 3. deploy two proxy instances
-        (module, safe) = IFactory(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress).clone(
-            currentNetworkDetail.addresses.moduleImplementationAddress,
-            admins,
-            vm.getNonce(msgSender),
-            bytes32(Target.unwrap(defaultModulePermission))
-        );
-
-        emit log_string(
-            string(abi.encodePacked("--safeAddress ", vm.toString(safe), " --moduleAddress ", vm.toString(module)))
-        );
-
-        // 4. include node to the module, as an owner of safe
+        // 4. include nodes to the module, as an owner of safe
         for (uint256 k = 0; k < nodeAddresses.length; k++) {
             // check if node is included in module
             (bool successReadIncluded, bytes memory returndataReadIncluded) =
@@ -211,32 +259,80 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             if (!included) {
                 bytes memory includeNodeData =
                     abi.encodeWithSignature("includeNode(uint256)", Target.unwrap(defaultNodeTargets[k]));
-                uint256 safeNonce = ISafe(safe).nonce();
-                _helperSignSafeTxAsOwner(ISafe(safe), module, safeNonce, includeNodeData);
+                uint256 safeNonce = ISafe(payable(safe)).nonce();
+                _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, includeNodeData);
             }
         }
+    }
 
-        // 5. approve token transfer
+    function approveChannelsForTokenTransferBySafe(address safe) public {
+        // 1. get the msgSender if not set. This msgSender should be the owner of safe to execute the tx
+        if (msgSender == address(0)) {
+            // get environment and msg.sender
+            getNetworkAndMsgSender();
+        }
+
+        // 2. prepare data payload for approve
         bytes memory approveData = abi.encodeWithSignature(
             "approve(address,uint256)", currentNetworkDetail.addresses.channelsContractAddress, type(uint256).max
         );
         _helperSignSafeTxAsOwner(
-            ISafe(safe), currentNetworkDetail.addresses.tokenContractAddress, ISafe(safe).nonce(), approveData
+            ISafe(payable(safe)),
+            currentNetworkDetail.addresses.tokenContractAddress,
+            ISafe(payable(safe)).nonce(),
+            approveData
+        );
+    }
+
+    /**
+     * add an ALL_ALLOWED target to the module, by the safe
+     * Abuse TOKEN type
+     */
+    function addAllAllowedTargetToModuleBySafe(address targetAddress, address safe, address module) public {
+        // 1. get the msgSender if not set. This msgSender should be the owner of safe to execute the tx
+        if (msgSender == address(0)) {
+            // get environment and msg.sender
+            getNetworkAndMsgSender();
+        }
+
+        // 2. prepare target permission data
+        /**
+         * Array of node permissions, where nothing is specified and falls back to the default
+         *     [
+         *       CapabilityPermission.NONE,
+         *       CapabilityPermission.NONE,
+         *       CapabilityPermission.NONE,
+         *       CapabilityPermission.NONE,
+         *       CapabilityPermission.NONE,
+         *       CapabilityPermission.NONE,
+         *       CapabilityPermission.NONE,
+         *       CapabilityPermission.NONE,
+         *       CapabilityPermission.NONE
+         *     ]
+         */
+        CapabilityPermission[] memory defaultPermission = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < defaultPermission.length; i++) {
+            defaultPermission[i] = CapabilityPermission.NONE;
+        }
+        // abuse the fast return and assign target as 0
+        Target target = TargetUtils.encodeDefaultPermissions(
+            targetAddress, Clearance.FUNCTION, TargetType.TOKEN, TargetPermission.ALLOW_ALL, defaultPermission
         );
 
-        vm.stopBroadcast();
-
-        // 6. add nodes and safe to network registry
-        address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
-        for (uint256 m = 0; m < nodeAddresses.length; m++) {
-            stakingSafeAddresses[m] = safe;
+        // 4. include the target to the module, as an owner of safe
+        // check if target has been included in module.
+        (bool successReadTryGetTarget, bytes memory returndataTryGetTarget) =
+            module.staticcall(abi.encodeWithSignature("tryGetTarget(address)", targetAddress));
+        if (!successReadTryGetTarget) {
+            revert("Cannot read tryGetTarget from module contract.");
         }
-        _helperGetDeployerInternalKey();
-        _registerNodes(stakingSafeAddresses, nodeAddresses);
-        vm.stopBroadcast();
+        (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
+        if (!included) {
+            bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
+            uint256 safeNonce = ISafe(payable(safe)).nonce();
 
-        // 7. transfer some tokens to safe
-        transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
+            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+        }
     }
 
     /**

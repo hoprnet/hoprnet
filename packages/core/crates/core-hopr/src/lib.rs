@@ -155,7 +155,7 @@ pub fn build_components(
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
     )));
 
-    let ack_actions = AcknowledgementInteraction::new(db.clone(), on_ack_tx, on_ack_tkt_tx);
+    let ack_actions = AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, on_ack_tkt_tx);
 
     let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 
@@ -259,11 +259,11 @@ pub mod wasm_impl {
         #[wasm_bindgen]
         pub async fn send_message(
             &mut self,
-            msg: ApplicationData,
-            path: Path,
+            msg: &ApplicationData,
+            path: &Path,
             timeout_in_millis: u64,
         ) -> Result<HalfKeyChallenge, JsValue> {
-            match self.pkt_sender.send_packet(msg, path) {
+            match self.pkt_sender.send_packet(msg.clone(), path.clone()) {
                 Ok(mut awaiter) => {
                     utils_log::debug!("Awaiting the HalfKeyChallenge");
                     awaiter

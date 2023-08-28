@@ -94,7 +94,6 @@ contract HoprChannels is
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
 
     type Balance is uint96;
-    type TicketEpoch is uint32;
     type TicketIndex is uint48;
     type TicketIndexOffset is uint32;
     type ChannelEpoch is uint24;
