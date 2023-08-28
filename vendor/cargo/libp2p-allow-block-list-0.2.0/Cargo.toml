@@ -35,7 +35,7 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.2"
+version = "0.2.3"
 features = ["peerid"]
 
 [dependencies.libp2p-swarm]
