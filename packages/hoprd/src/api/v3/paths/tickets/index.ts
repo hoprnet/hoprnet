@@ -3,19 +3,19 @@ import type { Ticket } from '@hoprnet/hopr-utils'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
-export var formatTicket = (ticket: Ticket) => {
+export function formatTicket(ticket: Ticket) {
   return {
     channel_id: ticket.channel_id.to_hex(),
     amount: ticket.amount.to_formatted_string(),
     index: ticket.index.to_string(),
     index_offset: ticket.index_offset.to_string(),
-    winProb: ticket.win_prob,
+    winProb: ticket.win_prob.toString(),
     channelEpoch: ticket.channel_epoch.to_string(),
     signature: ticket.signature?.to_hex()
   }
 }
 
-export const getAllTickets = async (node: Hopr) => {
+export async function getAllTickets(node: Hopr) {
   const tickets = await node.getAllTickets()
   return tickets.map(formatTicket)
 }
