@@ -133,13 +133,12 @@ hopli create-safe-module --network anvil-localhost \
 Migrate an exising set of node(d) with safe and module to a new network
 
 ```
-PRIVATE_KEY=<bank_private_key> \
+PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
 hopli migrate-safe-module --network anvil-localhost \
     --identity-directory "./test" \
     --password-path "./test/.pwd" \
     --safe-address <safe_address> \
     --module-address <module_address> \
-    --hopr-amount 10 --native-amount 0.1 \
     --contracts-root "../ethereum/contracts"
 ```
 
@@ -245,13 +244,12 @@ PRIVATE_KEY=<bank_private_key> \
 Migrate an exising set of node(d) with safe and module to a new network
 
 ```
-PRIVATE_KEY=<bank_private_key> \
+PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
     cargo run -- migrate-safe-module --network anvil-localhost \
     --identity-directory "./test" \
     --password-path "./test/.pwd" \
     --safe-address <safe_address> \
     --module-address <module_address> \
-    --hopr-amount 10 --native-amount 0.1 \
     --contracts-root "../ethereum/contracts"
 ```
 
