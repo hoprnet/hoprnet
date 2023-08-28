@@ -35,7 +35,13 @@ pub mod wasm {
     use hoprd_keypair::key_pair::wasm::*;
 
     use utils_log::logger::wasm::JsLogger;
-    use utils_misc::utils::wasm::JsResult;
+
+    #[allow(unused_imports)]
+    use utils_misc::utils::wasm::*;
+
+    #[allow(unused_imports)]
+    use utils_metrics::metrics::wasm::*;
+
     use wasm_bindgen::prelude::wasm_bindgen;
 
     static LOGGER: JsLogger = JsLogger {};
