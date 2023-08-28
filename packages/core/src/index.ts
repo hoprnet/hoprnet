@@ -1036,6 +1036,7 @@ export class Hopr extends EventEmitter {
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
     hoprNodeSafeRegistryAddress: string
+    hoprTicketPriceOracleAddress: string
     moduleAddress: string
     safeAddress: string
     noticePeriodChannelClosure: number

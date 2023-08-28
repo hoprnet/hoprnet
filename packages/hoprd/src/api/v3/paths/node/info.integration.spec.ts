@@ -23,6 +23,7 @@ const HOPR_NETWORK_REGISTRY_ADDRESS = '0xBEE1F5d64b562715E749771408d06D57EE0892A
 const HOPR_NODE_SAFE_REGISTRY_ADDRESS = '0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82'
 const MODULE_ADDRESS = '0x0262496080c3916d9afd5904EA3DFd46DfFBfF3D'
 const SAFE_ADDRESS = '0x8D56Ef78c9dfF0d1446A28476653D979336032f9'
+const HOPR_TICKET_PRICE_ORACLE_ADDRESS = '0x86202f0440cb82e94aad6c288d50ce93662c6c54'
 
 const DHT_ADDRESSES = [
   new Multiaddr(`/ip4/1.2.3.4/tcp/23/p2p/${ALICE_PEER_ID.toString()}`),
@@ -50,6 +51,7 @@ describe('GET /node/info', () => {
       hoprChannelsAddress: HOPR_CHANNELS_ADDRESS,
       hoprNetworkRegistryAddress: HOPR_NETWORK_REGISTRY_ADDRESS,
       hoprNodeSafeRegistryAddress: HOPR_NODE_SAFE_REGISTRY_ADDRESS,
+      hoprTicketPriceOracleAddress: HOPR_TICKET_PRICE_ORACLE_ADDRESS,
       moduleAddress: MODULE_ADDRESS,
       safeAddress: SAFE_ADDRESS,
       noticePeriodChannelClosure: 60

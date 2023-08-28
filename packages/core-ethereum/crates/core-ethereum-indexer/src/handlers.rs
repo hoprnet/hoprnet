@@ -13,6 +13,7 @@ use bindings::{
     },
     hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::{DergisteredNodeSafeFilter, HoprNodeSafeRegistryEvents, RegisteredNodeSafeFilter},
+    hopr_ticket_price_oracle::{HoprTicketPriceOracleEvents, TicketPriceUpdatedFilter},
     hopr_token::{ApprovalFilter, HoprTokenEvents, TransferFilter},
 };
 use core_crypto::types::{Hash, OffchainSignature};
@@ -49,6 +50,8 @@ pub struct ContractAddresses {
     pub node_safe_registry: Address,
     /// NodeManagementModule, permission module for Safe
     pub node_management_module: Address,
+    /// TicketPriceOracle, used to set ticket price
+    pub ticket_price_oracle: Address,
 }
 
 #[cfg(feature = "wasm")]
@@ -63,6 +66,8 @@ impl From<&wasm::ContractAddresses> for ContractAddresses {
                 .expect("invalid node_safe_registry address given"),
             node_management_module: Address::from_str(&x.node_management_module)
                 .expect("invalid node_management_module address given"),
+            ticket_price_oracle: Address::from_str(&x.ticket_price_oracle)
+                .expect("invalid ticket_price_oracle address given"),
         }
     }
 }
@@ -130,6 +135,10 @@ where
             RegisteredNodeSafeFilter::signature(),
             DergisteredNodeSafeFilter::signature(),
         ]
+    }
+
+    pub fn get_ticket_price_oracle_topics(&self) -> Vec<TxHash> {
+        vec![TicketPriceUpdatedFilter::signature()]
     }
 
     async fn on_announcement_event<T>(
@@ -516,6 +525,30 @@ where
         Ok(())
     }
 
+    async fn on_ticket_price_oracle_event<T>(&self, db: &mut T, log: &RawLog, _snapshot: &Snapshot) -> Result<()>
+    where
+        T: HoprCoreEthereumDbActions,
+    {
+        match HoprTicketPriceOracleEvents::decode_log(log)? {
+            HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
+                let old_price: U256 = u256::from_be_bytes(update.0.into()).into();
+                let new_price: U256 = u256::from_be_bytes(update.1.into()).into();
+
+                debug!(
+                    "on_ticket_price_updated - old: {:?} - new: {:?}",
+                    old_price.to_string(),
+                    new_price.to_string()
+                );
+
+                db.set_ticket_price(&new_price).await?;
+            }
+            HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
+                // ignore ownership transfer event
+            }
+        }
+        Ok(())
+    }
+
     pub async fn on_event<T>(
         &self,
         db: &mut T,
@@ -545,6 +578,8 @@ where
             return self.on_node_safe_registry_event(db, log, snapshot).await;
         } else if address.eq(&self.addresses.node_management_module) {
             return self.on_node_management_module_event(db, log, snapshot).await;
+        } else if address.eq(&self.addresses.ticket_price_oracle) {
+            return self.on_ticket_price_oracle_event(db, log, snapshot).await;
         } else {
             error!(
                 "on_event error - unknown contract address: {:?} - received log: {:?}",
@@ -608,6 +643,7 @@ pub mod tests {
     const ANNOUNCEMENTS_ADDR: [u8; 20] = hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
     const SAFE_MANAGEMENT_MODULE_ADDR: [u8; 20] = hex!("9b91245a65ad469163a86e32b2281af7a25f38ce"); // just a dummy
     const SAFE_INSTANCE_ADDR: [u8; 20] = hex!("b93d7fdd605fb64fdcc87f21590f950170719d47"); // just a dummy
+    const TICKET_PRICE_ORACLE_ADDR: [u8; 20] = hex!("11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
         let opt = rusty_leveldb::in_memory();
@@ -638,6 +674,7 @@ pub mod tests {
                 node_safe_registry: NODE_SAFE_REGISTRY_ADDR.try_into().unwrap(),
                 announcements: ANNOUNCEMENTS_ADDR.try_into().unwrap(),
                 node_management_module: SAFE_MANAGEMENT_MODULE_ADDR.try_into().unwrap(),
+                ticket_price_oracle: TICKET_PRICE_ORACLE_ADDR.try_into().unwrap(),
             },
             chain_key: SELF_CHAIN_ADDRESS.try_into().unwrap(),
             address_to_monitor: SELF_CHAIN_ADDRESS.try_into().unwrap(),
@@ -1529,6 +1566,7 @@ pub mod wasm {
         pub announcements: String,
         pub node_safe_registry: String,
         pub node_management_module: String,
+        pub ticket_price_oracle: String,
     }
 
     impl From<&super::ContractAddresses> for ContractAddresses {
@@ -1540,6 +1578,7 @@ pub mod wasm {
                 announcements: x.announcements.to_string(),
                 node_safe_registry: x.node_safe_registry.to_string(),
                 node_management_module: x.node_management_module.to_string(),
+                ticket_price_oracle: x.ticket_price_oracle.to_string(),
             }
         }
     }
@@ -1591,6 +1630,15 @@ pub mod wasm {
         pub fn get_node_safe_registry_topics(&self) -> Vec<JsString> {
             self.w
                 .get_node_safe_registry_topics()
+                .iter()
+                .map(|t| JsString::from(format!("0x{}", hex::encode(t.0))))
+                .collect::<Vec<_>>()
+        }
+
+        #[wasm_bindgen]
+        pub fn get_ticket_price_oracle_topics(&self) -> Vec<JsString> {
+            self.w
+                .get_ticket_price_oracle_topics()
                 .iter()
                 .map(|t| JsString::from(format!("0x{}", hex::encode(t.0))))
                 .collect::<Vec<_>>()

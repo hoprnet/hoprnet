@@ -56,6 +56,7 @@ export function getContractData(id: string): DeploymentExtract {
     hoprChannelsAddress: resolvedNetwork.channels,
     hoprNetworkRegistryAddress: resolvedNetwork.network_registry,
     hoprNodeSafeRegistryAddress: resolvedNetwork.node_safe_registry,
+    hoprTicketPriceOracleAddress: resolvedNetwork.ticket_price_oracle,
     indexerStartBlockNumber: resolvedNetwork.channel_contract_deploy_block
   }
 }

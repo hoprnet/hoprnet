@@ -68,6 +68,7 @@ export type DeploymentExtract = {
   hoprChannelsAddress: string
   hoprNetworkRegistryAddress: string
   hoprNodeSafeRegistryAddress: string
+  hoprTicketPriceOracleAddress: string
   indexerStartBlockNumber: number
 }
 
@@ -1076,6 +1077,7 @@ export async function createChainWrapper(
       hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
       hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,
       hoprNodeSafeRegistryAddress: deploymentExtract.hoprNodeSafeRegistryAddress,
+      hoprTicketPriceOracleAddress: deploymentExtract.hoprTicketPriceOracleAddress,
       moduleAddress: safeModuleOptions.moduleAddress.to_hex(),
       safeAddress: safeModuleOptions.safeAddress.to_hex(),
       noticePeriodChannelClosure

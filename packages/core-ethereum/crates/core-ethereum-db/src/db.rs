@@ -561,6 +561,28 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
+    async fn get_ticket_price(&self) -> Result<U256> {
+        //utils_log::debug!("DB: get_ticket_price");
+        let key = utils_db::db::Key::new_from_str(TICKET_PRICE_KEY)?;
+
+        self.db
+            .get_or_none::<U256>(key)
+            .await
+            .map(|v| v.unwrap_or(U256::zero()))
+    }
+
+    async fn set_ticket_price(&mut self, ticket_price: &U256) -> Result<()> {
+        let key = utils_db::db::Key::new_from_str(TICKET_PRICE_KEY)?;
+
+        let _ = self
+            .db
+            .set::<U256>(key, ticket_price)
+            .await
+            .map(|v| v.unwrap_or(U256::zero()))?;
+
+        Ok(())
+    }
+
     async fn get_node_safe_registry_domain_separator(&self) -> Result<Option<Hash>> {
         let key = utils_db::db::Key::new_from_str(NODE_SAFE_REGISTRY_DOMAIN_SEPARATOR_KEY)?;
         self.db.get_or_none::<Hash>(key).await
@@ -976,7 +998,7 @@ pub mod wasm {
     use js_sys::Uint8Array;
     use std::sync::Arc;
     use utils_db::leveldb;
-    use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot};
+    use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
     use wasm_bindgen::prelude::*;
 
     macro_rules! to_iterable {
@@ -1410,6 +1432,24 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_hopr_balance(balance).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_ticket_price(&self) -> Result<U256, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_ticket_price().await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn set_ticket_price(&self, ticket_price: &U256) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.set_ticket_price(ticket_price).await)
             //}
         }
 

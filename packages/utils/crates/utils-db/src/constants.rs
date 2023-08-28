@@ -18,6 +18,7 @@ pub const LATEST_CONFIRMED_SNAPSHOT_KEY: &str = "latestConfirmedSnapshot";
 pub const PENDING_ACKNOWLEDGEMENTS_PREFIX: &str = "tickets:pending-acknowledgement-";
 pub const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
 pub const HOPR_BALANCE_KEY: &str = "hopr-balance";
+pub const TICKET_PRICE_KEY: &str = "ticket-price";
 pub const STAKING_SAFE_ADDRESS_KEY: &str = "staking:safe-address";
 pub const STAKING_MODULE_ADDRESS_KEY: &str = "staking:module-address";
 pub const STAKING_SAFE_ALLOWANCE_KEY: &str = "staking:safe-allowance";
