@@ -32,17 +32,17 @@
     },
     "rotsee": {
       "environment_type": "staging",
-      "indexer_start_block_number": 0,
+      "indexer_start_block_number": 29690361,
       "addresses": {
-        "channels": "0x0000000000000000000000000000000000000000",
-        "module_implementation": "0x0000000000000000000000000000000000000000",
-        "network_registry": "0x0000000000000000000000000000000000000000",
-        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
-        "node_safe_registry": "0x0000000000000000000000000000000000000000",
-        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
+        "module_implementation": "0x32863c4974fBb6253E338a0cb70C382DCeD2eFCb",
+        "network_registry": "0x15a315E1320cFF0de84671c0139042EE320CE38d",
+        "network_registry_proxy": "0x20559cbD3C2eDcD0b396431226C00D2Cd102eB3F",
+        "node_safe_registry": "0x4F7C7dE3BA2B29ED8B2448dF2213cA43f94E45c0",
+        "node_stake_v2_factory": "0x791d190b2c95397F4BcE7bD8032FD67dCEA7a5F2",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
-        "announcements": "0x0000000000000000000000000000000000000000"
+        "ticket_price_oracle": "0x442df1d946303fB088C9377eefdaeA84146DA0A6",
+        "announcements": "0x7257fbdcbC81a37F8C830Deb8DD3b715f1D1BBa5"
       }
     },
     "debug-staging": {
