@@ -129,9 +129,6 @@ mod tests {
     lazy_static! {
         static ref SENDER_PRIV_KEY: ChainKeypair = ChainKeypair::from_secret(&SENDER_PRIV_BYTES).unwrap();
         static ref TARGET_PRIV_KEY: ChainKeypair = ChainKeypair::from_secret(&TARGET_PRIV_BYTES).unwrap();
-        static ref SENDER_PUB: PublicKey = PublicKey::from_privkey(&SENDER_PRIV_BYTES).unwrap();
-        static ref TARGET_PUB: PublicKey = PublicKey::from_privkey(&TARGET_PRIV_BYTES).unwrap();
-        static ref TARGET_ADDR: Address = Address::new(&hex!("65e78d07acf7b654e5ae6777a93ebbf30f639356"));
     }
 
     mock! {
@@ -241,7 +238,7 @@ mod tests {
 
     fn create_valid_ticket() -> Ticket {
         Ticket::new(
-            &TARGET_ADDR,
+            &TARGET_PRIV_KEY.public().to_address(),
             &Balance::new(1u64.into(), BalanceType::HOPR),
             1u64.into(),
             1u64.into(),
@@ -255,8 +252,8 @@ mod tests {
 
     fn create_channel_entry() -> ChannelEntry {
         ChannelEntry::new(
-            TARGET_ADDR.clone(),
-            TARGET_ADDR.clone(),
+            SENDER_PRIV_KEY.public().to_address(),
+            TARGET_PRIV_KEY.public().to_address(),
             Balance::new(100u64.into(), BalanceType::HOPR),
             U256::zero(),
             ChannelStatus::Open,
@@ -277,8 +274,8 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
-            Balance::from_str("1", BalanceType::HOPR),
+            &SENDER_PRIV_KEY.public().to_address(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
             &Hash::default(),
@@ -299,7 +296,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &TARGET_PUB.to_address(),
+            &TARGET_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -326,7 +323,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(2u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -356,7 +353,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -384,7 +381,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -414,7 +411,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -442,7 +439,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -471,7 +468,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -495,7 +492,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -526,7 +523,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             true,
@@ -557,7 +554,7 @@ mod tests {
             &db,
             &ticket,
             &channel,
-            &SENDER_PUB.to_address(),
+            &SENDER_PRIV_KEY.public().to_address(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             1.0f64,
             false,
@@ -573,13 +570,13 @@ mod tests {
         let level_db = Arc::new(Mutex::new(
             rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
         ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.to_address());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PRIV_KEY.public().to_address());
 
         let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
         let unack = UnacknowledgedTicket::new(
             create_valid_ticket(),
             HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
-            SENDER_PUB.to_address(),
+            SENDER_PRIV_KEY.public().to_address(),
         );
 
         db.store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack))
@@ -596,13 +593,7 @@ mod tests {
         match pending {
             PendingAcknowledgement::WaitingAsSender => panic!("must not be pending as sender"),
             PendingAcknowledgement::WaitingAsRelayer(ticket) => {
-                let ack = AcknowledgedTicket::new(
-                    ticket.ticket,
-                    Response::new(&random_bytes::<{ Response::SIZE }>()),
-                    SENDER_PUB.to_address(),
-                    &TARGET_PRIV_KEY,
-                    &Hash::default(),
-                ).unwrap();
+                let ack = ticket.acknowledge(&HalfKey::default(), &TARGET_PRIV_KEY, &Hash::default()).unwrap();
                 db.replace_unack_with_ack(&hkc, ack).await.unwrap();
 
                 let num_tickets = db.get_tickets(None).await.unwrap().len();
@@ -620,7 +611,7 @@ mod tests {
         let level_db = Arc::new(Mutex::new(
             rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
         ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PUB.to_address());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), SENDER_PRIV_KEY.public().to_address());
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
         let dummy_index = U256::one();
