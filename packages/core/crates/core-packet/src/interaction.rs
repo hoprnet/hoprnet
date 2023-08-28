@@ -560,8 +560,7 @@ where
         self.db.write().await.mark_pending(&destination, &ticket).await?;
 
         debug!(
-            "Creating ticket in channel {channel_id}. Ticket data: {}",
-            ticket.to_hex()
+            "Creating ticket in channel {channel_id}.",
         );
 
         #[cfg(all(feature = "prometheus", not(test)))]
