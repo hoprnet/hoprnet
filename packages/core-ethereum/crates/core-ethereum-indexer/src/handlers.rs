@@ -13,13 +13,13 @@ use bindings::{
     },
     hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::{DergisteredNodeSafeFilter, HoprNodeSafeRegistryEvents, RegisteredNodeSafeFilter},
-    hopr_token::{AllowanceCall, ApprovalFilter, HoprTokenEvents, TransferFilter},
+    hopr_token::{ApprovalFilter, HoprTokenEvents, TransferFilter},
 };
 use core_crypto::types::{Hash, OffchainSignature};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     account::{AccountEntry, AccountSignature, AccountType},
-    channels::{self, generate_channel_id, ChannelEntry, ChannelStatus},
+    channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{
     contract::{EthEvent, EthLogDecode},

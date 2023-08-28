@@ -491,8 +491,8 @@ pub mod tests {
         .await;
 
         let chain = ChainCalls::new(
-            OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
-            ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap(),
+            &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
+            &ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap(),
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
         );
 
@@ -529,8 +529,8 @@ pub mod tests {
 
         let keypair = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap();
         let chain = ChainCalls::new(
-            OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
-            keypair.clone(),
+            &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
+            &keypair,
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
         );
 
