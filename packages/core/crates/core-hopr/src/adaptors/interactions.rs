@@ -2,7 +2,7 @@ use futures::channel::mpsc::{channel, unbounded, Sender, UnboundedSender};
 use futures::future::poll_fn;
 
 use core_crypto::types::HalfKeyChallenge;
-use core_types::acknowledgement::{AcknowledgedTicket};
+use core_types::acknowledgement::AcknowledgedTicket;
 use utils_log::error;
 
 #[cfg(feature = "wasm")]
@@ -46,7 +46,10 @@ pub mod wasm {
 
                 wasm_bindgen_futures::spawn_local(async move {
                     while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                        if let Err(e) = on_ack_tkt_fn.call1(&JsValue::null(), &core_types::acknowledgement::wasm::AcknowledgedTicket::from(ack).into()) {
+                        if let Err(e) = on_ack_tkt_fn.call1(
+                            &JsValue::null(),
+                            &core_types::acknowledgement::wasm::AcknowledgedTicket::from(ack).into(),
+                        ) {
                             error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
                         }
                     }
