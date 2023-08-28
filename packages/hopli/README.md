@@ -130,6 +130,19 @@ hopli create-safe-module --network anvil-localhost \
     --contracts-root "../ethereum/contracts"
 ```
 
+Migrate an exising set of node(d) with safe and module to a new network
+
+```
+PRIVATE_KEY=<bank_private_key> \
+hopli migrate-safe-module --network anvil-localhost \
+    --identity-directory "./test" \
+    --password-path "./test/.pwd" \
+    --safe-address <safe_address> \
+    --module-address <module_address> \
+    --hopr-amount 10 --native-amount 0.1 \
+    --contracts-root "../ethereum/contracts"
+```
+
 ## Development
 
 ### Run local development
@@ -224,7 +237,20 @@ Express create a safe and a module instances, then set default permissions
 PRIVATE_KEY=<bank_private_key> \
     cargo run -- create-safe-module --network anvil-localhost \
     --identity-directory "./test" \
-    --password-path "/test/.pwd" \
+    --password-path "./test/.pwd" \
+    --hopr-amount 10 --native-amount 0.1 \
+    --contracts-root "../ethereum/contracts"
+```
+
+Migrate an exising set of node(d) with safe and module to a new network
+
+```
+PRIVATE_KEY=<bank_private_key> \
+    cargo run -- migrate-safe-module --network anvil-localhost \
+    --identity-directory "./test" \
+    --password-path "./test/.pwd" \
+    --safe-address <safe_address> \
+    --module-address <module_address> \
     --hopr-amount 10 --native-amount 0.1 \
     --contracts-root "../ethereum/contracts"
 ```
