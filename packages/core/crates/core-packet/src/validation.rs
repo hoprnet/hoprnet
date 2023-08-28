@@ -99,10 +99,10 @@ mod tests {
     use async_trait::async_trait;
     use core_crypto::random::random_bytes;
     use core_crypto::types::OffchainPublicKey;
-    use core_crypto::types::{HalfKey, Response};
+    use core_crypto::types::{HalfKey};
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair},
-        types::{HalfKeyChallenge, Hash, PublicKey},
+        types::{HalfKeyChallenge, Hash},
     };
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
