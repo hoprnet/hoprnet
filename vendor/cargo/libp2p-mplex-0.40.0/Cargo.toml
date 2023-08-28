@@ -58,7 +58,7 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.2"
+version = "0.2.3"
 
 [dependencies.unsigned-varint]
 version = "0.7"
