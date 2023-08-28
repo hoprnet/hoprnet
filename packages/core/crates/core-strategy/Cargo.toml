@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-trait = "0.1"
 getrandom = { workspace = true }
 js-sys = { workspace = true, optional = true }
 rand = "0.8.5"

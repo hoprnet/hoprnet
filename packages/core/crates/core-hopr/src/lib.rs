@@ -96,12 +96,13 @@ impl HoprTools {
 
 /// Enum differentiator for loop component futures.
 ///
-/// Used to differentiate the type of the future that exits the loop premateruly
+/// Used to differentiate the type of the future that exits the loop prematurely
 /// by tagging it as an enum.
 #[derive(Debug, Clone)]
 pub enum HoprLoopComponents {
     Swarm,
     Heartbeat,
+    Strategy
 }
 
 impl std::fmt::Display for HoprLoopComponents {
@@ -115,6 +116,7 @@ impl std::fmt::Display for HoprLoopComponents {
                 f,
                 "heartbeat component responsible for maintaining the network quality measurements"
             ),
+            HoprLoopComponents::Strategy => "component for generating strategy ticks"
         }
     }
 }

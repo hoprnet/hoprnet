@@ -54,7 +54,6 @@ export interface ChannelStrategyInterface {
 
   onChannelWillClose(channel: ChannelEntry): Promise<void> // Before a channel closes
   onAckedTicket(t: AcknowledgedTicket): Promise<void>
-  shouldCommitToChannel(c: ChannelEntry): boolean
 
   tickInterval: number
 }
@@ -97,11 +96,6 @@ export abstract class SaneDefaults {
     } else {
       log(`channel ${channel.get_id().to_hex()} is closing, not auto-redeeming tickets`)
     }
-  }
-
-  shouldCommitToChannel(c: ChannelEntry): boolean {
-    log(`committing to channel ${c.get_id().to_hex()}`)
-    return true
   }
 
   tickInterval = CHECK_TIMEOUT

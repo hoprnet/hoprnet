@@ -1334,6 +1334,7 @@ dependencies = [
 name = "core-strategy"
 version = "0.3.0"
 dependencies = [
+ "async-trait",
  "console_error_panic_hook",
  "core-types",
  "getrandom 0.2.10",
