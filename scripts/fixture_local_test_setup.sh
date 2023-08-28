@@ -186,7 +186,7 @@ function reuse_pregenerated_identities() {
     peer_id="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.peer_id")"
     native_address="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.native_address")"
 
-    log "\tnode1"
+    log "\tnode ${i}"
     log "\t\tpeer id: ${peer_id}"
     log "\t\tnative address: ${native_address}"
   done
@@ -416,6 +416,16 @@ wait_for_regex "${node5_log}" "STARTED NODE"
 wait_for_regex "${node6_log}" "STARTED NODE"
 wait_for_port 19096 "127.0.0.1" "${node6_log}"
 wait_for_regex "${node7_log}" "STARTED NODE"
+# }}}
+
+log "Sleep for 30 seconds to ensure announcements are confirmed on-chain"
+sleep 30
+
+log "Restarting node 1 to ensure restart works as expected"
+#  --- Restart check --- {{{
+lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+wait_for_regex "${node1_log}" "STARTED NODE"
 # }}}
 
 #  --- Ensure data directories are used --- {{{

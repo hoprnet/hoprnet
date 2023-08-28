@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.37"
 name = "pin-project-lite"
-version = "0.2.12"
+version = "0.2.13"
 exclude = [
     "/.*",
     "/tools",

@@ -1,6 +1,7 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt, type DeploymentExtract } from './ethereum.js'
+import { BigNumber } from 'ethers'
 import {
   AcknowledgedTicket,
   Balance,
@@ -213,9 +214,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  announce(multiaddr: Multiaddr): Promise<string> {
+  announce(multiaddr: Multiaddr, useSafe: boolean = false): Promise<string> {
     // Currently we announce always with key bindings
-    return this.chain.announce(multiaddr, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
+    return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -250,7 +251,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   /**
-   * Retrieves HOPR balance, optionally uses the indexer.
+   * Retrieves HOPR balance of the node, optionally uses the indexer.
    * The difference from the two methods is that the latter relys on
    * the coming events which require 8 blocks to be confirmed.
    * @returns HOPR balance
@@ -266,18 +267,26 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   /**
+   * Retrieves HOPR balance of the safe.
+   * @returns HOPR balance
+   */
+  public async getSafeBalance(): Promise<Balance> {
+    return this.chain.getBalance(this.safeModuleOptions.safeAddress)
+  }
+
+  /**
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => {
-    return this.chain.getNativeBalance(this.chainKeypair.to_address())
+  private uncachedGetNativeBalance = (address: string) => {
+    return this.chain.getNativeBalance(Address.from_string(address))
   }
-  private cachedGetNativeBalance = cacheNoArgAsyncFunction<Balance>(
-    this.uncachedGetNativeBalance,
-    constants.PROVIDER_CACHE_TTL
-  )
-  public async getNativeBalance(useCache: boolean = false): Promise<Balance> {
-    return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
+
+  private cachedGetNativeBalance = (address: string) =>
+    cacheNoArgAsyncFunction<Balance>(() => this.uncachedGetNativeBalance(address), constants.PROVIDER_CACHE_TTL)
+
+  public async getNativeBalance(address: string, useCache: boolean = false): Promise<Balance> {
+    return useCache ? this.cachedGetNativeBalance(address)() : this.uncachedGetNativeBalance(address)
   }
 
   public smartContractInfo(): {
@@ -526,7 +535,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Channel is already opened')
     }
 
-    const myBalance = await this.getBalance()
+    const myBalance = await this.getSafeBalance()
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
     }
@@ -547,28 +556,61 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public async fundChannel(dest: Address, myFund: Balance, counterpartyFund: Balance): Promise<Receipt> {
     const totalFund = myFund.add(counterpartyFund)
-    const myBalance = await this.getBalance()
+    const myBalance = await this.getSafeBalance()
     if (totalFund.gt(myBalance)) {
       throw Error('We do not have enough balance to fund the channel')
     }
-    log(`====> fundChannel: src: ${this.chainKeypair.to_address().to_string()} dest: ${dest.to_string()}`)
+    log(
+      `====> fundChannel: src: ${this.chainKeypair
+        .to_address()
+        .to_string()} dest: ${dest.to_string()} amount: ${myFund.to_string()} | ${counterpartyFund.to_string()}`
+    )
 
     const allowance = Balance.deserialize(
       (await this.db.get_staking_safe_allowance()).serialize_value(),
       BalanceType.HOPR
     )
-    if (allowance.lt(myBalance)) {
+    if (allowance.lt(myFund)) {
       throw Error('We do not have enough allowance to fund the channel')
     }
     return (
       await this.chain.fundChannel(
         dest,
-        counterpartyFund,
-        // (txHash: string) => this.setTxHandler(`token-approved-${txHash}`, txHash),
+        myFund,
         (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
         // we are only interested in fundChannel receipt
       )
     )[1]
+  }
+
+  public async isSafeAnnouncementAllowed(): Promise<boolean> {
+    // the position comes from the order of values in the smart contract
+    const ALLOW_ALL_ENUM_POSITION = 3
+    const targetAddress = this.chain.getInfo().hoprAnnouncementsAddress
+    const target = await this.chain.getNodeManagementModuleTargetInfo(targetAddress)
+    if (target) {
+      const targetAddress2 = target.shr(96)
+      const targetPermission = target.shl(176).shr(248)
+      const addressMatches = BigNumber.from(targetAddress).eq(targetAddress2)
+      const permissionIsAllowAll = BigInt.asUintN(8, targetPermission.toBigInt()) == BigInt(ALLOW_ALL_ENUM_POSITION)
+      return addressMatches && permissionIsAllowAll
+    }
+    return false
+  }
+
+  public async isNodeSafeRegisteredCorrectly(): Promise<boolean> {
+    const nodeAddress = this.chainKeypair.to_address()
+    const safeAddress = this.safeModuleOptions.safeAddress
+    const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
+    log('Currently registered Safe address in NodeSafeRegistry = %s', registeredAddress.to_string())
+    return registeredAddress.eq(Address.deserialize(safeAddress.serialize()))
+  }
+
+  public async isNodeSafeNotRegistered(): Promise<boolean> {
+    const nodeAddress = this.chainKeypair.to_address()
+    const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
+    log('Currently registered Safe address in NodeSafeRegistry = %s', registeredAddress.to_string())
+    return registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))
   }
 
   public async registerSafeByNode(): Promise<Receipt> {
@@ -583,27 +625,25 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
 
     const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
+    log('Currently registered Safe address in NodeSafeRegistry = %s', registeredAddress.to_string())
 
     let receipt = undefined
     if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
-      // if the node is not associated with any safe address, register it
+      log('Node is not associated with a Safe in NodeSafeRegistry yet')
       receipt = await this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
         this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
       )
     } else if (!registeredAddress.eq(Address.deserialize(safeAddress.serialize()))) {
       // the node has been associated with a differnt safe address
+      log('Node is associated with a different Safe in NodeSafeRegistry')
       throw Error('Node has been registered with a different safe')
+    } else {
+      log('Node is associated with correct Safe in NodeSafeRegistry')
     }
 
-    // the node has been associated with the provided safe address
-    log(`====> registerSafeByNode registeredAddress: is safeAddress`)
-
-    // update safe and module address
-    log(`>> should update safe and module address`)
+    log('update safe and module addresses in database')
     await this.db.set_staking_safe_address(safeAddress)
-    log(`>> set staking safe address`)
     await this.db.set_staking_module_address(this.safeModuleOptions.moduleAddress)
-    log(`>> set staking module address`)
 
     return receipt
   }

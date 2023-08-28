@@ -222,7 +222,7 @@ async function validateOpenChannelParameters(
   const counterparty: Address = Address.from_string(counterpartyAddressStr)
   const amount: BN = new BN(amountStr)
 
-  const balance = await node.getBalance()
+  const balance = await node.getSafeBalance()
   if (amount.lten(0) || balance.lt(balance.of_same(amount.toString()))) {
     return {
       valid: false,
@@ -277,10 +277,13 @@ export async function openChannel(
     const { channelId, receipt } = await node.openChannel(validationResult.counterparty, validationResult.amount)
     return { success: true, channelId: channelId.to_hex(), receipt }
   } catch (err) {
+    console.log('ERROR OPEN CHANNEL', err)
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE
 
     if (errString.includes('Channel is already opened')) {
       return { success: false, reason: STATUS_CODES.CHANNEL_ALREADY_OPEN }
+    } else if (errString.includes('not have enough allowance')) {
+      return { success: false, reason: STATUS_CODES.NOT_ENOUGH_ALLOWANCE }
     } else {
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
     }
@@ -305,6 +308,9 @@ const POST: Operation = [
       switch (openingResult.reason) {
         case STATUS_CODES.NOT_ENOUGH_BALANCE:
           res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })
+          break
+        case STATUS_CODES.NOT_ENOUGH_ALLOWANCE:
+          res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_ALLOWANCE })
           break
         case STATUS_CODES.CHANNEL_ALREADY_OPEN:
           res.status(409).send({ status: STATUS_CODES.CHANNEL_ALREADY_OPEN })
@@ -384,7 +390,7 @@ POST.apiDoc = {
       $ref: '#/components/responses/Unauthorized'
     },
     '403': {
-      description: 'Failed to open the channel because of insufficient HOPR balance.',
+      description: 'Failed to open the channel because of insufficient HOPR balance or allowance.',
       content: {
         'application/json': {
           schema: {

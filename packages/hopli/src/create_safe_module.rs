@@ -14,7 +14,6 @@ use ethers::{
 use log::{log, Level};
 use std::env;
 
-
 /// CLI arguments for `hopli create-safe-module`
 #[derive(Parser, Default, Debug)]
 pub struct CreateSafeModuleArgs {

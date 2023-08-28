@@ -27,7 +27,6 @@ import {
   AcknowledgedTicket,
   ChannelStatus,
   ChannelEntry,
-  PublicKey,
   Ticket,
   Hash,
   HalfKeyChallenge,
@@ -202,7 +201,6 @@ export class Hopr extends EventEmitter {
   private networkPeers: WasmNetwork
   private pinger: WasmPing
   private index_updater: WasmIndexerInteractions
-  private pubKey: PublicKey
   private id: PeerId
   private main_loop: Promise<void>
 
@@ -262,7 +260,7 @@ export class Hopr extends EventEmitter {
 
     const connector = HoprCoreEthereum.getInstance()
 
-    const balance = await connector.getNativeBalance(false)
+    const balance = await connector.getNativeBalance(this.getEthereumAddress().to_string())
 
     verbose(
       `Ethereum account ${this.getEthereumAddress().to_hex()} has ${balance.to_formatted_string()}. Mininum balance is ${new Balance(
@@ -289,7 +287,10 @@ export class Hopr extends EventEmitter {
 
     // Fetch previous announcements from database
     const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
-    log('Using initial nodes: ' + initialNodes)
+    log(
+      'Using initial nodes: ',
+      initialNodes.map((n) => n.id.toString())
+    )
 
     // Fetch all nodes that announce themselves during startup
     const recentlyAnnouncedNodes: PeerStoreAddress[] = []
@@ -364,27 +365,44 @@ export class Hopr extends EventEmitter {
 
     connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
-    // Add all entry nodes that were announced during startup
+    // Add all entry nodes that were announced during startup or were already
+    // known in the database.
     connector.indexer.off('peer', pushToRecentlyAnnouncedNodes)
+    for (const announcedNode of initialNodes) {
+      await this.onPeerAnnouncement(announcedNode)
+    }
     for (const announcedNode of recentlyAnnouncedNodes) {
       await this.onPeerAnnouncement(announcedNode)
     }
 
-    try {
-      await this.announce(this.options.announce)
-    } catch (err) {
-      console.error(`Could not announce self on-chain`)
-      console.error(`Observed error:`, err)
-      process.exit(1)
+    // If this is the first time the node starts up it has not registered a safe
+    // yet, therefore it may announce directly. Trying that to get the first
+    // announcement through. Otherwise, it may announce with the safe variant.
+    if (await connector.isNodeSafeNotRegistered()) {
+      log('No NodeSafeRegistry entry yet, proceeding with direct announcement')
+      try {
+        await this.announce(this.options.announce)
+      } catch (err) {
+        console.error('Could not announce directly self on-chain: ', err)
+        process.exit(1)
+      }
+    } else {
+      log('NodeSafeRegistry entry already present, proceeding with Safe-Module announcement')
+      try {
+        await this.announce(this.options.announce, true)
+      } catch (err) {
+        console.error('Could not announce through Safe-Module self on-chain: ', err)
+        process.exit(1)
+      }
     }
 
+    // Possibly register node-safe pair to NodeSafeRegistry. Following that the
+    // connector is set to use safe tx variants.
     try {
-      // register node-safe pair to NodeSafeRegistry
       log(`check node-safe registry`)
       await this.registerSafeByNode()
     } catch (err) {
-      console.error(`Could not register node with safe`)
-      console.error(`Observed error:`, err)
+      console.error('Could not register node with safe: ', err)
       process.exit(1)
     }
 
@@ -895,9 +913,10 @@ export class Hopr extends EventEmitter {
    * Announces address of node on-chain to be reachable by other nodes.
    * @dev Promise resolves before own announcement appears in the indexer
    * @param announceRoutableAddress publish routable address if true
+   * @param useSafe use Safe-variant of call if true
    * @returns a Promise that resolves once announce transaction has been published
    */
-  private async announce(announceRoutableAddress = false): Promise<void> {
+  private async announce(announceRoutableAddress = false, useSafe = false): Promise<void> {
     let routableAddressAvailable = false
 
     // Address that we will announce soon
@@ -943,18 +962,40 @@ export class Hopr extends EventEmitter {
     const ownAccount = await connector.getAccount(this.getEthereumAddress())
 
     // Do not announce if our last is equal to what we intend to announce
+    log('known own multiaddr from previous announcement %s', ownAccount?.get_multiaddr_str())
     if (ownAccount?.get_multiaddr_str() === addrToAnnounce.toString()) {
       log(`intended address has already been announced, nothing to do`)
       return
     }
 
+    // only announce when:
+    // (1) directly, safe is not used
+    // (2) safe is used, correctly set, and target has been configured with ALLOW_ALL
     try {
-      log(
-        'announcing on-chain %s routable address',
-        announceRoutableAddress && routableAddressAvailable ? 'with' : 'without'
-      )
-      const announceTxHash = await connector.announce(addrToAnnounce)
-      log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
+      if (!useSafe) {
+        log(
+          'announcing directy on-chain %s routable address %s',
+          announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
+          addrToAnnounce.toString()
+        )
+        const announceTxHash = await connector.announce(addrToAnnounce)
+        log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
+      } else {
+        const isRegisteredCorrectly = await connector.isNodeSafeRegisteredCorrectly()
+        const isAnnouncementAllowed = await connector.isSafeAnnouncementAllowed()
+        if (isRegisteredCorrectly && isAnnouncementAllowed) {
+          log(
+            'announcing via Safe-Module on-chain %s routable address %s',
+            announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
+            addrToAnnounce.toString()
+          )
+          const announceTxHash = await connector.announce(addrToAnnounce, true)
+          log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
+        } else {
+          // FIXME: implement path through the Safe as delegate
+          error('Cannot announce new multiaddress because Safe-Module configuration does not allow it')
+        }
+      }
     } catch (err) {
       log('announcing address %s failed', addrToAnnounce.toString())
       this.maybeEmitFundsEmptyEvent(err)
@@ -980,12 +1021,23 @@ export class Hopr extends EventEmitter {
   }
 
   public async getBalance(): Promise<Balance> {
+    verbose('Requesting hopr balance for node')
     return await HoprCoreEthereum.getInstance().getBalance(true)
   }
 
   public async getNativeBalance(): Promise<Balance> {
-    verbose('Requesting native balance from node.')
-    return await HoprCoreEthereum.getInstance().getNativeBalance(true)
+    verbose('Requesting native balance for node')
+    return await HoprCoreEthereum.getInstance().getNativeBalance(this.getEthereumAddress().to_string(), true)
+  }
+
+  public async getSafeBalance(): Promise<Balance> {
+    verbose('Requesting hopr balance for safe')
+    return await HoprCoreEthereum.getInstance().getSafeBalance()
+  }
+
+  public async getSafeNativeBalance(): Promise<Balance> {
+    verbose('Requesting native balance from safe')
+    return await HoprCoreEthereum.getInstance().getNativeBalance(this.smartContractInfo().safeAddress, true)
   }
 
   public smartContractInfo(): {
@@ -1018,16 +1070,16 @@ export class Hopr extends EventEmitter {
       throw Error('Cannot open channel to self!')
     }
 
-    const myAvailableTokens = await HoprCoreEthereum.getInstance().getBalance(true)
+    const myAvailableTokens = await HoprCoreEthereum.getInstance().getSafeBalance()
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
     } else if (amountToFund.gt(new BN(myAvailableTokens.to_string()))) {
       throw Error(
-        `You don't have enough tokens: ${amountToFund.toString(
-          10
-        )}<${myAvailableTokens.to_string()} at address ${this.pubKey.to_address().to_hex()}`
+        `You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.to_string()} at safe address ${
+          this.smartContractInfo().safeAddress
+        }`
       )
     }
 
@@ -1051,7 +1103,7 @@ export class Hopr extends EventEmitter {
    */
   public async fundChannel(counterparty: Address, myFund: BN, counterpartyFund: BN): Promise<string> {
     const connector = HoprCoreEthereum.getInstance()
-    const myBalance = await connector.getBalance(false)
+    const myBalance = await connector.getSafeBalance()
     const totalFund = myFund.add(counterpartyFund)
 
     // validate 'amountToFund'
@@ -1059,9 +1111,9 @@ export class Hopr extends EventEmitter {
       throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
     } else if (totalFund.gt(new BN(myBalance.to_string()))) {
       throw Error(
-        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.to_string()} at address ${this.pubKey
-          .to_address()
-          .to_hex()}`
+        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.to_string()} at safe address ${
+          this.smartContractInfo().safeAddress
+        }`
       )
     }
 
@@ -1353,7 +1405,9 @@ export class Hopr extends EventEmitter {
             try {
               // call connector directly and don't use cache, since this is
               // most likely outdated during node startup
-              const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(false)
+              const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(
+                this.getEthereumAddress().to_string()
+              )
               if (nativeBalance.gte(nativeBalance.of_same(MIN_NATIVE_BALANCE.toString(10)))) {
                 resolve()
               } else {

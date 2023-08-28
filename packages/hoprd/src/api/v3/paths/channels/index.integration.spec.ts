@@ -19,8 +19,7 @@ import { STATUS_CODES } from '../../utils.js'
 let node = sinon.fake as any
 node.getId = sinon.fake.returns(ALICE_PEER_ID)
 node.getEthereumAddress = sinon.fake.returns(ALICE_ETHEREUM_ADDR.clone())
-node.getNativeBalance = sinon.fake.returns(new Balance('10', BalanceType.Native))
-node.getBalance = () => new Balance('1', BalanceType.HOPR)
+node.getSafeBalance = sinon.fake.resolves(new Balance('10', BalanceType.HOPR))
 
 const CHANNEL_ID = channelEntryCreateMock().get_id()
 
@@ -57,9 +56,9 @@ describe('GET /channels', function () {
     new U256('3'),
     new U256('3')
   )
-  node.getChannelsFrom = async () => [outgoing]
-  node.getChannelsTo = async () => [incoming]
-  node.getAllChannels = async () => [incoming, outgoing, otherChannel]
+  node.getChannelsFrom = sinon.fake.resolves([outgoing])
+  node.getChannelsTo = sinon.fake.resolves([incoming])
+  node.getAllChannels = sinon.fake.resolves([incoming, outgoing, otherChannel])
   node.db = sinon.fake()
   node.db.get_account = sinon.fake.resolves(ALICE_ACCOUNT_ENTRY)
 

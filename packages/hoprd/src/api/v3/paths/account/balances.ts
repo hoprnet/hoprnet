@@ -1,16 +1,24 @@
+import { STATUS_CODES } from '../../utils.js'
+
 import type Hopr from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../utils.js'
 
 /**
  * @returns Current HOPR and native balance.
  */
 export const getBalances = async (node: Hopr) => {
-  const [nativeBalance, hoprBalance] = await Promise.all([await node.getNativeBalance(), await node.getBalance()])
+  const [nativeBalance, hoprBalance, safeNativeBalance, safeHoprBalance] = await Promise.all([
+    await node.getNativeBalance(),
+    await node.getBalance(),
+    await node.getSafeNativeBalance(),
+    await node.getSafeBalance()
+  ])
 
   return {
-    native: nativeBalance,
-    hopr: hoprBalance
+    native: nativeBalance.to_string(),
+    hopr: hoprBalance.to_string(),
+    safeNative: safeNativeBalance.to_string(),
+    safeHopr: safeHoprBalance.to_string()
   }
 }
 
@@ -19,10 +27,12 @@ const GET: Operation = [
     const { node } = req.context
 
     try {
-      const { native, hopr } = await getBalances(node)
+      const { native, hopr, safeNative, safeHopr } = await getBalances(node)
       return res.status(200).send({
-        native: native.to_string(),
-        hopr: hopr.to_string()
+        native,
+        hopr,
+        safeNative,
+        safeHopr
       })
     } catch (err) {
       return res
@@ -34,7 +44,7 @@ const GET: Operation = [
 
 GET.apiDoc = {
   description:
-    "Get node's HOPR and native balances. HOPR tokens from this balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance is used to pay for the gas fees for the blockchain.",
+    "Get node's and associated Safe's HOPR and native balances. HOPR tokens from the Safe balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance of the Node is used to pay for the gas fees for the blockchain.",
   tags: ['Account'],
   operationId: 'accountGetBalances',
   responses: {
@@ -49,6 +59,12 @@ GET.apiDoc = {
                 $ref: '#/components/schemas/NativeBalance'
               },
               hopr: {
+                $ref: '#/components/schemas/HoprBalance'
+              },
+              safeNative: {
+                $ref: '#/components/schemas/NativeBalance'
+              },
+              safeHopr: {
                 $ref: '#/components/schemas/HoprBalance'
               }
             }

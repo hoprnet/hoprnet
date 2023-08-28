@@ -311,7 +311,7 @@ dependencies = [
  "futures-core",
  "futures-io",
  "futures-lite",
- "gloo-timers",
+ "gloo-timers 0.2.6",
  "kv-log-macro",
  "log",
  "memchr",
@@ -1188,7 +1188,7 @@ dependencies = [
  "futures",
  "futures-lite",
  "getrandom 0.2.10",
- "gloo-timers",
+ "gloo-timers 0.3.0",
  "js-sys",
  "lazy_static",
  "more-asserts",
@@ -1214,7 +1214,7 @@ dependencies = [
  "futures",
  "futures-lite",
  "getrandom 0.2.10",
- "gloo-timers",
+ "gloo-timers 0.3.0",
  "js-sys",
  "libp2p-identity",
  "mockall",
@@ -1279,7 +1279,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "futures-lite",
- "gloo-timers",
+ "gloo-timers 0.3.0",
  "hex",
  "hex-literal 0.4.1",
  "js-sys",
@@ -2498,7 +2498,7 @@ version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e64b03909df88034c26dc1547e8970b91f98bdb65165d6a4e9110d94263dbb2c"
 dependencies = [
- "gloo-timers",
+ "gloo-timers 0.2.6",
  "send_wrapper 0.4.0",
 ]
 
@@ -2591,6 +2591,18 @@ name = "gloo-timers"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b995a66bb87bebce9a0f4a95aed01daca4872c050bfcb21653361c03bc35e5c"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "gloo-timers"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbb143cf96099802033e0d4f4963b19fd2e0b728bcf076cd9cf7f6634f092994"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -2773,7 +2785,7 @@ dependencies = [
  "async-trait",
  "console_error_panic_hook",
  "core-packet",
- "gloo-timers",
+ "gloo-timers 0.3.0",
  "hex",
  "js-sys",
  "ringbuffer",
@@ -4212,9 +4224,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.12"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12cc1b0bf1727a77a54b6654e7b5f1af8604923edc8b81885f8ec92f9e3f0a05"
+checksum = "8afb450f006bf6385ca15ef45d71d2288452bc3683ce2e2cacc0d18e4be60b58"
 
 [[package]]
 name = "pin-utils"
@@ -6047,7 +6059,7 @@ dependencies = [
  "bincode",
  "console_error_panic_hook",
  "futures-lite",
- "gloo-timers",
+ "gloo-timers 0.3.0",
  "hex",
  "js-sys",
  "mockall",

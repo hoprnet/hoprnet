@@ -1,5 +1,5 @@
 use crate::errors::{
-    CoreEthereumError::{InvalidArguments, InvalidState, NotAWinningTicket},
+    CoreEthereumError::{InvalidArguments, InvalidState},
     Result,
 };
 use bindings::{
@@ -10,12 +10,13 @@ use bindings::{
         InitiateOutgoingChannelClosureCall, InitiateOutgoingChannelClosureSafeCall, RedeemTicketCall,
         RedeemTicketSafeCall, RedeemableTicket, TicketData, Vrfparameters,
     },
+    hopr_node_management_module::ExecTransactionFromModuleCall,
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
     hopr_token::{ApproveCall, TransferCall},
 };
 use core_crypto::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::VrfParameters,
+    types::{VrfParameters},
 };
 use core_types::{account::AccountSignature, acknowledgement::AcknowledgedTicket};
 use ethers::{
@@ -24,11 +25,17 @@ use ethers::{
 };
 use multiaddr::Multiaddr;
 use std::str::FromStr;
-use utils_log::debug;
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
     traits::{BinarySerializable, PeerIdLike},
 };
+
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum Operation {
+    Call = 0,
+    DelegateCall = 1,
+}
 
 struct ChainCalls {
     /// used to announce key binding of off-chain key (ed25519)
@@ -38,17 +45,24 @@ struct ChainCalls {
     chain_key: Address,
     /// address of HoprChannels smart contract
     hopr_channels: Address,
+    hopr_announcements: Address,
     /// stateful, if set to true, all methods returns
     /// Safe-compliant ABI
     use_safe: bool,
 }
 
 impl ChainCalls {
-    pub fn new(offchain_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, hopr_channels: Address) -> Self {
+    pub fn new(
+        offchain_keypair: &OffchainKeypair,
+        chain_keypair: &ChainKeypair,
+        hopr_channels: Address,
+        hopr_announcements: Address,
+    ) -> Self {
         Self {
             offchain_keypair: offchain_keypair.clone(),
             chain_key: chain_keypair.public().to_address(),
             hopr_channels,
+            hopr_announcements,
             use_safe: false,
         }
     }
@@ -57,7 +71,11 @@ impl ChainCalls {
         self.use_safe = enabled;
     }
 
-    pub fn announce(&self, announced_multiaddr: &Multiaddr) -> Result<Vec<u8>> {
+    pub fn get_use_safe(&mut self) -> bool {
+        return self.use_safe;
+    }
+
+    pub fn announce(&self, announced_multiaddr: &Multiaddr, use_safe: bool) -> Result<Vec<u8>> {
         let account_sig = AccountSignature::new(&self.offchain_keypair, &self.chain_key);
 
         if let Some(ending) = announced_multiaddr.protocol_stack().last() {
@@ -72,13 +90,20 @@ impl ChainCalls {
 
         let serialized_signature = account_sig.signature.to_bytes();
 
-        if self.use_safe {
-            Ok(BindKeysAnnounceSafeCall {
+        if use_safe {
+            let call_data = BindKeysAnnounceSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
-                base_multiaddr: announced_multiaddr.to_string(),
-                ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
                 ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                 ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
+                ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
+                base_multiaddr: announced_multiaddr.to_string(),
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_announcements.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -130,16 +155,23 @@ impl ChainCalls {
         }
 
         if self.use_safe {
-            Ok(FundChannelSafeCall {
+            let call_data = FundChannelSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
-                amount: amount.value().as_u128(),
                 account: EthereumAddress::from_slice(&dest.to_bytes()),
+                amount: amount.value().as_u128(),
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_channels.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
             Ok(FundChannelCall {
-                amount: amount.value().as_u128(),
                 account: EthereumAddress::from_slice(&dest.to_bytes()),
+                amount: amount.value().as_u128(),
             }
             .encode())
         }
@@ -172,9 +204,16 @@ impl ChainCalls {
         }
 
         if self.use_safe {
-            Ok(InitiateOutgoingChannelClosureSafeCall {
+            let call_data = InitiateOutgoingChannelClosureSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 destination: EthereumAddress::from_slice(&destination.to_bytes()),
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_channels.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -190,10 +229,17 @@ impl ChainCalls {
         let params = convert_vrf_parameters(&acked_ticket.vrf_params);
 
         if self.use_safe {
-            Ok(RedeemTicketSafeCall {
+            let call_data = RedeemTicketSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 redeemable,
                 params,
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_channels.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -209,9 +255,16 @@ impl ChainCalls {
         }
 
         if self.use_safe {
-            Ok(FinalizeOutgoingChannelClosureSafeCall {
+            let call_data = FinalizeOutgoingChannelClosureSafeCall {
                 self_: H160::from_slice(&self.chain_key.to_bytes()),
                 destination: H160::from_slice(&destination.to_bytes()),
+            }
+            .encode();
+            Ok(ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.hopr_channels.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
             }
             .encode())
         } else {
@@ -492,11 +545,12 @@ pub mod tests {
 
         let chain = ChainCalls::new(
             &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
-            &ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap(),
+            &ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap(),
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
+            HoprAddress::random(),
         );
 
-        let payload = chain.announce(&test_multiaddr).unwrap();
+        let payload = chain.announce(&test_multiaddr, false).unwrap();
 
         let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
@@ -527,14 +581,15 @@ pub mod tests {
         )
         .await;
 
-        let keypair = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes()).unwrap();
+        let keypair = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
         let chain = ChainCalls::new(
             &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
             &keypair,
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
+            HoprAddress::random(),
         );
 
-        let counterparty = ChainKeypair::from_secret(&anvil.keys()[1].clone().to_bytes()).unwrap();
+        let counterparty = ChainKeypair::from_secret(&anvil.keys()[1].clone().to_bytes().as_slice()).unwrap();
 
         let domain_separator: Hash = hopr_channels
             .domain_separator()
@@ -614,9 +669,14 @@ pub mod wasm {
     #[wasm_bindgen]
     impl ChainCalls {
         #[wasm_bindgen(constructor)]
-        pub fn new(offchain_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, hopr_channels: Address) -> Self {
+        pub fn new(
+            offchain_keypair: &OffchainKeypair,
+            chain_keypair: &ChainKeypair,
+            hopr_channels: Address,
+            hopr_announcements: Address,
+        ) -> Self {
             Self {
-                w: super::ChainCalls::new(offchain_keypair, chain_keypair, hopr_channels),
+                w: super::ChainCalls::new(offchain_keypair, chain_keypair, hopr_channels, hopr_announcements),
             }
         }
 
@@ -626,12 +686,17 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn get_announce_payload(&self, announced_multiaddr: &str) -> JsResult<Vec<u8>> {
+        pub fn get_use_safe(&mut self) -> bool {
+            self.w.get_use_safe()
+        }
+
+        #[wasm_bindgen]
+        pub fn get_announce_payload(&self, announced_multiaddr: &str, use_safe: bool) -> JsResult<Vec<u8>> {
             let ma = match Multiaddr::from_str(announced_multiaddr) {
                 Ok(ma) => ma,
                 Err(e) => return Err(JsValue::from(e.to_string())),
             };
-            ok_or_jserr!(self.w.announce(&ma))
+            ok_or_jserr!(self.w.announce(&ma, use_safe))
         }
 
         #[wasm_bindgen]
@@ -679,49 +744,4 @@ pub mod wasm {
             ok_or_jserr!(self.w.deregister_node_by_safe())
         }
     }
-
-    // #[wasm_bindgen]
-    // pub async fn redeem_ticket(
-    //     db: &Database,
-    //     counterparty: &Address,
-    //     channel_id: &Hash,
-    //     acked_ticket: &mut AcknowledgedTicket,
-    //     submit_ticket: &Function, // (counterparty: Address, ackedTicket)
-    // ) -> JsResult<String> {
-    //     debug!("redeeming ticket for counterparty {counterparty} in channel {channel_id}");
-
-    //     //debug!(">>> READ prepare_redeem_ticket");
-    //     let pre_image = {
-    //         let val = db.as_ref_counted();
-    //         let g = val.read().await;
-
-    //         super::prepare_redeem_ticket(&*g, counterparty, channel_id, acked_ticket).await?
-    //     };
-    //     //debug!("<<< READ prepare_redeem_ticket");
-
-    //     let this = JsValue::undefined();
-    //     debug!("submitting tx for ticket redemption in channel {channel_id} to {counterparty}");
-    //     let res = submit_ticket.call2(
-    //         &this,
-    //         &<JsValue as From<Address>>::from(counterparty.to_owned()),
-    //         &<JsValue as From<AcknowledgedTicket>>::from(acked_ticket.to_owned()),
-    //     )?;
-
-    //     let promise: js_sys::Promise = js_sys::Promise::from(res);
-
-    //     let receipt = wasm_bindgen_futures::JsFuture::from(promise)
-    //         .await
-    //         .map_err(|e| format!("Error while trying to submit ticket {:?}", e))?;
-
-    //     //debug!(">>> WRITE after_redeem_ticket");
-    //     {
-    //         let val = db.as_ref_counted();
-    //         let mut g = val.write().await;
-    //         super::after_redeem_ticket(&mut *g, channel_id, &pre_image, acked_ticket).await?;
-    //     }
-    //     //debug!("<<< WRITE after_redeem_ticket");
-    //     debug!("Successfully submitted ticket {}", acked_ticket.response);
-
-    //     Ok(JsString::from(receipt).as_string().unwrap_or("no receipt given".into()))
-    // }
 }

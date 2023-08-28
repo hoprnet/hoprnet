@@ -7,7 +7,6 @@ test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; 
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
-set -x
 
 # set log id and use shared log function for readable logs
 declare mydir
@@ -288,9 +287,6 @@ log "Waiting for nodes to finish open channel (long running)"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-# closing temporary channel just to test get all channels later on
-api_close_channel 1 4 "${api1}" "${addr4}" "outgoing" "true"
-
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
@@ -402,11 +398,12 @@ test_redeem_in_specific_channel() {
 
 # initiate channel closures, but don't wait because this will trigger ticket
 # redemption as well
-api_close_channel 1 2 "${api1}" "${addr2}" "outgoing" & jobs+=( "$!" )
-api_close_channel 2 3 "${api2}" "${addr3}" "outgoing" & jobs+=( "$!" )
-api_close_channel 3 4 "${api3}" "${addr4}" "outgoing" & jobs+=( "$!" )
-api_close_channel 4 5 "${api4}" "${addr5}" "outgoing" & jobs+=( "$!" )
-api_close_channel 5 1 "${api5}" "${addr1}" "outgoing" & jobs+=( "$!" )
+api_close_channel 1 4 "${api1}" "${node_addr4}" "outgoing" & jobs+=( "$!" )
+api_close_channel 1 2 "${api1}" "${node_addr2}" "outgoing" & jobs+=( "$!" )
+api_close_channel 2 3 "${api2}" "${node_addr3}" "outgoing" & jobs+=( "$!" )
+api_close_channel 3 4 "${api3}" "${node_addr4}" "outgoing" & jobs+=( "$!" )
+api_close_channel 4 5 "${api4}" "${node_addr5}" "outgoing" & jobs+=( "$!" )
+api_close_channel 5 1 "${api5}" "${node_addr1}" "outgoing" & jobs+=( "$!" )
 
 # initiate channel closures for channels without tickets so we can check
 # completeness
