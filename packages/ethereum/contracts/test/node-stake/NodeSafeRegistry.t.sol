@@ -291,9 +291,9 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         vm.clearMockedCalls();
     }
 
-    function testFuzz_DomainSeparator(uint256 newChaidId) public {
-        newChaidId = bound(newChaidId, 1, 1e18);
-        vm.assume(newChaidId != block.chainid);
+    function testFuzz_DomainSeparator(uint256 newChainId) public {
+        newChainId = bound(newChainId, 1, 1e18);
+        vm.assume(newChainId != block.chainid);
         bytes32 domainSeparatorOnDeployment = nodeSafeRegistry.domainSeparator();
 
         // call updateDomainSeparator when chainid is the same
@@ -301,7 +301,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         assertEq(nodeSafeRegistry.domainSeparator(), domainSeparatorOnDeployment);
 
         // call updateDomainSeparator when chainid is different
-        vm.chainId(newChaidId);
+        vm.chainId(newChainId);
         vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
         emit DomainSeparatorUpdated(
             keccak256(
@@ -309,7 +309,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
                     keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                     keccak256(bytes("NodeSafeRegistry")),
                     keccak256(bytes(nodeSafeRegistry.VERSION())),
-                    newChaidId,
+                    newChainId,
                     address(nodeSafeRegistry)
                 )
             )
