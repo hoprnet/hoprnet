@@ -14,8 +14,8 @@ import {
   U256
 } from '@hoprnet/hopr-utils'
 
-import { MessageInbox, MessageInboxConfiguration, hoprd_inbox_initialize_crate } from '../../../lib/hoprd_inbox.js'
-hoprd_inbox_initialize_crate()
+import { MessageInbox, MessageInboxConfiguration, hoprd_hoprd_initialize_crate } from '../../../lib/hoprd_hoprd.js'
+hoprd_hoprd_initialize_crate()
 
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { State } from '../../types.js'
