@@ -2,62 +2,62 @@
   "networks": {
     "anvil-localhost": {
       "environment_type": "local",
-      "indexer_start_block_number": 6,
+      "indexer_start_block_number": 34,
       "addresses": {
-        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
-        "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
-        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
-        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-        "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
-        "ticket_price_oracle": "0x59b670e9fA9D0A427751Af201D676719a970857b",
-        "announcements": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
-        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+        "network_registry": "0x4EE6eCAD1c2Dae9f525404De8555724e3c35d07B",
+        "network_registry_proxy": "0x172076E0166D1F9Cc711C77Adf8488051744980C",
+        "channels": "0xf4B146FbA71F41E0592668ffbF264F1D186b2Ca8",
+        "token": "0x8198f5d8F8CfFE8f9C413d98a0A55aEB8ab9FbB7",
+        "module_implementation": "0x51A1ceB83B83F1985a81C295d1fF28Afef186E02",
+        "node_safe_registry": "0x36b58F5C1969B7b6591D752ea6F5486D069010AB",
+        "ticket_price_oracle": "0x1c85638e118b37167e9298c2268758e058DdfDA0",
+        "announcements": "0x367761085BF3C12e5DA2Df99AC6E1a824612b8fb",
+        "node_stake_v2_factory": "0xDC11f7E700A4c898AE5CAddB1082cFfa76512aDD"
       }
     },
     "anvil-localhost2": {
       "environment_type": "local",
-      "indexer_start_block_number": 6,
+      "indexer_start_block_number": 34,
       "addresses": {
-        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
-        "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
-        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
-        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-        "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
-        "ticket_price_oracle": "0x59b670e9fA9D0A427751Af201D676719a970857b",
-        "announcements": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
-        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+        "network_registry": "0x4EE6eCAD1c2Dae9f525404De8555724e3c35d07B",
+        "network_registry_proxy": "0x172076E0166D1F9Cc711C77Adf8488051744980C",
+        "channels": "0xf4B146FbA71F41E0592668ffbF264F1D186b2Ca8",
+        "token": "0x8198f5d8F8CfFE8f9C413d98a0A55aEB8ab9FbB7",
+        "module_implementation": "0x51A1ceB83B83F1985a81C295d1fF28Afef186E02",
+        "node_safe_registry": "0x36b58F5C1969B7b6591D752ea6F5486D069010AB",
+        "ticket_price_oracle": "0x1c85638e118b37167e9298c2268758e058DdfDA0",
+        "announcements": "0x367761085BF3C12e5DA2Df99AC6E1a824612b8fb",
+        "node_stake_v2_factory": "0xDC11f7E700A4c898AE5CAddB1082cFfa76512aDD"
       }
     },
     "rotsee": {
       "environment_type": "staging",
-      "indexer_start_block_number": 29472592,
+      "indexer_start_block_number": 29690361,
       "addresses": {
-        "channels": "0x4c3bb6470b72A749Db1bB394c024A92AB60a793e",
-        "module_implementation": "0xb3B09FA6504F9d59F1a9740F68f3E904ca857A82",
-        "network_registry": "0x2f3243adC9805F6dd3E01C9E9ED31675A5B16902",
-        "network_registry_proxy": "0x6af01f9B2eE06349a93032e9625D739FD8C199B1",
-        "node_safe_registry": "0x3E7c4720934ff6A9FE122Cb761f36a11E9b848D9",
-        "node_stake_v2_factory": "0xa2e2F71f687914f5DC2010632bC2dEbB1B9FC1D5",
+        "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
+        "module_implementation": "0x32863c4974fBb6253E338a0cb70C382DCeD2eFCb",
+        "network_registry": "0x15a315E1320cFF0de84671c0139042EE320CE38d",
+        "network_registry_proxy": "0x20559cbD3C2eDcD0b396431226C00D2Cd102eB3F",
+        "node_safe_registry": "0x4F7C7dE3BA2B29ED8B2448dF2213cA43f94E45c0",
+        "node_stake_v2_factory": "0x791d190b2c95397F4BcE7bD8032FD67dCEA7a5F2",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-        "ticket_price_oracle": "0xD47a3FAC305c2e272AD2344C1B718B2F70f81955",
-        "announcements": "0xD2C191dd9757D9f19f9815751a1A29B9933FfA63"
+        "ticket_price_oracle": "0x442df1d946303fB088C9377eefdaeA84146DA0A6",
+        "announcements": "0x7257fbdcbC81a37F8C830Deb8DD3b715f1D1BBa5"
       }
     },
     "debug-staging": {
-      "indexer_start_block_number": 29472570,
+      "indexer_start_block_number": 29690235,
       "environment_type": "staging",
       "addresses": {
-        "channels": "0xf20190bc14B6481A79f216b7B5F7683bdC820b25",
-        "network_registry": "0xF4C6e161036bC7CD087642d5601F56e3e2871aa3",
-        "network_registry_proxy": "0xa11cc45DDf3564Ac17Da2C15A9E22aD932B66a5a",
+        "channels": "0xc060582564b12335cD804339842F5509dbF6F74d",
+        "network_registry": "0xf08E27C3A09627D605bFd164459f7caF18D1d25f",
+        "network_registry_proxy": "0x0D1a8f1b13FD1d64696c5E03dd45Cd139e40dE0c",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-        "node_stake_v2_factory": "0x75b1e7E99F1cDded81ea3CF162746f68f1EA4D50",
-        "node_safe_registry": "0x03a13Cfd79009b56B7D62c68fc3b8fbb3B2b0752",
-        "module_implementation": "0xCb8F0Bdb575d5695732A10400E877784504ac853",
-        "ticket_price_oracle": "0xC797f94d98f08003D8fB23DAB0982645546CF2E1",
-        "announcements": "0xE9AC0501004877D5aD530d58B1F149dD0736b9e1"
+        "node_stake_v2_factory": "0x5F5b459db681996292Ad58cc10e88027033149B8",
+        "node_safe_registry": "0x0bf6bd25ac47FE9D41A99B135Cb439B89138F05a",
+        "module_implementation": "0xe8d914Ef66b4FF086C6fbCb1E0ea97c0A9D2f3de",
+        "ticket_price_oracle": "0x281a91FeA199a3bAB5D7d5f05833B257E2fd7741",
+        "announcements": "0xD78BCa8452B8Ea281a659f380E0eF710C64EB85b"
       }
     },
     "monte_rosa": {
@@ -68,6 +68,21 @@
         "network_registry": "0x819E6a81e1e3f96CF1ac9200477C2d09c676959D",
         "network_registry_proxy": "0xcA9B1bC189F977B2A9217598D0300d956b6a719f",
         "token": "0x66225dE86Cac02b32f34992eb3410F59DE416698",
+        "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
+        "node_safe_registry": "0x0000000000000000000000000000000000000000",
+        "module_implementation": "0x0000000000000000000000000000000000000000",
+        "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
+        "announcements": "0x0000000000000000000000000000000000000000"
+      }
+    },
+    "dufour": {
+      "environment_type": "production",
+      "indexer_start_block_number": 0,
+      "addresses": {
+        "channels": "0x0000000000000000000000000000000000000000",
+        "network_registry": "0x0000000000000000000000000000000000000000",
+        "network_registry_proxy": "0x0000000000000000000000000000000000000000",
+        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
         "node_stake_v2_factory": "0x0000000000000000000000000000000000000000",
         "node_safe_registry": "0x0000000000000000000000000000000000000000",
         "module_implementation": "0x0000000000000000000000000000000000000000",

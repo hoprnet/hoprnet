@@ -213,6 +213,53 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         }
     }
 
+    /**
+     * @dev Given existing node(s), safe and module, migrate them to a different network
+     * Perform the following actions as the owner of safe:
+     * - scope new channel contract
+     * - approve token transfer
+     * - add announcement contract as target
+     * As manager of network registry, add nodes and safe to network registry
+     *
+     * @notice Deployer is the single owner of safe
+     * nonce is the current nonce of deployer account
+     * Default fallback permission for module is to
+     * 1. allow all data to Channels contract
+     * 2. allow all data to Token contract
+     * 3. allow nodes to send native tokens to itself
+     *
+     * Give Channels max allowance to transfer Token for safe
+     *
+     * Add node safes to network registry, as a manager
+     * @param nodeAddresses array of node addresses to be added to the module
+     * @param safe safe address of node
+     * @param module module address of node
+     */
+    function migrateSafeModule(address[] memory nodeAddresses, address safe, address module) external {
+        // 1. get environment and msg.sender
+        getNetworkAndMsgSender();
+
+        // 2. scope channel contract of the new network
+        addNetworkChannelsTargetToModuleBySafe(safe, module);
+
+        // 3. approve token transfer, as an owner of safe
+        approveChannelsForTokenTransferBySafe(safe);
+
+        // 4. add announcement contract as target, as an owner of safe
+        addAllAllowedTargetToModuleBySafe(currentNetworkDetail.addresses.announcements, safe, module);
+        // bytes memory
+        vm.stopBroadcast();
+
+        // 5. add nodes and safe to network registry, as a manager of network registry
+        address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
+        for (uint256 m = 0; m < nodeAddresses.length; m++) {
+            stakingSafeAddresses[m] = safe;
+        }
+        _helperGetDeployerInternalKey();
+        _registerNodes(stakingSafeAddresses, nodeAddresses);
+        vm.stopBroadcast();
+    }
+
     function includeNodesToModuleBySafe(address[] memory nodeAddresses, address safe, address module) public {
         // 1. get the msgSender if not set. This msgSender should be the owner of safe to execute the tx
         if (msgSender == address(0)) {
@@ -336,6 +383,62 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     }
 
     /**
+     * add an ALL_ALLOWED Channels target of the current network's channels contract to the module, by the safe
+     */
+    function addNetworkChannelsTargetToModuleBySafe(address safe, address module) public {
+        // 1. get the msgSender if not set. This msgSender should be the owner of safe to execute the tx
+        if (msgSender == address(0)) {
+            // get environment and msg.sender
+            getNetworkAndMsgSender();
+        }
+        address targetAddress = currentNetworkDetail.addresses.channelsContractAddress;
+        // 2. scope channel contract
+        /**
+         * Array of capability permissions
+         *     [
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // RESERVED
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultCloseIncomingChannelSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultApproveFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW  // defaultSendFunctionPermisson
+         *     ]
+         */
+        CapabilityPermission[] memory channelsCapabilityPermissions = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < channelsCapabilityPermissions.length; i++) {
+            channelsCapabilityPermissions[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        Target target = TargetUtils.encodeDefaultPermissions(
+            targetAddress,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.ALLOW_ALL,
+            channelsCapabilityPermissions
+        );
+
+        // 3. include the target to the module, as an owner of safe
+        // check if target has been included in module.
+        (bool successReadTryGetTarget, bytes memory returndataTryGetTarget) =
+            module.staticcall(abi.encodeWithSignature("tryGetTarget(address)", targetAddress));
+        if (!successReadTryGetTarget) {
+            revert("Cannot read tryGetTarget from module contract.");
+        }
+        (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
+        if (!included) {
+            bytes memory scopeTargetData =
+                abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
+            uint256 safeNonce = ISafe(payable(safe)).nonce();
+
+            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+        }
+    }
+
+    /**
      * @dev get the deployer key
      * Set to default when it's in development environment
      * (uint for 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
@@ -371,37 +474,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             abi.encodePacked(r, s, v)
         );
     }
-
-    // /**
-    //  * @dev On network registry contract, register peers associated with the calling wallet.
-    //  */
-    // function selfRegisterNodes(string[] calldata peerIds) external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
-
-    //   // 2. call hoprNetworkRegistry.selfRegister(peerIds);
-    //   _selfRegisterNodes(currentNetworkDetail.networkRegistryContractAddress, peerIds);
-
-    //   vm.stopBroadcast();
-    // }
-
-    // /**
-    //  * @dev On network registry contract, deregister peers associated with the calling wallet.
-    //  */
-    // function selfDeregisterNodes(string[] calldata peerIds) external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
-
-    //   // 2. call hoprNetworkRegistry.selfDeregister(peerIds);
-    //   (bool successSelfDeregister, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('selfDeregister(string[])', peerIds)
-    //   );
-    //   if (!successSelfDeregister) {
-    //     emit log_string('Cannot deregister peers');
-    //     revert('Cannot deregister peers');
-    //   }
-    //   vm.stopBroadcast();
-    // }
 
     /**
      * @dev On network registry contract, register nodes and safes
@@ -457,133 +529,126 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         nodes = new address[](0);
     }
 
-    // /**
-    //  * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be
-    // called by the owner
-    //  */
-    // function deregisterNodes(address[] calldata stakingAddresses, string[] calldata peerIds) external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+    /**
+     * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be
+     * called by a manager
+     */
+    function deregisterNodes(address[] calldata nodeAddresses) external {
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-    //   // 2. owner registers nodes, depending on the environment
-    //   if (currentEnvironmentType == EnvironmentType.LOCAL) {
-    //     // call deregister accounts on HoprDummyProxyForNetworkRegistry
-    //     (bool successDeregisterNodesOnDummyProxy, ) = currentNetworkDetail.networkRegistryProxyContractAddress.call(
-    //       abi.encodeWithSignature('ownerBatchRemoveAccounts(address[])', stakingAddresses)
-    //     );
-    //     if (!successDeregisterNodesOnDummyProxy) {
-    //       emit log_string('Cannot remove stakingAddresses from the dummy proxy.');
-    //       revert('Cannot remove stakingAddresses from the dummy proxy.');
-    //     }
-    //   }
-    //   // actual deregister nodes
-    //   (bool successDeregisterNodes, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('ownerDeregister(string[])', peerIds)
-    //   );
-    //   if (!successDeregisterNodes) {
-    //     emit log_string('Cannot rdeegister nodes as an owner');
-    //     revert('Cannot deregister nodes as an owner');
-    //   }
-    //   vm.stopBroadcast();
-    // }
+        // 2. check if nodes have been registered, if not, skip
+        for (uint256 i = 0; i < nodeAddresses.length; i++) {
+            (bool successReadRegisteredNodeAddress, bytes memory returndataRegisteredNodeAddress) = currentNetworkDetail
+                .addresses
+                .networkRegistryContractAddress
+                .staticcall(abi.encodeWithSignature("nodeRegisterdToAccount(address)", nodeAddresses[i]));
+            if (!successReadRegisteredNodeAddress) {
+                revert("Cannot read successReadRegisteredNodeAddress from network registry contract.");
+            }
+            address registeredAccount = abi.decode(returndataRegisteredNodeAddress, (address));
 
-    // /**
-    //  * @dev On network registry contract, disable it. This function should only be called by the owner
-    //  */
-    // function disableNetworkRegistry() external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+            if (registeredAccount != address(0)) {
+                nodes.push(nodeAddresses[i]);
+            }
+        }
 
-    //   // 2. check if current NR is enabled.
-    //   (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
-    //     .networkRegistryContractAddress
-    //     .staticcall(abi.encodeWithSignature('enabled()'));
-    //   if (!successReadEnabled) {
-    //     revert('Cannot read enabled from network registry contract.');
-    //   }
-    //   bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+        // 2. deregister nodes
+        if (nodes.length > 0) {
+            (bool successDeregisterNodes,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+                abi.encodeWithSignature("managerDeregister(address[])", nodes)
+            );
+            if (!successDeregisterNodes) {
+                emit log_string("Cannot deregister nodes as a manager");
+                revert("Cannot deregister nodes as a manager");
+            }
+        }
 
-    //   // 3. disable if needed
-    //   if (isEnabled) {
-    //     (bool successDisableNetworkRegistry, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //       abi.encodeWithSignature('disableRegistry()')
-    //     );
-    //     if (!successDisableNetworkRegistry) {
-    //       emit log_string('Cannot disable network registery as an owner');
-    //       revert('Cannotdisable network registery as an owner');
-    //     }
-    //     vm.stopBroadcast();
-    //   }
-    // }
+        // reset
+        accounts = new address[](0);
+        nodes = new address[](0);
 
-    // /**
-    //  * @dev On network registry contract, enable it. This function should only be called by the owner
-    //  */
-    // function enableNetworkRegistry() external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+        vm.stopBroadcast();
+    }
 
-    //   // 2. check if current NR is enabled.
-    //   (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
-    //     .networkRegistryContractAddress
-    //     .staticcall(abi.encodeWithSignature('enabled()'));
-    //   if (!successReadEnabled) {
-    //     revert('Cannot read enabled from network registry contract.');
-    //   }
-    //   bool isEnabled = abi.decode(returndataReadEnabled, (bool));
+    /**
+     * @dev On network registry contract, disable it. This function should only be called by the owner
+     */
+    function disableNetworkRegistry() external {
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-    //   // 3. enable if needed
-    //   if (!isEnabled) {
-    //     (bool successEnableNetworkRegistry, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //       abi.encodeWithSignature('enableRegistry()')
-    //     );
-    //     if (!successEnableNetworkRegistry) {
-    //       emit log_string('Cannot enable network registery as an owner');
-    //       revert('Cannot enable network registery as an owner');
-    //     }
-    //     vm.stopBroadcast();
-    //   }
-    // }
+        // 2. check if current NR is enabled.
+        (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
+            .addresses
+            .networkRegistryContractAddress
+            .staticcall(abi.encodeWithSignature("enabled()"));
+        if (!successReadEnabled) {
+            revert("Cannot read enabled from network registry contract.");
+        }
+        bool isEnabled = abi.decode(returndataReadEnabled, (bool));
 
-    // /**
-    //  * @dev On network registry contract, update eligibility of some staking addresses to the desired . This function
-    // should only be called by the owner
-    //  */
-    // function forceEligibilityUpdate(address[] calldata stakingAddresses, bool[] calldata eligibility) external {
-    //   require(stakingAddresses.length == eligibility.length, 'Input lengths are different');
+        // 3. disable if needed
+        if (isEnabled) {
+            (bool successDisableNetworkRegistry,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+                abi.encodeWithSignature("disableRegistry()")
+            );
+            if (!successDisableNetworkRegistry) {
+                emit log_string("Cannot disable network registery as a manager");
+                revert("Cannotdisable network registery as a manager");
+            }
+            vm.stopBroadcast();
+        }
+    }
 
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+    /**
+     * @dev On network registry contract, enable it. This function should only be called by a manager
+     */
+    function enableNetworkRegistry() external {
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
 
-    //   // 2. update emit EligibilityUpdate events by the owner
-    //   (bool successForceEligibilityUpdate, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('ownerForceEligibility(address[],bool[])', stakingAddresses, eligibility)
-    //   );
-    //   if (!successForceEligibilityUpdate) {
-    //     emit log_string('Cannot force update eligibility as an owner');
-    //     revert('Cannot force update eligibility as an owner');
-    //   }
-    //   vm.stopBroadcast();
-    // }
+        // 2. check if current NR is enabled.
+        (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
+            .addresses
+            .networkRegistryContractAddress
+            .staticcall(abi.encodeWithSignature("enabled()"));
+        if (!successReadEnabled) {
+            revert("Cannot read enabled from network registry contract.");
+        }
+        bool isEnabled = abi.decode(returndataReadEnabled, (bool));
 
-    // /**
-    //  * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be
-    // called by the owner
-    //  */
-    // function syncEligibility(string[] calldata peerIds) external {
-    //   // 1. get network and msg.sender
-    //   getNetworkAndMsgSender();
+        // 3. enable if needed
+        if (!isEnabled) {
+            (bool successEnableNetworkRegistry,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+                abi.encodeWithSignature("enableRegistry()")
+            );
+            if (!successEnableNetworkRegistry) {
+                emit log_string("Cannot enable network registery as a manager");
+                revert("Cannot enable network registery as a manager");
+            }
+            vm.stopBroadcast();
+        }
+    }
 
-    //   // 2. sync peers eligibility according to the latest requirement of its current state
-    //   (bool successSyncEligibility, ) = currentNetworkDetail.networkRegistryContractAddress.call(
-    //     abi.encodeWithSignature('sync(string[])', peerIds)
-    //   );
-    //   if (!successSyncEligibility) {
-    //     emit log_string('Cannot sync eligibility as an owner');
-    //     revert('Cannot sync eligibility as an owner');
-    //   }
-    //   vm.stopBroadcast();
-    // }
+    /**
+     * @dev On network registry contract, sync eligibility of some staking addresses. This function should only be
+     * called by a manager
+     */
+    function syncEligibility(address[] calldata stakingAccounts) external {
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
+
+        // 2. sync peers eligibility according to the latest requirement of its current state
+        (bool successSyncEligibility,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
+            abi.encodeWithSignature("managerSync(address[])", stakingAccounts)
+        );
+        if (!successSyncEligibility) {
+            emit log_string("Cannot sync eligibility as a manager");
+            revert("Cannot sync eligibility as a manager");
+        }
+        vm.stopBroadcast();
+    }
 
     // /**
     //  * @dev On stake contract, stake xHopr to the target value
