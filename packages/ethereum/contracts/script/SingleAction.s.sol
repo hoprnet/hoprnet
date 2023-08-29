@@ -64,6 +64,10 @@ abstract contract IFactory {
         returns (address, address payable);
 }
 
+abstract contract IModule {
+    function tryGetTarget(address targetAddress) external view virtual returns (bool, Target);
+}
+
 /// Failed to read balance of a token contract
 /// @param token token address.
 error FailureInReadBalance(address token);
@@ -368,23 +372,21 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 4. include the target to the module, as an owner of safe
         // check if target has been included in module.
-        (bool successReadTryGetTarget, bytes memory returndataTryGetTarget) =
-            module.staticcall(abi.encodeWithSignature("tryGetTarget(address)", targetAddress));
-        if (!successReadTryGetTarget) {
+        try IModule(module).tryGetTarget(targetAddress) returns (bool successReadTryGetTarget, Target) {
+            if (successReadTryGetTarget) {
+                // already included, skip
+                return;
+            }
+            bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
+            uint256 safeNonce = ISafe(payable(safe)).nonce();
+
+            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+        } catch {
             // either it's an old module where tryGetTarget was not implemented, or the module is not valid
             emit log_string(
                 "Cannot read tryGetTarget from module contract. Either it's an old module where tryGetTarget was not implemented, or the module is not valid"
             );
         }
-        (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
-        if (included) {
-            // already included, skip
-            return;
-        }
-        bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
-        uint256 safeNonce = ISafe(payable(safe)).nonce();
-
-        _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
     }
 
     /**
@@ -428,24 +430,23 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 3. include the target to the module, as an owner of safe
         // check if target has been included in module.
-        (bool successReadTryGetTarget, bytes memory returndataTryGetTarget) =
-            module.staticcall(abi.encodeWithSignature("tryGetTarget(address)", targetAddress));
-        if (!successReadTryGetTarget) {
+        try IModule(module).tryGetTarget(targetAddress) returns (bool successReadTryGetTarget, Target) {
+            if (successReadTryGetTarget) {
+                // already included, skip
+                return;
+            }
+            // or scope the target
+            bytes memory scopeTargetData =
+                abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
+            uint256 safeNonce = ISafe(payable(safe)).nonce();
+
+            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+        } catch {
             // either it's an old module where tryGetTarget was not implemented, or the module is not valid
             emit log_string(
                 "Cannot read tryGetTarget from module contract. Either it's an old module where tryGetTarget was not implemented, or the module is not valid"
             );
         }
-        (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
-        if (included) {
-            // already included, skip
-            return;
-        }
-        // or scope the target
-        bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
-        uint256 safeNonce = ISafe(payable(safe)).nonce();
-
-        _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
     }
 
     /**
