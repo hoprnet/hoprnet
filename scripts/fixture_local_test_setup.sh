@@ -118,7 +118,7 @@ function cleanup {
   # Cleaning up everything
   log "Cleaning up processes"
   for port in "${all_ports[@]}"; do
-    lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill -9 {}
+    lsof -i ":${port}" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
   done
 
   local log exit_code non_zero
