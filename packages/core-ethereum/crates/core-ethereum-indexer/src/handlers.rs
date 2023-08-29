@@ -607,6 +607,7 @@ pub mod tests {
             NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter,
         },
         hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
+        hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::TransferFilter,
     };
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
@@ -1511,6 +1512,32 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(db.is_mfa_protected().await.unwrap(), None);
+    }
+
+    #[async_std::test]
+    async fn ticket_price_update() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let log = RawLog {
+            topics: vec![TicketPriceUpdatedFilter::signature()],
+            data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]),
+        };
+
+        assert_eq!(db.get_ticket_price().await.unwrap(), None);
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.ticket_price_oracle,
+                0u32,
+                &log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(db.get_ticket_price().await.unwrap(), Some(U256::from(123u64)));
     }
 }
 

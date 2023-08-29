@@ -433,15 +433,15 @@ export class Hopr extends EventEmitter {
     let mas: Multiaddr[] = []
 
     if (this.options.hosts.ip4 == undefined) {
-      throw new Error("IP address of the host must be specified")
+      throw new Error('IP address of the host must be specified')
     }
-    
+
     if (isIP(this.options.hosts.ip4.ip) == 0) {
-      throw new Error("IP address of the host is not a valid IPv4 or IPv6 address")
+      throw new Error('IP address of the host is not a valid IPv4 or IPv6 address')
     }
 
     if (this.options.hosts.ip4.ip == '0.0.0.0') {
-      throw new Error("IP address of the host must be a specific IPv4 or IPv6 address")
+      throw new Error('IP address of the host must be a specific IPv4 or IPv6 address')
     } else {
       mas.push(multiaddr(`/ip4/${this.options.hosts.ip4.ip}/tcp/${this.options.hosts.ip4.port}`))
     }

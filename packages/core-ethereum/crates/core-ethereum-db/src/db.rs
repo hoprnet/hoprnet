@@ -561,14 +561,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
-    async fn get_ticket_price(&self) -> Result<U256> {
+    async fn get_ticket_price(&self) -> Result<Option<U256>> {
         //utils_log::debug!("DB: get_ticket_price");
         let key = utils_db::db::Key::new_from_str(TICKET_PRICE_KEY)?;
 
-        self.db
-            .get_or_none::<U256>(key)
-            .await
-            .map(|v| v.unwrap_or(U256::zero()))
+        self.db.get_or_none::<U256>(key).await
     }
 
     async fn set_ticket_price(&mut self, ticket_price: &U256) -> Result<()> {
@@ -1436,7 +1433,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_ticket_price(&self) -> Result<U256, JsValue> {
+        pub async fn get_ticket_price(&self) -> Result<Option<U256>, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
@@ -1605,6 +1602,21 @@ mod tests {
 
         assert!(serialized.is_ok());
         assert_eq!(serialized.unwrap().len(), ChannelEntry::SIZE)
+    }
+
+    #[async_std::test]
+    async fn test_set_ticket_price() {
+        let level_db = Arc::new(Mutex::new(
+            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
+        ));
+
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+
+        assert_eq!(db.get_ticket_price().await, Ok(None));
+
+        assert!(db.set_ticket_price(&U256::from(100u64)).await.is_ok());
+
+        assert_eq!(db.get_ticket_price().await, Ok(Some(U256::from(100u64))));
     }
 
     #[async_std::test]

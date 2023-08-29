@@ -523,7 +523,20 @@ where
             .await
             .get_ticket_price()
             .await
-            .unwrap_or(*DEFAULT_PRICE_PER_PACKET);
+            .unwrap_or_else(|_| {
+                warn!(
+                    "Error reading ticket price value from database, using default {:?}",
+                    *DEFAULT_PRICE_PER_PACKET
+                );
+                Some(*DEFAULT_PRICE_PER_PACKET)
+            })
+            .unwrap_or_else(|| {
+                warn!(
+                    "No ticket price value set in database yet, using default {:?}",
+                    *DEFAULT_PRICE_PER_PACKET
+                );
+                *DEFAULT_PRICE_PER_PACKET
+            });
         let amount = Balance::new(
             price_per_packet
                 .divide_f64(TICKET_WIN_PROB)
@@ -694,7 +707,26 @@ where
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
                 // Validate the ticket first
-                let price_per_packet = self.db.read().await.get_ticket_price().await?;
+                let price_per_packet = self
+                    .db
+                    .read()
+                    .await
+                    .get_ticket_price()
+                    .await
+                    .unwrap_or_else(|_| {
+                        warn!(
+                            "Error reading ticket price value from database, using default {:?}",
+                            *DEFAULT_PRICE_PER_PACKET
+                        );
+                        Some(*DEFAULT_PRICE_PER_PACKET)
+                    })
+                    .unwrap_or_else(|| {
+                        warn!(
+                            "No ticket price value set in database yet, using default {:?}",
+                            *DEFAULT_PRICE_PER_PACKET
+                        );
+                        *DEFAULT_PRICE_PER_PACKET
+                    });
                 if let Err(e) = validate_unacknowledged_ticket::<Db>(
                     &*self.db.read().await,
                     &packet.ticket,
@@ -1104,6 +1136,7 @@ mod wasm {
 
 #[cfg(test)]
 mod tests {
+    use crate::interaction::DEFAULT_PRICE_PER_PACKET;
     use crate::{
         interaction::{
             AckProcessed, AcknowledgementInteraction, ApplicationData, MsgProcessed, PacketInteraction,
