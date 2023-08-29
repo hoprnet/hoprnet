@@ -2,16 +2,12 @@ use crate::{
     identity_input::LocalIdentityArgs,
     key_pair::read_identities,
     password::PasswordArgs,
-    process::{set_process_path_env, child_process_call_foundry_migrate_safe_module},
+    process::{child_process_call_foundry_migrate_safe_module, set_process_path_env},
     utils::{Cmd, HelperErrors},
 };
 use clap::Parser;
 use core_crypto::keypairs::Keypair;
 use core_crypto::types::ToChecksum;
-use ethers::{
-    types::U256,
-    utils::parse_units, //, types::U256, utils::format_units, ParseUnits
-};
 use log::{log, Level};
 use std::{env, str::FromStr};
 use utils_types::primitives::Address;
@@ -36,18 +32,10 @@ pub struct MigrateSafeModuleArgs {
     )]
     contracts_root: Option<String>,
 
-    #[clap(
-        help = "Ethereum address of safe",
-        long,
-        short
-    )]
+    #[clap(help = "Ethereum address of safe", long, short)]
     safe_address: String,
 
-    #[clap(
-        help = "Ethereum address of node management module",
-        long,
-        short
-    )]
+    #[clap(help = "Ethereum address of node management module", long, short)]
     module_address: String,
 }
 

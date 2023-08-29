@@ -31,6 +31,7 @@
 - Tickets 2.0: tickets use a VRF (verified random function) and no longer depend on external randomness ("iterated hash") ([#5338](https://github.com/hoprnet/hoprnet/pull/5338))
 - Tickets 2.0: payment channel funding happens immediately as it no longer requires any on-chain commitments ([#5338](https://github.com/hoprnet/hoprnet/pull/5338))
 - Prevent relayers from extracting multiple base amounts ([#5385](https://github.com/hoprnet/hoprnet/pull/5385))
+- Added dynamic price per packet via the TicketPriceOracle smart contract ([#5372](https://github.com/hoprnet/hoprnet/pull/5372))
 
 <a name="1.93"></a>
 

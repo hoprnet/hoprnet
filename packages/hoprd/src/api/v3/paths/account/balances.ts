@@ -1,6 +1,6 @@
 import { STATUS_CODES } from '../../utils.js'
 
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 
 /**

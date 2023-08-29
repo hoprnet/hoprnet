@@ -155,6 +155,12 @@ pub trait HoprCoreEthereumDbActions {
     /// Set balance as the current balance.
     async fn set_hopr_balance(&mut self, balance: &Balance) -> Result<()>;
 
+    /// Get the current ticket price.
+    async fn get_ticket_price(&self) -> Result<Option<U256>>;
+
+    /// Set new ticket price
+    async fn set_ticket_price(&mut self, ticket_price: &U256) -> Result<()>;
+
     /// Get the domain separator of node-safe-registry contract
     async fn get_node_safe_registry_domain_separator(&self) -> Result<Option<Hash>>;
 

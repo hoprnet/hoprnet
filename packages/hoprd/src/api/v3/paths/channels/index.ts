@@ -4,7 +4,7 @@ import { defer, Address, generate_channel_id, channel_status_to_string, ChannelS
 import { STATUS_CODES } from '../../utils.js'
 
 import type { Operation } from 'express-openapi'
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 import type { ChannelEntry, DeferType } from '@hoprnet/hopr-utils'
 
 export interface ChannelInfo {
