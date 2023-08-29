@@ -371,15 +371,20 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         (bool successReadTryGetTarget, bytes memory returndataTryGetTarget) =
             module.staticcall(abi.encodeWithSignature("tryGetTarget(address)", targetAddress));
         if (!successReadTryGetTarget) {
-            revert("Cannot read tryGetTarget from module contract.");
+            // either it's an old module where tryGetTarget was not implemented, or the module is not valid
+            emit log_string(
+                "Cannot read tryGetTarget from module contract. Either it's an old module where tryGetTarget was not implemented, or the module is not valid"
+            );
         }
         (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
-        if (!included) {
-            bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
-            uint256 safeNonce = ISafe(payable(safe)).nonce();
-
-            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+        if (included) {
+            // already included, skip
+            return;
         }
+        bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
+        uint256 safeNonce = ISafe(payable(safe)).nonce();
+
+        _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
     }
 
     /**
@@ -426,16 +431,21 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         (bool successReadTryGetTarget, bytes memory returndataTryGetTarget) =
             module.staticcall(abi.encodeWithSignature("tryGetTarget(address)", targetAddress));
         if (!successReadTryGetTarget) {
-            revert("Cannot read tryGetTarget from module contract.");
+            // either it's an old module where tryGetTarget was not implemented, or the module is not valid
+            emit log_string(
+                "Cannot read tryGetTarget from module contract. Either it's an old module where tryGetTarget was not implemented, or the module is not valid"
+            );
         }
         (bool included,) = abi.decode(returndataTryGetTarget, (bool, uint256));
-        if (!included) {
-            bytes memory scopeTargetData =
-                abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
-            uint256 safeNonce = ISafe(payable(safe)).nonce();
-
-            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+        if (included) {
+            // already included, skip
+            return;
         }
+        // or scope the target
+        bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
+        uint256 safeNonce = ISafe(payable(safe)).nonce();
+
+        _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
     }
 
     /**
