@@ -30,6 +30,7 @@
 - Rest API: Replace v2 with v3 which adds message inbox support and compatibility with new smart contracts ([#5297](https://github.com/hoprnet/hoprnet/pull/5297))
 - Tickets 2.0: tickets use a VRF (verified random function) and no longer depend on external randomness ("iterated hash") ([#5338](https://github.com/hoprnet/hoprnet/pull/5338))
 - Tickets 2.0: payment channel funding happens immediately as it no longer requires any on-chain commitments ([#5338](https://github.com/hoprnet/hoprnet/pull/5338))
+- Prevent relayers from extracting multiple base amounts ([#5385](https://github.com/hoprnet/hoprnet/pull/5385))
 
 <a name="1.93"></a>
 
