@@ -84,6 +84,7 @@ enum ForwardedMetaPacket<S: SphinxSuite> {
     RelayedPacket {
         packet: MetaPacket<S>,
         next_node: <S::P as Keypair>::Public,
+        path_pos: u8,
         additional_info: Box<[u8]>,
         derived_secret: SharedSecret,
         packet_tag: PacketTag,
@@ -224,6 +225,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
             ForwardedHeader::RelayNode {
                 header,
                 mac,
+                path_pos,
                 next_node,
                 additional_info,
             } => RelayedPacket {
@@ -232,6 +234,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 derived_secret: secret,
                 next_node: <S::P as Keypair>::Public::from_bytes(&next_node)
                     .map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
+                path_pos,
                 additional_info,
             },
             ForwardedHeader::FinalNode { additional_data } => FinalPacket {
@@ -269,6 +272,7 @@ pub enum PacketState {
         own_share: HalfKeyChallenge,
         next_hop: OffchainPublicKey,
         next_challenge: Challenge,
+        path_pos: u8,
     },
     /// Packet that is being sent out by us
     Outgoing {
@@ -357,6 +361,7 @@ impl Packet {
                     additional_info,
                     packet_tag,
                     next_node,
+                    path_pos,
                     ..
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
@@ -370,6 +375,7 @@ impl Packet {
                             packet_tag,
                             ack_key,
                             previous_hop,
+                            path_pos,
                             own_key: verification_output.own_key,
                             own_share: verification_output.own_share,
                             next_hop: next_node,

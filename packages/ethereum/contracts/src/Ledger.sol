@@ -57,6 +57,8 @@ abstract contract HoprLedger is HoprLedgerEvents {
         latestRoot.rootHash = bytes28(keccak256(abi.encodePacked(address(this))));
         latestRoot.timestamp = uint32(block.timestamp);
 
+        latestSnapshotRoot = latestRoot;
+
         // compute the domain separator on deployment
         updateLedgerDomainSeparator();
     }
@@ -92,11 +94,12 @@ abstract contract HoprLedger is HoprLedgerEvents {
         // take first 28 bytes
         latestRoot.rootHash = bytes28(
             keccak256(
-                abi.encode(
+                // keep hashed data minimal
+                abi.encodePacked(
                     // ledger feed must be unique
                     ledgerDomainSeparator,
                     // Allows the verifier to detect up until which block the snapshot includes state changes
-                    block.number,
+                    uint32(block.number),
                     // Bind result to previous root
                     latestRoot.rootHash,
                     // Information about the happened state change
@@ -104,10 +107,10 @@ abstract contract HoprLedger is HoprLedgerEvents {
                 )
             )
         );
+        latestRoot.timestamp = uint32(block.timestamp);
 
         if (createSnapshot) {
             latestSnapshotRoot = latestRoot;
-            latestRoot.timestamp = uint32(block.timestamp);
         }
     }
 }

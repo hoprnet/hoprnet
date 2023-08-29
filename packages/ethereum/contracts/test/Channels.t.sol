@@ -1861,9 +1861,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function testFuzz_DomainSeparator(uint256 newChaidId) public {
-        newChaidId = bound(newChaidId, 1, 1e18);
-        vm.assume(newChaidId != block.chainid);
+    function testFuzz_DomainSeparator(uint256 newChainId) public {
+        newChainId = bound(newChainId, 1, 1e18);
+        vm.assume(newChainId != block.chainid);
         bytes32 domainSeparatorOnDeployment = hoprChannels.domainSeparator();
 
         // call updateDomainSeparator when chainid is the same
@@ -1871,7 +1871,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         assertEq(hoprChannels.domainSeparator(), domainSeparatorOnDeployment);
 
         // call updateDomainSeparator when chainid is different
-        vm.chainId(newChaidId);
+        vm.chainId(newChainId);
         vm.expectEmit(true, true, false, false, address(hoprChannels));
         emit DomainSeparatorUpdated(
             keccak256(
@@ -1879,7 +1879,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
                     keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                     keccak256(bytes("HoprChannels")),
                     keccak256(bytes(hoprChannels.VERSION())),
-                    newChaidId,
+                    newChainId,
                     address(hoprChannels)
                 )
             )
@@ -1888,9 +1888,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         assertTrue(hoprChannels.domainSeparator() != domainSeparatorOnDeployment);
     }
 
-    function testFuzz_LedgerDomainSeparator(uint256 newChaidId) public {
-        newChaidId = bound(newChaidId, 1, 1e18);
-        vm.assume(newChaidId != block.chainid);
+    function testFuzz_LedgerDomainSeparator(uint256 newChainId) public {
+        newChainId = bound(newChainId, 1, 1e18);
+        vm.assume(newChainId != block.chainid);
         bytes32 ledgerDomainSeparatorOnDeployment = hoprChannels.ledgerDomainSeparator();
 
         // call updateLedgerDomainSeparator when chainid is the same
@@ -1898,7 +1898,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         assertEq(hoprChannels.ledgerDomainSeparator(), ledgerDomainSeparatorOnDeployment);
 
         // call updateLedgerDomainSeparator when chainid is different
-        vm.chainId(newChaidId);
+        vm.chainId(newChainId);
         vm.expectEmit(true, true, false, false, address(hoprChannels));
         emit LedgerDomainSeparatorUpdated(
             keccak256(
@@ -1906,7 +1906,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
                     keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                     keccak256(bytes("HoprLedger")),
                     keccak256(bytes(hoprChannels.LEDGER_VERSION())),
-                    newChaidId,
+                    newChainId,
                     address(hoprChannels)
                 )
             )

@@ -2,9 +2,10 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
+import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
+
 import { createTestApiInstance, ALICE_PEER_ID, INVALID_PEER_ID } from '../../../fixtures.js'
 import { STATUS_CODES } from '../../../utils.js'
-import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
 
 let node = sinon.fake() as any
 

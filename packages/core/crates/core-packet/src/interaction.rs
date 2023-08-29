@@ -1,6 +1,6 @@
 use crate::errors::PacketError::{
     AcknowledgementValidation, ChannelNotFound, InvalidPacketState, MissingDomainSeparator, OutOfFunds,
-    PacketConstructionError, PacketDecodingError, PathError, Retry, TagReplay, TransportError,
+    PacketConstructionError, PacketDecodingError, PathError, PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
@@ -67,7 +67,7 @@ lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
     static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 }
-/// Fixed inverse ticket winning probability
+/// Fixed ticket winning probability
 pub const TICKET_WIN_PROB: f64 = 1.0f64;
 
 /// Represents a payload (packet or acknowledgement) at the transport level.
@@ -564,8 +564,8 @@ where
             &destination,
             &amount,
             current_index,
-            U256::one(), // unaggregated always have index_offset == 1
-            1.0,         // 100% winning probability
+            U256::one(),     // unaggregated always have index_offset == 1
+            TICKET_WIN_PROB, // 100% winning probability
             channel.channel_epoch,
         )?;
 
@@ -586,7 +586,10 @@ where
             .await
             .get_chain_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
             .await?
-            .ok_or(PacketConstructionError)?;
+            .ok_or_else(|| {
+                debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
+                PacketConstructionError
+            })?;
 
         let domain_separator = self
             .db
@@ -594,7 +597,10 @@ where
             .await
             .get_channels_domain_separator()
             .await?
-            .ok_or(PacketConstructionError)?;
+            .ok_or_else(|| {
+                debug!("Missing domain separator.");
+                MissingDomainSeparator
+            })?;
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
@@ -646,7 +652,10 @@ where
             .await
             .get_channels_domain_separator()
             .await?
-            .ok_or(MissingDomainSeparator)?;
+            .ok_or_else(|| {
+                debug!("Missing domain separator");
+                MissingDomainSeparator
+            })?;
 
         match packet.state() {
             PacketState::Outgoing { .. } => return Err(InvalidPacketState),
@@ -667,14 +676,13 @@ where
                 own_key,
                 next_hop,
                 packet_tag,
+                path_pos,
                 ..
             } => {
                 // Validate if it's not a replayed packet
                 if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
                     return Err(TagReplay);
                 }
-
-                let default_win_probability = 1.0f64;
 
                 let previous_hop_addr =
                     self.db
@@ -733,7 +741,7 @@ where
                     &channel,
                     &previous_hop_addr,
                     Balance::new(price_per_packet, BalanceType::HOPR),
-                    default_win_probability,
+                    TICKET_WIN_PROB,
                     self.cfg.check_unrealized_balance,
                     &domain_separator,
                 )
@@ -761,13 +769,18 @@ where
                     .await?;
                 }
 
-                let path_pos = packet.ticket.get_path_position(U256::from(price_per_packet))?;
+                // Check that the calculated path position from the ticket matches value from the packet header
+                let ticket_path_pos = packet.ticket.get_path_position(U256::from(*price_per_packet))?;
+                if !ticket_path_pos.eq(path_pos) {
+                    error!("path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}");
+                    return Err(PathPositionMismatch);
+                }
 
                 // Create next ticket for the packet
-                next_ticket = if path_pos == 1 {
+                next_ticket = if ticket_path_pos == 1 {
                     Ticket::new_zero_hop(&next_hop_addr, &self.cfg.chain_keypair, &domain_separator)
                 } else {
-                    self.create_multihop_ticket(next_hop_addr, path_pos).await?
+                    self.create_multihop_ticket(next_hop_addr, ticket_path_pos).await?
                 };
                 previous_peer = previous_hop.to_peerid();
                 next_peer = next_hop.to_peerid();

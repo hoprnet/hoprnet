@@ -131,7 +131,7 @@ endif
 		--broadcast --sig "transferNetworkRegistryNft(address,string)" \
 		$(recipient) $(nftrank)
 
-# E.g. make express-setup-safe-module network=anvil-localhost environment-type=local node_address="[0xcb192a4ba9abea8579c59231b8a57e3f0591e02b]" hopramount=1000000000000000000 nativeamount=1000000000000000000
+# E.g. make express-setup-safe-module network=anvil-localhost environment-type=local node_address="0xcb192a4ba9abea8579c59231b8a57e3f0591e02b" hopramount=1000000000000000000 nativeamount=1000000000000000000
 .PHONY: express-setup-safe-module
 express-setup-safe-module: ensure-environment-and-network-are-set ensure-privatekey-is-set
 express-setup-safe-module: ## create a new safe and a new node management module, include the provided node address
@@ -140,6 +140,22 @@ ifeq ($(node_address),)
 endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "expressSetupSafeModule(address[],uint256,uint256)" [$(node_address)]  $(or $(hopramount),20000000000000000000000) $(or $(nativeamount),10000000000000000000)
+
+# E.g. make migrate-safe-module network=anvil-localhost environment-type=local node_address="0xcb192a4ba9abea8579c59231b8a57e3f0591e02b" safe_address=0x3A0A80BD107A4E029154286293296e62d235a4ce module_address=0xcE594ED193F314d66bC3Af9b53930CD9Ea87cc6E
+.PHONY: migrate-safe-module
+migrate-safe-module: ensure-environment-and-network-are-set ensure-privatekey-is-set
+migrate-safe-module: ## Migate existing node, safe and module to a new network
+ifeq ($(node_address),)
+	echo "parameter <node_address> missing" >&2 && exit 1
+endif
+ifeq ($(safe_address),)
+	echo "parameter <safe_address> missing" >&2 && exit 1
+endif
+ifeq ($(module_address),)
+	echo "parameter <module_address> missing" >&2 && exit 1
+endif
+	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
+		--broadcast --sig "migrateSafeModule(address[],address,address)" [$(node_address)] $(safe_address) $(module_address)
 
 # E.g. make add-all-allowed-target network=anvil-localhost environment-type=local target_address=0xcb192a4ba9abea8579c59231b8a57e3f0591e02b safe_address=0x3A0A80BD107A4E029154286293296e62d235a4ce module_address=0xcE594ED193F314d66bC3Af9b53930CD9Ea87cc6E
 .PHONY: add-all-allowed-target
@@ -174,27 +190,7 @@ endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "stakeNetworkRegistryNft(string)" $(nftrank)
 
-# E.g. make self-register-node network=anvil-localhost environment-type=local peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
-.PHONY: self-register-node
-self-register-node: ensure-environment-and-network-are-set ensure-privatekey-is-set
-self-register-node: ## staker register a node in network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
-endif
-	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "selfRegisterNodes(string[])" [$(peer_ids)]
-
-# E.g. make self-deregister-node network=anvil-localhost environment-type=local peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
-.PHONY: self-deregister-node
-self-deregister-node: ensure-environment-and-network-are-set ensure-privatekey-is-set
-self-deregister-node: ## staker deregister a node in network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
-endif
-	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "selfDeregisterNodes(string[])" $(peer_ids)
-
-# E.g. make register-nodes network=anvil-localhost environment-type=local staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
+# E.g. make register-nodes network=anvil-localhost environment-type=local staking_addresses="[0x3A0A80BD107A4E029154286293296e62d235a4ce,0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C]" node_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0x70997970c51812dc3a010c7d01b50e0d17dc79c8]"
 .PHONY: register-nodes
 register-nodes: ensure-environment-and-network-are-set ensure-privatekey-is-set
 register-nodes: ## manager registers nodes and safes in network registry contract
@@ -208,19 +204,16 @@ endif
 		--broadcast --sig "registerNodes(address[],address[])" \
 		$(staking_addresses) $(node_addresses)
 
-# E.g. make deregister-nodes network=anvil-localhost environment-type=local staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
+# E.g. make deregister-nodes network=anvil-localhost environment-type=local node_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0x70997970c51812dc3a010c7d01b50e0d17dc79c8]"
 .PHONY: deregister-nodes
 deregister-nodes: ensure-environment-and-network-are-set ensure-privatekey-is-set
 deregister-nodes: ## owner deregister given nodes from network registry contract
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
-endif
-ifeq ($(staking_addresses),)
-	echo "parameter <staking_addresses> missing. Please provide an empty array "[]" if no value of staking address should be provided." >&2 && exit 1
+ifeq ($(node_addresses),)
+	echo "parameter <node_addresses> missing" >&2 && exit 1
 endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "deregisterNodes(address[],string[])" \
-		$(staking_addresses) $(peer_ids)
+		--broadcast --sig "deregisterNodes(address[])" \
+		$(node_addresses)
 
 # E.g. make enable-network-registry network=anvil-localhost environment-type=local
 .PHONY: enable-network-registry
@@ -236,29 +229,15 @@ disable-network-registry: ## owner disables network registry (smart contract) gl
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
 		--broadcast --sig "disableNetworkRegistry()"
 
-# E.g. make force-eligibility-update network=anvil-localhost environment-type=local staking_addresses="[0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266,0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266]" eligibility="[true,false]"
-.PHONY: force-eligibility-update
-force-eligibility-update: ensure-environment-and-network-are-set ensure-privatekey-is-set
-force-eligibility-update: ## owner forces eligibility update
-ifeq ($(staking_addresses),)
-	echo "parameter <staking_addresses> missing" >&2 && exit 1
-endif
-ifeq ($(eligibility),)
-	echo "parameter <eligibility> missing" >&2 && exit 1
-endif
-	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "forceEligibilityUpdate(address[],bool[])" \
-		$(staking_addresses) $(eligibility)
-
-# E.g. make sync-eligibility network=anvil-localhost environment-type=local peer_ids="[16Uiu2HAmAmXnq8FtFsBAnSyfujaXbU3B5wdVRPYGfN8S99E5azdH,16Uiu2HAky1FmbdyrY4EC2ZmKVH5t1XTqZqkutnqNf5BpSjHuD9nF]"
+# E.g. make sync-eligibility network=anvil-localhost environment-type=local staking_addresses="[0x3A0A80BD107A4E029154286293296e62d235a4ce,0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C]"
 .PHONY: sync-eligibility
 sync-eligibility: ensure-environment-and-network-are-set ensure-privatekey-is-set
 sync-eligibility: ## owner sync eligibility of peers
-ifeq ($(peer_ids),)
-	echo "parameter <peer_ids> missing" >&2 && exit 1
+ifeq ($(staking_addresses),)
+	echo "parameter <staking_addresses> missing" >&2 && exit 1
 endif
 	$(forge-script) script/SingleAction.s.sol:SingleActionFromPrivateKeyScript \
-		--broadcast --sig "syncEligibility(string[])" $(peer_ids)
+		--broadcast --sig "syncEligibility(address[])" $(staking_addresses)
 
 # These targets needs to be splitted in macOs systems
 ensure-environment-and-network-are-set: ensure-network-is-set ensure-environment-is-set ensure-etherscan-api-key-is-set

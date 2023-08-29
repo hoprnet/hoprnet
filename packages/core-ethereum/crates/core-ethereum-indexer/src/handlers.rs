@@ -5,7 +5,7 @@ use bindings::{
     },
     hopr_channels::{
         ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
-        HoprChannelsEvents, OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
+        DomainSeparatorUpdatedFilter, HoprChannelsEvents, OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
     },
     hopr_network_registry::{
         DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter, HoprNetworkRegistryEvents,
@@ -104,6 +104,7 @@ where
             ChannelOpenedFilter::signature(),
             OutgoingChannelClosureInitiatedFilter::signature(),
             TicketRedeemedFilter::signature(),
+            DomainSeparatorUpdatedFilter::signature(),
         ]
     }
 
@@ -600,7 +601,7 @@ pub mod tests {
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
         hopr_channels::{
             ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
-            OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
+            DomainSeparatorUpdatedFilter, OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
         },
         hopr_network_registry::{
             DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter,
@@ -611,6 +612,7 @@ pub mod tests {
         hopr_token::TransferFilter,
     };
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
+    use core_crypto::types::Hash;
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::{
         account::{AccountEntry, AccountSignature, AccountType},
@@ -1199,6 +1201,31 @@ pub mod tests {
             *db.get_channel(&channel_id).await.unwrap().unwrap().balance.value(),
             solidity_balance
         );
+    }
+
+    #[async_std::test]
+    async fn on_channel_event_domain_separator_updated() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let separator = Hash::default();
+
+        let log = RawLog {
+            topics: vec![
+                DomainSeparatorUpdatedFilter::signature(),
+                H256::from_slice(&separator.to_bytes()),
+            ],
+            data: encode(&[]),
+        };
+
+        assert!(db.get_channels_domain_separator().await.unwrap().is_none());
+
+        handlers
+            .on_event(&mut db, &handlers.addresses.channels, 0u32, &log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(db.get_channels_domain_separator().await.unwrap().unwrap(), separator);
     }
 
     #[async_std::test]
