@@ -26,6 +26,12 @@ setup_node(){
   echo "Setting up ${instance} with $identities_path/$identity"
   gcloud compute ssh --zone ${zone} ${instance} --command 'sudo rm -f /opt/hoprd/{.hoprd.id,.env}'
   gcloud compute scp --zone ${zone}  $identities_path/$identity/{.hoprd.id,.env} ${instance}:/opt/hoprd/
+  echo "Ensure host ip is set in environment file"
+  gcloud compute ssh --zone ${zone} ${instance} --command '
+    curl -H "Metadata-Flavor:Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip > myip.txt
+    echo "HOPRD_HOST=\$(<myip.txt)" >> /opt/hoprd/.env
+    rm myip.txt
+  '
   gcloud compute ssh --zone ${zone} ${instance} --command 'sudo chown root:root -R /opt/hoprd'
   gcloud compute ssh --zone ${zone} ${instance} --command 'sudo service hoprd restart'
 }
