@@ -106,8 +106,7 @@ impl RoutingInfo {
         );
 
         let pub_key_size = <S::P as Keypair>::Public::SIZE;
-
-        let routing_info_len = additional_data_relayer_len + SimpleMac::SIZE + pub_key_size;
+        let routing_info_len = additional_data_relayer_len + SimpleMac::SIZE + pub_key_size + 1;
         let last_hop_len = additional_data_last_hop.map(|d| d.len()).unwrap_or(0) + 1; // end prefix length
 
         let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
@@ -143,9 +142,8 @@ impl RoutingInfo {
             } else {
                 extended_header.copy_within(0..header_len, routing_info_len);
                 extended_header[0..pub_key_size].copy_from_slice(&path[inverted_idx + 1].to_bytes());
-                extended_header[pub_key_size + 1] = idx as u8;
+                extended_header[pub_key_size] = inverted_idx as u8;
                 extended_header[pub_key_size + 1..pub_key_size + 1 + SimpleMac::SIZE].copy_from_slice(&ret.mac);
-
                 extended_header[pub_key_size + 1 + SimpleMac::SIZE
                     ..pub_key_size + 1 + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
                     .copy_from_slice(additional_data_relayer[inverted_idx]);
@@ -345,7 +343,7 @@ pub mod tests {
                 ForwardedHeader::RelayNode { mac, next_node, path_pos, .. } => {
                     last_mac.copy_from_slice(&mac);
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
-                    assert_eq!(path_pos, i, "invalid path position {path_pos}");
+                    assert_eq!(path_pos, i as u8, "invalid path position {path_pos}");
                     assert_eq!(pub_keys[i + 1].to_bytes().as_ref(), next_node.as_ref(), "invalid public key of the next node");
                 }
                 ForwardedHeader::FinalNode { additional_data } => {
@@ -354,6 +352,13 @@ pub mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test() {
+        generic_test_generate_routing_info_and_forward::<X25519Suite>(
+            (0..3).map(|_| OffchainKeypair::random()).collect(),
+        )
     }
 
     #[parameterized(amount = { 3, 2, 1 })]
