@@ -3,19 +3,12 @@ import {
   supported_networks,
   type ChainOptions,
   type ResolvedNetwork,
-  type Network,
-  core_misc_initialize_crate
-} from '../lib/core_misc.js'
-core_misc_initialize_crate()
+  type Network
+} from '../../hoprd/lib/hoprd_hoprd.js'
 
 import type { DeploymentExtract } from '@hoprnet/hopr-core-ethereum'
-export {
-  resolve_network,
-  supported_networks,
-  type ChainOptions,
-  type ResolvedNetwork,
-  type Network
-} from '../lib/core_hopr.js'
+
+export { resolve_network, supported_networks, type ChainOptions, type ResolvedNetwork, type Network }
 
 export type EnvironmentType = 'production' | 'staging' | 'development' | 'local'
 

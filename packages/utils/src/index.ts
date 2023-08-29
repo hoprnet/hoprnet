@@ -12,15 +12,6 @@ export * from './db/index.js'
 export * from './ethereum/index.js'
 export * from './utils.js'
 
-// Load `utils-misc` crate
-import { utils_misc_initialize_crate } from '../lib/utils_misc.js'
-utils_misc_initialize_crate()
-export { get_package_version } from '../lib/utils_misc.js'
-
-// Load `utils-metrics` crate
-import { utils_metrics_initialize_crate } from '../lib/utils_metrics.js'
-utils_metrics_initialize_crate()
-
 export {
   create_counter,
   SimpleCounter,
@@ -38,8 +29,9 @@ export {
   MultiHistogram,
   SimpleTimer,
   merge_encoded_metrics,
-  gather_all_metrics
-} from '../lib/utils_metrics.js'
+  gather_all_metrics,
+  get_package_version
+} from '../../hoprd/lib/hoprd_hoprd.js'
 
 export type MetricCollector = () => string
 

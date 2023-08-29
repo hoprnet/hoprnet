@@ -3,7 +3,7 @@ import express from 'express'
 import http from 'http'
 import { debug } from '@hoprnet/hopr-utils'
 import * as api from './v3.js'
-import { MessageInbox } from '../../lib/hoprd_inbox.js'
+import { type MessageInbox } from '../../lib/hoprd_hoprd.js'
 
 import type { default as Hopr } from '@hoprnet/hopr-core'
 import type { StateOps } from '../types.js'

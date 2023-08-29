@@ -26,7 +26,13 @@ pub mod wasm {
     use core_ethereum_indexer::handlers::wasm::*;
 
     #[allow(unused_imports)]
+    use core_misc::environment::wasm::*;
+
+    #[allow(unused_imports)]
     use core_hopr::wasm::*;
+
+    #[allow(unused_imports)]
+    use hoprd_misc::cli::wasm::*;
 
     #[allow(unused_imports)]
     use hoprd_inbox::inbox::wasm::*;
@@ -35,7 +41,13 @@ pub mod wasm {
     use hoprd_keypair::key_pair::wasm::*;
 
     use utils_log::logger::wasm::JsLogger;
-    use utils_misc::utils::wasm::JsResult;
+
+    #[allow(unused_imports)]
+    use utils_misc::utils::wasm::*;
+
+    #[allow(unused_imports)]
+    use utils_metrics::metrics::wasm::*;
+
     use wasm_bindgen::prelude::wasm_bindgen;
 
     static LOGGER: JsLogger = JsLogger {};
