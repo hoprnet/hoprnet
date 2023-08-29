@@ -32,12 +32,12 @@ use utils_types::{
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum Operation {
+pub enum Operation {
     Call = 0,
     DelegateCall = 1,
 }
 
-struct ChainCalls {
+pub struct ChainCalls {
     /// used to announce key binding of off-chain key (ed25519)
     /// and on-chain key (secp256k1)
     offchain_keypair: OffchainKeypair,
