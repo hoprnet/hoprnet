@@ -1,4 +1,5 @@
 use crate::create_safe_module::CreateSafeModuleArgs;
+use crate::migrate_safe_module::MigrateSafeModuleArgs;
 use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
 use crate::initialize_node::InitializeNodeArgs;
@@ -6,6 +7,7 @@ use crate::network_registry::RegisterInNetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
 pub mod create_safe_module;
+pub mod migrate_safe_module;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
@@ -42,6 +44,8 @@ enum Commands {
     InitializeNode(InitializeNodeArgs),
     #[clap(about = "Create a safe instance and a node management instance, configure default permissions")]
     CreateSafeModule(CreateSafeModuleArgs),
+    #[clap(about = "Migrate an exising set of node(d) with safe and module to a new network, with default permissions")]
+    MigrateSafeModule(MigrateSafeModuleArgs),
 }
 
 fn main() -> Result<(), HelperErrors> {
@@ -61,6 +65,9 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::CreateSafeModule(opt) => {
+            opt.run()?;
+        }
+        Commands::MigrateSafeModule(opt) => {
             opt.run()?;
         }
     }
