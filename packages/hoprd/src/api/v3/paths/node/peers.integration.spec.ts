@@ -2,6 +2,8 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
+import { PeerOrigin, PeerStatus, PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
+
 import {
   createTestApiInstance,
   ALICE_PEER_ID,
@@ -11,9 +13,9 @@ import {
   CHARLIE_PEER_ID
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
+
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type Hopr from '@hoprnet/hopr-core'
-import { PeerOrigin, PeerStatus, PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
 
 const meta: Map<string, string> = new Map([[PEER_METADATA_PROTOCOL_VERSION, '1.2.3']])
 

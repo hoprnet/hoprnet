@@ -19,7 +19,7 @@ wasm = [
 [dependencies]
 # a better separation of tcp + async-std for non wasm case could be designed
 libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp"] }
-libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence" }
+libp2p-mplex = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
@@ -27,7 +27,7 @@ syn = "2.0.27"      # needed for `features=["macros"]` from `libp2p`
 void = "1"          # needed for Behavior implementations from libp2p
 
 # wasm
-libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence", features = ["tcp"], optional = true }
+libp2p-wasm-ext = { workspace = true, features = ["tcp"], optional = true }
 getrandom = { version = "0.2.8", features = ["js"], optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.63", optional = true }

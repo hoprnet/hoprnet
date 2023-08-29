@@ -75,7 +75,7 @@ import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 
-import { networkInterfaces } from 'node:os'
+import { isIP } from 'node:net'
 
 const CODE_P2P = protocols('p2p').code
 
@@ -431,26 +431,17 @@ export class Hopr extends EventEmitter {
 
   private getLocalMultiaddresses(): Multiaddr[] {
     let mas: Multiaddr[] = []
-    // TODO: handle IPv6 as well
-    if (this.options.hosts.ip4 == undefined || this.options.hosts.ip4.ip == '0.0.0.0') {
-      let results: string[] = []
-      const nets = networkInterfaces()
 
-      for (const name of Object.keys(nets)) {
-        for (const net of nets[name]) {
-          // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
-          // 'IPv4' is in Node <= 17, from 18 it's a number 4 or 6
-          const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4
-          if (net.family === familyV4Value && !net.internal) {
-            results.push(net.address)
-          }
-        }
-      }
+    if (this.options.hosts.ip4 == undefined) {
+      throw new Error('IP address of the host must be specified')
+    }
 
-      const unique_ipv4s = [...new Set(results)]
-      for (const ip4 of unique_ipv4s) {
-        mas.push(multiaddr(`/ip4/${ip4}/tcp/${this.options.hosts.ip4.port}`))
-      }
+    if (isIP(this.options.hosts.ip4.ip) == 0) {
+      throw new Error('IP address of the host is not a valid IPv4 or IPv6 address')
+    }
+
+    if (this.options.hosts.ip4.ip == '0.0.0.0') {
+      throw new Error('IP address of the host must be a specific IPv4 or IPv6 address')
     } else {
       mas.push(multiaddr(`/ip4/${this.options.hosts.ip4.ip}/tcp/${this.options.hosts.ip4.port}`))
     }
@@ -711,7 +702,6 @@ export class Hopr extends EventEmitter {
    * Gets the observed addresses of a given peer.
    * @param peer peer to query for
    */
-  // TODO: this is needed by the API, but we cannot actually get it from that far
   public async getObservedAddresses(peer: PeerId): Promise<Multiaddr[]> {
     debug('Getting address for peer ' + peer)
     let addrs: Multiaddr[] = (await this.networkPeers.get_peer_multiaddresses(peer.toString())).map((mas) =>
