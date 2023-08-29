@@ -1136,6 +1136,7 @@ mod wasm {
 
 #[cfg(test)]
 mod tests {
+    use crate::interaction::Tag;
     use crate::interaction::DEFAULT_PRICE_PER_PACKET;
     use crate::{
         interaction::{
@@ -1145,6 +1146,7 @@ mod tests {
         por::ProofOfRelayValues,
     };
     use async_std::sync::RwLock;
+    use core_crypto::random::random_integer;
     use core_crypto::{
         derivation::derive_ack_key_share,
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -1160,7 +1162,7 @@ mod tests {
         channels::{ChannelEntry, ChannelStatus},
     };
     use futures::channel::mpsc::{Sender, UnboundedSender};
-    use futures::future::{select, Either};
+    use futures::future::{join3, select, Either};
     use futures::{pin_mut, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
@@ -1174,7 +1176,7 @@ mod tests {
     use utils_log::debug;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::{BinarySerializable, PeerIdLike, ToHex},
+        traits::{BinarySerializable, PeerIdLike},
     };
 
     use super::{PacketSendAwaiter, PacketSendFinalizer};
@@ -1378,7 +1380,7 @@ mod tests {
                     AckProcessed::Send(_, ack) => ack_interaction_sender
                         .writer()
                         .receive_acknowledgement(PEERS[1].public().to_peerid(), ack)
-                        .expect("Should succeed"),
+                        .expect("failed to receive ack"),
                     _ => panic!("Unexpected incoming acknowledgement detected"),
                 },
                 None => panic!("There should have been an acknowledgment to send"),
@@ -1388,18 +1390,11 @@ mod tests {
         let finish = async move {
             for i in 1..PENDING_ACKS + 1 {
                 let ack = done_rx.next().await.expect("failed finalize ack");
-                debug!("sender has received acknowledgement: {}", ack.to_hex());
-                if let Some(_) = sent_challenges.iter().find(|(_, chal)| chal.eq(&ack)) {
-                    // TODO: check solution of ack challenge
-                    /*assert!(
-                        ack_msg.solve(&ack_key.to_bytes()),
-                        "acknowledgement key must solve acknowledgement challenge"
-                    );*/
-
-                    // If it matches, set a signal that the test has finished
-                    debug!("peer 1 received expected ack");
-                }
-                debug!("done ack #{i} out of {PENDING_ACKS}");
+                debug!("sender has received acknowledgement {i}: {ack}");
+                assert!(
+                    sent_challenges.iter().find(|(_, c)| ack.eq(c)).is_some(),
+                    "received invalid challenge {ack}"
+                );
             }
         };
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
@@ -1415,7 +1410,8 @@ mod tests {
 
     async fn peer_setup_for(
         count: usize,
-        ack_tx: UnboundedSender<AcknowledgedTicket>,
+        ack_tkt_tx: UnboundedSender<AcknowledgedTicket>,
+        ack_tx: UnboundedSender<HalfKeyChallenge>,
         pkt_tx: Sender<ApplicationData>,
     ) -> Vec<(AcknowledgementInteraction, PacketInteraction)> {
         let peer_count = count;
@@ -1461,9 +1457,9 @@ mod tests {
                 let ack = AcknowledgementInteraction::new(
                     db.clone(),
                     &PEERS_CHAIN[i],
-                    None,
+                    if i == 0 { Some(ack_tx.clone()) } else { None },
                     if i == peer_count - 2 {
-                        Some(ack_tx.clone())
+                        Some(ack_tkt_tx.clone())
                     } else {
                         None
                     },
@@ -1493,7 +1489,6 @@ mod tests {
     async fn emulate_channel_communication(
         pending_packet_count: usize,
         mut components: Vec<(AcknowledgementInteraction, PacketInteraction)>,
-        expected_msg: ApplicationData,
     ) {
         let component_length = components.len();
 
@@ -1545,8 +1540,9 @@ mod tests {
                 {
                     MsgProcessed::Forward(peer, data) => {
                         assert_eq!(peer, PEERS[i + 1].public().to_peerid());
-                        assert!(
-                            i != component_length - 1,
+                        assert_ne!(
+                            i,
+                            component_length - 1,
                             "Only intermediate peers can serve as a forwarder"
                         );
                         components[i + 1]
@@ -1556,10 +1552,8 @@ mod tests {
                             .expect("Send of ack from relayer to receiver should succeed")
                     }
                     MsgProcessed::Receive(_peer, packet) => {
-                        let recv_app_data =
-                            ApplicationData::from_bytes(&packet).expect("could not deserialize app data");
-                        assert_eq!(i, component_length - 1, "Only the last peer can be a recepient");
-                        assert_eq!(expected_msg, recv_app_data, "received packet payload must match");
+                        ApplicationData::from_bytes(&packet).expect("could not deserialize app data");
+                        assert_eq!(i, component_length - 1, "Only the last peer can be a recipient");
                     }
                     _ => panic!("Should have gotten a send request or a final packet"),
                 }
@@ -1567,24 +1561,24 @@ mod tests {
         }
     }
 
-    #[serial]
-    #[async_std::test]
-    async fn test_packet_relayer_workflow_3_peers() {
-        let _ = env_logger::builder().is_test(true).try_init();
+    async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usize) {
+        assert!(peer_count >= 3, "invalid peer count given");
+        assert!(pending_packets >= 1, "at least one packet must be given");
 
-        let (pkt_tx, mut pkt_rx) = futures::channel::mpsc::channel::<ApplicationData>(100);
-        let (ack_tx, mut ack_rx) = futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
+        let (pkt_tx, pkt_rx) = futures::channel::mpsc::channel::<ApplicationData>(100);
+        let (ack_tkt_tx, ack_tkt_rx) = futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
+        let (ack_tx, ack_rx) = futures::channel::mpsc::unbounded::<HalfKeyChallenge>();
 
-        const PENDING_PACKETS: usize = 5;
-        const TIMEOUT_SECONDS: u64 = 20;
+        const TIMEOUT_SECONDS: u64 = 10;
 
-        let test_msg = ApplicationData {
-            application_tag: Some(10),
-            plain_text: random_bytes::<300>().into(),
-        };
+        let test_msgs = (0..pending_packets)
+            .map(|i| ApplicationData {
+                application_tag: (i == 0).then(|| random_integer(1, Some(65535)).unwrap() as Tag),
+                plain_text: random_bytes::<300>().into(),
+            })
+            .collect::<Vec<_>>();
 
-        let peer_count = 3;
-        let components = peer_setup_for(peer_count, ack_tx, pkt_tx).await;
+        let components = peer_setup_for(peer_count, ack_tkt_tx, ack_tx, pkt_tx).await;
 
         // Peer 1: start sending out packets
         let packet_path = Path::new_valid(
@@ -1595,15 +1589,18 @@ mod tests {
         );
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
-        for _ in 0..PENDING_PACKETS {
-            components[0]
+        let mut packet_challenges = Vec::new();
+        for i in 0..pending_packets {
+            let awaiter = components[0]
                 .1
                 .writer()
-                .send_packet(test_msg.clone(), packet_path.clone())
+                .send_packet(test_msgs[i].clone(), packet_path.clone())
                 .expect("Packet should be sent successfully");
+            let challenge = awaiter.rx.unwrap().await.expect("missing packet send challenge");
+            packet_challenges.push(challenge);
         }
 
-        let channel = emulate_channel_communication(PENDING_PACKETS, components, test_msg.clone());
+        let channel = emulate_channel_communication(pending_packets, components);
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
         pin_mut!(channel, timeout);
 
@@ -1613,113 +1610,54 @@ mod tests {
         };
 
         // Check that we received all acknowledgements and packets
-        let finish = async move {
-            let (mut acks, mut pkts) = (0, 0);
-            for _ in 0..2 * PENDING_PACKETS {
-                match select(ack_rx.next(), pkt_rx.next()).await {
-                    Either::Left((_, _)) => {
-                        acks += 1;
-                    }
-                    Either::Right((pkt, _)) => {
-                        let msg = pkt.unwrap();
-                        assert_eq!(test_msg, msg, "received packet payload must match");
-                        pkts += 1;
-                    }
-                }
-            }
-            (acks, pkts)
-        };
-
+        let finish = join3(
+            ack_rx.collect::<Vec<_>>(),
+            ack_tkt_rx.collect::<Vec<_>>(),
+            pkt_rx.collect::<Vec<_>>(),
+        );
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
         pin_mut!(finish, timeout);
 
-        let succeeded = match select(finish, timeout).await {
-            Either::Left(((acks, pkts), _)) => {
-                assert_eq!(acks, PENDING_PACKETS, "did not receive all acknowledgements");
-                assert_eq!(pkts, PENDING_PACKETS, "did not receive all packets");
-                succeeded && true
-            }
-            Either::Right(_) => false,
-        };
+        let succeeded = succeeded
+            && match select(finish, timeout).await {
+                Either::Left(((acks, ack_tkts, pkts), _)) => {
+                    assert_eq!(acks.len(), pending_packets, "did not receive all acknowledgements");
+                    assert!(
+                        packet_challenges.iter().all(|c| acks.contains(c)),
+                        "received some unknown acknowledgement"
+                    );
+
+                    assert_eq!(
+                        ack_tkts.len(),
+                        pending_packets,
+                        "did not receive all acknowledgement tickets"
+                    );
+
+                    assert_eq!(pkts.len(), pending_packets, "did not receive all packets");
+                    assert!(
+                        test_msgs.iter().all(|m| pkts.contains(m)),
+                        "some received packet data does not match"
+                    );
+
+                    true
+                }
+                Either::Right(_) => false,
+            };
 
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
 
     #[serial]
     #[async_std::test]
+    async fn test_packet_relayer_workflow_3_peers() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        packet_relayer_workflow_n_peers(3, 5).await;
+    }
+
+    #[serial]
+    #[async_std::test]
     async fn test_packet_relayer_workflow_5_peers() {
         let _ = env_logger::builder().is_test(true).try_init();
-
-        let (pkt_tx, mut pkt_rx) = futures::channel::mpsc::channel::<ApplicationData>(100);
-        let (ack_tx, mut ack_rx) = futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
-
-        const PENDING_PACKETS: usize = 5;
-        const TIMEOUT_SECONDS: u64 = 20;
-
-        let test_msg = ApplicationData {
-            application_tag: Some(10),
-            plain_text: random_bytes::<300>().into(),
-        };
-
-        let peer_count = 5;
-        let components = peer_setup_for(peer_count, ack_tx, pkt_tx).await;
-
-        // Peer 1: start sending out packets
-        let packet_path = Path::new_valid(
-            PEERS[1..peer_count]
-                .iter()
-                .map(|p| p.public().to_peerid())
-                .collect::<Vec<PeerId>>(),
-        );
-        assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
-
-        for _ in 0..PENDING_PACKETS {
-            components[0]
-                .1
-                .writer()
-                .send_packet(test_msg.clone(), packet_path.clone())
-                .expect("Packet should be sent successfully");
-        }
-
-        let channel = emulate_channel_communication(PENDING_PACKETS, components, test_msg.clone());
-        let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
-        pin_mut!(channel, timeout);
-
-        let succeeded = match select(channel, timeout).await {
-            Either::Left(_) => true,
-            Either::Right(_) => false,
-        };
-
-        // Check that we received all acknowledgements and packets
-        let finish = async move {
-            let (mut acks, mut pkts) = (0, 0);
-            for _ in 0..2 * PENDING_PACKETS {
-                match select(ack_rx.next(), pkt_rx.next()).await {
-                    Either::Left((_, _)) => {
-                        acks += 1;
-                    }
-                    Either::Right((pkt, _)) => {
-                        let msg = pkt.unwrap();
-                        assert_eq!(test_msg, msg, "received packet payload must match");
-                        pkts += 1;
-                    }
-                }
-            }
-            (acks, pkts)
-        };
-
-        let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
-        pin_mut!(finish, timeout);
-
-        let succeeded = match select(finish, timeout).await {
-            Either::Left(((acks, pkts), _)) => {
-                assert_eq!(acks, PENDING_PACKETS, "did not receive all acknowledgements");
-                assert_eq!(pkts, PENDING_PACKETS, "did not receive all packets");
-                succeeded && true
-            }
-            Either::Right(_) => false,
-        };
-
-        assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
+        packet_relayer_workflow_n_peers(5, 5).await;
     }
 }
