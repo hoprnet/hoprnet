@@ -3,9 +3,10 @@ use std::{pin::Pin, sync::Arc};
 use async_lock::RwLock;
 use core_crypto::types::OffchainPublicKey;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_network::network::Network;
+use core_network::{network::Network, PeerId};
 use core_p2p::libp2p_swarm::derive_prelude::Multiaddr;
 use futures::{channel::mpsc::Sender, future::poll_fn, StreamExt};
+use utils_log::{error, warn};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
@@ -13,9 +14,6 @@ use async_std::task::spawn_local;
 use utils_types::traits::PeerIdLike;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
-
-use core_network::PeerId;
-use utils_log::{error, warn};
 
 use crate::CoreEthereumDb;
 

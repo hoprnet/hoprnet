@@ -121,7 +121,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
      * @param pairId hashed value of the pair of concern, e.g. for channel `keccak256(src,dst)`, for token and send
      * `keccak256(owner,spender)`
      */
-    function getGranularPermissions(bytes32 capabilityKey, bytes32 pairId) external returns (GranularPermission) {
+    function getGranularPermissions(bytes32 capabilityKey, bytes32 pairId) external view returns (GranularPermission) {
         return role.capabilities[capabilityKey][pairId];
     }
 
