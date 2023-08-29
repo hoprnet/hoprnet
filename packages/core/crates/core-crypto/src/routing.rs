@@ -18,7 +18,7 @@ pub const fn header_length<S: SphinxSuite>(
     additional_data_relayer_len: usize,
     additional_data_last_hop_len: usize,
 ) -> usize {
-    let per_hop = <S::P as Keypair>::Public::SIZE + SimpleMac::SIZE + additional_data_relayer_len;
+    let per_hop = <S::P as Keypair>::Public::SIZE + 1 + SimpleMac::SIZE + additional_data_relayer_len;
     let last_hop = 1 + additional_data_last_hop_len;
 
     last_hop + (max_hops - 1) * per_hop
@@ -142,7 +142,7 @@ impl RoutingInfo {
             } else {
                 extended_header.copy_within(0..header_len, routing_info_len);
                 extended_header[0..pub_key_size].copy_from_slice(&path[inverted_idx + 1].to_bytes());
-                extended_header[pub_key_size] = inverted_idx as u8;
+                extended_header[pub_key_size] = idx as u8;
                 extended_header[pub_key_size + 1..pub_key_size + 1 + SimpleMac::SIZE].copy_from_slice(&ret.mac);
                 extended_header[pub_key_size + 1 + SimpleMac::SIZE
                     ..pub_key_size + 1 + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
@@ -343,7 +343,7 @@ pub mod tests {
                 ForwardedHeader::RelayNode { mac, next_node, path_pos, .. } => {
                     last_mac.copy_from_slice(&mac);
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
-                    assert_eq!(path_pos, i as u8, "invalid path position {path_pos}");
+                    assert_eq!(path_pos, (shares.secrets.len() - i - 1) as u8, "invalid path position {path_pos}");
                     assert_eq!(pub_keys[i + 1].to_bytes().as_ref(), next_node.as_ref(), "invalid public key of the next node");
                 }
                 ForwardedHeader::FinalNode { additional_data } => {

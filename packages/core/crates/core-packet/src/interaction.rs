@@ -729,6 +729,7 @@ where
                 // Check that the calculated path position from the ticket matches value from the packet header
                 let ticket_path_pos = packet.ticket.get_path_position(U256::from(*PRICE_PER_PACKET))?;
                 if !ticket_path_pos.eq(path_pos) {
+                    error!("path position from ticket {ticket_path_pos}, path position from packet {path_pos}");
                     return Err(PathPositionMismatch);
                 }
 
