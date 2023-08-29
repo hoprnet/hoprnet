@@ -55,14 +55,14 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.2"
+version = "0.2.3"
 
 [dependencies.socket2]
 version = "0.5.3"
 features = ["all"]
 
 [dependencies.tokio]
-version = "1.31.0"
+version = "1.32.0"
 features = ["net"]
 optional = true
 default-features = false
@@ -75,7 +75,7 @@ version = "1.6.5"
 features = ["attributes"]
 
 [dev-dependencies.tokio]
-version = "1.31.0"
+version = "1.32.0"
 features = ["full"]
 default-features = false
 

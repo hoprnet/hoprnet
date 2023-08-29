@@ -54,7 +54,7 @@ version = "0.40.0"
 path = "../../core"
 
 [dependencies.libp2p-identity]
-version = "0.2.2"
+version = "0.2.3"
 
 [dependencies.trust-dns-resolver]
 version = "0.22"

@@ -2,12 +2,12 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, TICKET_MOCK, ALICE_ETHEREUM_ADDR, BOB_ETHEREUM_ADDR } from '../../../fixtures.js'
+import { createTestApiInstance, ALICE_ETHEREUM_ADDR, BOB_ETHEREUM_ADDR } from '../../../fixtures.js'
 import { STATUS_CODES } from '../../../utils.js'
-import { Balance, BalanceType, U256, ChannelStatus, ChannelEntry } from '@hoprnet/hopr-utils'
+import { Balance, BalanceType, U256, ChannelStatus, ChannelEntry, Ticket } from '@hoprnet/hopr-utils'
 
 let node = sinon.fake() as any
-node.getTickets = sinon.fake.returns([TICKET_MOCK])
+node.getTickets = sinon.fake.returns([Ticket.default()])
 
 describe('GET /channels/{channelid}/tickets', () => {
   let service: any
