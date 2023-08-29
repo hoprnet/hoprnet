@@ -22,7 +22,7 @@
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
-    "test": "NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --full-trace",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules --trace-warnings --unhandled-rejections=strict\" mocha --full-trace -n experimental-wasm-reftypes",
     "docs:generate": "typedoc",
     "docs:watch": "typedoc --watch"
   },
