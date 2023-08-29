@@ -1,10 +1,11 @@
 import { peerIdFromString } from '@libp2p/peer-id'
 import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
+
 import { STATUS_CODES } from '../../../utils.js'
 
 import type { Operation } from 'express-openapi'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 
 /**
  * Pings another peer to check its availability.

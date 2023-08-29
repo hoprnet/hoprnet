@@ -5,8 +5,8 @@ import chai, { expect } from 'chai'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { Health } from '@hoprnet/hopr-core'
 
-import { hoprd_misc_initialize_crate, ResolvedNetwork } from '../../../../../lib/hoprd_misc.js'
-hoprd_misc_initialize_crate()
+import { hoprd_hoprd_initialize_crate, type ResolvedNetwork } from '../../../../../lib/hoprd_hoprd.js'
+hoprd_hoprd_initialize_crate()
 
 import { health_to_string } from '@hoprnet/hopr-utils'
 

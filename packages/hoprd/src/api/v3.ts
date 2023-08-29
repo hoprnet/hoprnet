@@ -23,10 +23,9 @@ import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocket, WebSocketServer } from 'ws'
 import type Hopr from '@hoprnet/hopr-core'
-import { SettingKey, StateOps } from '../types.js'
+import { SettingKey, type StateOps } from '../types.js'
 import type { Token } from './token.js'
-import { Database } from '../../../core/lib/core_hopr.js'
-import { ApplicationData, MessageInbox } from '../../lib/hoprd_inbox.js'
+import type { Database, ApplicationData, MessageInbox } from '../../../hoprd/lib/hoprd_hoprd.js'
 
 const debugLog = debug('hoprd:api:v3')
 
