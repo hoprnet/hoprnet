@@ -13,7 +13,7 @@
     "build:wasm": "make -C crates all && make -C crates install",
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo",
-    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha -n experimental-wasm-reftypes",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha",
     "dev": "yarn clean && yarn build:wasm && tsc -w",
     "build": "yarn clean && yarn build:wasm && tsc -p .",
     "docs:generate": "typedoc",

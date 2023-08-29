@@ -25,7 +25,7 @@
     "test:wasm": "make -C crates test",
     "clean": "yarn clean:wasm && rm -Rf ./lib ./tsconfig.tsbuildinfo ./tests/tsconfig.tsbuildinfo",
     "build": "yarn clean && yarn build:wasm && npx tsc -p .",
-    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha -n experimental-wasm-reftypes --full-trace",
+    "test": "NODE_OPTIONS=\"--experimental-wasm-modules\" mocha --full-trace",
     "prepublishOnly": "yarn clean && yarn build:wasm && tsc -p ./tsconfig.npm.json"
   },
   "dependencies": {
