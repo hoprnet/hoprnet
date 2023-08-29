@@ -65,7 +65,7 @@ lazy_static::lazy_static! {
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
-    static ref PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
+    static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 }
 /// Fixed ticket winning probability
 pub const TICKET_WIN_PROB: f64 = 1.0f64;
@@ -517,8 +517,28 @@ where
         let channel_id = channel.get_id();
         debug!("going to bump ticket index for channel id {channel_id}");
         let current_index = self.bump_ticket_index(&channel_id).await?;
+        let price_per_packet = self
+            .db
+            .read()
+            .await
+            .get_ticket_price()
+            .await
+            .unwrap_or_else(|_| {
+                warn!(
+                    "Error reading ticket price value from database, using default {:?}",
+                    *DEFAULT_PRICE_PER_PACKET
+                );
+                Some(*DEFAULT_PRICE_PER_PACKET)
+            })
+            .unwrap_or_else(|| {
+                warn!(
+                    "No ticket price value set in database yet, using default {:?}",
+                    *DEFAULT_PRICE_PER_PACKET
+                );
+                *DEFAULT_PRICE_PER_PACKET
+            });
         let amount = Balance::new(
-            PRICE_PER_PACKET
+            price_per_packet
                 .divide_f64(TICKET_WIN_PROB)
                 .expect("winning probability outside of allowed interval (0.0, 1.0]")
                 * U256::from(path_pos - 1),
@@ -695,12 +715,32 @@ where
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
                 // Validate the ticket first
+                let price_per_packet = self
+                    .db
+                    .read()
+                    .await
+                    .get_ticket_price()
+                    .await
+                    .unwrap_or_else(|_| {
+                        warn!(
+                            "Error reading ticket price value from database, using default {:?}",
+                            *DEFAULT_PRICE_PER_PACKET
+                        );
+                        Some(*DEFAULT_PRICE_PER_PACKET)
+                    })
+                    .unwrap_or_else(|| {
+                        warn!(
+                            "No ticket price value set in database yet, using default {:?}",
+                            *DEFAULT_PRICE_PER_PACKET
+                        );
+                        *DEFAULT_PRICE_PER_PACKET
+                    });
                 if let Err(e) = validate_unacknowledged_ticket::<Db>(
                     &*self.db.read().await,
                     &packet.ticket,
                     &channel,
                     &previous_hop_addr,
-                    Balance::new(*PRICE_PER_PACKET, BalanceType::HOPR),
+                    Balance::new(price_per_packet, BalanceType::HOPR),
                     TICKET_WIN_PROB,
                     self.cfg.check_unrealized_balance,
                     &domain_separator,
@@ -730,7 +770,7 @@ where
                 }
 
                 // Check that the calculated path position from the ticket matches value from the packet header
-                let ticket_path_pos = packet.ticket.get_path_position(U256::from(*PRICE_PER_PACKET))?;
+                let ticket_path_pos = packet.ticket.get_path_position(U256::from(price_per_packet))?;
                 if !ticket_path_pos.eq(path_pos) {
                     error!("path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}");
                     return Err(PathPositionMismatch);
@@ -1110,10 +1150,11 @@ mod wasm {
 #[cfg(test)]
 mod tests {
     use crate::interaction::Tag;
+    use crate::interaction::DEFAULT_PRICE_PER_PACKET;
     use crate::{
         interaction::{
             AckProcessed, AcknowledgementInteraction, ApplicationData, MsgProcessed, PacketInteraction,
-            PacketInteractionConfig, PRICE_PER_PACKET,
+            PacketInteractionConfig,
         },
         por::ProofOfRelayValues,
     };
@@ -1202,7 +1243,10 @@ mod tests {
         ChannelEntry::new(
             from,
             to,
-            Balance::new(U256::from(1234u64) * U256::from(*PRICE_PER_PACKET), BalanceType::HOPR),
+            Balance::new(
+                U256::from(1234u64) * U256::from(*DEFAULT_PRICE_PER_PACKET),
+                BalanceType::HOPR,
+            ),
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),

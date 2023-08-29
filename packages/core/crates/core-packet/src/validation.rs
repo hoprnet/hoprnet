@@ -195,6 +195,8 @@ mod tests {
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
             async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
+            async fn get_ticket_price(&self) -> core_ethereum_db::errors::Result<Option<U256>>;
+            async fn set_ticket_price(&mut self, ticket_price: &U256) -> core_ethereum_db::errors::Result<()>;
             async fn get_node_safe_registry_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
             async fn set_node_safe_registry_domain_separator(&mut self, node_safe_registry_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn get_channels_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;

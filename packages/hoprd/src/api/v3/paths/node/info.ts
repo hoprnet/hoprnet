@@ -1,4 +1,4 @@
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { health_to_string } from '@hoprnet/hopr-utils'

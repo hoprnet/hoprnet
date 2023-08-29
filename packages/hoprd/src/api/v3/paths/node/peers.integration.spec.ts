@@ -15,7 +15,7 @@ import {
 import { STATUS_CODES } from '../../utils.js'
 
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 
 const meta: Map<string, string> = new Map([[PEER_METADATA_PROTOCOL_VERSION, '1.2.3']])
 

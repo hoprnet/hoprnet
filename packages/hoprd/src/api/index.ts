@@ -5,7 +5,7 @@ import { debug } from '@hoprnet/hopr-utils'
 import * as api from './v3.js'
 import { type MessageInbox } from '../../lib/hoprd_hoprd.js'
 
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 import type { StateOps } from '../types.js'
 
 const debugLog = debug('hoprd:api')

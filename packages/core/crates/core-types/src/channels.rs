@@ -1017,9 +1017,7 @@ pub mod wasm {
         pub fn to_string(&self) -> String {
             format!("{:?}", self.w)
         }
-    }
 
-    impl Ticket {
         pub fn clone(&self) -> Ticket {
             Self { w: self.w.clone() }
         }

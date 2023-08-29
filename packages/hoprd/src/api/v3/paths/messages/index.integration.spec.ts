@@ -8,7 +8,7 @@ hoprd_hoprd_initialize_crate()
 
 import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
 
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 
 describe('DELETE /messages', function () {
   let node: Hopr

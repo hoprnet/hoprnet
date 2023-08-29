@@ -325,6 +325,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         topics: [this.handlers.get_network_registry_topics()],
         fromBlock,
         toBlock
+      },
+      {
+        address: contractAddresses.hoprTicketPriceOracleAddress,
+        topics: [this.handlers.get_ticket_price_oracle_topics()],
+        fromBlock,
+        toBlock
       }
     ]
 
