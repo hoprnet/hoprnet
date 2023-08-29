@@ -566,7 +566,10 @@ where
             .await
             .get_chain_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
             .await?
-            .ok_or(PacketConstructionError)?;
+            .ok_or_else(|| {
+                debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
+                PacketConstructionError
+            })?;
 
         let domain_separator = self
             .db
@@ -574,7 +577,10 @@ where
             .await
             .get_channels_domain_separator()
             .await?
-            .ok_or(PacketConstructionError)?;
+            .ok_or_else(|| {
+                debug!("Missing domain separator.");
+                MissingDomainSeparator
+            })?;
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
@@ -626,7 +632,10 @@ where
             .await
             .get_channels_domain_separator()
             .await?
-            .ok_or(MissingDomainSeparator)?;
+            .ok_or_else(|| {
+                debug!("Missing domain separator");
+                MissingDomainSeparator
+            })?;
 
         match packet.state() {
             PacketState::Outgoing { .. } => return Err(InvalidPacketState),
