@@ -143,10 +143,11 @@ impl RoutingInfo {
             } else {
                 extended_header.copy_within(0..header_len, routing_info_len);
                 extended_header[0..pub_key_size].copy_from_slice(&path[inverted_idx + 1].to_bytes());
-                extended_header[pub_key_size..pub_key_size + SimpleMac::SIZE].copy_from_slice(&ret.mac);
+                extended_header[pub_key_size + 1] = idx as u8;
+                extended_header[pub_key_size + 1..pub_key_size + 1 + SimpleMac::SIZE].copy_from_slice(&ret.mac);
 
-                extended_header[pub_key_size + SimpleMac::SIZE
-                    ..pub_key_size + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
+                extended_header[pub_key_size + 1 + SimpleMac::SIZE
+                    ..pub_key_size + 1 + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
                     .copy_from_slice(additional_data_relayer[inverted_idx]);
 
                 let key_stream = prg.digest(0, header_len);
@@ -172,6 +173,8 @@ pub enum ForwardedHeader {
         header: Box<[u8]>,
         /// Authentication tag
         mac: Box<[u8]>,
+        /// Position of the relay in the path
+        path_pos: u8,
         /// Public key of the next node
         next_node: Box<[u8]>,
         /// Additional data for the relayer
@@ -208,7 +211,7 @@ pub fn forward_header<S: SphinxSuite>(
     assert_eq!(SimpleMac::SIZE, mac.len(), "invalid mac length");
 
     let pub_key_size = <S::P as Keypair>::Public::SIZE;
-    let routing_info_len = additional_data_relayer_len + pub_key_size + SimpleMac::SIZE;
+    let routing_info_len = additional_data_relayer_len + pub_key_size + 1 + SimpleMac::SIZE;
     let last_hop_len = additional_data_last_hop_len + 1; // end prefix
 
     let header_len = last_hop_len + (max_hops - 1) * routing_info_len;
@@ -229,11 +232,11 @@ pub fn forward_header<S: SphinxSuite>(
     if header[0] != RELAYER_END_PREFIX {
         // Try to deserialize the public key to validate it
         let next_node: Box<[u8]> = (&header[0..pub_key_size]).into();
-
-        let mac: Box<[u8]> = (&header[pub_key_size..pub_key_size + SimpleMac::SIZE]).into();
+        let path_pos: u8 = header[pub_key_size];    // Path position is the secret key index
+        let mac: Box<[u8]> = (&header[pub_key_size + 1 ..pub_key_size + 1 + SimpleMac::SIZE]).into();
 
         let additional_info: Box<[u8]> = (&header
-            [pub_key_size + SimpleMac::SIZE..pub_key_size + SimpleMac::SIZE + additional_data_relayer_len])
+            [pub_key_size + 1 + SimpleMac::SIZE..pub_key_size + 1 + SimpleMac::SIZE + additional_data_relayer_len])
             .into();
 
         header.copy_within(routing_info_len.., 0);
@@ -243,6 +246,7 @@ pub fn forward_header<S: SphinxSuite>(
         Ok(RelayNode {
             header: (&header[..header_len]).into(),
             mac,
+            path_pos,
             next_node,
             additional_info,
         })
@@ -338,14 +342,15 @@ pub mod tests {
             let fwd = forward_header::<S>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
 
             match fwd {
-                ForwardedHeader::RelayNode { mac, next_node, .. } => {
+                ForwardedHeader::RelayNode { mac, next_node, path_pos, .. } => {
                     last_mac.copy_from_slice(&mac);
-                    assert!(i < shares.secrets.len() - 1);
-                    assert_eq!(pub_keys[i + 1].to_bytes().as_ref(), next_node.as_ref());
+                    assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
+                    assert_eq!(path_pos, i, "invalid path position {path_pos}");
+                    assert_eq!(pub_keys[i + 1].to_bytes().as_ref(), next_node.as_ref(), "invalid public key of the next node");
                 }
                 ForwardedHeader::FinalNode { additional_data } => {
-                    assert_eq!(shares.secrets.len() - 1, i);
-                    assert_eq!(0, additional_data.len());
+                    assert_eq!(shares.secrets.len() - 1, i, "cannot be a final node");
+                    assert_eq!(0, additional_data.len(), "final node must not have any additional data");
                 }
             }
         }
