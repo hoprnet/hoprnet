@@ -21,7 +21,9 @@ Relevant smart contracts are listed below, per environment **(to be updated)**:
 
 ## Register a node by the runner
 
-### Eligibility
+To be updated
+
+<!-- ### Eligibility
 
 A node can be registered by its runner if the runner is eligible. There are two ways to become an eligible account:
 
@@ -50,27 +52,17 @@ For the <mark>staging environment</mark>, please call the following function whe
 
 ```
 PRIVATE_KEY<private key of "account"> make stake-nrnft network=rotsee environment_type=staging nftrank=<rank of "Network_registry" nft>
-```
+``` -->
 
-### Register the peer ID
+### Register a node
 
-An eligible node runner can call `selfRegister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to register one or multiple HOPR node(s). The number of nodes one account is allowed to register is subject to the `rank` of the "Network Registry" NFT the account has staked.
-
-For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account. This call can only succeed if the caller (i.e. the `PRIVATE_KEY` of the node runner) is eligible (having enough stake or a "Network_registry" NFT).
-
-```
-PRIVATE_KEY=<private key of “account”> make self-register-node network=rotsee environment_type=staging peer-ids=<peerId1,peerId2,peerId3>
-```
+An eligible node runner can call `selfRegister(address[] nodeAddresses)` method on `HoprNetworkRegistry` smart contract to register one or multiple HOPR node(s).
+This function should be called from the Safe holding HOPR token assets.
 
 ## Deregister a node
 
-A node runner can call `selfDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to remove previously registered HOPR nodes.
-
-For the <mark>staging environment</mark>, please call the following function where the `PRIVATE_KEY` is the private key of the node runner's account.
-
-```
-PRIVATE_KEY=<private key of “account”> make self-deregister-node network=rotsee environment_type=staging peer-ids=<peerId1,peerId2,peerId3>
-```
+A node runner can call `selfDeregister(address[] nodeAddresses)` method on `HoprNetworkRegistry` smart contract to remove previously registered HOPR nodes.
+This function should be called from the Safe holding HOPR token assets.
 
 ## Register a node by the Network Registry contract owner
 
@@ -78,21 +70,20 @@ PRIVATE_KEY=<private key of “account”> make self-deregister-node network=rot
 
 Owner can register any account for any node. The eligibility of an account is not going to be checked unless a `sync` method for that account gets called.
 
-### Register the peer ID
+### Register a node
 
-Owner can call `ownerRegister(address[] accounts, string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to register a list of HOPR nodes for a list of accounts respectively. Note that this registration can overwrite existing entries.
+Owner can call `managerRegister(address[] accounts, address[] nodeAddresses)` method from `HoprNetworkRegistry` smart contract to register a list of HOPR nodes for a list of accounts respectively. Note that this registration can overwrite existing entries.
 
 ```
-make register-nodes network=rotsee environment_type=staging native_addresses=<address1,address2,address3,address4> peer_ids=<peerid1,peerid2,peerid3,peerid4>
-make force-eligibility-update network=rotsee environment_type=staging native_addresses=<address1,address2,address3,address4> eligibility=<true,false,true,true, etc>
+make register-nodes network=rotsee environment_type=staging staking_addresses=<address1,address2,address3,address4> node_addresses=<nodeAddress1,nodeAddress2,nodeAddress3,nodeAddress4>
 ```
 
 ## Deregister a node
 
-Owner can call `ownerDeregister(string[] hoprPeerIds)` method from `HoprNetworkRegistry` smart contract to remove a list of nodes.
+Owner can call `managerDeregister(address[] nodeAddresses)` method from `HoprNetworkRegistry` smart contract to remove a list of nodes.
 
 ```
-make deregister-nodes network=rotsee environment_type=staging peer_ids=<peerId1,peerId2,peerId3,peerId4>
+make deregister-nodes network=rotsee environment_type=staging node_addresses=<nodeAddress1,nodeAddress2>
 ```
 
 ## Enable and disable globally
@@ -110,7 +101,7 @@ or
 make enable-network-registry network=rotsee environment_type=staging
 ```
 
-## Internal NR testing
+<!-- ## Internal NR testing
 
 ### Staging
 
@@ -195,18 +186,18 @@ To register one (`community` rank) or many (`developer` rank) eligible node in t
 
       ```
       PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node network=monte_rosa environment_type=production \
-         peer_ids=<peerId1,peerId2,peerId3,peerId4...>
+         node_addresses=<peerId1,peerId2,peerId3,peerId4...>
       ```
 
    2. When "dummy proxy" is used:
       ```
       PRIVATE_KEY=${ACCOUNT_PRIVKEY} make sync-eligibility network=monte_rosa environment_type=production \
-         peer_ids=<peerId1,peerId2,peerId3,peerId4...>
+         node_addresses=<peerId1,peerId2,peerId3,peerId4...>
       ```
 
    b. For community/team testing:
 
    ```
    PRIVATE_KEY=${ACCOUNT_PRIVKEY} make stake-nrnft nftrank=<"developer" or "community"> network=monte_rosa environment_type=production
-   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node peer_ids=<peerId1,peerId2,peerId3,peerId4...> network=monte_rosa environment_type=production
-   ```
+   PRIVATE_KEY=${ACCOUNT_PRIVKEY} make self-register-node node_addresses=<peerId1,peerId2,peerId3,peerId4...> network=monte_rosa environment_type=production
+   ``` -->

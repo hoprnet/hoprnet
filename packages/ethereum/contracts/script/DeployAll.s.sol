@@ -32,7 +32,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // Halt if ERC1820Registry has not been deployed.
         mustHaveErc1820Registry();
         emit log_string(string(abi.encodePacked("Deploying in ", currentNetworkId)));
-        // set owner of network registry depending on the network
+        // get owner of network registry (and its proxy) depending on the network
         if (keccak256(abi.encodePacked(currentNetworkId)) == keccak256(abi.encodePacked("stake_hub_test"))) {
             owner = PRODUCT_MULTISIG_ADDRESS;
         } else {
@@ -208,17 +208,24 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             isHoprNetworkRegistryDeployed = true;
         } else if (!isValidAddress(currentNetworkDetail.addresses.networkRegistryProxyContractAddress)) {
             // deploy StakingProxy in other environment types, if no proxy contract is given.
+            // temporarily grant default admin role to the deployer wallet
             currentNetworkDetail.addresses.networkRegistryProxyContractAddress = deployCode(
                 "SafeProxyForNetworkRegistry.sol:HoprSafeProxyForNetworkRegistry",
                 abi.encode(
-                    owner,
                     deployerAddress,
+                    owner,
                     0, // disable self-registry
                     block.number, // latest block number
                     currentNetworkDetail.addresses.tokenContractAddress,
                     currentNetworkDetail.addresses.nodeSafeRegistryAddress
                 )
             );
+
+            // swap owner and grant manager role to more wallets
+            _helperSwapOwnerGrantManager(
+                currentNetworkDetail.addresses.networkRegistryContractAddress, deployerAddress, owner
+            );
+            // flag isHoprNetworkRegistryDeployed
             isHoprNetworkRegistryDeployed = true;
         }
     }
@@ -233,10 +240,16 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 || !isValidAddress(currentNetworkDetail.addresses.networkRegistryContractAddress)
         ) {
             // deploy NetworkRegistry contract
+            // temporarily grant default admin role to the deployer wallet
             currentNetworkDetail.addresses.networkRegistryContractAddress = deployCode(
                 "NetworkRegistry.sol:HoprNetworkRegistry",
-                abi.encode(currentNetworkDetail.addresses.networkRegistryProxyContractAddress, owner, deployerAddress)
+                abi.encode(currentNetworkDetail.addresses.networkRegistryProxyContractAddress, deployerAddress, owner)
             );
+            // swap owner and grant manager role to more wallets
+            _helperSwapOwnerGrantManager(
+                currentNetworkDetail.addresses.networkRegistryContractAddress, deployerAddress, owner
+            );
+
             // NetworkRegistry should be enabled (default behavior) in staging/production, and disabled in development
             if (currentEnvironmentType == EnvironmentType.LOCAL) {
                 (bool successDisableRegistry,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
@@ -276,6 +289,39 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 "Announcements.sol:HoprAnnouncements",
                 abi.encode(currentNetworkDetail.addresses.nodeSafeRegistryAddress)
             );
+        }
+    }
+
+    /**
+     * @dev helper function to
+     * - grant manager role to manager addresses
+     * - grant default admin role to the new owner
+     * - renounce default admin role from the current caller
+     * @param contractAddress address that has access control
+     * @param caller caller address
+     * @param newOwner new owner of the contract
+     */
+    function _helperSwapOwnerGrantManager(address contractAddress, address caller, address newOwner) internal {
+        // grant default admin role to the actual owner
+        (bool successGrantDefaultAdminRole,) =
+            contractAddress.call(abi.encodeWithSignature("grantRole(bytes32,address)", DEFAULT_ADMIN_ROLE, newOwner));
+        if (!successGrantDefaultAdminRole) {
+            emit log_string("Cannot grant DEFAULT_ADMIN_ROLE role on ");
+        }
+        // grant manager roles to more accounts
+        for (uint256 i = 0; i < PRODUCT_TEAM_MANAGER_ADDRESSES.length; i++) {
+            (bool successGrantManagerRole,) = contractAddress.call(
+                abi.encodeWithSignature("grantRole(bytes32,address)", MANAGER_ROLE, PRODUCT_TEAM_MANAGER_ADDRESSES[i])
+            );
+        }
+        if (!successGrantDefaultAdminRole) {
+            emit log_string("Cannot grant MANAGER_ROLE role on ");
+        }
+        // renounce the default admin role
+        (bool successRenounceDefaultAdminRole,) =
+            contractAddress.call(abi.encodeWithSignature("renounceRole(bytes32,address)", DEFAULT_ADMIN_ROLE, caller));
+        if (!successRenounceDefaultAdminRole) {
+            emit log_string("Cannot renounce DEFAULT_ADMIN_ROLE role on ");
         }
     }
 }
