@@ -1135,7 +1135,7 @@ mod tests {
     use utils_log::debug;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
-        traits::{BinarySerializable, PeerIdLike, ToHex},
+        traits::{BinarySerializable, PeerIdLike},
     };
 
     use super::{PacketSendAwaiter, PacketSendFinalizer};
@@ -1346,12 +1346,11 @@ mod tests {
         let finish = async move {
             for i in 1..PENDING_ACKS + 1 {
                 let ack = done_rx.next().await.expect("failed finalize ack");
-                debug!("sender has received acknowledgement: {}", ack.to_hex());
-                if let Some(_) = sent_challenges.iter().find(|(_, chal)| chal.eq(&ack)) {
-                    // If it matches, set a signal that the test has finished
-                    debug!("peer 1 received expected ack");
-                }
-                debug!("done ack #{i} out of {PENDING_ACKS}");
+                debug!("sender has received acknowledgement {i}: {ack}");
+                assert!(
+                    sent_challenges.iter().find(|(_, c)| ack.eq(c)).is_some(),
+                    "received invalid challenge {ack}"
+                );
             }
         };
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
