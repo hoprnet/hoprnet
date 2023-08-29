@@ -114,15 +114,15 @@ register_nodes() {
   log "Registering nodes finished"
 }
 
-# $1 - peerIds, comma-separated list
-sync_nodes_in_network_registry() {
+# $1 - native addresses ("Ethereum addresses"), comma-separated list
+sync_staking_accounts_in_network_registry() {
   log "Sync nodes in network registry"
 
   make -C "${mydir}/.." sync-eligibility \
     network=anvil-localhost environment_type=local \
-    peer_ids="[${1}]"
+    staking_addresses="[${1}]"
 
-  log "Sync nodes in network registry finished"
+  log "Sync accounts in network registry finished"
 }
 
 log "Running full E2E test with ${api1}, ${api2}, ${api3}, ${api4}, ${api5}, ${api6}, ${api7}"
@@ -202,7 +202,7 @@ fi
 register_nodes "${safe_addrs_to_register}" "${node_addrs_to_register}"
 
 # Sync nodes in the NR, emit "EligibilityUpdated" events
-#sync_nodes_in_network_registry "${node_addrs_to_register}"
+#sync_staking_accounts_in_network_registry "${safe_addrs_to_register}"
 
 # running withdraw and checking it results at the end of this test run
 balances=$(api_get_balances ${api1})
