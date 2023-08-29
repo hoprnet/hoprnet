@@ -14,8 +14,8 @@ default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen",
     "core-ethereum-db/wasm",
-    "core-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-p2p/wasm", "core-strategy/wasm", "core-types/wasm",
-    "utils-log/wasm", "utils-metrics?/wasm"
+    "core-crypto/wasm", "core-network/wasm", "core-mixer/wasm", "core-path/wasm", "core-packet/wasm", "core-p2p/wasm", "core-strategy/wasm", "core-types/wasm",
+    "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
 prometheus = ["dep:utils-metrics", "core-packet/prometheus"]
 
@@ -36,12 +36,18 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 core-network = { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
+core-mixer = { workspace = true, default-features = false }
+core-path = { workspace = true, default-features = false }
 core-p2p = { workspace = true, default-features = false }
 core-packet = { workspace = true, default-features = false }
 core-strategy = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
+utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
+utils-misc = { workspace = true, default-features = false }
 utils-metrics = { workspace = true, optional = true, default-features = false }
+utils-types = { workspace = true, default-features = false }
+
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
