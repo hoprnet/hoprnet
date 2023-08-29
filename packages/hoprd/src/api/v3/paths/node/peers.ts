@@ -1,9 +1,12 @@
 import { peerIdFromString } from '@libp2p/peer-id'
 import { PEER_METADATA_PROTOCOL_VERSION, PeerStatus, type Hopr } from '@hoprnet/hopr-core'
+import { debug } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
 import type { Operation } from 'express-openapi'
 import type { Multiaddr } from '@multiformats/multiaddr'
+
+const log = debug('hoprd:api:v3:node-peers')
 
 export type PeerInfo = {
   peerId: string
@@ -28,7 +31,7 @@ export type PeerInfo = {
 export function toPeerInfoFormat(info: PeerStatus, multiaddr?: Multiaddr): PeerInfo {
   return {
     peerId: info.peer_id(),
-    multiAddr: multiaddr ? multiaddr.toString() : undefined,
+    multiAddr: multiaddr ? multiaddr.toString() : '',
     heartbeats: {
       sent: Number(info.heartbeats_sent),
       success: Number(info.heartbeats_succeeded)
@@ -60,17 +63,19 @@ export async function getPeers(
   try {
     const announcedMap = new Map<string, PeerInfo>()
 
-    let addresses_on_chain = await node.getAddressesAnnouncedOnChain()
+    let addresses_on_chain: AsyncGenerator<Multiaddr, void, void> = node.getAddressesAnnouncedOnChain()
     for await (const addr of addresses_on_chain) {
+        console.log("ADDR ", addr)
+        console.log("PEER ID STR ", addr.getPeerId())
       const peerId = peerIdFromString(addr.getPeerId())
-      try {
+        console.log("PEER ID ", peerId)
         const info = await node.getConnectionInfo(peerId)
         // exclude if quality is lesser than the one wanted
+        console.log("INFO ", info)
         if (info === undefined || info.quality < quality) {
           continue
         }
         announcedMap.set(peerId.toString(), toPeerInfoFormat(info, addr))
-      } catch {}
     }
 
     let connected_peers = await node.getConnectedPeers()
@@ -78,20 +83,20 @@ export async function getPeers(
     const connected = []
 
     for (const peerId of connected_peers) {
+        console.log("PEER ID ", peerId)
       const peerIdStr = peerId.toString()
 
       // already exists in announced, we use this because it contains multiaddr already
       if (announcedMap.has(peerIdStr)) {
         connected.push(announcedMap.get(peerIdStr))
       } else {
-        try {
           const info = await node.getConnectionInfo(peerId)
           // exclude if quality is less than the one wanted
+        console.log("INFO ", info)
           if (info === undefined || info.quality < quality) {
             continue
           }
           connected.push(toPeerInfoFormat(info))
-        } catch {}
       }
     }
 
@@ -100,7 +105,8 @@ export async function getPeers(
       announced: [...announcedMap.values()]
     }
   } catch (err) {
-    // Makes sure this doesn't throw
+    console.trace()
+    log(`Error while getting all peers address information: ${err}`)
     const errString = `${STATUS_CODES.UNKNOWN_FAILURE} ${err instanceof Error ? err.message : 'Unknown error'}`
     throw new Error(errString)
   }

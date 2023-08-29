@@ -24,6 +24,7 @@ import {
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   Address,
+  AccountEntry,
   AcknowledgedTicket,
   ChannelStatus,
   ChannelEntry,
@@ -817,9 +818,9 @@ export class Hopr extends EventEmitter {
 
   /**
    * Takes a look into the indexer.
-   * @returns a list of announced multi addresses
+   * @returns a list of account entries
    */
-  public async *getAddressesAnnouncedOnChain() {
+  public async *getAddressesAnnouncedOnChain(): AsyncGenerator<AccountEntry, void, void> {
     yield* this.indexer.getAddressesAnnouncedOnChain()
   }
 

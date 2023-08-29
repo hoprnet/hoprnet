@@ -847,10 +847,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     throw new Error('Could not find packet key for address - have they announced? -' + address.to_hex())
   }
 
-  public async *getAddressesAnnouncedOnChain() {
-    let announced = await this.db.get_accounts()
-    while (announced.len() > 0) {
-      yield new Multiaddr(announced.next().get_multiaddr_str())
+  public async *getAddressesAnnouncedOnChain(): AsyncGenerator<AccountEntry, void, void>  {
+    let accounts = await this.db.get_accounts()
+    while (accounts.len() > 0) {
+      yield accounts.next()
     }
   }
 
