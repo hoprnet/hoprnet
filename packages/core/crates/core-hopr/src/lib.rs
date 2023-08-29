@@ -9,24 +9,7 @@ use async_lock::RwLock;
 use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
 use multiaddr::Multiaddr;
 
-pub use {
-    core_network::{
-        heartbeat::HeartbeatConfig,
-        network::{Health, PeerOrigin, PeerStatus},
-        ping::PingConfig,
-        PeerId,
-    },
-    core_types::acknowledgement::Acknowledgement,
-};
-
-#[cfg(feature = "wasm")]
-pub use core_misc::{
-    constants::wasm::*,
-    environment::{
-        wasm::{resolve_network, supported_networks},
-        ChainOptions, Network as EnvNetwork, ResolvedNetwork,
-    },
-};
+use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 
 use core_ethereum_db::db::CoreEthereumDb;
 use core_network::{
@@ -345,19 +328,6 @@ pub mod wasm {
     use utils_log::logger::wasm::JsLogger;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
-
-    // Temporarily re-export core-ethereum-misc commitments
-    #[allow(unused_imports)]
-    use core_ethereum_misc::chain::wasm::*;
-    #[allow(unused_imports)]
-    use core_ethereum_misc::constants::wasm::*;
-
-    // Temporarily re-export core-path
-    #[allow(unused_imports)]
-    use core_path::wasm::*;
-
-    #[allow(unused_imports)]
-    use core_ethereum_indexer::handlers::wasm::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]
