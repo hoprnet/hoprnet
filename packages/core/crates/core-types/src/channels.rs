@@ -868,7 +868,9 @@ pub mod tests {
         let bob = ChainKeypair::from_secret(&BOB).unwrap();
 
         let zero_hop_ticket = Ticket::new_zero_hop(&bob.public().to_address(), &alice, &Hash::default());
-        assert!(zero_hop_ticket.verify(&alice.public().to_address(), &Hash::default()).is_ok());
+        assert!(zero_hop_ticket
+            .verify(&alice.public().to_address(), &Hash::default())
+            .is_ok());
     }
 }
 
