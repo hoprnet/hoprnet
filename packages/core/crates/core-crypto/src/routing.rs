@@ -230,8 +230,8 @@ pub fn forward_header<S: SphinxSuite>(
     if header[0] != RELAYER_END_PREFIX {
         // Try to deserialize the public key to validate it
         let next_node: Box<[u8]> = (&header[0..pub_key_size]).into();
-        let path_pos: u8 = header[pub_key_size];    // Path position is the secret key index
-        let mac: Box<[u8]> = (&header[pub_key_size + 1 ..pub_key_size + 1 + SimpleMac::SIZE]).into();
+        let path_pos: u8 = header[pub_key_size]; // Path position is the secret key index
+        let mac: Box<[u8]> = (&header[pub_key_size + 1..pub_key_size + 1 + SimpleMac::SIZE]).into();
 
         let additional_info: Box<[u8]> = (&header
             [pub_key_size + 1 + SimpleMac::SIZE..pub_key_size + 1 + SimpleMac::SIZE + additional_data_relayer_len])
@@ -340,11 +340,24 @@ pub mod tests {
             let fwd = forward_header::<S>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0).unwrap();
 
             match fwd {
-                ForwardedHeader::RelayNode { mac, next_node, path_pos, .. } => {
+                ForwardedHeader::RelayNode {
+                    mac,
+                    next_node,
+                    path_pos,
+                    ..
+                } => {
                     last_mac.copy_from_slice(&mac);
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
-                    assert_eq!(path_pos, (shares.secrets.len() - i - 1) as u8, "invalid path position {path_pos}");
-                    assert_eq!(pub_keys[i + 1].to_bytes().as_ref(), next_node.as_ref(), "invalid public key of the next node");
+                    assert_eq!(
+                        path_pos,
+                        (shares.secrets.len() - i - 1) as u8,
+                        "invalid path position {path_pos}"
+                    );
+                    assert_eq!(
+                        pub_keys[i + 1].to_bytes().as_ref(),
+                        next_node.as_ref(),
+                        "invalid public key of the next node"
+                    );
                 }
                 ForwardedHeader::FinalNode { additional_data } => {
                     assert_eq!(shares.secrets.len() - 1, i, "cannot be a final node");

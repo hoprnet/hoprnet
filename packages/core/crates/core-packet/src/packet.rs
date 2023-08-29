@@ -272,7 +272,7 @@ pub enum PacketState {
         own_share: HalfKeyChallenge,
         next_hop: OffchainPublicKey,
         next_challenge: Challenge,
-        path_pos: u8
+        path_pos: u8,
     },
     /// Packet that is being sent out by us
     Outgoing {

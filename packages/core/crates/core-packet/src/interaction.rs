@@ -1,4 +1,7 @@
-use crate::errors::PacketError::{AcknowledgementValidation, ChannelNotFound, InvalidPacketState, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError, PathPositionMismatch, Retry, TagReplay, TransportError};
+use crate::errors::PacketError::{
+    AcknowledgementValidation, ChannelNotFound, InvalidPacketState, MissingDomainSeparator, OutOfFunds,
+    PacketConstructionError, PacketDecodingError, PathError, PathPositionMismatch, Retry, TagReplay, TransportError,
+};
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
 use async_lock::RwLock;
@@ -541,8 +544,8 @@ where
             &destination,
             &amount,
             current_index,
-            U256::one(),    // unaggregated always have index_offset == 1
-            TICKET_WIN_PROB,  // 100% winning probability
+            U256::one(),     // unaggregated always have index_offset == 1
+            TICKET_WIN_PROB, // 100% winning probability
             channel.channel_epoch,
         )?;
 
@@ -729,7 +732,7 @@ where
                 // Check that the calculated path position from the ticket matches value from the packet header
                 let ticket_path_pos = packet.ticket.get_path_position(U256::from(*PRICE_PER_PACKET))?;
                 if !ticket_path_pos.eq(path_pos) {
-                    error!("path position from ticket {ticket_path_pos}, path position from packet {path_pos}");
+                    error!("path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}");
                     return Err(PathPositionMismatch);
                 }
 
