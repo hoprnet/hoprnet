@@ -262,7 +262,7 @@ smoke-test: ## run smoke tests
 	#source .venv/bin/activate && (python3 -m pytest tests/test_stress.py || (cat /tmp/hopr-smoke-test_stress.log && false))
 
 .PHONY: smoke-test-full
-smoke-test: ## run smoke tests
+smoke-test-full: ## run smoke tests
 	source .venv/bin/activate && (python3 -m pytest tests/ || (cat /tmp/hopr-smoke-test_integration.log && false))
 
 .PHONY: smart-contract-test

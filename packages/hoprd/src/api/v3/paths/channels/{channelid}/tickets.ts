@@ -4,7 +4,7 @@ import { STATUS_CODES } from '../../../utils.js'
 import { formatTicket } from '../../tickets/index.js'
 
 import type { Operation } from 'express-openapi'
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 
 const GET: Operation = [
   async (req, res, _next) => {

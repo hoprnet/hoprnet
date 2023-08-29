@@ -1,4 +1,4 @@
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 import type { Ticket } from '@hoprnet/hopr-utils'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'

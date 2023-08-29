@@ -5,7 +5,7 @@ import chai, { expect } from 'chai'
 import { createTestApiInstance, ALICE_PEER_ID, ALICE_MULTI_ADDR, BOB_PEER_ID, BOB_MULTI_ADDR } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 
 const ALICE_ENTRY_INFO = {
   id: ALICE_PEER_ID,

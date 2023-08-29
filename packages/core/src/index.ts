@@ -1440,8 +1440,7 @@ export class Hopr extends EventEmitter {
   }
 }
 
-export default Hopr
-export * from './constants.js'
+export { PEER_METADATA_PROTOCOL_VERSION } from './constants.js'
 export { createHoprNode } from './main.js'
 export {
   Strategy,
