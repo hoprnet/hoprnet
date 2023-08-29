@@ -861,6 +861,15 @@ pub mod tests {
 
         assert!(ticket.get_path_position(U256::from(1u64)).is_err());
     }
+
+    #[test]
+    pub fn test_zero_hop() {
+        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
+        let bob = ChainKeypair::from_secret(&BOB).unwrap();
+
+        let zero_hop_ticket = Ticket::new_zero_hop(&bob.public().to_address(), &alice, &Hash::default());
+        assert!(zero_hop_ticket.verify(&alice.public().to_address(), &Hash::default()).is_ok());
+    }
 }
 
 #[cfg(feature = "wasm")]
