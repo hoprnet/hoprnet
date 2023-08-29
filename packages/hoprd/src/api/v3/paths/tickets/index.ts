@@ -11,7 +11,7 @@ export function formatTicket(ticket: Ticket) {
     indexOffset: ticket.index_offset.to_string(),
     winProb: ticket.win_prob.toString(),
     channelEpoch: ticket.channel_epoch.to_string(),
-    signature: ticket.signature.to_hex()
+    signature: ticket.signature?.to_hex()
   }
 }
 

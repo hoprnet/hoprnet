@@ -1,10 +1,12 @@
-import { Hash, stringToU8a } from '@hoprnet/hopr-utils'
+import { Hash, stringToU8a, debug } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 import { formatTicket } from '../../tickets/index.js'
 
 import type { Operation } from 'express-openapi'
 import type { Hopr } from '@hoprnet/hopr-core'
+
+const log = debug('hoprd:api:v3:channel-tickets')
 
 const GET: Operation = [
   async (req, res, _next) => {
@@ -20,6 +22,7 @@ const GET: Operation = [
       const formattedTickets = tickets.map(formatTicket)
       return res.status(200).send(formattedTickets)
     } catch (err) {
+      log(`Error getting tickets for channel ${channelid}: ${err}`)
       return res
         .status(422)
         .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
