@@ -9,15 +9,7 @@ use async_lock::RwLock;
 use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
 use multiaddr::Multiaddr;
 
-pub use {
-    core_network::{
-        heartbeat::HeartbeatConfig,
-        network::{Health, PeerOrigin, PeerStatus},
-        ping::PingConfig,
-        PeerId,
-    },
-    core_types::acknowledgement::Acknowledgement,
-};
+use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 
 use core_ethereum_db::db::CoreEthereumDb;
 use core_network::{

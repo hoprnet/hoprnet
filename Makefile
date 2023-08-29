@@ -205,7 +205,7 @@ build-cargo: build-solidity-types
 ifeq ($(origin NO_CARGO),undefined)
 # Build crates and copy bindings to their destination
 	WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 wasm-pack build --target=bundler `pwd`/packages/hoprd/crates/hoprd-hoprd
-	$(MAKE) -C `pwd`/packages/hoprd/crates/ install-hoprd
+	$(MAKE) -C packages/hoprd/crates install-hoprd
 ifeq ($(origin NO_HOPLI),undefined)
 # build hopli
 	$(MAKE) $(HOPLI_CRATE)

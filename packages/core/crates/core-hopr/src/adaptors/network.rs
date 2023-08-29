@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
 use async_lock::RwLock;
-use futures::channel::mpsc::Sender;
-
 use core_network::{
     network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerStatus},
     PeerId,
 };
 use core_strategy::generic::PeerQuality;
+use futures::channel::mpsc::Sender;
+use std::sync::Arc;
 use utils_log::{error, warn};
 
 pub struct ExternalNetworkInteractions {

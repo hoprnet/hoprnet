@@ -5,7 +5,7 @@ PACKAGES = hoprd-hoprd hoprd-inbox hoprd-misc hoprd-keypair
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))
 JS_FILES = $(foreach package,$(PACKAGES),$(package)/pkg/$(subst -,_,$(package)).js)
 
-.PHONY := all clean test install
+.PHONY := all clean test install install-hoprd
 
 all: $(JS_FILES)
 
@@ -36,9 +36,9 @@ ifneq ($(PACKAGES),)
 	install hoprd-hoprd/pkg/*.ts ../lib/
 	install hoprd-hoprd/pkg/*.wasm ../lib/
 
-	WASM_EXT_SUFFIX=$$(find ../lib/ -type f -exec grep -oP 'libp2p-wasm-ext-\K\w+' {} \; | uniq); \
+	WASM_EXT_SUFFIX=$$(find ./hoprd-hoprd/pkg/snippets -type d | grep -oP '.+libp2p-wasm-ext-\K[a-f0-9]+$$' | uniq); \
 	mkdir -p ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
-	install ../../../vendor/cargo/libp2p-wasm-ext*/src/*.js ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
+	install ./hoprd-hoprd/pkg/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/*.js ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
 	echo "{}" >| ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/package.json
 endif
 
