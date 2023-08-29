@@ -304,11 +304,9 @@ impl ResolvedNetwork {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::FromJsonFile;
-    use utils_misc::{clean_mono_repo_path, ok_or_jserr};
+    use utils_misc::{clean_mono_repo_path, ok_or_jserr, utils::wasm::JsResult};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
-
-    pub type JsResult<T> = Result<T, JsValue>;
 
     #[wasm_bindgen]
     pub fn supported_networks(mono_repo_path: &str) -> JsResult<JsValue> {
