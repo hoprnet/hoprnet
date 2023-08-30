@@ -267,7 +267,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
     log(`Dialing ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
-    let conn: Connection
+    let conn: Connection | undefined
 
     let maConn = await this.getConnectComponents()
       .getRelay()
@@ -315,6 +315,7 @@ class HoprConnect implements Transport, Initializable, Startable {
     // assign the array *by value* and its entries *by reference*
     maConn.tags = conn.tags as any
 
+    verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     return conn
   }
 
@@ -326,7 +327,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   public async dialDirectly(ma: Multiaddr, options: DialOptions): Promise<Connection> {
     log(`Dialing ${chalk.yellow(ma.toString())}`)
 
-    let conn: Connection
+    let conn: Connection | undefined
     const maConn = await createTCPConnection(
       ma,
       () => {
