@@ -203,8 +203,6 @@ where
                     .await?;
 
                 db.update_account_and_snapshot(&updated_account, snapshot).await?;
-
-                self.cbs.key_binding_created(&updated_account);
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
                 let maybe_account = db.get_account(&revocation.node.try_into()?).await?;
