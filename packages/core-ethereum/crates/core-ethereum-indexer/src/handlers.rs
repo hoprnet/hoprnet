@@ -5,11 +5,12 @@ use bindings::{
     },
     hopr_channels::{
         ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
-        DomainSeparatorUpdatedFilter, HoprChannelsEvents, OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
+        DomainSeparatorUpdatedFilter, HoprChannelsEvents, LedgerDomainSeparatorUpdatedFilter,
+        OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
     },
     hopr_network_registry::{
         DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter, HoprNetworkRegistryEvents,
-        NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter,
+        NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter, RequirementUpdatedFilter,
     },
     hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::{DergisteredNodeSafeFilter, HoprNodeSafeRegistryEvents, RegisteredNodeSafeFilter},
@@ -105,6 +106,7 @@ where
             OutgoingChannelClosureInitiatedFilter::signature(),
             TicketRedeemedFilter::signature(),
             DomainSeparatorUpdatedFilter::signature(),
+            LedgerDomainSeparatorUpdatedFilter::signature(),
         ]
     }
 
@@ -120,6 +122,7 @@ where
             NetworkRegistryStatusUpdatedFilter::signature(),
             RegisteredByManagerFilter::signature(),
             RegisteredFilter::signature(),
+            RequirementUpdatedFilter::signature(),
         ]
     }
 
@@ -135,6 +138,7 @@ where
         vec![
             RegisteredNodeSafeFilter::signature(),
             DergisteredNodeSafeFilter::signature(),
+            bindings::hopr_node_safe_registry::DomainSeparatorUpdatedFilter::signature(),
         ]
     }
 
