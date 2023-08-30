@@ -267,7 +267,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   private async dialWithRelay(relay: PeerId, destination: PeerId, options: DialOptions): Promise<Connection> {
     log(`Dialing ${chalk.yellow(`/p2p/${relay.toString()}/p2p-circuit/p2p/${destination.toString()}`)}`)
 
-    let conn: Connection | undefined
+    let conn: Connection
 
     let maConn = await this.getConnectComponents()
       .getRelay()
