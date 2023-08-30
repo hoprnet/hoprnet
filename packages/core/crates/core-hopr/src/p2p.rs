@@ -183,8 +183,8 @@ pub(crate) async fn p2p_loop(
 
                         if swarm.is_connected(&peer) {
                             match swarm.disconnect_peer_id(peer) {
-                                Ok(_) => debug!("Peer '{peer}' disconnected"),
-                                Err(e) => error!("Failed to disconnect peer '{peer}': {:?}", e)
+                                Ok(_) => debug!("Peer '{peer}' disconnected on network registry update"),
+                                Err(e) => error!("Failed to disconnect peer '{peer}' on network registry update: {:?}", e)
                             }
                         }
                     },
@@ -366,16 +366,13 @@ pub(crate) async fn p2p_loop(
                     // established_in,
                 } => {
                     debug!("Connection established with {:?}", peer_id);
-                    let _ = &allowed_peers.iter().for_each(|p| {
-                        debug!("ALLOWED PEERS: {:?}", p)
-                    });
                     if allowed_peers.contains(&peer_id) {
                         if ! (*network.read().await).has(&peer_id) {
                             (*network.write().await).add(&peer_id, PeerOrigin::IncomingConnection)
                         }
                     } else {
-                    debug!("DISCONNECTION PEER ID {:?}", peer_id);
-                       let _ = swarm.disconnect_peer_id(peer_id);
+                        debug!("DISCONNECTION (based on network registry) for PEER ID {:?}", peer_id);
+                        let _ = swarm.disconnect_peer_id(peer_id);
                     }
                 },
                 SwarmEvent::ConnectionClosed {

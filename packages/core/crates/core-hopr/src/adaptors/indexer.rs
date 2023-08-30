@@ -81,7 +81,7 @@ impl WasmIndexerInteractions {
 
         spawn_local(async move {
             let mut emitter = emitter;
-            let db = db;
+            let db_local: Arc<RwLock<CoreEthereumDb<LevelDbShim>>> = db.clone();
 
             while let Some(value) = to_process_rx.next().await {
                 let event = match value {
@@ -97,7 +97,7 @@ impl WasmIndexerInteractions {
                             let is_allowed = {
                                 let address = {
                                     if let Ok(key) = OffchainPublicKey::from_peerid(&peer) {
-                                        match db.read().await.get_chain_key(&key).await.and_then(|maybe_address| {
+                                        match db_local.read().await.get_chain_key(&key).await.and_then(|maybe_address| {
                                             maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!(
                                                 "No address available for peer '{}'",
                                                 peer
@@ -115,7 +115,7 @@ impl WasmIndexerInteractions {
                                     }
                                 };
 
-                                match db.read().await.is_allowed_to_access_network(&&address).await {
+                                match db_local.read().await.is_allowed_to_access_network(&&address).await {
                                     Ok(v) => v,
                                     Err(_) => continue,
                                 }
@@ -167,33 +167,37 @@ pub mod wasm {
     use super::*;
     use futures::future::poll_fn;
     use js_sys::JsString;
+    use utils_types::primitives::Address;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     impl WasmIndexerInteractions {
-        pub async fn update_peer_eligibility(&mut self, peer: JsString, eligible: bool) {
-            let peer: String = peer.into();
-            match PeerId::from_str(&peer) {
-                Ok(p) => match poll_fn(|cx| Pin::new(&mut self.internal_emitter).poll_ready(cx)).await {
-                    Ok(_) => {
-                        match self
-                            .internal_emitter
-                            .start_send(IndexerToProcess::EligibilityUpdate(p, eligible.into()))
-                        {
-                            Ok(_) => {}
-                            Err(e) => error!("Failed to send register update 'eligibility' to the receiver: {}", e),
-                        }
+        pub async fn node_allowed_to_access_network(&mut self, address: Address) {
+            match self.db.read().get_packet_key(&address).await {
+                Ok(Some(key)) => self.update_eligibility(key.to_peerid(), true),
+                _ => error!("Failed to update network registry status for {}", address.to_string())
+            }
+        }
+
+        pub async fn node_not_allowed_to_access_network(&mut self, address: Address) {
+            match self.db.read().get_packet_key(&address).await {
+                Ok(Some(key)) => self.update_eligibility(key.to_peerid(), false),
+                _ => error!("Failed to update network registry status for {}", address.to_string())
+            }
+        }
+
+        async fn update_eligibility(&mut self, peer: PeerId, eligible: bool) {
+            match poll_fn(|cx| Pin::new(&mut self.internal_emitter).poll_ready(cx)).await {
+                Ok(_) => {
+                    match self
+                        .internal_emitter
+                        .start_send(IndexerToProcess::EligibilityUpdate(p, eligible.into()))
+                    {
+                        Ok(_) => {}
+                        Err(e) => error!("Failed to send register update 'eligibility' to the receiver: {}", e),
                     }
-                    Err(e) => error!("The receiver for indexer updates was dropped: {}", e),
-                },
-                Err(err) => {
-                    warn!(
-                        "Failed to parse peer id {}, cannot update eligibility to {}: {}",
-                        peer,
-                        eligible,
-                        err.to_string()
-                    );
                 }
+                Err(e) => error!("The receiver for indexer updates was dropped: {}", e)
             }
         }
 
