@@ -1,6 +1,5 @@
 import { setImmediate as setImmediatePromise } from 'timers/promises'
 import BN from 'bn.js'
-import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { EventEmitter } from 'events'
 import { Multiaddr } from '@multiformats/multiaddr'
@@ -29,7 +28,7 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import type { ChainWrapper } from '../ethereum.js'
-import { type IndexerEventEmitter, IndexerStatus, type IndexerEvents } from './types.js'
+import { type IndexerEventEmitter, IndexerStatus, type IndexerEventsType } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, errors } from 'ethers'
 import { Filter, Log } from '@ethersproject/abstract-provider'
@@ -129,12 +128,14 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         network_registry: contractAddresses.hoprNetworkRegistryAddress,
         announcements: contractAddresses.hoprAnnouncementsAddress,
         node_safe_registry: contractAddresses.hoprNodeSafeRegistryAddress,
-        node_management_module: contractAddresses.moduleAddress
+        node_management_module: contractAddresses.moduleAddress,
+        ticket_price_oracle: contractAddresses.hoprTicketPriceOracleAddress
       },
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
         ownChannelUpdated: this.onOwnChannelUpdated.bind(this),
-        notAllowedToAccessNetwork: this.onNotAllowedToAccessNetwork.bind(this)
+        nodeNotAllowedToAccessNetwork: this.onNodeNotAllowedToAccessNetwork.bind(this),
+        nodeAllowedToAccessNetwork: this.onNodeAllowedToAccessNetwork.bind(this)
       }
     )
 
@@ -765,6 +766,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   onAnnouncementUpdate(account: AccountEntry) {
     this.emit('peer', {
       id: peerIdFromString(account.public_key.to_peerid_str()),
+      address: account.chain_addr,
       multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
     })
   }
@@ -773,8 +775,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.emit('own-channel-updated', channel)
   }
 
-  onNotAllowedToAccessNetwork(address: Address) {
-    this.emit('network-registry-eligibility-changed', address, false)
+  onNodeNotAllowedToAccessNetwork(address: Address) {
+    this.emit('network-registry-node-not-allowed', address)
+  }
+
+  onNodeAllowedToAccessNetwork(address: Address) {
+    this.emit('network-registry-node-allowed', address)
   }
 
   /**
@@ -817,7 +823,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   //   }
   // }
 
-  private indexEvent(indexerEvent: IndexerEvents) {
+  private indexEvent(indexerEvent: IndexerEventsType) {
     log(`Indexer indexEvent ${indexerEvent}`)
     this.emit(indexerEvent)
   }
@@ -847,39 +853,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     throw new Error('Could not find packet key for address - have they announced? -' + address.to_hex())
   }
 
-  public async *getAddressesAnnouncedOnChain() {
-    let announced = await this.db.get_accounts()
-    while (announced.len() > 0) {
-      yield new Multiaddr(announced.next().get_multiaddr_str())
+  public async *getAccountsAnnouncedOnChain(): AsyncGenerator<AccountEntry, void, void> {
+    let accounts = await this.db.get_accounts()
+    while (accounts.len() > 0) {
+      yield accounts.next()
     }
-  }
-
-  public async getPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    const result: { id: PeerId; multiaddrs: Multiaddr[] }[] = []
-    let out = `Known public nodes:\n`
-
-    let publicAccounts = await this.db.get_public_node_accounts()
-
-    while (publicAccounts.len() > 0) {
-      let account = publicAccounts.next()
-      if (account) {
-        let packetKey = await this.db.get_packet_key(account.chain_addr)
-        if (packetKey) {
-          out += `  - ${packetKey.to_peerid_str()} (on-chain ${account.chain_addr.to_string()}) ${account.get_multiaddr_str()}\n`
-          result.push({
-            id: peerIdFromString(packetKey.to_peerid_str()),
-            multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
-          })
-        } else {
-          log(`could not retrieve packet key for address ${account.chain_addr.to_string()}`)
-        }
-      }
-    }
-
-    // Remove last `\n`
-    log(out.substring(0, out.length - 1))
-
-    return result
   }
 
   /**
@@ -913,7 +891,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     return channels.filter((channel) => channel.status === ChannelStatus.Open)
   }
 
-  public resolvePendingTransaction(eventType: IndexerEvents, tx: string): DeferType<string> {
+  public resolvePendingTransaction(eventType: IndexerEventsType, tx: string): DeferType<string> {
     const deferred = {} as DeferType<string>
 
     deferred.promise = new Promise<string>((resolve, reject) => {

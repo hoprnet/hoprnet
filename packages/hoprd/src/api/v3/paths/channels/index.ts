@@ -277,7 +277,6 @@ export async function openChannel(
     const { channelId, receipt } = await node.openChannel(validationResult.counterparty, validationResult.amount)
     return { success: true, channelId: channelId.to_hex(), receipt }
   } catch (err) {
-    console.log('ERROR OPEN CHANNEL', err)
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE
 
     if (errString.includes('Channel is already opened')) {
