@@ -2,6 +2,7 @@ import process from 'process'
 import path from 'path'
 import fs from 'fs'
 import express from 'express'
+import morgan from 'morgan'
 import cors from 'cors'
 import swaggerUi from 'swagger-ui-express'
 import bodyParser from 'body-parser'
@@ -109,6 +110,9 @@ export async function setupRestApi(
     disableApiAuthentication?: boolean
   }
 ): Promise<ReturnType<typeof initialize>> {
+  // log request and responses
+  service.use(urlPath, morgan('combined'))
+
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
 
