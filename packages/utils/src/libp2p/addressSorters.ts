@@ -1,4 +1,3 @@
-import type { Address } from '@libp2p/interface-peer-store'
 import { isPrivateAddress, isLocalhost } from '../network/index.js'
 import { type Multiaddr, protocols } from '@multiformats/multiaddr'
 import type { NetworkInterfaceInfo } from 'os'
@@ -31,5 +30,3 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
 
   return isLocalhost(tuples[0][1], ipFamily) || isPrivateAddress(tuples[0][1], ipFamily)
 }
-
-export declare type AddressSorter = (input: Address[]) => Address[]
