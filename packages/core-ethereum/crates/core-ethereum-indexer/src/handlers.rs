@@ -1567,7 +1567,7 @@ pub mod wasm {
     use js_sys::{Array, JsString};
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
-    use utils_log::error;
+    use utils_log::{debug, error};
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::primitives::{Address, Snapshot};
     use wasm_bindgen::{prelude::*, JsValue};
@@ -1730,9 +1730,6 @@ pub mod wasm {
 
             let decoded_data = ok_or_jserr!(decode(data))?;
 
-            let val = db.as_ref_counted();
-            let mut g = val.write().await;
-
             let mut decoded_topics: Vec<H256> = vec![];
 
             for topic in topics.iter() {
@@ -1740,22 +1737,30 @@ pub mod wasm {
                 decoded_topics.push(H256::from_slice(&decoded_topic));
             }
 
-            self.w
-                .on_event(
-                    &mut *g,
-                    &contract_address,
-                    u32_block_number,
-                    &RawLog {
-                        topics: decoded_topics,
-                        data: decoded_data,
-                    },
-                    snapshot,
-                )
-                .await
-                .map_err(|e| {
-                    error!("on_event error - {:?}", e.to_string());
-                    JsValue::from(e.to_string())
-                })
+           let r = {
+                debug!(">>> WRITE on_event");
+                let val = db.as_ref_counted();
+                let mut g = val.write().await;
+
+                self.w
+                    .on_event(
+                        &mut *g,
+                        &contract_address,
+                        u32_block_number,
+                        &RawLog {
+                            topics: decoded_topics,
+                            data: decoded_data,
+                        },
+                        snapshot,
+                    )
+                    .await
+                    .map_err(|e| {
+                        error!("on_event error - {:?}", e.to_string());
+                        JsValue::from(e.to_string())
+                    })
+            };
+            debug!("<<< WRITE on_event");
+            r
         }
     }
 }
