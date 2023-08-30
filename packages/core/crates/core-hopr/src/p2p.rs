@@ -302,7 +302,7 @@ pub(crate) async fn p2p_loop(
                 })) => {
                     info!("Received a Ping request {} from {}", request_id, peer);
                     let challenge_response = api::HeartbeatResponder::generate_challenge_response(&request.0);
-                    match swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response)) {
+                    match swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response, crate::constants::APP_VERSION.to_owned())) {
                         Ok(_) => {},
                         Err(_) => {
                             error!("An error occured during the ping response, channel is either closed or timed out.");
@@ -319,7 +319,7 @@ pub(crate) async fn p2p_loop(
                     info!("Received a Pong response from {} (#{}) ", peer, request_id);
                     if active_manual_pings.take(&request_id).is_some() {
                         debug!("Processing manual ping response from peer {}", peer);
-                        match manual_ping_responds.record_pong((peer, Ok(response.0))).await {
+                        match manual_ping_responds.record_pong((peer, Ok((response.0, response.1)))).await {
                             Ok(_) => {},
                             Err(e) => {
                                 error!("Manual ping mechanism could not be updated with pong messages: {}", e);
@@ -327,7 +327,7 @@ pub(crate) async fn p2p_loop(
                         }
                     } else {
                         debug!("Processing heartbeat ping response from peer {}", peer);
-                        match heartbeat_responds.record_pong((peer, Ok(response.0))).await {
+                        match heartbeat_responds.record_pong((peer, Ok((response.0, response.1)))).await {
                             Ok(_) => {},
                             Err(e) => {
                                 error!("Heartbeat mechanism could not be updated with pong messages: {}", e);

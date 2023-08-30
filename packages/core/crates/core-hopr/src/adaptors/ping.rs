@@ -10,7 +10,7 @@ use core_network::{
     PeerId,
 };
 
-use crate::adaptors::network::ExternalNetworkInteractions;
+use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_METADATA_PROTOCOL_VERSION};
 
 /// Implementor of the ping external API.
 ///
@@ -31,9 +31,18 @@ impl PingExternalInteractions {
 
 #[async_trait]
 impl PingExternalAPI for PingExternalInteractions {
-    async fn on_finished_ping(&self, peer: &PeerId, result: Result) {
-        let mut writer = self.network.write().await;
-        (*writer).update_with_metadata(peer, result, None)
+    async fn on_finished_ping(&self, peer: &PeerId, result: Result, version: String) {
+        // This logic deserves a larger refactor of the entire heartbeat mechanism, but
+        // for now it is suffcient to fill out metadata only on successful pongs.
+        let metadata = if result.is_ok() {
+            let mut map = std::collections::HashMap::new();
+            map.insert(PEER_METADATA_PROTOCOL_VERSION.to_owned(), version);
+            Some(map)
+        } else {
+            None
+        };
+
+        self.network.write().await.update_with_metadata(peer, result, metadata)
     }
 }
 
