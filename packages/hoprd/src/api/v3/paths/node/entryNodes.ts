@@ -3,6 +3,7 @@ import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Hopr } from '@hoprnet/hopr-core'
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
+import { Address } from '@hoprnet/hopr-utils'
 
 export type EntryNodeInfo = {
   [index: string]: {
@@ -12,7 +13,12 @@ export type EntryNodeInfo = {
 }
 
 export async function getEntryNodes(node: Hopr): Promise<EntryNodeInfo> {
-  const entryNodes = (await node.getEntryNodes()) as { id: PeerId; multiaddrs: Multiaddr[]; isEligible: boolean }[]
+  const entryNodes = (await node.getPublicNodes()) as {
+    id: PeerId
+    address: Address
+    multiaddrs: Multiaddr[]
+    isEligible: boolean
+  }[]
 
   const result: EntryNodeInfo = {}
   for (const entryNode of entryNodes) {

@@ -8,8 +8,10 @@ import {
   createTestApiInstance,
   ALICE_PEER_ID,
   ALICE_MULTI_ADDR,
+  ALICE_ACCOUNT_ENTRY,
   BOB_PEER_ID,
   BOB_MULTI_ADDR,
+  BOB_ACCOUNT_ENTRY,
   CHARLIE_PEER_ID
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
@@ -56,33 +58,18 @@ const CHARLIE_ENTRY = PeerStatus.build(
 )
 
 function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
-  if (multiaddr === undefined) {
-    return {
-      peerId: peer.peer_id(),
-      heartbeats: {
-        sent: Number(peer.heartbeats_sent),
-        success: Number(peer.heartbeats_succeeded)
-      },
-      lastSeen: Number(peer.last_seen),
-      quality: peer.quality,
-      backoff: peer.backoff,
-      isNew: isNew,
-      reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
-    }
-  } else {
-    return {
-      peerId: peer.peer_id(),
-      multiAddr: multiaddr,
-      heartbeats: {
-        sent: Number(peer.heartbeats_sent),
-        success: Number(peer.heartbeats_succeeded)
-      },
-      lastSeen: Number(peer.last_seen),
-      quality: peer.quality,
-      backoff: peer.backoff,
-      isNew: isNew,
-      reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
-    }
+  return {
+    peerId: peer.peer_id(),
+    multiAddr: multiaddr ? multiaddr.toString() : '',
+    heartbeats: {
+      sent: Number(peer.heartbeats_sent),
+      success: Number(peer.heartbeats_succeeded)
+    },
+    lastSeen: Number(peer.last_seen),
+    quality: peer.quality,
+    backoff: peer.backoff,
+    isNew: isNew,
+    reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
   }
 }
 
@@ -96,12 +83,10 @@ const BOB_PEER_INFO = toJsonDict(BOB_ENTRY, true, BOB_MULTI_ADDR.toString())
 const CHARLIE_PEER_INFO = toJsonDict(CHARLIE_ENTRY, false, undefined)
 
 let node = sinon.fake() as any as Hopr
-node.getConnectedPeers = async () => {
-  return [ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID]
-}
-node.getAddressesAnnouncedOnChain = async function* () {
-  yield ALICE_MULTI_ADDR
-  yield BOB_MULTI_ADDR
+node.getConnectedPeers = sinon.fake.resolves([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
+node.getAccountsAnnouncedOnChain = async function* () {
+  yield ALICE_ACCOUNT_ENTRY
+  yield BOB_ACCOUNT_ENTRY
 }
 
 node.getConnectionInfo = async (peer: PeerId) => {

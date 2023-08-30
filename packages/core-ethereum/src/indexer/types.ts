@@ -11,7 +11,7 @@ export enum IndexerStatus {
 
 // Manual event typing because Node.js EventEmitter is untyped
 
-export type IndexerEvents =
+export type IndexerEventsType =
   | `announce-${string}`
   | `token-approved-${string}`
   | `withdraw-hopr-${string}`
@@ -21,129 +21,177 @@ export type IndexerEvents =
   | `on-new-block-${string}`
   | `node-safe-registered-${string}`
 
-type BlockEventName = 'block'
-type BlockProcessedEventName = 'block-processed'
-type StatusEventName = 'status'
-type PeerEventName = 'peer'
-type NetworkRegistryEligibilityChangedEventName = 'network-registry-eligibility-changed'
-type NetworkRegistryStatusChangedEventName = 'network-registry-status-changed'
+export const BlockEventName = 'block'
+export const BlockProcessedEventName = 'block-processed'
+export const StatusEventName = 'status'
+export const PeerEventName = 'peer'
+export const NetworkRegistryEligibilityChangedEventName = 'network-registry-eligibility-changed'
+export const NetworkRegistryStatusChangedEventName = 'network-registry-status-changed'
+export const NetworkRegistryNodeAllowedEventName = 'network-registry-node-allowed'
+export const NetworkRegistryNodeNotAllowedEventName = 'network-registry-node-not-allowed'
 
-type ChannelUpdateEventNames = 'own-channel-updated'
+export const ChannelUpdateEventNames = 'own-channel-updated'
+
+type BlockEventNameType = 'block'
+type BlockProcessedEventNameType = 'block-processed'
+type StatusEventNameType = 'status'
+type PeerEventNameType = 'peer'
+type NetworkRegistryEligibilityChangedEventNameType = 'network-registry-eligibility-changed'
+type NetworkRegistryStatusChangedEventNameType = 'network-registry-status-changed'
+type NetworkRegistryNodeAllowedEventNameType = 'network-registry-node-allowed'
+type NetworkRegistryNodeNotAllowedEventNameType = 'network-registry-node-not-allowed'
+
+type ChannelUpdateEventNamesType = 'own-channel-updated'
 
 type IndexerEventNames =
-  | BlockEventName
-  | BlockProcessedEventName
-  | StatusEventName
-  | PeerEventName
-  | ChannelUpdateEventNames
-  | IndexerEvents
-  | NetworkRegistryEligibilityChangedEventName
-  | NetworkRegistryStatusChangedEventName
+  | BlockEventNameType
+  | BlockProcessedEventNameType
+  | StatusEventNameType
+  | PeerEventNameType
+  | ChannelUpdateEventNamesType
+  | IndexerEventsType
+  | NetworkRegistryEligibilityChangedEventNameType
+  | NetworkRegistryStatusChangedEventNameType
+  | NetworkRegistryNodeAllowedEventNameType
+  | NetworkRegistryNodeNotAllowedEventNameType
 
 type BlockListener = (block: number) => void
 type BlockProcessedListener = (block: number) => void
 type StatusListener = (status: IndexerStatus) => void
-type PeerListener = (peerData: { id: PeerId; multiaddrs: Multiaddr[] }) => void
+type PeerListener = (peerData: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }) => void
 type ChannelUpdateListener = (channel: ChannelEntry) => void
 type IndexerEventsListener = (txHash: string) => void
 type NetworkRegistryEligibilityChangedListener = (account: Address, allowed: boolean) => void
 type NetworkRegistryStatusChangedListener = (isEnabled: boolean) => void
+type NetworkRegistryNodeAllowedListener = (node: Address) => void
+type NetworkRegistryNodeNotAllowedListener = (node: Address) => void
 
 export interface IndexerEventEmitter {
   addListener(event: IndexerEventNames, listener: () => void): this
-  addListener(event: BlockEventName, listener: BlockListener): this
-  addListener(event: BlockProcessedEventName, listener: BlockProcessedListener): this
-  addListener(event: StatusEventName, listener: StatusListener): this
-  addListener(event: PeerEventName, listener: PeerListener): this
-  addListener(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
-  addListener(event: IndexerEvents, listener: IndexerEventsListener): this
+  addListener(event: BlockEventNameType, listener: BlockListener): this
+  addListener(event: BlockProcessedEventNameType, listener: BlockProcessedListener): this
+  addListener(event: StatusEventNameType, listener: StatusListener): this
+  addListener(event: PeerEventNameType, listener: PeerListener): this
+  addListener(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  addListener(event: IndexerEventsType, listener: IndexerEventsListener): this
   addListener(
-    event: NetworkRegistryEligibilityChangedEventName,
+    event: NetworkRegistryEligibilityChangedEventNameType,
     listener: NetworkRegistryEligibilityChangedListener
   ): this
-  addListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  addListener(event: NetworkRegistryStatusChangedEventNameType, listener: NetworkRegistryStatusChangedListener): this
+  addListener(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeAllowedListener): this
+  addListener(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeNotAllowedListener): this
 
   emit(event: IndexerEventNames): boolean
-  emit(event: BlockEventName, block: number): boolean
-  emit(event: BlockProcessedEventName, block: number): boolean
-  emit(event: StatusEventName, status: IndexerStatus): boolean
-  emit(event: PeerEventName, peerData: { id: PeerId; multiaddrs: Multiaddr[] }): boolean
-  emit(event: ChannelUpdateEventNames, channel: ChannelEntry): boolean
-  emit(event: IndexerEvents, txHash: string): boolean
-  emit(event: NetworkRegistryEligibilityChangedEventName, account: Address, allowed: boolean): boolean
-  emit(event: NetworkRegistryStatusChangedEventName, isEnabled: boolean): boolean
+  emit(event: BlockEventNameType, block: number): boolean
+  emit(event: BlockProcessedEventNameType, block: number): boolean
+  emit(event: StatusEventNameType, status: IndexerStatus): boolean
+  emit(event: PeerEventNameType, peerData: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }): boolean
+  emit(event: ChannelUpdateEventNamesType, channel: ChannelEntry): boolean
+  emit(event: IndexerEventsType, txHash: string): boolean
+  emit(event: NetworkRegistryEligibilityChangedEventNameType, account: Address, allowed: boolean): boolean
+  emit(event: NetworkRegistryStatusChangedEventNameType, isEnabled: boolean): boolean
+  emit(event: NetworkRegistryNodeAllowedEventNameType, node: Address): boolean
+  emit(event: NetworkRegistryNodeNotAllowedEventNameType, node: Address): boolean
 
   on(event: IndexerEventNames, listener: () => void): this
-  on(event: BlockEventName, listener: BlockListener): this
-  on(event: BlockProcessedEventName, listener: BlockProcessedListener): this
-  on(event: StatusEventName, listener: StatusListener): this
-  on(event: PeerEventName, listener: PeerListener): this
-  on(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
-  on(event: IndexerEvents, listener: IndexerEventsListener): this
-  on(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
-  on(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  on(event: BlockEventNameType, listener: BlockListener): this
+  on(event: BlockProcessedEventNameType, listener: BlockProcessedListener): this
+  on(event: StatusEventNameType, listener: StatusListener): this
+  on(event: PeerEventNameType, listener: PeerListener): this
+  on(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  on(event: IndexerEventsType, listener: IndexerEventsListener): this
+  on(event: NetworkRegistryEligibilityChangedEventNameType, listener: NetworkRegistryEligibilityChangedListener): this
+  on(event: NetworkRegistryStatusChangedEventNameType, listener: NetworkRegistryStatusChangedListener): this
+  on(event: NetworkRegistryNodeAllowedEventNameType, listener: NetworkRegistryNodeAllowedListener): this
+  on(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeNotAllowedListener): this
 
   once(event: IndexerEventNames, listener: () => void): this
-  once(event: BlockEventName, listener: BlockListener): this
-  once(event: BlockProcessedEventName, listener: BlockProcessedListener): this
-  once(event: StatusEventName, listener: StatusListener): this
-  once(event: PeerEventName, listener: PeerListener): this
-  once(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
-  once(event: IndexerEvents, listener: IndexerEventsListener): this
-  once(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
-  once(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  once(event: BlockEventNameType, listener: BlockListener): this
+  once(event: BlockProcessedEventNameType, listener: BlockProcessedListener): this
+  once(event: StatusEventNameType, listener: StatusListener): this
+  once(event: PeerEventNameType, listener: PeerListener): this
+  once(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  once(event: IndexerEventsType, listener: IndexerEventsListener): this
+  once(event: NetworkRegistryEligibilityChangedEventNameType, listener: NetworkRegistryEligibilityChangedListener): this
+  once(event: NetworkRegistryStatusChangedEventNameType, listener: NetworkRegistryStatusChangedListener): this
+  once(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeAllowedListener): this
+  once(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeNotAllowedListener): this
 
   prependListener(event: IndexerEventNames, listener: () => void): this
-  prependListener(event: BlockEventName, listener: BlockListener): this
-  prependListener(event: BlockProcessedEventName, listener: BlockProcessedListener): this
-  prependListener(event: StatusEventName, listener: StatusListener): this
-  prependListener(event: PeerEventName, listener: PeerListener): this
-  prependListener(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
-  prependListener(event: IndexerEvents, listener: IndexerEventsListener): this
+  prependListener(event: BlockEventNameType, listener: BlockListener): this
+  prependListener(event: BlockProcessedEventNameType, listener: BlockProcessedListener): this
+  prependListener(event: StatusEventNameType, listener: StatusListener): this
+  prependListener(event: PeerEventNameType, listener: PeerListener): this
+  prependListener(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  prependListener(event: IndexerEventsType, listener: IndexerEventsListener): this
   prependListener(
-    event: NetworkRegistryEligibilityChangedEventName,
+    event: NetworkRegistryEligibilityChangedEventNameType,
     listener: NetworkRegistryEligibilityChangedListener
   ): this
-  prependListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  prependListener(
+    event: NetworkRegistryStatusChangedEventNameType,
+    listener: NetworkRegistryStatusChangedListener
+  ): this
+  prependListener(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeAllowedListener): this
+  prependListener(
+    event: NetworkRegistryNodeNotAllowedEventNameType,
+    listener: NetworkRegistryNodeNotAllowedListener
+  ): this
 
   prependOnceListener(event: IndexerEventNames, listener: () => void): this
-  prependOnceListener(event: BlockEventName, listener: BlockListener): this
-  prependOnceListener(event: BlockProcessedEventName, listener: BlockProcessedListener): this
-  prependOnceListener(event: StatusEventName, listener: StatusListener): this
-  prependOnceListener(event: PeerEventName, listener: PeerListener): this
-  prependOnceListener(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
-  prependOnceListener(event: IndexerEvents, listener: IndexerEventsListener): this
+  prependOnceListener(event: BlockEventNameType, listener: BlockListener): this
+  prependOnceListener(event: BlockProcessedEventNameType, listener: BlockProcessedListener): this
+  prependOnceListener(event: StatusEventNameType, listener: StatusListener): this
+  prependOnceListener(event: PeerEventNameType, listener: PeerListener): this
+  prependOnceListener(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  prependOnceListener(event: IndexerEventsType, listener: IndexerEventsListener): this
   prependOnceListener(
-    event: NetworkRegistryEligibilityChangedEventName,
+    event: NetworkRegistryEligibilityChangedEventNameType,
     listener: NetworkRegistryEligibilityChangedListener
   ): this
   prependOnceListener(
-    event: NetworkRegistryStatusChangedEventName,
+    event: NetworkRegistryStatusChangedEventNameType,
     listener: NetworkRegistryStatusChangedListener
+  ): this
+  prependOnceListener(
+    event: NetworkRegistryNodeNotAllowedEventNameType,
+    listener: NetworkRegistryNodeAllowedListener
+  ): this
+  prependOnceListener(
+    event: NetworkRegistryNodeNotAllowedEventNameType,
+    listener: NetworkRegistryNodeNotAllowedListener
   ): this
 
   removeListener(event: IndexerEventNames, listener: () => void): this
-  removeListener(event: BlockEventName, listener: BlockListener): this
-  removeListener(event: BlockProcessedEventName, listener: BlockProcessedListener): this
-  removeListener(event: StatusEventName, listener: StatusListener): this
-  removeListener(event: PeerEventName, listener: PeerListener): this
-  removeListener(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
-  removeListener(event: IndexerEvents, listener: IndexerEventsListener): this
+  removeListener(event: BlockEventNameType, listener: BlockListener): this
+  removeListener(event: BlockProcessedEventNameType, listener: BlockProcessedListener): this
+  removeListener(event: StatusEventNameType, listener: StatusListener): this
+  removeListener(event: PeerEventNameType, listener: PeerListener): this
+  removeListener(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  removeListener(event: IndexerEventsType, listener: IndexerEventsListener): this
   removeListener(
-    event: NetworkRegistryEligibilityChangedEventName,
+    event: NetworkRegistryEligibilityChangedEventNameType,
     listener: NetworkRegistryEligibilityChangedListener
   ): this
-  removeListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  removeListener(event: NetworkRegistryStatusChangedEventNameType, listener: NetworkRegistryStatusChangedListener): this
+  removeListener(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeAllowedListener): this
+  removeListener(
+    event: NetworkRegistryNodeNotAllowedEventNameType,
+    listener: NetworkRegistryNodeNotAllowedListener
+  ): this
 
   off(event: IndexerEventNames, listener: () => void): this
-  off(event: BlockEventName, listener: BlockListener): this
-  off(event: BlockProcessedEventName, listener: BlockProcessedListener): this
-  off(event: StatusEventName, listener: StatusListener): this
-  off(event: PeerEventName, listener: PeerListener): this
-  off(event: ChannelUpdateEventNames, listener: ChannelUpdateListener): this
-  off(event: IndexerEvents, listener: IndexerEventsListener): this
-  off(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
-  off(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  off(event: BlockEventNameType, listener: BlockListener): this
+  off(event: BlockProcessedEventNameType, listener: BlockProcessedListener): this
+  off(event: StatusEventNameType, listener: StatusListener): this
+  off(event: PeerEventNameType, listener: PeerListener): this
+  off(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  off(event: IndexerEventsType, listener: IndexerEventsListener): this
+  off(event: NetworkRegistryEligibilityChangedEventNameType, listener: NetworkRegistryEligibilityChangedListener): this
+  off(event: NetworkRegistryStatusChangedEventNameType, listener: NetworkRegistryStatusChangedListener): this
+  off(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeAllowedListener): this
+  off(event: NetworkRegistryNodeNotAllowedEventNameType, listener: NetworkRegistryNodeNotAllowedListener): this
 
   listeners(event: IndexerEventNames): Function[]
 }

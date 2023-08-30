@@ -81,7 +81,7 @@ impl WasmIndexerInteractions {
 
         spawn_local(async move {
             let mut emitter = emitter;
-            let db = db;
+            let db_local: Arc<RwLock<CoreEthereumDb<LevelDbShim>>> = db.clone();
 
             while let Some(value) = to_process_rx.next().await {
                 let event = match value {
@@ -97,12 +97,14 @@ impl WasmIndexerInteractions {
                             let is_allowed = {
                                 let address = {
                                     if let Ok(key) = OffchainPublicKey::from_peerid(&peer) {
-                                        match db.read().await.get_chain_key(&key).await.and_then(|maybe_address| {
-                                            maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!(
-                                                "No address available for peer '{}'",
-                                                peer
-                                            )))
-                                        }) {
+                                        match db_local.read().await.get_chain_key(&key).await.and_then(
+                                            |maybe_address| {
+                                                maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!(
+                                                    "No address available for peer '{}'",
+                                                    peer
+                                                )))
+                                            },
+                                        ) {
                                             Ok(v) => v,
                                             Err(e) => {
                                                 error!("{e}");
@@ -115,7 +117,7 @@ impl WasmIndexerInteractions {
                                     }
                                 };
 
-                                match db.read().await.is_allowed_to_access_network(&&address).await {
+                                match db_local.read().await.is_allowed_to_access_network(&&address).await {
                                     Ok(v) => v,
                                     Err(_) => continue,
                                 }
@@ -171,29 +173,46 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl WasmIndexerInteractions {
-        pub async fn update_peer_eligibility(&mut self, peer: JsString, eligible: bool) {
+        pub async fn node_allowed_to_access_network(&mut self, peer: JsString) {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
-                Ok(p) => match poll_fn(|cx| Pin::new(&mut self.internal_emitter).poll_ready(cx)).await {
-                    Ok(_) => {
-                        match self
-                            .internal_emitter
-                            .start_send(IndexerToProcess::EligibilityUpdate(p, eligible.into()))
-                        {
-                            Ok(_) => {}
-                            Err(e) => error!("Failed to send register update 'eligibility' to the receiver: {}", e),
-                        }
-                    }
-                    Err(e) => error!("The receiver for indexer updates was dropped: {}", e),
-                },
+                Ok(p) => self.update_eligibility(p, true).await,
                 Err(err) => {
                     warn!(
-                        "Failed to parse peer id {}, cannot update eligibility to {}: {}",
+                        "Failed to parse peer id {}, cannot set network registry allowance to true: {}",
                         peer,
-                        eligible,
                         err.to_string()
                     );
                 }
+            }
+        }
+
+        pub async fn node_not_allowed_to_access_network(&mut self, peer: JsString) {
+            let peer: String = peer.into();
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.update_eligibility(p, false).await,
+                Err(err) => {
+                    warn!(
+                        "Failed to parse peer id {}, cannot set network registry allowance to false: {}",
+                        peer,
+                        err.to_string()
+                    );
+                }
+            }
+        }
+
+        async fn update_eligibility(&mut self, peer: PeerId, eligible: bool) {
+            match poll_fn(|cx| Pin::new(&mut self.internal_emitter).poll_ready(cx)).await {
+                Ok(_) => {
+                    match self
+                        .internal_emitter
+                        .start_send(IndexerToProcess::EligibilityUpdate(peer, eligible.into()))
+                    {
+                        Ok(_) => {}
+                        Err(e) => error!("Failed to send register update 'eligibility' to the receiver: {}", e),
+                    }
+                }
+                Err(e) => error!("The receiver for indexer updates was dropped: {}", e),
             }
         }
 
