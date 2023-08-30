@@ -223,6 +223,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-broadcast"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c48ccdbf6ca6b121e0f586cbc0e73ae440e56c67c30fa0873b4e110d9c26d2b"
+dependencies = [
+ "event-listener",
+ "futures-core",
+]
+
+[[package]]
 name = "async-channel"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1146,6 +1156,33 @@ dependencies = [
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
+name = "core-events"
+version = "0.1.0"
+dependencies = [
+ "async-broadcast",
+ "async-std",
+ "console_error_panic_hook",
+ "core-types",
+ "enum-iterator",
+ "futures-lite",
+ "hex",
+ "hex-literal 0.4.1",
+ "js-sys",
+ "libp2p-identity",
+ "rusty-leveldb",
+ "tempfile",
+ "thiserror",
+ "utils-log",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
  "wasm-opt",
  "wasm-pack",
 ]
