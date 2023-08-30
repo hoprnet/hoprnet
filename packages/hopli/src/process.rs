@@ -133,7 +133,7 @@ pub fn child_process_call_foundry_migrate_safe_module(
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
         "--broadcast",
         "--sig",
-        "migrateSafeModule(address[],address,addressuint256,uint256)",
+        "migrateSafeModule(address[],address,address)",
         &ethereum_address,
         &safe_address,
         &module_address,

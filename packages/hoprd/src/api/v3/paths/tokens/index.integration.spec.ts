@@ -7,7 +7,7 @@ import { LevelDb, Database } from '@hoprnet/hopr-utils'
 import { createAuthenticatedTestApiInstance, ALICE_ETHEREUM_ADDR } from './../../fixtures.js'
 import { STATUS_CODES } from './../../utils.js'
 
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 
 describe('POST /tokens', function () {
   let node: Hopr

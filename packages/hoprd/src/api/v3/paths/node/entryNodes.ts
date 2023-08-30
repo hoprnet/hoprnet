@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type { Multiaddr } from '@multiformats/multiaddr'
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 

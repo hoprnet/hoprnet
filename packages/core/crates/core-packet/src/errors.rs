@@ -43,6 +43,12 @@ pub enum PacketError {
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),
 
+    #[error("path position from the packet header mismatched with the path position in ticket")]
+    PathPositionMismatch,
+
+    #[error("no channel domain_separator tag found")]
+    MissingDomainSeparator,
+
     #[error(transparent)]
     CryptographicError(#[from] CryptoError),
 
@@ -51,9 +57,6 @@ pub enum PacketError {
 
     #[error(transparent)]
     PathError(#[from] PathError),
-
-    #[error("No channel domain_separator tag found")]
-    MissingDomainSeparator,
 
     #[error(transparent)]
     CoreTypesError(#[from] CoreTypesError),
