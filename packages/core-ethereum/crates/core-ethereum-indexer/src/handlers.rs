@@ -203,6 +203,8 @@ where
                     .await?;
 
                 db.update_account_and_snapshot(&updated_account, snapshot).await?;
+
+                self.cbs.key_binding_created(&updated_account);
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
                 let maybe_account = db.get_account(&revocation.node.try_into()?).await?;
@@ -431,42 +433,49 @@ where
     {
         match HoprNetworkRegistryEvents::decode_log(log)? {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
+                let node_address = &deregistered.node_address.0.try_into()?;
                 db.remove_from_network_registry(
                     &deregistered.staking_account.0.try_into()?,
                     &deregistered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
+                db.set_allowed_to_access_network(node_address, false, snapshot).await?;
                 self.cbs
                     .node_not_allowed_to_access_network(&deregistered.node_address.0.try_into()?);
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
+                let node_address = &deregistered.node_address.0.try_into()?;
                 db.remove_from_network_registry(
                     &deregistered.staking_account.0.try_into()?,
                     &deregistered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
+                db.set_allowed_to_access_network(node_address, false, snapshot).await?;
                 self.cbs
                     .node_not_allowed_to_access_network(&deregistered.node_address.0.try_into()?);
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
+                let node_address = &registered.node_address.0.try_into()?;
                 db.add_to_network_registry(
                     &registered.staking_account.0.try_into()?,
                     &registered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
-                self.cbs
-                    .node_allowed_to_access_network(&registered.node_address.0.try_into()?);
+                db.set_allowed_to_access_network(node_address, true, snapshot).await?;
+                self.cbs.node_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
+                let node_address = &registered.node_address.0.try_into()?;
                 db.add_to_network_registry(
                     &registered.staking_account.0.try_into()?,
                     &registered.node_address.0.try_into()?,
                     snapshot,
                 )
                 .await?;
+                db.set_allowed_to_access_network(node_address, true, snapshot).await?;
                 self.cbs
                     .node_allowed_to_access_network(&registered.node_address.0.try_into()?);
             }
@@ -1618,8 +1627,8 @@ pub mod wasm {
             self.js_own_channel_updated(*channel_entry)
         }
 
-        fn node_not_allowed_to_access_network(&self, address: &Address) {
-            self.js_node_not_allowed_to_access_network(*address)
+        fn node_allowed_to_access_network(&self, address: &Address) {
+            self.js_node_allowed_to_access_network(*address)
         }
 
         fn node_not_allowed_to_access_network(&self, address: &Address) {

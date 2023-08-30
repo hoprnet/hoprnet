@@ -176,8 +176,8 @@ pub(crate) async fn p2p_loop(
                 },
                 Inputs::Indexer(task) => match task {
                     IndexerProcessed::Allow(peer) => {
-                        allowed_peers.insert(peer);
-                    },
+                        let _ = allowed_peers.insert(peer);
+                    }
                     IndexerProcessed::Ban(peer) => {
                         allowed_peers.remove(&peer);
 

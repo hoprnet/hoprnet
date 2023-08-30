@@ -2,18 +2,28 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { createTestApiInstance, ALICE_PEER_ID, ALICE_MULTI_ADDR, BOB_PEER_ID, BOB_MULTI_ADDR } from '../../fixtures.js'
+import {
+  createTestApiInstance,
+  ALICE_PEER_ID,
+  ALICE_MULTI_ADDR,
+  ALICE_ETHEREUM_ADDR,
+  BOB_PEER_ID,
+  BOB_MULTI_ADDR,
+  BOB_ETHEREUM_ADDR
+} from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Hopr } from '@hoprnet/hopr-core'
 
 const ALICE_ENTRY_INFO = {
   id: ALICE_PEER_ID,
+  address: ALICE_ETHEREUM_ADDR,
   multiaddrs: [ALICE_MULTI_ADDR]
 }
 
 const BOB_ENTRY_INFO = {
   id: BOB_PEER_ID,
+  address: BOB_ETHEREUM_ADDR,
   multiaddrs: [BOB_MULTI_ADDR]
 }
 
@@ -39,7 +49,7 @@ describe('GET /node/entryNodes', function () {
   })
 
   it('should return invalid quality when quality is not a number', async function () {
-    node.getEntryNodes = sinon.fake.resolves([ALICE_ENTRY_INFO, BOB_ENTRY_INFO])
+    node.getPublicNodes = sinon.fake.resolves([ALICE_ENTRY_INFO, BOB_ENTRY_INFO])
     const res = await request(service).get(`/api/v3/node/entryNodes`).send()
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
@@ -56,7 +66,7 @@ describe('GET /node/entryNodes', function () {
   })
 
   it('should handle error', async function () {
-    node.getEntryNodes = () => {
+    node.getPublicNodes = () => {
       throw Error(`boom`)
     }
 

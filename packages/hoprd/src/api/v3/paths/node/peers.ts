@@ -68,7 +68,6 @@ export async function getPeers(
       const peerId = peerIdFromString(acc.public_key.to_peerid_str())
       const info = await node.getConnectionInfo(peerId)
       // exclude if quality is lesser than the one wanted
-      console.log('INFO ', info)
       if (info === undefined || info.quality < quality) {
         continue
       }
@@ -80,7 +79,6 @@ export async function getPeers(
     const connected = []
 
     for (const peerId of connected_peers) {
-      console.log('PEER ID ', peerId)
       const peerIdStr = peerId.toString()
 
       // already exists in announced, we use this because it contains multiaddr already
@@ -89,7 +87,6 @@ export async function getPeers(
       } else {
         const info = await node.getConnectionInfo(peerId)
         // exclude if quality is less than the one wanted
-        console.log('INFO ', info)
         if (info === undefined || info.quality < quality) {
           continue
         }
@@ -102,7 +99,6 @@ export async function getPeers(
       announced: [...announcedMap.values()]
     }
   } catch (err) {
-    console.trace()
     log(`Error while getting all peers address information: ${err}`)
     const errString = `${STATUS_CODES.UNKNOWN_FAILURE} ${err instanceof Error ? err.message : 'Unknown error'}`
     throw new Error(errString)

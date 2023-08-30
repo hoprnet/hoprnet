@@ -97,12 +97,14 @@ impl WasmIndexerInteractions {
                             let is_allowed = {
                                 let address = {
                                     if let Ok(key) = OffchainPublicKey::from_peerid(&peer) {
-                                        match db_local.read().await.get_chain_key(&key).await.and_then(|maybe_address| {
-                                            maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!(
-                                                "No address available for peer '{}'",
-                                                peer
-                                            )))
-                                        }) {
+                                        match db_local.read().await.get_chain_key(&key).await.and_then(
+                                            |maybe_address| {
+                                                maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!(
+                                                    "No address available for peer '{}'",
+                                                    peer
+                                                )))
+                                            },
+                                        ) {
                                             Ok(v) => v,
                                             Err(e) => {
                                                 error!("{e}");
@@ -167,22 +169,35 @@ pub mod wasm {
     use super::*;
     use futures::future::poll_fn;
     use js_sys::JsString;
-    use utils_types::primitives::Address;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     impl WasmIndexerInteractions {
-        pub async fn node_allowed_to_access_network(&mut self, address: Address) {
-            match self.db.read().get_packet_key(&address).await {
-                Ok(Some(key)) => self.update_eligibility(key.to_peerid(), true),
-                _ => error!("Failed to update network registry status for {}", address.to_string())
+        pub async fn node_allowed_to_access_network(&mut self, peer: JsString) {
+            let peer: String = peer.into();
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.update_eligibility(p, true).await,
+                Err(err) => {
+                    warn!(
+                        "Failed to parse peer id {}, cannot set network registry allowance to true: {}",
+                        peer,
+                        err.to_string()
+                    );
+                }
             }
         }
 
-        pub async fn node_not_allowed_to_access_network(&mut self, address: Address) {
-            match self.db.read().get_packet_key(&address).await {
-                Ok(Some(key)) => self.update_eligibility(key.to_peerid(), false),
-                _ => error!("Failed to update network registry status for {}", address.to_string())
+        pub async fn node_not_allowed_to_access_network(&mut self, peer: JsString) {
+            let peer: String = peer.into();
+            match PeerId::from_str(&peer) {
+                Ok(p) => self.update_eligibility(p, false).await,
+                Err(err) => {
+                    warn!(
+                        "Failed to parse peer id {}, cannot set network registry allowance to false: {}",
+                        peer,
+                        err.to_string()
+                    );
+                }
             }
         }
 
@@ -191,13 +206,13 @@ pub mod wasm {
                 Ok(_) => {
                     match self
                         .internal_emitter
-                        .start_send(IndexerToProcess::EligibilityUpdate(p, eligible.into()))
+                        .start_send(IndexerToProcess::EligibilityUpdate(peer, eligible.into()))
                     {
                         Ok(_) => {}
                         Err(e) => error!("Failed to send register update 'eligibility' to the receiver: {}", e),
                     }
                 }
-                Err(e) => error!("The receiver for indexer updates was dropped: {}", e)
+                Err(e) => error!("The receiver for indexer updates was dropped: {}", e),
             }
         }
 

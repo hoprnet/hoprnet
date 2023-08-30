@@ -802,10 +802,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(self.db.get_or_none::<Vec<Address>>(key).await?.unwrap_or(vec![]))
     }
 
-    /// Removes a node from the network registry
+    /// Adds a node to the network registry
     ///
-    /// - `address`: the address to remove
-    /// - `stake_account`: the stake account from which the address should be removed
+    /// - `stake_account`: the stake account to which the address should be added
+    /// - `node_address`: the address to add
     /// - `snapshot`: latest chain snapshot
     async fn add_to_network_registry(
         &mut self,
@@ -844,6 +844,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
+    /// Removes a node from the network registry
+    ///
+    /// - `stake_account`: the stake account from which the address should be removed
+    /// - `node_address`: the address to remove
+    /// - `snapshot`: latest chain snapshot
     async fn remove_from_network_registry(
         &mut self,
         stake_account: &Address,
@@ -1451,6 +1456,15 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
+        pub async fn is_allowed_to_access_network(&self, node: &Address) -> Result<bool, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.is_allowed_to_access_network(&node.clone()).await)
+            //}
+        }
+
+        #[wasm_bindgen]
         pub async fn get_staking_module_address(&self) -> Result<Option<Address>, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
@@ -1651,6 +1665,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), true);
+
+        db.set_allowed_to_access_network(&test_address, false, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), false);
     }
 
     #[async_std::test]

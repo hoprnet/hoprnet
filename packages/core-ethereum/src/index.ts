@@ -27,8 +27,17 @@ import {
 
 import Indexer from './indexer/index.js'
 import { EventEmitter } from 'events'
-import type { IndexerEvents } from './indexer/types.js'
-export { BlockEventName , BlockProcessedEventName , StatusEventName , PeerEventName  , NetworkRegistryEligibilityChangedEventName , NetworkRegistryStatusChangedEventName , NetworkRegistryNodeAllowedEventName , NetworkRegistryNodeNotAllowedEventName } from './indexer/types.js'
+import type { IndexerEventsType } from './indexer/types.js'
+export {
+  BlockEventName,
+  BlockProcessedEventName,
+  StatusEventName,
+  PeerEventName,
+  NetworkRegistryEligibilityChangedEventName,
+  NetworkRegistryStatusChangedEventName,
+  NetworkRegistryNodeAllowedEventName,
+  NetworkRegistryNodeNotAllowedEventName
+} from './indexer/types.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -227,7 +236,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public setTxHandler(evt: IndexerEvents, tx: string): DeferType<string> {
+  public setTxHandler(evt: IndexerEventsType, tx: string): DeferType<string> {
     return this.indexer.resolvePendingTransaction(evt, tx)
   }
 
@@ -302,10 +311,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     noticePeriodChannelClosure: number
   } {
     return this.chain.getInfo()
-  }
-
-  public async waitForPublicNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    return await this.indexer.getPublicNodes()
   }
 
   public async redeemAllTickets(): Promise<void> {
@@ -704,8 +709,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       },
       indexer: {
         on: (event: string) => connectorLogger(`Indexer on handler top of chain called with event "${event}"`),
-        off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`),
-        getPublicNodes: () => Promise.resolve([])
+        off: (event: string) => connectorLogger(`Indexer off handler top of chain called with event "${event}`)
       },
       isAllowedAccessToNetwork: () => Promise.resolve(true)
     } as unknown as HoprCoreEthereum
