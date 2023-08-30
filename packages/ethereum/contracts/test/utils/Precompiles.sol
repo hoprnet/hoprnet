@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
+import { Address } from "openzeppelin-contracts/utils/Address.sol";
+
+
 library PrecompileUtils {
     /**
      * Checks if given address is a Foundry precompile
      * see https://book.getfoundry.sh/misc/precompile-registry
      */
-    function isPrecompileAddress(address maybePrecompile) public pure returns (bool) {
+    function isPrecompileAddress(address maybePrecompile) public view returns (bool) {
         address[12] memory precompiles = [
             0x0000000000000000000000000000000000000001, //	ECRecover
             0x0000000000000000000000000000000000000002, //	SHA-256
@@ -26,6 +29,11 @@ library PrecompileUtils {
             if (maybePrecompile == precompiles[i]) {
                 return true;
             }
+        }
+
+        if (Address.isContract(maybePrecompile)) {
+            // we don't want any contracts
+            return true;
         }
 
         return false;
