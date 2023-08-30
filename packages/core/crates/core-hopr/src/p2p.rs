@@ -144,11 +144,11 @@ pub(crate) async fn p2p_loop(
                         }
                     },
                     NetworkEvent::PeerOffline(_peer) => {
-                        // TODO: this functionality may not be needed after swtich to rust-libp2p
+                        // NOTE: this functionality is not be needed after swtich to rust-libp2p
                     },
-                    NetworkEvent::Register(peer, origin) => {
+                    NetworkEvent::Register(peer, origin, metadata) => {
                         let mut writer = network.write().await;
-                        (*writer).add(&peer, origin)
+                        (*writer).add_with_metadata(&peer, origin, metadata)
                     },
                     NetworkEvent::Unregister(peer) => {
                         let mut writer = network.write().await;

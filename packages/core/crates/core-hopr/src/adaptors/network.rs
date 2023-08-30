@@ -54,6 +54,7 @@ pub mod wasm {
     use futures::{future::poll_fn, StreamExt};
     use js_sys::JsString;
     use utils_types::traits::PeerIdLike;
+    use utils_misc::utils::wasm::js_map_to_hash_map;
     use wasm_bindgen::prelude::*;
 
     /// Wrapper object for the `Network` functionality to be callable from outside
@@ -236,14 +237,12 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn register_with_metadata(&mut self, peer: JsString, origin: PeerOrigin, _metadata: &js_sys::Map) {
+        pub async fn register_with_metadata(&mut self, peer: JsString, origin: PeerOrigin, metadata: &js_sys::Map) {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
                 Ok(p) => {
-                    // TODO: ignoring metadata for now
-                    // self.add_with_metadata(&p, origin, js_map_to_hash_map(metadata))
                     match poll_fn(|cx| Pin::new(&mut self.change_notifier).poll_ready(cx)).await {
-                        Ok(_) => match self.change_notifier.start_send(NetworkEvent::Register(p, origin)) {
+                        Ok(_) => match self.change_notifier.start_send(NetworkEvent::Register(p, origin, js_map_to_hash_map(metadata))) {
                             Ok(_) => {}
                             Err(e) => error!("Failed to sent network update 'register' to the receiver: {}", e),
                         },
