@@ -1,7 +1,6 @@
 export * from './async/index.js'
 export * from './collection/index.js'
 export * from './libp2p/index.js'
-export * from './math/index.js'
 export * from './network/index.js'
 export * from './process/index.js'
 export * from './types.js'
@@ -13,6 +12,7 @@ export * from './ethereum/index.js'
 export * from './utils.js'
 
 export {
+  app_version,
   create_counter,
   SimpleCounter,
   create_multi_counter,
