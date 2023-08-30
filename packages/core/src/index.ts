@@ -499,19 +499,21 @@ export class Hopr extends EventEmitter {
 
   private async onNetworkRegistryNodeAllowed(node: Address): Promise<void> {
     const packetKey = await this.db.get_packet_key(node)
-    // Skip if the key binding isn't available yet
     if (packetKey) {
       const peerId = packetKey.to_peerid_str()
       this.index_updater.node_allowed_to_access_network(peerId)
+    } else {
+      log(`Skipping network registry allow event for ${node.to_string()} because the key binding isn't available yet`)
     }
   }
 
   private async onNetworkRegistryNodeNotAllowed(node: Address): Promise<void> {
     const packetKey = await this.db.get_packet_key(node)
-    // Skip if the key binding isn't available yet
     if (packetKey) {
       const peerId = packetKey.to_peerid_str()
       this.index_updater.node_not_allowed_to_access_network(peerId)
+    } else {
+      log(`Skipping network registry disallow event for ${node.to_string()} because the key binding isn't available yet`)
     }
   }
 
