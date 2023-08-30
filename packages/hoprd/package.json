@@ -38,6 +38,7 @@
     "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
     "@types/chai-as-promised": "7.1.5",
+    "@types/debug": "4.1.8",
     "bn.js": "5.2.1",
     "body-parser": "1.20.2",
     "chai-as-promised": "7.1.1",

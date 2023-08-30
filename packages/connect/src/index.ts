@@ -315,7 +315,6 @@ class HoprConnect implements Transport, Initializable, Startable {
     // assign the array *by value* and its entries *by reference*
     maConn.tags = conn.tags as any
 
-    verbose(`Relayed connection to ${maConn.remoteAddr.toString()} has been established successfully!`)
     return conn
   }
 
@@ -327,7 +326,7 @@ class HoprConnect implements Transport, Initializable, Startable {
   public async dialDirectly(ma: Multiaddr, options: DialOptions): Promise<Connection> {
     log(`Dialing ${chalk.yellow(ma.toString())}`)
 
-    let conn: Connection | undefined
+    let conn: Connection
     const maConn = await createTCPConnection(
       ma,
       () => {
