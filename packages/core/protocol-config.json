@@ -52,9 +52,7 @@
         "ticket_price_oracle": "0xcA5656Fe6F2d847ACA32cf5f38E51D2054cA1273",
         "announcements": "0x619eabE23FD0E2291B50a507719aa633fE6069b8"
       },
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     },
     "rotsee": {
       "chain": "xdai",
@@ -72,9 +70,7 @@
         "ticket_price_oracle": "0x442df1d946303fB088C9377eefdaeA84146DA0A6",
         "announcements": "0x7257fbdcbC81a37F8C830Deb8DD3b715f1D1BBa5"
       },
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     },
     "debug-staging": {
       "chain": "xdai",
@@ -92,9 +88,7 @@
         "ticket_price_oracle": "0x281a91FeA199a3bAB5D7d5f05833B257E2fd7741",
         "announcements": "0xD78BCa8452B8Ea281a659f380E0eF710C64EB85b"
       },
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     "tuttlingen": {
       "environment_type": "production",
@@ -220,9 +214,7 @@
         "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
         "announcements": "0x0000000000000000000000000000000000000000"
       },
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     },
     "monte_rosa": {
       "chain": "xdai",
@@ -240,9 +232,7 @@
         "ticket_price_oracle": "0x0000000000000000000000000000000000000000",
         "announcements": "0x0000000000000000000000000000000000000000"
       },
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     }
   },
   "chains": {
