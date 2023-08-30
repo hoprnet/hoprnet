@@ -5,4 +5,3 @@ export * from './pubKeyToPeerId.js'
 export * from './privKeyToPeerId.js'
 export * from './relayCode.js'
 export * from './connection.js'
-
