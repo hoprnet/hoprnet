@@ -1398,6 +1398,7 @@ dependencies = [
  "ethers",
  "hex-literal 0.3.4",
  "js-sys",
+ "lazy_static",
  "multiaddr",
  "serde",
  "serde_repr",

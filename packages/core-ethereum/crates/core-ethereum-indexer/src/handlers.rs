@@ -20,7 +20,8 @@ use bindings::{
 use core_crypto::types::{Hash, OffchainSignature};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
-    account::{AccountEntry, AccountSignature, AccountType},
+    account::{AccountEntry, AccountType},
+    announcement::KeyBinding,
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{
@@ -187,26 +188,30 @@ where
                     return Err(CoreEthereumIndexerError::UnsupportedKeyRebinding);
                 }
 
-                let updated_account = AccountEntry::new(
-                    key_binding.ed_25519_pub_key.try_into()?,
+                match KeyBinding::from_parts(
                     key_binding.chain_key.try_into()?,
-                    AccountType::NotAnnounced,
-                );
+                    key_binding.ed_25519_pub_key.try_into()?,
+                    OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
+                ) {
+                    Ok(binding) => {
+                        let updated_account = AccountEntry::new(
+                            key_binding.ed_25519_pub_key.try_into()?,
+                            key_binding.chain_key.try_into()?,
+                            AccountType::NotAnnounced,
+                        );
 
-                let sig = AccountSignature {
-                    signature: OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
-                    pub_key: key_binding.ed_25519_pub_key.try_into()?,
-                    chain_key: key_binding.chain_key.try_into()?,
-                };
+                        db.link_chain_and_packet_keys(&binding.chain_key, &binding.packet_key, snapshot)
+                            .await?;
 
-                if !sig.verify() {
-                    return Err(CoreEthereumIndexerError::AccountEntrySignatureVerification);
+                        db.update_account_and_snapshot(&updated_account, snapshot).await?;
+                    }
+                    Err(_) => {
+                        debug!(
+                            "Filtering announcement from {} with invalid signature.",
+                            key_binding.chain_key
+                        )
+                    }
                 }
-
-                db.link_chain_and_packet_keys(&sig.chain_key, &sig.pub_key, snapshot)
-                    .await?;
-
-                db.update_account_and_snapshot(&updated_account, snapshot).await?;
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
                 let maybe_account = db.get_account(&revocation.node.try_into()?).await?;

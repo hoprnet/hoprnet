@@ -195,43 +195,6 @@ impl BinarySerializable for AccountEntry {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct AccountSignature {
-    pub signature: OffchainSignature,
-    pub pub_key: OffchainPublicKey,
-    pub chain_key: Address,
-}
-
-impl AccountSignature {
-    pub fn new(signing_key: &OffchainKeypair, chain_key: &Address) -> Self {
-        Self {
-            signature: OffchainSignature::sign_message(
-                format!(
-                    "HoprAnnouncements: cross-sign off-chain identity {} on-chain identity {}",
-                    signing_key.public().to_peerid(),
-                    chain_key
-                )
-                .as_bytes(),
-                signing_key,
-            ),
-            pub_key: signing_key.public().to_owned(),
-            chain_key: chain_key.to_owned(),
-        }
-    }
-
-    pub fn verify(&self) -> bool {
-        self.signature.verify_message(
-            format!(
-                "HoprAnnouncements: cross-sign off-chain identity {} on-chain identity {}",
-                self.pub_key.to_peerid(),
-                self.chain_key
-            )
-            .as_bytes(),
-            &self.pub_key,
-        )
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::AccountSignature;
@@ -309,15 +272,6 @@ mod test {
 
         let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
         assert_eq!(ae1, ae2);
-    }
-
-    #[test]
-    fn test_account_signature_workflow() {
-        let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
-
-        let sig = AccountSignature::new(&keypair, &chain_addr);
-        assert!(sig.verify());
     }
 }
 
