@@ -11,6 +11,7 @@ import retimer from 'retimer'
 import { compareAddressesLocalMode, compareAddressesPublicMode } from '@hoprnet/hopr-connect'
 
 import {
+  app_version,
   create_counter,
   create_gauge,
   create_histogram_with_buckets,
@@ -56,7 +57,7 @@ import {
   PingConfig
 } from '@hoprnet/hopr-utils'
 
-import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
+import { INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
 import { findPath } from './path/index.js'
 
@@ -694,7 +695,7 @@ export class Hopr extends EventEmitter {
    * Returns the version of hopr-core.
    */
   public getVersion() {
-    return FULL_VERSION
+    return app_version()
   }
 
   /**
