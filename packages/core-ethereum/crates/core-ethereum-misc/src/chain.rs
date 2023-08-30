@@ -15,20 +15,17 @@ use bindings::{
     hopr_token::{ApproveCall, TransferCall},
 };
 use core_crypto::{
-    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    keypairs::{ChainKeypair, Keypair},
     types::VrfParameters,
 };
-use core_types::{
-    acknowledgement::AcknowledgedTicket,
-    announcement::{AnnouncementData, KeyBinding},
-};
+use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use ethers::{
     abi::AbiEncode,
     types::{Address as EthereumAddress, H160, H256, U256},
 };
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
-    traits::{BinarySerializable, PeerIdLike},
+    traits::BinarySerializable,
 };
 
 #[repr(u8)]
@@ -59,14 +56,19 @@ impl ChainCalls {
         }
     }
 
+    /// If true, from now on create Safe-compliant payload. If false,
+    /// create legacy transaction payloads.
     pub fn set_use_safe(&mut self, enabled: bool) {
         self.use_safe = enabled;
     }
 
+    /// See whether the struct is generating Safe-compliant (returns true)
+    /// or legacy transaction payload (returns false).
     pub fn get_use_safe(&mut self) -> bool {
         return self.use_safe;
     }
 
+    /// Creates the transaction payload to announce a node on-chain.
     pub fn announce(&self, announcement: &AnnouncementData, use_safe: bool) -> Vec<u8> {
         match announcement.key_binding {
             Some(ref binding) => {
@@ -122,6 +124,7 @@ impl ChainCalls {
         }
     }
 
+    /// Create a ERC20 approve transaction payload. Prequisite to open payment channels.
     pub fn approve(&self, amount: &Balance) -> Result<Vec<u8>> {
         if amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments(
@@ -136,6 +139,7 @@ impl ChainCalls {
         .encode())
     }
 
+    /// Create a ERC20 transfer transaction payload
     pub fn transfer(&self, destination: &Address, amount: &Balance) -> Result<Vec<u8>> {
         if amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments("Token transfer must have balance type HOPR".into()));
@@ -148,6 +152,7 @@ impl ChainCalls {
         .encode())
     }
 
+    /// Creates the transaction payload to open a payment channel
     pub fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>> {
         if dest.eq(&self.chain_key) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
@@ -182,6 +187,7 @@ impl ChainCalls {
         }
     }
 
+    /// Creates the transaction payload to immediately close an incoming payment channel
     pub fn close_incoming_channel(&self, source: &Address) -> Result<Vec<u8>> {
         if source.eq(&self.chain_key) {
             return Err(InvalidArguments("Cannot close incoming channe from self".into()));
@@ -201,6 +207,9 @@ impl ChainCalls {
         }
     }
 
+    /// Creates the transaction payload that initiates the closure of a payment channel.
+    /// Once the notice period is due, the funds can be withdrawn using a
+    /// finalizeChannelClosure transaction.
     pub fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
         if destination.eq(&self.chain_key) {
             return Err(InvalidArguments(
@@ -229,6 +238,7 @@ impl ChainCalls {
         }
     }
 
+    /// Used to create the payload to claim incentives for relaying a mixnet packet.
     pub fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket) -> Result<Vec<u8>> {
         let redeemable = convert_acknowledged_ticket(acked_ticket)?;
         let params = convert_vrf_parameters(&acked_ticket.vrf_params);
@@ -252,6 +262,9 @@ impl ChainCalls {
         }
     }
 
+    /// Creates a transaction payload that withdraws funds from
+    /// an outgoing payment channel. This will succeed once the closure
+    /// notice period is due.
     pub fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
         if destination.eq(&self.chain_key) {
             return Err(InvalidArguments(
@@ -280,6 +293,8 @@ impl ChainCalls {
         }
     }
 
+    /// Creates a transaction payload to register a Safe instance which is used
+    /// to manage the node's funds
     pub fn register_safe_by_node(&self, safe_addr: &Address) -> Result<Vec<u8>> {
         if safe_addr.eq(&self.chain_key) {
             return Err(InvalidArguments("Safe address must be different from node addr".into()));
@@ -290,6 +305,8 @@ impl ChainCalls {
         .encode())
     }
 
+    /// Creates a transaction payload to remove the Safe instance. Once succeeded,
+    /// the funds are no longer managed by the node.
     pub fn deregister_node_by_safe(&self) -> Result<Vec<u8>> {
         if !self.use_safe {
             return Err(InvalidState(

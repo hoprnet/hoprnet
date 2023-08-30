@@ -98,8 +98,9 @@ impl AnnouncementData {
 
 impl AnnouncementData {
     /// Constructs structure from multiaddress and optionally also `KeyBinding`.
-    /// The multiaddress must not be empty and must end with `/p2p/<peer id>` to be considered valid.
-    /// Also if `key_binding` is specified, the public key must match the peer id of the multiaddress.
+    /// The multiaddress must not be empty. It should be the external address of the node.
+    /// It may contain a trailing PeerId (encapsulated multiaddr) or come without. If the
+    /// peerId is present, it must match with the keybinding.
     pub fn new(multiaddress: &Multiaddr, key_binding: Option<KeyBinding>) -> Result<Self, GeneralError> {
         if let Some(ending) = multiaddress.protocol_stack().last() {
             if let Some(ref binding) = key_binding {
@@ -156,8 +157,10 @@ mod tests {
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
     use hex_literal::hex;
     use multiaddr::Multiaddr;
-    use utils_types::primitives::Address;
-    use utils_types::traits::{BinarySerializable, PeerIdLike};
+    use utils_types::{
+        primitives::Address,
+        traits::{BinarySerializable, PeerIdLike},
+    };
 
     lazy_static::lazy_static! {
         static ref KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d")).unwrap();

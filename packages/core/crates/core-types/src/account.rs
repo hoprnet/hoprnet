@@ -1,13 +1,13 @@
-use serde::{Deserialize, Serialize};
-
 use crate::account::AccountType::{Announced, NotAnnounced};
-use core_crypto::keypairs::{Keypair, OffchainKeypair};
-use core_crypto::types::{OffchainPublicKey, OffchainSignature};
+use core_crypto::types::OffchainPublicKey;
 use multiaddr::Multiaddr;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::Address;
-use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+use utils_types::{
+    errors::GeneralError::ParseError,
+    primitives::Address,
+    traits::{BinarySerializable, PeerIdLike, ToHex},
+};
 
 /// Type of the node account.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -197,13 +197,11 @@ impl BinarySerializable for AccountEntry {
 
 #[cfg(test)]
 mod test {
-    use super::AccountSignature;
-    use crate::account::AccountEntry;
-    use crate::account::AccountType::{Announced, NotAnnounced};
-    use core_crypto::{
-        keypairs::{Keypair, OffchainKeypair},
-        types::OffchainPublicKey,
+    use crate::account::{
+        AccountEntry,
+        AccountType::{Announced, NotAnnounced},
     };
+    use core_crypto::types::OffchainPublicKey;
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use utils_types::{primitives::Address, traits::BinarySerializable};
