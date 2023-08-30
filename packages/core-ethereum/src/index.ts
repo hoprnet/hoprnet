@@ -28,6 +28,7 @@ import {
 import Indexer from './indexer/index.js'
 import { EventEmitter } from 'events'
 import type { IndexerEvents } from './indexer/types.js'
+export { BlockEventName , BlockProcessedEventName , StatusEventName , PeerEventName  , NetworkRegistryEligibilityChangedEventName , NetworkRegistryStatusChangedEventName , NetworkRegistryNodeAllowedEventName , NetworkRegistryNodeNotAllowedEventName } from './indexer/types.js'
 
 const log = debug('hopr-core-ethereum')
 

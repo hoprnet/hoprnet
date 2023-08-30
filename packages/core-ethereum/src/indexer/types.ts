@@ -21,24 +21,29 @@ export type IndexerEvents =
   | `on-new-block-${string}`
   | `node-safe-registered-${string}`
 
-type BlockEventName = 'block'
-type BlockProcessedEventName = 'block-processed'
-type StatusEventName = 'status'
-type PeerEventName = 'peer'
-type NetworkRegistryEligibilityChangedEventName = 'network-registry-eligibility-changed'
-type NetworkRegistryStatusChangedEventName = 'network-registry-status-changed'
+export const BlockEventName = 'block'
+export const BlockProcessedEventName = 'block-processed'
+export const StatusEventName = 'status'
+export const PeerEventName = 'peer'
+export const NetworkRegistryEligibilityChangedEventName = 'network-registry-eligibility-changed'
+export const NetworkRegistryStatusChangedEventName = 'network-registry-status-changed'
+export const NetworkRegistryNodeAllowedEventName = 'network-registry-node-allowed'
+export const NetworkRegistryNodeNotAllowedEventName = 'network-registry-node-not-allowed'
 
-type ChannelUpdateEventNames = 'own-channel-updated'
+export const ChannelUpdateEventNames = 'own-channel-updated'
 
-type IndexerEventNames =
-  | BlockEventName
-  | BlockProcessedEventName
-  | StatusEventName
-  | PeerEventName
-  | ChannelUpdateEventNames
-  | IndexerEvents
-  | NetworkRegistryEligibilityChangedEventName
-  | NetworkRegistryStatusChangedEventName
+enum IndexerEventNames {
+  BlockEventName,
+  BlockProcessedEventName,
+  StatusEventName,
+  PeerEventName,
+  ChannelUpdateEventNames,
+  IndexerEvents,
+  NetworkRegistryEligibilityChangedEventName,
+  NetworkRegistryStatusChangedEventName,
+  NetworkRegistryNodeAllowedEventName,
+  NetworkRegistryNodeNotAllowedEventName,
+}
 
 type BlockListener = (block: number) => void
 type BlockProcessedListener = (block: number) => void
@@ -48,6 +53,8 @@ type ChannelUpdateListener = (channel: ChannelEntry) => void
 type IndexerEventsListener = (txHash: string) => void
 type NetworkRegistryEligibilityChangedListener = (account: Address, allowed: boolean) => void
 type NetworkRegistryStatusChangedListener = (isEnabled: boolean) => void
+type NetworkRegistryNodeAllowedListener = (node: Address) => void
+type NetworkRegistryNodeNotAllowedListener = (node: Address) => void
 
 export interface IndexerEventEmitter {
   addListener(event: IndexerEventNames, listener: () => void): this
@@ -62,6 +69,8 @@ export interface IndexerEventEmitter {
     listener: NetworkRegistryEligibilityChangedListener
   ): this
   addListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  addListener(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeAllowedListener): this
+  addListener(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeNotAllowedListener): this
 
   emit(event: IndexerEventNames): boolean
   emit(event: BlockEventName, block: number): boolean
@@ -72,6 +81,8 @@ export interface IndexerEventEmitter {
   emit(event: IndexerEvents, txHash: string): boolean
   emit(event: NetworkRegistryEligibilityChangedEventName, account: Address, allowed: boolean): boolean
   emit(event: NetworkRegistryStatusChangedEventName, isEnabled: boolean): boolean
+  emit(event: NetworkRegistryNodeAllowedEventName, node: Address): boolean
+  emit(event: NetworkRegistryNodeNotAllowedEventName, node: Address): boolean
 
   on(event: IndexerEventNames, listener: () => void): this
   on(event: BlockEventName, listener: BlockListener): this
@@ -82,6 +93,8 @@ export interface IndexerEventEmitter {
   on(event: IndexerEvents, listener: IndexerEventsListener): this
   on(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
   on(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  on(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeAllowedListener): this
+  on(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeNotAllowedListener): this
 
   once(event: IndexerEventNames, listener: () => void): this
   once(event: BlockEventName, listener: BlockListener): this
@@ -92,6 +105,8 @@ export interface IndexerEventEmitter {
   once(event: IndexerEvents, listener: IndexerEventsListener): this
   once(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
   once(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  once(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeAllowedListener): this
+  once(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeNotAllowedListener): this
 
   prependListener(event: IndexerEventNames, listener: () => void): this
   prependListener(event: BlockEventName, listener: BlockListener): this
@@ -105,6 +120,8 @@ export interface IndexerEventEmitter {
     listener: NetworkRegistryEligibilityChangedListener
   ): this
   prependListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  prependListener(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeAllowedListener): this
+  prependListener(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeNotAllowedListener): this
 
   prependOnceListener(event: IndexerEventNames, listener: () => void): this
   prependOnceListener(event: BlockEventName, listener: BlockListener): this
@@ -121,6 +138,8 @@ export interface IndexerEventEmitter {
     event: NetworkRegistryStatusChangedEventName,
     listener: NetworkRegistryStatusChangedListener
   ): this
+  prependOnceListener(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeAllowedListener): this
+  prependOnceListener(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeNotAllowedListener): this
 
   removeListener(event: IndexerEventNames, listener: () => void): this
   removeListener(event: BlockEventName, listener: BlockListener): this
@@ -134,6 +153,8 @@ export interface IndexerEventEmitter {
     listener: NetworkRegistryEligibilityChangedListener
   ): this
   removeListener(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  removeListener(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeAllowedListener): this
+  removeListener(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeNotAllowedListener): this
 
   off(event: IndexerEventNames, listener: () => void): this
   off(event: BlockEventName, listener: BlockListener): this
@@ -144,6 +165,8 @@ export interface IndexerEventEmitter {
   off(event: IndexerEvents, listener: IndexerEventsListener): this
   off(event: NetworkRegistryEligibilityChangedEventName, listener: NetworkRegistryEligibilityChangedListener): this
   off(event: NetworkRegistryStatusChangedEventName, listener: NetworkRegistryStatusChangedListener): this
+  off(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeAllowedListener): this
+  off(event: NetworkRegistryNodeNotAllowedEventName, listener: NetworkRegistryNodeNotAllowedListener): this
 
   listeners(event: IndexerEventNames): Function[]
 }

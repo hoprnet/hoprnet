@@ -75,7 +75,9 @@ impl From<&wasm::ContractAddresses> for ContractAddresses {
 pub trait IndexerCallbacks {
     fn own_channel_updated(&self, channel_entry: &ChannelEntry);
 
-    fn not_allowed_to_access_network(&self, address: &Address);
+    fn node_not_allowed_to_access_network(&self, address: &Address);
+
+    fn node_allowed_to_access_network(&self, address: &Address);
 
     fn new_announcement(&self, account_entry: &AccountEntry);
 }
@@ -435,6 +437,8 @@ where
                     snapshot,
                 )
                 .await?;
+                self.cbs
+                    .node_not_allowed_to_access_network(&deregistered.node_address.0.try_into()?);
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 db.remove_from_network_registry(
@@ -443,6 +447,8 @@ where
                     snapshot,
                 )
                 .await?;
+                self.cbs
+                    .node_not_allowed_to_access_network(&deregistered.node_address.0.try_into()?);
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 db.add_to_network_registry(
@@ -451,6 +457,8 @@ where
                     snapshot,
                 )
                 .await?;
+                self.cbs
+                    .node_allowed_to_access_network(&registered.node_address.0.try_into()?);
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 db.add_to_network_registry(
@@ -459,16 +467,13 @@ where
                     snapshot,
                 )
                 .await?;
+                self.cbs
+                    .node_allowed_to_access_network(&registered.node_address.0.try_into()?);
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
                 let account: Address = eligibility_updated.staking_account.0.try_into()?;
-                let affected_nodes = db
-                    .set_eligible(&account, eligibility_updated.eligibility, snapshot)
+                db.set_eligible(&account, eligibility_updated.eligibility, snapshot)
                     .await?;
-
-                for affected_node in affected_nodes.iter() {
-                    self.cbs.not_allowed_to_access_network(affected_node);
-                }
             }
             HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
                 db.set_network_registry(enabled.is_enabled, snapshot).await?;
@@ -665,7 +670,9 @@ pub mod tests {
 
         fn own_channel_updated(&self, _channel_entry: &ChannelEntry) {}
 
-        fn not_allowed_to_access_network(&self, _address: &Address) {}
+        fn node_not_allowed_to_access_network(&self, _address: &Address) {}
+
+        fn node_allowed_to_access_network(&self, _address: &Address) {}
     }
 
     fn init_handlers() -> ContractEventHandlers<DummyCallbacks> {
@@ -1594,8 +1601,12 @@ pub mod wasm {
         #[wasm_bindgen(method, js_name = "newAnnouncement")]
         pub fn js_new_announcement(this: &IndexerCallbacks, account_entry: AccountEntry);
 
-        #[wasm_bindgen(method, js_name = "notAllowedToAccessNetwork")]
-        pub fn js_not_allowed_to_access_network(this: &IndexerCallbacks, address: Address);
+        #[wasm_bindgen(method, js_name = "nodeAllowedToAccessNetwork")]
+        pub fn js_node_allowed_to_access_network(this: &IndexerCallbacks, address: Address);
+
+        #[wasm_bindgen(method, js_name = "nodeNotAllowedToAccessNetwork")]
+        pub fn js_node_not_allowed_to_access_network(this: &IndexerCallbacks, address: Address);
+
     }
 
     impl super::IndexerCallbacks for IndexerCallbacks {
@@ -1607,8 +1618,12 @@ pub mod wasm {
             self.js_own_channel_updated(*channel_entry)
         }
 
-        fn not_allowed_to_access_network(&self, address: &Address) {
-            self.js_not_allowed_to_access_network(*address)
+        fn node_not_allowed_to_access_network(&self, address: &Address) {
+            self.js_node_not_allowed_to_access_network(*address)
+        }
+
+        fn node_not_allowed_to_access_network(&self, address: &Address) {
+            self.js_node_not_allowed_to_access_network(*address)
         }
     }
 

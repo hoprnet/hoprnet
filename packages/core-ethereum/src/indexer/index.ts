@@ -129,12 +129,14 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         network_registry: contractAddresses.hoprNetworkRegistryAddress,
         announcements: contractAddresses.hoprAnnouncementsAddress,
         node_safe_registry: contractAddresses.hoprNodeSafeRegistryAddress,
-        node_management_module: contractAddresses.moduleAddress
+        node_management_module: contractAddresses.moduleAddress,
+        ticket_price_oracle: contractAddresses.hoprTicketPriceOracleAddress,
       },
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
         ownChannelUpdated: this.onOwnChannelUpdated.bind(this),
-        notAllowedToAccessNetwork: this.onNotAllowedToAccessNetwork.bind(this)
+        nodeNotAllowedToAccessNetwork: this.onNodeNotAllowedToAccessNetwork.bind(this),
+        nodeAllowedToAccessNetwork: this.onNodeAllowedToAccessNetwork.bind(this)
       }
     )
 
@@ -773,8 +775,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.emit('own-channel-updated', channel)
   }
 
-  onNotAllowedToAccessNetwork(address: Address) {
-    this.emit('network-registry-eligibility-changed', address, false)
+  onNodeNotAllowedToAccessNetwork(address: Address) {
+    this.emit('network-registry-node-not-allowed', address)
+  }
+
+  onNodeAllowedToAccessNetwork(address: Address) {
+    this.emit('network-registry-node-allowed', address)
   }
 
   /**
@@ -847,7 +853,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     throw new Error('Could not find packet key for address - have they announced? -' + address.to_hex())
   }
 
-  public async *getAddressesAnnouncedOnChain(): AsyncGenerator<AccountEntry, void, void>  {
+  public async *getAccountsAnnouncedOnChain(): AsyncGenerator<AccountEntry, void, void> {
     let accounts = await this.db.get_accounts()
     while (accounts.len() > 0) {
       yield accounts.next()

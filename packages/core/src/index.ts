@@ -60,7 +60,7 @@ import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PA
 
 import { findPath } from './path/index.js'
 
-import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { type Indexer, NetworkRegistryNodeNotAllowedEventName, NetworkRegistryNodeAllowedEventName } from '@hoprnet/hopr-core-ethereum'
 
 import {
   type ChannelStrategyInterface,
@@ -364,6 +364,8 @@ export class Hopr extends EventEmitter {
       }
     })
 
+    connector.indexer.on(NetworkRegistryNodeAllowedEventName, this.onNetworkRegistryNodeAllowed.bind(this))
+    connector.indexer.on(NetworkRegistryNodeNotAllowedEventName, this.onNetworkRegistryNodeNotAllowed.bind(this))
     connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
     // Add all entry nodes that were announced during startup or were already
@@ -478,6 +480,14 @@ export class Hopr extends EventEmitter {
     } else if (isOutOfFunds === 'HOPR') {
       this.emit('hopr:warning:unfunded', address)
     }
+  }
+
+  private async onNetworkRegistryNodeAllowed(node: Address): Promise<void> {
+    this.index_updater.node_allowed_to_access_network(node.clone())
+  }
+
+  private async onNetworkRegistryNodeNotAllowed(node: Address): Promise<void> {
+    this.index_updater.node_not_allowed_to_access_network(node.clone())
   }
 
   /**
@@ -820,8 +830,8 @@ export class Hopr extends EventEmitter {
    * Takes a look into the indexer.
    * @returns a list of account entries
    */
-  public async *getAddressesAnnouncedOnChain(): AsyncGenerator<AccountEntry, void, void> {
-    yield* this.indexer.getAddressesAnnouncedOnChain()
+  public async *getAccountsAnnouncedOnChain(): AsyncGenerator<AccountEntry, void, void> {
+    yield* this.indexer.getAccountsAnnouncedOnChain()
   }
 
   /**
