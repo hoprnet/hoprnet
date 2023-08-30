@@ -207,14 +207,85 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         _helperGetDeployerInternalKey();
         _registerNodes(stakingSafeAddresses, nodeAddresses);
         vm.stopBroadcast();
+    }
 
-        // 8. transfer some tokens to safe
-        transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
+    /**
+     * @dev Configure a safe proxy and module proxy.
+     * Perform the following actions as the owner of safe:
+     * - include nodes to the module
+     * - add announcement contract as target
+     * As manager of network registry, add nodes and safe to network registry
+     *
+     * @notice Deployer is the single owner of safe
+     * nonce is the current nonce of deployer account
+     * Default fallback permission for module is to
+     * 1. allow all data to Channels contract
+     * 2. allow all data to Token contract
+     * 3. allow nodes to send native tokens to itself
+     *
+     * Add node safes to network registry, as a manager
+     * @param nodeAddresses array of node addresses to be added to the module
+     * @param safe safe address of node
+     * @param module module address of node
+     */
+    function configureSafeModule(
+        address[] memory nodeAddresses,
+        address safe,
+        address module
+    )
+        external
+        returns (address safe, address module)
+    {
+        // 1. get environment and msg.sender
+        getNetworkAndMsgSender();
 
-        // 9. transfer some xDAI to nodes
-        for (uint256 n = 0; n < nodeAddresses.length; n++) {
-            transferOrMintHoprAndSendNativeToAmount(safe, 0, nativeTokenAmountInWei);
+        /**
+         * Array of capability permissions
+         *     [
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // RESERVED
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultCloseIncomingChannelSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultApproveFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW  // defaultSendFunctionPermisson
+         *     ]
+         */
+        CapabilityPermission[] memory defaultChannelsCapabilityPermissions = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < defaultChannelsCapabilityPermissions.length; i++) {
+            defaultChannelsCapabilityPermissions[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
         }
+        Target defaultModulePermission = TargetUtils.encodeDefaultPermissions(
+            currentNetworkDetail.addresses.channelsContractAddress,
+            Clearance.FUNCTION,
+            TargetType.CHANNELS,
+            TargetPermission.ALLOW_ALL,
+            defaultChannelsCapabilityPermissions
+        );
+
+        // 1. include nodes to the module, as an owner of safe
+        includeNodesToModuleBySafe(nodeAddresses, safe, module);
+
+        // 2. approve token transfer, as an owner of safe
+        approveChannelsForTokenTransferBySafe(safe);
+
+        // 3. add announcement contract as target, as an owner of safe
+        addAllAllowedTargetToModuleBySafe(currentNetworkDetail.addresses.announcements, safe, module);
+        // bytes memory
+        vm.stopBroadcast();
+
+        // 4. add nodes and safe to network registry, as a manager of network registry
+        address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
+        for (uint256 m = 0; m < nodeAddresses.length; m++) {
+            stakingSafeAddresses[m] = safe;
+        }
+        _helperGetDeployerInternalKey();
+        _registerNodes(stakingSafeAddresses, nodeAddresses);
+        vm.stopBroadcast();
     }
 
     /**
