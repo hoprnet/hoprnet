@@ -24,6 +24,7 @@ import {
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   Address,
+  AccountEntry,
   AcknowledgedTicket,
   ChannelStatus,
   ChannelEntry,
@@ -59,7 +60,11 @@ import { FULL_VERSION, INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PA
 
 import { findPath } from './path/index.js'
 
-import HoprCoreEthereum, { type Indexer } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, {
+  type Indexer,
+  NetworkRegistryNodeNotAllowedEventName,
+  NetworkRegistryNodeAllowedEventName
+} from '@hoprnet/hopr-core-ethereum'
 
 import {
   type ChannelStrategyInterface,
@@ -254,7 +259,7 @@ export class Hopr extends EventEmitter {
    *
    * - Start heartbeat, automatic strategies, etc..
    */
-  public async start(__initialNodes?: { id: PeerId; multiaddrs: Multiaddr[] }[]) {
+  public async start(__initialNodes?: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }[]) {
     this.status = 'INITIALIZING'
     log('Starting hopr node...')
 
@@ -286,7 +291,14 @@ export class Hopr extends EventEmitter {
     }
 
     // Fetch previous announcements from database
-    const initialNodes = __initialNodes ?? (await connector.waitForPublicNodes())
+    const initialNodes: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }[] =
+      __initialNodes ?? (await this.getPublicNodes())
+
+    // Fetch nodes in network registry from database
+    let allowedNodes = initialNodes.filter(async (n) => {
+      return await this.db.is_allowed_to_access_network(n.address)
+    })
+
     log(
       'Using initial nodes: ',
       initialNodes.map((n) => n.id.toString())
@@ -363,6 +375,8 @@ export class Hopr extends EventEmitter {
       }
     })
 
+    connector.indexer.on(NetworkRegistryNodeAllowedEventName, this.onNetworkRegistryNodeAllowed.bind(this))
+    connector.indexer.on(NetworkRegistryNodeNotAllowedEventName, this.onNetworkRegistryNodeNotAllowed.bind(this))
     connector.indexer.on('peer', this.onPeerAnnouncement.bind(this))
 
     // Add all entry nodes that were announced during startup or were already
@@ -372,7 +386,11 @@ export class Hopr extends EventEmitter {
       await this.onPeerAnnouncement(announcedNode)
     }
     for (const announcedNode of recentlyAnnouncedNodes) {
-      await this.onPeerAnnouncement(announcedNode)
+      await this.onPeerAnnouncement({ ...announcedNode, address: undefined })
+    }
+    // Populate p2p allowed peers on startup
+    for (const allowedNode of allowedNodes) {
+      await this.onNetworkRegistryNodeAllowed(allowedNode.address)
     }
 
     // If this is the first time the node starts up it has not registered a safe
@@ -479,11 +497,33 @@ export class Hopr extends EventEmitter {
     }
   }
 
+  private async onNetworkRegistryNodeAllowed(node: Address): Promise<void> {
+    const packetKey = await this.db.get_packet_key(node)
+    if (packetKey) {
+      const peerId = packetKey.to_peerid_str()
+      this.index_updater.node_allowed_to_access_network(peerId)
+    } else {
+      log(`Skipping network registry allow event for ${node.to_string()} because the key binding isn't available yet`)
+    }
+  }
+
+  private async onNetworkRegistryNodeNotAllowed(node: Address): Promise<void> {
+    const packetKey = await this.db.get_packet_key(node)
+    if (packetKey) {
+      const peerId = packetKey.to_peerid_str()
+      this.index_updater.node_not_allowed_to_access_network(peerId)
+    } else {
+      log(
+        `Skipping network registry disallow event for ${node.to_string()} because the key binding isn't available yet`
+      )
+    }
+  }
+
   /**
    * Called whenever a peer is announced
    * @param peer newly announced peer
    */
-  private async onPeerAnnouncement(peer: { id: PeerId; multiaddrs: Multiaddr[] }): Promise<void> {
+  private async onPeerAnnouncement(peer: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }): Promise<void> {
     if (peer.id.equals(this.id)) {
       // Ignore announcements from ourself
       log(`Skipping announcements for ${peer}`)
@@ -510,6 +550,12 @@ export class Hopr extends EventEmitter {
       peer.id.toString(),
       addrsToAdd.map((ma) => ma.toString())
     )
+
+    // check whether the node is already registered in the network registry,
+    // notify p2p layer if so
+    if (peer.address && (await this.db.is_allowed_to_access_network(peer.address))) {
+      this.index_updater.node_allowed_to_access_network(peer.id.toString())
+    }
   }
 
   private async strategyOpenChannel(status: OutgoingChannelStatus) {
@@ -817,10 +863,10 @@ export class Hopr extends EventEmitter {
 
   /**
    * Takes a look into the indexer.
-   * @returns a list of announced multi addresses
+   * @returns a list of account entries
    */
-  public async *getAddressesAnnouncedOnChain() {
-    yield* this.indexer.getAddressesAnnouncedOnChain()
+  public async *getAccountsAnnouncedOnChain(): AsyncGenerator<AccountEntry, void, void> {
+    yield* this.indexer.getAccountsAnnouncedOnChain()
   }
 
   /**
@@ -1301,8 +1347,26 @@ export class Hopr extends EventEmitter {
     return ret
   }
 
-  public async getEntryNodes(): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }[]> {
-    return HoprCoreEthereum.getInstance().waitForPublicNodes()
+  public async getPublicNodes(): Promise<{ id: PeerId; address: Address; multiaddrs: Multiaddr[] }[]> {
+    const result: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }[] = []
+    let publicAccounts = await this.db.get_public_node_accounts()
+
+    while (publicAccounts.len() > 0) {
+      let account = publicAccounts.next()
+      if (account) {
+        let packetKey = await this.db.get_packet_key(account.chain_addr)
+        if (packetKey) {
+          result.push({
+            id: peerIdFromString(packetKey.to_peerid_str()),
+            address: account.chain_addr,
+            multiaddrs: [new Multiaddr(account.get_multiaddr_str())]
+          })
+        } else {
+          log(`could not retrieve packet key for address ${account.chain_addr.to_string()}`)
+        }
+      }
+    }
+    return result
   }
 
   public getEthereumAddress(): Address {

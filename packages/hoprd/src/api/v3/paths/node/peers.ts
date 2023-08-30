@@ -1,9 +1,12 @@
 import { peerIdFromString } from '@libp2p/peer-id'
 import { PEER_METADATA_PROTOCOL_VERSION, PeerStatus, type Hopr } from '@hoprnet/hopr-core'
+import { debug, AccountEntry } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
+import { Multiaddr } from '@multiformats/multiaddr'
 
 import type { Operation } from 'express-openapi'
-import type { Multiaddr } from '@multiformats/multiaddr'
+
+const log = debug('hoprd:api:v3:node-peers')
 
 export type PeerInfo = {
   peerId: string
@@ -28,7 +31,7 @@ export type PeerInfo = {
 export function toPeerInfoFormat(info: PeerStatus, multiaddr?: Multiaddr): PeerInfo {
   return {
     peerId: info.peer_id(),
-    multiAddr: multiaddr ? multiaddr.toString() : undefined,
+    multiAddr: multiaddr ? multiaddr.toString() : '',
     heartbeats: {
       sent: Number(info.heartbeats_sent),
       success: Number(info.heartbeats_succeeded)
@@ -60,17 +63,15 @@ export async function getPeers(
   try {
     const announcedMap = new Map<string, PeerInfo>()
 
-    let addresses_on_chain = await node.getAddressesAnnouncedOnChain()
-    for await (const addr of addresses_on_chain) {
-      const peerId = peerIdFromString(addr.getPeerId())
-      try {
-        const info = await node.getConnectionInfo(peerId)
-        // exclude if quality is lesser than the one wanted
-        if (info === undefined || info.quality < quality) {
-          continue
-        }
-        announcedMap.set(peerId.toString(), toPeerInfoFormat(info, addr))
-      } catch {}
+    let accounts: AsyncGenerator<AccountEntry, void, void> = node.getAccountsAnnouncedOnChain()
+    for await (const acc of accounts) {
+      const peerId = peerIdFromString(acc.public_key.to_peerid_str())
+      const info = await node.getConnectionInfo(peerId)
+      // exclude if quality is lesser than the one wanted
+      if (info === undefined || info.quality < quality) {
+        continue
+      }
+      announcedMap.set(peerId.toString(), toPeerInfoFormat(info, new Multiaddr(acc.get_multiaddr_str())))
     }
 
     let connected_peers = await node.getConnectedPeers()
@@ -84,14 +85,12 @@ export async function getPeers(
       if (announcedMap.has(peerIdStr)) {
         connected.push(announcedMap.get(peerIdStr))
       } else {
-        try {
-          const info = await node.getConnectionInfo(peerId)
-          // exclude if quality is less than the one wanted
-          if (info === undefined || info.quality < quality) {
-            continue
-          }
-          connected.push(toPeerInfoFormat(info))
-        } catch {}
+        const info = await node.getConnectionInfo(peerId)
+        // exclude if quality is less than the one wanted
+        if (info === undefined || info.quality < quality) {
+          continue
+        }
+        connected.push(toPeerInfoFormat(info))
       }
     }
 
@@ -100,7 +99,7 @@ export async function getPeers(
       announced: [...announcedMap.values()]
     }
   } catch (err) {
-    // Makes sure this doesn't throw
+    log(`Error while getting all peers address information: ${err}`)
     const errString = `${STATUS_CODES.UNKNOWN_FAILURE} ${err instanceof Error ? err.message : 'Unknown error'}`
     throw new Error(errString)
   }

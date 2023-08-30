@@ -8,6 +8,7 @@ members = [
     "packages/core/crates/core-network",
     "packages/core/crates/core-path",
     "packages/core/crates/core-packet",
+    "packages/core/crates/core-p2p",
     "packages/core/crates/core-strategy",
     "packages/core/crates/core-types",
     "packages/core-ethereum/crates/core-ethereum-db",
