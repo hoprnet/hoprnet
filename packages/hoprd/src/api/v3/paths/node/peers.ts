@@ -1,10 +1,9 @@
 import { peerIdFromString } from '@libp2p/peer-id'
-import { PEER_METADATA_PROTOCOL_VERSION, PeerStatus } from '@hoprnet/hopr-core'
+import { PEER_METADATA_PROTOCOL_VERSION, PeerStatus, type Hopr } from '@hoprnet/hopr-core'
 import { STATUS_CODES } from '../../utils.js'
 
 import type { Operation } from 'express-openapi'
 import type { Multiaddr } from '@multiformats/multiaddr'
-import type Hopr from '@hoprnet/hopr-core'
 
 export type PeerInfo = {
   peerId: string

@@ -369,14 +369,14 @@ pub(crate) async fn p2p_loop(
                     let _ = &allowed_peers.iter().for_each(|p| {
                         debug!("ALLOWED PEERS: {:?}", p)
                     });
-                    //if allowed_peers.contains(&peer_id) {
+                    if allowed_peers.contains(&peer_id) {
                         if ! (*network.read().await).has(&peer_id) {
                             (*network.write().await).add(&peer_id, PeerOrigin::IncomingConnection)
                         }
-                    //} else {
-                    //debug!("DISCONNECTION PEER ID {:?}", peer_id);
-                     //   let _ = swarm.disconnect_peer_id(peer_id);
-                    //}
+                    } else {
+                    debug!("DISCONNECTION PEER ID {:?}", peer_id);
+                       let _ = swarm.disconnect_peer_id(peer_id);
+                    }
                 },
                 SwarmEvent::ConnectionClosed {
                     peer_id,

@@ -3,7 +3,7 @@ import http from 'http'
 import cors from 'cors'
 import { debug } from '@hoprnet/hopr-utils'
 
-import type Hopr from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 
 const log = debug('hoprd:healthcheck')
 

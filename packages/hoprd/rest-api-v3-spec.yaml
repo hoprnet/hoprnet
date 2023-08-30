@@ -306,9 +306,6 @@ components:
         winProb:
           type: string
           description: The ticket's winning probability, going from 0.0 to 1.0 where 0.0 ~= 0% winning probability and 1.0 equals 100% winning probability.
-        challenge:
-          type: string
-          description: The ticket's challenge which needs to be solved before being able to claim the embedded incentive.
         signature:
           $ref: '#/components/schemas/Signature'
     Settings:

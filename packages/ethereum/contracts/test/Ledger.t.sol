@@ -48,12 +48,12 @@ contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChanne
         assertEq(latestRoot.rootHash, latestSnapshotRoot.rootHash);
     }
 
-    function test_indexing(uint32 firstTimestamp, uint32 secondTimestamp) public { 
+    function test_indexing(uint32 firstTimestamp, uint32 secondTimestamp) public {
         bytes28 initialRoot = latestSnapshotRoot.rootHash;
         uint32 initialTimestamp = latestSnapshotRoot.timestamp;
 
-
-        firstTimestamp = uint32(bound(firstTimestamp, latestRoot.timestamp, INDEX_SNAPSHOT_INTERVAL - latestRoot.timestamp));
+        firstTimestamp =
+            uint32(bound(firstTimestamp, latestRoot.timestamp, INDEX_SNAPSHOT_INTERVAL - latestRoot.timestamp));
         vm.warp(firstTimestamp);
 
         bytes28 currentRootHash = latestRoot.rootHash;
@@ -66,18 +66,24 @@ contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChanne
         assertEq(initialTimestamp, latestSnapshotRoot.timestamp);
 
         // check new root
-        assertEq(latestRoot.rootHash, bytes28(keccak256(abi.encodePacked(
-            // ledger feed must be unique
-            ledgerDomainSeparator,
-            // Allows the verifier to detect up until which block the snapshot includes state changes
-            currentBlockNumber,
-            // Bind result to previous root
-            currentRootHash,
-            // Information about the happened state change
-            keccak256(abi.encodePacked(ChannelOpened.selector))
-        ))));
+        assertEq(
+            latestRoot.rootHash,
+            bytes28(
+                keccak256(
+                    abi.encodePacked(
+                        // ledger feed must be unique
+                        ledgerDomainSeparator,
+                        // Allows the verifier to detect up until which block the snapshot includes state changes
+                        currentBlockNumber,
+                        // Bind result to previous root
+                        currentRootHash,
+                        // Information about the happened state change
+                        keccak256(abi.encodePacked(ChannelOpened.selector))
+                    )
+                )
+            )
+        );
         assertEq(latestRoot.timestamp, firstTimestamp);
-
 
         // currentRootHash = latestRoot.rootHash;
 
@@ -86,32 +92,44 @@ contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChanne
         indexEvent(abi.encodePacked(ChannelOpened.selector));
 
         // test chainability
-        assertEq(latestRoot.rootHash, bytes28(keccak256(abi.encodePacked(
-            // ledger feed must be unique
-            ledgerDomainSeparator,
-            // Allows the verifier to detect up until which block the snapshot includes state changes
-            currentBlockNumber + 1,
-            // Bind result to previous root
-            bytes28(keccak256(abi.encodePacked(
-                // ledger feed must be unique
-                ledgerDomainSeparator,
-                // Allows the verifier to detect up until which block the snapshot includes state changes
-                currentBlockNumber,
-                // Bind result to previous root
-                currentRootHash,
-                // Information about the happened state change
-                keccak256(abi.encodePacked(ChannelOpened.selector))
-            ))),
-            // Information about the happened state change
-            keccak256(abi.encodePacked(ChannelOpened.selector))
-        ))));
-
+        assertEq(
+            latestRoot.rootHash,
+            bytes28(
+                keccak256(
+                    abi.encodePacked(
+                        // ledger feed must be unique
+                        ledgerDomainSeparator,
+                        // Allows the verifier to detect up until which block the snapshot includes state changes
+                        currentBlockNumber + 1,
+                        // Bind result to previous root
+                        bytes28(
+                            keccak256(
+                                abi.encodePacked(
+                                    // ledger feed must be unique
+                                    ledgerDomainSeparator,
+                                    // Allows the verifier to detect up until which block the snapshot includes state
+                                    // changes
+                                    currentBlockNumber,
+                                    // Bind result to previous root
+                                    currentRootHash,
+                                    // Information about the happened state change
+                                    keccak256(abi.encodePacked(ChannelOpened.selector))
+                                )
+                            )
+                        ),
+                        // Information about the happened state change
+                        keccak256(abi.encodePacked(ChannelOpened.selector))
+                    )
+                )
+            )
+        );
 
         // snapshot should be unchanged
         assertEq(initialRoot, latestSnapshotRoot.rootHash);
         assertEq(initialTimestamp, latestSnapshotRoot.timestamp);
 
-        secondTimestamp = uint32(bound(secondTimestamp, latestRoot.timestamp + INDEX_SNAPSHOT_INTERVAL + 1, type(uint32).max));
+        secondTimestamp =
+            uint32(bound(secondTimestamp, latestRoot.timestamp + INDEX_SNAPSHOT_INTERVAL + 1, type(uint32).max));
         vm.warp(secondTimestamp);
 
         uint32 newBlockNumber = uint32(block.number);
@@ -123,33 +141,50 @@ contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChanne
         assertEq(latestRoot.timestamp, latestSnapshotRoot.timestamp);
 
         // test chainability
-        assertEq(latestRoot.rootHash, bytes28(keccak256(abi.encodePacked(
-            // ledger feed must be unique
-            ledgerDomainSeparator,
-            // Allows the verifier to detect up until which block the snapshot includes state changes
-            newBlockNumber,
-            // Bind result to previous root
-            bytes28(keccak256(abi.encodePacked(
-                // ledger feed must be unique
-                ledgerDomainSeparator,
-                // Allows the verifier to detect up until which block the snapshot includes state changes
-                currentBlockNumber + 1,
-                // Bind result to previous root
-                bytes28(keccak256(abi.encodePacked(
-                    // ledger feed must be unique
-                    ledgerDomainSeparator,
-                    // Allows the verifier to detect up until which block the snapshot includes state changes
-                    currentBlockNumber,
-                    // Bind result to previous root
-                    currentRootHash,
-                    // Information about the happened state change
-                    keccak256(abi.encodePacked(ChannelOpened.selector))
-                ))),
-                // Information about the happened state change
-                keccak256(abi.encodePacked(ChannelOpened.selector))
-            ))),
-            // Information about the happened state change
-            keccak256(abi.encodePacked(ChannelOpened.selector))
-        ))));
+        assertEq(
+            latestRoot.rootHash,
+            bytes28(
+                keccak256(
+                    abi.encodePacked(
+                        // ledger feed must be unique
+                        ledgerDomainSeparator,
+                        // Allows the verifier to detect up until which block the snapshot includes state changes
+                        newBlockNumber,
+                        // Bind result to previous root
+                        bytes28(
+                            keccak256(
+                                abi.encodePacked(
+                                    // ledger feed must be unique
+                                    ledgerDomainSeparator,
+                                    // Allows the verifier to detect up until which block the snapshot includes state
+                                    // changes
+                                    currentBlockNumber + 1,
+                                    // Bind result to previous root
+                                    bytes28(
+                                        keccak256(
+                                            abi.encodePacked(
+                                                // ledger feed must be unique
+                                                ledgerDomainSeparator,
+                                                // Allows the verifier to detect up until which block the snapshot
+                                                // includes state changes
+                                                currentBlockNumber,
+                                                // Bind result to previous root
+                                                currentRootHash,
+                                                // Information about the happened state change
+                                                keccak256(abi.encodePacked(ChannelOpened.selector))
+                                            )
+                                        )
+                                    ),
+                                    // Information about the happened state change
+                                    keccak256(abi.encodePacked(ChannelOpened.selector))
+                                )
+                            )
+                        ),
+                        // Information about the happened state change
+                        keccak256(abi.encodePacked(ChannelOpened.selector))
+                    )
+                )
+            )
+        );
     }
 }

@@ -14,7 +14,7 @@ import {
 } from './token.js'
 import { ALICE_ETHEREUM_ADDR } from './v3/fixtures.js'
 
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 import type { Capability } from './token.js'
 
 chai.should()

@@ -18,7 +18,7 @@ import {
 import {
   Health,
   createHoprNode,
-  default as Hopr,
+  type Hopr,
   type HoprOptions,
   isStrategy,
   ResolvedNetwork,

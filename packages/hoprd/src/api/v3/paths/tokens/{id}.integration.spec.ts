@@ -7,7 +7,7 @@ import { LevelDb, Database } from '@hoprnet/hopr-utils'
 import { authenticateToken, createToken, storeToken } from '../../../token.js'
 
 import { createAuthenticatedTestApiInstance, ALICE_ETHEREUM_ADDR } from '../../fixtures.js'
-import type { default as Hopr } from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-core'
 import type { Token } from './../../../token.js'
 
 describe('DELETE /tokens/{id}', function () {
