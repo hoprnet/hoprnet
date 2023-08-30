@@ -31,6 +31,7 @@
     "lib"
   ],
   "dependencies": {
+    "@hoprnet/hopr-connect": "workspace:packages/connect",
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@libp2p/interface-peer-id": "1.0.5",
