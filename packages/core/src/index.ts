@@ -513,7 +513,9 @@ export class Hopr extends EventEmitter {
       const peerId = packetKey.to_peerid_str()
       this.index_updater.node_not_allowed_to_access_network(peerId)
     } else {
-      log(`Skipping network registry disallow event for ${node.to_string()} because the key binding isn't available yet`)
+      log(
+        `Skipping network registry disallow event for ${node.to_string()} because the key binding isn't available yet`
+      )
     }
   }
 
