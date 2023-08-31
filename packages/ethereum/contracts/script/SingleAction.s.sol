@@ -207,6 +207,14 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         _helperGetDeployerInternalKey();
         _registerNodes(stakingSafeAddresses, nodeAddresses);
         vm.stopBroadcast();
+
+        // 8. transfer some tokens to safe
+        transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
+
+        // 9. transfer some xDAI to nodes
+        for (uint256 n = 0; n < nodeAddresses.length; n++) {
+            transferOrMintHoprAndSendNativeToAmount(safe, 0, nativeTokenAmountInWei);
+        }
     }
 
     /**
@@ -228,14 +236,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * @param safe safe address of node
      * @param module module address of node
      */
-    function configureSafeModule(
-        address[] memory nodeAddresses,
-        address safe,
-        address module
-    )
-        external
-        returns (address safe, address module)
-    {
+    function configureSafeModule(address[] memory nodeAddresses, address safe, address module) external {
         // 1. get environment and msg.sender
         getNetworkAndMsgSender();
 
@@ -259,14 +260,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         for (uint256 i = 0; i < defaultChannelsCapabilityPermissions.length; i++) {
             defaultChannelsCapabilityPermissions[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
         }
-        Target defaultModulePermission = TargetUtils.encodeDefaultPermissions(
-            currentNetworkDetail.addresses.channelsContractAddress,
-            Clearance.FUNCTION,
-            TargetType.CHANNELS,
-            TargetPermission.ALLOW_ALL,
-            defaultChannelsCapabilityPermissions
-        );
-
         // 1. include nodes to the module, as an owner of safe
         includeNodesToModuleBySafe(nodeAddresses, safe, module);
 
