@@ -76,8 +76,7 @@ pub mod wasm {
         pub async fn ping(&self, peer: js_sys::JsString) {
             let x: String = peer.into();
             if let Some(converted) = core_network::PeerId::from_str(&x).ok() {
-                let mut g = self.ping.write().await;
-                (*g).ping(vec![converted]).await;
+                self.ping.write().await.ping(vec![converted]).await;
             }
         }
     }
