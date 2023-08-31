@@ -997,8 +997,8 @@ pub mod wasm {
         account::AccountEntry,
         acknowledgement::wasm::AcknowledgedTicket,
         channels::{wasm::Ticket, ChannelEntry},
+        protocol::TagBloomFilter,
     };
-    use js_sys::Uint8Array;
     use std::sync::Arc;
     use utils_db::leveldb;
     use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
@@ -1129,6 +1129,24 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.delete_acknowledged_tickets_from(source).await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_tag_bloom_filter(&self) -> Result<TagBloomFilter, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_tag_bloom_filter().await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn set_tag_bloom_filter(&mut self, tbf: &TagBloomFilter) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.set_tag_bloom_filter(tbf).await)
             //}
         }
 

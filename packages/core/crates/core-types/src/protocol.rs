@@ -226,7 +226,7 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 mod wasm {
-    use crate::protocol::ApplicationData;
+    use crate::protocol::{ApplicationData, TagBloomFilter};
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::traits::BinarySerializable;
@@ -247,6 +247,14 @@ mod wasm {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<ApplicationData> {
             ok_or_jserr!(Self::from_bytes(data))
+        }
+    }
+
+    #[wasm_bindgen]
+    impl TagBloomFilter {
+        #[wasm_bindgen(constructor)]
+        pub fn _new() -> Self {
+            Self::default()
         }
     }
 }

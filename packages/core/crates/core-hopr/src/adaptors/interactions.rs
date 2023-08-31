@@ -11,7 +11,7 @@ pub mod wasm {
 
     use super::*;
 
-    use core_packet::interaction::ApplicationData;
+    use core_types::protocol::ApplicationData;
     use futures::Stream;
     use utils_log::debug;
     use wasm_bindgen::prelude::*;

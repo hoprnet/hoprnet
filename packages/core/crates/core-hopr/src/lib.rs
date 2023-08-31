@@ -25,6 +25,7 @@ use utils_log::error;
 use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;
 
+use core_types::protocol::TagBloomFilter;
 #[cfg(feature = "wasm")]
 use {core_ethereum_db::db::wasm::Database, utils_db::leveldb::wasm::LevelDbShim, wasm_bindgen::prelude::wasm_bindgen};
 
@@ -120,6 +121,7 @@ pub fn build_components(
     on_acknowledged_ticket: Option<js_sys::Function>,
     packet_cfg: PacketInteractionConfig,
     on_final_packet: Option<js_sys::Function>,
+    tbf: TagBloomFilter,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     use core_mixer::mixer::{Mixer, MixerConfig};
@@ -147,6 +149,7 @@ pub fn build_components(
         Mixer::new_with_gloo_timers(MixerConfig::default()),
         ack_actions.writer(),
         on_final_packet_tx,
+        tbf,
         packet_cfg,
     );
 
@@ -233,8 +236,8 @@ pub mod wasm_impl {
 
     use super::*;
     use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
-    use core_packet::interaction::ApplicationData;
     use core_path::path::Path;
+    use core_types::protocol::ApplicationData;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
@@ -279,6 +282,7 @@ pub mod wasm_impl {
             on_acknowledged_ticket: Option<js_sys::Function>,
             packet_cfg: PacketInteractionConfig,
             on_final_packet: Option<js_sys::Function>,
+            tbf: TagBloomFilter,
             my_multiaddresses: Vec<js_sys::JsString>,
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
@@ -292,6 +296,7 @@ pub mod wasm_impl {
                 on_acknowledged_ticket,
                 packet_cfg,
                 on_final_packet,
+                tbf,
                 my_multiaddresses
                     .into_iter()
                     .map(|ma| {

@@ -390,7 +390,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     db: Arc<RwLock<Db>>,
-    tags: Arc<RwLock<TagBloomFilter>>,
+    pub tbf: Arc<RwLock<TagBloomFilter>>,
     cfg: PacketInteractionConfig,
 }
 
@@ -401,7 +401,7 @@ where
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
-            tags: self.tags.clone(),
+            tbf: self.tbf.clone(),
             cfg: self.cfg.clone(),
         }
     }
@@ -417,11 +417,11 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig, tbf: TagBloomFilter) -> Self {
         Self {
             db,
             cfg,
-            tags: Arc::new(RwLock::new(TagBloomFilter::default())),
+            tbf: Arc::new(RwLock::new(tbf)),
         }
     }
 
@@ -601,7 +601,7 @@ where
 
             PacketState::Final { packet_tag, .. } => {
                 // Validate if it's not a replayed packet
-                if self.tags.write().await.check_and_set(packet_tag) {
+                if self.tbf.write().await.check_and_set(packet_tag) {
                     return Err(TagReplay);
                 }
 
@@ -619,7 +619,7 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if self.tags.write().await.check_and_set(packet_tag) {
+                if self.tbf.write().await.check_and_set(packet_tag) {
                     return Err(TagReplay);
                 }
 
@@ -893,12 +893,13 @@ impl PacketInteraction {
         mixer: Mixer,
         ack_interaction: AcknowledgementActions,
         on_final_packet: Option<Sender<ApplicationData>>,
+        tbf: TagBloomFilter,
         cfg: PacketInteractionConfig,
     ) -> Self {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
-        let processor = PacketProcessor::new(db, cfg);
+        let processor = PacketProcessor::new(db, cfg, tbf);
 
         let processing_stream = to_process_rx
             .then_concurrent(move |event| async move {
@@ -1065,7 +1066,7 @@ mod tests {
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_mixer::mixer::{Mixer, MixerConfig};
     use core_path::path::Path;
-    use core_types::protocol::Tag;
+    use core_types::protocol::{Tag, TagBloomFilter};
     use core_types::{
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
         channels::{ChannelEntry, ChannelStatus},
@@ -1382,6 +1383,7 @@ mod tests {
                     } else {
                         None
                     },
+                    TagBloomFilter::default(),
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
                         packet_keypair: OffchainKeypair::from_secret(&PEERS_PRIVS[i]).unwrap(),

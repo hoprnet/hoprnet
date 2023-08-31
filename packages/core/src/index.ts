@@ -349,6 +349,7 @@ export class Hopr extends EventEmitter {
       onAcknowledgedTicket,
       packetCfg,
       onReceivedMessage,
+      await this.db.get_tag_bloom_filter(),
       this.getLocalMultiaddresses().map((x) => x.toString())
     )
 

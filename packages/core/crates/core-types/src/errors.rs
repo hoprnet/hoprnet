@@ -26,7 +26,7 @@ pub enum CoreTypesError {
     CryptoError(#[from] CryptoError),
 
     #[error(transparent)]
-    GeneralError(#[from] utils_types::errors::GeneralError)
+    GeneralError(#[from] utils_types::errors::GeneralError),
 }
 
 pub type Result<T> = core::result::Result<T, CoreTypesError>;
