@@ -1,4 +1,5 @@
 pub mod adaptors;
+pub mod constants;
 pub mod errors;
 mod helpers;
 mod p2p;
@@ -151,7 +152,8 @@ pub fn build_components(
     );
 
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-    let (pong_tx, pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
+    let (pong_tx, pong_rx) =
+        futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
     // manual ping explicitly called by the API
     let ping = Ping::new(
@@ -176,7 +178,7 @@ pub fn build_components(
 
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (hb_pong_tx, hb_pong_rx) =
-        futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
+        futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
     let heartbeat_network_clone = network.clone();
     let ping_network_clone = network.clone();
@@ -328,6 +330,8 @@ pub mod wasm {
     use utils_log::logger::wasm::JsLogger;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
+
+    pub use crate::constants::wasm::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]
