@@ -171,13 +171,9 @@ particular branch to deploy on every change.
 2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487)
 3. On the `master` branch, and before the creation of the release branch, there should be an entry in `packages/hoprd/releases.json` for the new release name.
 
-- If the release will run in its own network ($RELEASENAME == $NETWORK) then a new entry in `packages/core/protocol-config.json` should be created for the network.
-- If the release will run in a multinetwork network like `dufour` then update the file `packages/core/protocol-config.json` for the `dufour` entry to accept the new `version_range` of the new release.
-- Create a PR and merge it into master
-
-4. On the `master` branch, create the release branch locally by executing `git checkout -b release/${RELEASE_NAME}`.
-5. On the `release/${RELEASE_NAME}` branch, and before pushing the branch to GitHub, some release-specific changes should be applied to ensure the resulting CD artifacts actually are proper release artifacts.
-
+   - If the release will run in its own network ($RELEASENAME == $NETWORK) then a new entry in `packages/core/protocol-config.json` should be created for the network.
+   - If the release will run in a multinetwork network like `dufour` then update the file `packages/core/protocol-config.json` for the `dufour` entry to accept the new `version_range` of the new release.
+   - Create a PR and merge it into master
    - Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
    - Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
    - Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
@@ -200,7 +196,18 @@ particular branch to deploy on every change.
 
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
    Changes should be committed locally.
-6. On github UI, clone the `master` branch to the `release/${RELEASE_NAME}` branch
+
+4. Create release branch:
+````
+git checkout master
+git pull
+git checkout -b release/${RELEASE_NAME}
+git push --set-upstream origin release/${RELEASE_NAME}
+
+
+````
+
+
 7. On the `release/${RELEASE_NAME}` branch, check that everything is ready and push it to GitHub by executing : `git push origin`. Create a PR to be merge to `release/${RELEASE_NAME}`. Wait until the PR merge workflow is finished.
 8. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE`, `release` and `release/${RELEASE_NAME}`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
 9. Create the cluster of hoprd nodes in GCP

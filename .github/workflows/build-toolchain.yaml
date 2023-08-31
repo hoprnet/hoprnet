@@ -42,7 +42,11 @@ jobs:
 
       - name: "Set PR number on version"
         run: | 
-          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          if [ "${{ github.event.pull_request.number }}" == "${{ vars.RELEASE_PR }}" ]; then
+            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }} true
+          else
+            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          fi
           echo "DOCKER_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/' )" >> $GITHUB_ENV
 
       - name: Build and push docker image
