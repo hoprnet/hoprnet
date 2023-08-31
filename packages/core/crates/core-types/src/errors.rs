@@ -16,14 +16,17 @@ pub enum CoreTypesError {
     #[error("Ticket seems to be destined for a different node")]
     InvalidTicketRecipient,
 
-    #[error(transparent)]
-    CryptoError(#[from] CryptoError),
-
     #[error("Cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
     LoopbackTicket,
 
     #[error("size of the packet payload has been exceeded")]
     PayloadSizeExceeded,
+
+    #[error(transparent)]
+    CryptoError(#[from] CryptoError),
+
+    #[error(transparent)]
+    GeneralError(#[from] utils_types::errors::GeneralError)
 }
 
 pub type Result<T> = core::result::Result<T, CoreTypesError>;

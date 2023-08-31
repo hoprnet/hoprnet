@@ -28,6 +28,7 @@ pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TagBloomFilter {
     bloom: Bloom<PacketTag>,
@@ -47,6 +48,7 @@ impl TagBloomFilter {
         self.count
     }
 
+    /// Puts a packet tag into the Bloom filter
     pub fn set(&mut self, tag: &PacketTag) {
         if self.count == Self::MAX_ITEMS {
             warn!("maximum number of items in the Bloom filter reached!");
@@ -58,10 +60,13 @@ impl TagBloomFilter {
         self.count += 1;
     }
 
+    /// Check if packet tag is in the Bloom filter.
+    /// False positives are possible.
     pub fn check(&self, tag: &PacketTag) -> bool {
         self.bloom.check(tag)
     }
 
+    /// Checks and sets a packet tag (if not present) in a single operation.
     pub fn check_and_set(&mut self, tag: &PacketTag) -> bool {
         if self.bloom.check_and_set(tag) {
             self.count += 1;
