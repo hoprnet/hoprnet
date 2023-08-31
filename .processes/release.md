@@ -2,10 +2,6 @@
 
 The purpose of this document is to streamline the releases of hoprd.
 
-# Release Process
-
-The purpose of this process is to streamline the releases of HOPR packages.
-
 - [Release Types](#types-of-release)
   - [Internal release](#internal-release)
   - [Public release](#public-release)
@@ -20,16 +16,9 @@ The purpose of this process is to streamline the releases of HOPR packages.
 - [On a new chain](#on-a-new-chain)
 - [On a new release](#on-a-new-release)
   - [Release Cycle](#release-cycle)
-  - [Actions](#actions)
-    - [Pre-release Version Bump (`feature` -> `master` = `x.y.z-0.next.*` -> `x.y.z-0.next.* + 1`)](#pre-release-version-bump-feature---master--xyz-0next---xyz-0next--1)
-    - [Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)](#release-version-bump-master---release--xyz-0next---xy0)
-    - [Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)](#minor-version-bump-release---master--xy---xy10-next0)
-  - [Deployment checklist](#deployment-checklist)
-    - [Per $release](#per-release)
-    - [Per $chain](#per-chain)
-  - [Scripts](#scripts)
-    - [`cover-traffic` deployment script](#cover-traffic-deployment-script)
-    - [`topology` deployment script](#topology-deployment-script)
+  - [Create Release](#create-release)
+  - [Create Patch](#create-patch)
+  - [Merge Back](#merge-back)
 
 ## Release Types
 
@@ -163,22 +152,29 @@ particular branch to deploy on every change.
 
 ```
 
-1. Setup some environment variables:
+### Create Release
 
-- Give a name to the release. For instance : `export RELEASE_NAME=providence`.
-- Give a name to the previous release: `export OLD_RELEASE_NAME=bratislava`
-- Give a name to the target network of the release. For instance: `export NETWORK=dufour`
+1. Create a [release](https://github.com/hoprnet/hoprnet/issues/new?assignees=hoprnet%2Fhopr-tech-representatives&labels=release&projects=&template=release.md&title=Release%3A+%5BRELEASE+NAME%5D) issue for tracking scope. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487)
+2. Create new PR to merge into master to prepare the release and include the following changes in it
+````
+export RELEASE_NAME=providence
+git checkout master
+git pull
+git checkout -b feature/prepare-release-${RELEASE_NAME}
+git push --set-upstream origin feature/prepare-${RELEASE_NAME}
+gh pr create --title "Prepare release ${RELEASE_NAME}" --base master --draft -w --body "The scope of this PR is to prepare the contents of the release"
 
-2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487)
-3. On the `master` branch, and before the creation of the release branch, there should be an entry in `packages/hoprd/releases.json` for the new release name.
+````
 
+The contents of the PR should be:
+
+- Check that there is an entry in `packages/hoprd/releases.json` for the new release name.
    - If the release will run in its own network ($RELEASENAME == $NETWORK) then a new entry in `packages/core/protocol-config.json` should be created for the network.
    - If the release will run in a multinetwork network like `dufour` then update the file `packages/core/protocol-config.json` for the `dufour` entry to accept the new `version_range` of the new release.
-   - Create a PR and merge it into master
-   - Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step. Changes should be committed locally.
-   - Update `CHANGELOG.md` with the new release's information. Changes should be committed locally.
-   - Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
-   - If the release will run in a new network then, copy create a network entry under the `networks` in `contracts-addresses.json`, like
+- Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step.
+- Update `CHANGELOG.md` with the new release's information.
+- Release owner checks if docs are correctly updated by comparing with the changes in `CHANGELOG.md`.
+- If the release will run in a new network then, check that the entry `networks` in `contracts-addresses.json`, contains its own network
 
    ```
     "new_network": {
@@ -198,28 +194,27 @@ particular branch to deploy on every change.
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
    Changes should be committed locally.
 
-4. Build release
+3. Check before merging the PR
 
-- Create a branch `git checkout -b feature/create-release-${RELEASE_NAME}`
-- Commit the previous changes
-- Create a PR
-- Modify the environment variables `RELEASE_PR` (Number of the PR created before) and `RELEASE_CANDIDATE_NUMBER` (Number of the release candidate to create) accordingly.
-- Wait for the docker images builds to finish. Make sure that all builds have been created to force a new tag of the docker image
+- Modify the [environment variables](https://github.com/hoprnet/hoprnet/settings/variables/actions) `RELEASE_PR` with the number of PR just created above
+- Modify the [environment variables](https://github.com/hoprnet/hoprnet/settings/variables/actions) `RELEASE_CANDIDATE_NUMBER` (Number of the release candidate to create) accordingly.
+- Wait for the docker images builds to finish.
+- Get the approval from at least 2 members
 - Merge the PR
+- Wait until the merge pipeline finishes.
 
-5. Create release branch:
+4. Create release branch:
 
 ```
 git checkout master
 git pull
 git checkout -b release/${RELEASE_NAME}
 git push --set-upstream origin release/${RELEASE_NAME}
-git tag release/${RELEASE_NAME}
-git push origin release/${RELEASE_NAME}
+git tag ${RELEASE_NAME}
+git push origin ${RELEASE_NAME}
 ```
 
-6. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE`, `release` and `release/${RELEASE_NAME}`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
-7. Create the cluster of hoprd nodes in GCP
+5. Create the cluster of hoprd nodes in GCP. Make sure that the nodes are monitored in Grafana
 
 ```
 ./scripts/create-identity.sh dufour 10
@@ -228,72 +223,45 @@ mv ./identities/identity-XX ./identities/identities-core-dufour-gcp
 ./scripts/setup-hoprd-nodes.sh dufour-providence ./identities/identities-core-dufour-gcp
 ```
 
-8. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
+6. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
-9. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
+7. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
    On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
-10. For details how patches are applied to the release, see the `Release patching` section below.
-11. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
 
-Once the release testing has concluded, or if any significant amount of patches has been applied to the release branch, the release branch should be merged back into `master` again.
 
-#### Release patching
+### Create Patch
 
-Whenever a patch to a release `${RELEASE_NAME}` is needed, it first needs to be tested in the Staging deployment. The Staging deployment
-is specific per each release and runs within the same network environment as the Release. Once the fix is
-considered stable enough (after testing in the Staging deployment), it can be merged into the Release branch (this is called Release upgrade).
-The developers are encourage to batch the hotfixes in the Staging branch and minimize the number of Release upgrades.
+Bug fixing will be done by creating PR pointing to branch `release/${RELEASE_NAME}`. Once there are enough bugs or there is a need to deliver a blocking issue fixed, the release patching process starts. Before starting the release patching the process of alpha testing should start. 
+If the testing is successful, then follow the following steps:
 
-If `staging/${RELEASE_NAME}` does not exist yet:
+- Create a PR to prepare the release patching
+````
+echo PATCH_NUMBER=2
+git pull
+git checkout release/${RELEASE_NAME}
+git pull
+git checkout -b feature/prepare-${RELEASE_NAME}-patch
+./scripts/bump-version.sh release/providence ${PATCH_NUMBER}
+git add .
+git commit -m "Preparing the patch ${RELEASE_NAME}-rc.${PATCH_NUMBER}"
+git push --set-upstream origin feature/prepare-${RELEASE_NAME}-patch
+gh pr create --title "Preparing the patch ${RELEASE_NAME}-rc.${PATCH_NUMBER}" --base release/${RELEASE_NAME} -w --body "The scope of this PR is to prepare the contents of the patch"
 
-1. (on `release/${RELEASE_NAME}`) if `staging/${RELEASE_NAME}` branch does not exist yet, create it: `git checkout -b staging/${RELEASE_NAME}`
-2. (on `staging/${RELEASE_NAME}`) create and push empty commit to trigger deployment: `git commit --allow-empty -m "Deploy staging ${RELEASE_NAME}" && git push -u origin staging/${RELEASE_NAME}`
+````
+- Wait for the PR pipeline checks to finish correctly. E2E tests included
+- Get the approval
+- Merge the PR
+- Tag the release 
 
-To create a hotfix:
+````
+git tag ${RELEASE_NAME}-rc.${PATCH_NUMBER}
+git push origin ${RELEASE_NAME}-rc.${PATCH_NUMBER}
 
-1. (on `staging/${RELEASE_NAME}`) create a hotfix branch `hotfix/fix-bug`
-2. (on `hotfix/fix-bug`) add commits to fix the bug
-3. Once the fix needs to be tested, create a PR of `hotfix/fix-bug` to `staging/${RELEASE_NAME}` and merge once peer-reviewed & approved.
+````
 
-#### Release upgrade
+### Merge Back
 
-The Release upgrade is done, when the Staging deployment is considered stable, so it can be merged back to the Release.
-Once the upgraded release is deployed, the Staging deployment must be updated as well from the Release branch (this is called Staging upgrade).
-
-1. (on `staging/${RELEASE_NAME}`) create branch `release-upgrade-${RELEASE_NAME}`: `git checkout -b release-upgrade-${RELEASE_NAME}`
-2. (on `release-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
-   In case of a merge conflict, the changes from the `release-upgrade-${RELEASE_NAME}` branch take precedence. For the conflict on the package.json version attribute, it should be taken the one comming from the `release/${RELEASE_NAME}` branch which does not have the suffix `-next.X`.
-3. Create a PR of `release-upgrade-${RELEASE_NAME}` and target to `release/${RELEASE_NAME}` and ask for a peer review.
-   Each of such PR merges will trigger a new release version, and re-build our infrastructure.
-   ```
-    git checkout release/${RELEASE_NAME}
-    git pull
-    git checkout staging/${RELEASE_NAME}
-    git pull
-    git checkout -b release-upgrade-${RELEASE_NAME}
-    git merge release/${RELEASE_NAME}
-   ```
-4. Wait for the CI to deploy upgraded Release. Then perform the following steps for Staging upgrade.
-5. (on `staging/${RELEASE_NAME}`) create branch `staging-upgrade-${RELEASE_NAME}`: `git checkout -b staging-upgrade-${RELEASE_NAME}`
-6. (on `staging-upgrade-${RELEASE_NAME}`) merge `release/${RELEASE_NAME}` into the branch: `git merge release/${RELEASE_NAME}`.
-   In case of a merge conflict, the changes from `release/${RELEASE_NAME}` take precedence.
-7. Create a PR of `staging-upgrade-${RELEASE_NAME}` and ask for a peer review (should be straight-forward).
-   The merge of the PR will trigger re-build of the Staging infrastructure.
-
-#### Release merge-back
-
-1. On the `master` branch update the latest changes by executing: `git pull`
-2. On the `release/${RELEASE_NAME}` branch, create a PR branch of the release branch: `git checkout -b merge-back-release-${RELEASE_NAME}`
-3. On the `merge-back-release-${RELEASE_NAME}` branch, merge `master` into the branch: `git merge master`.
-   For an example of a merge-back, take a look at older releases: https://github.com/hoprnet/hoprnet/pull/2956
-   In case of conflicts (which is expected) changes from `master` have preference in the following cases:
-   1. Revert changes in `packages/avado/docker-compose.yml`
-   2. Revert any chain specific changes.
-   3. Revert changes made to Avado configuration files as part of the initial release creation.
-      In regards to version naming convention for the merge-back:
-   - If it is the first merge-back, then the version number to be used should be the one being used in the release branch which does not have the suffix `-next.XX`.
-   - If it is other merge-back, then the version number to be used should be the one being used in the master branch which it has the suffix `-next.XX`.
-
+1. Perform the following steps
 ```
   git checkout master
   git pull
@@ -307,21 +275,20 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
   for package in "${packages[@]}"; do
     changes=$(git diff packages/$package/package.json  | grep @@ | wc -l)
     if [ "$changes" -eq "1" ]; then
-      echo "git checkout --theirs packages/$package/package.json"
-      echo "git add packages/$package/package.json"
+      git checkout --theirs packages/$package/package.json
+      git add packages/$package/package.json
     else
       echo "Review changes manully for ./packages/$package/package.json"
     fi
   done
-
-  echo "Resolving clonficts on Vscode for the package.json it would be similar to perform a 'Accept incomming change'"
-
+  echo "By default to resolve the confllicts in package.json files it would be choosing for the 'Accept incomming change' option"
   git status
 
   git commit -m "Merge branch 'master' into merge-back-release-${RELEASE_NAME}"
   git push --set-upstream origin merge-back-release-${RELEASE_NAME}
+  gh pr create --title "Merge back from ${RELEASE_NAME} 1" --base master -w --body "The scope of this PR is to merge back to master all the bug fixing found in release ${RELEASE_NAME}"
 ```
+Note: In case of conflicts in any chain specific file, changes from `master` have preference 
 
-4. Modify the above created PR to add reviewers, and labels accordingly. Wait for the review before merge the `merge-back-release-${RELEASE_NAME}` branch to `master`.
-5. If the release runs in a new environment, then redeploy `api.hoprnet.org` in Vercel to pickup release specific changes from the `protocol-config.json`.
-6. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
+2. Modify the above created PR to add reviewers, and labels accordingly. 
+3. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
