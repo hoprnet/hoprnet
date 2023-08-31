@@ -14,6 +14,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-trait = "0.1"
+async-lock = { workspace = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 futures = "0.3"
 js-sys = { workspace = true, optional = true }
