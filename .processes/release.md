@@ -2,36 +2,34 @@
 
 The purpose of this document is to streamline the releases of hoprd.
 
-
-
 # Release Process
 
 The purpose of this process is to streamline the releases of HOPR packages.
 
-  - [Release Types](#types-of-release)
-    - [Internal release](#internal-release)
-    - [Public release](#public-release)
-    - [Milestone based releases](#milestone-based-releases)
-    - [Deadline based releases](#deadline-based-releases)
-  - [Testing phases](#testing-phases)
-    - [Alpha testing](#alpha-testing)
-    - [Beta testing](#beta-testing)
-    - [Release candidate testing](#release-candidate-testing)
-    - [User acceptance testing](#user-acceptance-testing)
-  - [Release promotion](#release-promotion)
-  - [On a new chain](#on-a-new-chain)
-  - [On a new release](#on-a-new-release)
-    - [Release Cycle](#release-cycle)
-    - [Actions](#actions)
-      - [Pre-release Version Bump (`feature` -> `master` = `x.y.z-0.next.*` -> `x.y.z-0.next.* + 1`)](#pre-release-version-bump-feature---master--xyz-0next---xyz-0next--1)
-      - [Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)](#release-version-bump-master---release--xyz-0next---xy0)
-      - [Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)](#minor-version-bump-release---master--xy---xy10-next0)
-    - [Deployment checklist](#deployment-checklist)
-      - [Per $release](#per-release)
-      - [Per $chain](#per-chain)
-    - [Scripts](#scripts)
-      - [`cover-traffic` deployment script](#cover-traffic-deployment-script)
-      - [`topology` deployment script](#topology-deployment-script)
+- [Release Types](#types-of-release)
+  - [Internal release](#internal-release)
+  - [Public release](#public-release)
+  - [Milestone based releases](#milestone-based-releases)
+  - [Deadline based releases](#deadline-based-releases)
+- [Testing phases](#testing-phases)
+  - [Alpha testing](#alpha-testing)
+  - [Beta testing](#beta-testing)
+  - [Release candidate testing](#release-candidate-testing)
+  - [User acceptance testing](#user-acceptance-testing)
+- [Release promotion](#release-promotion)
+- [On a new chain](#on-a-new-chain)
+- [On a new release](#on-a-new-release)
+  - [Release Cycle](#release-cycle)
+  - [Actions](#actions)
+    - [Pre-release Version Bump (`feature` -> `master` = `x.y.z-0.next.*` -> `x.y.z-0.next.* + 1`)](#pre-release-version-bump-feature---master--xyz-0next---xyz-0next--1)
+    - [Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)](#release-version-bump-master---release--xyz-0next---xy0)
+    - [Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)](#minor-version-bump-release---master--xy---xy10-next0)
+  - [Deployment checklist](#deployment-checklist)
+    - [Per $release](#per-release)
+    - [Per $chain](#per-chain)
+  - [Scripts](#scripts)
+    - [`cover-traffic` deployment script](#cover-traffic-deployment-script)
+    - [`topology` deployment script](#topology-deployment-script)
 
 ## Release Types
 
@@ -48,7 +46,7 @@ The purpose of this process is to streamline the releases of HOPR packages.
 
 ### Public release
 
-- A _Public release_ occurs when an _Internal release is promoted, see [Release promotion](#release-promotion).
+- A _Public release_ occurs when an \_Internal release is promoted, see [Release promotion](#release-promotion).
 - Public releases are less frequent and their goal is to showcase new features and bug fixes.
 
 ### Milestone based releases
@@ -63,10 +61,10 @@ These releases should be of a large scope and occur only on occasions where a re
 
 ## Testing phases
 
-
 ### Alpha testing
 
 These are the keypoints of this testing phase:
+
 - This testing effort is owned by the Core team, meaning that all the Core team members should participate in the testing
 - Identify those bugs that are considered blockers and would prevent the other testing phases to even start or progress.
 - Start the testing before an _Internal release_ is created to avoid unnecessary releases.
@@ -81,6 +79,7 @@ These are the keypoints of this testing phase:
 ### Beta testing
 
 These are the keypoints of this testing phase:
+
 - This testing effort is owned by the Engineering team, meaning that all the engineering team members should participate in the testing.
 - It always occurs after a successful alpha testing phase and when the release owner has created the _Internal release_.
 - The release owners compiles the change log of the release that will help the testers to understand the new features and bug fixes that are bundled with it.
@@ -92,6 +91,7 @@ These are the keypoints of this testing phase:
 ### Release candidate testing
 
 These are the keypoints of this testing phase:
+
 - This testing effort is owned by the Com Team
 - It always occurs after a successful beta testing phase.
 - A coordinator must be chosen to lead the tests and collect all the issues.
@@ -103,6 +103,7 @@ These are the keypoints of this testing phase:
 ### User acceptance testing
 
 These are the keypoints of this testing phase:
+
 - This testing effort is owned by the Com Team
 - It always occurs after a successful beta or release candidate testing phase.
 - A coordinator must be chosen to lead the tests and collect all the issues.
@@ -143,7 +144,7 @@ particular branch to deploy on every change.
          x                   x   start hotfix bug-1  x 2.0.0-rc1 / providence  x 2.0.1
          x                   x ◄─────────────────────│                         x
          x                   │                       │                         x
-         x                   │   hotfix merge  1     │  backport pr bug-1      x 
+         x                   │   hotfix merge  1     │  backport pr bug-1      x
          x                   ▼ ─────────────────────►x ──────────────────►     x
          x                   x                       │                         x
          x  start fix bug-2  x                       │                         x
@@ -198,35 +199,39 @@ particular branch to deploy on every change.
    Changes should be committed locally.
 
 4. Build release
-  - Create a branch `git checkout -b feature/create-release-${RELEASE_NAME}`
-  - Commit the previous changes
-  - Create a PR
-  - Modify the environment variables `RELEASE_PR` (Number of the PR created before) and `RELEASE_CANDIDATE_NUMBER` (Number of the release candidate to create) accordingly.
-  - Wait for the docker images builds to finish. Make sure that all builds have been created to force a new tag of the docker image
-  - Merge the PR
+
+- Create a branch `git checkout -b feature/create-release-${RELEASE_NAME}`
+- Commit the previous changes
+- Create a PR
+- Modify the environment variables `RELEASE_PR` (Number of the PR created before) and `RELEASE_CANDIDATE_NUMBER` (Number of the release candidate to create) accordingly.
+- Wait for the docker images builds to finish. Make sure that all builds have been created to force a new tag of the docker image
+- Merge the PR
 
 5. Create release branch:
-````
+
+```
 git checkout master
 git pull
 git checkout -b release/${RELEASE_NAME}
 git push --set-upstream origin release/${RELEASE_NAME}
 git tag release/${RELEASE_NAME}
 git push origin release/${RELEASE_NAME}
-````
+```
 
 6. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE`, `release` and `release/${RELEASE_NAME}`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
 7. Create the cluster of hoprd nodes in GCP
-````
+
+```
 ./scripts/create-identity.sh dufour 10
 mv ./identities/identity-XX ./identities/identities-core-dufour-gcp
 ./scripts/setup-gcloud-cluster.sh dufour dufour-providence 10
 ./scripts/setup-hoprd-nodes.sh dufour-providence ./identities/identities-core-dufour-gcp
-````
+```
+
 8. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
-    You may use previous testnet pages as templates. Ensure all started nodes are documented.
+   You may use previous testnet pages as templates. Ensure all started nodes are documented.
 9. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
-    On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
+   On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
 10. For details how patches are applied to the release, see the `Release patching` section below.
 11. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
 
@@ -320,4 +325,3 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
 4. Modify the above created PR to add reviewers, and labels accordingly. Wait for the review before merge the `merge-back-release-${RELEASE_NAME}` branch to `master`.
 5. If the release runs in a new environment, then redeploy `api.hoprnet.org` in Vercel to pickup release specific changes from the `protocol-config.json`.
 6. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
-

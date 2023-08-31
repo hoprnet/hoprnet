@@ -29,8 +29,8 @@ services:
     environment:
       - DEBUG=hopr*
     env_file:
-        - .env-default
-        - .env
+      - .env-default
+      - .env
     volumes:
       - hoprd_data:/app/hoprd-db'
       - '/var/run/docker.sock:/var/run/docker.sock'
