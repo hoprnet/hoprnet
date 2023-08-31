@@ -173,7 +173,8 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl WasmIndexerInteractions {
-        pub async fn node_allowed_to_access_network(&mut self, peer: JsString) {
+        #[wasm_bindgen]
+        pub async fn node_allowed_to_access_network(&self, peer: JsString) {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
                 Ok(p) => self.update_eligibility(p, true).await,
@@ -187,7 +188,8 @@ pub mod wasm {
             }
         }
 
-        pub async fn node_not_allowed_to_access_network(&mut self, peer: JsString) {
+        #[wasm_bindgen]
+        pub async fn node_not_allowed_to_access_network(&self, peer: JsString) {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
                 Ok(p) => self.update_eligibility(p, false).await,
@@ -201,13 +203,12 @@ pub mod wasm {
             }
         }
 
-        async fn update_eligibility(&mut self, peer: PeerId, eligible: bool) {
-            match poll_fn(|cx| Pin::new(&mut self.internal_emitter).poll_ready(cx)).await {
+        async fn update_eligibility(&self, peer: PeerId, eligible: bool) {
+            let mut internal_emitter = self.internal_emitter.clone();
+
+            match poll_fn(|cx| Pin::new(&mut internal_emitter).poll_ready(cx)).await {
                 Ok(_) => {
-                    match self
-                        .internal_emitter
-                        .start_send(IndexerToProcess::EligibilityUpdate(peer, eligible.into()))
-                    {
+                    match internal_emitter.start_send(IndexerToProcess::EligibilityUpdate(peer, eligible.into())) {
                         Ok(_) => {}
                         Err(e) => error!("Failed to send register update 'eligibility' to the receiver: {}", e),
                     }
@@ -216,9 +217,12 @@ pub mod wasm {
             }
         }
 
-        pub async fn register_status_update(&mut self) {
-            match poll_fn(|cx| Pin::new(&mut self.internal_emitter).poll_ready(cx)).await {
-                Ok(_) => match self.internal_emitter.start_send(IndexerToProcess::RegisterStatusUpdate) {
+        #[wasm_bindgen]
+        pub async fn register_status_update(&self) {
+            let mut internal_emitter = self.internal_emitter.clone();
+
+            match poll_fn(|cx| Pin::new(&mut internal_emitter).poll_ready(cx)).await {
+                Ok(_) => match internal_emitter.start_send(IndexerToProcess::RegisterStatusUpdate) {
                     Ok(_) => {}
                     Err(e) => error!(
                         "Failed to send register update 'register status' to the receiver: {}",
@@ -229,7 +233,10 @@ pub mod wasm {
             }
         }
 
-        pub async fn announce(&mut self, peer: JsString, multiaddresses: js_sys::Array) {
+        #[wasm_bindgen]
+        pub async fn announce(&self, peer: JsString, multiaddresses: js_sys::Array) {
+            let mut internal_emitter = self.internal_emitter.clone();
+
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
                 Ok(p) => {
@@ -242,8 +249,8 @@ pub mod wasm {
                         })
                         .collect::<Vec<Multiaddr>>();
 
-                    match poll_fn(|cx| Pin::new(&mut self.internal_emitter).poll_ready(cx)).await {
-                        Ok(_) => match self.internal_emitter.start_send(IndexerToProcess::Announce(p, mas)) {
+                    match poll_fn(|cx| Pin::new(&mut internal_emitter).poll_ready(cx)).await {
+                        Ok(_) => match internal_emitter.start_send(IndexerToProcess::Announce(p, mas)) {
                             Ok(_) => {}
                             Err(e) => error!("Failed to send indexer update 'announce' to the receiver: {}", e),
                         },
