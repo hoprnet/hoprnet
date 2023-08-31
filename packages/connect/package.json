@@ -61,7 +61,7 @@
     "it-pipe": "2.0.5",
     "it-pushable": "3.0.0",
     "mocha": "10.2.0",
-    "typescript": "5.0.4"
+    "typescript": "5.2.2"
   },
   "mocha": {
     "spec": [
