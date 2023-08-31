@@ -4,6 +4,7 @@ use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
+    protocol::TagBloomFilter,
 };
 use utils_db::db::Batch;
 use utils_db::{
@@ -57,6 +58,20 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
+    async fn get_tag_bloom_filter(&self) -> Result<TagBloomFilter> {
+        let key = utils_db::db::Key::new_from_str(PACKET_TAG_BLOOM_FILTER)?;
+        self.db
+            .get_or_none::<TagBloomFilter>(key)
+            .await
+            .map(|tbf| tbf.unwrap_or_default())
+    }
+
+    async fn set_tag_bloom_filter(&mut self, tbf: &TagBloomFilter) -> Result<()> {
+        let key = utils_db::db::Key::new_from_str(PACKET_TAG_BLOOM_FILTER)?;
+        let _ = self.db.set(key, tbf).await?;
+        Ok(())
+    }
+
     async fn get_tickets(&self, maybe_signer: Option<Address>) -> Result<Vec<Ticket>> {
         let mut tickets = self
             .db
@@ -107,20 +122,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let _result = self.db.set(value_key, &balance.add(&ticket.amount)).await?;
 
         Ok(())
-    }
-
-    async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool> {
-        let key = utils_db::db::Key::new_bytes_with_prefix(tag, PACKET_TAG_PREFIX)?;
-
-        let has_packet_tag = self.db.contains(key.clone()).await;
-        if !has_packet_tag {
-            let empty: [u8; 0] = [];
-            self.db.set(key, &empty).await?;
-        }
-
-        //debug!("packet tag check: {}, set to: {}", has_packet_tag, hex::encode(tag));
-
-        Ok(has_packet_tag)
     }
 
     async fn get_pending_acknowledgement(
@@ -1513,15 +1514,6 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_staking_safe_allowance(balance, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn check_and_set_packet_tag(&self, tag: &Uint8Array) -> Result<bool, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.check_and_set_packet_tag(&tag.to_vec()).await)
             //}
         }
 

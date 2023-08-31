@@ -3,6 +3,7 @@ use async_trait::async_trait;
 
 use core_crypto::types::OffchainPublicKey;
 use core_crypto::types::{HalfKeyChallenge, Hash};
+use core_types::protocol::TagBloomFilter;
 use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
@@ -16,11 +17,12 @@ pub trait HoprCoreEthereumDbActions {
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
+    async fn get_tag_bloom_filter(&self) -> Result<Option<TagBloomFilter>>;
+    async fn set_tag_bloom_filter(&mut self, tbf: &TagBloomFilter) -> Result<()>;
+
     async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>>;
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
-
-    async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool>;
 
     async fn get_pending_acknowledgement(
         &self,

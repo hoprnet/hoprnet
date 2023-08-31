@@ -21,6 +21,9 @@ pub enum CoreTypesError {
 
     #[error("Cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
     LoopbackTicket,
+
+    #[error("size of the packet payload has been exceeded")]
+    PayloadSizeExceeded,
 }
 
 pub type Result<T> = core::result::Result<T, CoreTypesError>;

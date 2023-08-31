@@ -1,4 +1,5 @@
 pub const LATEST_BLOCK_NUMBER_KEY: &str = "latestBlockNumber";
+pub const PACKET_TAG_BLOOM_FILTER: &str = "packetTagBloomFilter";
 pub const ACCOUNT_PREFIX: &str = "account-";
 pub const CHANNEL_PREFIX: &str = "channel-";
 pub const CHANNELS_DOMAIN_SEPARATOR_KEY: &str = "channels:domainSeparator";
@@ -13,7 +14,6 @@ pub const REDEEMED_TICKETS_COUNT: &str = "statistics:redeemed:count";
 pub const REDEEMED_TICKETS_VALUE: &str = "statistics:redeemed:value";
 pub const NEGLECTED_TICKET_COUNT: &str = "statistics:neglected:count";
 pub const LOSING_TICKET_COUNT: &str = "statistics:losing:count";
-pub const PACKET_TAG_PREFIX: &str = "packets:tag-";
 pub const LATEST_CONFIRMED_SNAPSHOT_KEY: &str = "latestConfirmedSnapshot";
 pub const PENDING_ACKNOWLEDGEMENTS_PREFIX: &str = "tickets:pending-acknowledgement-";
 pub const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
