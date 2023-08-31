@@ -22,16 +22,16 @@ use core_network::{
 };
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
-use utils_log::error;
+use utils_log::{debug, error};
 
 use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;
 
+use crate::timer::UniversalTimer;
+use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::protocol::TagBloomFilter;
 #[cfg(feature = "wasm")]
 use {core_ethereum_db::db::wasm::Database, utils_db::leveldb::wasm::LevelDbShim, wasm_bindgen::prelude::wasm_bindgen};
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use crate::timer::UniversalTimer;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -90,7 +90,7 @@ impl HoprTools {
 pub enum HoprLoopComponents {
     Swarm,
     Heartbeat,
-    Timer
+    Timer,
 }
 
 impl std::fmt::Display for HoprLoopComponents {
@@ -104,7 +104,7 @@ impl std::fmt::Display for HoprLoopComponents {
                 f,
                 "heartbeat component responsible for maintaining the network quality measurements"
             ),
-            HoprLoopComponents::Timer => write!(f, "universal timer component for executing timed actions")
+            HoprLoopComponents::Timer => write!(f, "universal timer component for executing timed actions"),
         }
     }
 }
@@ -229,16 +229,19 @@ pub fn build_components(
             .map(|_| HoprLoopComponents::Swarm),
         ),
         Box::pin(async move {
-            UniversalTimer::new(Duration::from_secs(60))
+            UniversalTimer::new(Duration::from_secs(600))
                 .timer_loop(|| async {
                     let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
+                    debug!("storing tag bloom filter to the DB...");
+                    // TODO: consider moving the TBF to a file instead if it proves too blocking, depending on the TBF size
                     if let Err(e) = db_clone.write().await.set_tag_bloom_filter(&bloom).await {
                         error!("Failed to update tag bloom filter in the DB: {e}");
                     }
+                    debug!("tag bloom filter stored");
                 })
                 .map(|_| HoprLoopComponents::Timer)
                 .await
-        })
+        }),
     ];
     let mut futs = helpers::to_futures_unordered(ready_loops);
 

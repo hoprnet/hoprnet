@@ -36,11 +36,11 @@ pub struct TagBloomFilter {
 }
 
 impl TagBloomFilter {
-    // Allowed false positive rate. We don't care about this too much, because we are interested
-    // only in negative queries, so we set it to 33%
-    const FALSE_POSITIVE_RATE: f64 = 0.333_f64;
+    // Allowed false positive rate. This amounts to 0.1% chance
+    const FALSE_POSITIVE_RATE: f64 = 0.001_f64;
 
-    // Maximum number of items this Bloom filter can hold
+    // Maximum number of packet tags this Bloom filter can hold.
+    // After this many packets, the Bloom filter resets and packet replays are possible.
     const MAX_ITEMS: usize = 10_000_000;
 
     /// Returns the current number of items in this Bloom filter.

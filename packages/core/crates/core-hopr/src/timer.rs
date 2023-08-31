@@ -1,7 +1,7 @@
-use std::time::Duration;
-use futures::future::{Either, select};
+use futures::future::{select, Either};
 use futures::pin_mut;
 use futures::FutureExt;
+use std::time::Duration;
 use utils_log::{debug, warn};
 
 #[cfg(any(not(feature = "wasm"), test))]
@@ -18,7 +18,7 @@ use utils_misc::time::wasm::current_timestamp;
 /// Could be later extended so it supports multiple different periods and multiple actions.
 #[derive(Debug, Clone)]
 pub struct UniversalTimer {
-    period: Duration
+    period: Duration,
 }
 
 fn get_timestamp() -> Duration {
@@ -31,7 +31,9 @@ impl UniversalTimer {
     }
 
     pub async fn timer_loop<F>(&mut self, action: impl Fn() -> F)
-    where F: std::future::Future<Output = ()> {
+    where
+        F: std::future::Future<Output = ()>,
+    {
         loop {
             let start = get_timestamp();
 

@@ -418,11 +418,7 @@ where
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Arc<RwLock<Db>>, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self {
-        Self {
-            db,
-            cfg,
-            tbf
-        }
+        Self { db, cfg, tbf }
     }
 
     async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
@@ -602,6 +598,7 @@ where
             PacketState::Final { packet_tag, .. } => {
                 // Validate if it's not a replayed packet
                 if self.tbf.write().await.check_and_set(packet_tag) {
+                    // This could be a false positive (0.1% chance) due to the use of Bloom filter
                     return Err(TagReplay);
                 }
 
@@ -620,6 +617,7 @@ where
             } => {
                 // Validate if it's not a replayed packet
                 if self.tbf.write().await.check_and_set(packet_tag) {
+                    // This could be a false positive due to the use of Bloom filter
                     return Err(TagReplay);
                 }
 
