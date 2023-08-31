@@ -197,32 +197,38 @@ particular branch to deploy on every change.
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
    Changes should be committed locally.
 
-4. Create release branch:
+4. Build release
+  - Create a branch `git checkout -b feature/create-release-${RELEASE_NAME}`
+  - Commit the previous changes
+  - Create a PR
+  - Modify the environment variables `RELEASE_PR` (Number of the PR created before) and `RELEASE_CANDIDATE_NUMBER` (Number of the release candidate to create) accordingly.
+  - Wait for the docker images builds to finish. Make sure that all builds have been created to force a new tag of the docker image
+  - Merge the PR
+
+5. Create release branch:
 ````
 git checkout master
 git pull
 git checkout -b release/${RELEASE_NAME}
 git push --set-upstream origin release/${RELEASE_NAME}
-
-
+git tag release/${RELEASE_NAME}
+git push origin release/${RELEASE_NAME}
 ````
 
-
-7. On the `release/${RELEASE_NAME}` branch, check that everything is ready and push it to GitHub by executing : `git push origin`. Create a PR to be merge to `release/${RELEASE_NAME}`. Wait until the PR merge workflow is finished.
-8. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE`, `release` and `release/${RELEASE_NAME}`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
-9. Create the cluster of hoprd nodes in GCP
+6. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE`, `release` and `release/${RELEASE_NAME}`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
+7. Create the cluster of hoprd nodes in GCP
 ````
 ./scripts/create-identity.sh dufour 10
 mv ./identities/identity-XX ./identities/identities-core-dufour-gcp
 ./scripts/setup-gcloud-cluster.sh dufour dufour-providence 10
 ./scripts/setup-hoprd-nodes.sh dufour-providence ./identities/identities-core-dufour-gcp
 ````
-10. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
+8. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
     You may use previous testnet pages as templates. Ensure all started nodes are documented.
-11. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
+9. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
     On the `#testing` channel, members are expected to run their own nodes (either AVADO or via their workstation) to participate in the release.
-12. For details how patches are applied to the release, see the `Release patching` section below.
-13. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
+10. For details how patches are applied to the release, see the `Release patching` section below.
+11. Once the first release version has been built and is running, the release branch should be merged-back into `master` once to trigger version upgrades on `master`. See [the next](./release.md#release-merge-back) section for details.
 
 Once the release testing has concluded, or if any significant amount of patches has been applied to the release branch, the release branch should be merged back into `master` again.
 
