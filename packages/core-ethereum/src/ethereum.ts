@@ -114,7 +114,6 @@ export async function createChainWrapper(
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
 
   const chainCalls = new ChainCalls(
-    offchainKeypair,
     keypair,
     Address.from_string(deploymentExtract.hoprChannelsAddress),
     Address.from_string(deploymentExtract.hoprAnnouncementsAddress)
@@ -438,7 +437,7 @@ export async function createChainWrapper(
     txHandler: (tx: string) => DeferType<string>
   ): Promise<string> => {
     let to = deploymentExtract.hoprAnnouncementsAddress
-    let data = u8aToHex(chainCalls.get_announce_payload(multiaddr.toString(), useSafe))
+    let data = u8aToHex(chainCalls.get_announce_payload(multiaddr.toString(), offchainKeypair, useSafe))
     if (useSafe) {
       to = safeModuleOptions.moduleAddress.to_hex()
     }

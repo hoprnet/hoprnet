@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use multiaddr::Error as MultiaddrError;
+
 use core_crypto::errors::CryptoError;
 
 #[derive(Error, Debug)]
@@ -21,6 +23,9 @@ pub enum CoreTypesError {
 
     #[error("size of the packet payload has been exceeded")]
     PayloadSizeExceeded,
+
+    #[error(transparent)]
+    InvalidMultiaddr(#[from] MultiaddrError),
 
     #[error(transparent)]
     CryptoError(#[from] CryptoError),

@@ -15,6 +15,7 @@ crate-type = ["cdylib", "rlib"]
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 enum-iterator = "1.4.1"
 js-sys = { workspace = true, optional = true }
+lazy_static = "1.4.0"
 multiaddr = "0.18"
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
