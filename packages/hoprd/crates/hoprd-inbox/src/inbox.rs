@@ -1,6 +1,6 @@
 use async_lock::Mutex;
 use async_trait::async_trait;
-use core_packet::interaction::{ApplicationData, Tag, DEFAULT_APPLICATION_TAG};
+use core_types::protocol::{ApplicationData, Tag, DEFAULT_APPLICATION_TAG};
 use std::time::Duration;
 
 /// Represents a simple timestamping function.
@@ -162,7 +162,7 @@ where
 mod tests {
     use crate::inbox::{MessageInbox, MessageInboxConfiguration};
     use crate::ring::RingBufferInboxBackend;
-    use core_packet::interaction::{ApplicationData, Tag};
+    use core_types::protocol::{ApplicationData, Tag};
     use std::time::Duration;
 
     #[async_std::test]
@@ -225,9 +225,9 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::inbox::MessageInboxConfiguration;
-    use crate::inbox::Tag;
     use crate::ring::RingBufferInboxBackend;
-    use core_packet::interaction::ApplicationData;
+    use core_types::protocol::ApplicationData;
+    use core_types::protocol::Tag;
     use std::time::Duration;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;

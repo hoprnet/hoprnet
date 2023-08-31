@@ -3,7 +3,7 @@ use crate::errors::PacketError::{
     PacketConstructionError, PacketDecodingError, PathError, PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use crate::errors::Result;
-use crate::packet::{Packet, PacketState, PAYLOAD_SIZE};
+use crate::packet::{Packet, PacketState};
 use async_lock::RwLock;
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
@@ -18,8 +18,6 @@ use futures::channel::mpsc::{channel, Receiver, Sender, UnboundedSender};
 use futures::future::{poll_fn, Either};
 use futures::{pin_mut, stream::Stream, StreamExt};
 use libp2p_identity::PeerId;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
 use std::pin::Pin;
 use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
@@ -35,8 +33,6 @@ use wasm_bindgen_futures::spawn_local;
 use crate::validation::validate_unacknowledged_ticket;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
-use utils_types::errors::GeneralError::ParseError;
-
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_RECEIVED_SUCCESSFUL_ACKS: SimpleCounter = SimpleCounter::new(
@@ -67,15 +63,16 @@ lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
     static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 }
-/// Fixed ticket winning probability
-pub const TICKET_WIN_PROB: f64 = 1.0f64;
+
+// Default sizes of the acknowledgement queues
+pub const ACK_TX_QUEUE_SIZE: usize = 2048;
+pub const ACK_RX_QUEUE_SIZE: usize = 2048;
 
 /// Represents a payload (packet or acknowledgement) at the transport level.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone)]
-pub struct Payload {
-    remote_peer: PeerId,
-    data: Box<[u8]>,
+pub(crate) struct Payload {
+    pub(crate) remote_peer: PeerId,
+    pub(crate) data: Box<[u8]>,
 }
 
 impl Display for Payload {
@@ -86,70 +83,6 @@ impl Display for Payload {
             .finish()
     }
 }
-
-/// Tags are currently 16-bit unsigned integers
-pub type Tag = u16;
-
-/// Represent a default application tag if none is specified in `send_packet`.
-pub const DEFAULT_APPLICATION_TAG: Tag = 0;
-
-/// Represents the received decrypted packet carrying the application-layer data.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ApplicationData {
-    pub application_tag: Option<Tag>,
-    #[serde(with = "serde_bytes")]
-    pub plain_text: Box<[u8]>,
-}
-
-impl Display for ApplicationData {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "({}): {}",
-            self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG),
-            hex::encode(&self.plain_text)
-        )
-    }
-}
-
-impl AsRef<[u8]> for ApplicationData {
-    fn as_ref(&self) -> &[u8] {
-        &self.plain_text
-    }
-}
-
-impl BinarySerializable for ApplicationData {
-    const SIZE: usize = 2; // minimum size
-
-    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
-        if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
-            let tag = u16::from_be_bytes(data[0..2].try_into().map_err(|_| ParseError)?);
-            Ok(Self {
-                application_tag: if tag != DEFAULT_APPLICATION_TAG {
-                    Some(tag)
-                } else {
-                    None
-                },
-                plain_text: (&data[2..]).into(),
-            })
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let mut buf = Vec::with_capacity(Self::SIZE + self.plain_text.len());
-        let tag = self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG);
-        buf.extend_from_slice(&tag.to_be_bytes());
-        buf.extend_from_slice(&self.plain_text);
-        buf.into_boxed_slice()
-    }
-}
-
-// Default sizes of the acknowledgement queues
-pub const ACK_TX_QUEUE_SIZE: usize = 2048;
-pub const ACK_RX_QUEUE_SIZE: usize = 2048;
 
 #[derive(Debug)]
 pub enum AckToProcess {
@@ -457,6 +390,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     db: Arc<RwLock<Db>>,
+    pub tbf: Arc<RwLock<TagBloomFilter>>,
     cfg: PacketInteractionConfig,
 }
 
@@ -467,6 +401,7 @@ where
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
+            tbf: self.tbf.clone(),
             cfg: self.cfg.clone(),
         }
     }
@@ -482,8 +417,8 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig) -> Self {
-        Self { db, cfg }
+    pub fn new(db: Arc<RwLock<Db>>, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self {
+        Self { db, cfg, tbf }
     }
 
     async fn bump_ticket_index(&self, channel_id: &Hash) -> Result<U256> {
@@ -579,7 +514,7 @@ where
         Ok(ticket)
     }
 
-    pub async fn create_packet_from_me(&self, data: Box<[u8]>, path: Path) -> Result<(Payload, HalfKeyChallenge)> {
+    async fn create_outgoing_packet(&self, data: Box<[u8]>, path: Path) -> Result<(Payload, HalfKeyChallenge)> {
         let next_peer = self
             .db
             .read()
@@ -637,7 +572,7 @@ where
         }
     }
 
-    pub fn create_packet_from_bytes(&self, data: &[u8], peer: &PeerId) -> Result<Packet> {
+    fn create_packet_from_bytes(&self, data: &[u8], peer: &PeerId) -> Result<Packet> {
         Packet::from_bytes(data, &self.cfg.packet_keypair, peer)
     }
 
@@ -662,7 +597,8 @@ where
 
             PacketState::Final { packet_tag, .. } => {
                 // Validate if it's not a replayed packet
-                if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
+                if self.tbf.write().await.check_and_set(packet_tag) {
+                    // This could be a false positive (0.1% chance) due to the use of Bloom filter
                     return Err(TagReplay);
                 }
 
@@ -680,7 +616,8 @@ where
                 ..
             } => {
                 // Validate if it's not a replayed packet
-                if self.db.write().await.check_and_set_packet_tag(packet_tag).await? {
+                if self.tbf.write().await.check_and_set(packet_tag) {
+                    // This could be a false positive due to the use of Bloom filter
                     return Err(TagReplay);
                 }
 
@@ -839,8 +776,10 @@ impl From<futures::channel::oneshot::Receiver<HalfKeyChallenge>> for PacketSendA
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
+use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
+use std::fmt::{Display, Formatter};
 
 impl PacketSendAwaiter {
     pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<HalfKeyChallenge> {
@@ -949,6 +888,7 @@ impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
         db: Arc<RwLock<Db>>,
+        tbf: Arc<RwLock<TagBloomFilter>>,
         mixer: Mixer,
         ack_interaction: AcknowledgementActions,
         on_final_packet: Option<Sender<ApplicationData>>,
@@ -957,7 +897,7 @@ impl PacketInteraction {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
-        let processor = PacketProcessor::new(db, cfg);
+        let processor = PacketProcessor::new(db, tbf, cfg);
 
         let processing_stream = to_process_rx
             .then_concurrent(move |event| async move {
@@ -1039,7 +979,7 @@ impl PacketInteraction {
                         }
                     },
                     MsgToProcess::ToSend(data, path, finalizer) => {
-                        match processor.create_packet_from_me(data, path).await {
+                        match processor.create_outgoing_packet(data, path).await {
                             Ok((payload, challenge)) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 METRIC_PACKETS_COUNT.increment();
@@ -1102,54 +1042,8 @@ impl Stream for PacketInteraction {
     }
 }
 
-#[cfg(feature = "wasm")]
-mod wasm {
-    use std::str::FromStr;
-
-    use crate::interaction::Payload;
-
-    use super::ApplicationData;
-    use libp2p_identity::PeerId;
-    use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
-    use utils_types::traits::BinarySerializable;
-    use wasm_bindgen::prelude::*;
-
-    #[wasm_bindgen]
-    impl ApplicationData {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(tag: Option<u16>, data: Box<[u8]>) -> Self {
-            Self {
-                application_tag: tag,
-                plain_text: data,
-            }
-        }
-
-        #[wasm_bindgen(js_name = "serialize")]
-        pub fn _serialize(&self) -> Box<[u8]> {
-            self.to_bytes()
-        }
-
-        #[wasm_bindgen(js_name = "deserialize")]
-        pub fn _deserialize(data: &[u8]) -> JsResult<ApplicationData> {
-            ok_or_jserr!(Self::from_bytes(data))
-        }
-    }
-
-    #[wasm_bindgen]
-    impl Payload {
-        #[wasm_bindgen(constructor)]
-        pub fn _new(peer_id: &str, packet_data: Box<[u8]>) -> JsResult<Payload> {
-            Ok(Self {
-                remote_peer: ok_or_jserr!(PeerId::from_str(peer_id))?,
-                data: packet_data,
-            })
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::interaction::Tag;
     use crate::interaction::DEFAULT_PRICE_PER_PACKET;
     use crate::{
         interaction::{
@@ -1170,6 +1064,7 @@ mod tests {
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_mixer::mixer::{Mixer, MixerConfig};
     use core_path::path::Path;
+    use core_types::protocol::{Tag, TagBloomFilter};
     use core_types::{
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
         channels::{ChannelEntry, ChannelStatus},
@@ -1479,6 +1374,7 @@ mod tests {
                 );
                 let pkt = PacketInteraction::new(
                     db.clone(),
+                    Arc::new(RwLock::new(TagBloomFilter::default())),
                     Mixer::new(MixerConfig::default()),
                     ack.writer(),
                     if i == peer_count - 1 {
