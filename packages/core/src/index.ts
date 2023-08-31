@@ -1,4 +1,6 @@
 import EventEmitter from 'events'
+import path from 'path'
+import fs from 'fs'
 
 import { Multiaddr, multiaddr, protocols } from '@multiformats/multiaddr'
 
@@ -82,6 +84,7 @@ import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 
 import { isIP } from 'node:net'
+import { TagBloomFilter } from '@hoprnet/hoprd/lib/hoprd_hoprd.js'
 
 const CODE_P2P = protocols('p2p').code
 
@@ -339,6 +342,15 @@ export class Hopr extends EventEmitter {
     log('Linking chain and packet keys')
     this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot._default())
 
+    const tbfPath = path.join(this.options.dataPath, 'tbf')
+    let tagBloomFilter = new TagBloomFilter()
+    try {
+      let tbfData = new Uint8Array(fs.readFileSync(tbfPath))
+      tagBloomFilter = TagBloomFilter.deserialize(tbfData)
+    } catch (err) {
+      error(`no tag bloom filter file found, using empty`)
+    }
+
     log('Constructing the core application and tools')
     let coreApp = new CoreApp(
       new OffchainKeypair(this.packetKeypair.secret()),
@@ -350,7 +362,14 @@ export class Hopr extends EventEmitter {
       onAcknowledgedTicket,
       packetCfg,
       onReceivedMessage,
-      await this.db.get_tag_bloom_filter(),
+      tagBloomFilter,
+      (tbfData: Uint8Array) => {
+        try {
+          fs.writeFileSync(tbfPath, tbfData)
+        } catch (err) {
+          error(`failed to save tag bloom filter data`)
+        }
+      },
       this.getLocalMultiaddresses().map((x) => x.toString())
     )
 

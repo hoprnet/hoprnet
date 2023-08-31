@@ -256,5 +256,10 @@ mod wasm {
         pub fn _new() -> Self {
             Self::default()
         }
+
+        #[wasm_bindgen(js_name = "deserialize")]
+        pub fn _deserialize(data: &[u8]) -> JsResult<TagBloomFilter> {
+            ok_or_jserr!(Self::from_bytes(data))
+        }
     }
 }

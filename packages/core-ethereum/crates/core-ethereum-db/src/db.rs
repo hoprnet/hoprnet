@@ -4,7 +4,6 @@ use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
-    protocol::TagBloomFilter,
 };
 use utils_db::db::Batch;
 use utils_db::{
@@ -55,20 +54,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
         let _evicted = self.db.set(prefixed_key, &index).await?;
         // Ignoring evicted value
-        Ok(())
-    }
-
-    async fn get_tag_bloom_filter(&self) -> Result<TagBloomFilter> {
-        let key = utils_db::db::Key::new_from_str(PACKET_TAG_BLOOM_FILTER)?;
-        self.db
-            .get_or_none::<TagBloomFilter>(key)
-            .await
-            .map(|tbf| tbf.unwrap_or_default())
-    }
-
-    async fn set_tag_bloom_filter(&mut self, tbf: &TagBloomFilter) -> Result<()> {
-        let key = utils_db::db::Key::new_from_str(PACKET_TAG_BLOOM_FILTER)?;
-        let _ = self.db.set(key, tbf).await?;
         Ok(())
     }
 
@@ -997,7 +982,6 @@ pub mod wasm {
         account::AccountEntry,
         acknowledgement::wasm::AcknowledgedTicket,
         channels::{wasm::Ticket, ChannelEntry},
-        protocol::TagBloomFilter,
     };
     use std::sync::Arc;
     use utils_db::leveldb;
@@ -1129,24 +1113,6 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.delete_acknowledged_tickets_from(source).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_tag_bloom_filter(&self) -> Result<TagBloomFilter, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_tag_bloom_filter().await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn set_tag_bloom_filter(&self, tbf: &TagBloomFilter) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.set_tag_bloom_filter(tbf).await)
             //}
         }
 

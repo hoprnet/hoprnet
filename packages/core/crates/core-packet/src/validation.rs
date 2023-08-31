@@ -140,8 +140,6 @@ mod tests {
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
             async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
             async fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
-            async fn get_tag_bloom_filter(&self) -> core_ethereum_db::errors::Result<TagBloomFilter>;
-            async fn set_tag_bloom_filter(&mut self, tbf: &TagBloomFilter) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_acknowledgement(
                 &self,
                 half_key_challenge: &HalfKeyChallenge,

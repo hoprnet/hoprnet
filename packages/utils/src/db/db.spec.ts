@@ -30,7 +30,7 @@ const MOCK_PUBLIC_KEY = () =>
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
 import { LevelDb } from './db.js'
-import { db_sanity_test, TagBloomFilter } from '../../../hoprd/lib//hoprd_hoprd.js'
+import { db_sanity_test } from '../../../hoprd/lib//hoprd_hoprd.js'
 import fs from 'fs'
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
@@ -121,14 +121,6 @@ describe('db functional tests', function () {
     const latestBlockNumber = await db.get_latest_block_number()
 
     assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
-  })
-
-  it('should set a packet tag bloom filter', async function () {
-    let db = test_in_memory_db()
-
-    let tbf = new TagBloomFilter()
-    await db.set_tag_bloom_filter(tbf)
-    await db.get_tag_bloom_filter()
   })
 })
 

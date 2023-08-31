@@ -23,14 +23,14 @@ use core_network::{
 };
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
-use utils_log::{debug, error};
+use utils_log::{info, error};
 
 use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;
 
 use crate::timer::UniversalTimer;
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::protocol::TagBloomFilter;
+use utils_types::traits::BinarySerializable;
 #[cfg(feature = "wasm")]
 use {core_ethereum_db::db::wasm::Database, utils_db::leveldb::wasm::LevelDbShim, wasm_bindgen::prelude::wasm_bindgen};
 
@@ -129,6 +129,7 @@ pub fn build_components(
     packet_cfg: PacketInteractionConfig,
     on_final_packet: Option<js_sys::Function>,
     tbf: TagBloomFilter,
+    save_tbf: js_sys::Function,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     use core_mixer::mixer::{Mixer, MixerConfig};
@@ -195,7 +196,6 @@ pub fn build_components(
     let ping_network_clone = network.clone();
     let swarm_network_clone = network.clone();
     let tbf_clone = tbf.clone();
-    let db_clone = db.clone();
 
     let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
         Box::pin(async move {
@@ -234,12 +234,13 @@ pub fn build_components(
             UniversalTimer::new(Duration::from_secs(600))
                 .timer_loop(|| async {
                     let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
-                    debug!("storing tag bloom filter to the DB...");
-                    // TODO: consider moving the TBF to a file instead if it proves too blocking, depending on the TBF size
-                    if let Err(e) = db_clone.write().await.set_tag_bloom_filter(&bloom).await {
-                        error!("Failed to update tag bloom filter in the DB: {e}");
+                    if let Err(_) = save_tbf.call1(
+                            &wasm_bindgen::JsValue::null(),
+                            js_sys::Uint8Array::from(bloom.to_bytes().as_ref()).as_ref(),
+                    ) {
+                        error!("failed to call save tbf closure");
                     }
-                    debug!("tag bloom filter stored");
+                    info!("tag bloom filter saved");
                 })
                 .map(|_| HoprLoopComponents::Timer)
                 .await
@@ -310,6 +311,7 @@ pub mod wasm_impl {
             packet_cfg: PacketInteractionConfig,
             on_final_packet: Option<js_sys::Function>,
             tbf: TagBloomFilter,
+            save_tbf: js_sys::Function,
             my_multiaddresses: Vec<js_sys::JsString>,
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
@@ -324,6 +326,7 @@ pub mod wasm_impl {
                 packet_cfg,
                 on_final_packet,
                 tbf,
+                save_tbf,
                 my_multiaddresses
                     .into_iter()
                     .map(|ma| {
