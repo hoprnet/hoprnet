@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use multiaddr::Error as MultiaddrError;
+
 use core_crypto::errors::CryptoError;
 
 #[derive(Error, Debug)]
@@ -15,6 +17,9 @@ pub enum CoreTypesError {
 
     #[error("Ticket seems to be destined for a different node")]
     InvalidTicketRecipient,
+
+    #[error(transparent)]
+    InvalidMultiaddr(#[from] MultiaddrError),
 
     #[error(transparent)]
     CryptoError(#[from] CryptoError),

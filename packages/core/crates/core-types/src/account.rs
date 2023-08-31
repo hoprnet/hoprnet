@@ -1,13 +1,13 @@
-use serde::{Deserialize, Serialize};
-
 use crate::account::AccountType::{Announced, NotAnnounced};
-use core_crypto::keypairs::{Keypair, OffchainKeypair};
-use core_crypto::types::{OffchainPublicKey, OffchainSignature};
+use core_crypto::types::OffchainPublicKey;
 use multiaddr::Multiaddr;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_types::errors::GeneralError::ParseError;
-use utils_types::primitives::Address;
-use utils_types::traits::{BinarySerializable, PeerIdLike, ToHex};
+use utils_types::{
+    errors::GeneralError::ParseError,
+    primitives::Address,
+    traits::{BinarySerializable, PeerIdLike, ToHex},
+};
 
 /// Type of the node account.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,52 +195,13 @@ impl BinarySerializable for AccountEntry {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct AccountSignature {
-    pub signature: OffchainSignature,
-    pub pub_key: OffchainPublicKey,
-    pub chain_key: Address,
-}
-
-impl AccountSignature {
-    pub fn new(signing_key: &OffchainKeypair, chain_key: &Address) -> Self {
-        Self {
-            signature: OffchainSignature::sign_message(
-                format!(
-                    "HoprAnnouncements: cross-sign off-chain identity {} on-chain identity {}",
-                    signing_key.public().to_peerid(),
-                    chain_key
-                )
-                .as_bytes(),
-                signing_key,
-            ),
-            pub_key: signing_key.public().to_owned(),
-            chain_key: chain_key.to_owned(),
-        }
-    }
-
-    pub fn verify(&self) -> bool {
-        self.signature.verify_message(
-            format!(
-                "HoprAnnouncements: cross-sign off-chain identity {} on-chain identity {}",
-                self.pub_key.to_peerid(),
-                self.chain_key
-            )
-            .as_bytes(),
-            &self.pub_key,
-        )
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use super::AccountSignature;
-    use crate::account::AccountEntry;
-    use crate::account::AccountType::{Announced, NotAnnounced};
-    use core_crypto::{
-        keypairs::{Keypair, OffchainKeypair},
-        types::OffchainPublicKey,
+    use crate::account::{
+        AccountEntry,
+        AccountType::{Announced, NotAnnounced},
     };
+    use core_crypto::types::OffchainPublicKey;
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use utils_types::{primitives::Address, traits::BinarySerializable};
@@ -309,15 +270,6 @@ mod test {
 
         let ae2 = AccountEntry::from_bytes(&ae1.to_bytes()).unwrap();
         assert_eq!(ae1, ae2);
-    }
-
-    #[test]
-    fn test_account_signature_workflow() {
-        let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::from_bytes(&CHAIN_ADDR).unwrap();
-
-        let sig = AccountSignature::new(&keypair, &chain_addr);
-        assert!(sig.verify());
     }
 }
 
