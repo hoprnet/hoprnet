@@ -231,7 +231,7 @@ pub fn build_components(
             .map(|_| HoprLoopComponents::Swarm),
         ),
         Box::pin(async move {
-            UniversalTimer::new(Duration::from_secs(600))
+            UniversalTimer::new(Duration::from_secs(60))
                 .timer_loop(|| async {
                     let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
                     if let Err(_) = save_tbf.call1(

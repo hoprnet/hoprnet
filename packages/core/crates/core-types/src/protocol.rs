@@ -36,8 +36,8 @@ pub struct TagBloomFilter {
 }
 
 impl TagBloomFilter {
-    // Allowed false positive rate. This amounts to 0.1% chance
-    const FALSE_POSITIVE_RATE: f64 = 0.001_f64;
+    // Allowed false positive rate. This amounts to 0.01% chance
+    const FALSE_POSITIVE_RATE: f64 = 0.0001_f64;
 
     // Maximum number of packet tags this Bloom filter can hold.
     // After this many packets, the Bloom filter resets and packet replays are possible.
@@ -197,6 +197,8 @@ mod tests {
         items.iter().for_each(|item| filter1.set(item));
 
         assert_eq!(items.len(), filter1.count(), "invalid number of items in bf");
+
+        //let len = filter1.to_bytes().len();
 
         // Count number of items in the BF (incl. false positives)
         let match_count_1 = items.iter().filter(|item| filter1.check(item)).count();
