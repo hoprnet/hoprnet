@@ -1,18 +1,23 @@
+# Release Processs
+
+The purpose of this document is to streamline the releases of hoprd.
+
+
+
 # Release Process
 
 The purpose of this process is to streamline the releases of HOPR packages.
 
-- [Release Process](#release-process)
-  - [Types of release](#types-of-release)
+  - [Release Types](#types-of-release)
     - [Internal release](#internal-release)
     - [Public release](#public-release)
-  - [When to release](#when-to-release)
     - [Milestone based releases](#milestone-based-releases)
     - [Deadline based releases](#deadline-based-releases)
   - [Testing phases](#testing-phases)
-    - [Tech team testing](#tech-team-testing)
-    - [HOPR team testing](#hopr-team-testing)
-    - [Ambassador testing](#ambassador-testing)
+    - [Alpha testing](#alpha-testing)
+    - [Beta testing](#beta-testing)
+    - [Release candidate testing](#release-candidate-testing)
+    - [User acceptance testing](#user-acceptance-testing)
   - [Release promotion](#release-promotion)
   - [On a new chain](#on-a-new-chain)
   - [On a new release](#on-a-new-release)
@@ -28,35 +33,28 @@ The purpose of this process is to streamline the releases of HOPR packages.
       - [`cover-traffic` deployment script](#cover-traffic-deployment-script)
       - [`topology` deployment script](#topology-deployment-script)
 
-## Types of release
-
-| Type     | Goal                                                   | Ambassadors | Public |
-| -------- | ------------------------------------------------------ | ----------- | ------ |
-| Internal | Test new features and bug fixes                        | MAYBE       | NO     |
-| Public   | New HOPRd version, showcase new features and bug fixes | YES         | YES    |
+## Release Types
 
 ### Internal release
 
+- All releases start as an _Internal release_ and may be promoted to a _Public release_, see [Release promotion](#release-promotion).
 - Internal releases are more frequent and their goal is to test new features and bug fixes.
-- There should be no public involvement unless the [internal release](#internal-release) is promoted to a [public release](#public-release).
-- All releases start as an [internal release](#internal-release) and may be promoted to a [public release](#public-release), see [release promotion](#release-promotion).
-- When an internal release is created, one of the [representatives](./development.md#representatives) is assigned to oversee the release cycle, this includes:
-  - notifies the HOPR team that the [internal release](#internal-release) has been created in element channel `releases`
-  - [creating release](#release-cycle)
-  - [testing release](#testing-phases)
-  - [promoting release](#release-promotion)
+- In an _Internal release_ there should be no public involvement.
+- When an internal release is created, one member of the development team is assigned to oversee the launch of release, this includes:
+  - Notifies the HOPR team that the _Internal release_ has been created in element channel `releases`
+  - [Creating release](#release-cycle)
+  - [Testing phases](#testing-phases)
+  - [Release promotion](#release-promotion)
 
 ### Public release
 
+- A _Public release_ occurs when an _Internal release is promoted, see [Release promotion](#release-promotion).
 - Public releases are less frequent and their goal is to showcase new features and bug fixes.
-- A [public release](#public-release) occurs when an [internal release](#internal-release) is promoted to a [public release](#public-release), see [release promotion](#release-promotion).
-
-## When to release
 
 ### Milestone based releases
 
 At the end of a sprint, if a sufficient amount of features / bug fixes were implemented since last release, the [Trifecta](./development.md#trifecta) may queue and prioritize a new release for the **upcoming** sprint, this happens during [epic prioritization](./development.md#epic-prioritization).
-This new release is considered an [internal release](#internal-release) and may be [promoted](#release-promotion) to a [public release](#public-release) if [testing phases](#testing-phases) are successful.
+This new release is considered an [Internal release](#internal-release) and may be [promoted](#release-promotion) to a [Public release](#public-release) if [testing phases](#testing-phases) are successful.
 
 ### Deadline based releases
 
@@ -65,47 +63,60 @@ These releases should be of a large scope and occur only on occasions where a re
 
 ## Testing phases
 
-Testing phases occur only when a release is queued and prioritized during [epic prioritization](./development.md#epic-prioritization).
 
-For every phase completed, release owner must update the release's PR with the current testing phase status.
+### Alpha testing
 
-| Phase name         | Description                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| CORE team testing  | First phase, testing by CORE team members only (see [Phase 1 testing](./testing.md) ) |
-| HOPR team testing  | Second phase, testing by available HOPR team members                                  |
-| ambassador testing | Third (optional) phase, testing with the help of ambassadors                          |
-
-### Tech team testing
-
+These are the keypoints of this testing phase:
+- This testing effort is owned by the Core team, meaning that all the Core team members should participate in the testing
+- Identify those bugs that are considered blockers and would prevent the other testing phases to even start or progress.
+- Start the testing before an _Internal release_ is created to avoid unnecessary releases.
 - Capture low-hanging bugs which are easily detectable.
 - Test new features and bug fixes included in the release.
-- Avoid taking resources from the HOPR team members.
+- Asses that the `latest` docker image published in the Docker registry is stable enough to be released.
+- The release owner schedules a meeting where only the Core team members are invited
+- During the online testing sesion, the Core team executes a manual regresion suite of test cases.
+- Depending on the results of the session, a decission is taken to release the code as it is or not.
+- In case some blocking bugs are found, the Core team should adapt the sprint plan and include them. A new alpha testing session must be needed once they are fixed
 
-### HOPR team testing
+### Beta testing
 
-- Occurs after [Tech team testing](#tech-team-testing) is successful.
-- With the help of a [changelog](#release-cycle), test HOPRd.
+These are the keypoints of this testing phase:
+- This testing effort is owned by the Engineering team, meaning that all the engineering team members should participate in the testing.
+- It always occurs after a successful alpha testing phase and when the release owner has created the _Internal release_.
+- The release owners compiles the change log of the release that will help the testers to understand the new features and bug fixes that are bundled with it.
+- The devops team needs to deploy the new release in the required environments.
+- Once it is deployed, the Engineering team might start using this release to assess its stability.
+- A coordinator must be chosen to lead the tests and collect all the issues.
+- If the Engineering team identify relevant issues, it might require the Core team to create a new patch before continuing with more testing.
 
-### Ambassador testing
+### Release candidate testing
 
-A third and final phase of testing is to include ambassadors.
-This is optional in the possibility we want to gather more data points and/or a specific feature requires larger network topology.
+These are the keypoints of this testing phase:
+- This testing effort is owned by the Com Team
+- It always occurs after a successful beta testing phase.
+- A coordinator must be chosen to lead the tests and collect all the issues.
+- The Com Team members install the release in their own devices
+- The Com Team must asses if this release is stable enough or not.
+  - Stable: The _Internal release_ is promoted to become _Public release_.
+  - Unstable: Requests the Core Team to patch the internal release with the issues found.
 
-- May occur after [HOPR team testing](#hopr-team-testing) is successful.
-- Launch and fund HOPRd, then follow release instructions.
+### User acceptance testing
+
+These are the keypoints of this testing phase:
+- This testing effort is owned by the Com Team
+- It always occurs after a successful beta or release candidate testing phase.
+- A coordinator must be chosen to lead the tests and collect all the issues.
+- The scope of this testing effort is to test the release with the devices owned by the ambassadors
 
 ## Release promotion
 
 - All releases start by being internal releases.
 - An [internal release](#internal-release) may be promoted to a [public release](#public-release) when all [testing phases](#testing-phases) are successful.
 - Before promoting, release owner ensures that comm team actually needs this to be public.
-
-An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging its binaries with the public facing release name. See [Deployment checklist](#deployment-checklist).
-
-Once promoted, a release owner notifies the HOPR team that the [internal release](#internal-release) has been promoted to a [public release](#public-release):
-
-- by commenting into the release's epic
-- by writing in element channel `releases`
+- An [internal release](#internal-release) is promoted to a [public release](#public-release) by tagging its binaries with the public facing release name.
+- Once promoted, a release owner notifies the HOPR team that the [internal release](#internal-release) has been promoted to a [public release](#public-release):
+  - by commenting into the release's epic
+  - by writing in element channel `releases`
 
 ## On a new chain
 
@@ -125,43 +136,43 @@ particular branch to deploy on every change.
 ### Release Cycle
 
 ```
-   hotfix/patch-riga    staging/riga         release/riga           master
+   hotfix/bug-2         hotfix/bug-1         release/providence           master
 
-         x                   x                       x  create new release  x
-         x                   x                       x◄─────────────────────x 1.92.0-next.44
-         x                   x   create new staging  x 1.92.0               x
-         x                   │ ◄─────────────────────│                      x
-         x                   │                       │   first merge-back   x
-         x                   │                       │ ──────────────────►  x 1.93.0-next.0
-         x                   │ 1.92.0-next.0         │                      x
-         x                   │                       │                      x
-         x  start hotfix     ▼                       │                      x
-         ┌◄──────────────────x                       │                      x
-         │                   x                       │                      x
-         │  hotfix merge     x                       │                      x
-         ▼──────────────────►┐ 1.92.0-next.1         │                      x
-         x                   │                       │                      x
-                             │   release upgrade     │                      x
-         x                   ▼──────────────────────►┐ 1.92.1               x
-         x                   x   staging upgrade     │                      x
-         x                   x ◄─────────────────────│                      x
-         x                   x 1.92.1-next.0         │                      x
-         x                   x                       │   next merge-back    x
-         x                   x                       │ ──────────────────►  x
+         x                   x                       x  create new release     x
+         x                   x                       x◄─────────────────────   x 2.0.0
+         x                   x   start hotfix bug-1  x 2.0.0-rc1 / providence  x 2.0.1
+         x                   x ◄─────────────────────│                         x
+         x                   │                       │                         x
+         x                   │   hotfix merge  1     │  backport pr bug-1      x 
+         x                   ▼ ─────────────────────►x ──────────────────►     x
+         x                   x                       │                         x
+         x  start fix bug-2  x                       │                         x
+         x◄──────────────────x───────────────────────│                         x
+         │                   x                       │                         x
+         │  hotfix merge 2   x                       │  backport pr bug-1      x
+         ▼───────────────────x──────────────────────►│ ───────────────────►    x
+         x                   x                       │                         x
+         x                   x                       │                         x
+         x                   x                       │                         x
+         x                   x                       x 2.0.0-rc2/providence    x
+         x                   x                       │                         x
+         x                   x                       │                         x
+         x                   x                       │                         x
+         x                   x                       │                         x
 
 ```
 
 1. Setup some environment variables:
 
-- Give a name to the release. For instance : `export RELEASE_NAME=riga`.
-- Give a name to the previous release: `export OLD_RELEASE_NAME=bogota`
-- Give a name to the target network of the release. For instance: `export NETWORK=monte_rosa`
+- Give a name to the release. For instance : `export RELEASE_NAME=providence`.
+- Give a name to the previous release: `export OLD_RELEASE_NAME=bratislava`
+- Give a name to the target network of the release. For instance: `export NETWORK=dufour`
 
 2. Create a release tracking issue on GitHub. Use previous issues as [templates](https://github.com/hoprnet/hoprnet/issues/4487)
 3. On the `master` branch, and before the creation of the release branch, there should be an entry in `packages/hoprd/releases.json` for the new release name.
 
 - If the release will run in its own network ($RELEASENAME == $NETWORK) then a new entry in `packages/core/protocol-config.json` should be created for the network.
-- If the release will run in a multinetwork network like `monte_rosa` then update the file `packages/core/protocol-config.json` for the `monte_rosa` entry to accept the new `version_range` of the new release.
+- If the release will run in a multinetwork network like `dufour` then update the file `packages/core/protocol-config.json` for the `dufour` entry to accept the new `version_range` of the new release.
 - Create a PR and merge it into master
 
 4. On the `master` branch, create the release branch locally by executing `git checkout -b release/${RELEASE_NAME}`.
@@ -189,18 +200,16 @@ particular branch to deploy on every change.
 
    NOTE: Don't include the deployment of HoprChannels, because this will be re-deployed anyway by the CD system.
    Changes should be committed locally.
-
-6. Delete the topology VM instances of the ${OLD_RELEASE_NAME}
-
-- Check `gcloud compute instance-groups managed list` for a list and delete the instance groups using
-
-```sh
-HOPRD_PERFORM_CLEANUP=true ./scripts/setup-gcloud-cluster.sh "${NETWORK}" "" "${OLD_RELEASE_NAME}-topology-1-91"
-```
-
-7. On the `release/${RELEASE_NAME}` branch, check that everything is ready and push it to GitHub by executing : `git push origin`. Wait until the [deployment of the cluster](https://github.com/hoprnet/hoprnet/actions/workflows/deploy.yaml) has finished successfully.
+6. On github UI, clone the `master` branch to the `release/${RELEASE_NAME}` branch
+7. On the `release/${RELEASE_NAME}` branch, check that everything is ready and push it to GitHub by executing : `git push origin`. Create a PR to be merge to `release/${RELEASE_NAME}`. Wait until the PR merge workflow is finished.
 8. Create a Pull Request for tracking the release changes against the `master` branch. Remark in the PR description that it should never be merged!. Also use the label `DO NOT MERGE`, `release` and `release/${RELEASE_NAME}`. As a reference take a look at https://github.com/hoprnet/hoprnet/pull/4311
-9. On the `release/${RELEASE_NAME}` branch, create a topology cluster using the [script](./release.md#topology-deployment-script) mentioned at the end of this document.
+9. Create the cluster of hoprd nodes in GCP
+````
+./scripts/create-identity.sh dufour 10
+mv ./identities/identity-XX ./identities/identities-core-dufour-gcp
+./scripts/setup-gcloud-cluster.sh dufour dufour-providence 10
+./scripts/setup-hoprd-nodes.sh dufour-providence ./identities/identities-core-dufour-gcp
+````
 10. Create a release testnet page in the wiki at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
     You may use previous testnet pages as templates. Ensure all started nodes are documented.
 11. Share the links to the release tracking issue, tracking PR and testnet wiki page in the `#release` Element channel.
@@ -299,73 +308,3 @@ Once the upgraded release is deployed, the Staging deployment must be updated as
 5. If the release runs in a new environment, then redeploy `api.hoprnet.org` in Vercel to pickup release specific changes from the `protocol-config.json`.
 6. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
 
-### Actions
-
-We made active use of actions to automate tasks trivial to our workflow.
-
-#### Pre-release Version Bump (`feature` -> `master` = `x.y.z-0.next.*` -> `x.y.z-0.next.* + 1`)
-
-When a PR to `master` is merged, an action bumps the package.json pre-release
-version and commits that change to `master`. When a PR to `master` is merged,
-a tag on GitHub is pushed specifying that feature on that version.
-
-#### Release Version Bump (`master` -> `release/**` = `x.y.z-0.next.*` -> `x.y.0`)
-
-On first build, a `release/**` bumps the package.json by a `minor`, clearing
-the `pre-release` tag. Subsequent commits on `release` branches bump the
-`patch` version.
-
-#### Minor Version Bump (`release/**` -> `master` = `x.y.*` -> `x.y+1.0-next.0`)
-
-After testing a release, we can merge it back to `master` to trigger a bump on the
-package.json by a `minor`, and restoring the `pre-release` tag, to keep our normal
-daily workflow as it was before.
-
-### Deployment checklist
-
-#### Per $release
-
-The following are a series of manual tasks that are needed to be executed for the launch of a release. Ideally, we automate these entirely and delete this document in the future, but in the meantime, we'll have this document to keep track of these.
-
-- [ ] Deploy a set of `$release` CT nodes for our testnet using our **`cover-traffic` deployment script**.
-- [ ] Deploy a set of `$release` cloud nodes for our testnet with a full topology connected to feed event data for our leaderboard using our **`topology` deployment script**.
-- [ ] Verify the $release smart contract in the explorer platform, see [verification guide](../VERIFICATION_GUIDE.md).
-
-##### Optional
-
-- [ ] Create a DNS alias for each node (cloud, cover-traffic, topology), to be accessed via our `hoprnet.link` domain (e.g. ct-1-$release.hoprnet.link)
-- [ ] Tag a distribution manually $release on npm and on Docker Hub.
-- `npm login`, `npm dist-tag add @hoprnet/hoprd@$version $mountain/$city`
-- `docker login`, `docker tag gcr.io/hoprassociation/hoprd:latest hopr/hoprd:$city/$mountain`
-
-#### Per $chain
-
-- [ ] Deploy HOPR token on $chain and mint 130M HOPR tokens for our Development Address `0x2402da10A6172ED018AEEa22CA60EDe1F766655C`.
-
-- [ ] Transfer 1M HOPR token and 1 native $chain to our funding wallet in our CI/CD.
-
-- [ ] Transfer 1M HOPR token and 20 native $chain to our leaderboard wallet in network.hoprnet.org.
-
-### Scripts
-
-#### `cover-traffic` deployment script
-
-```
-CT_PRIV_KEY=14e6...a6a5 \
-./scripts/setup-ct-gcloud-cluster.sh athens
-```
-
-#### `topology` deployment script
-
-```
-
-export PRIVATE_KEY=
-export FAUCET_SECRET_API_KEY=
-export HOPRD_PASSWORD=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0
-export HOPRD_API_TOKEN=^binary6wire6GLEEMAN9urbanebetween1watch^
-
-
-HOPRD_PERFORM_CLEANUP=false \
-HOPRD_SHOW_PRESTART_INFO=true \
-./scripts/setup-gcloud-cluster.sh monte_rosa `pwd`/scripts/topologies/full_interconnected_cluster.sh ${RELEASE_NAME}-topology-1-92 gcr.io/hoprassociation/hoprd:${RELEASE_NAME} 6 ${RELEASE_NAME}-topology-1-92 true
-```

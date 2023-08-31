@@ -2,7 +2,7 @@
 
 <a name="2.00"></a>
 
-## [2.00](https://github.com/hoprnet/hoprnet/compare/release/bratislava...hoprnet:master)
+## [2.00](https://github.com/hoprnet/hoprnet/compare/release/bratislava...hoprnet:release/providence)
 
 - Introduce the possibility of using YAML configuration file and revamp the configuration infrastructure to make the YAML a default base for all configuration types (env vars, cmd line args) ([#4796](https://github.com/hoprnet/hoprnet/pull/4796))
 - Extend `hopli` so that it can derive peer ID from identity files. Add `initiate-node` to perform all the necessary on-chain operations before launching a HOPR node. Accept identity from path. ([#4894](https://github.com/hoprnet/hoprnet/pull/4894))
