@@ -1142,7 +1142,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn set_tag_bloom_filter(&mut self, tbf: &TagBloomFilter) -> Result<(), JsValue> {
+        pub async fn set_tag_bloom_filter(&self, tbf: &TagBloomFilter) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
