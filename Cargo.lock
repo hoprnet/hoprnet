@@ -1182,7 +1182,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "core-hopr"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1199,6 +1199,7 @@ dependencies = [
  "core-types",
  "futures",
  "futures-concurrency",
+ "gloo-timers 0.3.0",
  "js-sys",
  "multiaddr",
  "serde-wasm-bindgen",

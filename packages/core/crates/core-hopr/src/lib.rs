@@ -2,8 +2,10 @@ pub mod adaptors;
 pub mod errors;
 mod helpers;
 mod p2p;
+mod timer;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_lock::RwLock;
 use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
@@ -28,6 +30,8 @@ use crate::p2p::api;
 use core_types::protocol::TagBloomFilter;
 #[cfg(feature = "wasm")]
 use {core_ethereum_db::db::wasm::Database, utils_db::leveldb::wasm::LevelDbShim, wasm_bindgen::prelude::wasm_bindgen};
+use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use crate::timer::UniversalTimer;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -86,6 +90,7 @@ impl HoprTools {
 pub enum HoprLoopComponents {
     Swarm,
     Heartbeat,
+    Timer
 }
 
 impl std::fmt::Display for HoprLoopComponents {
@@ -99,6 +104,7 @@ impl std::fmt::Display for HoprLoopComponents {
                 f,
                 "heartbeat component responsible for maintaining the network quality measurements"
             ),
+            HoprLoopComponents::Timer => write!(f, "universal timer component for executing timed actions")
         }
     }
 }
@@ -144,12 +150,14 @@ pub fn build_components(
 
     let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 
+    let tbf = Arc::new(RwLock::new(tbf));
+
     let packet_actions = PacketInteraction::new(
         db.clone(),
+        tbf.clone(),
         Mixer::new_with_gloo_timers(MixerConfig::default()),
         ack_actions.writer(),
         on_final_packet_tx,
-        tbf,
         packet_cfg,
     );
 
@@ -184,6 +192,9 @@ pub fn build_components(
     let heartbeat_network_clone = network.clone();
     let ping_network_clone = network.clone();
     let swarm_network_clone = network.clone();
+    let tbf_clone = tbf.clone();
+    let db_clone = db.clone();
+
     let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
         Box::pin(async move {
             let hb_pinger = Ping::new(
@@ -217,6 +228,17 @@ pub fn build_components(
             )
             .map(|_| HoprLoopComponents::Swarm),
         ),
+        Box::pin(async move {
+            UniversalTimer::new(Duration::from_secs(60))
+                .timer_loop(|| async {
+                    let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
+                    if let Err(e) = db_clone.write().await.set_tag_bloom_filter(&bloom).await {
+                        error!("Failed to update tag bloom filter in the DB: {e}");
+                    }
+                })
+                .map(|_| HoprLoopComponents::Timer)
+                .await
+        })
     ];
     let mut futs = helpers::to_futures_unordered(ready_loops);
 

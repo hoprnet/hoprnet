@@ -417,11 +417,11 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Arc<RwLock<Db>>, cfg: PacketInteractionConfig, tbf: TagBloomFilter) -> Self {
+    pub fn new(db: Arc<RwLock<Db>>, tbf: Arc<RwLock<TagBloomFilter>>, cfg: PacketInteractionConfig) -> Self {
         Self {
             db,
             cfg,
-            tbf: Arc::new(RwLock::new(tbf)),
+            tbf
         }
     }
 
@@ -890,16 +890,16 @@ impl PacketInteraction {
     /// Creates a new instance given the DB and our public key used to verify the acknowledgements.
     pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
         db: Arc<RwLock<Db>>,
+        tbf: Arc<RwLock<TagBloomFilter>>,
         mixer: Mixer,
         ack_interaction: AcknowledgementActions,
         on_final_packet: Option<Sender<ApplicationData>>,
-        tbf: TagBloomFilter,
         cfg: PacketInteractionConfig,
     ) -> Self {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
-        let processor = PacketProcessor::new(db, cfg, tbf);
+        let processor = PacketProcessor::new(db, tbf, cfg);
 
         let processing_stream = to_process_rx
             .then_concurrent(move |event| async move {
@@ -1376,6 +1376,7 @@ mod tests {
                 );
                 let pkt = PacketInteraction::new(
                     db.clone(),
+                    Arc::new(RwLock::new(TagBloomFilter::default())),
                     Mixer::new(MixerConfig::default()),
                     ack.writer(),
                     if i == peer_count - 1 {
@@ -1383,7 +1384,6 @@ mod tests {
                     } else {
                         None
                     },
-                    TagBloomFilter::default(),
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
                         packet_keypair: OffchainKeypair::from_secret(&PEERS_PRIVS[i]).unwrap(),
