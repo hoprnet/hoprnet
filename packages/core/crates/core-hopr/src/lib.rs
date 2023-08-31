@@ -23,7 +23,7 @@ use core_network::{
 };
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
-use utils_log::{info, error};
+use utils_log::{error, info};
 
 use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;
@@ -235,8 +235,8 @@ pub fn build_components(
                 .timer_loop(|| async {
                     let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
                     if let Err(_) = save_tbf.call1(
-                            &wasm_bindgen::JsValue::null(),
-                            js_sys::Uint8Array::from(bloom.to_bytes().as_ref()).as_ref(),
+                        &wasm_bindgen::JsValue::null(),
+                        js_sys::Uint8Array::from(bloom.to_bytes().as_ref()).as_ref(),
                     ) {
                         error!("failed to call save tbf closure");
                     }
