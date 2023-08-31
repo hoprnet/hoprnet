@@ -119,7 +119,7 @@ impl AnnouncementData {
                         })
                     } else {
                         return Err(NonSpecificError(format!(
-                            "Received a multiaddr with incorrect PeerId, got {} but expected {}",
+                            "Received a multiaddr with a PeerId that doesn't match the keybinding, got {} but expected {}",
                             multiaddress, expected
                         )));
                     }
@@ -181,12 +181,36 @@ mod tests {
     fn test_announcement() {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
         let peer_id = KEY_PAIR.public().to_peerid();
-        let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
 
-        let ad = AnnouncementData::new(&maddr, Some(key_binding.clone()))
-            .expect("construction of announcement data should work");
-        assert_eq!("/ip4/127.0.0.1/tcp/10000", ad.to_multiaddress_str());
-        assert_eq!(Some(key_binding), ad.key_binding);
+        for (ma_str, decapsulated_ma_str) in vec![
+            (
+                format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}"),
+                format!("/ip4/127.0.0.1/tcp/10000"),
+            ),
+            (
+                format!("/ip6/::1/tcp/10000/p2p/{peer_id}"),
+                format!("/ip6/::1/tcp/10000"),
+            ),
+            (
+                format!("/dns4/hoprnet.org/tcp/10000/p2p/{peer_id}"),
+                format!("/dns4/hoprnet.org/tcp/10000"),
+            ),
+            (
+                format!("/dns6/hoprnet.org/tcp/10000/p2p/{peer_id}"),
+                format!("/dns6/hoprnet.org/tcp/10000"),
+            ),
+            (
+                format!("/ip4/127.0.0.1/udp/10000/quic/p2p/{peer_id}"),
+                format!("/ip4/127.0.0.1/udp/10000/quic"),
+            ),
+        ] {
+            let maddr: Multiaddr = ma_str.parse().unwrap();
+
+            let ad = AnnouncementData::new(&maddr, Some(key_binding.clone()))
+                .expect("construction of announcement data should work");
+            assert_eq!(decapsulated_ma_str, ad.to_multiaddress_str());
+            assert_eq!(Some(key_binding.clone()), ad.key_binding);
+        }
     }
 
     #[test]
