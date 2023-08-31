@@ -18,7 +18,7 @@ pub struct ManualPingChallenge(pub PeerId, pub ControlMessage);
 // case of faster input than output the memory might run out, but these are protected
 // by a bounded queue managing the request generation.
 pub type HeartbeaRequestRx = mpsc::UnboundedReceiver<(PeerId, ControlMessage)>;
-pub type HeartbeatResponseTx = mpsc::UnboundedSender<(PeerId, std::result::Result<ControlMessage, ()>)>;
+pub type HeartbeatResponseTx = mpsc::UnboundedSender<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
 pub struct HeartbeatResponder {
     sender: HeartbeatResponseTx,
@@ -30,7 +30,10 @@ impl HeartbeatResponder {
         Self { sender }
     }
 
-    pub async fn record_pong(&mut self, pong: (PeerId, std::result::Result<ControlMessage, ()>)) -> Result<()> {
+    pub async fn record_pong(
+        &mut self,
+        pong: (PeerId, std::result::Result<(ControlMessage, String), ()>),
+    ) -> Result<()> {
         match poll_fn(|cx| Pin::new(&mut self.sender).poll_ready(cx)).await {
             Ok(_) => match self.sender.start_send(pong) {
                 Err(e) => Err(P2PError::Notification(format!(
@@ -196,13 +199,16 @@ mod tests {
 
     #[async_std::test]
     pub async fn test_heartbeat_responder_should_update_the_pong_if_the_challenge_is_replied_correctly() {
-        let (hb_tx, mut pong_receiver) = mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
+        let (hb_tx, mut pong_receiver) =
+            mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
         let mut responder = HeartbeatResponder::new(hb_tx);
 
         let peer = PeerId::random();
         let pong = ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request()).unwrap();
 
-        let result = responder.record_pong((peer, Ok(pong.clone()))).await;
+        let result = responder
+            .record_pong((peer, Ok((pong.clone(), "version".to_owned()))))
+            .await;
         assert!(result.is_ok());
 
         let notification = pong_receiver.next().await;
@@ -210,19 +216,20 @@ mod tests {
         let (_peer, _response) = notification.unwrap();
 
         assert_eq!(peer, _peer);
-        assert_eq!(Ok(pong), _response);
+        assert_eq!(Ok((pong, "version".to_owned())), _response);
     }
 
     #[async_std::test]
     pub async fn test_heartbeat_responder_should_fail_if_the_receiver_is_closed() {
-        let (hb_tx, mut pong_receiver) = mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
+        let (hb_tx, mut pong_receiver) =
+            mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
         let mut responder = HeartbeatResponder::new(hb_tx);
 
         let peer = PeerId::random();
         let pong = ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request()).unwrap();
 
         pong_receiver.close();
-        let result = responder.record_pong((peer, Ok(pong.clone()))).await;
+        let result = responder.record_pong((peer, Ok((pong.clone(), "".to_owned())))).await;
         assert!(result.is_err());
 
         let notification = pong_receiver.next().await;

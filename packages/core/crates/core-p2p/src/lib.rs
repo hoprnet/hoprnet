@@ -25,7 +25,7 @@ use core_types::acknowledgement::Acknowledgement;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(pub ControlMessage);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Pong(pub ControlMessage);
+pub struct Pong(pub ControlMessage, pub String);
 
 pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
 pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";

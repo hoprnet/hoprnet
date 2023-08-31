@@ -110,7 +110,7 @@ function cleanup {
 
   # Cleaning up everything
   log "Wiping databases"
-  find -L "${tmp_dir}" -type d -name "${node_prefix}_*" -exec rm -rf {} +
+  find -L "${tmp_dir}" -type d -name "${node_prefix}_*" -exec rm -rf {} + || true
 
   log "Cleaning up processes"
   for port in 8545 13301 13302 13303 13304 13305 19091 19092 19093 19094 19095; do
@@ -192,8 +192,8 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.safe.args" -delete || true
+  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" -delete || true
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity \
@@ -208,7 +208,7 @@ function generate_local_identities() {
 function create_local_safes() {
   log "Create safe"
 
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" | sort)"
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" | sort || true)"
 
   # create a loop so safes are created for all the nodes TODO:
   for id_file in ${id_files[@]}; do
