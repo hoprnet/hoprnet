@@ -33,6 +33,7 @@ declare version_suffix
 # Get the version suffix from input parameters
 base_branch_name="${1:-}"
 version_suffix="${2:-}"
+is_release="${3:-}"
 
 # define packages for versioning
 # does not include ethereum, which isn't a real package anymore, just a folder
@@ -50,7 +51,12 @@ fi
 
 declare new_version
 
-new_version="${current_version}-${pre_release}+pr.${version_suffix}"
+if [ -z ${is_release+x} ]; then 
+  new_version="${current_version}-${pre_release}+pr.${version_suffix}"
+else
+  new_version="${current_version}-rc.${version_suffix}"
+fi
+
 
 # create new version in each package
 for package in "${versioned_packages[@]}"; do

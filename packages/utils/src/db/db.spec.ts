@@ -122,14 +122,6 @@ describe('db functional tests', function () {
 
     assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
   })
-
-  it('should set a packet tag', async function () {
-    let db = test_in_memory_db()
-
-    const DUMMY_TAG = new Uint8Array(Hash.size()).fill(0xff)
-
-    await db.check_and_set_packet_tag(DUMMY_TAG)
-  })
 })
 
 describe(`levelup shim tests`, function () {

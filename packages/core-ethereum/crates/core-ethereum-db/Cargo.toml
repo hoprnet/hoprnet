@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-db"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Selected core modules"
