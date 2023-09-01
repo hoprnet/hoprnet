@@ -1,6 +1,6 @@
 import { peerIdFromString } from '@libp2p/peer-id'
 import { PEER_METADATA_PROTOCOL_VERSION, PeerStatus, type Hopr } from '@hoprnet/hopr-core'
-import { debug, AccountEntry } from '@hoprnet/hopr-utils'
+import { debug, AccountEntry, Address } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 import { Multiaddr } from '@multiformats/multiaddr'
 
@@ -10,6 +10,7 @@ const log = debug('hoprd:api:v3:node-peers')
 
 export type PeerInfo = {
   peerId: string
+  peerAddress: string
   multiAddr?: string
   heartbeats: {
     sent: number
@@ -28,9 +29,10 @@ export type PeerInfo = {
  * @param multiaddr
  * @returns PeerInfo
  */
-export function toPeerInfoFormat(info: PeerStatus, multiaddr?: Multiaddr): PeerInfo {
+export function toPeerInfoFormat(address: Address, info: PeerStatus, multiaddr?: Multiaddr): PeerInfo {
   return {
     peerId: info.peer_id(),
+    peerAddress: address.to_string(),
     multiAddr: multiaddr ? multiaddr.toString() : '',
     heartbeats: {
       sent: Number(info.heartbeats_sent),
@@ -71,7 +73,10 @@ export async function getPeers(
       if (info === undefined || info.quality < quality) {
         continue
       }
-      announcedMap.set(peerId.toString(), toPeerInfoFormat(info, new Multiaddr(acc.get_multiaddr_str())))
+      announcedMap.set(
+        peerId.toString(),
+        toPeerInfoFormat(acc.chain_addr, info, new Multiaddr(acc.get_multiaddr_str()))
+      )
     }
 
     let connected_peers = await node.getConnectedPeers()
@@ -80,7 +85,7 @@ export async function getPeers(
 
     for (const peerId of connected_peers) {
       const peerIdStr = peerId.toString()
-
+      const chainKey = await node.peerIdToChainKey(peerId)
       // already exists in announced, we use this because it contains multiaddr already
       if (announcedMap.has(peerIdStr)) {
         connected.push(announcedMap.get(peerIdStr))
@@ -90,7 +95,7 @@ export async function getPeers(
         if (info === undefined || info.quality < quality) {
           continue
         }
-        connected.push(toPeerInfoFormat(info))
+        connected.push(toPeerInfoFormat(chainKey, info))
       }
     }
 
@@ -132,6 +137,9 @@ const PEER_INFO_DOC: any = {
   properties: {
     peerId: {
       $ref: '#/components/schemas/HoprAddress'
+    },
+    peerAddress: {
+      $ref: '#/components/schemas/NativeAddress'
     },
     multiAddr: {
       $ref: '#/components/schemas/MultiAddress'

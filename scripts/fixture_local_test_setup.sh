@@ -431,9 +431,9 @@ wait_for_regex "${node1_log}" "STARTED NODE"
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
   declare node_dir_db="${node_dir}/db/db.sqlite"
-  declare node_dir_peerstore="${node_dir}/peerstore/LOG"
+  declare node_dir_tbf="${node_dir}/tbf"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
-  [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }
+  [ -f "${node_dir_tbf}" ] || { echo "Data file ${node_dir_tbf} missing"; exit 1; }
 done
 # }}}
 
