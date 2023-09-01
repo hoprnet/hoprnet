@@ -223,7 +223,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 10. transfer some xDAI to nodes
         for (uint256 n = 0; n < nodeAddresses.length; n++) {
-            transferOrMintHoprAndSendNativeToAmount(safe, 0, nativeTokenAmountInWei);
+            transferOrMintHoprAndSendNativeToAmount(nodeAddresses[n], 0, nativeTokenAmountInWei);
         }
     }
 
