@@ -200,19 +200,28 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         // bytes memory
         vm.stopBroadcast();
 
-        // 7. add nodes and safe to network registry, as a manager of network registry
+        // prepare data paylaods for manager 
         address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
         for (uint256 m = 0; m < nodeAddresses.length; m++) {
             stakingSafeAddresses[m] = safe;
         }
+        bool[] memory eligibilities = new bool[](nodeAddresses.length);
+        for (uint256 n = 0; n < nodeAddresses.length; n++) {
+            eligibilities[n] = true;
+        }
         _helperGetDeployerInternalKey();
+
+        // 7. add nodes and safe to network registry, as a manager of network registry
         _registerNodes(stakingSafeAddresses, nodeAddresses);
+
+        // 8. set node eligibilities to network registry, as a manager of network registry
+        _forceSyncEligibility(stakingSafeAddresses, eligibilities);
         vm.stopBroadcast();
 
-        // 8. transfer some tokens to safe
+        // 9. transfer some tokens to safe
         transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
 
-        // 9. transfer some xDAI to nodes
+        // 10. transfer some xDAI to nodes
         for (uint256 n = 0; n < nodeAddresses.length; n++) {
             transferOrMintHoprAndSendNativeToAmount(safe, 0, nativeTokenAmountInWei);
         }
@@ -260,8 +269,18 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         for (uint256 m = 0; m < nodeAddresses.length; m++) {
             stakingSafeAddresses[m] = safe;
         }
+        bool[] memory eligibilities = new bool[](nodeAddresses.length);
+        for (uint256 n = 0; n < nodeAddresses.length; n++) {
+            eligibilities[n] = true;
+        }
         _helperGetDeployerInternalKey();
+
+        // 6. add nodes and safe to network registry, as a manager of network registry
         _registerNodes(stakingSafeAddresses, nodeAddresses);
+
+        // 7. set node eligibilities to network registry, as a manager of network registry
+        _forceSyncEligibility(stakingSafeAddresses, eligibilities);
+
         vm.stopBroadcast();
     }
 
@@ -645,6 +664,42 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             revert("Cannot sync eligibility on network registery as a manager");
         }
         vm.stopBroadcast();
+    }
+
+    /**
+     * @dev On network registry contract, set eligibility of some staking addresses to desired values
+     * This function should only be called by a manager
+     */
+    function forceSyncEligibility(
+        address[] memory stakingAccounts,
+        bool[] memory eligibilities
+    ) public {
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
+
+        // 2. call private function to set eligibility
+        _forceSyncEligibility(stakingAccounts, eligibilities);
+    
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev On network registry contract, set eligibility of some staking addresses to desired values
+     * This function should only be called by a manager
+     */
+    function _forceSyncEligibility(
+        address[] memory stakingAccounts,
+        bool[] memory eligibilities
+    ) private {
+        require(stakingAccounts.length == eligibilities.length, "Input lengths are different");
+
+        // 2. sync peers eligibility according to the latest requirement of its current state
+        try HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerForceSync(stakingAccounts, eligibilities) {
+            emit log_string("Manager set eligibility on network regsitry");
+        } catch (bytes memory lowlevelData) {
+            emit log_named_bytes("set eligibility on network registry error", lowlevelData);
+            revert("Cannot set eligibility on network registery as a manager");
+        }
     }
 
     // /**
