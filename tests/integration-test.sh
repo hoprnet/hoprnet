@@ -408,7 +408,6 @@ test_redeem_in_specific_channel() {
 #log "Waiting for nodes to finish ticket redemption (long running)"
 #for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 #log "Waiting DONE"
-set -x
 
 # initiate channel closures, but don't wait because this will trigger ticket
 # redemption as well

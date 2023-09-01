@@ -29,10 +29,10 @@ export type PeerInfo = {
  * @param multiaddr
  * @returns PeerInfo
  */
-export function toPeerInfoFormat(address: Address, info: PeerStatus, multiaddr?: Multiaddr): PeerInfo {
+export function toPeerInfoFormat(address: Address | undefined, info: PeerStatus, multiaddr?: Multiaddr): PeerInfo {
   return {
     peerId: info.peer_id(),
-    peerAddress: address.to_string(),
+    peerAddress: address?.to_string(),
     multiAddr: multiaddr ? multiaddr.toString() : '',
     heartbeats: {
       sent: Number(info.heartbeats_sent),
@@ -85,7 +85,12 @@ export async function getPeers(
 
     for (const peerId of connected_peers) {
       const peerIdStr = peerId.toString()
-      const chainKey = await node.peerIdToChainKey(peerId)
+      let chainKey: Address
+      try {
+        chainKey = await node.peerIdToChainKey(peerId)
+      } catch {
+        // chain key might not be available if key binding is missing
+      }
       // already exists in announced, we use this because it contains multiaddr already
       if (announcedMap.has(peerIdStr)) {
         connected.push(announcedMap.get(peerIdStr))

@@ -1,4 +1,12 @@
-import { debug, Hash, channel_status_to_string, stringToU8a, ChannelStatus, defer, type DeferType } from '@hoprnet/hopr-utils'
+import {
+  debug,
+  Hash,
+  channel_status_to_string,
+  stringToU8a,
+  ChannelStatus,
+  defer,
+  type DeferType
+} from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 import { ChannelTopologyInfo, formatChannelTopologyInfo } from '../index.js'
