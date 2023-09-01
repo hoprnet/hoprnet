@@ -9,6 +9,7 @@ use core_crypto::{
     types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
 };
 use core_path::path::Path;
+use core_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
 use core_types::{acknowledgement::Acknowledgement, channels::Ticket};
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
@@ -29,12 +30,6 @@ use crate::{
 
 /// Currently used ciphersuite for Sphinx
 type CurrentSphinxSuite = core_crypto::ec_groups::X25519Suite;
-
-/// Number of intermediate hops: 3 relayers and 1 destination
-pub const INTERMEDIATE_HOPS: usize = 3;
-
-/// Maximum size of the packet payload
-pub const PAYLOAD_SIZE: usize = 500;
 
 /// Length of the packet including header and the payload
 pub const PACKET_LENGTH: usize = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
@@ -459,8 +454,7 @@ impl Packet {
 #[cfg(test)]
 mod tests {
     use crate::packet::{
-        add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, Packet, PacketState, INTERMEDIATE_HOPS,
-        PADDING_TAG,
+        add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, Packet, PacketState, PADDING_TAG,
     };
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
     use core_crypto::{
@@ -471,6 +465,7 @@ mod tests {
     };
     use core_path::path::Path;
     use core_types::channels::Ticket;
+    use core_types::protocol::INTERMEDIATE_HOPS;
     use parameterized::parameterized;
     use utils_types::{
         primitives::{Balance, BalanceType, EthereumChallenge, U256},

@@ -3,6 +3,7 @@ pub mod acknowledgement;
 pub mod announcement;
 pub mod channels;
 pub mod errors;
+pub mod protocol;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

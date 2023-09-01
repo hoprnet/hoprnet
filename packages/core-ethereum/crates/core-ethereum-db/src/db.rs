@@ -109,20 +109,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
-    async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool> {
-        let key = utils_db::db::Key::new_bytes_with_prefix(tag, PACKET_TAG_PREFIX)?;
-
-        let has_packet_tag = self.db.contains(key.clone()).await;
-        if !has_packet_tag {
-            let empty: [u8; 0] = [];
-            self.db.set(key, &empty).await?;
-        }
-
-        //debug!("packet tag check: {}, set to: {}", has_packet_tag, hex::encode(tag));
-
-        Ok(has_packet_tag)
-    }
-
     async fn get_pending_acknowledgement(
         &self,
         half_key_challenge: &HalfKeyChallenge,
@@ -997,7 +983,6 @@ pub mod wasm {
         acknowledgement::wasm::AcknowledgedTicket,
         channels::{wasm::Ticket, ChannelEntry},
     };
-    use js_sys::Uint8Array;
     use std::sync::Arc;
     use utils_db::leveldb;
     use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
@@ -1513,15 +1498,6 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.set_staking_safe_allowance(balance, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn check_and_set_packet_tag(&self, tag: &Uint8Array) -> Result<bool, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.check_and_set_packet_tag(&tag.to_vec()).await)
             //}
         }
 

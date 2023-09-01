@@ -1,9 +1,12 @@
 pub mod adaptors;
+pub mod constants;
 pub mod errors;
 mod helpers;
 mod p2p;
+mod timer;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_lock::RwLock;
 use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
@@ -20,11 +23,14 @@ use core_network::{
 };
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
-use utils_log::error;
+use utils_log::{error, info};
 
 use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;
 
+use crate::timer::UniversalTimer;
+use core_types::protocol::TagBloomFilter;
+use utils_types::traits::BinarySerializable;
 #[cfg(feature = "wasm")]
 use {core_ethereum_db::db::wasm::Database, utils_db::leveldb::wasm::LevelDbShim, wasm_bindgen::prelude::wasm_bindgen};
 
@@ -85,7 +91,7 @@ impl HoprTools {
 pub enum HoprLoopComponents {
     Swarm,
     Heartbeat,
-    Strategy
+    Timer,
 }
 
 impl std::fmt::Display for HoprLoopComponents {
@@ -99,7 +105,7 @@ impl std::fmt::Display for HoprLoopComponents {
                 f,
                 "heartbeat component responsible for maintaining the network quality measurements"
             ),
-            HoprLoopComponents::Strategy => "component for generating strategy ticks"
+            HoprLoopComponents::Timer => write!(f, "universal timer component for executing timed actions"),
         }
     }
 }
@@ -122,6 +128,8 @@ pub fn build_components(
     on_acknowledged_ticket: Option<js_sys::Function>,
     packet_cfg: PacketInteractionConfig,
     on_final_packet: Option<js_sys::Function>,
+    tbf: TagBloomFilter,
+    save_tbf: js_sys::Function,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     use core_mixer::mixer::{Mixer, MixerConfig};
@@ -144,8 +152,11 @@ pub fn build_components(
 
     let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 
+    let tbf = Arc::new(RwLock::new(tbf));
+
     let packet_actions = PacketInteraction::new(
         db.clone(),
+        tbf.clone(),
         Mixer::new_with_gloo_timers(MixerConfig::default()),
         ack_actions.writer(),
         on_final_packet_tx,
@@ -153,7 +164,8 @@ pub fn build_components(
     );
 
     let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-    let (pong_tx, pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
+    let (pong_tx, pong_rx) =
+        futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
     // manual ping explicitly called by the API
     let ping = Ping::new(
@@ -178,11 +190,13 @@ pub fn build_components(
 
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
     let (hb_pong_tx, hb_pong_rx) =
-        futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<ControlMessage, ()>)>();
+        futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
     let heartbeat_network_clone = network.clone();
     let ping_network_clone = network.clone();
     let swarm_network_clone = network.clone();
+    let tbf_clone = tbf.clone();
+
     let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
         Box::pin(async move {
             let hb_pinger = Ping::new(
@@ -216,6 +230,21 @@ pub fn build_components(
             )
             .map(|_| HoprLoopComponents::Swarm),
         ),
+        Box::pin(async move {
+            UniversalTimer::new(Duration::from_secs(60))
+                .timer_loop(|| async {
+                    let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
+                    if let Err(_) = save_tbf.call1(
+                        &wasm_bindgen::JsValue::null(),
+                        js_sys::Uint8Array::from(bloom.to_bytes().as_ref()).as_ref(),
+                    ) {
+                        error!("failed to call save tbf closure");
+                    }
+                    info!("tag bloom filter saved");
+                })
+                .map(|_| HoprLoopComponents::Timer)
+                .await
+        }),
     ];
     let mut futs = helpers::to_futures_unordered(ready_loops);
 
@@ -235,8 +264,8 @@ pub mod wasm_impl {
 
     use super::*;
     use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
-    use core_packet::interaction::ApplicationData;
     use core_path::path::Path;
+    use core_types::protocol::ApplicationData;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
@@ -281,6 +310,8 @@ pub mod wasm_impl {
             on_acknowledged_ticket: Option<js_sys::Function>,
             packet_cfg: PacketInteractionConfig,
             on_final_packet: Option<js_sys::Function>,
+            tbf: TagBloomFilter,
+            save_tbf: js_sys::Function,
             my_multiaddresses: Vec<js_sys::JsString>,
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
@@ -294,6 +325,8 @@ pub mod wasm_impl {
                 on_acknowledged_ticket,
                 packet_cfg,
                 on_final_packet,
+                tbf,
+                save_tbf,
                 my_multiaddresses
                     .into_iter()
                     .map(|ma| {
@@ -330,6 +363,8 @@ pub mod wasm {
     use utils_log::logger::wasm::JsLogger;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::*;
+
+    pub use crate::constants::wasm::*;
 
     // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
     #[cfg(feature = "wee_alloc")]

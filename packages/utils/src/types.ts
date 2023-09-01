@@ -84,7 +84,6 @@ export {
   PacketInteractionConfig,
   PassiveStrategy,
   Path,
-  Payload,
   PeerOrigin,
   PeerStatus,
   PromiscuousStrategy,

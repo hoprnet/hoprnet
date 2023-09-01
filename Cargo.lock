@@ -525,7 +525,7 @@ dependencies = [
  "fs2",
  "hex",
  "is_executable",
- "siphasher",
+ "siphasher 0.3.10",
  "tar",
  "ureq",
  "zip",
@@ -561,6 +561,9 @@ name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bitflags"
@@ -636,6 +639,17 @@ dependencies = [
  "fastrand 1.9.0",
  "futures-lite",
  "log",
+]
+
+[[package]]
+name = "bloomfilter"
+version = "1.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b92db7965d438b8b4b1c1d0aedd188440a1084593c9eb7f6657e3df7e906d934"
+dependencies = [
+ "bit-vec",
+ "getrandom 0.2.10",
+ "siphasher 1.0.0",
 ]
 
 [[package]]
@@ -1047,7 +1061,7 @@ dependencies = [
  "generic-array",
  "getrandom 0.2.10",
  "hex",
- "hex-literal 0.4.1",
+ "hex-literal",
  "hkdf",
  "hmac",
  "js-sys",
@@ -1071,7 +1085,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-db"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1109,8 +1123,9 @@ dependencies = [
  "ethers",
  "ethnum",
  "hex",
- "hex-literal 0.4.1",
+ "hex-literal",
  "js-sys",
+ "lazy_static",
  "multiaddr",
  "primitive-types",
  "rusty-leveldb",
@@ -1140,7 +1155,7 @@ dependencies = [
  "ethers",
  "futures",
  "hex",
- "hex-literal 0.4.1",
+ "hex-literal",
  "js-sys",
  "libp2p-identity",
  "mockall",
@@ -1205,7 +1220,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "core-hopr"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1222,6 +1237,7 @@ dependencies = [
  "core-types",
  "futures",
  "futures-concurrency",
+ "gloo-timers 0.3.0",
  "js-sys",
  "multiaddr",
  "serde-wasm-bindgen",
@@ -1335,7 +1351,7 @@ dependencies = [
 
 [[package]]
 name = "core-packet"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "async-lock",
  "async-process",
@@ -1354,7 +1370,7 @@ dependencies = [
  "futures-lite",
  "gloo-timers 0.3.0",
  "hex",
- "hex-literal 0.4.1",
+ "hex-literal",
  "js-sys",
  "lazy_static",
  "libp2p-identity",
@@ -1363,7 +1379,6 @@ dependencies = [
  "rusty-leveldb",
  "serde",
  "serde-wasm-bindgen",
- "serde_bytes",
  "serial_test",
  "thiserror",
  "typenum",
@@ -1386,7 +1401,7 @@ dependencies = [
  "core-ethereum-db",
  "core-types",
  "hex",
- "hex-literal 0.4.1",
+ "hex-literal",
  "js-sys",
  "libp2p-identity",
  "rusty-leveldb",
@@ -1427,17 +1442,20 @@ dependencies = [
 
 [[package]]
 name = "core-types"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bindings",
+ "bloomfilter",
  "console_error_panic_hook",
  "core-crypto",
  "enum-iterator",
  "ethers",
- "hex-literal 0.3.4",
+ "hex-literal",
  "js-sys",
+ "lazy_static",
  "multiaddr",
  "serde",
+ "serde_bytes",
  "serde_repr",
  "thiserror",
  "utils-log",
@@ -2837,12 +2855,6 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hex-literal"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
-
-[[package]]
-name = "hex-literal"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
@@ -2931,7 +2943,7 @@ dependencies = [
  "async-std",
  "async-trait",
  "console_error_panic_hook",
- "core-packet",
+ "core-types",
  "gloo-timers 0.3.0",
  "hex",
  "js-sys",
@@ -4417,7 +4429,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
 dependencies = [
- "siphasher",
+ "siphasher 0.3.10",
 ]
 
 [[package]]
@@ -4426,7 +4438,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90fcb95eef784c2ac79119d1dd819e162b5da872ce6f3c3abe1e8ca1c082f72b"
 dependencies = [
- "siphasher",
+ "siphasher 0.3.10",
 ]
 
 [[package]]
@@ -5619,6 +5631,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bd3e3206899af3f8b12af284fafc038cc1dc2b41d1b89dd17297221c5d225de"
 
 [[package]]
+name = "siphasher"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54ac45299ccbd390721be55b412d41931911f654fa99e2cb8bfb57184b2061fe"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6457,7 +6478,7 @@ dependencies = [
  "ethnum",
  "getrandom 0.2.10",
  "hex",
- "hex-literal 0.4.1",
+ "hex-literal",
  "js-sys",
  "libp2p-identity",
  "primitive-types",
@@ -6757,7 +6778,7 @@ dependencies = [
  "serde_derive",
  "serde_ignored",
  "serde_json",
- "siphasher",
+ "siphasher 0.3.10",
  "strsim",
  "toml 0.7.6",
  "ureq",
