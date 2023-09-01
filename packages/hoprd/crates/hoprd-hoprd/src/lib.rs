@@ -63,8 +63,8 @@ pub mod wasm {
         //
         // For more details see
         // https://github.com/rustwasm/console_error_panic_hook#readme
-        #[cfg(feature = "console_error_panic_hook")]
-        console_error_panic_hook::set_once();
+        // #[cfg(feature = "console_error_panic_hook")]
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));        console_error_panic_hook::set_once();
     }
 
     #[wasm_bindgen]

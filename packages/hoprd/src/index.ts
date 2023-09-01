@@ -6,7 +6,7 @@ import {
   get_package_version,
   Balance,
   BalanceType,
-  setupPromiseRejectionFilter,
+  // setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
   pickVersion,
@@ -53,6 +53,20 @@ import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-co
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
 
 const log = debug('hoprd')
+
+function stopGracefully(signal) {
+  log(`Process exiting with signal ${signal}`)
+  process.exit()
+}
+
+process.on('uncaughtExceptionMonitor', (err, origin) => {
+  // Make sure we get a log.
+  log(`FATAL ERROR, exiting with uncaught exception`, origin, err)
+})
+
+process.once('exit', stopGracefully)
+process.on('SIGINT', stopGracefully)
+process.on('SIGTERM', stopGracefully)
 
 // Metrics
 const metric_processStartTime = create_gauge(
@@ -148,7 +162,7 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
 // Parse the CLI arguments and return the processed object.
 // This function may exit the calling process entirely if an error is
 // encountered or the version or help are rendered.
-export function parseCliArguments(args: string[]) {
+function parseCliArguments(args: string[]) {
   const mono_repo_path = new URL('../../../', import.meta.url).pathname
   let argv: CliArgs
   try {
@@ -168,30 +182,30 @@ export function parseCliArguments(args: string[]) {
   return argv
 }
 
-async function addUnhandledPromiseRejectionHandler() {
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(
-      `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
-    )
-    const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
+// async function addUnhandledPromiseRejectionHandler() {
+//   if (process.env.NODE_ENV !== 'production') {
+//     console.log(
+//       `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
+//     )
+//     const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
 
-    registerUnhandled()
-    setLogger((msg) => {
-      console.error(msg)
-    })
-  }
+//     registerUnhandled()
+//     setLogger((msg) => {
+//       console.error(msg)
+//     })
+//   }
 
-  // Filter specific known promise rejection that cannot be handled for
-  // one reason or the other
-  setupPromiseRejectionFilter()
-}
+//   // Filter specific known promise rejection that cannot be handled for
+//   // one reason or the other
+//   setupPromiseRejectionFilter()
+// }
 
 async function main() {
   // Starting with Node.js 15, undhandled promise rejections terminate the
   // process with a non-zero exit code, which makes debugging quite difficult.
   // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
-  addUnhandledPromiseRejectionHandler()
+  // addUnhandledPromiseRejectionHandler()
   // Increase the default maximum number of event listeners
   ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
@@ -209,20 +223,6 @@ async function main() {
       maxAutoChannels: undefined
     }
   }
-
-  function stopGracefully(signal) {
-    log(`Process exiting with signal ${signal}`)
-    process.exit()
-  }
-
-  process.on('uncaughtExceptionMonitor', (err, origin) => {
-    // Make sure we get a log.
-    log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
-  })
-
-  process.once('exit', stopGracefully)
-  process.on('SIGINT', stopGracefully)
-  process.on('SIGTERM', stopGracefully)
 
   const setState = (newState: State): void => {
     state = newState
