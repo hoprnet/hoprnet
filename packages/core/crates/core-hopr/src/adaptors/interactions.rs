@@ -13,8 +13,10 @@ pub mod wasm {
 
     use core_types::protocol::ApplicationData;
     use futures::Stream;
+    use js_sys::Uint8Array;
     use utils_log::debug;
     use wasm_bindgen::prelude::*;
+    use utils_types::traits::BinarySerializable;
 
     /// Helper loop ensuring conversion and enqueueing of events on acknowledgement
     pub fn spawn_ack_receiver_loop(on_ack: Option<js_sys::Function>) -> Option<UnboundedSender<HalfKeyChallenge>> {
@@ -72,13 +74,8 @@ pub mod wasm {
                 wasm_bindgen_futures::spawn_local(async move {
                     while let Some(packet) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
                         debug!("wasm packet interaction loop received a new packet");
-
-                        if let Ok(param) = serde_wasm_bindgen::to_value(&packet) {
-                            if let Err(e) = on_msg_rcv.call1(&JsValue::null(), &param) {
-                                error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
-                            }
-                        } else {
-                            error!("failed to serialize application data to JsValue");
+                        if let Err(e) = on_msg_rcv.call1(&JsValue::null(), Uint8Array::from(packet.to_bytes().as_ref()).as_ref()) {
+                            error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
                         }
                     }
                 });
