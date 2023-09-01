@@ -12,6 +12,7 @@ export * from './ethereum/index.js'
 export * from './utils.js'
 
 export {
+  app_version,
   create_counter,
   SimpleCounter,
   create_multi_counter,

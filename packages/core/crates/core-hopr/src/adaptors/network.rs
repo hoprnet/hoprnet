@@ -24,8 +24,8 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
         true
     }
 
-    fn emit(&mut self, event: NetworkEvent) {
-        if let Err(e) = self.emitter.start_send(event.clone()) {
+    fn emit(&self, event: NetworkEvent) {
+        if let Err(e) = self.emitter.clone().start_send(event.clone()) {
             error!("Failed to emit a network status: {}: {}", event, e)
         }
     }
@@ -53,6 +53,7 @@ pub mod wasm {
     use core_network::network::{Health, PeerOrigin};
     use futures::{future::poll_fn, StreamExt};
     use js_sys::JsString;
+    use utils_misc::utils::wasm::js_map_to_hash_map;
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
 
@@ -230,26 +231,28 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn register(&mut self, peer: JsString, origin: PeerOrigin) {
+        pub async fn register(&self, peer: JsString, origin: PeerOrigin) {
             self.register_with_metadata(peer, origin, &js_sys::Map::from(JsValue::undefined()))
                 .await
         }
 
         #[wasm_bindgen]
-        pub async fn register_with_metadata(&mut self, peer: JsString, origin: PeerOrigin, _metadata: &js_sys::Map) {
+        pub async fn register_with_metadata(&self, peer: JsString, origin: PeerOrigin, metadata: &js_sys::Map) {
+            let mut change_notifier = self.change_notifier.clone();
+
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
-                Ok(p) => {
-                    // TODO: ignoring metadata for now
-                    // self.add_with_metadata(&p, origin, js_map_to_hash_map(metadata))
-                    match poll_fn(|cx| Pin::new(&mut self.change_notifier).poll_ready(cx)).await {
-                        Ok(_) => match self.change_notifier.start_send(NetworkEvent::Register(p, origin)) {
-                            Ok(_) => {}
-                            Err(e) => error!("Failed to sent network update 'register' to the receiver: {}", e),
-                        },
-                        Err(e) => error!("The receiver for network updates was dropped: {}", e),
-                    }
-                }
+                Ok(p) => match poll_fn(|cx| Pin::new(&mut change_notifier).poll_ready(cx)).await {
+                    Ok(_) => match change_notifier.start_send(NetworkEvent::Register(
+                        p,
+                        origin,
+                        js_map_to_hash_map(metadata),
+                    )) {
+                        Ok(_) => {}
+                        Err(e) => error!("Failed to sent network update 'register' to the receiver: {}", e),
+                    },
+                    Err(e) => error!("The receiver for network updates was dropped: {}", e),
+                },
                 Err(err) => {
                     warn!(
                         "Failed to parse peer id {}, network ignores the register attempt: {}",
@@ -261,11 +264,13 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn unregister(&mut self, peer: JsString) {
+        pub async fn unregister(&self, peer: JsString) {
+            let mut change_notifier = self.change_notifier.clone();
+
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
-                Ok(p) => match poll_fn(|cx| Pin::new(&mut self.change_notifier).poll_ready(cx)).await {
-                    Ok(_) => match self.change_notifier.start_send(NetworkEvent::Unregister(p)) {
+                Ok(p) => match poll_fn(|cx| Pin::new(&mut change_notifier).poll_ready(cx)).await {
+                    Ok(_) => match change_notifier.start_send(NetworkEvent::Unregister(p)) {
                         Ok(_) => {}
                         Err(e) => error!("Failed to sent network update 'unregister' to the receiver: {}", e),
                     },

@@ -5,7 +5,7 @@ use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
 use core_strategy::{
-    generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy, random::RandomStrategy,
+    generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy,
 };
 use hex;
 use proc_macro_regex::regex;
@@ -210,7 +210,7 @@ pub struct CliArgs {
         help = "Default channel strategy to use after node starts up",
         env = "HOPRD_DEFAULT_STRATEGY",
         value_name = "DEFAULT_STRATEGY",
-        value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME, RandomStrategy::NAME])
+        value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME ])
     )]
     pub default_strategy: Option<String>,
 
@@ -226,7 +226,7 @@ pub struct CliArgs {
     #[arg(
         long = "disableTicketAutoRedeem",
         env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
-        help = "Disables automatic redeemeing of winning tickets.",
+        help = "Disables automatic redeeming of winning tickets.",
         action = ArgAction::SetFalse,
         default_value_t = crate::config::Strategy::default().auto_redeem_tickets
     )]

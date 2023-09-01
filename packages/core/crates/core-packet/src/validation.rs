@@ -111,6 +111,7 @@ mod tests {
     use core_types::{
         account::AccountEntry,
         channels::{ChannelEntry, Ticket},
+        protocol::TagBloomFilter,
     };
     use hex_literal::hex;
     use lazy_static::lazy_static;
@@ -139,7 +140,6 @@ mod tests {
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
             async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
             async fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
-            async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> core_ethereum_db::errors::Result<bool>;
             async fn get_pending_acknowledgement(
                 &self,
                 half_key_challenge: &HalfKeyChallenge,

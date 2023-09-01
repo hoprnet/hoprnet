@@ -105,11 +105,11 @@ impl std::fmt::Display for Health {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NetworkEvent {
     CloseConnection(PeerId),
     PeerOffline(PeerId),
-    Register(PeerId, PeerOrigin),
+    Register(PeerId, PeerOrigin, Option<HashMap<String, String>>),
     Unregister(PeerId),
 }
 
@@ -123,7 +123,7 @@ impl std::fmt::Display for NetworkEvent {
 pub trait NetworkExternalActions {
     fn is_public(&self, peer: &PeerId) -> bool;
 
-    fn emit(&mut self, event: NetworkEvent);
+    fn emit(&self, event: NetworkEvent);
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -581,7 +581,7 @@ mod tests {
             false
         }
 
-        fn emit(&mut self, _: NetworkEvent) {}
+        fn emit(&self, _: NetworkEvent) {}
     }
 
     fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction> {

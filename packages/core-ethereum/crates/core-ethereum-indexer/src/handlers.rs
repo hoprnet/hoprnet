@@ -20,7 +20,8 @@ use bindings::{
 use core_crypto::types::{Hash, OffchainSignature};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
-    account::{AccountEntry, AccountSignature, AccountType},
+    account::{AccountEntry, AccountType},
+    announcement::KeyBinding,
     channels::{generate_channel_id, ChannelEntry, ChannelStatus},
 };
 use ethers::{
@@ -187,26 +188,30 @@ where
                     return Err(CoreEthereumIndexerError::UnsupportedKeyRebinding);
                 }
 
-                let updated_account = AccountEntry::new(
-                    key_binding.ed_25519_pub_key.try_into()?,
+                match KeyBinding::from_parts(
                     key_binding.chain_key.try_into()?,
-                    AccountType::NotAnnounced,
-                );
+                    key_binding.ed_25519_pub_key.try_into()?,
+                    OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
+                ) {
+                    Ok(binding) => {
+                        let updated_account = AccountEntry::new(
+                            key_binding.ed_25519_pub_key.try_into()?,
+                            key_binding.chain_key.try_into()?,
+                            AccountType::NotAnnounced,
+                        );
 
-                let sig = AccountSignature {
-                    signature: OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
-                    pub_key: key_binding.ed_25519_pub_key.try_into()?,
-                    chain_key: key_binding.chain_key.try_into()?,
-                };
+                        db.link_chain_and_packet_keys(&binding.chain_key, &binding.packet_key, snapshot)
+                            .await?;
 
-                if !sig.verify() {
-                    return Err(CoreEthereumIndexerError::AccountEntrySignatureVerification);
+                        db.update_account_and_snapshot(&updated_account, snapshot).await?;
+                    }
+                    Err(_) => {
+                        debug!(
+                            "Filtering announcement from {} with invalid signature.",
+                            key_binding.chain_key
+                        )
+                    }
                 }
-
-                db.link_chain_and_packet_keys(&sig.chain_key, &sig.pub_key, snapshot)
-                    .await?;
-
-                db.update_account_and_snapshot(&updated_account, snapshot).await?;
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
                 let maybe_account = db.get_account(&revocation.node.try_into()?).await?;
@@ -627,11 +632,14 @@ pub mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::TransferFilter,
     };
-    use core_crypto::keypairs::{Keypair, OffchainKeypair};
-    use core_crypto::types::Hash;
+    use core_crypto::{
+        keypairs::{Keypair, OffchainKeypair},
+        types::Hash,
+    };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::{
-        account::{AccountEntry, AccountSignature, AccountType},
+        account::{AccountEntry, AccountType},
+        announcement::KeyBinding,
         channels::{generate_channel_id, ChannelEntry, ChannelStatus},
     };
     use ethers::{
@@ -642,7 +650,6 @@ pub mod tests {
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use std::str::FromStr;
     use std::sync::{Arc, Mutex};
     use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
     use utils_types::{
@@ -650,19 +657,20 @@ pub mod tests {
         traits::BinarySerializable,
     };
 
-    const SELF_PRIV_KEY: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-    const COUNTERPARTY_CHAIN_ADDRESS: [u8; 20] = hex!("f1a73ef496c45e260924a9279d2d9752ae378812");
-    const SELF_CHAIN_ADDRESS: [u8; 20] = hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a");
-    const STAKE_ADDRESS: [u8; 20] = hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3");
-
-    const CHANNELS_ADDR: [u8; 20] = hex!("bab20aea98368220baa4e3b7f151273ee71df93b"); // just a dummy
-    const TOKEN_ADDR: [u8; 20] = hex!("47d1677e018e79dcdd8a9c554466cb1556fa5007"); // just a dummy
-    const NETWORK_REGISTRY_ADDR: [u8; 20] = hex!("a469d0225f884fb989cbad4fe289f6fd2fb98051"); // just a dummy
-    const NODE_SAFE_REGISTRY_ADDR: [u8; 20] = hex!("0dcd1bf9a1b36ce34237eeafef220932846bcd82"); // just a dummy
-    const ANNOUNCEMENTS_ADDR: [u8; 20] = hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
-    const SAFE_MANAGEMENT_MODULE_ADDR: [u8; 20] = hex!("9b91245a65ad469163a86e32b2281af7a25f38ce"); // just a dummy
-    const SAFE_INSTANCE_ADDR: [u8; 20] = hex!("b93d7fdd605fb64fdcc87f21590f950170719d47"); // just a dummy
-    const TICKET_PRICE_ORACLE_ADDR: [u8; 20] = hex!("11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e"); // just a dummy
+    lazy_static::lazy_static! {
+        static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref COUNTERPARTY_CHAIN_ADDRESS: Address = Address::from_bytes(&hex!("f1a73ef496c45e260924a9279d2d9752ae378812")).unwrap();
+        static ref SELF_CHAIN_ADDRESS: Address = Address::from_bytes(&hex!("2e505638d318598334c0a2c2e887e0ff1a23ec6a")).unwrap();
+        static ref STAKE_ADDRESS: Address = Address::from_bytes(&hex!("4331eaa9542b6b034c43090d9ec1c2198758dbc3")).unwrap();
+        static ref CHANNELS_ADDR: Address = Address::from_bytes(&hex!("bab20aea98368220baa4e3b7f151273ee71df93b")).unwrap(); // just a dummy
+        static ref TOKEN_ADDR: Address = Address::from_bytes(&hex!("47d1677e018e79dcdd8a9c554466cb1556fa5007")).unwrap(); // just a dummy
+        static ref NETWORK_REGISTRY_ADDR: Address = Address::from_bytes(&hex!("a469d0225f884fb989cbad4fe289f6fd2fb98051")).unwrap(); // just a dummy
+        static ref NODE_SAFE_REGISTRY_ADDR: Address = Address::from_bytes(&hex!("0dcd1bf9a1b36ce34237eeafef220932846bcd82")).unwrap(); // just a dummy
+        static ref ANNOUNCEMENTS_ADDR: Address = Address::from_bytes(&hex!("11db4791bf45ef31a10ea4a1b5cb90f46cc72c7e")).unwrap(); // just a dummy
+        static ref SAFE_MANAGEMENT_MODULE_ADDR: Address = Address::from_bytes(&hex!("9b91245a65ad469163a86e32b2281af7a25f38ce")).unwrap(); // just a dummy
+        static ref SAFE_INSTANCE_ADDR: Address = Address::from_bytes(&hex!("b93d7fdd605fb64fdcc87f21590f950170719d47")).unwrap(); // just a dummy
+        static ref TICKET_PRICE_ORACLE_ADDR: Address = Address::from_bytes(&hex!("11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e")).unwrap(); // just a dummy
+    }
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
         let opt = rusty_leveldb::in_memory();
@@ -689,16 +697,16 @@ pub mod tests {
     fn init_handlers() -> ContractEventHandlers<DummyCallbacks> {
         ContractEventHandlers {
             addresses: super::ContractAddresses {
-                channels: CHANNELS_ADDR.try_into().unwrap(),
-                token: TOKEN_ADDR.try_into().unwrap(),
-                network_registry: NETWORK_REGISTRY_ADDR.try_into().unwrap(),
-                node_safe_registry: NODE_SAFE_REGISTRY_ADDR.try_into().unwrap(),
-                announcements: ANNOUNCEMENTS_ADDR.try_into().unwrap(),
-                node_management_module: SAFE_MANAGEMENT_MODULE_ADDR.try_into().unwrap(),
-                ticket_price_oracle: TICKET_PRICE_ORACLE_ADDR.try_into().unwrap(),
+                channels: *CHANNELS_ADDR,
+                token: *TOKEN_ADDR,
+                network_registry: *NETWORK_REGISTRY_ADDR,
+                node_safe_registry: *NODE_SAFE_REGISTRY_ADDR,
+                announcements: *ANNOUNCEMENTS_ADDR,
+                node_management_module: *SAFE_MANAGEMENT_MODULE_ADDR,
+                ticket_price_oracle: *TICKET_PRICE_ORACLE_ADDR,
             },
-            chain_key: SELF_CHAIN_ADDRESS.try_into().unwrap(),
-            address_to_monitor: SELF_CHAIN_ADDRESS.try_into().unwrap(),
+            chain_key: *SELF_CHAIN_ADDRESS,
+            address_to_monitor: *SELF_CHAIN_ADDRESS,
             cbs: DummyCallbacks {},
         }
     }
@@ -708,21 +716,22 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let keypair = OffchainKeypair::from_secret(&SELF_PRIV_KEY).unwrap();
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-
-        let sig = AccountSignature::new(&keypair, &chain_key);
+        let keybinding = KeyBinding::new(*SELF_CHAIN_ADDRESS, &SELF_PRIV_KEY);
 
         let keybinding_log = RawLog {
             topics: vec![KeyBindingFilter::signature()],
             data: encode(&[
-                Token::FixedBytes(Vec::from(sig.signature.to_bytes())),
-                Token::FixedBytes(Vec::from(sig.pub_key.to_bytes())),
-                Token::Address(EthereumAddress::from_slice(&chain_key.to_bytes())),
+                Token::FixedBytes(Vec::from(keybinding.signature.to_bytes())),
+                Token::FixedBytes(Vec::from(keybinding.packet_key.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
             ]),
         };
 
-        let account_entry = AccountEntry::new(keypair.public().clone(), chain_key, AccountType::NotAnnounced);
+        let account_entry = AccountEntry::new(
+            SELF_PRIV_KEY.public().clone(),
+            *SELF_CHAIN_ADDRESS,
+            AccountType::NotAnnounced,
+        );
 
         handlers
             .on_event(
@@ -735,7 +744,10 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(db.get_account(&chain_key).await.unwrap().unwrap(), account_entry);
+        assert_eq!(
+            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            account_entry
+        );
     }
 
     #[async_std::test]
@@ -743,29 +755,30 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let keypair = OffchainKeypair::from_secret(&SELF_PRIV_KEY).unwrap();
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-
         // Assume that there is a keybinding
-        let account_entry = AccountEntry::new(keypair.public().clone(), chain_key, AccountType::NotAnnounced);
+        let account_entry = AccountEntry::new(
+            SELF_PRIV_KEY.public().clone(),
+            *SELF_CHAIN_ADDRESS,
+            AccountType::NotAnnounced,
+        );
 
         db.update_account_and_snapshot(&account_entry, &Snapshot::default())
             .await
             .unwrap();
 
-        let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
+        let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
 
         let address_announcement_log = RawLog {
             topics: vec![AddressAnnouncementFilter::signature()],
             data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&chain_key.to_bytes())),
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
                 Token::String(test_multiaddr.to_string()),
             ]),
         };
 
         let announced_account_entry = AccountEntry::new(
-            keypair.public().clone(),
-            chain_key,
+            SELF_PRIV_KEY.public().clone(),
+            *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
                 multiaddr: test_multiaddr,
                 updated_block: 0,
@@ -784,7 +797,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.get_account(&chain_key).await.unwrap().unwrap(),
+            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
             announced_account_entry
         );
     }
@@ -794,15 +807,12 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let keypair = OffchainKeypair::from_secret(&SELF_PRIV_KEY).unwrap();
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-
-        let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56").unwrap();
+        let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
 
         // Assume that there is a keybinding and an address announcement
         let announced_account_entry = AccountEntry::new(
-            keypair.public().clone(),
-            chain_key,
+            SELF_PRIV_KEY.public().clone(),
+            *SELF_CHAIN_ADDRESS,
             AccountType::Announced {
                 multiaddr: test_multiaddr,
                 updated_block: 0,
@@ -815,10 +825,16 @@ pub mod tests {
 
         let revoke_announcement_log = RawLog {
             topics: vec![RevokeAnnouncementFilter::signature()],
-            data: encode(&[Token::Address(EthereumAddress::from_slice(&chain_key.to_bytes()))]),
+            data: encode(&[Token::Address(EthereumAddress::from_slice(
+                &SELF_CHAIN_ADDRESS.to_bytes(),
+            ))]),
         };
 
-        let account_entry = AccountEntry::new(keypair.public().clone(), chain_key, AccountType::NotAnnounced);
+        let account_entry = AccountEntry::new(
+            SELF_PRIV_KEY.public().clone(),
+            *SELF_CHAIN_ADDRESS,
+            AccountType::NotAnnounced,
+        );
 
         handlers
             .on_event(
@@ -831,7 +847,10 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(db.get_account(&chain_key).await.unwrap().unwrap(), account_entry);
+        assert_eq!(
+            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            account_entry
+        );
     }
 
     #[async_std::test]
@@ -839,15 +858,13 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-
         let value = U256::max();
 
         let transferred_log = RawLog {
             topics: vec![
                 TransferFilter::signature(),
                 H256::from_slice(&Address::default().to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
             data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]),
         };
@@ -874,8 +891,6 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-
         let value = U256::max();
 
         db.set_hopr_balance(&Balance::new(value, BalanceType::HOPR))
@@ -885,7 +900,7 @@ pub mod tests {
         let transferred_log = RawLog {
             topics: vec![
                 TransferFilter::signature(),
-                H256::from_slice(&chain_key.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
                 H256::from_slice(&Address::default().to_bytes32()),
             ],
             data: encode(&[Token::Uint(EthU256::from_big_endian(&value.to_bytes()))]),
@@ -913,14 +928,11 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
-
         let registered_log = RawLog {
             topics: vec![
                 RegisteredFilter::signature(),
-                H256::from_slice(&stake_address.to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
             data: encode(&[]),
         };
@@ -936,9 +948,9 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
+        let stored = db.get_from_network_registry(&STAKE_ADDRESS).await.unwrap();
 
-        assert_eq!(stored, vec![chain_key]);
+        assert_eq!(stored, vec![*SELF_CHAIN_ADDRESS]);
     }
 
     #[async_std::test]
@@ -946,14 +958,11 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
-
         let registered_log = RawLog {
             topics: vec![
                 RegisteredByManagerFilter::signature(),
-                H256::from_slice(&stake_address.to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
             data: encode(&[]),
         };
@@ -969,9 +978,9 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
+        let stored = db.get_from_network_registry(&STAKE_ADDRESS).await.unwrap();
 
-        assert_eq!(stored, vec![chain_key]);
+        assert_eq!(stored, vec![*SELF_CHAIN_ADDRESS]);
     }
 
     #[async_std::test]
@@ -979,18 +988,15 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
-
-        db.add_to_network_registry(&chain_key, &stake_address, &Snapshot::default())
+        db.add_to_network_registry(&SELF_CHAIN_ADDRESS, &STAKE_ADDRESS, &Snapshot::default())
             .await
             .unwrap();
 
         let registered_log = RawLog {
             topics: vec![
                 DeregisteredFilter::signature(),
-                H256::from_slice(&stake_address.to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
             data: encode(&[]),
         };
@@ -1006,7 +1012,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
+        let stored = db.get_from_network_registry(&STAKE_ADDRESS).await.unwrap();
 
         assert_eq!(stored, vec![]);
     }
@@ -1016,18 +1022,15 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let chain_key = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
-
-        db.add_to_network_registry(&chain_key, &stake_address, &Snapshot::default())
+        db.add_to_network_registry(&SELF_CHAIN_ADDRESS, &STAKE_ADDRESS, &Snapshot::default())
             .await
             .unwrap();
 
         let registered_log = RawLog {
             topics: vec![
                 DeregisteredByManagerFilter::signature(),
-                H256::from_slice(&stake_address.to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
             data: encode(&[]),
         };
@@ -1043,7 +1046,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db.get_from_network_registry(&stake_address).await.unwrap();
+        let stored = db.get_from_network_registry(&STAKE_ADDRESS).await.unwrap();
 
         assert_eq!(stored, vec![]);
     }
@@ -1109,12 +1112,10 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
-
         let set_eligible = RawLog {
             topics: vec![
                 EligibilityUpdatedFilter::signature(),
-                H256::from_slice(&stake_address.to_bytes32()),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
                 H256::from_low_u64_be(1),
             ],
             data: encode(&[]),
@@ -1131,7 +1132,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(db.is_eligible(&stake_address).await.unwrap());
+        assert!(db.is_eligible(&STAKE_ADDRESS).await.unwrap());
     }
 
     #[async_std::test]
@@ -1139,16 +1140,14 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let stake_address = Address::from_bytes(&STAKE_ADDRESS).unwrap();
-
-        db.set_eligible(&stake_address, false, &Snapshot::default())
+        db.set_eligible(&STAKE_ADDRESS, false, &Snapshot::default())
             .await
             .unwrap();
 
         let set_eligible = RawLog {
             topics: vec![
                 EligibilityUpdatedFilter::signature(),
-                H256::from_slice(&stake_address.to_bytes32()),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()),
                 H256::from_low_u64_be(0),
             ],
             data: encode(&[]),
@@ -1165,7 +1164,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(!db.is_eligible(&stake_address).await.unwrap());
+        assert!(!db.is_eligible(&STAKE_ADDRESS).await.unwrap());
     }
 
     #[async_std::test]
@@ -1173,16 +1172,13 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
-
-        let channel_id = generate_channel_id(&source, &destination);
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
         db.update_channel_and_snapshot(
             &channel_id,
             &ChannelEntry::new(
-                source,
-                destination,
+                *SELF_CHAIN_ADDRESS,
+                *COUNTERPARTY_CHAIN_ADDRESS,
                 Balance::new(U256::zero(), BalanceType::HOPR),
                 U256::zero(),
                 ChannelStatus::Open,
@@ -1251,16 +1247,13 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
-
-        let channel_id = generate_channel_id(&source, &destination);
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
         db.update_channel_and_snapshot(
             &channel_id,
             &ChannelEntry::new(
-                source,
-                destination,
+                *SELF_CHAIN_ADDRESS,
+                *COUNTERPARTY_CHAIN_ADDRESS,
                 Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
                 U256::zero(),
                 ChannelStatus::Open,
@@ -1304,16 +1297,13 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
-
-        let channel_id = generate_channel_id(&source, &destination);
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
         db.update_channel_and_snapshot(
             &channel_id,
             &ChannelEntry::new(
-                source,
-                destination,
+                *SELF_CHAIN_ADDRESS,
+                *COUNTERPARTY_CHAIN_ADDRESS,
                 Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
                 U256::zero(),
                 ChannelStatus::Open,
@@ -1355,16 +1345,13 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
-
-        let channel_id = generate_channel_id(&source, &destination);
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
         let channel_opened_log = RawLog {
             topics: vec![
                 ChannelOpenedFilter::signature(),
-                H256::from_slice(&source.to_bytes32()),
-                H256::from_slice(&destination.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
             ],
             data: encode(&[]),
         };
@@ -1390,16 +1377,13 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
-
-        let channel_id = generate_channel_id(&source, &destination);
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
         db.update_channel_and_snapshot(
             &channel_id,
             &ChannelEntry::new(
-                source,
-                destination,
+                *SELF_CHAIN_ADDRESS,
+                *COUNTERPARTY_CHAIN_ADDRESS,
                 Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
                 U256::zero(),
                 ChannelStatus::Open,
@@ -1442,16 +1426,13 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let source = Address::from_bytes(&SELF_CHAIN_ADDRESS).unwrap();
-        let destination = Address::from_bytes(&COUNTERPARTY_CHAIN_ADDRESS).unwrap();
-
-        let channel_id = generate_channel_id(&source, &destination);
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
         db.update_channel_and_snapshot(
             &channel_id,
             &ChannelEntry::new(
-                source,
-                destination,
+                *SELF_CHAIN_ADDRESS,
+                *COUNTERPARTY_CHAIN_ADDRESS,
                 Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
                 U256::zero(),
                 ChannelStatus::Open,
@@ -1495,14 +1476,11 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let safe_instance: Address = SAFE_INSTANCE_ADDR.try_into().unwrap();
-        let chain_key: Address = SELF_CHAIN_ADDRESS.try_into().unwrap();
-
         let safe_registered_log = RawLog {
             topics: vec![
                 RegisteredNodeSafeFilter::signature(),
-                H256::from_slice(&safe_instance.to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
+                H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
             data: encode(&[]),
         };
@@ -1518,10 +1496,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            db.is_mfa_protected().await.unwrap(),
-            Some(SAFE_INSTANCE_ADDR.try_into().unwrap())
-        );
+        assert_eq!(db.is_mfa_protected().await.unwrap(), Some(*SAFE_INSTANCE_ADDR));
     }
 
     #[async_std::test]
@@ -1529,18 +1504,15 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        let safe_instance: Address = SAFE_INSTANCE_ADDR.try_into().unwrap();
-        let chain_key: Address = SELF_CHAIN_ADDRESS.try_into().unwrap();
-
-        db.set_mfa_protected_and_update_snapshot(Some(safe_instance), &Snapshot::default())
+        db.set_mfa_protected_and_update_snapshot(Some(*SAFE_INSTANCE_ADDR), &Snapshot::default())
             .await
             .unwrap();
 
         let safe_registered_log = RawLog {
             topics: vec![
                 DergisteredNodeSafeFilter::signature(),
-                H256::from_slice(&safe_instance.to_bytes32()),
-                H256::from_slice(&chain_key.to_bytes32()),
+                H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
             ],
             data: encode(&[]),
         };
@@ -1745,7 +1717,7 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub async fn on_event(
-            &mut self,
+            &self,
             db: &Database,
             address: &str,
             topics: Array,

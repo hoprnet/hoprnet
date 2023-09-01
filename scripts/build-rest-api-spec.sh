@@ -64,6 +64,9 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"
 
+log "Generate identity file"
+make create-local-identity
+
 log "Start hoprd node"
 env DEBUG="hopr*" CI="true" HOPRD_API_PORT="${api_port}" \
   make -C "${mydir}/../" run-local-with-safe > "${node_log_file}" 2>&1 &

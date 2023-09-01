@@ -1,6 +1,6 @@
 [package]
 name = "core-types"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types required by the Core package, which are not generic enough to be in the utils-types crate"
 edition = "2021"
@@ -12,14 +12,17 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+bloomfilter = { version = "1.0.12", features = ["serde"] }
 enum-iterator = "1.4.1"
 js-sys = { workspace = true, optional = true }
+lazy_static = "1.4.0"
 multiaddr = "0.18"
 serde = { version = "1.0", features = ["derive"] }
 serde_repr = "0.1"
+serde_bytes = "0.11.12"
 wasm-bindgen = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-hex-literal = "0.3"
+hex-literal = "0.4.1"
 thiserror = "1.0"
 ethers = { version = "2", default-features = false }
 

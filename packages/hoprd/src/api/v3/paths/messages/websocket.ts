@@ -15,6 +15,24 @@ Incoming messages from other nodes are sent to the websocket client.
 A client may also send message by sending the following data:
   { cmd: "sendmsg", args: { peerId: "SOME_PEER_ID", path: [], hops: 1} }
 The command arguments follow the same semantics as in the dedicated API endpoint for sending messages.
+
+The following messages may be sent by the server over the Websocket connection:
+
+  {
+    type: "message",
+    tag: 12,
+    body: "my example message"
+  }
+
+  {
+    type: "message-ack",
+    id: "some challenge id"
+  }
+
+  {
+    type: "message-ack-challenge",
+    id: "some challenge id"
+  }
 `,
     '/messages/websocket'
   ),

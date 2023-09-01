@@ -23,7 +23,7 @@ fi
 network=${1:-rotsee}
 number=${2:-1}
 docker_tag=${3:-latest}
-hopr_amount=${4:-20}
+hopr_amount=${4:-10}
 native_amount=${5:-0.1}
 random="${RANDOM}"
 
