@@ -258,7 +258,9 @@ async function main() {
       }
 
       // Needs to be created new, because the incoming `data` is from serde_wasmbindgen and not a Rust WASM object
-      let appData = new ApplicationData(data.application_tag, data.plain_text)
+      // Use the plain message, not the RLP encoded form. At this point we don't
+      // care about the latency anymore.
+      let appData = new ApplicationData(data.application_tag, new TextEncoder().encode(decodedMsg.msg))
       await inbox.push(appData)
     } catch (err) {
       log('Could not decode message', err instanceof Error ? err.message : 'Unknown error', data.plain_text.toString())
