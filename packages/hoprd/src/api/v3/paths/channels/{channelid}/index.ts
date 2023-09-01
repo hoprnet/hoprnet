@@ -82,7 +82,6 @@ const DELETE: Operation = [
 
     const closingResult = await closeChannel(node, channelid)
 
-    console.log(closingResult)
     if (closingResult.success == true) {
       res
         .status(200)
