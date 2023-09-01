@@ -142,7 +142,7 @@ hopli migrate-safe-module --network anvil-localhost \
     --contracts-root "../ethereum/contracts"
 ```
 
-Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`. 
+Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
 If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
 
 ```
@@ -265,7 +265,7 @@ PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_mana
     --contracts-root "../ethereum/contracts"
 ```
 
-Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`. 
+Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
 If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
 
 ```

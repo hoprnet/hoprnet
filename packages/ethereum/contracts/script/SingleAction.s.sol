@@ -200,7 +200,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         // bytes memory
         vm.stopBroadcast();
 
-        // prepare data paylaods for manager 
+        // prepare data paylaods for manager
         address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
         for (uint256 m = 0; m < nodeAddresses.length; m++) {
             stakingSafeAddresses[m] = safe;
@@ -530,7 +530,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 1. check if nodes have been registered, if so, skip
         for (uint256 i = 0; i < nodeAddresses.length; i++) {
-            try HoprNetworkRegistry(nrContractAddress).nodeRegisterdToAccount(nodeAddresses[i]) returns (address registeredAccount) {
+            try HoprNetworkRegistry(nrContractAddress).nodeRegisterdToAccount(nodeAddresses[i]) returns (
+                address registeredAccount
+            ) {
                 if (registeredAccount == address(0)) {
                     accounts.push(stakingAccounts[i]);
                     nodes.push(nodeAddresses[i]);
@@ -566,7 +568,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 2. check if nodes have been registered, if not, skip
         for (uint256 i = 0; i < nodeAddresses.length; i++) {
-            try HoprNetworkRegistry(nrContractAddress).nodeRegisterdToAccount(nodeAddresses[i]) returns (address registeredAccount) {
+            try HoprNetworkRegistry(nrContractAddress).nodeRegisterdToAccount(nodeAddresses[i]) returns (
+                address registeredAccount
+            ) {
                 if (registeredAccount != address(0)) {
                     nodes.push(nodeAddresses[i]);
                 }
@@ -657,7 +661,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         getNetworkAndMsgSender();
 
         // 2. sync peers eligibility according to the latest requirement of its current state
-        try HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerSync(stakingAccounts) {
+        try HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerSync(
+            stakingAccounts
+        ) {
             emit log_string("Manager synced eligibility on network regsitry");
         } catch (bytes memory lowlevelData) {
             emit log_named_bytes("sync eligibility on network registry error", lowlevelData);
@@ -670,16 +676,13 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * @dev On network registry contract, set eligibility of some staking addresses to desired values
      * This function should only be called by a manager
      */
-    function forceSyncEligibility(
-        address[] memory stakingAccounts,
-        bool[] memory eligibilities
-    ) public {
+    function forceSyncEligibility(address[] memory stakingAccounts, bool[] memory eligibilities) public {
         // 1. get network and msg.sender
         getNetworkAndMsgSender();
 
         // 2. call private function to set eligibility
         _forceSyncEligibility(stakingAccounts, eligibilities);
-    
+
         vm.stopBroadcast();
     }
 
@@ -687,14 +690,13 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * @dev On network registry contract, set eligibility of some staking addresses to desired values
      * This function should only be called by a manager
      */
-    function _forceSyncEligibility(
-        address[] memory stakingAccounts,
-        bool[] memory eligibilities
-    ) private {
+    function _forceSyncEligibility(address[] memory stakingAccounts, bool[] memory eligibilities) private {
         require(stakingAccounts.length == eligibilities.length, "Input lengths are different");
 
         // 2. sync peers eligibility according to the latest requirement of its current state
-        try HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerForceSync(stakingAccounts, eligibilities) {
+        try HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerForceSync(
+            stakingAccounts, eligibilities
+        ) {
             emit log_string("Manager set eligibility on network regsitry");
         } catch (bytes memory lowlevelData) {
             emit log_named_bytes("set eligibility on network registry error", lowlevelData);
