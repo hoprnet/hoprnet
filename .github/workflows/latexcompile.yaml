@@ -15,7 +15,7 @@ on:
 
 jobs:
   build_latex:
-    runs-on: ubuntu-2-core
+    runs-on: ubuntu-latest-4-cores
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v3
