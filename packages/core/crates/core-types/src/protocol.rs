@@ -125,18 +125,14 @@ impl Display for ApplicationData {
     }
 }
 
-impl AsRef<[u8]> for ApplicationData {
-    fn as_ref(&self) -> &[u8] {
-        &self.plain_text
-    }
-}
-
 impl BinarySerializable for ApplicationData {
     const SIZE: usize = 2; // minimum size
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
-            let tag = u16::from_be_bytes(data[0..2].try_into().map_err(|_| ParseError)?);
+            let mut tag = [0u8;2];
+            tag.copy_from_slice(&data[0..2]);
+            let tag = u16::from_be_bytes(tag);
             Ok(Self {
                 application_tag: if tag != DEFAULT_APPLICATION_TAG {
                     Some(tag)
