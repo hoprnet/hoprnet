@@ -4,6 +4,8 @@ import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 import { PeerOrigin, PeerStatus, PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
 
+import { AccountEntry } from '@hoprnet/hopr-utils'
+
 import {
   createTestApiInstance,
   ALICE_PEER_ID,
@@ -12,7 +14,8 @@ import {
   BOB_PEER_ID,
   BOB_MULTI_ADDR,
   BOB_ACCOUNT_ENTRY,
-  CHARLIE_PEER_ID
+  CHARLIE_PEER_ID,
+  CHARLIE_ACCOUNT_ENTRY
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -57,9 +60,10 @@ const CHARLIE_ENTRY = PeerStatus.build(
   meta
 )
 
-function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
+function toJsonDict(account: AccountEntry, peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
   return {
     peerId: peer.peer_id(),
+    peerAddress: account.chain_addr.to_string(),
     multiAddr: multiaddr ? multiaddr.toString() : '',
     heartbeats: {
       sent: Number(peer.heartbeats_sent),
@@ -78,9 +82,9 @@ function toJsonDict(peer: PeerStatus, isNew: boolean, multiaddr: string | undefi
   return Number(this)
 }
 
-const ALICE_PEER_INFO = toJsonDict(ALICE_ENTRY, false, ALICE_MULTI_ADDR.toString())
-const BOB_PEER_INFO = toJsonDict(BOB_ENTRY, true, BOB_MULTI_ADDR.toString())
-const CHARLIE_PEER_INFO = toJsonDict(CHARLIE_ENTRY, false, undefined)
+const ALICE_PEER_INFO = toJsonDict(ALICE_ACCOUNT_ENTRY, ALICE_ENTRY, false, ALICE_MULTI_ADDR.toString())
+const BOB_PEER_INFO = toJsonDict(BOB_ACCOUNT_ENTRY, BOB_ENTRY, true, BOB_MULTI_ADDR.toString())
+const CHARLIE_PEER_INFO = toJsonDict(CHARLIE_ACCOUNT_ENTRY, CHARLIE_ENTRY, false, undefined)
 
 let node = sinon.fake() as any as Hopr
 node.getConnectedPeers = sinon.fake.resolves([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
@@ -97,6 +101,17 @@ node.getConnectionInfo = async (peer: PeerId) => {
       return BOB_ENTRY
     case CHARLIE_PEER_ID.toString():
       return CHARLIE_ENTRY
+  }
+}
+
+node.peerIdToChainKey = async (peer: PeerId) => {
+  switch (peer.toString()) {
+    case ALICE_PEER_ID.toString():
+      return ALICE_ACCOUNT_ENTRY.chain_addr
+    case BOB_PEER_ID.toString():
+      return BOB_ACCOUNT_ENTRY.chain_addr
+    case CHARLIE_PEER_ID.toString():
+      return CHARLIE_ACCOUNT_ENTRY.chain_addr
   }
 }
 

@@ -12,7 +12,7 @@ concurrency:
 jobs:
   check_changeset:
     name: Check changeset
-    runs-on: ubuntu-2-core
+    runs-on: ubuntu-latest-4-cores
     if: github.event.pull_request.draft == false
     outputs:
       build_toolchain: ${{ steps.check_pr_changeset.outputs.build_toolchain }}

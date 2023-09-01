@@ -213,7 +213,7 @@ jobs:
           # Identify the network to deploy nodes
           network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" packages/hoprd/releases.json | sed 's/_/-/')
           # In case the base PR is pointing to an unknown branch/release, we deploy to the default network "rotsee"
-          if [ -z $network ]; then 
+          if [ -z $network ]; then
             echo "No network selected"
             exit 1;
           fi
