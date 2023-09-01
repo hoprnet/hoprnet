@@ -226,7 +226,7 @@ pub struct CliArgs {
     #[arg(
         long = "disableTicketAutoRedeem",
         env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
-        help = "Disables automatic redeemeing of winning tickets.",
+        help = "Disables automatic redeeming of winning tickets.",
         action = ArgAction::SetFalse,
         default_value_t = crate::config::Strategy::default().auto_redeem_tickets
     )]
