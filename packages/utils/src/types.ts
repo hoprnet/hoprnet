@@ -18,7 +18,6 @@ globalThis.crypto = webcrypto
 export {
   AccountEntry,
   AcknowledgedTicket,
-  Acknowledgement,
   Address,
   AnnouncementData,
   ApplicationData,
@@ -93,7 +92,6 @@ export {
   random_fill,
   random_float,
   random_integer,
-  RandomStrategy,
   Response,
   Signature,
   SimpleCounter,
