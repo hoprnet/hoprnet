@@ -4,6 +4,7 @@ use utils_types::primitives::{Address, Balance};
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
 /// Implements passive strategy which does nothing.
+#[derive(Debug, Clone)]
 pub struct PassiveStrategy;
 
 impl ChannelStrategy for PassiveStrategy {
@@ -44,13 +45,13 @@ pub mod wasm {
     use wasm_bindgen::JsValue;
     use utils_log::error;
 
-    #[wasm_bindgen(js_name = "PassiveStrategy")]
-    pub struct WasmPassiveStrategy {
+    #[wasm_bindgen]
+    pub struct PassiveStrategy {
         w: Mutex<super::PassiveStrategy>
     }
 
     #[wasm_bindgen]
-    impl WasmPassiveStrategy {
+    impl PassiveStrategy {
         #[wasm_bindgen(constructor)]
         pub fn new() -> Self {
             Self {

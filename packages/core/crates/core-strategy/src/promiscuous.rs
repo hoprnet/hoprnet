@@ -372,8 +372,8 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
     use utils_log::error;
 
-    #[wasm_bindgen(js_name = "PromiscuousStrategy", getter_with_clone)]
-    pub struct WasmPromiscuousStrategy {
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct PromiscuousStrategy {
         pub network_quality_threshold: f64,
         pub new_channel_stake: Balance,
         pub minimum_channel_balance: Balance,
@@ -385,7 +385,7 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    impl WasmPromiscuousStrategy {
+    impl PromiscuousStrategy {
         #[wasm_bindgen(constructor)]
         pub fn _new() -> Self {
             let s = super::PromiscuousStrategy::default();
@@ -406,8 +406,7 @@ pub mod wasm {
             super::PromiscuousStrategy::NAME.into()
         }
 
-        #[wasm_bindgen(js_name = "tick")]
-        pub fn _tick(
+        pub fn tick(
             &self,
             balance: Balance,
             peers: PeerQuality,
