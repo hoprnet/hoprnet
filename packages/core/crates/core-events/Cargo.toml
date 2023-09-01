@@ -19,6 +19,7 @@ core-types = { path = "../../../core/crates/core-types", default-features = fals
 hex = "0.4"
 js-sys = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
+strum = "0.25.0"
 thiserror = "1"
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
