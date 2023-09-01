@@ -18,7 +18,6 @@ type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
 /// Implements promiscuous strategy.
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct PromiscuousStrategy {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
     /// Defaults to 0.5
@@ -364,34 +363,69 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::sync::Mutex;
     use crate::generic::ChannelStrategy;
     use crate::generic::{wasm::StrategyTickResult, PeerQuality};
-    use crate::promiscuous::PromiscuousStrategy;
     use crate::strategy_tick;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Balance;
     use wasm_bindgen::prelude::*;
+    use utils_log::error;
+
+    #[wasm_bindgen(js_name = "PromiscuousStrategy", getter_with_clone)]
+    pub struct WasmPromiscuousStrategy {
+        pub network_quality_threshold: f64,
+        pub new_channel_stake: Balance,
+        pub minimum_channel_balance: Balance,
+        pub minimum_node_balance: Balance,
+        pub max_channels: Option<usize>,
+        pub auto_redeem_tickets: bool,
+        pub enforce_max_channels: bool,
+        w: Mutex<super::PromiscuousStrategy>
+    }
 
     #[wasm_bindgen]
-    impl PromiscuousStrategy {
+    impl WasmPromiscuousStrategy {
         #[wasm_bindgen(constructor)]
         pub fn _new() -> Self {
-            Self::default()
+            let s = super::PromiscuousStrategy::default();
+            Self {
+                network_quality_threshold: s.network_quality_threshold,
+                new_channel_stake: s.new_channel_stake,
+                minimum_channel_balance: s.minimum_channel_balance,
+                minimum_node_balance: s.minimum_node_balance,
+                max_channels: s.max_channels,
+                auto_redeem_tickets: s.auto_redeem_tickets,
+                enforce_max_channels: s.enforce_max_channels,
+                w: Mutex::new(s)
+            }
         }
 
         #[wasm_bindgen(getter)]
         pub fn name(&self) -> String {
-            Self::NAME.into()
+            super::PromiscuousStrategy::NAME.into()
         }
 
         #[wasm_bindgen(js_name = "tick")]
         pub fn _tick(
-            &mut self,
+            &self,
             balance: Balance,
-            mut peers: PeerQuality,
+            peers: PeerQuality,
             outgoing_channels: JsValue,
         ) -> JsResult<StrategyTickResult> {
-            strategy_tick!(self, balance, peers, outgoing_channels)
+            if let Ok(mut s) = self.w.lock() {
+                s.network_quality_threshold = self.network_quality_threshold;
+                s.new_channel_stake = self.new_channel_stake;
+                s.minimum_channel_balance = self.minimum_channel_balance;
+                s.minimum_node_balance = self.minimum_node_balance;
+                s.max_channels = self.max_channels;
+                s.auto_redeem_tickets = self.auto_redeem_tickets;
+                s.enforce_max_channels = self.enforce_max_channels;
+                strategy_tick!(s, balance, peers, outgoing_channels)
+            } else {
+                error!("could not lock for strategy tick");
+                Err("strategy lock failed".into())
+            }
         }
     }
 }
