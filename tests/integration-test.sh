@@ -298,9 +298,6 @@ log "Waiting for nodes to finish open channel (long running)"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-echo "Exit early after opening channels, because some 1-hop messages are not fully working yet"
-exit 0
-
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
@@ -318,6 +315,10 @@ done
 log "Waiting for nodes to finish sending 1 hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
+
+echo "Exit early after sending 1-hop messages"
+exit 0
+
 
 log "Node 2 should now have a ticket"
 result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")
