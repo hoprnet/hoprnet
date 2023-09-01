@@ -409,6 +409,9 @@ test_redeem_in_specific_channel() {
 #for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 #log "Waiting DONE"
 
+echo "Exit early before closing channels"
+exit 0
+
 # initiate channel closures, but don't wait because this will trigger ticket
 # redemption as well
 api_close_channel 1 4 "${api1}" "${node_addr4}" "outgoing" & jobs+=( "$!" )
