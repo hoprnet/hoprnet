@@ -20,8 +20,6 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 
-    async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool>;
-
     async fn get_pending_acknowledgement(
         &self,
         half_key_challenge: &HalfKeyChallenge,

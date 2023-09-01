@@ -3,7 +3,7 @@ use crate::errors::{
     Result,
 };
 use bindings::{
-    hopr_announcements::{BindKeysAnnounceCall, BindKeysAnnounceSafeCall},
+    hopr_announcements::{AnnounceCall, AnnounceSafeCall, BindKeysAnnounceCall, BindKeysAnnounceSafeCall},
     hopr_channels::{
         CloseIncomingChannelCall, CloseIncomingChannelSafeCall, CompactSignature, FinalizeOutgoingChannelClosureCall,
         FinalizeOutgoingChannelClosureSafeCall, FundChannelCall, FundChannelSafeCall,
@@ -15,19 +15,17 @@ use bindings::{
     hopr_token::{ApproveCall, TransferCall},
 };
 use core_crypto::{
-    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    keypairs::{ChainKeypair, Keypair},
     types::VrfParameters,
 };
-use core_types::{account::AccountSignature, acknowledgement::AcknowledgedTicket};
+use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use ethers::{
     abi::AbiEncode,
     types::{Address as EthereumAddress, H160, H256, U256},
 };
-use multiaddr::Multiaddr;
-use std::str::FromStr;
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
-    traits::{BinarySerializable, PeerIdLike},
+    traits::BinarySerializable,
 };
 
 #[repr(u8)]
@@ -38,9 +36,6 @@ pub enum Operation {
 }
 
 pub struct ChainCalls {
-    /// used to announce key binding of off-chain key (ed25519)
-    /// and on-chain key (secp256k1)
-    offchain_keypair: OffchainKeypair,
     /// own Ethereum address
     chain_key: Address,
     /// address of HoprChannels smart contract
@@ -52,14 +47,8 @@ pub struct ChainCalls {
 }
 
 impl ChainCalls {
-    pub fn new(
-        offchain_keypair: &OffchainKeypair,
-        chain_keypair: &ChainKeypair,
-        hopr_channels: Address,
-        hopr_announcements: Address,
-    ) -> Self {
+    pub fn new(chain_keypair: &ChainKeypair, hopr_channels: Address, hopr_announcements: Address) -> Self {
         Self {
-            offchain_keypair: offchain_keypair.clone(),
             chain_key: chain_keypair.public().to_address(),
             hopr_channels,
             hopr_announcements,
@@ -67,56 +56,75 @@ impl ChainCalls {
         }
     }
 
+    /// If true, from now on create Safe-compliant payload. If false,
+    /// create legacy transaction payloads.
     pub fn set_use_safe(&mut self, enabled: bool) {
         self.use_safe = enabled;
     }
 
+    /// See whether the struct is generating Safe-compliant (returns true)
+    /// or legacy transaction payload (returns false).
     pub fn get_use_safe(&mut self) -> bool {
         return self.use_safe;
     }
 
-    pub fn announce(&self, announced_multiaddr: &Multiaddr, use_safe: bool) -> Result<Vec<u8>> {
-        let account_sig = AccountSignature::new(&self.offchain_keypair, &self.chain_key);
+    /// Creates the transaction payload to announce a node on-chain.
+    pub fn announce(&self, announcement: &AnnouncementData, use_safe: bool) -> Vec<u8> {
+        match announcement.key_binding {
+            Some(ref binding) => {
+                let serialized_signature = binding.signature.to_bytes();
 
-        if let Some(ending) = announced_multiaddr.protocol_stack().last() {
-            let expected: String = format!("/p2p/{}", self.offchain_keypair.public().to_peerid_str());
-            if ending == "p2p" && !announced_multiaddr.ends_with(&Multiaddr::from_str(expected.as_str())?) {
-                return Err(InvalidArguments(format!(
-                    "Received a multiaddr with incorrect PeerId, got {} but expected {}",
-                    announced_multiaddr, expected
-                )));
+                if use_safe {
+                    let call_data = BindKeysAnnounceSafeCall {
+                        self_: H160::from_slice(&self.chain_key.to_bytes()),
+                        ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
+                        ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
+                        ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
+                        base_multiaddr: announcement.to_multiaddress_str(),
+                    }
+                    .encode();
+                    ExecTransactionFromModuleCall {
+                        to: H160::from_slice(&self.hopr_announcements.to_bytes()),
+                        value: U256::zero(),
+                        data: call_data.into(),
+                        operation: Operation::Call as u8,
+                    }
+                    .encode()
+                } else {
+                    BindKeysAnnounceCall {
+                        ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
+                        ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
+                        ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
+                        base_multiaddr: announcement.to_multiaddress_str(),
+                    }
+                    .encode()
+                }
             }
-        }
-
-        let serialized_signature = account_sig.signature.to_bytes();
-
-        if use_safe {
-            let call_data = BindKeysAnnounceSafeCall {
-                self_: H160::from_slice(&self.chain_key.to_bytes()),
-                ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
-                ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
-                base_multiaddr: announced_multiaddr.to_string(),
+            None => {
+                if use_safe {
+                    let call_data = AnnounceSafeCall {
+                        self_: H160::from_slice(&self.chain_key.to_bytes()),
+                        base_multiaddr: announcement.to_multiaddress_str(),
+                    }
+                    .encode();
+                    ExecTransactionFromModuleCall {
+                        to: H160::from_slice(&self.hopr_announcements.to_bytes()),
+                        value: U256::zero(),
+                        data: call_data.into(),
+                        operation: Operation::Call as u8,
+                    }
+                    .encode()
+                } else {
+                    AnnounceCall {
+                        base_multiaddr: announcement.to_multiaddress_str(),
+                    }
+                    .encode()
+                }
             }
-            .encode();
-            Ok(ExecTransactionFromModuleCall {
-                to: H160::from_slice(&self.hopr_announcements.to_bytes()),
-                value: U256::zero(),
-                data: call_data.into(),
-                operation: Operation::Call as u8,
-            }
-            .encode())
-        } else {
-            Ok(BindKeysAnnounceCall {
-                base_multiaddr: announced_multiaddr.to_string(),
-                ed_25519_pub_key: H256::from_slice(&self.offchain_keypair.public().to_bytes()).into(),
-                ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
-                ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-            }
-            .encode())
         }
     }
 
+    /// Create a ERC20 approve transaction payload. Prequisite to open payment channels.
     pub fn approve(&self, amount: &Balance) -> Result<Vec<u8>> {
         if amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments(
@@ -131,6 +139,7 @@ impl ChainCalls {
         .encode())
     }
 
+    /// Create a ERC20 transfer transaction payload
     pub fn transfer(&self, destination: &Address, amount: &Balance) -> Result<Vec<u8>> {
         if amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments("Token transfer must have balance type HOPR".into()));
@@ -143,6 +152,7 @@ impl ChainCalls {
         .encode())
     }
 
+    /// Creates the transaction payload to open a payment channel
     pub fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>> {
         if dest.eq(&self.chain_key) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
@@ -177,6 +187,7 @@ impl ChainCalls {
         }
     }
 
+    /// Creates the transaction payload to immediately close an incoming payment channel
     pub fn close_incoming_channel(&self, source: &Address) -> Result<Vec<u8>> {
         if source.eq(&self.chain_key) {
             return Err(InvalidArguments("Cannot close incoming channe from self".into()));
@@ -196,6 +207,9 @@ impl ChainCalls {
         }
     }
 
+    /// Creates the transaction payload that initiates the closure of a payment channel.
+    /// Once the notice period is due, the funds can be withdrawn using a
+    /// finalizeChannelClosure transaction.
     pub fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
         if destination.eq(&self.chain_key) {
             return Err(InvalidArguments(
@@ -224,6 +238,7 @@ impl ChainCalls {
         }
     }
 
+    /// Used to create the payload to claim incentives for relaying a mixnet packet.
     pub fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket) -> Result<Vec<u8>> {
         let redeemable = convert_acknowledged_ticket(acked_ticket)?;
         let params = convert_vrf_parameters(&acked_ticket.vrf_params);
@@ -247,6 +262,9 @@ impl ChainCalls {
         }
     }
 
+    /// Creates a transaction payload that withdraws funds from
+    /// an outgoing payment channel. This will succeed once the closure
+    /// notice period is due.
     pub fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
         if destination.eq(&self.chain_key) {
             return Err(InvalidArguments(
@@ -275,6 +293,8 @@ impl ChainCalls {
         }
     }
 
+    /// Creates a transaction payload to register a Safe instance which is used
+    /// to manage the node's funds
     pub fn register_safe_by_node(&self, safe_addr: &Address) -> Result<Vec<u8>> {
         if safe_addr.eq(&self.chain_key) {
             return Err(InvalidArguments("Safe address must be different from node addr".into()));
@@ -285,6 +305,8 @@ impl ChainCalls {
         .encode())
     }
 
+    /// Creates a transaction payload to remove the Safe instance. Once succeeded,
+    /// the funds are no longer managed by the node.
     pub fn deregister_node_by_safe(&self) -> Result<Vec<u8>> {
         if !self.use_safe {
             return Err(InvalidState(
@@ -362,7 +384,11 @@ pub mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
+    use core_types::{
+        acknowledgement::AcknowledgedTicket,
+        announcement::{AnnouncementData, KeyBinding},
+        channels::Ticket,
+    };
     use ethers::{
         abi::{Address, Token},
         core::utils::{Anvil, AnvilInstance},
@@ -543,23 +569,52 @@ pub mod tests {
         )
         .await;
 
+        let chain_key = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
+
         let chain = ChainCalls::new(
-            &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
-            &ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap(),
+            &chain_key,
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
             HoprAddress::random(),
         );
 
-        let payload = chain.announce(&test_multiaddr, false).unwrap();
+        let ad = AnnouncementData::new(
+            &test_multiaddr,
+            Some(KeyBinding::new(
+                chain_key.public().to_address(),
+                &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
+            )),
+        )
+        .unwrap();
 
         let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-        tx.set_data(payload.into());
+        tx.set_data(chain.announce(&ad, false).into());
         tx.set_to(hopr_announcements.address());
 
-        let receipt = client.send_transaction(tx, None).await.unwrap().await;
+        assert!(client
+            .send_transaction(tx, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+            .is_some());
 
-        println!("{:?}", receipt);
+        let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99").unwrap();
+
+        let ad_reannounce = AnnouncementData::new(&test_multiaddr_reannounce, None).unwrap();
+
+        let mut reannounce_tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+
+        reannounce_tx.set_data(chain.announce(&ad_reannounce, false).into());
+        reannounce_tx.set_to(hopr_announcements.address());
+
+        assert!(client
+            .send_transaction(reannounce_tx, None)
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+            .is_some());
     }
 
     #[tokio::test]
@@ -583,7 +638,6 @@ pub mod tests {
 
         let keypair = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
         let chain = ChainCalls::new(
-            &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
             &keypair,
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
             HoprAddress::random(),
@@ -654,7 +708,10 @@ pub mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
-    use core_types::acknowledgement::wasm::AcknowledgedTicket;
+    use core_types::{
+        acknowledgement::wasm::AcknowledgedTicket,
+        announcement::{AnnouncementData, KeyBinding},
+    };
     use multiaddr::Multiaddr;
     use std::str::FromStr;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
@@ -669,14 +726,9 @@ pub mod wasm {
     #[wasm_bindgen]
     impl ChainCalls {
         #[wasm_bindgen(constructor)]
-        pub fn new(
-            offchain_keypair: &OffchainKeypair,
-            chain_keypair: &ChainKeypair,
-            hopr_channels: Address,
-            hopr_announcements: Address,
-        ) -> Self {
+        pub fn new(chain_keypair: &ChainKeypair, hopr_channels: Address, hopr_announcements: Address) -> Self {
             Self {
-                w: super::ChainCalls::new(offchain_keypair, chain_keypair, hopr_channels, hopr_announcements),
+                w: super::ChainCalls::new(chain_keypair, hopr_channels, hopr_announcements),
             }
         }
 
@@ -691,12 +743,22 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub fn get_announce_payload(&self, announced_multiaddr: &str, use_safe: bool) -> JsResult<Vec<u8>> {
-            let ma = match Multiaddr::from_str(announced_multiaddr) {
-                Ok(ma) => ma,
+        pub fn get_announce_payload(
+            &self,
+            announced_multiaddr: &str,
+            packet_key: &OffchainKeypair,
+            use_safe: bool,
+        ) -> JsResult<Vec<u8>> {
+            match Multiaddr::from_str(announced_multiaddr) {
+                Ok(ma) => Ok(self.w.announce(
+                    &ok_or_jserr!(AnnouncementData::new(
+                        &ma,
+                        Some(KeyBinding::new(self.w.chain_key, packet_key))
+                    ))?,
+                    use_safe,
+                )),
                 Err(e) => return Err(JsValue::from(e.to_string())),
-            };
-            ok_or_jserr!(self.w.announce(&ma, use_safe))
+            }
         }
 
         #[wasm_bindgen]

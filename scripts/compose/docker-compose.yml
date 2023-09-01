@@ -14,52 +14,31 @@ services:
   hoprd:
     image: ${HOPRD_DOCKER_IMAGE}
     pull_policy: always
-    mem_reservation: 300m
+    mem_reservation: 1g
+    mem_limit: 4g
     container_name: hoprd
     hostname: hoprd
-    restart: unless-stopped
+    restart: on-failure
     networks:
       - hopr-net
     ports:
-      - '8080:8080'
-      - '9091:9091'
-      - '3001:3001'
+      - 8080:8080
+      - 9091:9091/tcp
+      - 9091:9091/udp
+      - 3001:3001
     environment:
       - DEBUG=hopr*
-      - HOPRD_ANNOUNCE=${HOPRD_ANNOUNCE}
-      - HOPRD_DATA=/app/hoprd-db
-      - HOPRD_PASSWORD=${HOPRD_PASSWORD}
-      - HOPRD_INIT=true
-      - HOPRD_API=true
-      - HOPRD_API_HOST=0.0.0.0
-      - HOPRD_IDENTITY=/app/hoprd-db/.hopr-id
-      - HOPRD_DISABLE_API_AUTHENTICATION=true
-      # FIXME: must be used as long as release bratislava is set
-      - HOPRD_ENVIRONMENT=${HOPRD_ENVIRONMENT}
-      # FIXME: must be used once release providence is set
-      # - HOPRD_NETWORK=${HOPRD_NETWORK}
-      - HOPRD_HEALTH_CHECK=true
-      - HOPRD_HEALTH_CHECK_HOST=0.0.0.0
+    env_file:
+      - .env-default
+      - .env
     volumes:
-      - hoprd_data:/app/hoprd-db
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-
-  admin:
-    image: ${HOPR_ADMIN_DOCKER_IMAGE}
-    ports:
-      - '3000:3000'
-    restart: unless-stopped
-    depends_on:
-      - hoprd
-    networks:
-      - hopr-net
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+      - hoprd_data:/app/hoprd-db'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    logging:
+      driver: json-file
+      options:
+        max-size: 1000M
+        max-file: 5
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.47.2@sha256:78cf73632de30193dc249923fdfdb1d43ee7cfccbf64662991de89ff7c4b1fda

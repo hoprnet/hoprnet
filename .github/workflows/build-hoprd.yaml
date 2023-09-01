@@ -31,6 +31,7 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
+        timeout-minutes: 10
 
       - name: Set up Google Cloud Credentials
         id: auth
@@ -53,7 +54,11 @@ jobs:
 
       - name: "Set PR number on version"
         run: |
-          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          if [ "${{ github.event.pull_request.number }}" == "${{ vars.RELEASE_PR }}" ]; then
+            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ vars.RELEASE_CANDIDATE_NUMBER }} true
+          else
+            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          fi
           new_version=$(./scripts/get-package-version.sh | sed 's/+/-/')
           echo "DOCKER_TAG=${new_version}" >> $GITHUB_ENV
 

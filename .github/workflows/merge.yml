@@ -68,7 +68,11 @@ jobs:
           else
             echo "DOCKER_STABLE_TAG=${base_branch/release\//}" >> $GITHUB_ENV
           fi
-          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          if [ "${{ github.event.pull_request.number }}" == "${{ vars.RELEASE_PR }}" ]; then
+            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }} true
+          else
+            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
+          fi
           echo "DOCKER_PR_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/' )" >> $GITHUB_ENV
           echo "DOCKER_REGISTRY=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images" >> $GITHUB_ENV
 
