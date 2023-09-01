@@ -142,6 +142,18 @@ hopli migrate-safe-module --network anvil-localhost \
     --contracts-root "../ethereum/contracts"
 ```
 
+Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
+If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
+
+```
+PRIVATE_KEY=<network_registry_manager_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
+hopli sync-network-registry --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
+    --safe-addresses 0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C,0x7d852faebb35adaed925869e028d9325bdd555a4,0xff7570ba5fc8bac26d4536565c48474e09f37b0d \
+    --sync-type forced-sync \
+    --eligibility true
+```
+
 ## Development
 
 ### Run local development
@@ -251,6 +263,18 @@ PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_mana
     --safe-address <safe_address> \
     --module-address <module_address> \
     --contracts-root "../ethereum/contracts"
+```
+
+Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
+If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
+
+```
+PRIVATE_KEY=<network_registry_manager_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
+    cargo run -- sync-network-registry --network anvil-localhost \
+    --contracts-root "../ethereum/contracts" \
+    --safe-addresses 0x4AAf51e0b43d8459AF85E33eEf3Ffb7EACb5532C,0x7d852faebb35adaed925869e028d9325bdd555a4,0xff7570ba5fc8bac26d4536565c48474e09f37b0d \
+    --sync-type forced-sync \
+    --eligibility true
 ```
 
 ### Test
