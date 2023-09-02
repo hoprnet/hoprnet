@@ -4,9 +4,7 @@ use std::ffi::OsString;
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
-use core_strategy::{
-    generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy,
-};
+use core_strategy::{generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy};
 use hex;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};

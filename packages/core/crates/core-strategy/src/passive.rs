@@ -35,19 +35,19 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::sync::Mutex;
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::{ChannelStrategy, PeerQuality};
     use crate::strategy_tick;
+    use std::sync::Mutex;
+    use utils_log::error;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Balance;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
-    use utils_log::error;
 
     #[wasm_bindgen]
     pub struct PassiveStrategy {
-        w: Mutex<super::PassiveStrategy>
+        w: Mutex<super::PassiveStrategy>,
     }
 
     #[wasm_bindgen]
@@ -55,7 +55,7 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new() -> Self {
             Self {
-                w: Mutex::new(super::PassiveStrategy)
+                w: Mutex::new(super::PassiveStrategy),
             }
         }
 

@@ -340,8 +340,7 @@ export class Hopr extends EventEmitter {
     const onReceivedMessage = (msg: Uint8Array) => {
       try {
         this.emit('hopr:message', ApplicationData.deserialize(msg))
-      }
-      catch (err) {
+      } catch (err) {
         log(`could not deserialize application data: ${err}`)
       }
     }
