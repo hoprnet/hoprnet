@@ -344,7 +344,13 @@ export class Hopr extends EventEmitter {
     let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
-    const onReceivedMessage = (msg: ApplicationData) => this.emit('hopr:message', msg)
+    const onReceivedMessage = (msg: Uint8Array) => {
+      try {
+        this.emit('hopr:message', ApplicationData.deserialize(msg))
+      } catch (err) {
+        log(`could not deserialize application data: ${err}`)
+      }
+    }
 
     log('Linking chain and packet keys')
     this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot._default())

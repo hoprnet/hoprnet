@@ -24,8 +24,8 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
         true
     }
 
-    fn emit(&mut self, event: NetworkEvent) {
-        if let Err(e) = self.emitter.start_send(event.clone()) {
+    fn emit(&self, event: NetworkEvent) {
+        if let Err(e) = self.emitter.clone().start_send(event.clone()) {
             error!("Failed to emit a network status: {}: {}", event, e)
         }
     }

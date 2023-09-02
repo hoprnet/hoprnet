@@ -298,74 +298,72 @@ log "Waiting for nodes to finish open channel (long running)"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-#for i in `seq 1 10`; do
-#  log "Node 1 send 1 hop message to self via node 2"
-#  api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
-#
-#  log "Node 2 send 1 hop message to self via node 3"
-#  api_send_message "${api2}" "${msg_tag}" "${addr2}" 'hello, world from self via 3' "${addr3}" & jobs+=( "$!" )
-#
-#  log "Node 3 send 1 hop message to self via node 4"
-#  api_send_message "${api3}" "${msg_tag}" "${addr3}" 'hello, world from self via 4' "${addr4}" & jobs+=( "$!" )
-#
-#  log "Node 4 send 1 hop message to self via node 5"
-#  api_send_message "${api4}" "${msg_tag}" "${addr4}" 'hello, world from self via 5' "${addr5}" & jobs+=( "$!" )
-#done
+for i in `seq 1 10`; do
+  log "Node 1 send 1 hop message to self via node 2"
+  api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
 
-echo "FIXME: Skipping over multi-hop message sending and ticket redemption"
+  log "Node 2 send 1 hop message to self via node 3"
+  api_send_message "${api2}" "${msg_tag}" "${addr2}" 'hello, world from self via 3' "${addr3}" & jobs+=( "$!" )
+
+  log "Node 3 send 1 hop message to self via node 4"
+  api_send_message "${api3}" "${msg_tag}" "${addr3}" 'hello, world from self via 4' "${addr4}" & jobs+=( "$!" )
+
+  log "Node 4 send 1 hop message to self via node 5"
+  api_send_message "${api4}" "${msg_tag}" "${addr4}" 'hello, world from self via 5' "${addr5}" & jobs+=( "$!" )
+done
 
 log "Waiting for nodes to finish sending 1 hop messages"
-#for j in ${jobs[@]}; do wait -n $j; done; jobs=()
+for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-#log "Node 2 should now have a ticket"
-#result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")
-#log "-- ${result}"
-#
-#log "Node 3 should now have a ticket"
-#result=$(api_get_ticket_statistics "${api3}" "\"winProportion\":1")
-#log "-- ${result}"
-#
-#log "Node 4 should now have a ticket"
-#result=$(api_get_ticket_statistics "${api4}" "\"winProportion\":1")
-#log "-- ${result}"
-#
-#log "Node 5 should now have a ticket"
-#result=$(api_get_ticket_statistics "${api5}" "\"winProportion\":1")
-#log "-- ${result}"
-#
-#for i in `seq 1 10`; do
-#  log "Node 1 send 1 hop message to node 3 via node 2"
-#  api_send_message "${api1}" "${msg_tag}" "${addr3}" 'hello, world from 1 via 2' "${addr2}" & jobs+=( "$!" )
-#
-#  log "Node 2 send 1 hop message to node 4 via node 3"
-#  api_send_message "${api2}" "${msg_tag}" "${addr4}" 'hello, world from 2 via 3' "${addr3}" & jobs+=( "$!" )
-#
-#  log "Node 3 send 1 hop message to node 5 via node 4"
-#  api_send_message "${api3}" "${msg_tag}" "${addr5}" 'hello, world from 3 via 4' "${addr4}" & jobs+=( "$!" )
-#
-#  log "Node 5 send 1 hop message to node 2 via node 1"
-#  api_send_message "${api5}" "${msg_tag}" "${addr2}" 'hello, world from 5 via 1' "${addr1}" & jobs+=( "$!" )
-#done
-#log "Waiting for nodes to finish sending 1-hop messages"
-#for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-#log "Waiting DONE"
-#
-#for i in `seq 1 10`; do
-#  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
-#  api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
-#done
-#log "Waiting for nodes to finish sending 3-hop messages"
-#for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-#log "Waiting DONE"
-#
-#for i in `seq 1 10`; do
-#  log "Node 1 send message to node 5"
-#  api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
-#done
-#log "Waiting for node 1 to send messages to node 5"
-#for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-#log "Waiting DONE"
+log "Node 2 should now have a ticket"
+result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")
+log "-- ${result}"
+
+log "Node 3 should now have a ticket"
+result=$(api_get_ticket_statistics "${api3}" "\"winProportion\":1")
+log "-- ${result}"
+
+log "Node 4 should now have a ticket"
+result=$(api_get_ticket_statistics "${api4}" "\"winProportion\":1")
+log "-- ${result}"
+
+log "Node 5 should now have a ticket"
+result=$(api_get_ticket_statistics "${api5}" "\"winProportion\":1")
+log "-- ${result}"
+
+for i in `seq 1 10`; do
+  log "Node 1 send 1 hop message to node 3 via node 2"
+  api_send_message "${api1}" "${msg_tag}" "${addr3}" 'hello, world from 1 via 2' "${addr2}" & jobs+=( "$!" )
+
+  log "Node 2 send 1 hop message to node 4 via node 3"
+  api_send_message "${api2}" "${msg_tag}" "${addr4}" 'hello, world from 2 via 3' "${addr3}" & jobs+=( "$!" )
+
+  log "Node 3 send 1 hop message to node 5 via node 4"
+  api_send_message "${api3}" "${msg_tag}" "${addr5}" 'hello, world from 3 via 4' "${addr4}" & jobs+=( "$!" )
+
+  log "Node 5 send 1 hop message to node 2 via node 1"
+  api_send_message "${api5}" "${msg_tag}" "${addr2}" 'hello, world from 5 via 1' "${addr1}" & jobs+=( "$!" )
+done
+log "Waiting for nodes to finish sending 1-hop messages"
+for j in ${jobs[@]}; do wait -n $j; done; jobs=()
+log "Waiting DONE"
+
+for i in `seq 1 10`; do
+  log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
+  api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
+done
+log "Waiting for nodes to finish sending 3-hop messages"
+for j in ${jobs[@]}; do wait -n $j; done; jobs=()
+log "Waiting DONE"
+
+for i in `seq 1 10`; do
+  log "Node 1 send message to node 5"
+  api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
+done
+log "Waiting for node 1 to send messages to node 5"
+for j in ${jobs[@]}; do wait -n $j; done; jobs=()
+log "Waiting DONE"
 
 test_redeem_in_specific_channel() {
   local node_id="${1}"
@@ -396,6 +394,7 @@ test_redeem_in_specific_channel() {
   echo "all good"
 }
 
+echo "!!! Skipping ticket redemption tests until fixed !!!"
 # FIXME: re-enable when ticket redemption works
 #
 # test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
@@ -469,4 +468,4 @@ test_get_all_channels "${api1}"
 
 
 # checking statuses of the long running tests
-# check_native_withdraw_results ${native_balance}
+#check_native_withdraw_results ${native_balance}

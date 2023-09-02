@@ -672,6 +672,9 @@ where
                         );
                         *DEFAULT_PRICE_PER_PACKET
                     });
+
+                debug!("price per packet is {price_per_packet}");
+
                 if let Err(e) = validate_unacknowledged_ticket::<Db>(
                     &*self.db.read().await,
                     &packet.ticket,
@@ -690,6 +693,7 @@ where
                 }
 
                 {
+                    debug!("storing pending acknowledgement for channel {}", channel.get_id());
                     let mut g = self.db.write().await;
                     g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index.into())
                         .await?;
