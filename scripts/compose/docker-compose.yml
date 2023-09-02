@@ -11,6 +11,18 @@ volumes:
   hoprd_data: {}
 
 services:
+  hopr-admin:
+    image: hopr-admin
+    build:
+      context: https://github.com/hoprnet/hopr-admin.git#f15eaaf2031b061b6eb304b8a5c4ec36df603827:.
+      dockerfile: scripts/NodeAdmin.Dockerfile
+    ports:
+      - 3000:3000
+    depends_on:
+      - hoprd
+    networks:
+      - hopr-net
+
   hoprd:
     image: ${HOPRD_DOCKER_IMAGE}
     pull_policy: always
