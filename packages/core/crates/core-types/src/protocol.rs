@@ -130,7 +130,7 @@ impl BinarySerializable for ApplicationData {
 
     fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
         if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
-            let mut tag = [0u8;2];
+            let mut tag = [0u8; 2];
             tag.copy_from_slice(&data[0..2]);
             let tag = u16::from_be_bytes(tag);
             Ok(Self {
