@@ -298,6 +298,7 @@ function setup_node() {
       --testUseWeakCrypto \
       --allowLocalNodeConnections \
       --allowPrivateNodeConnections \
+      --disableTicketAutoRedeem \
       ${additional_args} \
       > "${log}" 2>&1 &
 }

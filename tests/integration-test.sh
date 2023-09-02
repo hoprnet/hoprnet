@@ -316,10 +316,6 @@ log "Waiting for nodes to finish sending 1 hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-echo "Exit early after sending 1-hop messages"
-exit 0
-
-
 log "Node 2 should now have a ticket"
 result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")
 log "-- ${result}"
@@ -398,6 +394,7 @@ test_redeem_in_specific_channel() {
   echo "all good"
 }
 
+echo "!!! Skipping ticket redemption tests until fixed !!!"
 # FIXME: re-enable when ticket redemption works
 #
 # test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
