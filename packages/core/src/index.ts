@@ -210,7 +210,7 @@ export class Hopr extends EventEmitter {
   private networkPeers: WasmNetwork
   private pinger: WasmPing
   private index_updater: WasmIndexerInteractions
-  public id: PeerId
+  private id: PeerId
   private main_loop: Promise<void>
 
   public network: ResolvedNetwork
