@@ -1,4 +1,12 @@
-import { Hash, channel_status_to_string, stringToU8a, ChannelStatus, defer, type DeferType } from '@hoprnet/hopr-utils'
+import {
+  debug,
+  Hash,
+  channel_status_to_string,
+  stringToU8a,
+  ChannelStatus,
+  defer,
+  type DeferType
+} from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 import { ChannelTopologyInfo, formatChannelTopologyInfo } from '../index.js'
@@ -6,9 +14,9 @@ import { ChannelTopologyInfo, formatChannelTopologyInfo } from '../index.js'
 import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 
-import { log } from 'debug'
-
 const closingRequests = new Map<string, DeferType<void>>()
+
+const log = debug('hoprd:api:v3:channel-close')
 
 /**
  * Closes a channel with channel id.
@@ -43,10 +51,11 @@ export async function closeChannel(
   // incoming if destination is me, outgoing if source is me
   let direction
   let counterpartyAddress
-  if (channel.source == node.getEthereumAddress()) {
+
+  if (channel.source.to_string() == node.getEthereumAddress().to_string()) {
     direction = 'outgoing'
     counterpartyAddress = channel.destination
-  } else if (channel.destination == node.getEthereumAddress()) {
+  } else if (channel.destination.to_string() == node.getEthereumAddress().to_string()) {
     direction = 'incoming'
     counterpartyAddress = channel.source
   } else {

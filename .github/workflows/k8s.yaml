@@ -13,7 +13,7 @@ env:
 jobs:
   deploy:
     name: deploy
-    runs-on: ubuntu-2-core
+    runs-on: ubuntu-latest-4-cores
     timeout-minutes: 30
     if: github.event.label.name == 'deploy_nodes' && github.event.action == 'labeled'
     steps:
@@ -67,7 +67,7 @@ jobs:
 
   undeploy:
     name: undeploy
-    runs-on: ubuntu-2-core
+    runs-on: ubuntu-latest-4-cores
     timeout-minutes: 30
     if: github.event.label.name == 'deploy_nodes' && github.event.action == 'unlabeled'
     steps:

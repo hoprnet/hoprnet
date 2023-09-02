@@ -51,6 +51,9 @@ pub enum HelperErrors {
     #[error("unable read private key")]
     UnableToReadPrivateKey,
 
+    #[error("missing parameter: {0}")]
+    MissingParameter(String),
+
     #[error(transparent)]
     KeyStoreError(#[from] KeyPairError),
 }

@@ -27,7 +27,7 @@ jobs:
 
   build:
     name: docker
-    runs-on: ubuntu-2-core
+    runs-on: ubuntu-latest-4-cores
     timeout-minutes: 60
     steps:
       - name: Checkout hoprnet repository
@@ -50,8 +50,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          driver: kubernetes
 
       - name: "Set PR number on version"
         run: |
