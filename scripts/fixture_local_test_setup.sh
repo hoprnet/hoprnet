@@ -294,6 +294,7 @@ function setup_node() {
       --api \
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
+      --disableTicketAutoRedeem \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
       --allowLocalNodeConnections \

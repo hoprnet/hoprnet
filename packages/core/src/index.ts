@@ -59,14 +59,7 @@ import {
   PingConfig
 } from '@hoprnet/hopr-utils'
 
-import {
-  INTERMEDIATE_HOPS,
-  MAX_HOPS,
-  PACKET_SIZE,
-  VERSION,
-  MAX_PARALLEL_PINGS,
-  ONBOARDING_INFORMATION_INTERVAL
-} from './constants.js'
+import { INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
 
 import { findPath } from './path/index.js'
 
@@ -217,7 +210,7 @@ export class Hopr extends EventEmitter {
   private networkPeers: WasmNetwork
   private pinger: WasmPing
   private index_updater: WasmIndexerInteractions
-  private id: PeerId
+  public id: PeerId
   private main_loop: Promise<void>
 
   public network: ResolvedNetwork
@@ -474,9 +467,6 @@ export class Hopr extends EventEmitter {
     log('# STARTED NODE')
     log('ID', this.getId().toString())
     log('Protocol version', VERSION)
-
-    // possibly show onboarding information
-    await this.showOnboardingInformation()
   }
 
   public async startProcessing() {
@@ -1538,36 +1528,6 @@ export class Hopr extends EventEmitter {
       return Promise.resolve()
     }
     return new Promise((resolve) => this.once('running', resolve))
-  }
-
-  private async showOnboardingInformation(): Promise<void> {
-    const address = this.getEthereumAddress().to_string()
-    const version = this.getVersion()
-    if (await this.isAllowedAccessToNetwork(this.id)) {
-      const msg = `
-      Node information:
-
-      Node peerID: ${this.id.toString()}
-      Node address: ${address}
-      Node version: ${version}
-      `
-      log(msg)
-      return
-    }
-
-    const msg = `
-    Node information:
-
-    Node peerID: ${this.id.toString()}
-    Node address: ${address}
-    Node version: ${version}
-
-    Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding=${address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
-      `
-    log(msg)
-    retimer(async () => {
-      await this.showOnboardingInformation()
-    }, ONBOARDING_INFORMATION_INTERVAL)
   }
 }
 
