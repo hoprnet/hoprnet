@@ -1085,7 +1085,7 @@ dependencies = [
  "core-types",
  "hex",
  "js-sys",
- "rusty-leveldb",
+ "rusty-leveldb 1.0.8",
  "serde",
  "serde-wasm-bindgen",
  "stdext",
@@ -1118,7 +1118,7 @@ dependencies = [
  "lazy_static",
  "multiaddr",
  "primitive-types",
- "rusty-leveldb",
+ "rusty-leveldb 1.0.8",
  "serde",
  "serde-wasm-bindgen",
  "thiserror",
@@ -1151,7 +1151,7 @@ dependencies = [
  "libp2p-identity",
  "mockall",
  "multiaddr",
- "rusty-leveldb",
+ "rusty-leveldb 1.0.8",
  "semver",
  "svm-rs",
  "thiserror",
@@ -1340,7 +1340,7 @@ dependencies = [
  "libp2p-identity",
  "mockall",
  "parameterized",
- "rusty-leveldb",
+ "rusty-leveldb 1.0.8",
  "serde",
  "serde-wasm-bindgen",
  "serial_test",
@@ -1368,7 +1368,7 @@ dependencies = [
  "hex-literal",
  "js-sys",
  "libp2p-identity",
- "rusty-leveldb",
+ "rusty-leveldb 1.0.8",
  "tempfile",
  "thiserror",
  "utils-db",
@@ -5208,6 +5208,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusty-leveldb"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ebb08e1856dfba2e1870b15b8f4ad1994a3a9611619241929cedeaa7324a51c"
+dependencies = [
+ "crc",
+ "errno 0.2.8",
+ "fs2",
+ "integer-encoding",
+ "rand 0.7.3",
+ "snap",
+]
+
+[[package]]
 name = "rw-stream-sink"
 version = "0.4.0"
 source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=release/providence-update-20230828#b6ad8dda34727860d63ca6dc21087f1cb4862650"
@@ -6375,7 +6389,7 @@ dependencies = [
  "js-sys",
  "mockall",
  "pin-project-lite",
- "rusty-leveldb",
+ "rusty-leveldb 2.0.0",
  "scopeguard",
  "serde",
  "serde-wasm-bindgen",

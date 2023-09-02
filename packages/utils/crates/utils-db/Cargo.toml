@@ -35,10 +35,10 @@ scopeguard = "1.1.0"
 tempfile = "3.5.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rusty-leveldb = "1.0"
+rusty-leveldb = "2.0.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-rusty-leveldb = "1.0"
+rusty-leveldb = "2.0.0"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
