@@ -4,6 +4,7 @@ use crate::faucet::FaucetArgs;
 use crate::identity::IdentityArgs;
 use crate::initialize_node::InitializeNodeArgs;
 use crate::network_registry::RegisterInNetworkRegistryArgs;
+use crate::sync_network_registry::SyncNetworkRegistryArgs;
 use crate::utils::{Cmd, HelperErrors};
 use clap::{Parser, Subcommand};
 pub mod create_safe_module;
@@ -18,6 +19,7 @@ pub mod network_registry;
 pub mod password;
 pub mod process;
 pub mod utils;
+pub mod sync_network_registry;
 
 #[derive(Parser, Debug)]
 #[clap(name = "hopli")]
@@ -46,6 +48,8 @@ enum Commands {
     CreateSafeModule(CreateSafeModuleArgs),
     #[clap(about = "Migrate an exising set of node(d) with safe and module to a new network, with default permissions")]
     MigrateSafeModule(MigrateSafeModuleArgs),
+    #[clap(about = "Sync eligibility of safes on network registry")]
+    SyncNetworkRegistry(SyncNetworkRegistryArgs),
 }
 
 fn main() -> Result<(), HelperErrors> {
@@ -68,6 +72,9 @@ fn main() -> Result<(), HelperErrors> {
             opt.run()?;
         }
         Commands::MigrateSafeModule(opt) => {
+            opt.run()?;
+        }
+        Commands::SyncNetworkRegistry(opt) => {
             opt.run()?;
         }
     }

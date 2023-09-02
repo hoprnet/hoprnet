@@ -384,16 +384,6 @@ fund-local-all: ## use faucet script to fund all the local identities
 		--identity-directory "${id_dir}" \
 		--contracts-root "./packages/ethereum/contracts"
 
-.PHONY: fund-local-rotsee
-fund-local-rotsee: network=rotsee
-fund-local-rotsee: ## use faucet script to fund all the local identities
-ifeq ($(node_address),)
-	echo "parameter <node_address> missing" >&2 && exit 1
-else
-	echo "$$args" > .safe.args && \
-		safe_address=$$(cat .safe.args | awk '{print $$2}') && \
-		make register-nodes network="${network}" environment_type=staging staking_addresses="[${safe_address}]" node_addresses="[${node_address}]"
-endif
 .PHONY: create-safe-module-all
 create-safe-module-all: id_dir=/tmp/
 create-safe-module-all: id_password=local

@@ -363,14 +363,14 @@ mod tests {
 /// WASM bindings
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::sync::Mutex;
     use crate::generic::ChannelStrategy;
     use crate::generic::{wasm::StrategyTickResult, PeerQuality};
     use crate::strategy_tick;
+    use std::sync::Mutex;
+    use utils_log::error;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Balance;
     use wasm_bindgen::prelude::*;
-    use utils_log::error;
 
     #[wasm_bindgen(getter_with_clone)]
     pub struct PromiscuousStrategy {
@@ -381,7 +381,7 @@ pub mod wasm {
         pub max_channels: Option<usize>,
         pub auto_redeem_tickets: bool,
         pub enforce_max_channels: bool,
-        w: Mutex<super::PromiscuousStrategy>
+        w: Mutex<super::PromiscuousStrategy>,
     }
 
     #[wasm_bindgen]
@@ -397,7 +397,7 @@ pub mod wasm {
                 max_channels: s.max_channels,
                 auto_redeem_tickets: s.auto_redeem_tickets,
                 enforce_max_channels: s.enforce_max_channels,
-                w: Mutex::new(s)
+                w: Mutex::new(s),
             }
         }
 
