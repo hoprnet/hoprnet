@@ -165,8 +165,8 @@ function reuse_pregenerated_identities() {
   log "Reuse pre-generated identities"
 
   # remove existing identity files in tmp folder, .safe.args
-  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -type f -maxdepth 0 -name "${node_prefix}_*.safe.args" -delete
+  find -L "${tmp_dir}" -type f -maxdepth 0 -name "${node_prefix}_*.id" -delete
 
   local ready_id_files
   mapfile -t ready_id_files <<< "$(find -L "${mydir}/../tests/identities" -type f -name "*.id" | sort)"
