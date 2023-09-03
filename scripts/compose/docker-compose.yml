@@ -17,7 +17,7 @@ services:
       context: https://github.com/hoprnet/hopr-admin.git#f15eaaf2031b061b6eb304b8a5c4ec36df603827:.
       dockerfile: scripts/NodeAdmin.Dockerfile
     ports:
-      - 3000:3000
+      - 3000:80
     depends_on:
       - hoprd
     networks:
