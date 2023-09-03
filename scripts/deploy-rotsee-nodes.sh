@@ -158,7 +158,7 @@ upload_identities() {
   local dest src identities
   dest="/root/hoprd-db/.hopr-id"
   src="${mydir}/tmp/"
-  mapfile -t identities <<< "$(find "${src}" -type f -maxdepth 0 -name '.hopr-id_*.id' | sort)"
+  mapfile -t identities <<< "$(find "${src}" -maxdepth 1 -type f -name '.hopr-id_*.id' | sort)"
 
   for i in "${!ssh_hosts[@]}"; do
     local host
@@ -191,7 +191,7 @@ deploy_safes() {
 
   local src identities
   src="${mydir}/tmp/"
-  mapfile -t identities <<< "$(find "${src}" -type f -maxdepth 0 -name '.hopr-id_*.id' | sort)"
+  mapfile -t identities <<< "$(find "${src}" -maxdepth 1 -type f -name '.hopr-id_*.id' | sort)"
 
   for i in "${!identities[@]}"; do
     local id_path

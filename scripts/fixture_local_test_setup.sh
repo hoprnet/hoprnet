@@ -165,11 +165,11 @@ function reuse_pregenerated_identities() {
   log "Reuse pre-generated identities"
 
   # remove existing identity files in tmp folder, .safe.args
-  find -L "${tmp_dir}" -type f -maxdepth 0 -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -type f -maxdepth 0 -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete
 
   local ready_id_files
-  mapfile -t ready_id_files <<< "$(find -L "${mydir}/../tests/identities" -type f -maxdepth 0 -name "*.id" | sort)"
+  mapfile -t ready_id_files <<< "$(find -L "${mydir}/../tests/identities/" -maxdepth 1 -type f -name "*.id" | sort)"
 
   # we copy and rename the files according to the expected file name format and
   # destination folder
@@ -196,8 +196,8 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  find -L "${tmp_dir}" -type f -maxdepth 0 -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -type f -maxdepth 0 -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete
 
   env ETHERSCAN_API_KEY="${ETHERSCAN_API_KEY:-}" IDENTITY_PASSWORD="${password}" \
     hopli identity \
@@ -212,7 +212,7 @@ function generate_local_identities() {
 function create_local_safes() {
   log "Create safe"
 
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -maxdepth 0 -name "${node_prefix}_*.id" | sort)"
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort)"
 
   # create a loop so safes are created for all the nodes TODO:
   for id_file in ${id_files[@]}; do
