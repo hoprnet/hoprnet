@@ -20,8 +20,6 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 
-    async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool>;
-
     async fn get_pending_acknowledgement(
         &self,
         half_key_challenge: &HalfKeyChallenge,
@@ -230,19 +228,6 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_from_network_registry(&self, stake_account: &Address) -> Result<Vec<Address>>;
 
-    async fn add_to_network_registry(
-        &mut self,
-        stake_account: &Address,
-        node_address: &Address,
-        snapshot: &Snapshot,
-    ) -> Result<()>;
-
-    async fn remove_from_network_registry(
-        &mut self,
-        stake_account: &Address,
-        node_address: &Address,
-        snapshot: &Snapshot,
-    ) -> Result<()>;
     /// Check if address as eligible to be operating in the network.
     async fn is_eligible(&self, account: &Address) -> Result<bool>;
 

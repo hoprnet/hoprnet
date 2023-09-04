@@ -4,7 +4,7 @@ use utils_types::primitives::{Address, Balance};
 use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
 
 /// Implements passive strategy which does nothing.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone)]
 pub struct PassiveStrategy;
 
 impl ChannelStrategy for PassiveStrategy {
@@ -37,33 +37,45 @@ mod tests {
 pub mod wasm {
     use crate::generic::wasm::StrategyTickResult;
     use crate::generic::{ChannelStrategy, PeerQuality};
-    use crate::passive::PassiveStrategy;
     use crate::strategy_tick;
+    use std::sync::Mutex;
+    use utils_log::error;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Balance;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
+    pub struct PassiveStrategy {
+        w: Mutex<super::PassiveStrategy>,
+    }
+
+    #[wasm_bindgen]
     impl PassiveStrategy {
         #[wasm_bindgen(constructor)]
-        pub fn _new() -> Self {
-            Self {}
+        pub fn new() -> Self {
+            Self {
+                w: Mutex::new(super::PassiveStrategy),
+            }
         }
 
         #[wasm_bindgen(getter)]
         pub fn name(&self) -> String {
-            Self::NAME.into()
+            super::PassiveStrategy::NAME.into()
         }
 
-        #[wasm_bindgen(js_name = "tick")]
-        pub fn _tick(
-            &mut self,
+        pub fn tick(
+            &self,
             balance: Balance,
-            mut peers: PeerQuality,
+            peers: PeerQuality,
             outgoing_channels: JsValue,
         ) -> JsResult<StrategyTickResult> {
-            strategy_tick!(self, balance, peers, outgoing_channels)
+            if let Ok(mut s) = self.w.lock() {
+                strategy_tick!(s, balance, peers, outgoing_channels)
+            } else {
+                error!("could not lock for strategy tick");
+                Err("strategy lock failed".into())
+            }
         }
     }
 }

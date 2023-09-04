@@ -1,4 +1,6 @@
 import EventEmitter from 'events'
+import path from 'path'
+import fs from 'fs'
 
 import { Multiaddr, multiaddr, protocols } from '@multiformats/multiaddr'
 
@@ -82,6 +84,7 @@ import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 
 import { isIP } from 'node:net'
+import { TagBloomFilter } from '@hoprnet/hoprd/lib/hoprd_hoprd.js'
 
 const CODE_P2P = protocols('p2p').code
 
@@ -334,10 +337,25 @@ export class Hopr extends EventEmitter {
     let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
     packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
 
-    const onReceivedMessage = (msg: ApplicationData) => this.emit('hopr:message', msg)
+    const onReceivedMessage = (msg: Uint8Array) => {
+      try {
+        this.emit('hopr:message', ApplicationData.deserialize(msg))
+      } catch (err) {
+        log(`could not deserialize application data: ${err}`)
+      }
+    }
 
     log('Linking chain and packet keys')
     this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot._default())
+
+    const tbfPath = path.join(this.options.dataPath, 'tbf')
+    let tagBloomFilter = new TagBloomFilter()
+    try {
+      let tbfData = new Uint8Array(fs.readFileSync(tbfPath))
+      tagBloomFilter = TagBloomFilter.deserialize(tbfData)
+    } catch (err) {
+      error(`no tag bloom filter file found, using empty`)
+    }
 
     log('Constructing the core application and tools')
     let coreApp = new CoreApp(
@@ -350,6 +368,14 @@ export class Hopr extends EventEmitter {
       onAcknowledgedTicket,
       packetCfg,
       onReceivedMessage,
+      tagBloomFilter,
+      (tbfData: Uint8Array) => {
+        try {
+          fs.writeFileSync(tbfPath, tbfData)
+        } catch (err) {
+          error(`failed to save tag bloom filter data`)
+        }
+      },
       this.getLocalMultiaddresses().map((x) => x.toString())
     )
 
@@ -1393,7 +1419,7 @@ export class Hopr extends EventEmitter {
     return result
   }
 
-  private async peerIdToChainKey(id: PeerId) {
+  public async peerIdToChainKey(id: PeerId): Promise<Address> {
     let pk = OffchainPublicKey.from_peerid_str(id.toString())
     return await this.db.get_chain_key(pk)
   }
@@ -1403,13 +1429,16 @@ export class Hopr extends EventEmitter {
    * @returns true if allowed access
    */
   public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
-    let chain_key = await this.peerIdToChainKey(id)
-    if (chain_key) {
-      return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(Address.deserialize(chain_key.serialize()))
-    } else {
-      log(`failed to determine channel key of ${id.toString()}`)
-      return false
+    // Don't wait for key binding and local linking if identity is the local node
+    if (this.id.equals(id)) {
+      return await this.db.is_allowed_to_access_network(this.getEthereumAddress())
     }
+    let chain_key: Address = await this.peerIdToChainKey(id)
+    // Only check if we found a chain key, otherwise peer is not allowed
+    if (chain_key) {
+      return await this.db.is_allowed_to_access_network(chain_key)
+    }
+    return false
   }
 
   /**

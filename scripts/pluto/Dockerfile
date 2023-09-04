@@ -57,4 +57,4 @@ EXPOSE 18085
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
 ENV NODE_OPTIONS="--experimental-wasm-modules"
-ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh --hoprd-command "node packages/hoprd/lib/main.cjs" -l "0.0.0.0"
+ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh

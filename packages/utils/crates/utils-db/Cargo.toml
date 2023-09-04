@@ -19,7 +19,6 @@ hex = "0.4.3"
 js-sys = { workspace = true, optional = true }
 pin-project-lite = "0.2.13"
 serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = { version = "0.5", optional = true }
 thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
@@ -48,5 +47,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:serde-wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "utils-log/wasm", "utils-types/wasm"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:gloo-timers", "utils-log/wasm", "utils-types/wasm"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]

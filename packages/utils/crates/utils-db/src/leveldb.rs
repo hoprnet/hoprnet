@@ -22,7 +22,7 @@ pub mod wasm {
 
         // https://github.com/Level/levelup#dbbatcharray-options-callback-array-form
         #[wasm_bindgen(method, catch)]
-        async fn batch(this: &LevelDb, operations: js_sys::Array, wait_for_write: bool) -> Result<(), JsValue>;
+        async fn batch(this: &LevelDb, operations: Vec<JsValue>, wait_for_write: bool) -> Result<(), JsValue>;
 
         #[wasm_bindgen(method, catch)]
         fn iterValues(this: &LevelDb, prefix: js_sys::Uint8Array, suffix_length: u32) -> Result<JsValue, JsValue>;
@@ -50,6 +50,14 @@ pub mod wasm {
         pub fn new(db: LevelDb) -> LevelDbShim {
             LevelDbShim { db }
         }
+    }
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct BatchOp {
+        #[wasm_bindgen(js_name = "type")]
+        pub kind: String,
+        pub key: Box<[u8]>,
+        pub value: Option<Box<[u8]>>,
     }
 
     #[async_trait(? Send)]
@@ -143,6 +151,7 @@ pub mod wasm {
 
             Ok(Box::new(crate::types::wasm::BinaryStreamWrapper::new(stream)))
         }
+
         async fn batch(
             &mut self,
             operations: Vec<BatchOperation<Self::Key, Self::Value>>,
@@ -150,23 +159,24 @@ pub mod wasm {
         ) -> crate::errors::Result<()> {
             let ops = operations
                 .into_iter()
-                .map(|op| serde_wasm_bindgen::to_value(&op))
+                .map(|op| match op {
+                    BatchOperation::del(key) => JsValue::from(BatchOp {
+                        kind: "del".into(),
+                        key: key.key,
+                        value: None,
+                    }),
+                    BatchOperation::put(put) => JsValue::from(BatchOp {
+                        kind: "put".into(),
+                        key: put.key,
+                        value: Some(put.value),
+                    }),
+                })
                 .collect::<Vec<_>>();
 
-            if ops.iter().any(|i| i.is_err()) {
-                Err(DbError::GenericError(
-                    "Batch operation contains a deserialization error, aborting".to_string(),
-                ))
-            } else {
-                let ops: js_sys::Array = ops
-                    .into_iter()
-                    .filter_map(|op| op.ok().map(|v| JsValue::from(&v)))
-                    .collect();
-                self.db
-                    .batch(ops, wait_for_write)
-                    .await
-                    .map_err(|e| DbError::GenericError(format!("Batch operation failed to write data: {:?}", e)))
-            }
+            self.db
+                .batch(ops, wait_for_write)
+                .await
+                .map_err(|e| DbError::GenericError(format!("Batch operation failed to write data: {:?}", e)))
         }
     }
 

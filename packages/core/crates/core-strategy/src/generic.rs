@@ -104,7 +104,7 @@ impl PeerQuality {
         }
     }
 
-    pub fn take(&mut self) -> Vec<(Address, f64)> {
+    pub fn take(&self) -> Vec<(Address, f64)> {
         self.peers_with_quality.clone()
     }
 }

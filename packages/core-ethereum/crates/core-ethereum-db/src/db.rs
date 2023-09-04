@@ -109,20 +109,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(())
     }
 
-    async fn check_and_set_packet_tag(&mut self, tag: &[u8]) -> Result<bool> {
-        let key = utils_db::db::Key::new_bytes_with_prefix(tag, PACKET_TAG_PREFIX)?;
-
-        let has_packet_tag = self.db.contains(key.clone()).await;
-        if !has_packet_tag {
-            let empty: [u8; 0] = [];
-            self.db.set(key, &empty).await?;
-        }
-
-        //debug!("packet tag check: {}, set to: {}", has_packet_tag, hex::encode(tag));
-
-        Ok(has_packet_tag)
-    }
-
     async fn get_pending_acknowledgement(
         &self,
         half_key_challenge: &HalfKeyChallenge,
@@ -802,84 +788,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(self.db.get_or_none::<Vec<Address>>(key).await?.unwrap_or(vec![]))
     }
 
-    /// Adds a node to the network registry
-    ///
-    /// - `stake_account`: the stake account to which the address should be added
-    /// - `node_address`: the address to add
-    /// - `snapshot`: latest chain snapshot
-    async fn add_to_network_registry(
-        &mut self,
-        stake_account: &Address,
-        node_address: &Address,
-        snapshot: &Snapshot,
-    ) -> Result<()> {
-        let mut registered_nodes = self.get_from_network_registry(stake_account).await?;
-
-        let already_included = registered_nodes.contains(node_address);
-
-        if !already_included {
-            registered_nodes.push(node_address.to_owned());
-        }
-
-        let mut batch_ops = utils_db::db::Batch::new();
-
-        let eligible = self.is_eligible(stake_account).await?;
-
-        if eligible {
-            batch_ops.put(
-                utils_db::db::Key::new_with_prefix(node_address, NETWORK_REGISTRY_ALLOWED_PREFIX)?,
-                (),
-            )
-        }
-
-        batch_ops.put(
-            utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?,
-            &registered_nodes,
-        );
-        batch_ops.put(
-            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            snapshot,
-        );
-
-        self.db.batch(batch_ops, true).await
-    }
-
-    /// Removes a node from the network registry
-    ///
-    /// - `stake_account`: the stake account from which the address should be removed
-    /// - `node_address`: the address to remove
-    /// - `snapshot`: latest chain snapshot
-    async fn remove_from_network_registry(
-        &mut self,
-        stake_account: &Address,
-        node_address: &Address,
-        snapshot: &Snapshot,
-    ) -> Result<()> {
-        let registered_nodes: Vec<Address> = self
-            .get_from_network_registry(stake_account)
-            .await?
-            .into_iter()
-            .filter(|registered_node| registered_node.ne(&node_address))
-            .collect();
-
-        let mut batch_ops = utils_db::db::Batch::new();
-
-        batch_ops.del(utils_db::db::Key::new_with_prefix(
-            node_address,
-            NETWORK_REGISTRY_ALLOWED_PREFIX,
-        )?);
-        batch_ops.put(
-            utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX)?,
-            &registered_nodes,
-        );
-        batch_ops.put(
-            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            snapshot,
-        );
-
-        self.db.batch(batch_ops, true).await
-    }
-
     /// Checks if an stake account is eligible to register nodes
     ///
     /// - `stake_account`: the account to check
@@ -997,7 +905,6 @@ pub mod wasm {
         acknowledgement::wasm::AcknowledgedTicket,
         channels::{wasm::Ticket, ChannelEntry},
     };
-    use js_sys::Uint8Array;
     use std::sync::Arc;
     use utils_db::leveldb;
     use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
@@ -1517,15 +1424,6 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn check_and_set_packet_tag(&self, tag: &Uint8Array) -> Result<bool, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.check_and_set_packet_tag(&tag.to_vec()).await)
-            //}
-        }
-
-        #[wasm_bindgen]
         pub async fn store_authorization(&self, token: AuthorizationToken) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
@@ -1671,89 +1569,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), false);
-    }
-
-    #[async_std::test]
-    async fn test_add_to_network_registry() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
-
-        let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
-        let test_stake_account = Address::from_str("0xf2a867525fc8a16055d0dea371f0360288795c61").unwrap();
-
-        db.add_to_network_registry(&test_stake_account, &test_address, &Snapshot::default())
-            .await
-            .unwrap();
-
-        assert_eq!(
-            db.get_from_network_registry(&test_stake_account).await.unwrap(),
-            vec![test_address]
-        );
-
-        assert!(!db.is_allowed_to_access_network(&test_address).await.unwrap());
-
-        db.set_eligible(&test_stake_account, true, &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.add_to_network_registry(&test_stake_account, &test_address, &Snapshot::default())
-            .await
-            .unwrap();
-
-        assert_eq!(
-            db.get_from_network_registry(&test_stake_account).await.unwrap(),
-            vec![test_address]
-        );
-
-        assert!(db.is_allowed_to_access_network(&test_address).await.unwrap());
-    }
-
-    #[async_std::test]
-    async fn test_remove_from_network_registry() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
-
-        let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
-        let test_stake_account = Address::from_str("0xf2a867525fc8a16055d0dea371f0360288795c61").unwrap();
-
-        db.add_to_network_registry(&test_stake_account, &test_address, &Snapshot::default())
-            .await
-            .unwrap();
-
-        assert_eq!(
-            db.get_from_network_registry(&test_stake_account).await.unwrap(),
-            vec![test_address]
-        );
-
-        db.remove_from_network_registry(&test_stake_account, &test_address, &Snapshot::default())
-            .await
-            .unwrap();
-
-        assert_eq!(db.get_from_network_registry(&test_stake_account).await.unwrap(), vec![]);
-
-        assert!(!db.is_allowed_to_access_network(&test_address).await.unwrap());
-
-        db.add_to_network_registry(&test_stake_account, &test_address, &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.set_eligible(&test_stake_account, true, &Snapshot::default())
-            .await
-            .unwrap();
-
-        db.remove_from_network_registry(&test_stake_account, &test_address, &Snapshot::default())
-            .await
-            .unwrap();
-
-        assert_eq!(db.get_from_network_registry(&test_stake_account).await.unwrap(), vec![]);
-
-        assert!(!db.is_allowed_to_access_network(&test_address).await.unwrap());
     }
 
     #[async_std::test]

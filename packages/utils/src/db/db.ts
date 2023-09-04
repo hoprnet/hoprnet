@@ -97,10 +97,6 @@ export class LevelDb {
 
     let batch = this.backend.batch()
     for (const op of ops) {
-      if (!op.hasOwnProperty('type') || !op.hasOwnProperty('key')) {
-        throw new Error('Invalid operation, missing key or type: ' + JSON.stringify(op))
-      }
-
       if (op.type === 'put') {
         batch.del(u8aToHex(op.key)) // We must try to delete first then insert (in case of updates)
         batch.put(u8aToHex(op.key), u8aToHex(op.value))
