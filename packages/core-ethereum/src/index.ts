@@ -20,7 +20,6 @@ import {
   OffchainPublicKey,
   ChainKeypair,
   OffchainKeypair,
-  is_allowed_to_access_network,
   CORE_ETHEREUM_CONSTANTS,
   Database
 } from '@hoprnet/hopr-utils'
@@ -653,17 +652,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.db.set_staking_module_address(this.safeModuleOptions.moduleAddress)
 
     return receipt
-  }
-
-  /**
-   * Checks whether a given `hoprNode` is allowed access.
-   * When the register is disabled, a `hoprNode` is seen as `registered`,
-   * when the register is enabled, a `hoprNode` needs to also be `eligible`.
-   * @param hoprNode Ethereum address of the account we want to check if it's registered
-   * @returns true if registered
-   */
-  public async isAllowedAccessToNetwork(hoprNode: Address): Promise<boolean> {
-    return await is_allowed_to_access_network(this.db, hoprNode)
   }
 
   public static createMockInstance(chainKeypair: ChainKeypair, peerId: PeerId): HoprCoreEthereum {
