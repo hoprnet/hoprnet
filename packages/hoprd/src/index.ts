@@ -1,4 +1,5 @@
 import path from 'path'
+import retimer from 'retimer'
 
 import {
   create_gauge,
@@ -51,6 +52,8 @@ import setupHealthcheck from './healthcheck.js'
 import { decodeMessage } from './api/utils.js'
 import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
+
+const ONBOARDING_INFORMATION_INTERVAL = 30000 // show information every 30sec
 
 const log = debug('hoprd')
 
@@ -374,12 +377,12 @@ async function main() {
       setupHealthcheck(node, cfg.healthcheck.host, cfg.healthcheck.port)
     }
 
-    log(`Node address: ${node.getId().toString()}`)
-
     const ethAddr = node.getEthereumAddress().to_hex()
     const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
 
     log(`Node is not started, please fund this node ${ethAddr} with at least ${fundsReq}`)
+
+    showOnboardingInformation(node)
 
     // 2.5 Await funding of wallet.
     await node.waitForFunds()
@@ -401,6 +404,37 @@ async function main() {
     log('Node failed to start: ' + e)
     process.exit(1)
   }
+}
+
+async function showOnboardingInformation(node: Hopr): Promise<void> {
+  const address = node.getEthereumAddress().to_string()
+  const version = node.getVersion()
+  const isAllowed = await node.isAllowedAccessToNetwork(node.getId())
+  if (isAllowed) {
+    const msg = `
+      Node information:
+
+      Node peerID: ${node.getId().toString()}
+      Node address: ${address}
+      Node version: ${version}
+      `
+    log(msg)
+    return
+  }
+
+  const msg = `
+    Node information:
+
+    Node peerID: ${node.getId().toString()}
+    Node address: ${address}
+    Node version: ${version}
+
+    Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding=${address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.
+      `
+  log(msg)
+  retimer(async () => {
+    await showOnboardingInformation(node)
+  }, ONBOARDING_INFORMATION_INTERVAL)
 }
 
 main()

@@ -273,11 +273,11 @@ pub mod wasm_impl {
         #[wasm_bindgen]
         pub async fn send_message(
             &self,
-            msg: &ApplicationData,
-            path: &Path,
+            msg: ApplicationData,
+            path: Path,
             timeout_in_millis: u64,
         ) -> Result<HalfKeyChallenge, JsValue> {
-            match self.pkt_sender.clone().send_packet(msg.clone(), path.clone()) {
+            match self.pkt_sender.clone().send_packet(msg, path) {
                 Ok(mut awaiter) => {
                     utils_log::debug!("Awaiting the HalfKeyChallenge");
                     awaiter

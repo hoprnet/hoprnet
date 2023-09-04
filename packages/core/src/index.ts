@@ -340,8 +340,7 @@ export class Hopr extends EventEmitter {
     const onReceivedMessage = (msg: Uint8Array) => {
       try {
         this.emit('hopr:message', ApplicationData.deserialize(msg))
-      }
-      catch (err) {
+      } catch (err) {
         log(`could not deserialize application data: ${err}`)
       }
     }
@@ -1420,7 +1419,7 @@ export class Hopr extends EventEmitter {
     return result
   }
 
-  private async peerIdToChainKey(id: PeerId) {
+  public async peerIdToChainKey(id: PeerId): Promise<Address> {
     let pk = OffchainPublicKey.from_peerid_str(id.toString())
     return await this.db.get_chain_key(pk)
   }
@@ -1430,13 +1429,8 @@ export class Hopr extends EventEmitter {
    * @returns true if allowed access
    */
   public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
-    let chain_key = await this.peerIdToChainKey(id)
-    if (chain_key) {
-      return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(Address.deserialize(chain_key.serialize()))
-    } else {
-      log(`failed to determine channel key of ${id.toString()}`)
-      return false
-    }
+    let chain_key: Address = await this.peerIdToChainKey(id)
+    return await this.db.is_allowed_to_access_network(chain_key)
   }
 
   /**

@@ -15,6 +15,7 @@ pub mod wasm {
     use futures::Stream;
     use js_sys::Uint8Array;
     use utils_log::debug;
+    use utils_types::traits::BinarySerializable;
     use wasm_bindgen::prelude::*;
     use utils_types::traits::BinarySerializable;
 
@@ -74,7 +75,9 @@ pub mod wasm {
                 wasm_bindgen_futures::spawn_local(async move {
                     while let Some(packet) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
                         debug!("wasm packet interaction loop received a new packet");
-                        if let Err(e) = on_msg_rcv.call1(&JsValue::null(), Uint8Array::from(packet.to_bytes().as_ref()).as_ref()) {
+                        if let Err(e) =
+                            on_msg_rcv.call1(&JsValue::null(), Uint8Array::from(packet.to_bytes().as_ref()).as_ref())
+                        {
                             error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
                         }
                     }

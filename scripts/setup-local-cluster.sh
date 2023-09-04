@@ -20,7 +20,7 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 declare api_token="^^LOCAL-testing-123^^"
 declare myne_chat_url="http://app.myne.chat"
 declare init_script=""
-declare hoprd_command="node --experimental-wasm-modules ${mydir}/../packages/hoprd/lib/main.cjs"
+declare hoprd_command="node ${mydir}/../packages/hoprd/lib/main.cjs"
 declare listen_host="127.0.0.1"
 declare node_env="development"
 # first anvil account
@@ -165,6 +165,7 @@ function setup_node() {
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
     HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
+    NODE_OPTIONS="--experimental-wasm-modules" \
     ${hoprd_command} \
       --announce \
       --api-token "${api_token}" \
@@ -192,8 +193,8 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.safe.args" -delete || true
-  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" -delete || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete || true
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity \
@@ -208,7 +209,7 @@ function generate_local_identities() {
 function create_local_safes() {
   log "Create safe"
 
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" | sort || true)"
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -maxdepth 1 -name "${node_prefix}_*.id" | sort || true)"
 
   # create a loop so safes are created for all the nodes TODO:
   for id_file in ${id_files[@]}; do

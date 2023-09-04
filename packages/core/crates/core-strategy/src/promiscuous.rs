@@ -367,6 +367,8 @@ pub mod wasm {
     use crate::generic::ChannelStrategy;
     use crate::generic::{wasm::StrategyTickResult, PeerQuality};
     use crate::strategy_tick;
+    use std::sync::Mutex;
+    use utils_log::error;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Balance;
     use wasm_bindgen::prelude::*;
@@ -384,6 +386,18 @@ pub mod wasm {
         w: Mutex<super::PromiscuousStrategy>
     }
 
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct PromiscuousStrategy {
+        pub network_quality_threshold: f64,
+        pub new_channel_stake: Balance,
+        pub minimum_channel_balance: Balance,
+        pub minimum_node_balance: Balance,
+        pub max_channels: Option<usize>,
+        pub auto_redeem_tickets: bool,
+        pub enforce_max_channels: bool,
+        w: Mutex<super::PromiscuousStrategy>,
+    }
+
     #[wasm_bindgen]
     impl PromiscuousStrategy {
         #[wasm_bindgen(constructor)]
@@ -397,7 +411,7 @@ pub mod wasm {
                 max_channels: s.max_channels,
                 auto_redeem_tickets: s.auto_redeem_tickets,
                 enforce_max_channels: s.enforce_max_channels,
-                w: Mutex::new(s)
+                w: Mutex::new(s),
             }
         }
 

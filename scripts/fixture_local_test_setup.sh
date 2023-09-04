@@ -169,7 +169,7 @@ function reuse_pregenerated_identities() {
   find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete
 
   local ready_id_files
-  mapfile -t ready_id_files <<< "$(find -L "${mydir}/../tests/identities" -type f -name "*.id" | sort)"
+  mapfile -t ready_id_files <<< "$(find -L "${mydir}/../tests/identities/" -maxdepth 1 -type f -name "*.id" | sort)"
 
   # we copy and rename the files according to the expected file name format and
   # destination folder
@@ -196,8 +196,8 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete
 
   env ETHERSCAN_API_KEY="${ETHERSCAN_API_KEY:-}" IDENTITY_PASSWORD="${password}" \
     hopli identity \
@@ -212,7 +212,7 @@ function generate_local_identities() {
 function create_local_safes() {
   log "Create safe"
 
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -name "${node_prefix}_*.id" | sort)"
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort)"
 
   # create a loop so safes are created for all the nodes TODO:
   for id_file in ${id_files[@]}; do
@@ -294,6 +294,7 @@ function setup_node() {
       --api \
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
+      --disableTicketAutoRedeem \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
       --allowLocalNodeConnections \
@@ -431,9 +432,9 @@ sleep 30
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
   declare node_dir_db="${node_dir}/db/db.sqlite"
-  declare node_dir_peerstore="${node_dir}/peerstore/LOG"
+  declare node_dir_tbf="${node_dir}/tbf"
   [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
-  [ -f "${node_dir_peerstore}" ] || { echo "Data file ${node_dir_peerstore} missing"; exit 1; }
+  [ -f "${node_dir_tbf}" ] || { echo "Data file ${node_dir_tbf} missing"; exit 1; }
 done
 # }}}
 
