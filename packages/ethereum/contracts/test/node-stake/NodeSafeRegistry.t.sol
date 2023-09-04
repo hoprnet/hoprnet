@@ -60,6 +60,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      */
     function testFuzz_RegisterSafeWithNodeSig(uint256 nodePrivateKey, address safeAddress) public {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
+        vm.assume(!Address.isContract(vm.addr(nodePrivateKey)));
         vm.assume(
             !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
                 && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
@@ -92,6 +93,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      */
     function testRevert_RegisterSafeWithNodeSigNonceReused(uint256 nodePrivateKey, address safeAddress) public {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
+        vm.assume(!Address.isContract(vm.addr(nodePrivateKey)));
         vm.assume(
             !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
                 && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
