@@ -1197,6 +1197,7 @@ dependencies = [
  "core-p2p",
  "core-packet",
  "core-path",
+ "core-protocol",
  "core-strategy",
  "core-types",
  "futures",

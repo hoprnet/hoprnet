@@ -3,6 +3,7 @@ pub mod errors;
 
 use std::fmt::Debug;
 
+use core_types::channels::Ticket;
 use libp2p::StreamProtocol;
 
 pub use libp2p::identity;
@@ -30,6 +31,7 @@ pub struct Pong(pub ControlMessage, pub String);
 pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
 pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";
 pub const HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0: &str = "/hopr/ack/0.1.0";
+pub const HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0: &str = "/hopr/aggregate_ticket/0.1.0";
 
 const HOPR_HEARTBEAT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_HEARTBEAT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
@@ -40,12 +42,16 @@ const HOPR_MESSAGE_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::f
 const HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
+const HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
+const HOPR_TICKET_AGGREGATION_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
     pub heartbeat: libp2p_request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p_request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p_request_response::cbor::Behaviour<Acknowledgement, ()>,
+    pub ticket_aggregation: libp2p_request_response::cbor::Behaviour<Vec<Ticket>, std::result::Result<Ticket, String>>,
     keep_alive: libp2p_swarm::keep_alive::Behaviour, // run the business logic loop indefinitely
 }
 
@@ -61,6 +67,7 @@ pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p_request_response::Event<Ping, Pong>),
     Message(libp2p_request_response::Event<Box<[u8]>, ()>),
     Acknowledgement(libp2p_request_response::Event<Acknowledgement, ()>),
+    TicketAggregation(libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>),
     KeepAlive(void::Void),
 }
 
@@ -79,6 +86,13 @@ impl From<libp2p_request_response::Event<Ping, Pong>> for HoprNetworkBehaviorEve
 impl From<libp2p_request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehaviorEvent {
     fn from(event: libp2p_request_response::Event<Box<[u8]>, ()>) -> Self {
         Self::Message(event)
+    }
+}
+
+
+impl From<libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>) -> Self {
+        Self::TicketAggregation(event)
     }
 }
 
@@ -124,6 +138,18 @@ impl Default for HoprNetworkBehavior {
                     let mut cfg = libp2p_request_response::Config::default();
                     cfg.set_connection_keep_alive(HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE);
                     cfg.set_request_timeout(HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT);
+                    cfg
+                },
+            ),
+            ticket_aggregation: libp2p_request_response::cbor::Behaviour::<Vec<Ticket>, std::result::Result<Ticket, String>>::new(
+                [(
+                    StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
+                    libp2p_request_response::ProtocolSupport::Full,
+                )],
+                {
+                    let mut cfg = libp2p_request_response::Config::default();
+                    cfg.set_connection_keep_alive(HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(HOPR_TICKET_AGGREGATION_REQUEST_TIMEOUT);
                     cfg
                 },
             ),

@@ -17,7 +17,7 @@ wasm = [
 
 [dependencies]
 # a better separation of tcp + async-std for non wasm case could be designed
-async-std = { workspace = true, features = ["attributes"] }
+async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }

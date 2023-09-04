@@ -42,15 +42,19 @@ use wasm_bindgen_futures::spawn_local;
 pub const TICKET_AGGREGATION_TX_QUEUE_SIZE: usize = 2048;
 pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 
+/// The input to the processor background pipeline
 #[derive(Debug)]
 pub enum TicketAggregationToProcess {
     ToReceive(PeerId, std::result::Result<Ticket, String>),
+    ToProcess(PeerId, Vec<Ticket>),
     ToSend(PeerId, Vec<Ticket>),
 }
 
+/// Emitted by the processor background pipeline once processed
 #[derive(Debug)]
 pub enum TicketAggregationProcessed {
     Receive(PeerId, std::result::Result<Ticket, String>),
+    Reply(PeerId, std::result::Result<Ticket,String>),
     Send(PeerId, Vec<Ticket>),
 }
 
@@ -102,6 +106,13 @@ pub struct TicketAggregationActions {
 impl TicketAggregationActions {
     /// Pushes the aggregated ticket received from the transport layer into processing.
     pub fn receive_ticket(&mut self, source: PeerId, ticket: std::result::Result<Ticket, String>) -> Result<()> {
+        // TODO: received ticket should be emitted somehow and component tickets removed
+        Err(crate::errors::ProtocolError::ProtocolTicketAggregation("Failed to process received ticket".to_owned()))
+    }
+
+    /// Process the received aggregation request
+    pub fn receive_aggregation_request(&mut self, source: PeerId, tickets: Vec<Ticket>) -> Result<()> {
+        // TODO: received tickets should be processed here and a single Ticket emitted
         Err(crate::errors::ProtocolError::ProtocolTicketAggregation("Failed to process received ticket".to_owned()))
     }
 
@@ -109,6 +120,7 @@ impl TicketAggregationActions {
     pub fn send_aggregation_request(&mut self, destination: PeerId, tickets: Vec<Ticket>) -> Result<()> {
         // #[cfg(all(feature = "prometheus", not(test)))]
         // METRIC_SENT_ACKS.increment();
+        // TODO: metrics here would be nice as well
 
         self.process(TicketAggregationToProcess::ToSend(destination, tickets))
     }
@@ -200,7 +212,7 @@ impl Stream for TicketAggregationInteraction {
 #[cfg(test)]
 mod tests {
     #[async_std::test]
-    fn test_ticket_aggregation_should_work() {
+    async fn test_ticket_aggregation_should_work() {
         assert!(false)
     }
 }

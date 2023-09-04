@@ -133,6 +133,7 @@ pub fn build_components(
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     use core_mixer::mixer::{Mixer, MixerConfig};
+    use core_protocol::ticket_aggregation::TicketAggregationInteraction;
 
     let identity = me;
 
@@ -197,6 +198,8 @@ pub fn build_components(
     let swarm_network_clone = network.clone();
     let tbf_clone = tbf.clone();
 
+    let ticket_aggregation = TicketAggregationInteraction::new(db.clone());
+
     let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
         Box::pin(async move {
             let hb_pinger = Ping::new(
@@ -222,6 +225,7 @@ pub fn build_components(
                 indexer_update_rx,
                 ack_actions,
                 packet_actions,
+                ticket_aggregation,
                 api::HeartbeatRequester::new(hb_ping_rx),
                 api::HeartbeatResponder::new(hb_pong_tx),
                 api::ManualPingRequester::new(ping_rx),
