@@ -1383,6 +1383,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-protocol"
+version = "0.2.0"
+dependencies = [
+ "async-lock",
+ "async-std",
+ "console_error_panic_hook",
+ "core-ethereum-db",
+ "core-mixer",
+ "core-types",
+ "env_logger",
+ "futures",
+ "futures-lite",
+ "getrandom 0.2.10",
+ "js-sys",
+ "libp2p-identity",
+ "more-asserts",
+ "serde",
+ "thiserror",
+ "utils-log",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "core-strategy"
 version = "0.3.1"
 dependencies = [
