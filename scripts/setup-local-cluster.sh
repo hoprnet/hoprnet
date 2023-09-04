@@ -209,7 +209,7 @@ function generate_local_identities() {
 function create_local_safes() {
   log "Create safe"
 
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -maxdepth 1 -name "${node_prefix}_*.id" | sort || true)"
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
 
   # create a loop so safes are created for all the nodes TODO:
   for id_file in ${id_files[@]}; do
