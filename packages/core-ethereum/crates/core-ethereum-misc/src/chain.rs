@@ -64,7 +64,7 @@ impl ChainCalls {
 
     /// See whether the struct is generating Safe-compliant (returns true)
     /// or legacy transaction payload (returns false).
-    pub fn get_use_safe(&mut self) -> bool {
+    pub fn get_use_safe(&self) -> bool {
         return self.use_safe;
     }
 
@@ -707,20 +707,21 @@ pub mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use async_lock::RwLock;
     use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
     use core_types::{
         acknowledgement::wasm::AcknowledgedTicket,
         announcement::{AnnouncementData, KeyBinding},
     };
     use multiaddr::Multiaddr;
-    use std::str::FromStr;
+    use std::{str::FromStr, sync::Arc};
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::primitives::{Address, Balance};
     use wasm_bindgen::{prelude::*, JsValue};
 
     #[wasm_bindgen]
     pub struct ChainCalls {
-        w: super::ChainCalls,
+        w: Arc<RwLock<super::ChainCalls>>,
     }
 
     #[wasm_bindgen]
@@ -728,82 +729,145 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(chain_keypair: &ChainKeypair, hopr_channels: Address, hopr_announcements: Address) -> Self {
             Self {
-                w: super::ChainCalls::new(chain_keypair, hopr_channels, hopr_announcements),
+                w: Arc::new(RwLock::new(super::ChainCalls::new(
+                    chain_keypair,
+                    hopr_channels,
+                    hopr_announcements,
+                ))),
             }
         }
 
         #[wasm_bindgen]
-        pub fn set_use_safe(&mut self, enabled: bool) {
-            self.w.set_use_safe(enabled)
+        pub async fn set_use_safe(&self, enabled: bool) {
+            self.w.write().await.set_use_safe(enabled)
         }
 
         #[wasm_bindgen]
-        pub fn get_use_safe(&mut self) -> bool {
-            self.w.get_use_safe()
+        pub async fn get_use_safe(&self) -> bool {
+            self.w.read().await.get_use_safe()
         }
 
         #[wasm_bindgen]
-        pub fn get_announce_payload(
+        pub async fn get_announce_payload(
             &self,
             announced_multiaddr: &str,
             packet_key: &OffchainKeypair,
             use_safe: bool,
-        ) -> JsResult<Vec<u8>> {
+        ) -> JsResult<js_sys::Uint8Array> {
+            let reader = self.w.read().await;
             match Multiaddr::from_str(announced_multiaddr) {
-                Ok(ma) => Ok(self.w.announce(
-                    &ok_or_jserr!(AnnouncementData::new(
-                        &ma,
-                        Some(KeyBinding::new(self.w.chain_key, packet_key))
-                    ))?,
-                    use_safe,
+                Ok(ma) => Ok(js_sys::Uint8Array::from(
+                    reader
+                        .announce(
+                            &ok_or_jserr!(AnnouncementData::new(
+                                &ma,
+                                Some(KeyBinding::new(reader.chain_key, packet_key))
+                            ))?,
+                            use_safe,
+                        )
+                        .as_slice(),
                 )),
                 Err(e) => return Err(JsValue::from(e.to_string())),
             }
         }
 
         #[wasm_bindgen]
-        pub fn get_approve_payload(&self, amount: &Balance) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.approve(amount))
+        pub async fn get_approve_payload(&self, amount: &Balance) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .approve(amount)
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 
         #[wasm_bindgen]
-        pub fn get_transfer_payload(&self, dest: &Address, amount: &Balance) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.transfer(dest, amount))
+        pub async fn get_transfer_payload(&self, dest: &Address, amount: &Balance) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .transfer(dest, amount)
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 
         #[wasm_bindgen]
-        pub fn get_fund_channel_payload(&self, dest: &Address, amount: &Balance) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.fund_channel(dest, amount))
+        pub async fn get_fund_channel_payload(&self, dest: &Address, amount: &Balance) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .fund_channel(dest, amount)
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 
         #[wasm_bindgen]
-        pub fn get_close_incoming_channel_payload(&self, source: &Address) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.close_incoming_channel(source))
+        pub async fn get_close_incoming_channel_payload(&self, source: &Address) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .close_incoming_channel(source)
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 
         #[wasm_bindgen]
-        pub fn get_intiate_outgoing_channel_closure_payload(&self, dest: &Address) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.initiate_outgoing_channel_closure(dest))
+        pub async fn get_intiate_outgoing_channel_closure_payload(
+            &self,
+            dest: &Address,
+        ) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .initiate_outgoing_channel_closure(dest)
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 
         #[wasm_bindgen]
-        pub fn get_finalize_outgoing_channel_closure_payload(&self, dest: &Address) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.finalize_outgoing_channel_closure(dest))
+        pub async fn get_finalize_outgoing_channel_closure_payload(
+            &self,
+            dest: &Address,
+        ) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .finalize_outgoing_channel_closure(dest)
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 
         #[wasm_bindgen]
-        pub fn get_redeem_ticket_payload(&self, acked_ticket: &AcknowledgedTicket) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.redeem_ticket(&acked_ticket.into()))
+        pub async fn get_redeem_ticket_payload(
+            &self,
+            acked_ticket: &AcknowledgedTicket,
+        ) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .redeem_ticket(&acked_ticket.into())
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 
         #[wasm_bindgen]
-        pub fn get_register_safe_by_node_payload(&self, safe_addr: &Address) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.register_safe_by_node(safe_addr))
+        pub async fn get_register_safe_by_node_payload(&self, safe_addr: &Address) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .register_safe_by_node(safe_addr)
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 
         #[wasm_bindgen]
-        pub fn get_deregister_node_by_safe_payload(&self) -> JsResult<Vec<u8>> {
-            ok_or_jserr!(self.w.deregister_node_by_safe())
+        pub async fn get_deregister_node_by_safe_payload(&self) -> JsResult<js_sys::Uint8Array> {
+            ok_or_jserr!(self
+                .w
+                .read()
+                .await
+                .deregister_node_by_safe()
+                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
     }
 }

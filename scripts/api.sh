@@ -274,7 +274,7 @@ api_close_channel() {
 
   # fetch channel id from API
   channels_info="$(api_get_all_channels "${source_api}" false)"
-  channel_id="$(echo "${channel_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains("${destination_address}")))[0].id")"
+  channel_id="$(echo "${channels_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
 
   log "Node ${source_id} close channel ${channel_id} to Node ${destination_id}"
 
@@ -308,18 +308,20 @@ api_open_channel() {
 # $1 = node api address (origin)
 # validate that node is funded
 api_validate_node_balance_gt0() {
-  local balance eth_balance hopr_balance
+  local balance eth_balance safe_hopr_balance
   local endpoint=${1:-localhost:3001}
 
   balance=$(api_get_balances "${endpoint}")
   eth_balance=$(echo "${balance}" | jq -r ".native")
-  hopr_balance=$(echo "${balance}" | jq -r ".hopr")
+  safe_hopr_balance=$(echo "${balance}" | jq -r ".safeHopr")
 
-  if [[ "$eth_balance" != "0" && "$hopr_balance" != "0" ]]; then
-    log "$1 is funded"
-  else
-    log "⛔️ $1 Node has an invalid balance: $eth_balance, $hopr_balance"
-    log "$balance"
+  if [[ "$eth_balance" = "0" && "${safe_hopr_balance}" != "0" ]]; then
+    log "Error: $1 Node has an invalid native balance: $eth_balance"
     exit 1
   fi
+  if [[ "$safe_hopr_balance" = "0" ]]; then
+    log "Error: $1 Node Safe has an invalid HOPR balance: $safe_hopr_balance"
+    exit 1
+  fi
+  log "$1 is funded"
 }

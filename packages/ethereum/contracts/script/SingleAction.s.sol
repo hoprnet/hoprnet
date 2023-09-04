@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import "./utils/NetworkConfig.s.sol";
 import "./utils/BoostUtilsLib.sol";
 import "../src/utils/TargetUtils.sol";
+import { HoprNetworkRegistry } from "../src/NetworkRegistry.sol";
 
 abstract contract Enum {
     enum Operation {
@@ -199,21 +200,30 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         // bytes memory
         vm.stopBroadcast();
 
-        // 7. add nodes and safe to network registry, as a manager of network registry
+        // prepare data paylaods for manager
         address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
         for (uint256 m = 0; m < nodeAddresses.length; m++) {
             stakingSafeAddresses[m] = safe;
         }
+        bool[] memory eligibilities = new bool[](nodeAddresses.length);
+        for (uint256 n = 0; n < nodeAddresses.length; n++) {
+            eligibilities[n] = true;
+        }
         _helperGetDeployerInternalKey();
+
+        // 7. add nodes and safe to network registry, as a manager of network registry
         _registerNodes(stakingSafeAddresses, nodeAddresses);
+
+        // 8. set node eligibilities to network registry, as a manager of network registry
+        _forceSyncEligibility(stakingSafeAddresses, eligibilities);
         vm.stopBroadcast();
 
-        // 8. transfer some tokens to safe
+        // 9. transfer some tokens to safe
         transferOrMintHoprAndSendNativeToAmount(safe, hoprTokenAmountInWei, nativeTokenAmountInWei);
 
-        // 9. transfer some xDAI to nodes
+        // 10. transfer some xDAI to nodes
         for (uint256 n = 0; n < nodeAddresses.length; n++) {
-            transferOrMintHoprAndSendNativeToAmount(safe, 0, nativeTokenAmountInWei);
+            transferOrMintHoprAndSendNativeToAmount(nodeAddresses[n], 0, nativeTokenAmountInWei);
         }
     }
 
@@ -323,8 +333,18 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         for (uint256 m = 0; m < nodeAddresses.length; m++) {
             stakingSafeAddresses[m] = safe;
         }
+        bool[] memory eligibilities = new bool[](nodeAddresses.length);
+        for (uint256 n = 0; n < nodeAddresses.length; n++) {
+            eligibilities[n] = true;
+        }
         _helperGetDeployerInternalKey();
+
+        // 6. add nodes and safe to network registry, as a manager of network registry
         _registerNodes(stakingSafeAddresses, nodeAddresses);
+
+        // 7. set node eligibilities to network registry, as a manager of network registry
+        _forceSyncEligibility(stakingSafeAddresses, eligibilities);
+
         vm.stopBroadcast();
     }
 
@@ -570,31 +590,28 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      */
     function _registerNodes(address[] memory stakingAccounts, address[] memory nodeAddresses) private {
         require(stakingAccounts.length == nodeAddresses.length, "Input lengths are different");
+        address nrContractAddress = currentNetworkDetail.addresses.networkRegistryContractAddress;
 
         // 1. check if nodes have been registered, if so, skip
         for (uint256 i = 0; i < nodeAddresses.length; i++) {
-            (bool successReadRegisteredNodeAddress, bytes memory returndataRegisteredNodeAddress) = currentNetworkDetail
-                .addresses
-                .networkRegistryContractAddress
-                .staticcall(abi.encodeWithSignature("nodeRegisterdToAccount(address)", nodeAddresses[i]));
-            if (!successReadRegisteredNodeAddress) {
+            try HoprNetworkRegistry(nrContractAddress).nodeRegisterdToAccount(nodeAddresses[i]) returns (
+                address registeredAccount
+            ) {
+                if (registeredAccount == address(0)) {
+                    accounts.push(stakingAccounts[i]);
+                    nodes.push(nodeAddresses[i]);
+                }
+            } catch {
                 revert("Cannot read successReadRegisteredNodeAddress from network registry contract.");
-            }
-            address registeredAccount = abi.decode(returndataRegisteredNodeAddress, (address));
-
-            if (registeredAccount == address(0)) {
-                accounts.push(stakingAccounts[i]);
-                nodes.push(nodeAddresses[i]);
             }
         }
 
         // 2. register nodes
         if (nodes.length > 0) {
-            (bool successRegisterNodes,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-                abi.encodeWithSignature("managerRegister(address[],address[])", accounts, nodes)
-            );
-            if (!successRegisterNodes) {
-                emit log_string("Cannot register nodes as a manager");
+            try HoprNetworkRegistry(nrContractAddress).managerRegister(accounts, nodes) {
+                emit log_string("Nodes registered to Network Registry");
+            } catch (bytes memory lowlevelData) {
+                emit log_named_bytes("regsiter nodes to network registry error", lowlevelData);
                 revert("Cannot register nodes as a manager");
             }
         }
@@ -611,30 +628,27 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     function deregisterNodes(address[] calldata nodeAddresses) external {
         // 1. get network and msg.sender
         getNetworkAndMsgSender();
+        address nrContractAddress = currentNetworkDetail.addresses.networkRegistryContractAddress;
 
         // 2. check if nodes have been registered, if not, skip
         for (uint256 i = 0; i < nodeAddresses.length; i++) {
-            (bool successReadRegisteredNodeAddress, bytes memory returndataRegisteredNodeAddress) = currentNetworkDetail
-                .addresses
-                .networkRegistryContractAddress
-                .staticcall(abi.encodeWithSignature("nodeRegisterdToAccount(address)", nodeAddresses[i]));
-            if (!successReadRegisteredNodeAddress) {
+            try HoprNetworkRegistry(nrContractAddress).nodeRegisterdToAccount(nodeAddresses[i]) returns (
+                address registeredAccount
+            ) {
+                if (registeredAccount != address(0)) {
+                    nodes.push(nodeAddresses[i]);
+                }
+            } catch {
                 revert("Cannot read successReadRegisteredNodeAddress from network registry contract.");
-            }
-            address registeredAccount = abi.decode(returndataRegisteredNodeAddress, (address));
-
-            if (registeredAccount != address(0)) {
-                nodes.push(nodeAddresses[i]);
             }
         }
 
         // 2. deregister nodes
         if (nodes.length > 0) {
-            (bool successDeregisterNodes,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-                abi.encodeWithSignature("managerDeregister(address[])", nodes)
-            );
-            if (!successDeregisterNodes) {
-                emit log_string("Cannot deregister nodes as a manager");
+            try HoprNetworkRegistry(nrContractAddress).managerDeregister(nodes) {
+                emit log_string("Nodes deregistered from Network Registry");
+            } catch (bytes memory lowlevelData) {
+                emit log_named_bytes("deregsiter nodes from network registry error", lowlevelData);
                 revert("Cannot deregister nodes as a manager");
             }
         }
@@ -652,25 +666,23 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     function disableNetworkRegistry() external {
         // 1. get network and msg.sender
         getNetworkAndMsgSender();
+        address nrContractAddress = currentNetworkDetail.addresses.networkRegistryContractAddress;
+        bool isEnabled;
 
         // 2. check if current NR is enabled.
-        (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
-            .addresses
-            .networkRegistryContractAddress
-            .staticcall(abi.encodeWithSignature("enabled()"));
-        if (!successReadEnabled) {
+        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNREnabled) {
+            isEnabled = isNREnabled;
+        } catch {
             revert("Cannot read enabled from network registry contract.");
         }
-        bool isEnabled = abi.decode(returndataReadEnabled, (bool));
 
         // 3. disable if needed
         if (isEnabled) {
-            (bool successDisableNetworkRegistry,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-                abi.encodeWithSignature("disableRegistry()")
-            );
-            if (!successDisableNetworkRegistry) {
-                emit log_string("Cannot disable network registery as a manager");
-                revert("Cannotdisable network registery as a manager");
+            try HoprNetworkRegistry(nrContractAddress).disableRegistry() {
+                emit log_string("Network Registry is disabled");
+            } catch (bytes memory lowlevelData) {
+                emit log_named_bytes("disable network registry error", lowlevelData);
+                revert("Cannot disable network registery as a manager");
             }
             vm.stopBroadcast();
         }
@@ -682,24 +694,22 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     function enableNetworkRegistry() external {
         // 1. get network and msg.sender
         getNetworkAndMsgSender();
+        address nrContractAddress = currentNetworkDetail.addresses.networkRegistryContractAddress;
+        bool isEnabled;
 
         // 2. check if current NR is enabled.
-        (bool successReadEnabled, bytes memory returndataReadEnabled) = currentNetworkDetail
-            .addresses
-            .networkRegistryContractAddress
-            .staticcall(abi.encodeWithSignature("enabled()"));
-        if (!successReadEnabled) {
+        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNREnabled) {
+            isEnabled = isNREnabled;
+        } catch {
             revert("Cannot read enabled from network registry contract.");
         }
-        bool isEnabled = abi.decode(returndataReadEnabled, (bool));
 
         // 3. enable if needed
         if (!isEnabled) {
-            (bool successEnableNetworkRegistry,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-                abi.encodeWithSignature("enableRegistry()")
-            );
-            if (!successEnableNetworkRegistry) {
-                emit log_string("Cannot enable network registery as a manager");
+            try HoprNetworkRegistry(nrContractAddress).enableRegistry() {
+                emit log_string("Network Registry is enabled");
+            } catch (bytes memory lowlevelData) {
+                emit log_named_bytes("enable network registry error", lowlevelData);
                 revert("Cannot enable network registery as a manager");
             }
             vm.stopBroadcast();
@@ -715,14 +725,47 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         getNetworkAndMsgSender();
 
         // 2. sync peers eligibility according to the latest requirement of its current state
-        (bool successSyncEligibility,) = currentNetworkDetail.addresses.networkRegistryContractAddress.call(
-            abi.encodeWithSignature("managerSync(address[])", stakingAccounts)
-        );
-        if (!successSyncEligibility) {
-            emit log_string("Cannot sync eligibility as a manager");
-            revert("Cannot sync eligibility as a manager");
+        try HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerSync(
+            stakingAccounts
+        ) {
+            emit log_string("Manager synced eligibility on network regsitry");
+        } catch (bytes memory lowlevelData) {
+            emit log_named_bytes("sync eligibility on network registry error", lowlevelData);
+            revert("Cannot sync eligibility on network registery as a manager");
         }
         vm.stopBroadcast();
+    }
+
+    /**
+     * @dev On network registry contract, set eligibility of some staking addresses to desired values
+     * This function should only be called by a manager
+     */
+    function forceSyncEligibility(address[] memory stakingAccounts, bool[] memory eligibilities) public {
+        // 1. get network and msg.sender
+        getNetworkAndMsgSender();
+
+        // 2. call private function to set eligibility
+        _forceSyncEligibility(stakingAccounts, eligibilities);
+
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev On network registry contract, set eligibility of some staking addresses to desired values
+     * This function should only be called by a manager
+     */
+    function _forceSyncEligibility(address[] memory stakingAccounts, bool[] memory eligibilities) private {
+        require(stakingAccounts.length == eligibilities.length, "Input lengths are different");
+
+        // 2. sync peers eligibility according to the latest requirement of its current state
+        try HoprNetworkRegistry(currentNetworkDetail.addresses.networkRegistryContractAddress).managerForceSync(
+            stakingAccounts, eligibilities
+        ) {
+            emit log_string("Manager set eligibility on network regsitry");
+        } catch (bytes memory lowlevelData) {
+            emit log_named_bytes("set eligibility on network registry error", lowlevelData);
+            revert("Cannot set eligibility on network registery as a manager");
+        }
     }
 
     // /**

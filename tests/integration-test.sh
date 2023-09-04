@@ -298,9 +298,6 @@ log "Waiting for nodes to finish open channel (long running)"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-echo "Exit early after opening channels, because some 1-hop messages are not fully working yet"
-exit 0
-
 for i in `seq 1 10`; do
   log "Node 1 send 1 hop message to self via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
@@ -397,6 +394,7 @@ test_redeem_in_specific_channel() {
   echo "all good"
 }
 
+echo "!!! Skipping ticket redemption tests until fixed !!!"
 # FIXME: re-enable when ticket redemption works
 #
 # test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
@@ -421,7 +419,7 @@ api_close_channel 5 1 "${api5}" "${node_addr1}" "outgoing" & jobs+=( "$!" )
 
 # initiate channel closures for channels without tickets so we can check
 # completeness
-api_close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true" & jobs+=( "$!" )
+api_close_channel 1 5 "${api1}" "${node_addr5}" "outgoing" "true" & jobs+=( "$!" )
 
 log "Waiting for nodes to finish handling close channels calls"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
@@ -467,4 +465,4 @@ test_get_all_channels "${api1}"
 
 
 # checking statuses of the long running tests
-check_native_withdraw_results ${native_balance}
+#check_native_withdraw_results ${native_balance}

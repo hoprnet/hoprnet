@@ -156,7 +156,7 @@ pub fn child_process_call_foundry_express_setup_safe_module(
     native_amount: &str,
 ) -> Result<(), HelperErrors> {
     // add brackets to around the string
-    let self_register_args = vec![
+    let express_setup_safe_args = vec![
         "script",
         "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
         "--broadcast",
@@ -167,7 +167,7 @@ pub fn child_process_call_foundry_express_setup_safe_module(
         &native_amount,
     ];
 
-    child_process_call_foundry(network, &self_register_args)
+    child_process_call_foundry(network, &express_setup_safe_args)
 }
 
 /// Launch a child process to call foundry  command
@@ -190,6 +190,48 @@ pub fn child_process_call_foundry_self_register(network: &str, peer_ids: &String
     ];
 
     child_process_call_foundry(network, &self_register_args)
+}
+
+/// Launch a child process to call foundry command
+///
+/// # Arguments
+///
+/// * `network` - Name of the network that nodes run in
+/// * `staking_address` - Addresses of staking accounts
+/// * `eligibilities` - Array of eligibility 
+pub fn child_process_call_foundry_set_eligibility(network: &str, staking_address: &String, eligibilities: &String) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let set_eligibility_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "forceSyncEligibility(address[],bool[])",
+        &staking_address,
+        &eligibilities,
+    ];
+
+    child_process_call_foundry(network, &set_eligibility_args)
+}
+
+/// Launch a child process to call foundry command
+///
+/// # Arguments
+///
+/// * `network` - Name of the network that nodes run in
+/// * `staking_address` - Addresses of staking accounts
+pub fn child_process_call_foundry_sync_eligibility(network: &str, staking_address: &String) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let sync_eligibility_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "syncEligibility(address[])",
+        &staking_address,
+    ];
+
+    child_process_call_foundry(network, &sync_eligibility_args)
 }
 
 /// Launch a child process to call a foundry script
