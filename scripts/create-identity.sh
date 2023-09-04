@@ -20,7 +20,7 @@ if ! command -v hopli; then
     export PATH="${PATH}:${workspace_dir}/packages/hopli/.cargo/bin"
 fi
 
-network=${1:-rotsee}
+network=${1}
 number=${2:-1}
 docker_tag=${3:-latest}
 hopr_amount=${4:-10}
