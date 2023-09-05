@@ -23,7 +23,7 @@ pub mod wasm {
         fn batch(this: &Sqlite, operations: Vec<JsValue>) -> Result<(), JsValue>;
 
         #[wasm_bindgen(method, catch)]
-        fn iterValues(this: &Sqlite, prefix: js_sys::Uint8Array, suffix_length: u32) -> Result<JsValue, JsValue>;
+        fn iterValues(this: &Sqlite, prefix: js_sys::Uint8Array, suffix_length: u32) -> Result<Vec<JsValue>, JsValue>;
     }
 
     pub struct SqliteShim {
@@ -94,20 +94,16 @@ pub mod wasm {
                 .map_err(|_| DbError::GenericError("Encountered error on DB remove operation".to_string()))
         }
 
-        fn iterate(
-            &self,
-            prefix: Self::Key,
-            suffix_size: u32,
-        ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
-            let iterable = self
+        fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<Vec<Self::Value>> {
+            return self
                 .db
                 .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
-                .map(js_sys::AsyncIterator::from)
-                .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)))?;
-
-            let stream = wasm_bindgen_futures::stream::JsStream::from(iterable);
-
-            Ok(Box::new(crate::types::wasm::BinaryStreamWrapper::new(stream)))
+                .map(|v| {
+                    v.into_iter()
+                        .map(|e| js_sys::Uint8Array::from(e).to_vec().into_boxed_slice())
+                        .collect()
+                })
+                .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)));
         }
 
         fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>) -> crate::errors::Result<()> {
@@ -247,17 +243,12 @@ pub mod wasm {
         let expected = vec![value_1.as_bytes().into(), value_3.as_bytes().into()];
 
         let mut received = Vec::new();
-        let mut data_stream = Box::into_pin(
-            kv_storage
-                .iterate(prefix.as_bytes().into(), (prefixed_key_1.len() - prefix.len()) as u32)
-                .map_err(|e| JsValue::from(format!("Test #7.1 failed: failed to iterate over DB {:?}", e)))?,
-        );
+        let data = kv_storage
+            .iterate(prefix.as_bytes().into(), (prefixed_key_1.len() - prefix.len()) as u32)
+            .map_err(|e| JsValue::from(format!("Test #7.1 failed: failed to iterate over DB {:?}", e)))?;
 
-        while let Some(value) = data_stream.next().await {
-            let v = value
-                .map(|v| js_sys::Uint8Array::from(v.as_ref()).to_vec().into_boxed_slice())
-                .map_err(|e| JsValue::from(format!("Test #7.1 failed: failed to iterate over DB {:?}", e)))?;
-
+        for value in data.into_iter() {
+            let v = js_sys::Uint8Array::from(value.as_ref()).to_vec().into_boxed_slice();
             if v.as_ref() != value_2.as_bytes() {
                 received.push(v);
             }

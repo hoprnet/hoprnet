@@ -50,7 +50,7 @@ where
         Ok(self.data.remove(&key))
     }
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<StorageValueIterator<Self::Value>, DbError> {
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<Vec<Self::Value>, DbError> {
         todo!("iterate not implement on InMemoryHashMapStorage")
     }
 

@@ -168,12 +168,12 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         filter: &dyn Fn(&V) -> bool,
     ) -> Result<Vec<V>> {
         match self.backend.iterate(prefix, suffix_size) {
-            Ok(values) => {
-                return values
-                    .iter()
-                    .map(|val| bincode::deserialize(val.as_ref()).filter(|v| v.is_ok_and()))
-                    .collect()
-            }
+            Ok(values) => Ok(values
+                .iter()
+                .map(|v| bincode::deserialize(v.as_ref()))
+                .filter(|v| v.is_ok())
+                .map(|v| v.unwrap())
+                .collect::<Vec<V>>()),
             Err(e) => Err(e),
         }
     }
