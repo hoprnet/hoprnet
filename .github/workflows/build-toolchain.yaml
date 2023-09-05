@@ -44,7 +44,7 @@ jobs:
           if echo "${{ github.event.pull_request.labels.*.name }}" | grep -q release; then
             docker_tag=$(jq -r '.version' packages/hoprd/package.json)
           else
-            next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }}
+            next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
             ./scripts/bump-version.sh ${next_version}
             docker_tag=$(echo "${next_version}" | sed 's/+/-/')
           fi

@@ -27,7 +27,7 @@ jobs:
 
       - name: Get version
         run: |
-          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }}
+          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
           docker_tag=$(echo "${next_version}" | sed 's/+/-/')
           echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
 
@@ -81,7 +81,7 @@ jobs:
 
       - name: Get version
         run: |
-          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }}
+          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
           docker_tag=$(echo "${next_version}" | sed 's/+/-/')
           echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
 
