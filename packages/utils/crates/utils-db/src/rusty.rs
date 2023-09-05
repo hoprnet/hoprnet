@@ -500,7 +500,7 @@ pub mod wasm {
 
     impl Drop for FileHandle {
         fn drop(&mut self) {
-            fcloseSync(self.0);
+            closeSync(self.0);
         }
     }
 
