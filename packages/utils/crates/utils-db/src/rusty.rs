@@ -1,7 +1,5 @@
-use std::cell::RefCell;
 use async_trait::async_trait;
 use std::cmp::Ordering;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use crate::errors::DbError;
@@ -56,31 +54,27 @@ pub struct RustyLevelDbShim {
 }
 
 impl RustyLevelDbShim {
-    /// Create adapter from the given Rusty LevelDB instance.
     #[cfg(not(feature = "wasm"))]
-    pub fn new(path: &str) -> Self {
-        if path == ":memory" {
-            Self {
-                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", rusty_leveldb::in_memory())
-                    .expect("failed to create DB")))
-            }
-        } else {
-            unimplemented!()
+    pub fn new_in_memory() -> Self {
+        Self {
+            db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hoprd_db", rusty_leveldb::in_memory())
+                .expect("failed to create DB")))
+        }
+    }
+
+    #[cfg(feature = "wasm")]
+    pub fn new_in_memory() -> Self {
+        Self {
+            db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hoprd_db", wasm::WasmMemEnv::create_options())
+                .expect("failed to create DB")))
         }
     }
 
     #[cfg(feature = "wasm")]
     pub fn new(path: &str) -> Self {
-        if path == ":memory" {
-            Self {
-                db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hoprd_db", wasm::WasmMemEnv::create_options())
-                    .expect("failed to create DB")))
-            }
-        } else {
-            Self {
-                db: Arc::new(Mutex::new(rusty_leveldb::DB::open(path, wasm::NodeJsEnv::create_options())
-                    .expect("failed to create DB")))
-            }
+        Self {
+            db: Arc::new(Mutex::new(rusty_leveldb::DB::open(path, wasm::NodeJsEnv::create_options())
+                .expect("failed to create DB")))
         }
     }
 }
@@ -194,7 +188,7 @@ mod tests {
         let prefixed_key_2 = "xyb";
         let prefixed_key_3 = "xyc";
 
-        let mut kv_storage = crate::rusty::RustyLevelDbShim::new(":memory");
+        let mut kv_storage = crate::rusty::RustyLevelDbShim::new_in_memory();
 
         assert!(
             !kv_storage.contains(key_1.as_bytes().into()).await.unwrap(),

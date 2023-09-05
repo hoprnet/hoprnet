@@ -969,6 +969,15 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Database {
+        pub fn new_in_memory(me_addr: Address) -> Self {
+            Self {
+                core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
+                    DB::new(utils_db::rusty::RustyLevelDbShim::new_in_memory()),
+                    me_addr,
+                ))),
+            }
+        }
+
         #[wasm_bindgen(constructor)]
         pub fn new(path: &str, me_addr: Address) -> Self {
             Self {
@@ -1516,7 +1525,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_ticket_price() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         assert_eq!(db.get_ticket_price().await, Ok(None));
 
@@ -1527,7 +1536,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_network_registry() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
 
@@ -1538,7 +1547,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_allowed_to_access_network() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1559,7 +1568,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_token_storage() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         let token_id = "test";
 
@@ -1583,7 +1592,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_mfa() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 

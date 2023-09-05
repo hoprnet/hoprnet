@@ -111,12 +111,10 @@ mod tests {
     use core_types::{
         account::AccountEntry,
         channels::{ChannelEntry, Ticket},
-        protocol::TagBloomFilter,
     };
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use mockall::mock;
-    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{
@@ -559,7 +557,7 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_workflow() {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(":memory")),
+            DB::new(RustyLevelDbShim::new_in_memory()),
             SENDER_PRIV_KEY.public().to_address(),
         );
 
@@ -602,7 +600,7 @@ mod tests {
     #[async_std::test]
     async fn test_db_should_store_ticket_index() {
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(":memory")),
+            DB::new(RustyLevelDbShim::new_in_memory()),
             SENDER_PRIV_KEY.public().to_address(),
         );
 

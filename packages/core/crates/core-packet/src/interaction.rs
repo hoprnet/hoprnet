@@ -1081,7 +1081,7 @@ mod tests {
     use libp2p_identity::PeerId;
     use serial_test::serial;
     use std::{
-        sync::{Arc, Mutex},
+        sync::{Arc},
         time::Duration,
     };
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
@@ -1155,11 +1155,7 @@ mod tests {
 
     fn create_dbs(amount: usize) -> Vec<RustyLevelDbShim> {
         (0..amount)
-            .map(|_| {
-                RustyLevelDbShim::new(
-                    ":memory",
-                )
-            })
+            .map(|_| RustyLevelDbShim::new_in_memory())
             .collect()
     }
 

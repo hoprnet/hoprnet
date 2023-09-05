@@ -178,7 +178,7 @@ mod tests {
 
         let mut last_addr = chain_key.to_address();
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(":memory")),
+            DB::new(RustyLevelDbShim::new_in_memory()),
             last_addr,
         );
 
