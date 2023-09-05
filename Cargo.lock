@@ -5210,12 +5210,9 @@ dependencies = [
 [[package]]
 name = "rusty-leveldb"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ebb08e1856dfba2e1870b15b8f4ad1994a3a9611619241929cedeaa7324a51c"
+source = "git+https://github.com/NumberFour8/leveldb-rs?branch=feature/no-fs#87dfad05b6538e4592c27b08c17c8fcd821b9ed8"
 dependencies = [
  "crc",
- "errno 0.2.8",
- "fs2",
  "integer-encoding",
  "rand 0.7.3",
  "snap",

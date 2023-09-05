@@ -22,7 +22,7 @@ mod tests {
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use hex_literal::hex;
     use std::sync::{Arc, Mutex};
-    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address, Snapshot},
         traits::BinarySerializable,
@@ -33,11 +33,8 @@ mod tests {
     const TEST_ACCOUNT: [u8; Address::SIZE] = hex!("3a585656b8bbb14e8aebf89256ce4511fa35ac33");
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
-        let opt = rusty_leveldb::in_memory();
-        let db = rusty_leveldb::DB::open("test", opt).unwrap();
-
         CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
+            DB::new(RustyLevelDbShim::new(":memory")),
             Address::from_bytes(&ADDR).unwrap(),
         )
     }

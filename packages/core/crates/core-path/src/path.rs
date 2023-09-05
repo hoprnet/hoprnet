@@ -137,7 +137,7 @@ mod tests {
     use libp2p_identity::PeerId;
     use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::PeerIdLike;
 
@@ -179,9 +179,7 @@ mod tests {
 
         let mut last_addr = chain_key.to_address();
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(
-                rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-            )))),
+            DB::new(RustyLevelDbShim::new(":memory")),
             last_addr,
         );
 

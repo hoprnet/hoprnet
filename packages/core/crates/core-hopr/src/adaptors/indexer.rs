@@ -72,7 +72,7 @@ pub struct WasmIndexerInteractions {
 #[cfg(feature = "wasm")]
 impl WasmIndexerInteractions {
     pub fn new(
-        db: Arc<RwLock<CoreEthereumDb<LevelDbShim>>>,
+        db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
         network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
         emitter: Sender<IndexerProcessed>,
     ) -> Self {
@@ -81,7 +81,7 @@ impl WasmIndexerInteractions {
 
         spawn_local(async move {
             let mut emitter = emitter;
-            let db_local: Arc<RwLock<CoreEthereumDb<LevelDbShim>>> = db.clone();
+            let db_local: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>> = db.clone();
 
             while let Some(value) = to_process_rx.next().await {
                 let event = match value {

@@ -651,7 +651,7 @@ pub mod tests {
     use multiaddr::Multiaddr;
     use primitive_types::H256;
     use std::sync::{Arc, Mutex};
-    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
@@ -673,11 +673,8 @@ pub mod tests {
     }
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
-        let opt = rusty_leveldb::in_memory();
-        let db = rusty_leveldb::DB::open("test", opt).unwrap();
-
         CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
+            DB::new(RustyLevelDbShim::new(":memory")),
             Address::random(),
         )
     }

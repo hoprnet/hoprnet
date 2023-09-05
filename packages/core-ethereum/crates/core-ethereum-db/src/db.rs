@@ -1037,11 +1037,11 @@ pub mod wasm {
     #[derive(Clone)]
     #[wasm_bindgen]
     pub struct Database {
-        core_ethereum_db: Arc<RwLock<CoreEthereumDb<leveldb::wasm::LevelDbShim>>>,
+        core_ethereum_db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     }
 
     impl Database {
-        pub fn as_ref_counted(&self) -> Arc<RwLock<CoreEthereumDb<leveldb::wasm::LevelDbShim>>> {
+        pub fn as_ref_counted(&self) -> Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>> {
             self.core_ethereum_db.clone()
         }
     }
@@ -1049,10 +1049,10 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Database {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: leveldb::wasm::LevelDb, me_addr: Address) -> Self {
+        pub fn new(path: &str, me_addr: Address) -> Self {
             Self {
                 core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
-                    DB::new(leveldb::wasm::LevelDbShim::new(db)),
+                    DB::new(utils_db::rusty::RustyLevelDbShim::new(path)),
                     me_addr,
                 ))),
             }
@@ -1539,7 +1539,7 @@ mod tests {
         sync::{Arc, Mutex},
     };
     use utils_db::db::serialize_to_bytes;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, EthereumChallenge};
     use utils_types::traits::BinarySerializable;
 
@@ -1596,11 +1596,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_ticket_price() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
 
         assert_eq!(db.get_ticket_price().await, Ok(None));
 
@@ -1611,11 +1607,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_network_registry() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
 
@@ -1626,11 +1618,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_allowed_to_access_network() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1651,11 +1639,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_add_to_network_registry() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
         let test_stake_account = Address::from_str("0xf2a867525fc8a16055d0dea371f0360288795c61").unwrap();
@@ -1689,11 +1673,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_remove_from_network_registry() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
         let test_stake_account = Address::from_str("0xf2a867525fc8a16055d0dea371f0360288795c61").unwrap();
@@ -1734,10 +1714,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_token_storage() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
 
         let token_id = "test";
 
@@ -1761,10 +1738,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_mfa() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(":memory")), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 

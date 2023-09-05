@@ -120,7 +120,7 @@ impl std::fmt::Display for HoprLoopComponents {
 #[cfg(feature = "wasm")]
 pub fn build_components(
     me: libp2p_identity::Keypair,
-    db: Arc<RwLock<CoreEthereumDb<LevelDbShim>>>,
+    db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     network_quality_threshold: f64,
     hb_cfg: HeartbeatConfig,
     ping_cfg: PingConfig,

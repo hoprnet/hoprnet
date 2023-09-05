@@ -21,6 +21,7 @@ pin-project-lite = "0.2.13"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.5", optional = true }
 thiserror = "1.0"
+rusty-leveldb = { git = "https://github.com/NumberFour8/leveldb-rs", branch = "feature/no-fs", default-features = false }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
@@ -33,12 +34,6 @@ async-std = { version = "1.12.0", features = ["attributes"] }
 mockall = "0.11.3"
 scopeguard = "1.1.0"
 tempfile = "3.5.0"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rusty-leveldb = "2.0.0"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-rusty-leveldb = "2.0.0"
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
