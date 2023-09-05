@@ -433,7 +433,7 @@ pub mod wasm {
         fn writeSync(fd: i64, buffer: &Uint8Array, offset: u64, length: Option<u32>, position: Option<i64>) -> i64;
         fn fsyncSync(fd: i64);
         fn fstatSync(fd: i64, options: &JsValue) -> Stats;
-        fn fcloseSync(fd: i64);
+        fn closeSync(fd: i64);
         fn mkdirSync(path: &str) -> JsString;
         fn rmdirSync(path: &str, options: &JsValue);
         fn rmSync(path: &str, options: &JsValue);
