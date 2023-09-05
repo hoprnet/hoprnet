@@ -650,7 +650,6 @@ pub mod tests {
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use std::sync::{Arc, Mutex};
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},

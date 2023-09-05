@@ -135,7 +135,6 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use hex_literal::hex;
     use libp2p_identity::PeerId;
-    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};

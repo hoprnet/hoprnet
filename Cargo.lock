@@ -6381,6 +6381,7 @@ dependencies = [
  "bincode",
  "console_error_panic_hook",
  "futures-lite",
+ "getrandom 0.2.10",
  "gloo-timers 0.3.0",
  "hex",
  "js-sys",

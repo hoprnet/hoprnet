@@ -37,7 +37,7 @@ export async function createHoprNode(
   }*/
 
   // TODO: change to actual path
-  let db = new Database(":wasm-memory", chainKeypair.public().to_address())
+  let db = new Database(":memory", chainKeypair.public().to_address())
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = options.safeModule.safeAddress

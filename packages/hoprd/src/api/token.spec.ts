@@ -27,7 +27,7 @@ describe('authentication token', function () {
     node = sinon.fake() as any
     //let db = new LevelDb()
     //await db.backend.open()
-    node.db = new Database(":wasm-memory", ALICE_ETHEREUM_ADDR.clone())
+    node.db = new Database(":memory", ALICE_ETHEREUM_ADDR.clone())
   })
 
   it('should be created if parameters are valid', async function () {
@@ -222,7 +222,7 @@ describe('authentication token authorization', function () {
     node = sinon.fake() as any
     /*let db = new LevelDb()
     await db.backend.open()*/
-    node.db = new Database(":wasm-memory", ALICE_ETHEREUM_ADDR.clone())
+    node.db = new Database(":memory", ALICE_ETHEREUM_ADDR.clone())
   })
 
   it('should succeed if lifetime is unset', async function () {

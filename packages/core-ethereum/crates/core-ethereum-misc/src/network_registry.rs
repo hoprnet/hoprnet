@@ -21,7 +21,6 @@ where
 mod tests {
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use hex_literal::hex;
-    use std::sync::{Arc, Mutex};
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address, Snapshot},

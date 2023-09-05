@@ -984,7 +984,6 @@ pub mod wasm {
         channels::{wasm::Ticket, ChannelEntry},
     };
     use std::sync::Arc;
-    use utils_db::leveldb;
     use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
     use wasm_bindgen::prelude::*;
 
@@ -1536,7 +1535,6 @@ mod tests {
     use core_types::channels::ChannelEntry;
     use std::{
         str::FromStr,
-        sync::{Arc, Mutex},
     };
     use utils_db::db::serialize_to_bytes;
     use utils_db::rusty::RustyLevelDbShim;

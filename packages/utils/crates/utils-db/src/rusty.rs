@@ -56,15 +56,23 @@ pub struct RustyLevelDbShim {
 
 impl RustyLevelDbShim {
     /// Create adapter from the given Rusty LevelDB instance.
+    #[cfg(not(feature = "wasm"))]
     pub fn new(path: &str) -> Self {
         if path == ":memory" {
             Self {
                 db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", rusty_leveldb::in_memory())
                     .expect("failed to create DB")))
             }
-        } else if path == ":wasm-memory" {
+        } else {
+            unimplemented!()
+        }
+    }
+
+    #[cfg(feature = "wasm")]
+    pub fn new(path: &str) -> Self {
+        if path == ":memory" {
             Self {
-                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", wasm_memory())
+                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", wasm::wasm_memory())
                     .expect("failed to create DB")))
             }
         } else {
@@ -178,7 +186,6 @@ mod tests {
         let prefixed_key_2 = "xyb";
         let prefixed_key_3 = "xyc";
 
-        let opt = rusty_leveldb::in_memory();
         let mut kv_storage = crate::rusty::RustyLevelDbShim::new(":memory");
 
         assert!(
