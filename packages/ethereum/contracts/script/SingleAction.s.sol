@@ -228,6 +228,70 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     }
 
     /**
+     * @dev Configure a safe proxy and module proxy.
+     * Perform the following actions as the owner of safe:
+     * - include nodes to the module
+     * - add announcement contract as target
+     * As manager of network registry, add nodes and safe to network registry
+     *
+     * @notice Deployer is the single owner of safe
+     * nonce is the current nonce of deployer account
+     * Default fallback permission for module is to
+     * 1. allow all data to Channels contract
+     * 2. allow all data to Token contract
+     * 3. allow nodes to send native tokens to itself
+     *
+     * Add node safes to network registry, as a manager
+     * @param nodeAddresses array of node addresses to be added to the module
+     * @param safe safe address of node
+     * @param module module address of node
+     */
+    function configureSafeModule(address[] memory nodeAddresses, address safe, address module) external {
+        // 1. get environment and msg.sender
+        getNetworkAndMsgSender();
+
+        /**
+         * Array of capability permissions
+         *     [
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // RESERVED
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultCloseIncomingChannelSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultInitiateOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, //
+         * defaultFinalizeOutgoingChannelClosureSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultFundChannelMultiFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultSetCommitmentSafeFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultApproveFunctionPermisson
+         *       CapabilityPermission.SPECIFIC_FALLBACK_ALLOW  // defaultSendFunctionPermisson
+         *     ]
+         */
+        CapabilityPermission[] memory defaultChannelsCapabilityPermissions = new CapabilityPermission[](9);
+        for (uint256 i = 0; i < defaultChannelsCapabilityPermissions.length; i++) {
+            defaultChannelsCapabilityPermissions[i] = CapabilityPermission.SPECIFIC_FALLBACK_ALLOW;
+        }
+        // 1. include nodes to the module, as an owner of safe
+        includeNodesToModuleBySafe(nodeAddresses, safe, module);
+
+        // 2. approve token transfer, as an owner of safe
+        approveChannelsForTokenTransferBySafe(safe);
+
+        // 3. add announcement contract as target, as an owner of safe
+        addAllAllowedTargetToModuleBySafe(currentNetworkDetail.addresses.announcements, safe, module);
+        // bytes memory
+        vm.stopBroadcast();
+
+        // 4. add nodes and safe to network registry, as a manager of network registry
+        address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
+        for (uint256 m = 0; m < nodeAddresses.length; m++) {
+            stakingSafeAddresses[m] = safe;
+        }
+        _helperGetDeployerInternalKey();
+        _registerNodes(stakingSafeAddresses, nodeAddresses);
+        vm.stopBroadcast();
+    }
+
+    /**
      * @dev Given existing node(s), safe and module, migrate them to a different network
      * Perform the following actions as the owner of safe:
      * - scope new channel contract

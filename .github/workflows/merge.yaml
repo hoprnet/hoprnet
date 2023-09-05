@@ -197,7 +197,7 @@ jobs:
           ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
             "${{ github.workflow }}" "${{ github.run_id }}"
 
-# FIXME: Disabled until self-hosted workers work again
+# FIXME: Disabled until hoprd nodes can work in Kubernetes
 #  deploy_natted_nodes:
 #    name: Deploy Natted nodes
 #    runs-on: ubuntu-latest

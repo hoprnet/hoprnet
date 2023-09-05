@@ -48,13 +48,9 @@ mod tests {
             .await
             .unwrap();
 
-        db.add_to_network_registry(
-            &Address::from_bytes(&TEST_ADDR).unwrap(),
-            &Address::from_bytes(&TEST_ACCOUNT).unwrap(),
-            &Snapshot::default(),
-        )
-        .await
-        .unwrap();
+        db.set_allowed_to_access_network(&Address::from_bytes(&TEST_ACCOUNT).unwrap(), true, &Snapshot::default())
+            .await
+            .unwrap();
 
         let is_allowed = super::is_allowed_to_access_network(&db, &Address::from_bytes(&TEST_ACCOUNT).unwrap()).await;
 

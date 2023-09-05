@@ -213,18 +213,6 @@ mod tests {
             async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn is_network_registry_enabled(&self) -> core_ethereum_db::errors::Result<bool>;
             async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn add_to_network_registry(
-                &mut self,
-                public_key: &Address,
-                account: &Address,
-                snapshot: &Snapshot,
-            ) -> core_ethereum_db::errors::Result<()>;
-            async fn remove_from_network_registry(
-                &mut self,
-                public_key: &Address,
-                account: &Address,
-                snapshot: &Snapshot,
-            ) -> core_ethereum_db::errors::Result<()>;
             async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
             async fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
             async fn retrieve_authorization(&self, id: String) -> core_ethereum_db::errors::Result<Option<AuthorizationToken>>;
