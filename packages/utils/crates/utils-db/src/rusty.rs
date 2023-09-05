@@ -314,6 +314,7 @@ pub mod wasm {
     use rusty_leveldb::{Env, FileLock, Logger, MemEnv, RandomAccess, Status, StatusCode};
     use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use utils_misc::console_log;
 
     pub struct WasmMemEnv(MemEnv);
 
@@ -644,21 +645,26 @@ pub mod wasm {
     }
 
     pub(crate) fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
+        console_log!("1");
         let test_dir = base.join(format!("test_dir_{0}", ts));
         env.mkdir(&test_dir).expect("could not create dir");
 
+        console_log!("2");
         let test_file = test_dir.join("test_file");
         assert!(!env.exists(&test_file).expect("could not check file existence 1"), "file should not exist before creation");
 
+        console_log!("3");
         let data = hex!("deadbeefcafebabe");
 
         {
+            console_log!("4");
             let mut f = env.open_writable_file(&test_file).expect("could not open file 1");
             let len = f.write(&data).expect("could not write to a file");
             assert_eq!(data.len(), len, "writting invalid number of bytes");
         }
 
         {
+            console_log!("5");
             assert!(env.exists(&test_file).expect("could not check file existence 3"), "file should exist");
             let mut f = env.open_sequential_file(&test_file).expect("could not open file 2");
             let mut buf = vec![0u8; data.len()];
@@ -668,17 +674,20 @@ pub mod wasm {
         }
 
         {
+            console_log!("6");
             let mut f = env.open_appendable_file(&test_file).expect("could not open file 3");
             let len = f.write(&data).expect("appendable write failed");
             assert_eq!(data.len(), len, "could not write all bytes to the file");
         }
 
         {
+            console_log!("7");
             let len = env.size_of(&test_file).expect("could not get file size");
             assert_eq!(data.len() * 2, len, "file should have twice the length after appending");
         }
 
         {
+            console_log!("8");
             let f = env.open_random_access_file(&test_file).expect("could not open file 4");
             let mut buf = [0; 8];
             let len = f.read_at(4, &mut buf).expect("could not read file at 1");
@@ -697,6 +706,7 @@ pub mod wasm {
         }
 
         {
+            console_log!("9");
             let children = env.children(&test_dir).expect("cannot retrieve children of test dir");
             assert_eq!(children.len(), 1, "contains more children");
             assert!(children.contains(&PathBuf::from("test_file".to_string())), "children do not contain test file");
@@ -704,17 +714,20 @@ pub mod wasm {
 
         let new_file = test_dir.join("new_file");
         {
+            console_log!("10");
             env.rename(&test_file, &new_file).expect("rename must not fail");
             assert!(!env.exists(&test_file).expect("failed to check existence after rename"), "old file must not exist after rename");
             assert!(env.exists(&new_file).expect("failed to check existence after rename"), "new file must exist after rename");
         }
 
         {
+            console_log!("11");
             env.delete(&new_file).expect("could not delete file");
             assert!(!env.exists(&new_file).expect("failed to check existence after deletion"), "file must not exist after deletion");
         }
 
         {
+            console_log!("12");
             let _ = env.rmdir(&test_dir); // cannot be tested with MemEnv
         }
     }
