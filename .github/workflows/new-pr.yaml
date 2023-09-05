@@ -13,14 +13,13 @@ jobs:
     name: Convert to draft
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && ! contains(github.author, 'github-actions')
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
 
       - name: Convert to draft
         run: |
-          set -x
           gh pr ready ${{ github.event.pull_request.number }} --undo
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

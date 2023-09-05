@@ -27,9 +27,9 @@ jobs:
 
       - name: Get version
         run: |
-          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
-          DOCKER_TAG_VERSION=$(./scripts/get-package-version.sh | sed 's/+/-/')
-          echo "DOCKER_TAG_VERSION=${DOCKER_TAG_VERSION}" >> $GITHUB_ENV
+          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }}
+          docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+          echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
 
       - name: Checkout gitops
         uses: actions/checkout@v3
@@ -50,7 +50,7 @@ jobs:
           echo "NETWORK=${network}" >> $GITHUB_ENV
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
           pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deployment.py -a deploy -e ${{ env.GITOPS_ENVIRONMENT }} -n ${network} -v ${{ env.DOCKER_TAG_VERSION }}
+          python3 ./scripts/sync-deployment.py -a deploy -e ${{ env.GITOPS_ENVIRONMENT }} -n ${network} -v ${{ env.DOCKER_TAG }}
         working-directory: "./gitops"
       - name: Create Deploy Pull Request
         uses: peter-evans/create-pull-request@v5
@@ -81,9 +81,9 @@ jobs:
 
       - name: Get version
         run: |
-          ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
-          DOCKER_TAG_VERSION=$(./scripts/get-package-version.sh | sed 's/+/-/')
-          echo "DOCKER_TAG_VERSION=${DOCKER_TAG_VERSION}" >> $GITHUB_ENV
+          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }}
+          docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+          echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
 
       - name: Checkout gitops
         uses: actions/checkout@v3
@@ -104,7 +104,7 @@ jobs:
           echo "NETWORK=${network}" >> $GITHUB_ENV
           echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
           pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deployment.py -a undeploy -e ${{ env.GITOPS_ENVIRONMENT }} -v ${{ env.DOCKER_TAG_VERSION }}
+          python3 ./scripts/sync-deployment.py -a undeploy -e ${{ env.GITOPS_ENVIRONMENT }} -v ${{ env.DOCKER_TAG }}
         working-directory: "./gitops"
       - name: Create Undeploy Pull Request
         uses: peter-evans/create-pull-request@v5
