@@ -2,7 +2,7 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { LevelDb, Database } from '@hoprnet/hopr-utils'
+import { Db, Database } from '@hoprnet/hopr-utils'
 
 import { authenticateToken, createToken, storeToken } from '../../../token.js'
 
@@ -17,8 +17,8 @@ describe('DELETE /tokens/{id}', function () {
 
   before(async function () {
     node = sinon.fake() as any
-    let db = new LevelDb()
-    await db.backend.open()
+    let db = new Db()
+    db.open()
     node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)

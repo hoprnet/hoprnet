@@ -29,7 +29,7 @@ const MOCK_PUBLIC_KEY = () =>
 
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
-import { LevelDb } from './db.js'
+import { Db } from './db.js'
 import { db_sanity_test } from '../../../hoprd/lib//hoprd_hoprd.js'
 import fs from 'fs'
 
@@ -50,16 +50,16 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, ba
 }
 
 describe('db shim tests', function () {
-  let db: LevelDb
+  let db: Db
   let db_dir_path: string
 
   beforeEach(function () {
-    db = new LevelDb()
+    db = new Db()
     db_dir_path = '/tmp/test-shim.db'
   })
 
   afterEach(async function () {
-    await db.close()
+    db.close()
 
     fs.rmSync(db_dir_path, { recursive: true, force: true })
   })
@@ -76,7 +76,7 @@ describe('db shim tests', function () {
 })
 
 function test_in_memory_db() {
-  return new Database(new LevelDb(), MOCK_PUBLIC_KEY().to_address())
+  return new Database(new Db(), MOCK_PUBLIC_KEY().to_address())
 }
 
 describe('db functional tests', function () {
@@ -125,24 +125,24 @@ describe('db functional tests', function () {
 })
 
 describe(`levelup shim tests`, function () {
-  let db: LevelDb
+  let db: Db
 
   beforeEach(function () {
-    db = new LevelDb()
+    db = new Db()
   })
 
   afterEach(async function () {
-    await db.close()
+    db.close()
   })
 
   it('should store network', async function () {
-    await db.setNetworkId('test-env')
-    assert.equal(await db.getNetworkId(), 'test-env')
+    db.setNetworkId('test-env')
+    assert.equal(db.getNetworkId(), 'test-env')
   })
 
   it('should verify network', async function () {
-    await db.setNetworkId('test-env')
-    assert((await db.verifyNetworkId('wrong-id')) === false, `must fail for wrong id`)
-    assert((await db.verifyNetworkId('test-env')) === true, `must not fail for correct id`)
+    db.setNetworkId('test-env')
+    assert((db.verifyNetworkId('wrong-id')) === false, `must fail for wrong id`)
+    assert((db.verifyNetworkId('test-env')) === true, `must not fail for correct id`)
   })
 })

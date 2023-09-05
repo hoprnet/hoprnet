@@ -9,7 +9,7 @@ use utils_db::db::Batch;
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
-    traits::AsyncKVStorage,
+    traits::KVStorage,
 };
 use utils_log::debug;
 use utils_types::{
@@ -30,20 +30,20 @@ fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Re
 
 pub struct CoreEthereumDb<T>
 where
-    T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
+    T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
     pub db: DB<T>,
     pub me: Address,
 }
 
-impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
+impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
     pub fn new(db: DB<T>, me: Address) -> Self {
         Self { db, me }
     }
 }
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
-impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
+impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     // core only part
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
@@ -142,7 +142,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         batch_ops.del(unack_key);
         batch_ops.put(ack_key, ack_ticket);
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     // core and core-ethereum part
@@ -243,7 +243,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch, true).await
+        self.db.batch(batch)
     }
 
     async fn get_channel_to(&self, dest: &Address) -> Result<Option<ChannelEntry>> {
@@ -273,7 +273,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         batch_ops.put(channel_key, channel);
         batch_ops.put(snapshot_key, snapshot);
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     // core-ethereum only part
@@ -295,7 +295,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             batch_ops.put(key, neglected_ticket_count + acknowledged_tickets.len())
         }
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn get_latest_block_number(&self) -> Result<u32> {
@@ -350,7 +350,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         batch_ops.put(address_key, account);
         batch_ops.put(snapshot_key, snapshot);
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn get_accounts(&self) -> Result<Vec<AccountEntry>> {
@@ -417,7 +417,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn mark_redeemed(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()> {
@@ -455,7 +455,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let new_pending_balance = pending_balance.sub(&ticket.ticket.amount);
         ops.put(key, new_pending_balance);
 
-        self.db.batch(ops, true).await
+        self.db.batch(ops)
     }
 
     async fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()> {
@@ -481,7 +481,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .unwrap_or(Balance::zero(BalanceType::HOPR));
         ops.put(key, balance.sub(&ticket.ticket.amount));
 
-        self.db.batch(ops, true).await
+        self.db.batch(ops)
     }
 
     async fn get_rejected_tickets_value(&self) -> Result<Balance> {
@@ -586,7 +586,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn get_channels_domain_separator(&self) -> Result<Option<Hash>> {
@@ -609,7 +609,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn get_channels_ledger_domain_separator(&self) -> Result<Option<Hash>> {
@@ -632,7 +632,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
@@ -651,7 +651,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
@@ -670,7 +670,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     /// Get the staking safe address
@@ -688,7 +688,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.put(safe_address_key, safe_address);
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     /// Get the staking module address
@@ -706,7 +706,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch_ops = utils_db::db::Batch::new();
         batch_ops.put(module_address_key, module_address);
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     /// Get the allowance for HoprChannels contract to transfer tokens on behalf of staking safe address
@@ -730,7 +730,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     /// Checks whether network registry is enabled. Default: true
@@ -750,7 +750,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             snapshot,
         );
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn is_allowed_to_access_network(&self, node: &Address) -> Result<bool> {
@@ -779,7 +779,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             batch_ops.del(key)
         }
 
-        self.db.batch(batch_ops, true).await
+        self.db.batch(batch_ops)
     }
 
     async fn get_from_network_registry(&self, stake_account: &Address) -> Result<Vec<Address>> {
@@ -838,7 +838,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
             snapshot,
         );
-        self.db.batch(batch_ops, true).await?;
+        self.db.batch(batch_ops);
 
         Ok(registered_nodes)
     }
@@ -869,14 +869,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 batch_ops.put(mfa_key, mfa_address);
                 batch_ops.put(snapshot_key, snapshot);
 
-                self.db.batch(batch_ops, true).await
+                self.db.batch(batch_ops)
             }
             None => {
                 let mut batch_ops = utils_db::db::Batch::new();
                 batch_ops.del(mfa_key);
                 batch_ops.put(snapshot_key, snapshot);
 
-                self.db.batch(batch_ops, true).await
+                self.db.batch(batch_ops)
             }
         }
     }
@@ -906,7 +906,7 @@ pub mod wasm {
         channels::{wasm::Ticket, ChannelEntry},
     };
     use std::sync::Arc;
-    use utils_db::leveldb;
+    use utils_db::sqlite;
     use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
     use wasm_bindgen::prelude::*;
 
@@ -959,11 +959,11 @@ pub mod wasm {
     #[derive(Clone)]
     #[wasm_bindgen]
     pub struct Database {
-        core_ethereum_db: Arc<RwLock<CoreEthereumDb<leveldb::wasm::LevelDbShim>>>,
+        core_ethereum_db: Arc<RwLock<CoreEthereumDb<sqlite::wasm::SqliteShim>>>,
     }
 
     impl Database {
-        pub fn as_ref_counted(&self) -> Arc<RwLock<CoreEthereumDb<leveldb::wasm::LevelDbShim>>> {
+        pub fn as_ref_counted(&self) -> Arc<RwLock<CoreEthereumDb<sqlite::wasm::SqliteShim>>> {
             self.core_ethereum_db.clone()
         }
     }
@@ -971,10 +971,10 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Database {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: leveldb::wasm::LevelDb, me_addr: Address) -> Self {
+        pub fn new(db: sqlite::wasm::Sqlite, me_addr: Address) -> Self {
             Self {
                 core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
-                    DB::new(leveldb::wasm::LevelDbShim::new(db)),
+                    DB::new(sqlite::wasm::SqliteShim::new(db)),
                     me_addr,
                 ))),
             }
@@ -1461,7 +1461,7 @@ mod tests {
         sync::{Arc, Mutex},
     };
     use utils_db::db::serialize_to_bytes;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::sqlite::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, EthereumChallenge};
     use utils_types::traits::BinarySerializable;
 

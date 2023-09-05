@@ -274,10 +274,10 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         includeNodesToModuleBySafe(nodeAddresses, safe, module);
 
         // 2. approve token transfer, as an owner of safe
-        approveChannelsForTokenTransferBySafe(safe);
+        //approveChannelsForTokenTransferBySafe(safe);
 
         // 3. add announcement contract as target, as an owner of safe
-        addAllAllowedTargetToModuleBySafe(currentNetworkDetail.addresses.announcements, safe, module);
+        //addAllAllowedTargetToModuleBySafe(currentNetworkDetail.addresses.announcements, safe, module);
         // bytes memory
         vm.stopBroadcast();
 
@@ -600,6 +600,11 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                 if (registeredAccount == address(0)) {
                     accounts.push(stakingAccounts[i]);
                     nodes.push(nodeAddresses[i]);
+                } else {
+                emit log_string(string(abi.encodePacked("Node already registered to Network Registry - ",
+                                vm.toString(registeredAccount),
+                                " - ",
+                                vm.toString(nodeAddresses[i]))));
                 }
             } catch {
                 revert("Cannot read successReadRegisteredNodeAddress from network registry contract.");
@@ -614,6 +619,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                 emit log_named_bytes("regsiter nodes to network registry error", lowlevelData);
                 revert("Cannot register nodes as a manager");
             }
+        } else {
+                emit log_string("No new nodes registered to Network Registry");
         }
 
         // reset

@@ -1,6 +1,6 @@
 import path from 'path'
 
-import { debug, Database, LevelDb, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-utils'
+import { debug, Database, Db, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-utils'
 
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -22,23 +22,18 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  let levelDb = new LevelDb()
+  let dbBackend = new Db()
 
   try {
     const dbPath = path.join(options.dataPath, 'db')
-    await levelDb.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)
+    await dbBackend.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)
 
-    // Dump entire database to a file if given by the env variable
-    const dump_file = process.env.DB_DUMP ?? ''
-    if (dump_file.length > 0) {
-      await levelDb.dump(dump_file)
-    }
   } catch (err: unknown) {
     log(`failed init db:`, err)
     throw err
   }
 
-  let db = new Database(levelDb, chainKeypair.public().to_address())
+  let db = new Database(dbBackend, chainKeypair.public().to_address())
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = options.safeModule.safeAddress

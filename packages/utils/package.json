@@ -31,15 +31,14 @@
     "@libp2p/interface-peer-id": "1.0.5",
     "@libp2p/peer-id": "1.1.16",
     "@multiformats/multiaddr": "10.3.3",
-    "abstract-level": "1.0.3",
+    "@types/better-sqlite3": "^7.6.4",
+    "better-sqlite3": "^8.6.0",
     "bn.js": "5.2.1",
     "debug": "4.3.4",
     "ethers": "5.7.2",
     "it-pipe": "2.0.5",
-    "memory-level": "1.0.0",
     "multiformats": "9.6.5",
     "secp256k1": "4.0.3",
-    "sqlite-level": "1.0.1",
     "timeout-abort-controller": "3.0.0"
   },
   "devDependencies": {

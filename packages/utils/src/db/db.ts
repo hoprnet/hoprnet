@@ -1,11 +1,8 @@
 import { stat, mkdir, rm } from 'fs/promises'
 import { debug } from '../process/index.js'
 
-import fs from 'fs'
-import { stringToU8a, u8aConcat, u8aToHex } from '../u8a/index.js'
-import { AbstractLevel } from 'abstract-level'
-import { MemoryLevel } from 'memory-level'
-const SqliteLevel = (await import('sqlite-level')).default.SqliteLevel
+import { u8aToHex } from '../u8a/index.js'
+import { default as Sqlite, type Database, type Statement } from 'better-sqlite3'
 
 const log = debug(`hopr-core:db`)
 
@@ -14,12 +11,15 @@ const decoder = new TextDecoder()
 
 const NETWORK_KEY = encoder.encode('network_id')
 
-export class LevelDb {
-  public backend: AbstractLevel<string | Uint8Array | Buffer>
+export class Db {
+  public backend: Database
+
+  private removeStatement: Statement
+  private putStatement: Statement
+  private getStatement: Statement
 
   constructor() {
-    // unless initialized with a specific db path, memory version is used
-    this.backend = new MemoryLevel()
+    this.backend = new Sqlite(':memory:')
   }
 
   public async init(initialize: boolean, dbPath: string, forceCreate: boolean = false, networkId: string) {
@@ -56,16 +56,33 @@ export class LevelDb {
       }
     }
 
-    this.backend = new SqliteLevel({ filename: dbPath + '/db.sqlite' })
+    // open database connection
+    this.backend = new Sqlite(dbPath + '/db.sqlite', { verbose: console.log })
 
-    // Fully initialize database
-    await this.backend.open()
+    this.open(setNetwork, networkId)
+  }
+
+  public open(setNetwork: boolean = false, networkId: string = ''): void {
+    // setup connection parameters
+    this.backend.pragma("journal_mode = WAL");
+    this.backend.pragma("synchronous = normal");
+    this.backend.pragma("auto_vacuum = full");
+    this.backend.pragma("page_size = 4096");
+    this.backend.pragma("cache_size = -4000");
+
+    // setup prepared statements
+    this.removeStatement = this.backend.prepare("DELETE FROM kv2 WHERE key = ?")
+    this.putStatement = this.backend.prepare("INSERT INTO kv2 (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value")
+    this.getStatement = this.backend.prepare("SELECT value FROM kv2 WHERE key = ?");
+    // ensure latest schema is used
+    this.backend.exec("CREATE TABLE IF NOT EXISTS kv2 (key TEXT PRIMARY KEY, value BLOB)");
+    this.backend.exec("DROP TABLE IF EXISTS kv");
 
     if (setNetwork) {
       log(`setting network id ${networkId} to db`)
-      await this.put(NETWORK_KEY, encoder.encode(networkId))
+      this.put(NETWORK_KEY, encoder.encode(networkId))
     } else {
-      let storedNetworkId = await this.maybeGet(NETWORK_KEY)
+      let storedNetworkId = this.get(NETWORK_KEY)
       let decodedStoredNetworkId = storedNetworkId !== undefined ? undefined : decoder.decode(storedNetworkId)
 
       const hasNetworkKey = decodedStoredNetworkId !== undefined && decodedStoredNetworkId === networkId
@@ -73,115 +90,67 @@ export class LevelDb {
       if (!hasNetworkKey) {
         throw new Error(`invalid db network id: ${decodedStoredNetworkId} (expected: ${networkId})`)
       }
-    }
+  }
   }
 
-  public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    let k = u8aToHex(key)
-    await this.backend.del(k) // Delete first in case the value already exists
-    return await this.backend.put(k, u8aToHex(value))
+  public put(key: Uint8Array, value: Uint8Array): void {
+    const k = u8aToHex(key)
+    this.backend.transaction(() =>
+        this.putStatement.run(k, value.toString())
+      )()
   }
 
-  public async get(key: Uint8Array): Promise<Uint8Array> {
-    return stringToU8a(await this.backend.get(u8aToHex(key)))
-  }
-
-  public async remove(key: Uint8Array): Promise<void> {
-    await this.backend.del(u8aToHex(key))
-  }
-
-  public async batch(ops: Array<any>, wait_for_write = true): Promise<void> {
-    const options: { sync: boolean } = {
-      sync: wait_for_write
-    }
-
-    let batch = this.backend.batch()
-    for (const op of ops) {
-      if (op.type === 'put') {
-        batch.del(u8aToHex(op.key)) // We must try to delete first then insert (in case of updates)
-        batch.put(u8aToHex(op.key), u8aToHex(op.value))
-      } else if (op.type === 'del') {
-        batch.del(u8aToHex(op.key))
-      } else {
-        throw new Error(`Unsupported operation type: ${JSON.stringify(op)}`)
+  public get(key: Uint8Array): Uint8Array | undefined {
+    const k = u8aToHex(key)
+      const tx = this.backend.transaction(() =>
+        this.getStatement.get(k)
+      )
+      const row = tx()
+      if (row) {
+        const value = row['value']
+        return value
       }
-    }
-
-    await batch.write(options)
+      return undefined
   }
 
-  public async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
-    try {
-      return await this.get(key)
-    } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound) {
-        return undefined
-      }
-      throw err
-    }
+  public remove(key: Uint8Array): void {
+    const k = u8aToHex(key)
+    this.backend.transaction(() =>
+                             this.removeStatement.run(k)
+                            )()
   }
 
-  public iterValues(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
-    return this.iter(prefix, suffixLength)
+  public batch(ops: Array<any>): void {
+    this.backend.transaction(() => {
+      ops.forEach((op) => {
+        if (op.type === 'put') {
+          this.putStatement.run(op.key, op.value)
+        } else if (op.type === 'del') {
+          this.removeStatement.run(op.key)
+        } else {
+          throw new Error(`Unsupported operation type: ${JSON.stringify(op)}`)
+        }
+      })
+    })()
   }
 
-  protected async *iter(prefix: Uint8Array, suffixLength: number): AsyncIterable<Uint8Array> {
-    const firstPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0x00))
-    const lastPrefixed = u8aConcat(prefix, new Uint8Array(suffixLength).fill(0xff))
-
-    for await (const [_key, chunk] of this.backend.iterator({
-      // LevelDB does not support Uint8Arrays, always convert to Buffer
-      gte: u8aToHex(firstPrefixed),
-      lte: u8aToHex(lastPrefixed),
-      keys: false
-    }) as any) {
-      yield stringToU8a(chunk)
-    }
-  }
-
-  public async close() {
+  public close(): void {
     log('Closing database')
-    return await this.backend.close()
+    this.backend.close()
   }
 
-  public async dump(destFile: string) {
-    log(`Dumping current database to ${destFile}`)
-    let dumpFile = fs.createWriteStream(destFile, { flags: 'a' })
-    for await (const [key_hex, value_hex] of this.backend.iterator()) {
-      let key = stringToU8a(key_hex)
-      let out = ''
-      while (key.length > 0) {
-        const nextDelimiter = key.findIndex((v: number) => v == 0x2d) // 0x2d ~= '-'
-
-        if (key.subarray(0, nextDelimiter).every((v: number) => v >= 32 && v <= 126)) {
-          out += decoder.decode(key.subarray(0, nextDelimiter))
-        } else {
-          out += u8aToHex(key.subarray(0, nextDelimiter))
-        }
-
-        if (nextDelimiter < 0) {
-          break
-        } else {
-          key = (key as Buffer).subarray(nextDelimiter + 1)
-        }
-      }
-      dumpFile.write(out + ',' + value_hex + '\n')
-    }
-    dumpFile.close()
-  }
-
-  public async setNetworkId(network_id: string): Promise<void> {
+  public setNetworkId(network_id: string): void {
     // conversion to Buffer done by `.put()` method
-    await this.put(NETWORK_KEY, encoder.encode(network_id))
+    this.put(NETWORK_KEY, encoder.encode(network_id))
   }
 
-  public async getNetworkId(): Promise<string> {
+  public getNetworkId(): string | undefined {
     // conversion to Buffer done by `.get()` method
-    return decoder.decode(await this.maybeGet(NETWORK_KEY))
+    return decoder.decode(this.get(NETWORK_KEY))
   }
 
-  public async verifyNetworkId(expectedId: string): Promise<boolean> {
-    const storedId = await this.getNetworkId()
+  public verifyNetworkId(expectedId: string): boolean {
+    const storedId = this.getNetworkId()
 
     if (storedId == undefined) {
       return false

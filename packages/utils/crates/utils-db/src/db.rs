@@ -1,6 +1,6 @@
 use crate::{
     errors::{DbError, Result},
-    traits::AsyncKVStorage,
+    traits::KVStorage,
 };
 use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
@@ -102,23 +102,23 @@ impl Deref for Key {
     }
 }
 
-pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
+pub struct DB<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
     backend: T,
 }
 
-impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
+impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
         Self { backend }
     }
 
-    pub async fn contains(&self, key: Key) -> bool {
-        self.backend.contains(key.into()).await.is_ok_and(|v| v)
+    pub fn contains(&self, key: Key) -> bool {
+        self.backend.contains(key.into()).is_ok_and(|v| v)
     }
 
-    pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
+    pub fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        match self.backend.get(key.into()).await {
+        match self.backend.get(key.into()) {
             Ok(Some(val)) => match bincode::deserialize(&val) {
                 Ok(deserialized) => Ok(Some(deserialized)),
                 Err(e) => Err(DbError::DeserializationError(format!(
@@ -131,7 +131,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         }
     }
 
-    pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
+    pub fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
     where
         V: Serialize + DeserializeOwned,
     {
@@ -140,50 +140,46 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
             .map_err(|e| DbError::SerializationError(e.to_string()))?
             .into_boxed_slice();
 
-        match self.backend.set(key, value).await? {
-            Some(v) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
+        match self.backend.set(key, value) {
+            Ok(Some(v)) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
                 DbError::DeserializationError(format!("during set operation: {}", e.to_string().as_str()))
             }),
-            None => Ok(None),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
-    pub async fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
+    pub fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        match self.backend.remove(key).await? {
-            Some(v) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
+        match self.backend.remove(key) {
+            Ok(Some(v)) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
                 DbError::DeserializationError(format!("during remove operation: {}", e.to_string().as_str()))
             }),
-            None => Ok(None),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
-    pub async fn get_more<V: Serialize + DeserializeOwned>(
+    pub fn get_more<V: Serialize + DeserializeOwned>(
         &self,
         prefix: Box<[u8]>,
         suffix_size: u32,
         filter: &dyn Fn(&V) -> bool,
     ) -> Result<Vec<V>> {
-        let mut output = Vec::new();
-
-        let mut data_stream = Box::into_pin(self.backend.iterate(prefix, suffix_size)?);
-
-        // fail fast for the first value that cannot be deserialized
-        while let Some(value) = data_stream.next().await {
-            let value =
-                bincode::deserialize::<V>(value?.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string()))?;
-
-            if (*filter)(&value) {
-                output.push(value);
+        match self.backend.iterate(prefix, suffix_size) {
+            Ok(values) => {
+                return values
+                    .iter()
+                    .map(|val| bincode::deserialize(val.as_ref()).filter(|v| v.is_ok_and()))
+                    .collect()
             }
+            Err(e) => Err(e),
         }
-
-        Ok(output)
     }
 
-    pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
-        self.backend.batch(batch.ops, wait_for_write).await
+    pub fn batch(&mut self, batch: Batch) -> Result<()> {
+        self.backend.batch(batch.ops)
     }
 }
 

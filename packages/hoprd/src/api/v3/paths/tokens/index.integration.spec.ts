@@ -2,7 +2,7 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { LevelDb, Database } from '@hoprnet/hopr-utils'
+import { Db, Database } from '@hoprnet/hopr-utils'
 
 import { createAuthenticatedTestApiInstance, ALICE_ETHEREUM_ADDR } from './../../fixtures.js'
 import { STATUS_CODES } from './../../utils.js'
@@ -15,8 +15,8 @@ describe('POST /tokens', function () {
 
   before(async function () {
     node = sinon.fake() as any
-    let db = new LevelDb()
-    await db.backend.open()
+    let db = new Db()
+    db.open()
     node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)
