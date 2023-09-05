@@ -72,11 +72,14 @@ impl RustyLevelDbShim {
     pub fn new(path: &str) -> Self {
         if path == ":memory" {
             Self {
-                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", wasm::WasmMemEnv::create_options())
+                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hoprd_db", wasm::WasmMemEnv::create_options())
                     .expect("failed to create DB")))
             }
         } else {
-            todo!("when nodejs_env is implemented, change to FS")
+            Self {
+                db: Rc::new(RefCell::new(rusty_leveldb::DB::open(path, wasm::NodeJsEnv::create_options())
+                    .expect("failed to create DB")))
+            }
         }
     }
 }
