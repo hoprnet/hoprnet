@@ -2,7 +2,6 @@ pub mod constants;
 pub mod db;
 pub mod errors;
 pub mod hashmap;
-pub mod leveldb;
 pub mod sqlite;
 pub mod traits;
 pub mod types;

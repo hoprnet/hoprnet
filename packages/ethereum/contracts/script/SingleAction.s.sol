@@ -601,10 +601,16 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                     accounts.push(stakingAccounts[i]);
                     nodes.push(nodeAddresses[i]);
                 } else {
-                emit log_string(string(abi.encodePacked("Node already registered to Network Registry - ",
+                    emit log_string(
+                        string(
+                            abi.encodePacked(
+                                "Node already registered to Network Registry - ",
                                 vm.toString(registeredAccount),
                                 " - ",
-                                vm.toString(nodeAddresses[i]))));
+                                vm.toString(nodeAddresses[i])
+                            )
+                        )
+                    );
                 }
             } catch {
                 revert("Cannot read successReadRegisteredNodeAddress from network registry contract.");
@@ -620,7 +626,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                 revert("Cannot register nodes as a manager");
             }
         } else {
-                emit log_string("No new nodes registered to Network Registry");
+            emit log_string("No new nodes registered to Network Registry");
         }
 
         // reset

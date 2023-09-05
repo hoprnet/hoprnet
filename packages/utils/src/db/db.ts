@@ -64,19 +64,21 @@ export class Db {
 
   public open(setNetwork: boolean = false, networkId: string = ''): void {
     // setup connection parameters
-    this.backend.pragma("journal_mode = WAL");
-    this.backend.pragma("synchronous = normal");
-    this.backend.pragma("auto_vacuum = full");
-    this.backend.pragma("page_size = 4096");
-    this.backend.pragma("cache_size = -4000");
+    this.backend.pragma('journal_mode = WAL')
+    this.backend.pragma('synchronous = normal')
+    this.backend.pragma('auto_vacuum = full')
+    this.backend.pragma('page_size = 4096')
+    this.backend.pragma('cache_size = -4000')
 
     // setup prepared statements
-    this.removeStatement = this.backend.prepare("DELETE FROM kv2 WHERE key = ?")
-    this.putStatement = this.backend.prepare("INSERT INTO kv2 (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value")
-    this.getStatement = this.backend.prepare("SELECT value FROM kv2 WHERE key = ?");
+    this.removeStatement = this.backend.prepare('DELETE FROM kv2 WHERE key = ?')
+    this.putStatement = this.backend.prepare(
+      'INSERT INTO kv2 (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value'
+    )
+    this.getStatement = this.backend.prepare('SELECT value FROM kv2 WHERE key = ?')
     // ensure latest schema is used
-    this.backend.exec("CREATE TABLE IF NOT EXISTS kv2 (key TEXT PRIMARY KEY, value BLOB)");
-    this.backend.exec("DROP TABLE IF EXISTS kv");
+    this.backend.exec('CREATE TABLE IF NOT EXISTS kv2 (key TEXT PRIMARY KEY, value BLOB)')
+    this.backend.exec('DROP TABLE IF EXISTS kv')
 
     if (setNetwork) {
       log(`setting network id ${networkId} to db`)
@@ -90,34 +92,28 @@ export class Db {
       if (!hasNetworkKey) {
         throw new Error(`invalid db network id: ${decodedStoredNetworkId} (expected: ${networkId})`)
       }
-  }
+    }
   }
 
   public put(key: Uint8Array, value: Uint8Array): void {
     const k = u8aToHex(key)
-    this.backend.transaction(() =>
-        this.putStatement.run(k, value.toString())
-      )()
+    this.backend.transaction(() => this.putStatement.run(k, value.toString()))()
   }
 
   public get(key: Uint8Array): Uint8Array | undefined {
     const k = u8aToHex(key)
-      const tx = this.backend.transaction(() =>
-        this.getStatement.get(k)
-      )
-      const row = tx()
-      if (row) {
-        const value = row['value']
-        return value
-      }
-      return undefined
+    const tx = this.backend.transaction(() => this.getStatement.get(k))
+    const row = tx()
+    if (row) {
+      const value = row['value']
+      return value
+    }
+    return undefined
   }
 
   public remove(key: Uint8Array): void {
     const k = u8aToHex(key)
-    this.backend.transaction(() =>
-                             this.removeStatement.run(k)
-                            )()
+    this.backend.transaction(() => this.removeStatement.run(k))()
   }
 
   public batch(ops: Array<any>): void {

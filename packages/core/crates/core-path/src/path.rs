@@ -61,8 +61,7 @@ impl Path {
         // Ignore the last hop in the check, because channels are not required for direct messages
         for hop in path.iter().take(path.len() - 1) {
             ticket_receiver = db
-                .get_chain_key(&OffchainPublicKey::from_peerid(hop)?)
-                .await?
+                .get_chain_key(&OffchainPublicKey::from_peerid(hop)?)?
                 .ok_or(InvalidPeer(format!("could not find channel key for {hop}")))?;
 
             // Check for loops
@@ -75,8 +74,7 @@ impl Path {
 
             // Check if the channel is opened
             let channel = db
-                .get_channel_x(&ticket_issuer, &ticket_receiver)
-                .await?
+                .get_channel_x(&ticket_issuer, &ticket_receiver)?
                 .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
 
             if channel.status != ChannelStatus::Open {
@@ -135,9 +133,8 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use hex_literal::hex;
     use libp2p_identity::PeerId;
-    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::hashmap::InMemoryHashMapStorage;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::PeerIdLike;
 
@@ -173,23 +170,20 @@ mod tests {
     }
 
     // Channels: 0 -> 1 -> 2 -> 3 -> 4, 4 /> 0
-    async fn create_db_with_channel_topology(peers: &mut Vec<PeerId>) -> CoreEthereumDb<RustyLevelDbShim> {
+    async fn create_db_with_channel_topology(
+        peers: &mut Vec<PeerId>,
+    ) -> CoreEthereumDb<InMemoryHashMapStorage<Box<[u8]>, Box<[u8]>>> {
         let chain_key = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap();
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
 
         let mut last_addr = chain_key.to_address();
-        let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(
-                rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-            )))),
-            last_addr,
-        );
+        let backend = InMemoryHashMapStorage::new();
+        let mut db = CoreEthereumDb::new(DB::new(backend), last_addr);
 
         let packet_key = OffchainPublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap();
         peers.push(packet_key.to_peerid());
 
         db.link_chain_and_packet_keys(&chain_key.to_address(), &packet_key, &testing_snapshot)
-            .await
             .unwrap();
 
         for peer in PEERS_PRIVS.iter().skip(1) {
@@ -199,19 +193,16 @@ mod tests {
 
             // Link both keys
             db.link_chain_and_packet_keys(&chain_key.to_address(), &packet_key, &testing_snapshot)
-                .await
                 .unwrap();
 
             // Open channel to self
             let channel = create_dummy_channel(chain_key.to_address(), chain_key.to_address(), ChannelStatus::Open);
             db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-                .await
                 .unwrap();
 
             // Open channel from last node to us
             let channel = create_dummy_channel(last_addr, chain_key.to_address(), ChannelStatus::Open);
             db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-                .await
                 .unwrap();
 
             last_addr = chain_key.to_address();
@@ -223,7 +214,6 @@ mod tests {
         let chain_key_4 = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
         let channel = create_dummy_channel(chain_key_4, chain_key_0, ChannelStatus::Closed);
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-            .await
             .unwrap();
 
         db

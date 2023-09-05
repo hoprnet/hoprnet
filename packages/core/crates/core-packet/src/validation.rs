@@ -66,8 +66,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
         info!("checking unrealized balances for channel {}", channel.get_id());
 
         let unrealized_balance = db
-            .get_tickets(Some(*sender))
-            .await? // all tickets from sender
+            .get_tickets(Some(*sender))? // all tickets from sender
             .into_iter()
             .filter(|t| channel.channel_epoch.eq(&t.channel_epoch.into()))
             .fold(Some(channel.balance), |result, t| {
@@ -118,7 +117,7 @@ mod tests {
     use mockall::mock;
     use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::hashmap::InMemoryHashMapStorage;
     use utils_types::primitives::{
         Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256,
     };
@@ -134,95 +133,94 @@ mod tests {
 
     mock! {
         pub Db { }
-        #[async_trait(? Send)]
         impl HoprCoreEthereumDbActions for Db {
-            async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
-            async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
-            async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
-            async fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
-            async fn get_pending_acknowledgement(
+            fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
+            fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
+            fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
+            fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
+            fn get_pending_acknowledgement(
                 &self,
                 half_key_challenge: &HalfKeyChallenge,
             ) -> core_ethereum_db::errors::Result<Option<PendingAcknowledgement>>;
-            async fn store_pending_acknowledgment(
+            fn store_pending_acknowledgment(
                 &mut self,
                 half_key_challenge: HalfKeyChallenge,
                 pending_acknowledgment: PendingAcknowledgement,
             ) -> core_ethereum_db::errors::Result<()>;
-            async fn replace_unack_with_ack(
+            fn replace_unack_with_ack(
                 &mut self,
                 half_key_challenge: &HalfKeyChallenge,
                 ack_ticket: AcknowledgedTicket,
             ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
-            async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
-            async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
-            async fn get_pending_balance_to(&self, counterparty: &Address) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_channel_to(&self, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn get_channel_from(&self, src: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn update_channel_and_snapshot(
+            fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
+            fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
+            fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
+            fn get_pending_balance_to(&self, counterparty: &Address) -> core_ethereum_db::errors::Result<Balance>;
+            fn get_channel_to(&self, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            fn get_channel_from(&self, src: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            fn update_channel_and_snapshot(
                 &mut self,
                 channel_id: &Hash,
                 channel: &ChannelEntry,
                 snapshot: &Snapshot,
             ) -> core_ethereum_db::errors::Result<()>;
-            async fn get_packet_key(&self, chain_key: &Address) -> core_ethereum_db::errors::Result<Option<OffchainPublicKey>>;
-            async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
-            async fn get_latest_block_number(&self) -> core_ethereum_db::errors::Result<u32>;
-            async fn update_latest_block_number(&mut self, number: u32) -> core_ethereum_db::errors::Result<()>;
-            async fn get_latest_confirmed_snapshot(&self) -> core_ethereum_db::errors::Result<Option<Snapshot>>;
-            async fn get_channel(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn get_channels(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_channels_open(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_account(&self, address: &Address) -> core_ethereum_db::errors::Result<Option<AccountEntry>>;
-            async fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
-            async fn get_redeemed_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_redeemed_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_neglected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_pending_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_losing_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn mark_redeemed(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
-            async fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
-            async fn get_rejected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn get_channel_x(&self, src: &Address, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
-            async fn get_channels_from(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_channels_to(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
-            async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
-            async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
-            async fn get_ticket_price(&self) -> core_ethereum_db::errors::Result<Option<U256>>;
-            async fn set_ticket_price(&mut self, ticket_price: &U256) -> core_ethereum_db::errors::Result<()>;
-            async fn get_node_safe_registry_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn set_node_safe_registry_domain_separator(&mut self, node_safe_registry_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_channels_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn set_channels_domain_separator(&mut self, channels_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_channels_ledger_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
-            async fn set_channels_ledger_domain_separator(&mut self, channels_ledger_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_staking_safe_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn set_staking_safe_address(&mut self, safe_address: &Address) -> core_ethereum_db::errors::Result<()>;
-            async fn get_staking_module_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn set_staking_module_address(&mut self, module_address: &Address) -> core_ethereum_db::errors::Result<()>;
-            async fn get_staking_safe_allowance(&self) -> core_ethereum_db::errors::Result<Balance>;
-            async fn set_staking_safe_allowance(&mut self, allowance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn is_network_registry_enabled(&self) -> core_ethereum_db::errors::Result<bool>;
-            async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
-            async fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
-            async fn retrieve_authorization(&self, id: String) -> core_ethereum_db::errors::Result<Option<AuthorizationToken>>;
-            async fn delete_authorization(&mut self, id: String) -> core_ethereum_db::errors::Result<()>;
-            async fn is_mfa_protected(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
-            async fn set_mfa_protected_and_update_snapshot(&mut self,maybe_mfa_address: Option<Address>,snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn is_allowed_to_access_network(&self, node: &Address) -> core_ethereum_db::errors::Result<bool>;
-            async fn set_allowed_to_access_network(&mut self, node: &Address, allowed: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn get_from_network_registry(&self, stake_account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
-            async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<Vec<Address>>;
+            fn get_packet_key(&self, chain_key: &Address) -> core_ethereum_db::errors::Result<Option<OffchainPublicKey>>;
+            fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
+            fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
+            fn get_latest_block_number(&self) -> core_ethereum_db::errors::Result<u32>;
+            fn update_latest_block_number(&mut self, number: u32) -> core_ethereum_db::errors::Result<()>;
+            fn get_latest_confirmed_snapshot(&self) -> core_ethereum_db::errors::Result<Option<Snapshot>>;
+            fn get_channel(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            fn get_channels(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
+            fn get_channels_open(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
+            fn get_account(&self, address: &Address) -> core_ethereum_db::errors::Result<Option<AccountEntry>>;
+            fn update_account_and_snapshot(&mut self, account: &AccountEntry, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn get_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
+            fn get_redeemed_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
+            fn get_redeemed_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
+            fn get_neglected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
+            fn get_pending_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
+            fn get_losing_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
+            fn resolve_pending(&mut self, ticket: &Address, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn mark_redeemed(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
+            fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
+            fn get_rejected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
+            fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
+            fn get_channel_x(&self, src: &Address, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
+            fn get_channels_from(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
+            fn get_channels_to(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
+            fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
+            fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
+            fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
+            fn get_ticket_price(&self) -> core_ethereum_db::errors::Result<Option<U256>>;
+            fn set_ticket_price(&mut self, ticket_price: &U256) -> core_ethereum_db::errors::Result<()>;
+            fn get_node_safe_registry_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
+            fn set_node_safe_registry_domain_separator(&mut self, node_safe_registry_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn get_channels_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
+            fn set_channels_domain_separator(&mut self, channels_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn get_channels_ledger_domain_separator(&self) -> core_ethereum_db::errors::Result<Option<Hash>>;
+            fn set_channels_ledger_domain_separator(&mut self, channels_ledger_domain_separator: &Hash, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn get_staking_safe_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            fn set_staking_safe_address(&mut self, safe_address: &Address) -> core_ethereum_db::errors::Result<()>;
+            fn get_staking_module_address(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            fn set_staking_module_address(&mut self, module_address: &Address) -> core_ethereum_db::errors::Result<()>;
+            fn get_staking_safe_allowance(&self) -> core_ethereum_db::errors::Result<Balance>;
+            fn set_staking_safe_allowance(&mut self, allowance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn add_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn sub_hopr_balance(&mut self, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn is_network_registry_enabled(&self) -> core_ethereum_db::errors::Result<bool>;
+            fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
+            fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
+            fn retrieve_authorization(&self, id: String) -> core_ethereum_db::errors::Result<Option<AuthorizationToken>>;
+            fn delete_authorization(&mut self, id: String) -> core_ethereum_db::errors::Result<()>;
+            fn is_mfa_protected(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
+            fn set_mfa_protected_and_update_snapshot(&mut self,maybe_mfa_address: Option<Address>,snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn is_allowed_to_access_network(&self, node: &Address) -> core_ethereum_db::errors::Result<bool>;
+            fn set_allowed_to_access_network(&mut self, node: &Address, allowed: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            fn get_from_network_registry(&self, stake_account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
+            fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<Vec<Address>>;
         }
     }
 
@@ -558,13 +556,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_workflow() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-        let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(level_db)),
-            SENDER_PRIV_KEY.public().to_address(),
-        );
+        let backend = InMemoryHashMapStorage::new();
+        let mut db = CoreEthereumDb::new(DB::new(backend), SENDER_PRIV_KEY.public().to_address());
 
         let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
         let unack = UnacknowledgedTicket::new(
@@ -574,14 +567,12 @@ mod tests {
         );
 
         db.store_pending_acknowledgment(hkc.clone(), PendingAcknowledgement::WaitingAsRelayer(unack))
-            .await
             .unwrap();
-        let num_tickets = db.get_tickets(None).await.unwrap();
+        let num_tickets = db.get_tickets(None).unwrap();
         assert_eq!(1, num_tickets.len(), "db should find one ticket");
 
         let pending = db
             .get_pending_acknowledgement(&hkc)
-            .await
             .unwrap()
             .expect("db should contain pending ack");
         match pending {
@@ -590,11 +581,11 @@ mod tests {
                 let ack = ticket
                     .acknowledge(&HalfKey::default(), &TARGET_PRIV_KEY, &Hash::default())
                     .unwrap();
-                db.replace_unack_with_ack(&hkc, ack).await.unwrap();
+                db.replace_unack_with_ack(&hkc, ack).unwrap();
 
-                let num_tickets = db.get_tickets(None).await.unwrap().len();
-                let num_unack = db.get_unacknowledged_tickets(None).await.unwrap().len();
-                let num_ack = db.get_acknowledged_tickets(None).await.unwrap().len();
+                let num_tickets = db.get_tickets(None).unwrap().len();
+                let num_unack = db.get_unacknowledged_tickets(None).unwrap().len();
+                let num_ack = db.get_acknowledged_tickets(None).unwrap().len();
                 assert_eq!(1, num_tickets, "db should find one ticket");
                 assert_eq!(0, num_unack, "db should not contain any unacknowledged tickets");
                 assert_eq!(1, num_ack, "db should contain exactly one acknowledged ticket");
@@ -604,21 +595,15 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_store_ticket_index() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-        let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(level_db)),
-            SENDER_PRIV_KEY.public().to_address(),
-        );
+        let backend = InMemoryHashMapStorage::new();
+        let mut db = CoreEthereumDb::new(DB::new(backend), SENDER_PRIV_KEY.public().to_address());
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
         let dummy_index = U256::one();
 
-        db.set_current_ticket_index(&dummy_channel, dummy_index).await.unwrap();
+        db.set_current_ticket_index(&dummy_channel, dummy_index).unwrap();
         let idx = db
             .get_current_ticket_index(&dummy_channel)
-            .await
             .unwrap()
             .expect("db must contain ticket index");
 

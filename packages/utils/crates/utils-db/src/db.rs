@@ -187,7 +187,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
 mod tests {
     use super::*;
     use crate::errors::DbError;
-    use crate::traits::MockAsyncKVStorage;
+    use crate::traits::MockKVStorage;
     use mockall::predicate;
     use serde::Deserialize;
     use utils_types::traits::BinarySerializable;
@@ -226,7 +226,7 @@ mod tests {
 
         let expected = bincode::serialize(&key).unwrap().into_boxed_slice();
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_contains()
             .with(predicate::eq(expected.clone()))
@@ -234,7 +234,7 @@ mod tests {
 
         let db = DB::new(backend);
 
-        assert!(db.contains(Key::new(&key).ok().unwrap()).await)
+        assert!(db.contains(Key::new(&key).ok().unwrap()))
     }
 
     #[async_std::test]
@@ -245,7 +245,7 @@ mod tests {
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
         let ser_value: Result<Option<Box<[u8]>>> = Ok(Some(bincode::serialize(&value).unwrap().into_boxed_slice()));
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_get()
             .with(predicate::eq(expected_key.clone()))
@@ -254,7 +254,7 @@ mod tests {
         let db = DB::new(backend);
 
         assert_eq!(
-            db.get_or_none::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            db.get_or_none::<TestValue>(Key::new(&key).ok().unwrap()),
             Ok(Some(value))
         )
     }
@@ -265,7 +265,7 @@ mod tests {
 
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_get()
             .with(predicate::eq(expected_key.clone()))
@@ -274,7 +274,7 @@ mod tests {
         let db = DB::new(backend);
 
         assert_eq!(
-            db.get_or_none::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            db.get_or_none::<TestValue>(Key::new(&key).ok().unwrap()),
             Err(DbError::NotFound)
         )
     }
@@ -287,7 +287,7 @@ mod tests {
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
         let expected_value = bincode::serialize(&value).unwrap().into_boxed_slice();
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_set()
             .with(
@@ -298,7 +298,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value).await, Ok(None))
+        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value), Ok(None))
     }
 
     #[async_std::test]
@@ -309,7 +309,7 @@ mod tests {
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
         let expected_value = bincode::serialize(&value).unwrap().into_boxed_slice();
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_set()
             .with(
@@ -320,10 +320,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(
-            db.set(Key::new(&key).ok().unwrap(), &value).await,
-            Err(DbError::NotFound)
-        )
+        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value), Err(DbError::NotFound))
     }
 
     #[async_std::test]
@@ -338,7 +335,7 @@ mod tests {
         let expected_value = bincode::serialize(&value).unwrap().into_boxed_slice();
         let evicted_value = bincode::serialize(&evicted).unwrap().into_boxed_slice();
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_set()
             .with(
@@ -349,7 +346,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value).await, Ok(Some(evicted)))
+        assert_eq!(db.set(Key::new(&key).ok().unwrap(), &value), Ok(Some(evicted)))
     }
 
     #[async_std::test]
@@ -358,7 +355,7 @@ mod tests {
 
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_remove()
             .with(predicate::eq(expected_key.clone()))
@@ -366,7 +363,7 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.remove::<TestValue>(Key::new(&key).ok().unwrap()).await, Ok(None))
+        assert_eq!(db.remove::<TestValue>(Key::new(&key).ok().unwrap()), Ok(None))
     }
 
     #[async_std::test]
@@ -375,7 +372,7 @@ mod tests {
 
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_remove()
             .with(predicate::eq(expected_key.clone()))
@@ -384,7 +381,7 @@ mod tests {
         let mut db = DB::new(backend);
 
         assert_eq!(
-            db.remove::<TestValue>(Key::new(&key).ok().unwrap()).await,
+            db.remove::<TestValue>(Key::new(&key).ok().unwrap()),
             Err(DbError::NotFound)
         )
     }
@@ -399,7 +396,7 @@ mod tests {
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
         let evicted_value = bincode::serialize(&evicted).unwrap().into_boxed_slice();
 
-        let mut backend = MockAsyncKVStorage::new();
+        let mut backend = MockKVStorage::new();
         backend
             .expect_remove()
             .with(predicate::eq(expected_key.clone()))
@@ -407,6 +404,6 @@ mod tests {
 
         let mut db = DB::new(backend);
 
-        assert_eq!(db.remove(Key::new(&key).ok().unwrap()).await, Ok(Some(evicted)))
+        assert_eq!(db.remove(Key::new(&key).ok().unwrap()), Ok(Some(evicted)))
     }
 }

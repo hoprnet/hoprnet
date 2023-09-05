@@ -161,7 +161,7 @@ where
     {
         match HoprAnnouncementsEvents::decode_log(log)? {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
-                let maybe_account = db.get_account(&address_announcement.node.try_into()?).await?;
+                let maybe_account = db.get_account(&address_announcement.node.try_into()?)?;
 
                 debug!(
                     "on_announcement_event - multiaddr: {:?} - node: {:?}",
@@ -176,7 +176,7 @@ where
                     };
 
                     account.update(new_entry_type);
-                    db.update_account_and_snapshot(&account, snapshot).await?;
+                    db.update_account_and_snapshot(&account, snapshot)?;
 
                     self.cbs.new_announcement(&account);
                 } else {
@@ -184,7 +184,7 @@ where
                 }
             }
             HoprAnnouncementsEvents::KeyBindingFilter(key_binding) => {
-                if db.get_account(&key_binding.chain_key.try_into()?).await?.is_some() {
+                if db.get_account(&key_binding.chain_key.try_into()?)?.is_some() {
                     return Err(CoreEthereumIndexerError::UnsupportedKeyRebinding);
                 }
 
@@ -200,10 +200,9 @@ where
                             AccountType::NotAnnounced,
                         );
 
-                        db.link_chain_and_packet_keys(&binding.chain_key, &binding.packet_key, snapshot)
-                            .await?;
+                        db.link_chain_and_packet_keys(&binding.chain_key, &binding.packet_key, snapshot)?;
 
-                        db.update_account_and_snapshot(&updated_account, snapshot).await?;
+                        db.update_account_and_snapshot(&updated_account, snapshot)?;
                     }
                     Err(_) => {
                         debug!(
@@ -214,11 +213,11 @@ where
                 }
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
-                let maybe_account = db.get_account(&revocation.node.try_into()?).await?;
+                let maybe_account = db.get_account(&revocation.node.try_into()?)?;
 
                 if let Some(mut account) = maybe_account {
                     account.update(AccountType::NotAnnounced);
-                    db.update_account_and_snapshot(&account, snapshot).await?;
+                    db.update_account_and_snapshot(&account, snapshot)?;
                 } else {
                     return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
                 }
@@ -233,15 +232,14 @@ where
     {
         match HoprChannelsEvents::decode_log(log)? {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
-                let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?)?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.balance = channel
                         .balance
                         .sub(&Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR));
 
-                    db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
-                        .await?;
+                    db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
@@ -251,15 +249,14 @@ where
                 }
             }
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
-                let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?)?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.balance = channel
                         .balance
                         .add(&Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR));
 
-                    db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
-                        .await?;
+                    db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
@@ -269,18 +266,17 @@ where
                 }
             }
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
-                let maybe_channel = db.get_channel(&channel_closed.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&channel_closed.channel_id.try_into()?)?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::Closed;
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel.destination.eq(&self.chain_key) {
-                        db.delete_acknowledged_tickets_from(channel).await?;
+                        db.delete_acknowledged_tickets_from(channel)?;
                     }
 
-                    db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
-                        .await?;
+                    db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
@@ -295,7 +291,7 @@ where
 
                 let channel_id = generate_channel_id(&source, &destination);
 
-                let maybe_channel = db.get_channel(&channel_id).await?;
+                let maybe_channel = db.get_channel(&channel_id)?;
                 debug!(
                     "on_open_channel_event - source: {:?} - destination: {:?} - channel_id: {:?}, channel known: {:?}",
                     source.to_string(),
@@ -307,7 +303,7 @@ where
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::Open;
 
-                    db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
+                    db.update_channel_and_snapshot(&channel_id, &channel, snapshot)?;
 
                     if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
@@ -323,8 +319,7 @@ where
                         0u64.into(),
                     );
 
-                    db.update_channel_and_snapshot(&channel_id, &new_channel, snapshot)
-                        .await?;
+                    db.update_channel_and_snapshot(&channel_id, &new_channel, snapshot)?;
 
                     if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&new_channel);
@@ -332,13 +327,12 @@ where
                 }
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
-                let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.try_into()?)?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.ticket_index = ticket_redeemed.new_ticket_index.into();
 
-                    db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)
-                        .await?;
+                    db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
@@ -348,14 +342,13 @@ where
                 }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
-                let maybe_channel = db.get_channel(&closure_initiated.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&closure_initiated.channel_id.try_into()?)?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::PendingToClose;
                     channel.closure_time = closure_initiated.closure_time.into();
 
-                    db.update_channel_and_snapshot(&closure_initiated.channel_id.try_into()?, &channel, snapshot)
-                        .await?;
+                    db.update_channel_and_snapshot(&closure_initiated.channel_id.try_into()?, &channel, snapshot)?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
@@ -365,15 +358,16 @@ where
                 }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                db.set_channels_domain_separator(&Hash::try_from(domain_separator_updated.domain_separator)?, snapshot)
-                    .await?;
+                db.set_channels_domain_separator(
+                    &Hash::try_from(domain_separator_updated.domain_separator)?,
+                    snapshot,
+                )?;
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
                 db.set_channels_ledger_domain_separator(
                     &Hash::try_from(ledger_domain_separator_updated.ledger_domain_separator)?,
                     snapshot,
-                )
-                .await?;
+                )?;
             }
         }
         Ok(())
@@ -400,11 +394,9 @@ where
                 if to.ne(&self.address_to_monitor) && from.ne(&self.address_to_monitor) {
                     return Ok(());
                 } else if to.eq(&self.address_to_monitor) {
-                    db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
-                        .await?;
+                    db.add_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)?;
                 } else if from.eq(&self.address_to_monitor) {
-                    db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)
-                        .await?;
+                    db.sub_hopr_balance(&Balance::new(value, BalanceType::HOPR), snapshot)?;
                 }
             }
             HoprTokenEvents::ApprovalFilter(approved) => {
@@ -422,8 +414,7 @@ where
                 );
 
                 if owner.eq(&self.address_to_monitor) && spender.eq(&self.addresses.channels) {
-                    db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)
-                        .await?;
+                    db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)?;
                 } else {
                     return Ok(());
                 }
@@ -441,31 +432,30 @@ where
         match HoprNetworkRegistryEvents::decode_log(log)? {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 let node_address = &deregistered.node_address.0.try_into()?;
-                db.set_allowed_to_access_network(node_address, false, snapshot).await?;
+                db.set_allowed_to_access_network(node_address, false, snapshot)?;
                 self.cbs.node_not_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 let node_address = &deregistered.node_address.0.try_into()?;
-                db.set_allowed_to_access_network(node_address, false, snapshot).await?;
+                db.set_allowed_to_access_network(node_address, false, snapshot)?;
                 self.cbs.node_not_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 let node_address = &registered.node_address.0.try_into()?;
-                db.set_allowed_to_access_network(node_address, true, snapshot).await?;
+                db.set_allowed_to_access_network(node_address, true, snapshot)?;
                 self.cbs.node_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 let node_address = &registered.node_address.0.try_into()?;
-                db.set_allowed_to_access_network(node_address, true, snapshot).await?;
+                db.set_allowed_to_access_network(node_address, true, snapshot)?;
                 self.cbs.node_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
                 let account: Address = eligibility_updated.staking_account.0.try_into()?;
-                db.set_eligible(&account, eligibility_updated.eligibility, snapshot)
-                    .await?;
+                db.set_eligible(&account, eligibility_updated.eligibility, snapshot)?;
             }
             HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
-                db.set_network_registry(enabled.is_enabled, snapshot).await?;
+                db.set_network_registry(enabled.is_enabled, snapshot)?;
             }
             HoprNetworkRegistryEvents::RequirementUpdatedFilter(_) => {
                 // TODO: implement this
@@ -484,14 +474,13 @@ where
         match HoprNodeSafeRegistryEvents::decode_log(log)? {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
                 if self.chain_key.eq(&registered.node_address.0.try_into()?) {
-                    db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.0.try_into()?), snapshot)
-                        .await?;
+                    db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.0.try_into()?), snapshot)?;
                 }
             }
             HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
                 if self.chain_key.eq(&deregistered.node_address.0.try_into()?) {
-                    if db.is_mfa_protected().await?.is_some() {
-                        db.set_mfa_protected_and_update_snapshot(None, snapshot).await?;
+                    if db.is_mfa_protected()?.is_some() {
+                        db.set_mfa_protected_and_update_snapshot(None, snapshot)?;
                     } else {
                         return Err(CoreEthereumIndexerError::MFAModuleDoesNotExist);
                     }
@@ -501,8 +490,7 @@ where
                 db.set_node_safe_registry_domain_separator(
                     &Hash::try_from(domain_separator_updated.domain_separator)?,
                     snapshot,
-                )
-                .await?;
+                )?;
             }
         }
         Ok(())
@@ -535,7 +523,7 @@ where
                     new_price.to_string()
                 );
 
-                db.set_ticket_price(&new_price).await?;
+                db.set_ticket_price(&new_price)?;
             }
             HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
                 // ignore ownership transfer event
@@ -623,8 +611,7 @@ pub mod tests {
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use std::sync::{Arc, Mutex};
-    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, hashmap::InMemoryHashMapStorage};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
@@ -645,14 +632,9 @@ pub mod tests {
         static ref TICKET_PRICE_ORACLE_ADDR: Address = Address::from_bytes(&hex!("11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e")).unwrap(); // just a dummy
     }
 
-    fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
-        let opt = rusty_leveldb::in_memory();
-        let db = rusty_leveldb::DB::open("test", opt).unwrap();
-
-        CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
-            Address::random(),
-        )
+    fn create_mock_db() -> CoreEthereumDb<InMemoryHashMapStorage<Box<[u8]>, Box<[u8]>>> {
+        let backend = InMemoryHashMapStorage::new();
+        CoreEthereumDb::new(DB::new(backend), Address::random())
     }
 
     struct DummyCallbacks {}
@@ -717,10 +699,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
-            account_entry
-        );
+        assert_eq!(db.get_account(&SELF_CHAIN_ADDRESS).unwrap().unwrap(), account_entry);
     }
 
     #[async_std::test]
@@ -736,7 +715,6 @@ pub mod tests {
         );
 
         db.update_account_and_snapshot(&account_entry, &Snapshot::default())
-            .await
             .unwrap();
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
@@ -770,7 +748,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            db.get_account(&SELF_CHAIN_ADDRESS).unwrap().unwrap(),
             announced_account_entry
         );
     }
@@ -793,7 +771,6 @@ pub mod tests {
         );
 
         db.update_account_and_snapshot(&announced_account_entry, &Snapshot::default())
-            .await
             .unwrap();
 
         let revoke_announcement_log = RawLog {
@@ -820,10 +797,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
-            account_entry
-        );
+        assert_eq!(db.get_account(&SELF_CHAIN_ADDRESS).unwrap().unwrap(), account_entry);
     }
 
     #[async_std::test]
@@ -853,10 +827,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            db.get_hopr_balance().await.unwrap(),
-            Balance::new(value, BalanceType::HOPR)
-        )
+        assert_eq!(db.get_hopr_balance().unwrap(), Balance::new(value, BalanceType::HOPR))
     }
 
     #[async_std::test]
@@ -866,9 +837,7 @@ pub mod tests {
 
         let value = U256::max();
 
-        db.set_hopr_balance(&Balance::new(value, BalanceType::HOPR))
-            .await
-            .unwrap();
+        db.set_hopr_balance(&Balance::new(value, BalanceType::HOPR)).unwrap();
 
         let transferred_log = RawLog {
             topics: vec![
@@ -891,7 +860,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.get_hopr_balance().await.unwrap(),
+            db.get_hopr_balance().unwrap(),
             Balance::new(U256::zero(), BalanceType::HOPR)
         )
     }
@@ -910,7 +879,7 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).unwrap());
 
         handlers
             .on_event(
@@ -923,7 +892,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).unwrap());
     }
 
     #[async_std::test]
@@ -940,7 +909,7 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).unwrap());
 
         handlers
             .on_event(
@@ -953,7 +922,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).unwrap());
     }
 
     #[async_std::test]
@@ -962,7 +931,6 @@ pub mod tests {
         let mut db = create_mock_db();
 
         db.set_allowed_to_access_network(&SELF_CHAIN_ADDRESS, true, &Snapshot::default())
-            .await
             .unwrap();
 
         let registered_log = RawLog {
@@ -974,7 +942,7 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).unwrap());
 
         handlers
             .on_event(
@@ -987,7 +955,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).unwrap());
     }
 
     #[async_std::test]
@@ -996,7 +964,6 @@ pub mod tests {
         let mut db = create_mock_db();
 
         db.set_allowed_to_access_network(&SELF_CHAIN_ADDRESS, true, &Snapshot::default())
-            .await
             .unwrap();
 
         let registered_log = RawLog {
@@ -1008,7 +975,7 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).unwrap());
 
         handlers
             .on_event(
@@ -1021,7 +988,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).unwrap());
     }
 
     #[async_std::test]
@@ -1048,7 +1015,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(db.is_network_registry_enabled().await.unwrap());
+        assert!(db.is_network_registry_enabled().unwrap());
     }
 
     #[async_std::test]
@@ -1056,7 +1023,7 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        db.set_network_registry(true, &Snapshot::default()).await.unwrap();
+        db.set_network_registry(true, &Snapshot::default()).unwrap();
 
         let nr_disabled = RawLog {
             topics: vec![
@@ -1077,7 +1044,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(!db.is_network_registry_enabled().await.unwrap());
+        assert!(!db.is_network_registry_enabled().unwrap());
     }
 
     #[async_std::test]
@@ -1105,7 +1072,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(db.is_eligible(&STAKE_ADDRESS).await.unwrap());
+        assert!(db.is_eligible(&STAKE_ADDRESS).unwrap());
     }
 
     #[async_std::test]
@@ -1113,9 +1080,7 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        db.set_eligible(&STAKE_ADDRESS, false, &Snapshot::default())
-            .await
-            .unwrap();
+        db.set_eligible(&STAKE_ADDRESS, false, &Snapshot::default()).unwrap();
 
         let set_eligible = RawLog {
             topics: vec![
@@ -1137,7 +1102,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert!(!db.is_eligible(&STAKE_ADDRESS).await.unwrap());
+        assert!(!db.is_eligible(&STAKE_ADDRESS).unwrap());
     }
 
     #[async_std::test]
@@ -1160,7 +1125,6 @@ pub mod tests {
             ),
             &Snapshot::default(),
         )
-        .await
         .unwrap();
 
         let solidity_balance = U256::from((1u128 << 96) - 1);
@@ -1185,7 +1149,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            *db.get_channel(&channel_id).await.unwrap().unwrap().balance.value(),
+            *db.get_channel(&channel_id).unwrap().unwrap().balance.value(),
             solidity_balance
         );
     }
@@ -1205,14 +1169,14 @@ pub mod tests {
             data: encode(&[]),
         };
 
-        assert!(db.get_channels_domain_separator().await.unwrap().is_none());
+        assert!(db.get_channels_domain_separator().unwrap().is_none());
 
         handlers
             .on_event(&mut db, &handlers.addresses.channels, 0u32, &log, &Snapshot::default())
             .await
             .unwrap();
 
-        assert_eq!(db.get_channels_domain_separator().await.unwrap().unwrap(), separator);
+        assert_eq!(db.get_channels_domain_separator().unwrap().unwrap(), separator);
     }
 
     #[async_std::test]
@@ -1235,7 +1199,6 @@ pub mod tests {
             ),
             &Snapshot::default(),
         )
-        .await
         .unwrap();
 
         let solidity_balance = U256::from((1u128 << 96) - 1);
@@ -1260,7 +1223,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            *db.get_channel(&channel_id).await.unwrap().unwrap().balance.value(),
+            *db.get_channel(&channel_id).unwrap().unwrap().balance.value(),
             U256::zero()
         );
     }
@@ -1285,7 +1248,6 @@ pub mod tests {
             ),
             &Snapshot::default(),
         )
-        .await
         .unwrap();
 
         let channel_closed_log = RawLog {
@@ -1308,7 +1270,7 @@ pub mod tests {
             .unwrap();
 
         assert_eq!(
-            db.get_channel(&channel_id).await.unwrap().unwrap().status,
+            db.get_channel(&channel_id).unwrap().unwrap().status,
             ChannelStatus::Closed
         );
     }
@@ -1340,7 +1302,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+        let channel = db.get_channel(&channel_id).unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::Open);
     }
@@ -1365,7 +1327,6 @@ pub mod tests {
             ),
             &Snapshot::default(),
         )
-        .await
         .unwrap();
 
         let ticket_index = U256::from((1u128 << 48) - 1);
@@ -1389,7 +1350,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+        let channel = db.get_channel(&channel_id).unwrap().unwrap();
 
         assert_eq!(channel.ticket_index, ticket_index);
     }
@@ -1414,7 +1375,6 @@ pub mod tests {
             ),
             &Snapshot::default(),
         )
-        .await
         .unwrap();
 
         let timestamp = U256::from((1u64 << 32) - 1);
@@ -1438,7 +1398,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+        let channel = db.get_channel(&channel_id).unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::PendingToClose);
         assert_eq!(channel.closure_time, timestamp);
@@ -1469,7 +1429,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(db.is_mfa_protected().await.unwrap(), Some(*SAFE_INSTANCE_ADDR));
+        assert_eq!(db.is_mfa_protected().unwrap(), Some(*SAFE_INSTANCE_ADDR));
     }
 
     #[async_std::test]
@@ -1478,7 +1438,6 @@ pub mod tests {
         let mut db = create_mock_db();
 
         db.set_mfa_protected_and_update_snapshot(Some(*SAFE_INSTANCE_ADDR), &Snapshot::default())
-            .await
             .unwrap();
 
         let safe_registered_log = RawLog {
@@ -1501,7 +1460,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(db.is_mfa_protected().await.unwrap(), None);
+        assert_eq!(db.is_mfa_protected().unwrap(), None);
     }
 
     #[async_std::test]
@@ -1514,7 +1473,7 @@ pub mod tests {
             data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]),
         };
 
-        assert_eq!(db.get_ticket_price().await.unwrap(), None);
+        assert_eq!(db.get_ticket_price().unwrap(), None);
 
         handlers
             .on_event(
@@ -1527,7 +1486,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(db.get_ticket_price().await.unwrap(), Some(U256::from(123u64)));
+        assert_eq!(db.get_ticket_price().unwrap(), Some(U256::from(123u64)));
     }
 }
 

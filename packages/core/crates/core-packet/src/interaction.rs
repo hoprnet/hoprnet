@@ -145,8 +145,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
             .db
             .read()
             .await
-            .get_pending_acknowledgement(&ack.ack_challenge())
-            .await?
+            .get_pending_acknowledgement(&ack.ack_challenge())?
             .ok_or_else(|| {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_FAILED_ACKS.increment();
@@ -187,7 +186,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     .read()
                     .await
                     .get_channel_from(&unackowledged.signer)
-                    .await
                     .map_err(|e| {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RECEIVED_FAILED_ACKS.increment();
@@ -202,7 +200,6 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     .read()
                     .await
                     .get_channels_domain_separator()
-                    .await
                     .unwrap()
                     .ok_or(MissingDomainSeparator)?;
 
@@ -212,8 +209,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 self.db
                     .write()
                     .await
-                    .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
-                    .await?;
+                    .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())?;
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACKED_TICKETS.increment();
@@ -426,15 +422,13 @@ where
             .db
             .read()
             .await
-            .get_current_ticket_index(channel_id)
-            .await?
+            .get_current_ticket_index(channel_id)?
             .unwrap_or(U256::one());
 
         self.db
             .write()
             .await
-            .set_current_ticket_index(channel_id, current_ticket_index + 1u64.into())
-            .await?;
+            .set_current_ticket_index(channel_id, current_ticket_index + 1u64.into())?;
 
         Ok(current_ticket_index)
     }
@@ -445,8 +439,7 @@ where
             .db
             .read()
             .await
-            .get_channel_to(&destination)
-            .await?
+            .get_channel_to(&destination)?
             .ok_or(ChannelNotFound(destination.to_string()))?;
 
         let channel_id = channel.get_id();
@@ -457,7 +450,6 @@ where
             .read()
             .await
             .get_ticket_price()
-            .await
             .unwrap_or_else(|_| {
                 warn!(
                     "Error reading ticket price value from database, using default {:?}",
@@ -481,7 +473,7 @@ where
         );
 
         debug!("retrieving pending balance to {destination}");
-        let outstanding_balance = self.db.read().await.get_pending_balance_to(&destination).await?;
+        let outstanding_balance = self.db.read().await.get_pending_balance_to(&destination)?;
 
         let channel_balance = channel.balance.sub(&outstanding_balance);
 
@@ -504,7 +496,7 @@ where
             channel.channel_epoch,
         )?;
 
-        self.db.write().await.mark_pending(&destination, &ticket).await?;
+        self.db.write().await.mark_pending(&destination, &ticket)?;
 
         debug!("Creating ticket in channel {channel_id}.",);
 
@@ -519,23 +511,16 @@ where
             .db
             .read()
             .await
-            .get_chain_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)
-            .await?
+            .get_chain_key(&OffchainPublicKey::from_peerid(&path.hops()[0])?)?
             .ok_or_else(|| {
                 debug!("Could not retrieve on-chain key for {}", path.hops()[0]);
                 PacketConstructionError
             })?;
 
-        let domain_separator = self
-            .db
-            .read()
-            .await
-            .get_channels_domain_separator()
-            .await?
-            .ok_or_else(|| {
-                debug!("Missing domain separator.");
-                MissingDomainSeparator
-            })?;
+        let domain_separator = self.db.read().await.get_channels_domain_separator()?.ok_or_else(|| {
+            debug!("Missing domain separator.");
+            MissingDomainSeparator
+        })?;
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
@@ -552,8 +537,7 @@ where
                 self.db
                     .write()
                     .await
-                    .store_pending_acknowledgment(*ack_challenge, PendingAcknowledgement::WaitingAsSender)
-                    .await?;
+                    .store_pending_acknowledgment(*ack_challenge, PendingAcknowledgement::WaitingAsSender)?;
 
                 Ok((
                     Payload {
@@ -581,16 +565,10 @@ where
         let previous_peer;
         let next_peer;
 
-        let domain_separator = self
-            .db
-            .read()
-            .await
-            .get_channels_domain_separator()
-            .await?
-            .ok_or_else(|| {
-                debug!("Missing domain separator");
-                MissingDomainSeparator
-            })?;
+        let domain_separator = self.db.read().await.get_channels_domain_separator()?.ok_or_else(|| {
+            debug!("Missing domain separator");
+            MissingDomainSeparator
+        })?;
 
         match packet.state() {
             PacketState::Outgoing { .. } => return Err(InvalidPacketState),
@@ -625,8 +603,7 @@ where
                     self.db
                         .read()
                         .await
-                        .get_chain_key(previous_hop)
-                        .await?
+                        .get_chain_key(previous_hop)?
                         .ok_or(PacketDecodingError(format!(
                             "failed to find channel key for packet key {previous_hop} on previous hop"
                         )))?;
@@ -635,8 +612,7 @@ where
                     .db
                     .read()
                     .await
-                    .get_chain_key(next_hop)
-                    .await?
+                    .get_chain_key(next_hop)?
                     .ok_or(PacketDecodingError(format!(
                         "failed to find channel key for packet key {next_hop} on next hop"
                     )))?;
@@ -647,8 +623,7 @@ where
                     .db
                     .read()
                     .await
-                    .get_channel_from(&previous_hop_addr)
-                    .await?
+                    .get_channel_from(&previous_hop_addr)?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
 
                 // Validate the ticket first
@@ -657,7 +632,6 @@ where
                     .read()
                     .await
                     .get_ticket_price()
-                    .await
                     .unwrap_or_else(|_| {
                         warn!(
                             "Error reading ticket price value from database, using default {:?}",
@@ -688,15 +662,14 @@ where
                 .await
                 {
                     // Mark as reject and passthrough the error
-                    self.db.write().await.mark_rejected(&packet.ticket).await?;
+                    self.db.write().await.mark_rejected(&packet.ticket)?;
                     return Err(e);
                 }
 
                 {
                     debug!("storing pending acknowledgement for channel {}", channel.get_id());
                     let mut g = self.db.write().await;
-                    g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index.into())
-                        .await?;
+                    g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index.into())?;
 
                     // Store the unacknowledged ticket
                     g.store_pending_acknowledgment(
@@ -706,8 +679,7 @@ where
                             own_key.clone(),
                             previous_hop_addr,
                         )),
-                    )
-                    .await?;
+                    )?;
                 }
 
                 // Check that the calculated path position from the ticket matches value from the packet header
@@ -1084,7 +1056,7 @@ mod tests {
         sync::{Arc, Mutex},
         time::Duration,
     };
-    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, hashmap::InMemoryHashMapStorage};
     use utils_log::debug;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
@@ -1153,35 +1125,35 @@ mod tests {
         )
     }
 
-    fn create_dbs(amount: usize) -> Vec<Arc<Mutex<rusty_leveldb::DB>>> {
+    fn create_dbs(amount: usize) -> Vec<Arc<Mutex<InMemoryHashMapStorage<Box<[u8]>, Box<[u8]>>>>> {
         (0..amount)
-            .map(|i| {
-                Arc::new(Mutex::new(
-                    rusty_leveldb::DB::open(format!("test_db_{i}"), rusty_leveldb::in_memory()).unwrap(),
-                ))
-            })
+            .map(|i| Arc::new(Mutex::new(InMemoryHashMapStorage::new())))
             .collect()
     }
 
-    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    fn create_core_dbs(
+        dbs: &Vec<Arc<Mutex<InMemoryHashMapStorage<Box<[u8]>, Box<[u8]>>>>>,
+    ) -> Vec<Arc<RwLock<InMemoryHashMapStorage<Box<[u8]>, Box<[u8]>>>>> {
         dbs.iter()
             .enumerate()
             .map(|(i, db)| {
                 Arc::new(RwLock::new(CoreEthereumDb::new(
-                    DB::new(RustyLevelDbShim::new(db.clone())),
+                    DB::new(InMemoryHashMapStorage::new()),
                     PublicKey::from_privkey(&PEERS_CHAIN_PRIVS[i]).unwrap().to_address(),
                 )))
             })
             .collect::<Vec<_>>()
     }
 
-    async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
+    async fn create_minimal_topology(
+        dbs: &Vec<Arc<Mutex<InMemoryHashMapStorage<Box<[u8]>, Box<[u8]>>>>>,
+    ) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
         for index in 0..dbs.len() {
             let mut db = CoreEthereumDb::new(
-                DB::new(RustyLevelDbShim::new(dbs[index].clone())),
+                DB::new(InMemoryHashMapStorage::new()),
                 PEERS_CHAIN[index].public().to_address(),
             );
 
@@ -1189,8 +1161,7 @@ mod tests {
             for i in 0..PEERS_PRIVS.len() {
                 let node_key = PEERS[i].public();
                 let chain_key = PEERS_CHAIN[i].public();
-                db.link_chain_and_packet_keys(&chain_key.to_address(), node_key, &Snapshot::default())
-                    .await?;
+                db.link_chain_and_packet_keys(&chain_key.to_address(), node_key, &Snapshot::default())?;
             }
 
             let mut channel: Option<ChannelEntry> = None;
@@ -1209,8 +1180,7 @@ mod tests {
                     &channel.clone().unwrap().get_id(),
                     &channel.clone().unwrap(),
                     &testing_snapshot,
-                )
-                .await?;
+                )?;
             }
 
             if index > 0 {
@@ -1218,8 +1188,7 @@ mod tests {
                     &previous_channel.clone().unwrap().get_id(),
                     &previous_channel.clone().unwrap(),
                     &testing_snapshot,
-                )
-                .await?;
+                )?;
             }
 
             previous_channel = channel;
@@ -1259,7 +1228,6 @@ mod tests {
                 .write()
                 .await
                 .store_pending_acknowledgment(porv.ack_challenge.clone(), PendingAcknowledgement::WaitingAsSender)
-                .await
                 .expect("failed to store pending ack");
 
             // This is what counterparty derives and sends back to solve the challenge
@@ -1343,7 +1311,6 @@ mod tests {
                 .write()
                 .await
                 .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
-                .await
                 .unwrap();
         }
 

@@ -27,7 +27,6 @@ export async function createHoprNode(
   try {
     const dbPath = path.join(options.dataPath, 'db')
     await dbBackend.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)
-
   } catch (err: unknown) {
     log(`failed init db:`, err)
     throw err
