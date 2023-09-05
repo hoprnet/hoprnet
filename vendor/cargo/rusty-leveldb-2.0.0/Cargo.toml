@@ -60,11 +60,6 @@ optional = true
 version = "0.4.3"
 optional = true
 
-[dependencies.getrandom]
-version = "0.2.10"
-features = ["js"]
-optional = true
-
 [dependencies.tokio]
 version = ">= 1.21"
 features = [
@@ -84,7 +79,6 @@ fs = [
     "errno",
     "fs2",
 ]
-wasm = ["getrandom"]
 
 [workspace]
 members = [
