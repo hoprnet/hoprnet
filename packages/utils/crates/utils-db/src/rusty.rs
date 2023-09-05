@@ -72,7 +72,7 @@ impl RustyLevelDbShim {
     pub fn new(path: &str) -> Self {
         if path == ":memory" {
             Self {
-                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", wasm::wasm_memory())
+                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", wasm::WasmMemEnv::create_options())
                     .expect("failed to create DB")))
             }
         } else {
@@ -292,18 +292,26 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use std::{io, thread, time};
+    use std::collections::HashMap;
     use std::io::{Read, Write};
     use std::path::{Path, PathBuf};
     use std::rc::Rc;
-    use rusty_leveldb::{Env, MemEnv};
-
-    pub fn wasm_memory() -> rusty_leveldb::Options {
-        let mut opt = rusty_leveldb::Options::default();
-        opt.env = Rc::new(Box::new(WasmMemEnv(MemEnv::new())));
-        opt
-    }
+    use std::sync::{Arc, Mutex};
+    use js_sys::{JsString, Uint8Array};
+    use rusty_leveldb::{Env, FileLock, Logger, MemEnv, RandomAccess, Status, StatusCode};
+    use wasm_bindgen::JsValue;
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     pub struct WasmMemEnv(MemEnv);
+
+    impl WasmMemEnv {
+        pub fn create_options() -> rusty_leveldb::Options {
+            let mut opt = rusty_leveldb::Options::default();
+            opt.env = Rc::new(Box::new(WasmMemEnv(MemEnv::new())));
+            opt
+        }
+    }
 
     impl Env for WasmMemEnv {
         fn open_sequential_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Read>> {
@@ -368,6 +376,257 @@ pub mod wasm {
 
         fn sleep_for(&self, micros: u32) {
             self.0.sleep_for(micros)
+        }
+    }
+
+    #[wasm_bindgen(module = "fs")]
+    extern "C" {
+        #[derive(Debug, Clone)]
+        pub type Stats;
+
+        #[wasm_bindgen(method, getter)]
+        fn dev(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn ino(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn mode(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn nlink(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn uid(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn gid(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn rdev(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn size(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn blksize(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn blocks(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn atimeMs(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn mtimeMs(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn ctimeMs(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn birthtimeMs(this: &Stats) -> i64;
+        #[wasm_bindgen(method, getter)]
+        fn atime(this: &Stats) -> js_sys::Date;
+        #[wasm_bindgen(method, getter)]
+        fn mtime(this: &Stats) -> js_sys::Date;
+        #[wasm_bindgen(method, getter)]
+        fn ctime(this: &Stats) -> js_sys::Date;
+        #[wasm_bindgen(method, getter)]
+        fn birthtime(this: &Stats) -> js_sys::Date;
+    }
+
+    #[wasm_bindgen(module = "fs")]
+    extern "C" {
+        fn existsSync(path: &str) -> bool;
+        fn openSync(path: &str, flags: Option<JsString>, mode: Option<JsString>) -> i64;
+        fn readSync(fd: i64, buffer: &Uint8Array, offset: u64, length: u32, position: Option<i64>) -> i64;
+        fn writeSync(fd: i64, buffer: &Uint8Array, offset: u64, length: Option<u32>, position: Option<i64>) -> i64;
+        fn fsyncSync(fd: i64);
+        fn fstatSync(fd: i64, options: &JsValue) -> Stats;
+        fn fcloseSync(fd: i64);
+        fn mkdirSync(path: &str) -> JsString;
+        fn rmdirSync(path: &str, options: &JsValue);
+        fn rmSync(path: &str, options: &JsValue);
+        fn readdirSync(path: &str, options: &JsValue) -> Vec<JsString>;
+        fn renameSync(old: &str, new: &str);
+    }
+
+    struct FileHandle(i64);
+
+    impl FileHandle {
+        pub fn open(path: &str, flags: Option<String>) -> std::io::Result<Self> {
+            let fd = openSync(path, flags.map(JsString::from), None);
+            if fd >= 0 {
+                Ok(Self(fd))
+            } else {
+                Err(io::ErrorKind::Other.into())
+            }
+        }
+
+        fn read_from(&self, offset: Option<i64>, dst: &mut [u8]) -> std::io::Result<usize> {
+            let mut ubuf = Uint8Array::new_with_length(dst.len() as u32);
+            let read = readSync(self.0, &mut ubuf, 0, dst.len() as u32, offset);
+            if read > 0 {
+                ubuf.copy_to(dst);
+                Ok(read as usize)
+            } else if read == 0 {
+                Ok(0)
+            } else {
+                Err(io::ErrorKind::Other.into())
+            }
+        }
+    }
+
+    impl Read for FileHandle {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            self.read_from(None, buf)
+        }
+    }
+
+    impl Write for FileHandle {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            let arr = Uint8Array::new_with_length(buf.len() as u32);
+            arr.copy_from(buf);
+            let written = writeSync(self.0, &arr, 0, Some(buf.len() as u32), None);
+            if written >= 0 {
+                Ok(written as usize)
+            } else {
+                Err(io::ErrorKind::Other.into())
+            }
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            fsyncSync(self.0);
+            Ok(())
+        }
+    }
+
+    impl RandomAccess for FileHandle {
+        fn read_at(&self, off: usize, dst: &mut [u8]) -> rusty_leveldb::Result<usize> {
+            self.read_from(Some(off as i64), dst)
+                .map_err(rusty_leveldb::Status::from)
+        }
+    }
+
+    impl Drop for FileHandle {
+        fn drop(&mut self) {
+            fcloseSync(self.0);
+        }
+    }
+
+    pub struct NodeJsEnv {
+        locks: Arc<Mutex<HashMap<String, FileHandle>>>,
+    }
+
+    impl NodeJsEnv {
+        pub fn create_options() -> rusty_leveldb::Options {
+            let mut opt = rusty_leveldb::Options::default();
+            opt.env = Rc::new(Box::new(Self::new()));
+            opt
+        }
+
+        pub fn new() -> Self {
+            Self {
+                locks: Arc::new(Mutex::new(HashMap::new()))
+            }
+        }
+    }
+
+    impl Env for NodeJsEnv {
+        fn open_sequential_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Read>> {
+            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into()))
+                .map(Box::new)
+                .map_err(rusty_leveldb::Status::from)?)
+        }
+
+        fn open_random_access_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn RandomAccess>> {
+            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into()))
+                .map(Box::new)
+                .map_err(rusty_leveldb::Status::from)?)
+        }
+
+        fn open_writable_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Write>> {
+            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("w".into()))
+                .map(Box::new)
+                .map_err(rusty_leveldb::Status::from)?)
+        }
+
+        fn open_appendable_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Write>> {
+            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("a".into()))
+                .map(Box::new)
+                .map_err(rusty_leveldb::Status::from)?)
+        }
+
+        fn exists(&self, p: &Path) -> rusty_leveldb::Result<bool> {
+            Ok(existsSync(p.to_str().expect("invalid path")))
+        }
+
+        fn children(&self, p: &Path) -> rusty_leveldb::Result<Vec<PathBuf>> {
+            Ok(readdirSync(p.to_str().expect("invalid path"), &JsValue::null())
+                .into_iter()
+                .map(|s| PathBuf::from(s.as_string().expect("invalid path buf")))
+                .collect())
+        }
+
+        fn size_of(&self, p: &Path) -> rusty_leveldb::Result<usize> {
+            let fh = FileHandle::open(p.to_str().expect("invalid file path"), Some("r".into()))?;
+            let stat = fstatSync(fh.0, &JsValue::null());
+            Ok(stat.size() as usize)
+        }
+
+        fn delete(&self, p: &Path) -> rusty_leveldb::Result<()> {
+            rmSync(p.to_str().expect("invalid path"), &JsValue::null());
+            Ok(())
+        }
+
+        fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
+            mkdirSync(p.to_str().expect("invalid path"));
+            Ok(())
+        }
+
+        fn rmdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
+            rmdirSync(p.to_str().expect("invalid path"), &JsValue::null());
+            Ok(())
+        }
+
+        fn rename(&self, old: &Path, new: &Path) -> rusty_leveldb::Result<()> {
+            renameSync(
+                old.to_str().expect("invalid old path"),
+                new.to_str().expect("invalid new path")
+            );
+            Ok(())
+        }
+
+        fn lock(&self, p: &Path) -> rusty_leveldb::Result<FileLock> {
+            let mut locks = self.locks.lock().unwrap();
+
+            if locks.contains_key(&p.to_str().unwrap().to_string()) {
+                Err(Status::new(StatusCode::AlreadyExists, "Lock is held"))
+            } else {
+                let lock_file = FileHandle(0);
+
+                // TODO: implement proper file locking!
+
+                locks.insert(p.to_str().unwrap().to_string(), lock_file);
+                let lock = FileLock {
+                    id: p.to_str().unwrap().to_string(),
+                };
+                Ok(lock)
+            }
+        }
+
+        fn unlock(&self, l: FileLock) -> rusty_leveldb::Result<()> {
+            let mut locks = self.locks.lock().unwrap();
+            if !locks.contains_key(&l.id) {
+                return Err(Status::new(
+                    StatusCode::LockError,
+                    "lock on database is already held by different process",
+                ));
+            } else {
+                let _ = locks.remove(&l.id).unwrap();
+                // TODO: implement proper file locking!
+                Ok(())
+            }
+        }
+
+        fn new_logger(&self, p: &Path) -> rusty_leveldb::Result<Logger> {
+            self.open_appendable_file(p)
+                .map(|dst| Logger::new(Box::new(dst)))
+        }
+
+        fn micros(&self) -> u64 {
+            utils_misc::time::wasm::current_timestamp() * 1000
+        }
+
+        fn sleep_for(&self, micros: u32) {
+            thread::sleep(time::Duration::new(0, micros * 1000));
         }
     }
 }
