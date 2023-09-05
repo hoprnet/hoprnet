@@ -6384,6 +6384,7 @@ dependencies = [
  "getrandom 0.2.10",
  "gloo-timers 0.3.0",
  "hex",
+ "hex-literal",
  "js-sys",
  "mockall",
  "pin-project-lite",

@@ -17,6 +17,7 @@ futures-lite = "1.12.0"
 getrandom = { workspace = true, optional = true }
 gloo-timers = { workspace = true, optional = true}
 hex = "0.4.3"
+hex-literal = "0.4.1"
 js-sys = { workspace = true, optional = true }
 pin-project-lite = "0.2.13"
 serde = { version = "1.0", features = ["derive"] }
