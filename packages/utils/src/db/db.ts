@@ -1,7 +1,7 @@
 import { stat, mkdir, rm } from 'fs/promises'
 import { debug } from '../process/index.js'
 
-import { u8aToHex } from '../u8a/index.js'
+import { u8aToHex, stringToU8a } from '../u8a/index.js'
 import { default as Sqlite, type Database, type Statement } from 'better-sqlite3'
 
 const log = debug(`hopr-core:db`)
@@ -81,7 +81,7 @@ export class Db {
       'INSERT INTO kv2 (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value'
     )
     this.getStatement = this.backend.prepare('SELECT value FROM kv2 WHERE key = ?')
-    this.iterStatement = this.backend.prepare("SELECT value FROM kv2 WHERE key LIKE ?")
+    this.iterStatement = this.backend.prepare('SELECT value FROM kv2 WHERE key LIKE ?')
 
     if (setNetwork) {
       log(`setting network id ${networkId} to db`)
@@ -109,7 +109,7 @@ export class Db {
     const row = tx()
     if (row) {
       const value = row['value']
-      return value
+      return stringToU8a(value)
     }
     return undefined
   }
@@ -123,9 +123,9 @@ export class Db {
     this.backend.transaction(() => {
       ops.forEach((op) => {
         if (op.type === 'put') {
-          this.putStatement.run(op.key, op.value)
+          this.putStatement.run(u8aToHex(op.key), u8aToHex(op.value))
         } else if (op.type === 'del') {
-          this.removeStatement.run(op.key)
+          this.removeStatement.run(u8aToHex(op.key))
         } else {
           throw new Error(`Unsupported operation type: ${JSON.stringify(op)}`)
         }
@@ -135,15 +135,9 @@ export class Db {
 
   public iterValues(prefix: Uint8Array, _suffix: number): Uint8Array[] {
     const k = u8aToHex(prefix)
-    const tx = this.backend.transaction(() => this.iterStatement.get(`${k}%`))
-    const row = tx()
-    console.log(row)
-    if (row) {
-      const value = row['value']
-      console.log(value)
-      return value
-    }
-    return []
+    const tx = this.backend.transaction(() => this.iterStatement.all(`${k}%`))
+    const rows = tx()
+    return rows.map((r) => stringToU8a(r['value']))
   }
 
   public close(): void {
