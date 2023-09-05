@@ -1151,7 +1151,7 @@ export class Hopr extends EventEmitter {
     }
 
     if (!this.isReady) {
-      log('withdraw: Node is not ready for on-chain operations')
+      log('openChannel: Node is not ready for on-chain operations')
     }
 
     const myAvailableTokens = await HoprCoreEthereum.getInstance().getSafeBalance()
@@ -1187,7 +1187,7 @@ export class Hopr extends EventEmitter {
    */
   public async fundChannel(counterparty: Address, myFund: BN, counterpartyFund: BN): Promise<string> {
     if (!this.isReady) {
-      log('withdraw: Node is not ready for on-chain operations')
+      log('fundChannel: Node is not ready for on-chain operations')
     }
 
     const connector = HoprCoreEthereum.getInstance()
@@ -1222,7 +1222,7 @@ export class Hopr extends EventEmitter {
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     if (!this.isReady) {
-      log('withdraw: Node is not ready for on-chain operations')
+      log('closeChannel: Node is not ready for on-chain operations')
     }
 
     const connector = HoprCoreEthereum.getInstance()
