@@ -173,6 +173,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
                 .map(|v| bincode::deserialize(v.as_ref()))
                 .filter(|v| v.is_ok())
                 .map(|v| v.unwrap())
+                .filter(filter)
                 .collect::<Vec<V>>()),
             Err(e) => Err(e),
         }

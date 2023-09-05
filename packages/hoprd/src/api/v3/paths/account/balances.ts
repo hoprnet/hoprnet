@@ -1,7 +1,10 @@
 import { STATUS_CODES } from '../../utils.js'
+import { debug } from '@hoprnet/hopr-utils'
 
 import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
+
+const log = debug('hoprd:api:v3:account-balances')
 
 /**
  * @returns Current HOPR and native balance.
@@ -35,6 +38,7 @@ const GET: Operation = [
         safeHopr
       })
     } catch (err) {
+      log(`Error fetching balances: ${err}`)
       return res
         .status(422)
         .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })

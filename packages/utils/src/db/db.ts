@@ -17,6 +17,7 @@ export class Db {
   private removeStatement: Statement
   private putStatement: Statement
   private getStatement: Statement
+  private iterStatement: Statement
 
   constructor() {
     this.backend = new Sqlite(':memory:')
@@ -70,15 +71,17 @@ export class Db {
     this.backend.pragma('page_size = 4096')
     this.backend.pragma('cache_size = -4000')
 
+    // ensure latest schema is used
+    this.backend.exec('CREATE TABLE IF NOT EXISTS kv2 (key TEXT PRIMARY KEY, value BLOB)')
+    this.backend.exec('DROP TABLE IF EXISTS kv')
+
     // setup prepared statements
     this.removeStatement = this.backend.prepare('DELETE FROM kv2 WHERE key = ?')
     this.putStatement = this.backend.prepare(
       'INSERT INTO kv2 (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value=excluded.value'
     )
     this.getStatement = this.backend.prepare('SELECT value FROM kv2 WHERE key = ?')
-    // ensure latest schema is used
-    this.backend.exec('CREATE TABLE IF NOT EXISTS kv2 (key TEXT PRIMARY KEY, value BLOB)')
-    this.backend.exec('DROP TABLE IF EXISTS kv')
+    this.iterStatement = this.backend.prepare("SELECT value FROM kv2 WHERE key LIKE ?")
 
     if (setNetwork) {
       log(`setting network id ${networkId} to db`)
@@ -97,7 +100,7 @@ export class Db {
 
   public put(key: Uint8Array, value: Uint8Array): void {
     const k = u8aToHex(key)
-    this.backend.transaction(() => this.putStatement.run(k, value.toString()))()
+    this.backend.transaction(() => this.putStatement.run(k, u8aToHex(value)))()
   }
 
   public get(key: Uint8Array): Uint8Array | undefined {
@@ -128,6 +131,19 @@ export class Db {
         }
       })
     })()
+  }
+
+  public iterValues(prefix: Uint8Array, _suffix: number): Uint8Array[] {
+    const k = u8aToHex(prefix)
+    const tx = this.backend.transaction(() => this.iterStatement.get(`${k}%`))
+    const row = tx()
+    console.log(row)
+    if (row) {
+      const value = row['value']
+      console.log(value)
+      return value
+    }
+    return []
   }
 
   public close(): void {
