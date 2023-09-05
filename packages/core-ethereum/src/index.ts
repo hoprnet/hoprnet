@@ -395,7 +395,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     // Use an async iterator to make execution interruptable and allow
     // Node.JS to schedule iterations at any time
     const ticketRedeemIterator = async function* () {
-      let serdeChannel = channel
+      let serdeChannel = channel.clone()
       let tickets = await boundGetAckdTickets(serdeChannel)
       log(`there are ${tickets.len()} left to redeem in channel ${channelId.to_hex()}`)
 
@@ -413,11 +413,9 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         ticket = fetched
 
-        log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel ${channelId.to_hex()} from ${channel.source.to_hex()} to ${channel.destination.to_hex()}, porSecret ${ticket.response.to_hex()}`
-        )
+        log(`redeeming ticket ${ticket.response.to_hex()} in channel ${channel.to_string()}`)
 
-        log(ticket.ticket.to_string())
+        log('ticket: ', ticket.ticket.to_string())
 
         const result = await boundRedeemTicket(channel.source, channelId, ticket)
 
