@@ -1,12 +1,12 @@
+use std::cell::RefCell;
 use async_trait::async_trait;
 use std::cmp::Ordering;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
 use futures_lite::stream::iter;
 use rusty_leveldb::{DBIterator, LdbIterator, StatusCode, WriteBatch};
-use crate::rusty::wasm::wasm_memory;
 
 struct RustyLevelDbIterator {
     iter: DBIterator,
@@ -51,7 +51,7 @@ impl Iterator for RustyLevelDbIterator {
 /// Adapter for Rusty Level DB database.
 #[derive(Clone)]
 pub struct RustyLevelDbShim {
-    db: Arc<Mutex<rusty_leveldb::DB>>,
+    db: Rc<RefCell<rusty_leveldb::DB>>,
 }
 
 impl RustyLevelDbShim {
@@ -59,12 +59,12 @@ impl RustyLevelDbShim {
     pub fn new(path: &str) -> Self {
         if path == ":memory" {
             Self {
-                db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hopr", rusty_leveldb::in_memory())
+                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", rusty_leveldb::in_memory())
                     .expect("failed to create DB")))
             }
         } else if path == ":wasm-memory" {
             Self {
-                db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hopr", wasm_memory())
+                db: Rc::new(RefCell::new(rusty_leveldb::DB::open("hopr", wasm_memory())
                     .expect("failed to create DB")))
             }
         } else {
@@ -79,7 +79,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
     type Value = Box<[u8]>;
 
     async fn get(&self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
-        let mut db = self.db.lock().unwrap();
+        let mut db = self.db.borrow_mut();
 
         let snapshot = db.get_snapshot();
         match db.get_at(&snapshot, &key) {
@@ -99,21 +99,19 @@ impl AsyncKVStorage for RustyLevelDbShim {
 
     async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
         self.db
-            .lock()
-            .unwrap()
+            .borrow_mut()
             .put(&key, &value)
             .map(|_| None)
             .map_err(|e| DbError::GenericError(e.err))
     }
 
     async fn contains(&self, key: Self::Key) -> crate::errors::Result<bool> {
-        Ok(self.db.lock().unwrap().get(&key).is_some())
+        Ok(self.db.borrow_mut().get(&key).is_some())
     }
 
     async fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
         self.db
-            .lock()
-            .unwrap()
+            .borrow_mut()
             .delete(&key)
             .map(|_| None)
             .map_err(|e| DbError::GenericError(e.err))
@@ -130,8 +128,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
     ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
         let i = self
             .db
-            .lock()
-            .unwrap()
+            .borrow_mut()
             .new_iter()
             .map_err(|e| DbError::GenericError(e.err))?;
         Ok(Box::new(iter(RustyLevelDbIterator::new(
@@ -155,8 +152,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
         }
 
         self.db
-            .lock()
-            .unwrap()
+            .borrow_mut()
             .write(wb, wait_for_write)
             .map_err(|e| DbError::GenericError(e.err))
     }
