@@ -76,7 +76,7 @@ describe('db shim tests', function () {
 })
 
 function test_in_memory_db() {
-  return new Database(":memory", MOCK_PUBLIC_KEY().to_address())
+  return new Database(":wasm-memory", MOCK_PUBLIC_KEY().to_address())
 }
 
 describe('db functional tests', function () {

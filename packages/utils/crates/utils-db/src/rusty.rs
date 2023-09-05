@@ -6,6 +6,7 @@ use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
 use futures_lite::stream::iter;
 use rusty_leveldb::{DBIterator, LdbIterator, StatusCode, WriteBatch};
+use crate::rusty::wasm::wasm_memory;
 
 struct RustyLevelDbIterator {
     iter: DBIterator,
@@ -59,6 +60,11 @@ impl RustyLevelDbShim {
         if path == ":memory" {
             Self {
                 db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hopr", rusty_leveldb::in_memory())
+                    .expect("failed to create DB")))
+            }
+        } else if path == ":wasm-memory" {
+            Self {
+                db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hopr", wasm_memory())
                     .expect("failed to create DB")))
             }
         } else {
@@ -159,8 +165,6 @@ impl AsyncKVStorage for RustyLevelDbShim {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
-
     #[async_std::test]
     async fn rusty_leveldb_sanity_test() {
         use crate::traits::{AsyncKVStorage, BatchOperation};
@@ -280,5 +284,87 @@ mod tests {
             }
         }
         assert_eq!(received, expected, "Test #7 failed: db content mismatch");
+    }
+}
+
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use std::io::{Read, Write};
+    use std::path::{Path, PathBuf};
+    use std::rc::Rc;
+    use rusty_leveldb::{Env, MemEnv};
+
+    pub fn wasm_memory() -> rusty_leveldb::Options {
+        let mut opt = rusty_leveldb::Options::default();
+        opt.env = Rc::new(Box::new(WasmMemEnv(MemEnv::new())));
+        opt
+    }
+
+    pub struct WasmMemEnv(MemEnv);
+
+    impl Env for WasmMemEnv {
+        fn open_sequential_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Read>> {
+            self.0.open_sequential_file(p)
+        }
+
+        fn open_random_access_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn rusty_leveldb::RandomAccess>> {
+            self.0.open_random_access_file(p)
+        }
+
+        fn open_writable_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Write>> {
+            self.0.open_writable_file(p)
+        }
+
+        fn open_appendable_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Write>> {
+            self.0.open_appendable_file(p)
+        }
+
+        fn exists(&self, p: &Path) -> rusty_leveldb::Result<bool> {
+            self.0.exists(p)
+        }
+
+        fn children(&self, p: &Path) -> rusty_leveldb::Result<Vec<PathBuf>> {
+            self.0.children(p)
+        }
+
+        fn size_of(&self, p: &Path) -> rusty_leveldb::Result<usize> {
+            self.0.size_of(p)
+        }
+
+        fn delete(&self, p: &Path) -> rusty_leveldb::Result<()> {
+            self.0.delete(p)
+        }
+
+        fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
+            self.0.mkdir(p)
+        }
+
+        fn rmdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
+            self.0.rmdir(p)
+        }
+
+        fn rename(&self, old: &Path, new: &Path) -> rusty_leveldb::Result<()> {
+            self.0.rename(old, new)
+        }
+
+        fn lock(&self, p: &Path) -> rusty_leveldb::Result<rusty_leveldb::FileLock> {
+            self.0.lock(p)
+        }
+
+        fn unlock(&self, l: rusty_leveldb::FileLock) -> rusty_leveldb::Result<()> {
+            self.0.unlock(l)
+        }
+
+        fn new_logger(&self, p: &Path) -> rusty_leveldb::Result<rusty_leveldb::Logger> {
+            self.0.new_logger(p)
+        }
+
+        fn micros(&self) -> u64 {
+            utils_misc::time::wasm::current_timestamp() * 1000
+        }
+
+        fn sleep_for(&self, micros: u32) {
+            self.0.sleep_for(micros)
+        }
     }
 }

@@ -18,7 +18,7 @@ describe('GET /token', function () {
     node = sinon.fake() as any
     /*let db = new LevelDb()
     await db.backend.open()*/
-    node.db = new Database(":memory", ALICE_ETHEREUM_ADDR.clone())
+    node.db = new Database(":wasm-memory", ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)
 

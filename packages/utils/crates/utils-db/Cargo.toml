@@ -28,6 +28,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 
 utils-log = { path = "../utils-log", default-features = false }
 utils-types = { path = "../utils-types", default-features = false }
+utils-misc = { path = "../utils-misc", default-features = false }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }

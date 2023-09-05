@@ -5210,7 +5210,7 @@ dependencies = [
 [[package]]
 name = "rusty-leveldb"
 version = "2.0.0"
-source = "git+https://github.com/NumberFour8/leveldb-rs?branch=feature/no-fs#87dfad05b6538e4592c27b08c17c8fcd821b9ed8"
+source = "git+https://github.com/NumberFour8/leveldb-rs?branch=feature/no-fs#e6e8d5e17ca18f33755847d7f4260b7dd4048d58"
 dependencies = [
  "crc",
  "integer-encoding",
@@ -6393,6 +6393,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "utils-log",
+ "utils-misc",
  "utils-types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
