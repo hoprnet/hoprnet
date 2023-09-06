@@ -72,7 +72,6 @@ jobs:
           password: ${{ steps.auth.outputs.access_token }}
 
       - name: Tag docker images
-        if: ${{ ! contains(github.event.pull_request.labels.*.name, 'release') }}
         run: |
           set -x
           # Set docker stable tag
@@ -228,6 +227,8 @@ jobs:
         run: |
           milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
           ./scripts/generate-changelog.sh ${milestone_number} > docs/changelog/changelog.md
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Release
         uses: softprops/action-gh-release@v1
