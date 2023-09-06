@@ -72,16 +72,9 @@ jobs:
           password: ${{ steps.auth.outputs.access_token }}
 
       - name: Tag docker images
+        if: ${{ ! contains(github.event.pull_request.labels.*.name, 'release') }}
         run: |
           set -x
-          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-          # Set docker PR tag
-          if echo "${{ github.event.pull_request.labels.*.name }}" | grep -q release; then
-            docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json)
-          else
-            docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
-          fi
-
           # Set docker stable tag
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [ "${base_branch}" == "master" ]; then
@@ -94,7 +87,6 @@ jobs:
           images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
           for image in ${images[@]}; 
           do 
-            gcloud artifacts docker tags add ${docker_registry}/${image}:${build_version} ${docker_registry}/${image}:${docker_pr_tag}
             gcloud artifacts docker tags add ${docker_registry}/${image}:${build_version} ${docker_registry}/${image}:${docker_stable_tag}
           done
 
