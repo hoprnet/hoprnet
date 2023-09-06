@@ -531,42 +531,57 @@ pub mod wasm {
 
     #[wasm_bindgen(module = "fs")]
     extern "C" {
-        fn existsSync(path: &str) -> bool;
-        fn openSync(path: &str, flags: Option<JsString>, mode: Option<JsString>) -> i32;
-        fn readSync(fd: i32, buffer: &Uint8Array, offset: u32, length: u32, position: Option<u32>) -> i32;
-        fn writeSync(fd: i32, buffer: &Uint8Array, offset: u32, length: Option<u32>, position: Option<u32>) -> i32;
-        fn fsyncSync(fd: i32);
-        fn fstatSync(fd: i32, options: &JsValue) -> Stats;
-        fn closeSync(fd: i32);
-        fn mkdirSync(path: &str) -> JsString;
-        fn rmdirSync(path: &str, options: &JsValue);
-        fn rmSync(path: &str, options: &JsValue);
-        fn readdirSync(path: &str, options: &JsValue) -> Vec<JsString>;
-        fn renameSync(old: &str, new: &str);
+        #[wasm_bindgen(catch)]
+        fn existsSync(path: &str) -> Result<bool, JsValue>;
+        #[wasm_bindgen(catch)]
+        fn openSync(path: &str, flags: Option<JsString>, mode: Option<JsString>) -> Result<i32, JsValue>;
+        #[wasm_bindgen(catch)]
+        fn readSync(fd: i32, buffer: &Uint8Array, offset: u32, length: u32, position: Option<u32>) -> Result<i32, JsValue>;
+        #[wasm_bindgen(catch)]
+        fn writeSync(fd: i32, buffer: &Uint8Array, offset: u32, length: Option<u32>, position: Option<u32>) -> Result<i32, JsValue>;
+        #[wasm_bindgen(catch)]
+        fn fsyncSync(fd: i32) -> Result<(), JsValue>;
+        #[wasm_bindgen(catch)]
+        fn fstatSync(fd: i32, options: &JsValue) -> Result<Stats, JsValue>;
+        #[wasm_bindgen(catch)]
+        fn closeSync(fd: i32) -> Result<(), JsValue>;
+        #[wasm_bindgen(catch)]
+        fn mkdirSync(path: &str) -> Result<JsString, JsValue>;
+        #[wasm_bindgen(catch)]
+        fn rmdirSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
+        #[wasm_bindgen(catch)]
+        fn rmSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
+        #[wasm_bindgen(catch)]
+        fn readdirSync(path: &str, options: &JsValue) -> Result<Vec<JsString>, JsValue>;
+        #[wasm_bindgen(catch)]
+        fn renameSync(old: &str, new: &str) -> Result<(), JsValue>;
     }
 
     struct FileHandle(i32);
 
     impl FileHandle {
-        pub fn open(path: &str, flags: Option<String>) -> std::io::Result<Self> {
-            let fd = openSync(path, flags.map(JsString::from), None);
+        pub fn open(path: &str, flags: Option<String>) -> rusty_leveldb::Result<Self> {
+            let fd = openSync(path, flags.map(JsString::from), None)
+                .map_err(|v| Status::new(StatusCode::IOError, &v.as_string().unwrap_or("n/a".into())))?;
             if fd >= 0 {
                 Ok(Self(fd))
             } else {
-                Err(io::ErrorKind::Other.into())
+                Err(Status::new(StatusCode::IOError, &format!("could not open file {path}")))
             }
         }
 
-        fn read_from(&self, offset: Option<u32>, dst: &mut [u8]) -> std::io::Result<usize> {
+        fn read_from(&self, offset: Option<u32>, dst: &mut [u8]) -> rusty_leveldb::Result<usize> {
             let mut ubuf = Uint8Array::new_with_length(dst.len() as u32);
-            let read = readSync(self.0, &mut ubuf, 0, dst.len() as u32, offset);
+            let read = readSync(self.0, &mut ubuf, 0, dst.len() as u32, offset)
+                .map_err(|v| Status::new(StatusCode::IOError, &v.as_string().unwrap_or("n/a".into())))?;
+
             if read > 0 {
                 ubuf.copy_to(dst);
                 Ok(read as usize)
             } else if read == 0 {
                 Ok(0)
             } else {
-                Err(io::ErrorKind::Other.into())
+                Err(Status::new(StatusCode::IOError, "read error"))
             }
         }
     }
@@ -574,6 +589,7 @@ pub mod wasm {
     impl Read for FileHandle {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
             self.read_from(None, buf)
+                .map_err(|_| io::ErrorKind::Other.into())
         }
     }
 
@@ -581,7 +597,10 @@ pub mod wasm {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
             let arr = Uint8Array::new_with_length(buf.len() as u32);
             arr.copy_from(buf);
-            let written = writeSync(self.0, &arr, 0, Some(buf.len() as u32), None);
+
+            let written = writeSync(self.0, &arr, 0, Some(buf.len() as u32), None)
+                .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+
             if written >= 0 {
                 Ok(written as usize)
             } else {
@@ -590,22 +609,19 @@ pub mod wasm {
         }
 
         fn flush(&mut self) -> io::Result<()> {
-            fsyncSync(self.0);
-            Ok(())
+            fsyncSync(self.0).map_err(|_| io::Error::from(io::ErrorKind::Other))
         }
     }
 
     impl RandomAccess for FileHandle {
         fn read_at(&self, off: usize, dst: &mut [u8]) -> rusty_leveldb::Result<usize> {
             self.read_from(Some(off as u32), dst)
-                .map_err(rusty_leveldb::Status::from)
         }
     }
 
     impl Drop for FileHandle {
         fn drop(&mut self) {
-            fsyncSync(self.0);
-            closeSync(self.0);
+            fsyncSync(self.0).and_then(|_| closeSync(self.0)).expect("failed to write file")
         }
     }
 
@@ -653,11 +669,13 @@ pub mod wasm {
         }
 
         fn exists(&self, p: &Path) -> rusty_leveldb::Result<bool> {
-            Ok(existsSync(p.to_str().expect("invalid path")))
+            existsSync(p.to_str().expect("invalid path"))
+                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in exists".into())))
         }
 
         fn children(&self, p: &Path) -> rusty_leveldb::Result<Vec<PathBuf>> {
             Ok(readdirSync(p.to_str().expect("invalid path"), &JsValue::undefined())
+                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in readdir".into())))?
                 .into_iter()
                 .map(|s| PathBuf::from(s.as_string().expect("invalid path buf")))
                 .collect())
@@ -665,31 +683,33 @@ pub mod wasm {
 
         fn size_of(&self, p: &Path) -> rusty_leveldb::Result<usize> {
             let fh = FileHandle::open(p.to_str().expect("invalid file path"), Some("r".into()))?;
-            let stat = fstatSync(fh.0, &JsValue::undefined());
-            Ok(stat.size() as usize)
+            fstatSync(fh.0, &JsValue::undefined())
+                .map(|s| s.size() as usize)
+                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in delete".into())))
         }
 
         fn delete(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            rmSync(p.to_str().expect("invalid path"), &JsValue::undefined());
-            Ok(())
+            rmSync(p.to_str().expect("invalid path"), &JsValue::undefined())
+                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in delete".into())))
         }
 
         fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            mkdirSync(p.to_str().expect("invalid path"));
-            Ok(())
+            mkdirSync(p.to_str().expect("invalid path"))
+                .map(|_| ())
+                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in mkdir".into())))
         }
 
         fn rmdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            rmdirSync(p.to_str().expect("invalid path"), &JsValue::undefined());
-            Ok(())
+            rmdirSync(p.to_str().expect("invalid path"), &JsValue::undefined())
+                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in rmdir".into())))
         }
 
         fn rename(&self, old: &Path, new: &Path) -> rusty_leveldb::Result<()> {
             renameSync(
                 old.to_str().expect("invalid old path"),
                 new.to_str().expect("invalid new path")
-            );
-            Ok(())
+            )
+            .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in rename".into())))
         }
 
         fn lock(&self, p: &Path) -> rusty_leveldb::Result<FileLock> {
