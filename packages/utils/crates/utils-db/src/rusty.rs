@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
 use futures_lite::stream::iter;
-use rusty_leveldb::{DBIterator, Env, LdbIterator, StatusCode, WriteBatch};
+use rusty_leveldb::{DBIterator, LdbIterator, StatusCode, WriteBatch};
 
 struct RustyLevelDbIterator {
     iter: DBIterator,
@@ -168,7 +168,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
 }
 
 #[cfg(any(feature = "wasm", test))]
-fn test_env(env: Box<dyn Env>, base: &std::path::Path, ts: u64) {
+fn test_env(env: Box<dyn rusty_leveldb::Env>, base: &std::path::Path, ts: u64) {
     utils_log::debug!("test #1");
     let test_dir = base.join(format!("test_dir_{0}", ts));
     env.mkdir(&test_dir).expect("could not create dir");
@@ -227,12 +227,20 @@ fn test_env(env: Box<dyn Env>, base: &std::path::Path, ts: u64) {
         let mut buf = [0; 4];
         let len = f.read_at(4, &mut buf).expect("could not read file at 2");
         assert_eq!(len, buf.len(), "could not read all bytes 4");
-        assert_eq!(hex_literal::hex!("cafebabe"), buf, "mismatch random access read bytes 1");
+        assert_eq!(
+            hex_literal::hex!("cafebabe"),
+            buf,
+            "mismatch random access read bytes 1"
+        );
 
         let mut buf = [0; 4];
         let len = f.read_at(2, &mut buf).expect("could not read file at 4");
         assert_eq!(len, buf.len(), "could not read all bytes 6");
-        assert_eq!(hex_literal::hex!("beefcafe"), buf, "mismatch random access read bytes 2");
+        assert_eq!(
+            hex_literal::hex!("beefcafe"),
+            buf,
+            "mismatch random access read bytes 2"
+        );
     }
 
     {
@@ -711,14 +719,16 @@ pub mod wasm {
         fn size_of(&self, p: &Path) -> rusty_leveldb::Result<usize> {
             #[derive(Serialize, Deserialize)]
             struct Stats {
-                size: u32
+                size: u32,
             }
 
             let fh = FileHandle::open(p.to_str().expect("invalid file path"), Some("r".into()))?;
             fstatSync(fh.0, &JsValue::undefined())
                 .map_err(|e| translate_fs_err("fstat error", e))
-                .and_then(|v| serde_wasm_bindgen::from_value::<Stats>(v)
-                    .map_err(|_| Status::new(StatusCode::Unknown, "could not deserialize stats")))
+                .and_then(|v| {
+                    serde_wasm_bindgen::from_value::<Stats>(v)
+                        .map_err(|_| Status::new(StatusCode::Unknown, "could not deserialize stats"))
+                })
                 .map(|s| s.size as usize)
         }
 
