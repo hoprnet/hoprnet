@@ -1429,13 +1429,16 @@ export class Hopr extends EventEmitter {
    * @returns true if allowed access
    */
   public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
-    let chain_key = await this.peerIdToChainKey(id)
-    if (chain_key) {
-      return HoprCoreEthereum.getInstance().isAllowedAccessToNetwork(Address.deserialize(chain_key.serialize()))
-    } else {
-      log(`failed to determine channel key of ${id.toString()}`)
-      return false
+    // Don't wait for key binding and local linking if identity is the local node
+    if (this.id.equals(id)) {
+      return await this.db.is_allowed_to_access_network(this.getEthereumAddress())
     }
+    let chain_key: Address = await this.peerIdToChainKey(id)
+    // Only check if we found a chain key, otherwise peer is not allowed
+    if (chain_key) {
+      return await this.db.is_allowed_to_access_network(chain_key)
+    }
+    return false
   }
 
   /**
