@@ -1,17 +1,14 @@
-use crate::errors::ProtocolError::{
-    ProtocolTicketAggregation, Retry, TransportError
-};
+use crate::errors::ProtocolError::{ProtocolTicketAggregation, Retry, TransportError};
+use crate::errors::Result;
 use async_lock::RwLock;
 use core_mixer::future_extensions::StreamThenConcurrentExt;
-use crate::errors::Result;
-use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-use core_types::channels::Ticket;
+use core_types::acknowledgement::AcknowledgedTicket;
 use futures::channel::mpsc::{channel, Receiver, Sender, UnboundedSender};
-use futures::future::{poll_fn};
+use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
+use libp2p_identity::PeerId;
 use std::pin::Pin;
 use std::sync::Arc;
-use libp2p_identity::PeerId;
 
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use utils_log::{debug, error, info, warn};
@@ -45,17 +42,17 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 /// The input to the processor background pipeline
 #[derive(Debug)]
 pub enum TicketAggregationToProcess {
-    ToReceive(PeerId, std::result::Result<Ticket, String>),
-    ToProcess(PeerId, Vec<Ticket>),
-    ToSend(PeerId, Vec<Ticket>),
+    ToReceive(PeerId, std::result::Result<AcknowledgedTicket, String>),
+    ToProcess(PeerId, Vec<AcknowledgedTicket>),
+    ToSend(PeerId, Vec<AcknowledgedTicket>),
 }
 
 /// Emitted by the processor background pipeline once processed
 #[derive(Debug)]
 pub enum TicketAggregationProcessed {
-    Receive(PeerId, std::result::Result<Ticket, String>),
-    Reply(PeerId, std::result::Result<Ticket,String>),
-    Send(PeerId, Vec<Ticket>),
+    Receive(PeerId, std::result::Result<AcknowledgedTicket, String>),
+    Reply(PeerId, std::result::Result<AcknowledgedTicket, String>),
+    Send(PeerId, Vec<AcknowledgedTicket>),
 }
 
 /// Implements protocol ticket aggregation logic for acknowledgements
@@ -78,8 +75,6 @@ impl<Db: HoprCoreEthereumDbActions> Clone for TicketAggregationProcessor<Db> {
 impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
     pub fn new(
         db: Arc<RwLock<Db>>,
-        // on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
-        // on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
     ) -> Self {
         Self {
             db,
@@ -88,9 +83,12 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         }
     }
 
-    pub async fn aggregate_ticket(&mut self, tickets: Vec<Ticket>) -> std::result::Result<Ticket, String> {
+    pub async fn aggregate_ticket(
+        &mut self,
+        tickets: Vec<AcknowledgedTicket>,
+    ) -> std::result::Result<AcknowledgedTicket, String> {
         /*
-        */
+         */
 
         Err("Random error or nothing...".to_owned())
     }
@@ -105,19 +103,27 @@ pub struct TicketAggregationActions {
 
 impl TicketAggregationActions {
     /// Pushes the aggregated ticket received from the transport layer into processing.
-    pub fn receive_ticket(&mut self, source: PeerId, ticket: std::result::Result<Ticket, String>) -> Result<()> {
+    pub fn receive_ticket(&mut self, source: PeerId, ticket: std::result::Result<AcknowledgedTicket, String>) -> Result<()> {
         // TODO: received ticket should be emitted somehow and component tickets removed
-        Err(crate::errors::ProtocolError::ProtocolTicketAggregation("Failed to process received ticket".to_owned()))
+        Err(crate::errors::ProtocolError::ProtocolTicketAggregation(
+            "Failed to process received ticket".to_owned(),
+        ))
     }
 
     /// Process the received aggregation request
-    pub fn receive_aggregation_request(&mut self, source: PeerId, tickets: Vec<Ticket>) -> Result<()> {
+    pub fn receive_aggregation_request(&mut self, source: PeerId, tickets: Vec<AcknowledgedTicket>) -> Result<()> {
         // TODO: received tickets should be processed here and a single Ticket emitted
-        Err(crate::errors::ProtocolError::ProtocolTicketAggregation("Failed to process received ticket".to_owned()))
+
+        for ticket in tickets {
+            
+        }
+        Err(crate::errors::ProtocolError::ProtocolTicketAggregation(
+            "Failed to process received ticket".to_owned(),
+        ))
     }
 
     /// Pushes a new collection of tickets into the processing.
-    pub fn send_aggregation_request(&mut self, destination: PeerId, tickets: Vec<Ticket>) -> Result<()> {
+    pub fn send_aggregation_request(&mut self, destination: PeerId, tickets: Vec<AcknowledgedTicket>) -> Result<()> {
         // #[cfg(all(feature = "prometheus", not(test)))]
         // METRIC_SENT_ACKS.increment();
         // TODO: metrics here would be nice as well
@@ -147,11 +153,11 @@ pub struct TicketAggregationInteraction {
 
 impl TicketAggregationInteraction {
     /// Creates a new instance given the DB to process the ticket aggregation requests.
-    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
-        db: Arc<RwLock<Db>>,
-    ) -> Self {
-        let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess>(TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE);
-        let (processing_out_tx, processing_out_rx) = channel::<TicketAggregationProcessed>(TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE);
+    pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>) -> Self {
+        let (processing_in_tx, processing_in_rx) =
+            channel::<TicketAggregationToProcess>(TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE);
+        let (processing_out_tx, processing_out_rx) =
+            channel::<TicketAggregationProcessed>(TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE);
 
         let processor = TicketAggregationProcessor::new(db);
 
@@ -207,7 +213,6 @@ impl Stream for TicketAggregationInteraction {
         return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
     }
 }
-
 
 #[cfg(test)]
 mod tests {
