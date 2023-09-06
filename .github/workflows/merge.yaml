@@ -3,8 +3,8 @@ name: Merge
 on:
   pull_request:
     types:
-      #- closed
-      - synchronize
+      - closed
+      # - synchronize
 
 concurrency:
   group: merge
@@ -20,158 +20,158 @@ env:
   MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
 
 jobs:
-  # cleanup-actions:
-  #   name: Cleanup Actions
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@v3
-  #     - name: Cleanup
-  #       run: |
-  #         gh extension install actions/gh-actions-cache
+  cleanup-actions:
+    name: Cleanup Actions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+      - name: Cleanup
+        run: |
+          gh extension install actions/gh-actions-cache
 
-  #         REPO=${{ github.repository }}
-  #         BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+          REPO=${{ github.repository }}
+          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
 
-  #         echo "Fetching list of cache key"
-  #         cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
+          echo "Fetching list of cache key"
+          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
 
-  #         ## Setting this to not fail the workflow while deleting cache keys.
-  #         set +e
-  #         echo "Deleting caches..."
-  #         for cacheKey in $cacheKeysForPR
-  #         do
-  #           gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-  #         done
-  #         echo "Done"
-  #       env:
-  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting caches..."
+          for cacheKey in $cacheKeysForPR
+          do
+            gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+          done
+          echo "Done"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # tag:
-  #   name: Tag images
-  #   runs-on: ubuntu-latest
-  #   # if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
-  #   steps:
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@v3
-  #       with:
-  #         fetch-depth: 0
+  tag:
+    name: Tag images
+    runs-on: ubuntu-latest
+    # if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-  #     - name: Set up Google Cloud Credentials
-  #       id: auth
-  #       uses: google-github-actions/auth@v1
-  #       with:
-  #         token_format: "access_token"
-  #         credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-  #     - name: Login Google Container Registry
-  #       uses: docker/login-action@v2
-  #       with:
-  #         registry: europe-west3-docker.pkg.dev
-  #         username: oauth2accesstoken
-  #         password: ${{ steps.auth.outputs.access_token }}
+      - name: Login Google Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
 
-  #     - name: Tag docker images
-  #       run: |
-  #         docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-  #         # Set docker PR tag
-  #         if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
-  #           docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
-  #         else
-  #           docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
-  #         fi
-  #         # Set docker stable tag
-  #         declare base_branch=${{ github.event.pull_request.base.ref }}
-  #         if [ "${base_branch}" == "master" ]; then
-  #           docker_stable_tag=latest
-  #         else
-  #           docker_stable_tag=${base_branch/release\//}
-  #         fi
+      - name: Tag docker images
+        run: |
+          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
+          # Set docker PR tag
+          if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
+            docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
+          else
+            docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
+          fi
+          # Set docker stable tag
+          declare base_branch=${{ github.event.pull_request.base.ref }}
+          if [ "${base_branch}" == "master" ]; then
+            docker_stable_tag=latest
+          else
+            docker_stable_tag=${base_branch/release\//}
+          fi
 
-  #         # Tag images
-  #         images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
-  #         for image in ${images[@]}; 
-  #         do
-  #           echo "Tagging ${image}:${docker_stable_tag}"
-  #           gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_stable_tag}
-  #         done
+          # Tag images
+          images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
+          for image in ${images[@]}; 
+          do
+            echo "Tagging ${image}:${docker_stable_tag}"
+            gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_stable_tag}
+          done
 
-  # deploy_prn_nodes:
-  #   name: Deploy PRN nodes
-  #   runs-on: ubuntu-latest
-  #   if: needs.tag.result == 'success'
-  #   needs:
-  #     - tag
-  #   steps:
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@v3
+  deploy_prn_nodes:
+    name: Deploy PRN nodes
+    runs-on: ubuntu-latest
+    if: needs.tag.result == 'success'
+    needs:
+      - tag
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
 
-  #     - name: Set up Google Cloud Credentials
-  #       id: auth
-  #       uses: google-github-actions/auth@v1
-  #       with:
-  #         credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-  #     - name: Set up Google Cloud SDK
-  #       uses: google-github-actions/setup-gcloud@v1
-  #       with:
-  #         project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-  #         install_components: beta
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          install_components: beta
 
-  #     - name: Deploy on GCP
-  #       run: |
-  #         declare base_branch=${{ github.event.pull_request.base.ref }}
-  #         if [[ "${base_branch}" == "master" ]]; then
-  #           ./scripts/deploy.sh rotsee
-  #         elif [[ "${base_branch}" =~ ^"release" ]]; then
-  #           ./scripts/deploy.sh "${base_branch/release\/}-dufour"
-  #         else
-  #           echo "Skipping deployment"
-  #         fi
-  #       env:
-  #         DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-  #         HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
-  #         HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-  #         FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
-  #         ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
+      - name: Deploy on GCP
+        run: |
+          declare base_branch=${{ github.event.pull_request.base.ref }}
+          if [[ "${base_branch}" == "master" ]]; then
+            ./scripts/deploy.sh rotsee
+          elif [[ "${base_branch}" =~ ^"release" ]]; then
+            ./scripts/deploy.sh "${base_branch/release\/}-dufour"
+          else
+            echo "Skipping deployment"
+          fi
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
-  #     - name: Add ssh key to deploy to Hetzner
-  #       uses: webfactory/ssh-agent@v0.7.0
-  #       with:
-  #           ssh-private-key: ${{ secrets.HETZNER_ROTSEE_SSH_PRIVATE_KEY }}
+      - name: Add ssh key to deploy to Hetzner
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+            ssh-private-key: ${{ secrets.HETZNER_ROTSEE_SSH_PRIVATE_KEY }}
 
-  #     - name: Deploy on Hetzner
-  #       run: |
-  #         declare base_branch=${{ github.event.pull_request.base.ref }}
-  #         if [ "${base_branch}" == "master" ]; then
-  #           hosts=($(echo "${{ vars.HETZNER_ROTSEE_NODES }}" | sed 's/\r//'  | sed 's/\n/ /'))
-  #         else
-  #           hosts=""
-  #         fi
-  #         echo "Restarting hosts: ${hosts}"
-  #         for host in ${hosts[@]}; do
-  #           ssh -o StrictHostKeyChecking=no root@${host} "service hoprd restart"
-  #         done
-  #       env:
-  #         DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-  #         IDENTITY_PASSWORD: ${{ secrets.BS_PASSWORD }}
-  #         API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-  #         FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
-  #         ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
+      - name: Deploy on Hetzner
+        run: |
+          declare base_branch=${{ github.event.pull_request.base.ref }}
+          if [ "${base_branch}" == "master" ]; then
+            hosts=($(echo "${{ vars.HETZNER_ROTSEE_NODES }}" | sed 's/\r//'  | sed 's/\n/ /'))
+          else
+            hosts=""
+          fi
+          echo "Restarting hosts: ${hosts}"
+          for host in ${hosts[@]}; do
+            ssh -o StrictHostKeyChecking=no root@${host} "service hoprd restart"
+          done
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          IDENTITY_PASSWORD: ${{ secrets.BS_PASSWORD }}
+          API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
-  #     - name: Notify Success
-  #       if: ${{ success() }}
-  #       run: |
-  #         ./scripts/notify-matrix-cluster-info.sh
-  #       env:
-  #         MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
-  #         HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+      - name: Notify Success
+        if: ${{ success() }}
+        run: |
+          ./scripts/notify-matrix-cluster-info.sh
+        env:
+          MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
 
-  #     - name: Notify Failure
-  #       if: ${{ failure() }}
-  #       run: |
-  #         ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
-  #           "${{ github.workflow }}" "${{ github.run_id }}"
+      - name: Notify Failure
+        if: ${{ failure() }}
+        run: |
+          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
+            "${{ github.workflow }}" "${{ github.run_id }}"
 
 # FIXME: Disabled until hoprd nodes can work in Kubernetes
   # deploy_natted_nodes:
@@ -206,8 +206,8 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     if: contains(github.event.pull_request.labels.*.name, 'release')
-    # needs:
-    #   - tag
+    needs:
+      - tag
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -223,11 +223,11 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      # - name: Tag repository
-      #   id: tag
-      #   run: |
-      #     git tag v${{ steps.setup.outputs.current_version }}
-      #     git push origin v${{ steps.setup.outputs.current_version }}
+      - name: Tag repository
+        id: tag
+        run: |
+          git tag v${{ steps.setup.outputs.current_version }}
+          git push origin v${{ steps.setup.outputs.current_version }}
 
       - name: Generate Changelog
         id: changelog
@@ -241,7 +241,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           body_path: docs/changelog/changelog.md
-          draft: true
           prerelease: ${{ steps.setup.outputs.prerelease }}
           name: HOPR - v${{ steps.setup.outputs.current_version }}
           tag_name: v${{ steps.setup.outputs.current_version }}
