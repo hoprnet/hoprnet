@@ -244,4 +244,4 @@ jobs:
           draft: true
           prerelease: ${{ steps.setup.outputs.prerelease }}
           name: HOPR - v${{ steps.setup.outputs.current_version }}
-          tag_name: ${{ steps.setup.outputs.current_version }}
+          tag_name: v${{ steps.setup.outputs.current_version }}
