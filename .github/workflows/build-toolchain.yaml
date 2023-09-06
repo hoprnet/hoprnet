@@ -18,6 +18,17 @@ jobs:
     runs-on: ubuntu-latest-4-cores
     timeout-minutes: 60
     steps:
+      - name: "Build"
+        if: ${{ ! contains(github.event.pull_request.labels.*.name, 'release') }}
+        run: |
+          echo "Build"
+
+      - name: "Release"
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'release') }}
+        run: |
+          echo "Release"
+
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
         timeout-minutes: 10
