@@ -25,7 +25,7 @@ network=${1}
 number=${2:-1}
 docker_tag=${3:-latest}
 hopr_amount=${4:-10}
-native_amount=${5:-0.1}
+native_amount=${5:-0.01}
 random="${RANDOM}"
 
 for (( i=1; i<=${number}; i++ )) do

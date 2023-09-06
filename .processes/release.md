@@ -7,15 +7,17 @@ The purpose of this document is to streamline the releases of hoprd.
   - [Public release](#public-release)
   - [Deadline based releases](#deadline-based-releases)
 - [Testing phases](#testing-phases)
-  - [Alpha testing](#alpha-testing)
-  - [Beta testing](#beta-testing)
-  - [Release candidate testing](#release-candidate-testing)
+  - [Pre-release testing](#pre-release-testing)
+  - [Release testing](#release-testing)
+  - [Promotion testing](#promotion-testing)
   - [User acceptance testing](#user-acceptance-testing)
 - [Release promotion](#release-promotion)
 - [On a new chain](#on-a-new-chain)
 - [On a new release](#on-a-new-release)
   - [Release Cycle](#release-cycle)
-  - [Create Release](#create-release)
+  - [Open Release](#open-release)
+  - [Close Release](#close-release)
+  - [Promote release](#promote-release)
   - [Create Patch](#create-patch)
   - [Merge Back](#merge-back)
 
@@ -44,7 +46,7 @@ These releases should be of a large scope and occur only on occasions where a re
 
 ## Testing phases
 
-### Alpha testing
+### Pre-release testing
 
 These are the keypoints of this testing phase:
 
@@ -57,26 +59,25 @@ These are the keypoints of this testing phase:
 - The release owner schedules a meeting where only the Core team members are invited
 - During the online testing sesion, the Core team executes a manual regresion suite of test cases.
 - Depending on the results of the session, a decission is taken to release the code as it is or not.
-- In case some blocking bugs are found, the Core team should adapt the sprint plan and include them. A new alpha testing session must be needed once they are fixed
+- In case some blocking bugs are found, the Core team should adapt the sprint plan and include them. A new pre-release testing session must be needed once they are fixed
 
-### Beta testing
+### Release testing
 
 These are the keypoints of this testing phase:
 
 - This testing effort is owned by the Engineering team, meaning that all the engineering team members should participate in the testing.
-- It always occurs after a successful alpha testing phase and when the release owner has created the _Internal release_.
-- The release owners compiles the change log of the release that will help the testers to understand the new features and bug fixes that are bundled with it.
+- It always occurs after a successful pre-release testing phase and when the release owner has created the _Internal release_.
 - The devops team needs to deploy the new release in the required environments.
 - Once it is deployed, the Engineering team might start using this release to assess its stability.
 - A coordinator must be chosen to lead the tests and collect all the issues.
 - If the Engineering team identify relevant issues, it might require the Core team to create a new patch before continuing with more testing.
 
-### Release candidate testing
+### Promotion testing
 
 These are the keypoints of this testing phase:
 
 - This testing effort is owned by the Com Team
-- It always occurs after a successful beta testing phase.
+- It always occurs after a successful release testing phase.
 - A coordinator must be chosen to lead the tests and collect all the issues.
 - The Com Team members install the release in their own devices
 - The Com Team must asses if this release is stable enough or not.
@@ -88,7 +89,7 @@ These are the keypoints of this testing phase:
 These are the keypoints of this testing phase:
 
 - This testing effort is owned by the Com Team
-- It always occurs after a successful beta or release candidate testing phase.
+- It always occurs after a successful release or promotion testing phase.
 - A coordinator must be chosen to lead the tests and collect all the issues.
 - The scope of this testing effort is to test the release with the devices owned by the ambassadors
 
@@ -146,14 +147,14 @@ particular branch to deploy on every change.
 
 ```
 
-### Open a new release
+### Open release
 
 The process of opening a release should be done at the begining of the release. Ideally should be the first task to do right after the clousure of the previous release, so the team can start contributing to this new release by adding their issues and PR to the given milestone.
 
 1. Execute the manual workflow named [Open Release](https://github.com/hoprnet/hoprnet/actions/workflows/open-release.yaml) specifying the type of new release that you want to create and selecting the branch where you want to create it.
 2. A new PR will be created with the name `Create release <RELEASE_NUMBER>`. Review, approve and merge it.
 
-### Close a release
+### Close release
 
 The process of closing a release consists of building, tagging and publishing the given release of the branch. It does not perform any other action like bumping the version to the next release.
 
@@ -163,9 +164,9 @@ The process of closing a release consists of building, tagging and publishing th
 4. Review the contents of the new [Github Release](https://github.com/hoprnet/hoprnet/releases) created and modify accordingly
 5. Share the links to the  Github release and testnet wiki page in the `#release` Element channel.
 
-### Promote the named release
+### Promote release
 
-The process of promoting a named release (bratislava, providence, etc) consists of creating or updating a given ${RELEASE_NAME} tag and artifacts to the newly closed released. This process should be executed after the closure of release.
+The process of promoting the named release (bratislava, providence, etc) consists of creating or updating a given ${RELEASE_NAME} tag and artifacts to the newly closed released. This process should be executed after the closure of release.
 
 1. Update the named release
 ```
@@ -183,39 +184,6 @@ git push origin ${RELEASE_NAME}
 
 3. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
-
-
-
-
-### Create Patch
-
-Bug fixing will be done by creating PR pointing to branch `release/${RELEASE_NAME}`. Once there are enough bugs or there is a need to deliver a blocking issue fixed, the release patching process starts. Before starting the release patching the process of alpha testing should start. 
-If the testing is successful, then follow the following steps:
-
-- Create a PR to prepare the release patching
-````
-echo PATCH_NUMBER=2
-git pull
-git checkout release/${RELEASE_NAME}
-git pull
-git checkout -b feature/prepare-${RELEASE_NAME}-patch
-./scripts/bump-version.sh release/providence ${PATCH_NUMBER}
-git add .
-git commit -m "Preparing the patch ${RELEASE_NAME}-rc.${PATCH_NUMBER}"
-git push --set-upstream origin feature/prepare-${RELEASE_NAME}-patch
-gh pr create --title "Preparing the patch ${RELEASE_NAME}-rc.${PATCH_NUMBER}" --base release/${RELEASE_NAME} -w --body "The scope of this PR is to prepare the contents of the patch"
-
-````
-- Wait for the PR pipeline checks to finish correctly. E2E tests included
-- Get the approval
-- Merge the PR
-- Tag the release 
-
-````
-git tag ${RELEASE_NAME}-rc.${PATCH_NUMBER}
-git push origin ${RELEASE_NAME}-rc.${PATCH_NUMBER}
-
-````
 
 ### Merge Back
 
