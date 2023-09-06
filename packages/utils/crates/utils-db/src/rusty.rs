@@ -645,6 +645,11 @@ pub mod wasm {
         }
     }
 
+    #[derive(Serialize, Deserialize)]
+    struct Opts {
+        recursive: bool,
+    }
+
     impl Env for NodeJsEnv {
         fn open_sequential_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Read>> {
             Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into()))
@@ -696,12 +701,7 @@ pub mod wasm {
         }
 
         fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            #[derive(Serialize, Deserialize)]
-            struct Opts {
-                recursive: bool,
-                mode: String
-            }
-            let opts = serde_wasm_bindgen::to_value(&Opts { recursive: true, mode: "0o777".into() })
+            let opts = serde_wasm_bindgen::to_value(&Opts { recursive: true })
                 .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
 
             if let Err(e) = mkdirSync(p.to_str().expect("invalid path"), &opts).map(|_| ()) {
@@ -717,7 +717,11 @@ pub mod wasm {
         }
 
         fn rmdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            rmdirSync(p.to_str().expect("invalid path"), &JsValue::undefined())
+
+            let opts = serde_wasm_bindgen::to_value(&Opts { recursive: true })
+                .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
+
+            rmdirSync(p.to_str().expect("invalid path"), &opts)
                 .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in rmdir".into())))
         }
 
