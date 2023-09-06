@@ -29,7 +29,7 @@ export async function createHoprNode(
     await rm(dbPath, { recursive: true, force: true })
     await mkdir(dbPath, { recursive: true })
   }
-  let db = new Database(path.join(optons.dataPath, "hopr").toString(), chainKeypair.public().to_address())
+  let db = new Database(path.join(dbPath, "hopr").toString(), chainKeypair.public().to_address())
 
   //let db = Database.new_in_memory(chainKeypair.public().to_address());
 
