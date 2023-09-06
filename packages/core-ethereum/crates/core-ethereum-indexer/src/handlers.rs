@@ -431,22 +431,46 @@ where
     {
         match HoprNetworkRegistryEvents::decode_log(log)? {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
-                let node_address = &deregistered.node_address.0.try_into()?;
+                let node_address: &Address = &deregistered.node_address.0.try_into()?;
+
+                debug!(
+                    "on_network_registry_event_deregistered_by_manager - node_address: {:?}",
+                    node_address.to_string()
+                );
+
                 db.set_allowed_to_access_network(node_address, false, snapshot)?;
                 self.cbs.node_not_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
-                let node_address = &deregistered.node_address.0.try_into()?;
+                let node_address: &Address = &deregistered.node_address.0.try_into()?;
+
+                debug!(
+                    "on_network_registry_event_deregistered - node_address: {:?}",
+                    node_address.to_string()
+                );
+
                 db.set_allowed_to_access_network(node_address, false, snapshot)?;
                 self.cbs.node_not_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
-                let node_address = &registered.node_address.0.try_into()?;
+                let node_address: &Address = &registered.node_address.0.try_into()?;
+
+                debug!(
+                    "on_network_registry_event_registered_by_manager - node_address: {:?}",
+                    node_address.to_string()
+                );
+
                 db.set_allowed_to_access_network(node_address, true, snapshot)?;
                 self.cbs.node_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
-                let node_address = &registered.node_address.0.try_into()?;
+                let node_address: &Address = &registered.node_address.0.try_into()?;
+
+                debug!(
+                    "on_network_registry_event_registered - node_address: {:?}",
+                    node_address.to_string()
+                );
+
                 db.set_allowed_to_access_network(node_address, true, snapshot)?;
                 self.cbs.node_allowed_to_access_network(node_address);
             }

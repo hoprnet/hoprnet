@@ -54,11 +54,7 @@ pub mod wasm {
                     None
                 } else {
                     let arr = js_sys::Uint8Array::from(val).to_vec().into_boxed_slice();
-                    if arr.len() > 0 {
-                        Some(arr)
-                    } else {
-                        None
-                    }
+                    Some(arr)
                 }),
                 Err(e) => Err(DbError::GenericError(
                     "Encountered error on DB get operation".to_string(),

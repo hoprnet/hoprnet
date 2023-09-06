@@ -58,7 +58,11 @@ export class Db {
     }
 
     // open database connection
-    this.backend = new Sqlite(dbPath + '/db.sqlite', { verbose: console.log })
+    const options = {}
+    if (process.env.HOPRD_DB_DEBUG_LOG === 'true') {
+      options['verbose'] = log
+    }
+    this.backend = new Sqlite(dbPath + '/db.sqlite', options)
 
     this.open(setNetwork, networkId)
   }
