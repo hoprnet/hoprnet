@@ -6404,7 +6404,6 @@ dependencies = [
  "rusty-leveldb",
  "scopeguard",
  "serde",
- "serde-wasm-bindgen",
  "tempfile",
  "thiserror",
  "utils-log",
