@@ -118,7 +118,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        match self.backend.get(key.into()).await {
+        match self.backend.get(key).await {
             Ok(Some(val)) => match bincode::deserialize(&val) {
                 Ok(deserialized) => Ok(Some(deserialized)),
                 Err(e) => Err(DbError::DeserializationError(format!(

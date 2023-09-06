@@ -15,7 +15,7 @@ describe('POST /tokens', function () {
 
   before(async function () {
     node = sinon.fake() as any
-    node.db = Database.new_in_memory( ALICE_ETHEREUM_ADDR.clone())
+    node.db = Database.new_in_memory(ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)
 

@@ -25,7 +25,7 @@ describe('authentication token', function () {
 
   beforeEach(async function () {
     node = sinon.fake() as any
-    node.db = Database.new_in_memory( ALICE_ETHEREUM_ADDR.clone())
+    node.db = Database.new_in_memory(ALICE_ETHEREUM_ADDR.clone())
   })
 
   it('should be created if parameters are valid', async function () {
@@ -218,7 +218,7 @@ describe('authentication token authorization', function () {
 
   before(async function () {
     node = sinon.fake() as any
-    node.db = Database.new_in_memory( ALICE_ETHEREUM_ADDR.clone())
+    node.db = Database.new_in_memory(ALICE_ETHEREUM_ADDR.clone())
   })
 
   it('should succeed if lifetime is unset', async function () {

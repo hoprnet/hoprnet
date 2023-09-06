@@ -1464,9 +1464,7 @@ pub mod wasm {
 mod tests {
     use super::*;
     use core_types::channels::ChannelEntry;
-    use std::{
-        str::FromStr,
-    };
+    use std::str::FromStr;
     use utils_db::db::serialize_to_bytes;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, EthereumChallenge};

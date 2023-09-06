@@ -177,10 +177,7 @@ mod tests {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
 
         let mut last_addr = chain_key.to_address();
-        let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
-            last_addr,
-        );
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), last_addr);
 
         let packet_key = OffchainPublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap();
         peers.push(packet_key.to_peerid());

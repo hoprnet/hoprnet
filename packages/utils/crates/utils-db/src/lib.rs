@@ -3,9 +3,9 @@ pub mod db;
 pub mod errors;
 pub mod hashmap;
 pub mod leveldb;
+pub mod rusty;
 pub mod traits;
 pub mod types;
-pub mod rusty;
 
 pub use traits::KVStorage;
 

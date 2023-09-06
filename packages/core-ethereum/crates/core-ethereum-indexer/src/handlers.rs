@@ -645,10 +645,7 @@ pub mod tests {
     }
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
-        CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
-            Address::random(),
-        )
+        CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random())
     }
 
     struct DummyCallbacks {}

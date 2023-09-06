@@ -29,9 +29,8 @@ const MOCK_PUBLIC_KEY = () =>
 
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
-import { LevelDb } from './db.js'
-import { db_sanity_test, test_nodejs_env, hoprd_hoprd_initialize_crate } from '../../../hoprd/lib//hoprd_hoprd.js'
-import fs from 'fs'
+import { test_nodejs_env, hoprd_hoprd_initialize_crate } from '../../../hoprd/lib//hoprd_hoprd.js'
+import { rmdirSync } from 'fs'
 hoprd_hoprd_initialize_crate()
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
@@ -51,7 +50,7 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, ba
 }
 
 function test_in_memory_db() {
-  return Database.new_in_memory( MOCK_PUBLIC_KEY().to_address())
+  return Database.new_in_memory(MOCK_PUBLIC_KEY().to_address())
 }
 
 describe('db functional tests', function () {
@@ -99,15 +98,16 @@ describe('db functional tests', function () {
   })
 
   it('test rusty level db', async function () {
-    test_nodejs_env("/tmp")
+    test_nodejs_env('/tmp')
   })
 
   it('test db creation and simple set', async function () {
-    let db = new Database("/tmp/test", MOCK_PUBLIC_KEY().to_address())
-    let balance_1 = new Balance("100", BalanceType.HOPR)
+    rmdirSync('/tmp/test', {})
+
+    let db = new Database('/tmp/test', MOCK_PUBLIC_KEY().to_address())
+    let balance_1 = new Balance('100', BalanceType.HOPR)
     await db.set_hopr_balance(balance_1)
     let balance_2 = await db.get_hopr_balance()
     assert.equal(balance_2.to_string(), balance_1.to_string(), 'value must be equal')
   })
 })
-

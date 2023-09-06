@@ -1080,10 +1080,7 @@ mod tests {
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
     use serial_test::serial;
-    use std::{
-        sync::{Arc},
-        time::Duration,
-    };
+    use std::{sync::Arc, time::Duration};
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_log::debug;
     use utils_types::{
@@ -1154,9 +1151,7 @@ mod tests {
     }
 
     fn create_dbs(amount: usize) -> Vec<RustyLevelDbShim> {
-        (0..amount)
-            .map(|_| RustyLevelDbShim::new_in_memory())
-            .collect()
+        (0..amount).map(|_| RustyLevelDbShim::new_in_memory()).collect()
     }
 
     fn create_core_dbs(dbs: &Vec<RustyLevelDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
@@ -1176,10 +1171,7 @@ mod tests {
         let mut previous_channel: Option<ChannelEntry> = None;
 
         for index in 0..dbs.len() {
-            let mut db = CoreEthereumDb::new(
-                DB::new(dbs[index].clone()),
-                PEERS_CHAIN[index].public().to_address(),
-            );
+            let mut db = CoreEthereumDb::new(DB::new(dbs[index].clone()), PEERS_CHAIN[index].public().to_address());
 
             // Link all the node keys and chain keys from the simulated announcements
             for i in 0..PEERS_PRIVS.len() {

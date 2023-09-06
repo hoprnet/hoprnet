@@ -5,7 +5,6 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Hopr, type HoprOptions } from './index.js'
 import { getContractData } from './network.js'
 import path from 'path'
-import { mkdir, rm } from 'fs/promises'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -22,16 +21,8 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-
   const dbPath = path.join(options.dataPath, 'db')
-  if (options.createDbIfNotExist) {
-    log('force create - wipe old database and create a new')
-    await rm(dbPath, { recursive: true, force: true })
-    await mkdir(dbPath, { recursive: true })
-  }
-  let db = new Database(path.join(dbPath, "hopr").toString(), chainKeypair.public().to_address())
-
-  //let db = Database.new_in_memory(chainKeypair.public().to_address());
+  let db = new Database(path.join(dbPath, 'hopr').toString(), chainKeypair.public().to_address())
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = options.safeModule.safeAddress

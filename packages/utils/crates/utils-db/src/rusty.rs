@@ -60,24 +60,27 @@ impl RustyLevelDbShim {
     #[cfg(not(feature = "wasm"))]
     pub fn new_in_memory() -> Self {
         Self {
-            db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hoprd_db", rusty_leveldb::in_memory())
-                .expect("failed to create DB")))
+            db: Arc::new(Mutex::new(
+                rusty_leveldb::DB::open("hoprd_db", rusty_leveldb::in_memory()).expect("failed to create DB"),
+            )),
         }
     }
 
     #[cfg(feature = "wasm")]
     pub fn new_in_memory() -> Self {
         Self {
-            db: Arc::new(Mutex::new(rusty_leveldb::DB::open("hoprd_db", wasm::WasmMemEnv::create_options())
-                .expect("failed to create DB")))
+            db: Arc::new(Mutex::new(
+                rusty_leveldb::DB::open("hoprd_db", wasm::WasmMemEnv::create_options()).expect("failed to create DB"),
+            )),
         }
     }
 
     #[cfg(feature = "wasm")]
     pub fn new(path: &str) -> Self {
         Self {
-            db: Arc::new(Mutex::new(rusty_leveldb::DB::open(path, wasm::NodeJsEnv::create_options())
-                .expect("failed to create DB")))
+            db: Arc::new(Mutex::new(
+                rusty_leveldb::DB::open(path, wasm::NodeJsEnv::create_options()).expect("failed to create DB"),
+            )),
         }
     }
 }
@@ -92,7 +95,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
 
         let snapshot = db.get_snapshot();
         match db.get_at(&snapshot, &key) {
-            Ok(Some(val)) => Ok(if val.len() > 0 {
+            Ok(Some(val)) => Ok(if !val.is_empty() {
                 Some(val.into_boxed_slice())
             } else {
                 None
@@ -132,11 +135,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
         Ok(())
     }
 
-    fn iterate(
-        &self,
-        prefix: Self::Key,
-        suffix_size: u32,
-    ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
         let i = self
             .db
             .lock()
@@ -179,7 +178,10 @@ fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
 
     debug!("test #2");
     let test_file = test_dir.join("test_file");
-    assert!(!env.exists(&test_file).expect("could not check file existence 1"), "file should not exist before creation");
+    assert!(
+        !env.exists(&test_file).expect("could not check file existence 1"),
+        "file should not exist before creation"
+    );
 
     debug!("test #3");
     let data = hex!("deadbeefcafebabe");
@@ -193,7 +195,10 @@ fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
 
     {
         debug!("test #5");
-        assert!(env.exists(&test_file).expect("could not check file existence 3"), "file should exist");
+        assert!(
+            env.exists(&test_file).expect("could not check file existence 3"),
+            "file should exist"
+        );
         let mut f = env.open_sequential_file(&test_file).expect("could not open file 2");
         let mut buf = vec![0u8; data.len()];
         let len = f.read(&mut buf).expect("could not read from file");
@@ -237,21 +242,33 @@ fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
         debug!("test #9");
         let children = env.children(&test_dir).expect("cannot retrieve children of test dir");
         assert_eq!(children.len(), 1, "contains more children");
-        assert!(children.contains(&PathBuf::from("test_file".to_string())), "children do not contain test file");
+        assert!(
+            children.contains(&PathBuf::from("test_file".to_string())),
+            "children do not contain test file"
+        );
     }
 
     let new_file = test_dir.join("new_file");
     {
         debug!("test #10");
         env.rename(&test_file, &new_file).expect("rename must not fail");
-        assert!(!env.exists(&test_file).expect("failed to check existence after rename"), "old file must not exist after rename");
-        assert!(env.exists(&new_file).expect("failed to check existence after rename"), "new file must exist after rename");
+        assert!(
+            !env.exists(&test_file).expect("failed to check existence after rename"),
+            "old file must not exist after rename"
+        );
+        assert!(
+            env.exists(&new_file).expect("failed to check existence after rename"),
+            "new file must exist after rename"
+        );
     }
 
     {
         debug!("test #11");
         env.delete(&new_file).expect("could not delete file");
-        assert!(!env.exists(&new_file).expect("failed to check existence after deletion"), "file must not exist after deletion");
+        assert!(
+            !env.exists(&new_file).expect("failed to check existence after deletion"),
+            "file must not exist after deletion"
+        );
     }
 
     {
@@ -260,12 +277,11 @@ fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use rusty_leveldb::MemEnv;
     use crate::rusty::test_env;
+    use rusty_leveldb::MemEnv;
+    use std::path::Path;
 
     #[async_std::test]
     async fn rusty_leveldb_sanity_test() {
@@ -387,38 +403,46 @@ mod tests {
         assert_eq!(received, expected, "Test #7 failed: db content mismatch");
     }
 
-
     #[test]
-    fn wasm_test_sanity() {
+    fn wasm_test_sanity_test() {
         // This just tests the sanity of the "test_env" against a known working implementation (MemEnv)
         // so it can be further used in the WASM test
-        test_env(Box::new(MemEnv::new()), Path::new("/"), utils_misc::time::native::current_timestamp())
+        test_env(
+            Box::new(MemEnv::new()),
+            Path::new("/"),
+            utils_misc::time::native::current_timestamp(),
+        )
     }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::{io, thread, time};
+    use crate::rusty::test_env;
+    use js_sys::{JsString, Uint8Array};
+    use rusty_leveldb::{Env, FileLock, Logger, MemEnv, RandomAccess, Status, StatusCode};
+    use serde::{Deserialize, Serialize};
+    use std::cmp::Ordering;
     use std::collections::HashMap;
     use std::io::{Read, Write};
     use std::path::{Path, PathBuf};
     use std::rc::Rc;
     use std::sync::{Arc, Mutex};
-    use js_sys::{JsString, Uint8Array};
-    use rusty_leveldb::{Env, FileLock, Logger, MemEnv, RandomAccess, Status, StatusCode};
-    use serde::{Deserialize, Serialize};
-    use wasm_bindgen::JsValue;
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use std::{io, thread, time};
     use utils_log::debug;
-    use crate::rusty::test_env;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use wasm_bindgen::JsValue;
 
+    /// WASM-compatible Rusty LevelDB environment for FS operations in memory.
+    /// This implements the `Env` trait.
     pub struct WasmMemEnv(MemEnv);
 
     impl WasmMemEnv {
+        /// Create options directly with `WasmMemEnv`
         pub fn create_options() -> rusty_leveldb::Options {
-            let mut opt = rusty_leveldb::Options::default();
-            opt.env = Rc::new(Box::new(WasmMemEnv(MemEnv::new())));
-            opt
+            rusty_leveldb::Options {
+                env: Rc::new(Box::new(WasmMemEnv(MemEnv::new()))),
+                ..Default::default()
+            }
         }
     }
 
@@ -538,9 +562,21 @@ pub mod wasm {
         #[wasm_bindgen(catch)]
         fn openSync(path: &str, flags: Option<JsString>, mode: Option<JsString>) -> Result<i32, JsValue>;
         #[wasm_bindgen(catch)]
-        fn readSync(fd: i32, buffer: &Uint8Array, offset: u32, length: u32, position: Option<u32>) -> Result<i32, JsValue>;
+        fn readSync(
+            fd: i32,
+            buffer: &Uint8Array,
+            offset: u32,
+            length: u32,
+            position: Option<u32>,
+        ) -> Result<i32, JsValue>;
         #[wasm_bindgen(catch)]
-        fn writeSync(fd: i32, buffer: &Uint8Array, offset: u32, length: Option<u32>, position: Option<u32>) -> Result<i32, JsValue>;
+        fn writeSync(
+            fd: i32,
+            buffer: &Uint8Array,
+            offset: u32,
+            length: Option<u32>,
+            position: Option<u32>,
+        ) -> Result<i32, JsValue>;
         #[wasm_bindgen(catch)]
         fn fsyncSync(fd: i32) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
@@ -550,8 +586,6 @@ pub mod wasm {
         #[wasm_bindgen(catch)]
         fn mkdirSync(path: &str, options: &JsValue) -> Result<JsString, JsValue>;
         #[wasm_bindgen(catch)]
-        fn rmdirSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
-        #[wasm_bindgen(catch)]
         fn rmSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
         fn readdirSync(path: &str, options: &JsValue) -> Result<Vec<JsString>, JsValue>;
@@ -559,35 +593,49 @@ pub mod wasm {
         fn renameSync(old: &str, new: &str) -> Result<(), JsValue>;
     }
 
+    /// Represents a file handle (descriptor) in NodeJS FS
     struct FileHandle(i32);
 
-    #[derive(Debug, Serialize, Deserialize)]
-    struct FsErr {
-        errno: i32,
-        syscall: Option<String>,
-        code: Option<String>,
-        path: Option<String>
-    }
-
     fn translate_fs_err(prefix: &str, value: JsValue) -> Status {
-        let err_res = serde_wasm_bindgen::from_value(value);
-        if err_res.is_err() {
-            return Status::new(StatusCode::Unknown, &format!("{prefix}: failed to deserialize error info"))
+        if value.is_undefined() || value.is_null() {
+            return Status::new(StatusCode::Unknown, &format!("{prefix}: null error info"));
         }
 
-        let err: FsErr = err_res.unwrap();
-        debug!("io error: {:?}", err);
+        let err_res = serde_wasm_bindgen::from_value(value);
+        if err_res.is_err() {
+            return Status::new(
+                StatusCode::Unknown,
+                &format!("{prefix}: failed to deserialize error info"),
+            );
+        }
 
-        if err.code.is_some() {
-            let code = err.code.unwrap();
-            let path = err.path.unwrap_or("n/a".into());
+        #[derive(Debug, Serialize, Deserialize)]
+        struct FsErr {
+            errno: Option<i32>,
+            syscall: Option<String>,
+            code: Option<String>,
+            path: Option<String>,
+        }
+
+        let deserialized_error: FsErr = err_res.unwrap();
+        debug!("io error: {:?}", deserialized_error);
+
+        if deserialized_error.code.is_some() {
+            let code = deserialized_error.code.unwrap();
+            let path = deserialized_error.path.unwrap_or("n/a".into());
             match code.as_str() {
                 "ENOENT" => Status::new(StatusCode::NotFound, &format!("{prefix}: path {path} not found")),
-                "EEXIST" => Status::new(StatusCode::AlreadyExists, &format!("{prefix}: path {path} already exists")),
-                _ => Status::new(StatusCode::Unknown, &format!("{prefix}: unknown error {code} at {path}"))
+                "EEXIST" => Status::new(
+                    StatusCode::AlreadyExists,
+                    &format!("{prefix}: path {path} already exists"),
+                ),
+                _ => Status::new(
+                    StatusCode::Unknown,
+                    &format!("{prefix}: unknown error {code} at {path}"),
+                ),
             }
         } else {
-            return Status::new(StatusCode::Unknown, &format!("{prefix}: failed without error code"))
+            Status::new(StatusCode::Unknown, &format!("{prefix}: failed without an error code"))
         }
     }
 
@@ -602,25 +650,24 @@ pub mod wasm {
         }
 
         fn read_from(&self, offset: Option<u32>, dst: &mut [u8]) -> rusty_leveldb::Result<usize> {
-            let mut ubuf = Uint8Array::new_with_length(dst.len() as u32);
-            let read = readSync(self.0, &mut ubuf, 0, dst.len() as u32, offset)
+            let ubuf = Uint8Array::new_with_length(dst.len() as u32);
+            let read = readSync(self.0, &ubuf, 0, dst.len() as u32, offset)
                 .map_err(|e| translate_fs_err("could not read", e))?;
 
-            if read > 0 {
-                ubuf.copy_to(dst);
-                Ok(read as usize)
-            } else if read == 0 {
-                Ok(0)
-            } else {
-                Err(Status::new(StatusCode::IOError, "read error"))
+            match 0.cmp(&read) {
+                Ordering::Less => {
+                    ubuf.copy_to(dst);
+                    Ok(read as usize)
+                }
+                Ordering::Equal => Ok(0),
+                Ordering::Greater => Err(Status::new(StatusCode::IOError, "read error")),
             }
         }
     }
 
     impl Read for FileHandle {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-            self.read_from(None, buf)
-                .map_err(|_| io::ErrorKind::Other.into())
+            self.read_from(None, buf).map_err(|_| io::ErrorKind::Other.into())
         }
     }
 
@@ -657,53 +704,47 @@ pub mod wasm {
         }
     }
 
+    /// Rusty LevelDB environment for FS operations realized using NodeJS' "fs" module in WASM.
+    /// This implements the `Env` trait.
     pub struct NodeJsEnv {
         locks: Arc<Mutex<HashMap<String, FileHandle>>>,
     }
 
     impl NodeJsEnv {
+        /// Create options directly with `NodeJsEnv`
         pub fn create_options() -> rusty_leveldb::Options {
-            let mut opt = rusty_leveldb::Options::default();
-            opt.env = Rc::new(Box::new(Self::new()));
-            opt
+            rusty_leveldb::Options {
+                env: Rc::new(Box::new(Self::new())),
+                ..Default::default()
+            }
         }
 
-        pub fn new() -> Self {
+        fn new() -> Self {
             Self {
-                locks: Arc::new(Mutex::new(HashMap::new()))
+                locks: Arc::new(Mutex::new(HashMap::new())),
             }
         }
     }
 
-    #[derive(Serialize, Deserialize)]
-    struct Opts {
-        recursive: bool,
-    }
-
     impl Env for NodeJsEnv {
         fn open_sequential_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Read>> {
-            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into()))
-                .map(Box::new)?)
+            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into())).map(Box::new)?)
         }
 
         fn open_random_access_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn RandomAccess>> {
-            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into()))
-                .map(Box::new)?)
+            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into())).map(Box::new)?)
         }
 
         fn open_writable_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Write>> {
-            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("w".into()))
-                .map(Box::new)?)
+            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("w".into())).map(Box::new)?)
         }
 
         fn open_appendable_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Write>> {
-            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("a".into()))
-                .map(Box::new)?)
+            Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("a".into())).map(Box::new)?)
         }
 
         fn exists(&self, p: &Path) -> rusty_leveldb::Result<bool> {
-            existsSync(p.to_str().expect("invalid path"))
-                .map_err(|e| translate_fs_err("exists error", e))
+            existsSync(p.to_str().expect("invalid path")).map_err(|e| translate_fs_err("exists error", e))
         }
 
         fn children(&self, p: &Path) -> rusty_leveldb::Result<Vec<PathBuf>> {
@@ -727,7 +768,12 @@ pub mod wasm {
         }
 
         fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            let opts = serde_wasm_bindgen::to_value(&Opts { recursive: true })
+            #[derive(Serialize, Deserialize)]
+            struct MkDirOpts {
+                recursive: bool,
+            }
+
+            let opts = serde_wasm_bindgen::to_value(&MkDirOpts { recursive: true })
                 .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
 
             if let Err(err) = mkdirSync(p.to_str().expect("invalid path"), &opts)
@@ -745,18 +791,25 @@ pub mod wasm {
         }
 
         fn rmdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
+            #[derive(Serialize, Deserialize)]
+            struct RmOpts {
+                recursive: bool,
+                force: bool,
+            }
 
-            let opts = serde_wasm_bindgen::to_value(&Opts { recursive: true })
-                .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
+            let opts = serde_wasm_bindgen::to_value(&RmOpts {
+                recursive: true,
+                force: true,
+            })
+            .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
 
-            rmdirSync(p.to_str().expect("invalid path"), &opts)
-                .map_err(|e| translate_fs_err("rmdir error", e))
+            rmSync(p.to_str().expect("invalid path"), &opts).map_err(|e| translate_fs_err("rmdir error", e))
         }
 
         fn rename(&self, old: &Path, new: &Path) -> rusty_leveldb::Result<()> {
             renameSync(
                 old.to_str().expect("invalid old path"),
-                new.to_str().expect("invalid new path")
+                new.to_str().expect("invalid new path"),
             )
             .map_err(|e| translate_fs_err("rename error", e))
         }
@@ -764,38 +817,37 @@ pub mod wasm {
         fn lock(&self, p: &Path) -> rusty_leveldb::Result<FileLock> {
             let mut locks = self.locks.lock().unwrap();
 
-            if locks.contains_key(&p.to_str().unwrap().to_string()) {
-                Err(Status::new(StatusCode::AlreadyExists, "Lock is held"))
-            } else {
+            let id = p.to_str().unwrap().to_string();
+            if let std::collections::hash_map::Entry::Vacant(e) = locks.entry(id.clone()) {
                 let lock_file = FileHandle(0);
 
                 // TODO: implement proper file locking!
 
-                locks.insert(p.to_str().unwrap().to_string(), lock_file);
-                let lock = FileLock {
-                    id: p.to_str().unwrap().to_string(),
-                };
-                Ok(lock)
+                e.insert(lock_file);
+                Ok(FileLock { id })
+            } else {
+                Err(Status::new(StatusCode::AlreadyExists, "Lock is held"))
             }
         }
 
         fn unlock(&self, l: FileLock) -> rusty_leveldb::Result<()> {
             let mut locks = self.locks.lock().unwrap();
-            if !locks.contains_key(&l.id) {
-                return Err(Status::new(
+            if locks.contains_key(&l.id) {
+                let _ = locks.remove(&l.id).unwrap();
+
+                // TODO: implement proper file locking!
+
+                Ok(())
+            } else {
+                Err(Status::new(
                     StatusCode::LockError,
                     "lock on database is already held by different process",
-                ));
-            } else {
-                let _ = locks.remove(&l.id).unwrap();
-                // TODO: implement proper file locking!
-                Ok(())
+                ))
             }
         }
 
         fn new_logger(&self, p: &Path) -> rusty_leveldb::Result<Logger> {
-            self.open_appendable_file(p)
-                .map(|dst| Logger::new(Box::new(dst)))
+            self.open_appendable_file(p).map(|dst| Logger::new(Box::new(dst)))
         }
 
         fn micros(&self) -> u64 {
@@ -806,9 +858,13 @@ pub mod wasm {
             thread::sleep(time::Duration::new(0, micros * 1000));
         }
     }
-    
+
     #[wasm_bindgen]
     pub fn test_nodejs_env(base_dir: &str) {
-        test_env(Box::new(NodeJsEnv::new()), Path::new(base_dir), utils_misc::time::wasm::current_timestamp());
+        test_env(
+            Box::new(NodeJsEnv::new()),
+            Path::new(base_dir),
+            utils_misc::time::wasm::current_timestamp(),
+        );
     }
 }
