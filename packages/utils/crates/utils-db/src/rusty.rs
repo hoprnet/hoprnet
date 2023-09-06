@@ -406,6 +406,7 @@ pub mod wasm {
     use std::sync::{Arc, Mutex};
     use js_sys::{JsString, Uint8Array};
     use rusty_leveldb::{Env, FileLock, Logger, MemEnv, RandomAccess, Status, StatusCode};
+    use serde::{Deserialize, Serialize};
     use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
     use crate::rusty::test_env;
@@ -531,27 +532,6 @@ pub mod wasm {
 
     #[wasm_bindgen(module = "fs")]
     extern "C" {
-        #[derive(Debug, Clone)]
-        pub type MakeDirectoryOptions;
-
-        #[wasm_bindgen(constructor)]
-        fn new() -> MakeDirectoryOptions;
-
-        #[wasm_bindgen(method, getter)]
-        fn recursive(this: &MakeDirectoryOptions) -> bool;
-
-        #[wasm_bindgen(method, setter)]
-        fn set_recursive(this: &MakeDirectoryOptions, value: bool);
-
-        #[wasm_bindgen(method, getter)]
-        fn mode(this: &MakeDirectoryOptions) -> JsString;
-
-        #[wasm_bindgen(method, setter)]
-        fn set_mode(this: &MakeDirectoryOptions, value: JsString);
-    }
-
-    #[wasm_bindgen(module = "fs")]
-    extern "C" {
         #[wasm_bindgen(catch)]
         fn existsSync(path: &str) -> Result<bool, JsValue>;
         #[wasm_bindgen(catch)]
@@ -567,7 +547,7 @@ pub mod wasm {
         #[wasm_bindgen(catch)]
         fn closeSync(fd: i32) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
-        fn mkdirSync(path: &str, options: &MakeDirectoryOptions) -> Result<JsString, JsValue>;
+        fn mkdirSync(path: &str, options: &JsValue) -> Result<JsString, JsValue>;
         #[wasm_bindgen(catch)]
         fn rmdirSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
@@ -716,9 +696,13 @@ pub mod wasm {
         }
 
         fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            let opts = MakeDirectoryOptions::new();
-            opts.set_mode("0o777".into());
-            opts.set_recursive(true);
+            #[derive(Serialize, Deserialize)]
+            struct Opts {
+                recursive: bool,
+                mode: String
+            }
+            let opts = serde_wasm_bindgen::to_value(&Opts { recursive: true, mode: "0o777".into() })
+                .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
 
             if let Err(e) = mkdirSync(p.to_str().expect("invalid path"), &opts).map(|_| ()) {
                 let err_str = e.as_string().unwrap_or("unknown error in mkdir".into());
