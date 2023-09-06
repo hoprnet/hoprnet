@@ -189,36 +189,8 @@ git push origin ${RELEASE_NAME}
 
 ### Merge Back
 
-1. Perform the following steps
+The process of merge back consists of bringing all the changes made in the release branch back to the master branch.
 
-```
-  git checkout master
-  git pull
-  git branch -D merge-back-release-${RELEASE_NAME}
-  git checkout release/${RELEASE_NAME}
-  git pull
-  git checkout -b merge-back-release-${RELEASE_NAME}
-  git merge master
-
-  packages=(connect core-ethereum core cover-traffic-daemon ethereum hoprd real utils)
-  for package in "${packages[@]}"; do
-    changes=$(git diff packages/$package/package.json  | grep @@ | wc -l)
-    if [ "$changes" -eq "1" ]; then
-      git checkout --theirs packages/$package/package.json
-      git add packages/$package/package.json
-    else
-      echo "Review changes manully for ./packages/$package/package.json"
-    fi
-  done
-  echo "By default to resolve the confllicts in package.json files it would be choosing for the 'Accept incomming change' option"
-  git status
-
-  git commit -m "Merge branch 'master' into merge-back-release-${RELEASE_NAME}"
-  git push --set-upstream origin merge-back-release-${RELEASE_NAME}
-  gh pr create --title "Merge back from ${RELEASE_NAME} 1" --base master -w --body "The scope of this PR is to merge back to master all the bug fixing found in release ${RELEASE_NAME}"
-```
-
-Note: In case of conflicts in any chain specific file, changes from `master` have preference
-
-2. Modify the above created PR to add reviewers, and labels accordingly.
-3. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
+1. Execute the manual workflow named [Merge Back](https://github.com/hoprnet/hoprnet/actions/workflows/merge-back.yaml)
+2. Review the new PR created by this workflow and approve it if the changes provided are correct.
+3. Remind that the release must be merged-back periodically to minimise conflicts whenever we want to merge a hotfix back to master.
