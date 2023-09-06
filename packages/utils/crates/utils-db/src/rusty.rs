@@ -398,33 +398,33 @@ pub mod wasm {
         pub type Stats;
 
         #[wasm_bindgen(method, getter)]
-        fn dev(this: &Stats) -> i64;
+        fn dev(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn ino(this: &Stats) -> i64;
+        fn ino(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn mode(this: &Stats) -> i64;
+        fn mode(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn nlink(this: &Stats) -> i64;
+        fn nlink(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn uid(this: &Stats) -> i64;
+        fn uid(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn gid(this: &Stats) -> i64;
+        fn gid(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn rdev(this: &Stats) -> i64;
+        fn rdev(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn size(this: &Stats) -> i64;
+        fn size(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn blksize(this: &Stats) -> i64;
+        fn blksize(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn blocks(this: &Stats) -> i64;
+        fn blocks(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn atimeMs(this: &Stats) -> i64;
+        fn atimeMs(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn mtimeMs(this: &Stats) -> i64;
+        fn mtimeMs(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn ctimeMs(this: &Stats) -> i64;
+        fn ctimeMs(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
-        fn birthtimeMs(this: &Stats) -> i64;
+        fn birthtimeMs(this: &Stats) -> u32;
         #[wasm_bindgen(method, getter)]
         fn atime(this: &Stats) -> js_sys::Date;
         #[wasm_bindgen(method, getter)]
@@ -438,12 +438,12 @@ pub mod wasm {
     #[wasm_bindgen(module = "fs")]
     extern "C" {
         fn existsSync(path: &str) -> bool;
-        fn openSync(path: &str, flags: Option<JsString>, mode: Option<JsString>) -> i64;
-        fn readSync(fd: i64, buffer: &Uint8Array, offset: u64, length: u32, position: Option<i64>) -> i64;
-        fn writeSync(fd: i64, buffer: &Uint8Array, offset: u64, length: Option<u32>, position: Option<i64>) -> i64;
-        fn fsyncSync(fd: i64);
-        fn fstatSync(fd: i64, options: &JsValue) -> Stats;
-        fn closeSync(fd: i64);
+        fn openSync(path: &str, flags: Option<JsString>, mode: Option<JsString>) -> i32;
+        fn readSync(fd: i32, buffer: &Uint8Array, offset: u32, length: u32, position: Option<u32>) -> i32;
+        fn writeSync(fd: i32, buffer: &Uint8Array, offset: u32, length: Option<u32>, position: Option<u32>) -> i32;
+        fn fsyncSync(fd: i32);
+        fn fstatSync(fd: i32, options: &JsValue) -> Stats;
+        fn closeSync(fd: i32);
         fn mkdirSync(path: &str) -> JsString;
         fn rmdirSync(path: &str, options: &JsValue);
         fn rmSync(path: &str, options: &JsValue);
@@ -451,7 +451,7 @@ pub mod wasm {
         fn renameSync(old: &str, new: &str);
     }
 
-    struct FileHandle(i64);
+    struct FileHandle(i32);
 
     impl FileHandle {
         pub fn open(path: &str, flags: Option<String>) -> std::io::Result<Self> {
@@ -463,7 +463,7 @@ pub mod wasm {
             }
         }
 
-        fn read_from(&self, offset: Option<i64>, dst: &mut [u8]) -> std::io::Result<usize> {
+        fn read_from(&self, offset: Option<u32>, dst: &mut [u8]) -> std::io::Result<usize> {
             let mut ubuf = Uint8Array::new_with_length(dst.len() as u32);
             let read = readSync(self.0, &mut ubuf, 0, dst.len() as u32, offset);
             if read > 0 {
@@ -503,7 +503,7 @@ pub mod wasm {
 
     impl RandomAccess for FileHandle {
         fn read_at(&self, off: usize, dst: &mut [u8]) -> rusty_leveldb::Result<usize> {
-            self.read_from(Some(off as i64), dst)
+            self.read_from(Some(off as u32), dst)
                 .map_err(rusty_leveldb::Status::from)
         }
     }
