@@ -50,7 +50,7 @@ jobs:
   tag:
     name: Tag images
     runs-on: ubuntu-latest
-    # if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
+    if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -174,33 +174,33 @@ jobs:
             "${{ github.workflow }}" "${{ github.run_id }}"
 
 # FIXME: Disabled until hoprd nodes can work in Kubernetes
-  # deploy_natted_nodes:
-  #   name: Deploy Natted nodes
-  #   runs-on: ubuntu-latest
-  #   if: needs.tag.result == 'success'
-  #   needs:
-  #     - tag
-  #   steps:
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@v3
-  
-  #     - name: "Restart deployments"
-  #       run: |
-  #         prBase="${{ github.event.pull_request.base.ref }}"
-  #         # Identify the network to deploy nodes
-  #         network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" packages/hoprd/releases.json | sed 's/_/-/')
-  #         # In case the base PR is pointing to an unknown branch/release, we deploy to the default network "rotsee"
-  #         if [ -z $network ]; then
-  #           echo "No network selected"
-  #           exit 1;
-  #         fi
-  #         echo "[INFO] Restarting deployments on ${network} from pr-${{ github.event.pull_request.number }}"
-  #         # Get list of deployments to restart
-  #         export deployments=($(kubectl get deployments -n ${network} -l hoprds.hoprnet.org/cluster=hoprd-${network} -o jsonpath="{.items[*].metadata.name}"))
-  #         for deployment in "${deployments[@]}"; do
-  #           echo "[INFO] Restarting hoprd node ${deployments}"
-  #           kubectl rollout restart deployments -n ${network} $deployment;
-  #         done
+#  deploy_natted_nodes:
+#    name: Deploy Natted nodes
+#    runs-on: ubuntu-latest
+#    if: needs.tag.result == 'success'
+#    needs:
+#      - tag
+#    steps:
+#      - name: Checkout hoprnet repository
+#        uses: actions/checkout@v3
+
+#       - name: "Restart deployments"
+#        run: |
+#          prBase="${{ github.event.pull_request.base.ref }}"
+#          # Identify the network to deploy nodes
+#          network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" packages/hoprd/releases.json | sed 's/_/-/')
+#          # In case the base PR is pointing to an unknown branch/release, we deploy to the default network "rotsee"
+#          if [ -z $network ]; then
+#            echo "No network selected"
+#            exit 1;
+#          fi
+#          echo "[INFO] Restarting deployments on ${network} from pr-${{ github.event.pull_request.number }}"
+#          # Get list of deployments to restart
+#          export deployments=($(kubectl get deployments -n ${network} -l hoprds.hoprnet.org/cluster=hoprd-${network} -o jsonpath="{.items[*].metadata.name}"))
+#          for deployment in "${deployments[@]}"; do
+#            echo "[INFO] Restarting hoprd node ${deployments}"
+#            kubectl rollout restart deployments -n ${network} $deployment;
+#          done
 
   create_release:
     name: Create Release

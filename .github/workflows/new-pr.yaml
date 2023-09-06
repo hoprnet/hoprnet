@@ -13,7 +13,7 @@ jobs:
     name: Convert to draft
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event.pull_request.draft == false && ! contains(github.author, 'github-actions')
+    if: ${{ github.event.pull_request.draft == false && ! contains(github.event.sender.login, 'github-actions') }}
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
