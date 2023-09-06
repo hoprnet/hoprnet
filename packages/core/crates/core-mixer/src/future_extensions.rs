@@ -134,9 +134,9 @@ mod tests {
 
     #[async_std::test]
     async fn fast_items() {
-        let item_1 = 0u64; // 3rd in the output
-        let item_2 = 0u64; // 1st in the output
-        let item_3 = 7u64; // 2nd in the output
+        let item_1 = 0u64;
+        let item_2 = 0u64;
+        let item_3 = 7u64;
 
         let stream = futures::stream::iter(vec![item_1, item_2, item_3]).then_concurrent(|x| async move {
             if x == 0 {
