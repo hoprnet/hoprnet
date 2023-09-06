@@ -2,7 +2,6 @@ import { default as Sqlite, type Database, Statement } from 'better-sqlite3'
 import workerpool from 'workerpool'
 
 import { debug } from '../process/index.js'
-import { u8aToHex, stringToU8a } from '../u8a/index.js'
 
 const log = debug(`hopr-core:db:worker`)
 
@@ -72,34 +71,31 @@ backend.pragma('auto_vacuum = full')
 backend.pragma('page_size = 4096')
 backend.pragma('cache_size = -4000')
 
-function put(key: Uint8Array, value: Uint8Array): void {
-    const k = u8aToHex(key)
-    backend.transaction(() => getPutStatement().run(k, u8aToHex(value)))()
+function put(key: string, value: string): void {
+    backend.transaction(() => getPutStatement().run(key, value))()
 }
 
-function get(key: Uint8Array): Uint8Array | undefined {
-    const k = u8aToHex(key)
-    const tx = backend.transaction(() => getGetStatement().get(k))
+function get(key: string): string | undefined {
+    const tx = backend.transaction(() => getGetStatement().get(key))
     const row = tx()
     if (row) {
         const value = row['value']
-        return stringToU8a(value)
+        return value
     }
     return undefined
 }
 
-function remove(key: Uint8Array): void {
-    const k = u8aToHex(key)
-    backend.transaction(() => getRemoveStatement().run(k))()
+function remove(key: string): void {
+    backend.transaction(() => getRemoveStatement().run(key))()
 }
 
 function batch(ops: Array<any>): void {
     backend.transaction(() => {
         ops.forEach((op) => {
             if (op.type === 'put') {
-                getPutStatement().run(u8aToHex(op.key), u8aToHex(op.value))
+                getPutStatement().run(op.key, op.value)
             } else if (op.type === 'del') {
-                getRemoveStatement().run(u8aToHex(op.key))
+                getRemoveStatement().run(op.key)
             } else {
                 throw new Error(`Unsupported operation type: ${JSON.stringify(op)}`)
             }
@@ -107,11 +103,10 @@ function batch(ops: Array<any>): void {
     })()
 }
 
-function iterValues(prefix: Uint8Array, _suffix: number): Uint8Array[] {
-    const k = u8aToHex(prefix)
-    const tx = backend.transaction(() => getIterStatement().all(`${k}%`))
+function iterValues(prefix: string, _suffix: number): string[] {
+    const tx = backend.transaction(() => getIterStatement().all(`${prefix}%`))
     const rows = tx()
-    return rows.map((r) => stringToU8a(r['value']))
+    return rows.map((r) => r['value'])
 }
 
 function exec(stmt: string): void {

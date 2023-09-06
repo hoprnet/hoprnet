@@ -5,33 +5,48 @@ pub mod wasm {
     use async_trait::async_trait;
     use wasm_bindgen::prelude::*;
 
+    #[wasm_bindgen]
+    extern "C" {
+        pub type QueryResults;
+
+        #[wasm_bindgen(method, catch)]
+        fn get(this: &QueryResults, pos: u32) -> Result<JsValue, JsValue>;
+
+        #[wasm_bindgen(method, catch)]
+        fn length(this: &QueryResults) -> Result<u32, JsValue>;
+    }
+
     // https://users.rust-lang.org/t/wasm-web-sys-how-to-manipulate-js-objects-from-rust/36504
     #[wasm_bindgen]
     extern "C" {
-        pub type Sqlite;
+        pub type SqliteDb;
 
         #[wasm_bindgen(method, catch)]
-        fn put(this: &Sqlite, key: Box<[u8]>, value: Box<[u8]>) -> Result<(), JsValue>;
+        async fn put(this: &SqliteDb, key: Box<[u8]>, value: Box<[u8]>) -> Result<(), JsValue>;
 
         #[wasm_bindgen(method, catch)]
-        fn get(this: &Sqlite, key: Box<[u8]>) -> Result<JsValue, JsValue>; // Option<Box<[u8]>>;
+        async fn get(this: &SqliteDb, key: Box<[u8]>) -> Result<JsValue, JsValue>; // Option<Box<[u8]>>;
 
         #[wasm_bindgen(method, catch)]
-        fn remove(this: &Sqlite, key: Box<[u8]>) -> Result<JsValue, JsValue>; // Option<Box<[u8]>>;
+        async fn remove(this: &SqliteDb, key: Box<[u8]>) -> Result<JsValue, JsValue>; // Option<Box<[u8]>>;
 
         #[wasm_bindgen(method, catch)]
-        fn batch(this: &Sqlite, operations: Vec<JsValue>) -> Result<(), JsValue>;
+        async fn batch(this: &SqliteDb, operations: Vec<JsValue>) -> Result<(), JsValue>;
 
         #[wasm_bindgen(method, catch)]
-        fn iterValues(this: &Sqlite, prefix: js_sys::Uint8Array, suffix_length: u32) -> Result<Vec<JsValue>, JsValue>;
+        async fn iterValues(
+            this: &SqliteDb,
+            prefix: js_sys::Uint8Array,
+            suffix_length: u32,
+        ) -> Result<QueryResults, JsValue>;
     }
 
     pub struct SqliteShim {
-        db: Sqlite,
+        db: SqliteDb,
     }
 
     impl SqliteShim {
-        pub fn new(db: Sqlite) -> SqliteShim {
+        pub fn new(db: SqliteDb) -> SqliteShim {
             SqliteShim { db }
         }
     }
@@ -50,14 +65,18 @@ pub mod wasm {
         type Value = Box<[u8]>;
 
         async fn get(&self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
-            match self.db.get(key.clone()) {
-                Ok(val) => Ok(if val.is_undefined() {
+            match self.db.get(key.clone()).await {
+                Ok(val) => Ok(if val.is_undefined() && val.is_null() {
                     None
                 } else {
                     let arr = js_sys::Uint8Array::from(val).to_vec().into_boxed_slice();
-                    Some(arr)
+                    if arr.is_empty() {
+                        None
+                    } else {
+                        Some(arr)
+                    }
                 }),
-                Err(e) => Err(DbError::GenericError(
+                Err(_e) => Err(DbError::GenericError(
                     "Encountered error on DB get operation".to_string(),
                 )),
             }
@@ -66,6 +85,7 @@ pub mod wasm {
         async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
             self.db
                 .put(key.clone(), value)
+                .await
                 .map(|_| None)
                 .map_err(|_| DbError::GenericError("Encountered error on DB put operation".to_string()))
         }
@@ -81,6 +101,7 @@ pub mod wasm {
         async fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
             self.db
                 .remove(key.clone())
+                .await
                 .map(|v| {
                     if v.is_undefined() {
                         None
@@ -95,10 +116,14 @@ pub mod wasm {
             return self
                 .db
                 .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
+                .await
                 .map(|v| {
-                    v.into_iter()
-                        .map(|e| js_sys::Uint8Array::from(e).to_vec().into_boxed_slice())
-                        .collect()
+                    let items = v.length().unwrap();
+                    let results: Vec<Box<[u8]>> = Vec::with_capacity(usize::try_from(items).unwrap());
+                    for n in 0..items {
+                        results.push(js_sys::Uint8Array::from(v.get(n).unwrap()).to_vec().into_boxed_slice())
+                    }
+                    results
                 })
                 .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)));
         }
@@ -125,12 +150,13 @@ pub mod wasm {
 
             self.db
                 .batch(ops)
+                .await
                 .map_err(|e| DbError::GenericError(format!("Batch operation failed to write data: {:?}", e)))
         }
     }
 
     #[wasm_bindgen]
-    pub async fn db_sanity_test(db: Sqlite) -> Result<(), JsValue> {
+    pub async fn db_sanity_test(db: SqliteDb) -> Result<(), JsValue> {
         let key_1 = "1";
         let value_1 = "abc";
         let key_2 = "2";

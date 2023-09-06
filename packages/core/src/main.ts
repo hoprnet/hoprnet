@@ -1,6 +1,6 @@
 import path from 'path'
 
-import { debug, Database, Db, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-utils'
+import { debug, Database, SqliteDb, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-utils'
 
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
@@ -22,7 +22,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  let dbBackend: Db = new Db()
+  let dbBackend: SqliteDb = new SqliteDb()
   try {
     const dbPath = path.join(options.dataPath, 'db')
     await dbBackend.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)

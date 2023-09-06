@@ -8,6 +8,7 @@ use std::{
     fmt::{Display, Formatter},
     ops::Deref,
 };
+use utils_log::debug;
 use utils_types::traits::BinarySerializable;
 
 pub struct Batch {
@@ -119,14 +120,20 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         let key: T::Key = key.into();
 
         match self.backend.get(key.into()).await {
-            Ok(Some(val)) => match bincode::deserialize(&val) {
-                Ok(deserialized) => Ok(Some(deserialized)),
-                Err(e) => Err(DbError::DeserializationError(format!(
-                    "during get operation: {}",
-                    e.to_string().as_str()
-                ))),
-            },
-            Ok(None) => Ok(None),
+            Ok(Some(val)) => {
+                debug!("GET_OR_NONE: {:?}", val);
+                match bincode::deserialize(&val) {
+                    Ok(deserialized) => Ok(Some(deserialized)),
+                    Err(e) => Err(DbError::DeserializationError(format!(
+                        "during get operation: {}",
+                        e.to_string().as_str()
+                    ))),
+                }
+            }
+            Ok(None) => {
+                debug!("GET_OR_NONE: received NONE");
+                Ok(None)
+            }
             Err(e) => Err(e),
         }
     }

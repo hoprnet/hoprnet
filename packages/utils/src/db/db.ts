@@ -5,6 +5,7 @@ import {default as workerpool, type WorkerPool}  from 'workerpool'
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { debug } from '../process/index.js'
+import { u8aToHex, stringToU8a } from '../u8a/index.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,7 +17,23 @@ const decoder = new TextDecoder()
 
 const NETWORK_KEY = encoder.encode('network_id')
 
-export class Db {
+export class QueryResults {
+  private results: Uint8Array[] = []
+
+  public push(item: Uint8Array) {
+    this.results.push(item)
+  }
+
+  public length(): number {
+    return this.results.length
+  }
+
+  public get(pos: number): Uint8Array{
+    return this.results[pos]
+  }
+}
+
+export class SqliteDb {
   private workerPool: WorkerPool
   private dbPath: string
 
@@ -97,23 +114,47 @@ export class Db {
   }
 
   public async put(key: Uint8Array, value: Uint8Array): Promise<void> {
-    await this.workerPool.exec('put', [key, value])
+    await this.workerPool.exec('put', [u8aToHex(key), u8aToHex(value)])
   }
 
   public async get(key: Uint8Array): Promise<Uint8Array | undefined> {
-    return await this.workerPool.exec('get', [key])
+    const result = await this.workerPool.exec('get', [u8aToHex(key)])
+    log("DB GET: ", u8aToHex(key), " - ", result)
+    if (result) {
+      log("DB GET: ", u8aToHex(key), " - ", stringToU8a(result))
+      return stringToU8a(result)
+    }
+    return undefined
   }
 
   public async remove(key: Uint8Array): Promise<void> {
-    await this.workerPool.exec('remove', [key])
+    await this.workerPool.exec('remove', [u8aToHex(key)])
   }
 
   public async batch(ops: Array<any>): Promise<void> {
-    await this.workerPool.exec('batch', [ops])
+    const opsConverted = ops.map((o) => {
+      const newOp = {}
+      if (o['key']) {
+        newOp['key'] = u8aToHex(o['key'])
+      }
+      if (o['value']) {
+        newOp['value'] = u8aToHex(o['value'])
+      }
+      if (o['type']) {
+        newOp['type'] = o['type'].toString()
+      }
+      return newOp
+    })
+    await this.workerPool.exec('batch', [opsConverted])
   }
 
-  public async iterValues(prefix: Uint8Array, _suffix: number): Promise<Uint8Array[]> {
-    return await this.workerPool.exec('iterValues', [prefix])
+  public async iterValues(prefix: Uint8Array, _suffix: number): Promise<QueryResults> {
+    const results = await this.workerPool.exec('iterValues', [u8aToHex(prefix)])
+    let qResults = new QueryResults()
+    for (const r of results) {
+      qResults.push(stringToU8a(r))
+    }
+    return qResults
   }
 
   public async close(): Promise<void> {

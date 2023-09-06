@@ -690,6 +690,7 @@ __metadata:
     "@types/better-sqlite3": ^7.6.4
     "@types/chai": 4.3.5
     "@types/mocha": 10.0.1
+    "@types/workerpool": ^6
     better-sqlite3: ^8.6.0
     bl: 5.1.0
     bn.js: 5.2.1
@@ -707,6 +708,7 @@ __metadata:
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
     typescript: 5.2.2
+    workerpool: ^6.4.2
   languageName: unknown
   linkType: soft
 
@@ -2088,6 +2090,15 @@ __metadata:
   version: 9.0.2
   resolution: "@types/uuid@npm:9.0.2"
   checksum: 1754bcf3444e1e3aeadd6e774fc328eb53bc956665e2e8fb6ec127aa8e1f43d9a224c3d22a9a6233dca8dd81a12dc7fed4d84b8876dd5ec82d40f574f7ff8b68
+  languageName: node
+  linkType: hard
+
+"@types/workerpool@npm:^6":
+  version: 6.4.1
+  resolution: "@types/workerpool@npm:6.4.1"
+  dependencies:
+    "@types/node": "*"
+  checksum: 2867b64a6dfd474325a4022e272c25c6bc62f789610ff5a297970263c0ba0473a4f472976ae9ce1c69784ca73d02e41602fb4936cd84a5c85dba6d9145c1f1d9
   languageName: node
   linkType: hard
 
@@ -9077,6 +9088,13 @@ __metadata:
   version: 6.2.1
   resolution: "workerpool@npm:6.2.1"
   checksum: c2c6eebbc5225f10f758d599a5c016fa04798bcc44e4c1dffb34050cd361d7be2e97891aa44419e7afe647b1f767b1dc0b85a5e046c409d890163f655028b09d
+  languageName: node
+  linkType: hard
+
+"workerpool@npm:^6.4.2":
+  version: 6.4.2
+  resolution: "workerpool@npm:6.4.2"
+  checksum: 7ff589dfcfb81aeb253acc2f07c0622b5b497c3e7c89f330848ec79f0549f2659301197b047fcb78ff653b4e784d98dfb149dec25b77ff86659fb071e509b4da
   languageName: node
   linkType: hard
 
