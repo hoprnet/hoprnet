@@ -191,7 +191,7 @@ mod tests {
 
         let mut mock = MockHeartbeatExternalApi::new();
         mock.expect_get_peers()
-            .times(expected_loop_count)
+            .times(expected_loop_count..)
             .return_const(vec![PeerId::random(), PeerId::random()]);
 
         let mut heartbeat = Heartbeat::new(config, DelayingPinger { delay: ping_delay }, mock);
@@ -215,7 +215,7 @@ mod tests {
 
         let mut mock = MockHeartbeatExternalApi::new();
         mock.expect_get_peers()
-            .times(expected_loop_count)
+            .times(expected_loop_count..)
             .return_const(vec![PeerId::random(), PeerId::random()]);
 
         let mut heartbeat = Heartbeat::new(config.clone(), DelayingPinger { delay: ping_delay }, mock);
