@@ -20,13 +20,15 @@ pub fn serialize_to_bytes<S: Serialize + BinarySerializable>(s: &S) -> Result<Ve
     // bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
 }
 
-impl Batch {
-    pub fn new() -> Self {
+impl Default for Batch {
+    fn default() -> Self {
         Self {
             ops: Vec::with_capacity(10),
         }
     }
+}
 
+impl Batch {
     pub fn put<U: Serialize>(&mut self, key: Key, value: U) {
         let key: Box<[u8]> = key.into();
         let value: Box<[u8]> = bincode::serialize(&value).unwrap().into_boxed_slice();
