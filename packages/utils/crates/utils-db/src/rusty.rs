@@ -529,10 +529,25 @@ pub mod wasm {
         fn birthtime(this: &Stats) -> js_sys::Date;
     }
 
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct MkdirOpts {
-        pub recursive: bool,
-        pub mode: JsString
+    #[wasm_bindgen(module = "fs")]
+    extern "C" {
+        #[derive(Debug, Clone)]
+        pub type MakeDirectoryOptions;
+
+        #[wasm_bindgen(constructor)]
+        fn new() -> MakeDirectoryOptions;
+
+        #[wasm_bindgen(method, getter)]
+        fn recursive(this: &MakeDirectoryOptions) -> bool;
+
+        #[wasm_bindgen(method, setter)]
+        fn set_recursive(this: &MakeDirectoryOptions, value: bool);
+
+        #[wasm_bindgen(method, getter)]
+        fn mode(this: &MakeDirectoryOptions) -> JsString;
+
+        #[wasm_bindgen(method, setter)]
+        fn set_mode(this: &MakeDirectoryOptions, value: JsString);
     }
 
     #[wasm_bindgen(module = "fs")]
@@ -552,7 +567,7 @@ pub mod wasm {
         #[wasm_bindgen(catch)]
         fn closeSync(fd: i32) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
-        fn mkdirSync(path: &str, options: &JsValue) -> Result<JsString, JsValue>;
+        fn mkdirSync(path: &str, options: &MakeDirectoryOptions) -> Result<JsString, JsValue>;
         #[wasm_bindgen(catch)]
         fn rmdirSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
@@ -701,11 +716,11 @@ pub mod wasm {
         }
 
         fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            let opts = MkdirOpts {
-                recursive: true,
-                mode: "0o777".into()
-            };
-            if let Err(e) = mkdirSync(p.to_str().expect("invalid path"), &JsValue::from(opts)).map(|_| ()) {
+            let opts = MakeDirectoryOptions::new();
+            opts.set_mode("0o777".into());
+            opts.set_recursive(true);
+
+            if let Err(e) = mkdirSync(p.to_str().expect("invalid path"), &opts).map(|_| ()) {
                 let err_str = e.as_string().unwrap_or("unknown error in mkdir".into());
                 if err_str.contains("EEXIST") { // don't fail if path already exists
                     Ok(())
