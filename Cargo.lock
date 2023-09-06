@@ -5210,7 +5210,7 @@ dependencies = [
 [[package]]
 name = "rusty-leveldb"
 version = "2.0.0"
-source = "git+https://github.com/NumberFour8/leveldb-rs?branch=feature/no-fs#d044a61ed1530962e36f6a51575033ac621d627a"
+source = "git+https://github.com/hoprnet/leveldb-rs?branch=feature/no-fs#d044a61ed1530962e36f6a51575033ac621d627a"
 dependencies = [
  "crc",
  "integer-encoding",

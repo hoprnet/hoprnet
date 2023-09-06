@@ -112,7 +112,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
             .unwrap()
             .put(&key, &value)
             .map(|_| None)
-            .map_err(|e| DbError::GenericError(e.err))
+            .map_err(|e| DbError::GenericError(e.to_string()))
     }
 
     async fn contains(&self, key: Self::Key) -> crate::errors::Result<bool> {
@@ -125,7 +125,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
             .unwrap()
             .delete(&key)
             .map(|_| None)
-            .map_err(|e| DbError::GenericError(e.err))
+            .map_err(|e| DbError::GenericError(e.to_string()))
     }
 
     async fn dump(&self, _destination: String) -> crate::errors::Result<()> {

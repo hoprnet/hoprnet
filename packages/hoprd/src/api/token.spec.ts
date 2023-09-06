@@ -25,8 +25,6 @@ describe('authentication token', function () {
 
   beforeEach(async function () {
     node = sinon.fake() as any
-    //let db = new LevelDb()
-    //await db.backend.open()
     node.db = Database.new_in_memory( ALICE_ETHEREUM_ADDR.clone())
   })
 
@@ -220,8 +218,6 @@ describe('authentication token authorization', function () {
 
   before(async function () {
     node = sinon.fake() as any
-    /*let db = new LevelDb()
-    await db.backend.open()*/
     node.db = Database.new_in_memory( ALICE_ETHEREUM_ADDR.clone())
   })
 

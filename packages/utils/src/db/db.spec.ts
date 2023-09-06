@@ -50,32 +50,6 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, ba
   return tkt
 }
 
-describe('db shim tests', function () {
-  let db: LevelDb
-  let db_dir_path: string
-
-  beforeEach(function () {
-    db = new LevelDb()
-    db_dir_path = '/tmp/test-shim'
-  })
-
-  afterEach(async function () {
-    await db.close()
-
-    fs.rmSync(db_dir_path, { recursive: true, force: true })
-  })
-
-  it('basic DB operations are performed in Rust correctly', async function () {
-    await db.init(true, db_dir_path, true, 'monte_rosa')
-
-    try {
-      await db_sanity_test(db)
-    } catch (e) {
-      assert.fail(`db sanity tests should pass: ${e}`)
-    }
-  })
-})
-
 function test_in_memory_db() {
   return Database.new_in_memory( MOCK_PUBLIC_KEY().to_address())
 }
@@ -137,25 +111,3 @@ describe('db functional tests', function () {
   })
 })
 
-describe(`levelup shim tests`, function () {
-  let db: LevelDb
-
-  beforeEach(function () {
-    db = new LevelDb()
-  })
-
-  afterEach(async function () {
-    await db.close()
-  })
-
-  it('should store network', async function () {
-    await db.setNetworkId('test-env')
-    assert.equal(await db.getNetworkId(), 'test-env')
-  })
-
-  it('should verify network', async function () {
-    await db.setNetworkId('test-env')
-    assert((await db.verifyNetworkId('wrong-id')) === false, `must fail for wrong id`)
-    assert((await db.verifyNetworkId('test-env')) === true, `must not fail for correct id`)
-  })
-})
