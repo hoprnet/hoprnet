@@ -26,12 +26,19 @@ jobs:
           ref: master
 
       - name: Merge back
-        id: merge
+
         run: |
+          set -x
           git fetch
           git checkout release/${{ github.event.inputs.release_name }}
           git checkout -b merge-back-release-${{ github.event.inputs.release_name }}
-          git merge master --no-commit --no-edit
+          git merge master > /tmp/merge.log || true
+          conflicts=$(grep "CONFLICT" /tmp/merge.log | grep -v package.json | wc -l)
+          if [[ "$conflicts" -gt "0" ]];
+          then
+            echo "There are conflicts in source code files"
+            echo "exit 1"
+          fi
           packages=(connect core-ethereum core hoprd real utils)
           for package in "${packages[@]}"; do
             if [ `git diff packages/$package/package.json | wc -l` -gt "0" ]; then 
@@ -44,21 +51,10 @@ jobs:
               fi
             fi
           done
-          git merge --continue --no-edit
+          git commit -am "Merge branch 'master' into merge-back-release-${RELEASE_NAME}"
+          git push --set-upstream origin merge-back-release-${RELEASE_NAME}
           today=`date +%Y-%m-%d`
-          echo "today=${today}" >> $GITHUB_OUTPUT
+          gh pr create --title "Merge back from ${RELEASE_NAME} - ${today}" --base master --label merge-back --assignee ${{ github.actor }} --reviewer hoprnet/hopr-development --body "The scope of this PR is to merge back to master all the bug fixing found in release ${RELEASE_NAME}"
+
         env:
           GH_TOKEN: ${{ github.token }}
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-            commit-message: "Merge Back ${{ steps.merge.outputs.today }}"
-            title: "Merge Back ${{ steps.merge.outputs.today }}"
-            body: "This PR merge back the changes made in ${{ github.event.inputs.release_name }} to master"
-            branch: merge-back-release-${{ github.event.inputs.release_name }}
-            delete-branch: true
-            labels: merge-back
-            assignees: ${{ github.actor }}
-            team-reviewers: hoprnet/hopr-development
-

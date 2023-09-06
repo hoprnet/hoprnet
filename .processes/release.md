@@ -24,6 +24,7 @@ The purpose of this document is to streamline the releases of hoprd.
 ## Release Types
 
 The following types of releases describe the different characteristics that they have:
+
 - A release can be _Internal release_ or _Public release_
 - A release can be deadline based or not
 
@@ -162,13 +163,14 @@ The process of closing a release consists of building, tagging and publishing th
 2. Execute the manual workflow named [Close Release](https://github.com/hoprnet/hoprnet/actions/workflows/close-release.yaml) selecting the branch where you want to close it.
 3. A new PR will be created with the name `Close release <RELEASE_NUMBER>`. Follow the instructions on the PR until merge it.
 4. Review the contents of the new [Github Release](https://github.com/hoprnet/hoprnet/releases) created and modify accordingly
-5. Share the links to the  Github release and testnet wiki page in the `#release` Element channel.
+5. Share the links to the Github release and testnet wiki page in the `#release` Element channel.
 
 ### Promote release
 
 The process of promoting the named release (bratislava, providence, etc) consists of creating or updating a given ${RELEASE_NAME} tag and artifacts to the newly closed released. This process should be executed after the closure of release.
 
 1. Update the named release
+
 ```
 echo RELEASE_NAME=providence
 echo RELEASE_NUMBER=2.0.0-rc.3
@@ -188,6 +190,7 @@ git push origin ${RELEASE_NAME}
 ### Merge Back
 
 1. Perform the following steps
+
 ```
   git checkout master
   git pull
@@ -214,7 +217,8 @@ git push origin ${RELEASE_NAME}
   git push --set-upstream origin merge-back-release-${RELEASE_NAME}
   gh pr create --title "Merge back from ${RELEASE_NAME} 1" --base master -w --body "The scope of this PR is to merge back to master all the bug fixing found in release ${RELEASE_NAME}"
 ```
-Note: In case of conflicts in any chain specific file, changes from `master` have preference 
 
-2. Modify the above created PR to add reviewers, and labels accordingly. 
+Note: In case of conflicts in any chain specific file, changes from `master` have preference
+
+2. Modify the above created PR to add reviewers, and labels accordingly.
 3. Remind that the release must be merged-back every week (Friday) to minimise conflicts whenever we want to merge a hotfix back to master.
