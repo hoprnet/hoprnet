@@ -561,33 +561,50 @@ pub mod wasm {
 
     struct FileHandle(i32);
 
+    #[derive(Debug, Serialize, Deserialize)]
+    struct FsErr {
+        errno: i32,
+        syscall: Option<String>,
+        code: Option<String>,
+        path: Option<String>
+    }
+
+    fn translate_fs_err(prefix: &str, value: JsValue) -> Status {
+        let err_res = serde_wasm_bindgen::from_value(value);
+        if err_res.is_err() {
+            return Status::new(StatusCode::Unknown, &format!("{prefix}: failed to deserialize error info"))
+        }
+
+        let err: FsErr = err_res.unwrap();
+        debug!("io error: {:?}", err);
+
+        if err.code.is_some() {
+            let code = err.code.unwrap();
+            let path = err.path.unwrap_or("n/a".into());
+            match code.as_str() {
+                "ENOENT" => Status::new(StatusCode::NotFound, &format!("{prefix}: path {path} not found")),
+                "EEXIST" => Status::new(StatusCode::AlreadyExists, &format!("{prefix}: path {path} already exists")),
+                _ => Status::new(StatusCode::Unknown, &format!("{prefix}: unknown error {code} at {path}"))
+            }
+        } else {
+            return Status::new(StatusCode::Unknown, &format!("{prefix}: failed without error code"))
+        }
+    }
+
     impl FileHandle {
         pub fn open(path: &str, flags: Option<String>) -> rusty_leveldb::Result<Self> {
-            match openSync(path, flags.map(JsString::from), None) {
-                Ok(fd) => {
-                    if fd >= 0 {
-                        Ok(Self(fd))
-                    } else {
-                        debug!("file {path} could not be opened: -1");
-                        Err(Status::new(StatusCode::IOError, &format!("could not open file {path}")))
-                    }
-                },
-                Err(err) => {
-                    let err_str = err.as_string().unwrap_or("unknown error in open".into());
-                    debug!("file {path} could not be opened: {err_str}");
-                    if err_str.contains("ENOENT") {
-                        Err(Status::new(StatusCode::NotFound, &format!("file not found {path}")))
-                    } else {
-                        Err(Status::new(StatusCode::IOError, &format!("could not open file {path}: {err_str}")))
-                    }
-                },
-            }
+            openSync(path, flags.map(JsString::from), None)
+                .map_err(|e| translate_fs_err("could not open file", e))
+                .map(|fd| {
+                    assert!(fd >= 0, "negative fd");
+                    Self(fd)
+                })
         }
 
         fn read_from(&self, offset: Option<u32>, dst: &mut [u8]) -> rusty_leveldb::Result<usize> {
             let mut ubuf = Uint8Array::new_with_length(dst.len() as u32);
             let read = readSync(self.0, &mut ubuf, 0, dst.len() as u32, offset)
-                .map_err(|v| Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in read".into())))?;
+                .map_err(|e| translate_fs_err("could not read", e))?;
 
             if read > 0 {
                 ubuf.copy_to(dst);
@@ -666,36 +683,32 @@ pub mod wasm {
     impl Env for NodeJsEnv {
         fn open_sequential_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Read>> {
             Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into()))
-                .map(Box::new)
-                .map_err(rusty_leveldb::Status::from)?)
+                .map(Box::new)?)
         }
 
         fn open_random_access_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn RandomAccess>> {
             Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("r".into()))
-                .map(Box::new)
-                .map_err(rusty_leveldb::Status::from)?)
+                .map(Box::new)?)
         }
 
         fn open_writable_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Write>> {
             Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("w".into()))
-                .map(Box::new)
-                .map_err(rusty_leveldb::Status::from)?)
+                .map(Box::new)?)
         }
 
         fn open_appendable_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn Write>> {
             Ok(FileHandle::open(p.to_str().expect("invalid path"), Some("a".into()))
-                .map(Box::new)
-                .map_err(rusty_leveldb::Status::from)?)
+                .map(Box::new)?)
         }
 
         fn exists(&self, p: &Path) -> rusty_leveldb::Result<bool> {
             existsSync(p.to_str().expect("invalid path"))
-                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in exists".into())))
+                .map_err(|e| translate_fs_err("exists error", e))
         }
 
         fn children(&self, p: &Path) -> rusty_leveldb::Result<Vec<PathBuf>> {
             Ok(readdirSync(p.to_str().expect("invalid path"), &JsValue::undefined())
-                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in readdir".into())))?
+                .map_err(|e| translate_fs_err("readdir error", e))?
                 .into_iter()
                 .map(|s| PathBuf::from(s.as_string().expect("invalid path buf")))
                 .collect())
@@ -705,24 +718,26 @@ pub mod wasm {
             let fh = FileHandle::open(p.to_str().expect("invalid file path"), Some("r".into()))?;
             fstatSync(fh.0, &JsValue::undefined())
                 .map(|s| s.size() as usize)
-                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in delete".into())))
+                .map_err(|e| translate_fs_err("fstat error", e))
         }
 
         fn delete(&self, p: &Path) -> rusty_leveldb::Result<()> {
             rmSync(p.to_str().expect("invalid path"), &JsValue::undefined())
-                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in delete".into())))
+                .map_err(|e| translate_fs_err("delete error", e))
         }
 
         fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
             let opts = serde_wasm_bindgen::to_value(&Opts { recursive: true })
                 .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
 
-            if let Err(e) = mkdirSync(p.to_str().expect("invalid path"), &opts).map(|_| ()) {
-                let err_str = e.as_string().unwrap_or("unknown error in mkdir".into());
-                if err_str.contains("EEXIST") { // don't fail if path already exists
+            if let Err(err) = mkdirSync(p.to_str().expect("invalid path"), &opts)
+                .map(|_| ())
+                .map_err(|e| translate_fs_err("mkdir error", e))
+            {
+                if err.code == StatusCode::AlreadyExists {
                     Ok(())
                 } else {
-                    Err(Status::new(StatusCode::IOError, &err_str))
+                    Err(err)
                 }
             } else {
                 Ok(())
@@ -735,7 +750,7 @@ pub mod wasm {
                 .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
 
             rmdirSync(p.to_str().expect("invalid path"), &opts)
-                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in rmdir".into())))
+                .map_err(|e| translate_fs_err("rmdir error", e))
         }
 
         fn rename(&self, old: &Path, new: &Path) -> rusty_leveldb::Result<()> {
@@ -743,7 +758,7 @@ pub mod wasm {
                 old.to_str().expect("invalid old path"),
                 new.to_str().expect("invalid new path")
             )
-            .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in rename".into())))
+            .map_err(|e| translate_fs_err("rename error", e))
         }
 
         fn lock(&self, p: &Path) -> rusty_leveldb::Result<FileLock> {

@@ -32,7 +32,6 @@ const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F6
 import { LevelDb } from './db.js'
 import { db_sanity_test, test_nodejs_env, hoprd_hoprd_initialize_crate } from '../../../hoprd/lib//hoprd_hoprd.js'
 hoprd_hoprd_initialize_crate()
-import fs from 'fs'
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
   let chainKp = new ChainKeypair(signerPrivKey)
