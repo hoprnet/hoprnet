@@ -40,19 +40,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: "Update to build version"
-        if: ${{ ! contains(github.event.pull_request.labels.*.name, 'release') }}
+      - name: "Update version"
         run: |
-          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
-          ./scripts/bump-version.sh ${next_version}
-          docker_tag=$(echo "${next_version}" | sed 's/+/-/')
-          echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
+          if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
+            docker_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
+          else
+            next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
+            ./scripts/bump-version.sh ${next_version}
+            docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV            
+          fi
 
-      - name: "Use release version"
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'release') }}
-        run: |
-          docker_tag=$(jq -r '.version' packages/hoprd/package.json)
-          echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
+      # - name: "Update to build version"
+      #   if: ${{ ! contains(github.event.pull_request.labels.*.name, 'release') }}
+      #   run: |
+      #     next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
+      #     ./scripts/bump-version.sh ${next_version}
+      #     docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+      #     echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
+
+      # - name: "Use release version"
+      #   if: ${{ contains(github.event.pull_request.labels.*.name, 'release') }}
+      #   run: |
+      #     docker_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
+      #     echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
 
       - name: Build and push docker image
         uses: docker/build-push-action@v4
