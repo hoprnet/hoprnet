@@ -21,14 +21,14 @@ jobs:
         id: template
         run: |
           current_version=$(jq -r '.version' packages/hoprd/package.json)
+          echo "current_version=${current_version}" >> $GITHUB_OUTPUT
           # Choose the template file
           if [[ "${{ github.ref_name }}" = "master" ]] && [[ ${current_version} == *"-rc.1" ]]
           then 
             echo "pr_template=pr-close-release.md" >> $GITHUB_OUTPUT
           else
             echo "pr_template=pr-close-patch.md" >> $GITHUB_OUTPUT
-          fi
-          echo "current_version=${current_version}" >> $GITHUB_OUTPUT
+          fi          
           milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${current_version}"  ' to_entries[] | select(.value.title | test($version)).value.number')
           ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog-${current_version}.md
 
@@ -45,6 +45,5 @@ jobs:
             delete-branch: true
             labels: release
             assignees: ${{ github.actor }}
-            #reviewers: hopr-version-bot
             team-reviewers: hoprnet/hopr-development
 

@@ -63,7 +63,6 @@ jobs:
             branch: feature/create-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
             delete-branch: true
             assignees: ${{ github.actor }}
-            # reviewers: hopr-version-bot
             team-reviewers: hoprnet/hopr-development
 
       - name: Enable Auto Merge
