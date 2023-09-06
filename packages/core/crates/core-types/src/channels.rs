@@ -193,7 +193,7 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 }
 
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ticket {
     pub channel_id: Hash,
     pub amount: Balance,
@@ -203,6 +203,18 @@ pub struct Ticket {
     pub channel_epoch: u32,
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
+}
+
+impl PartialOrd for Ticket {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.index.partial_cmp(&other.index)
+    }
+}
+
+impl Ord for Ticket {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.index.cmp(&other.index)
+    }
 }
 
 impl Default for Ticket {

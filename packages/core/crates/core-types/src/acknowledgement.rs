@@ -82,12 +82,24 @@ impl BinarySerializable for Acknowledgement {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     pub ticket: Ticket,
     pub response: Response,
     pub vrf_params: VrfParameters,
     pub signer: Address,
+}
+
+impl PartialOrd for AcknowledgedTicket {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.ticket.partial_cmp(&other.ticket)
+    }
+}
+
+impl Ord for AcknowledgedTicket {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.ticket.cmp(&other.ticket)
+    }
 }
 
 impl AcknowledgedTicket {

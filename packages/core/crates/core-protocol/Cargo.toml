@@ -33,10 +33,13 @@ wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
+core-crypto = { workspace = true }
 core-mixer = { workspace = true }
 core-ethereum-db = { workspace = true }
 core-types = { workspace = true }
+utils-db = { workspace = true }
 utils-log = { workspace = true }
+utils-types = { workspace = true }
 
 [dev-dependencies]
 more-asserts = "0.3.1"

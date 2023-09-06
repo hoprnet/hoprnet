@@ -10,7 +10,7 @@ use digest::Digest;
 use generic_array::{ArrayLength, GenericArray};
 use sha2::Sha512;
 use subtle::{Choice, ConstantTimeEq};
-use utils_types::traits::BinarySerializable;
+use utils_types::{primitives::Address, traits::BinarySerializable};
 use zeroize::ZeroizeOnDrop;
 
 /// Represents a generic key pair
@@ -151,6 +151,12 @@ impl ConstantTimeEq for ChainKeypair {
 impl From<&ChainKeypair> for k256::Scalar {
     fn from(value: &ChainKeypair) -> Self {
         k256::Scalar::from_bytes(value.0.as_ref()).unwrap()
+    }
+}
+
+impl From<&ChainKeypair> for Address {
+    fn from(value: &ChainKeypair) -> Self {
+        value.public().to_address()
     }
 }
 

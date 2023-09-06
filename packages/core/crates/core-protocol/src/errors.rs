@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use utils_db::errors::DbError;
+
 #[derive(Error, Debug, PartialEq)]
 pub enum ProtocolError {
     #[error("tx queue is full, retry later")]
@@ -7,6 +9,9 @@ pub enum ProtocolError {
 
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),
+
+    #[error("db error {0}")]
+    DbError(#[from] DbError),
 
     #[error("Failed to notify an external process: {0}")]
     Notification(String),
