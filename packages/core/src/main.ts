@@ -4,6 +4,8 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Hopr, type HoprOptions } from './index.js'
 import { getContractData } from './network.js'
+import path from 'path'
+import { mkdir, rm } from 'fs/promises'
 
 const log = debug(`hopr-core:create-hopr`)
 
@@ -20,25 +22,16 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  /*let levelDb = new LevelDb()
 
-  try {
-    const dbPath = path.join(options.dataPath, 'db')
-    await levelDb.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)
+  const dbPath = path.join(options.dataPath, 'db')
+  if (options.createDbIfNotExist) {
+    log('force create - wipe old database and create a new')
+    await rm(dbPath, { recursive: true, force: true })
+    await mkdir(dbPath, { recursive: true })
+  }
+  let db = new Database(dbPath.toString(), chainKeypair.public().to_address())
 
-    // Dump entire database to a file if given by the env variable
-    const dump_file = process.env.DB_DUMP ?? ''
-    if (dump_file.length > 0) {
-      await levelDb.dump(dump_file)
-    }
-  } catch (err: unknown) {
-    log(`failed init db:`, err)
-    throw err
-  }*/
-
-  // TODO: change this
-  //let db = new Database(dbPath.toString(), chainKeypair.public().to_address())
-  let db = Database.new_in_memory(chainKeypair.public().to_address());
+  //let db = Database.new_in_memory(chainKeypair.public().to_address());
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = options.safeModule.safeAddress
