@@ -29,8 +29,9 @@ const MOCK_PUBLIC_KEY = () =>
 
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
+import { rmSync } from 'fs'
+
 import { test_nodejs_env, hoprd_hoprd_initialize_crate } from '../../../hoprd/lib//hoprd_hoprd.js'
-import { rmdirSync } from 'fs'
 hoprd_hoprd_initialize_crate()
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
@@ -102,7 +103,7 @@ describe('db functional tests', function () {
   })
 
   it('test db creation and simple set', async function () {
-    rmdirSync('/tmp/test', {})
+    rmSync('/tmp/test', { force: true, recursive: true })
 
     let db = new Database('/tmp/test', MOCK_PUBLIC_KEY().to_address())
     let balance_1 = new Balance('100', BalanceType.HOPR)

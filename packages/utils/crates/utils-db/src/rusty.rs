@@ -1,14 +1,11 @@
 use async_trait::async_trait;
 use std::cmp::Ordering;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
 use futures_lite::stream::iter;
-use hex_literal::hex;
 use rusty_leveldb::{DBIterator, Env, LdbIterator, StatusCode, WriteBatch};
-use utils_log::debug;
 
 struct RustyLevelDbIterator {
     iter: DBIterator,
@@ -171,30 +168,30 @@ impl AsyncKVStorage for RustyLevelDbShim {
 }
 
 #[cfg(any(feature = "wasm", test))]
-fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
-    debug!("test #1");
+fn test_env(env: Box<dyn Env>, base: &std::path::Path, ts: u64) {
+    utils_log::debug!("test #1");
     let test_dir = base.join(format!("test_dir_{0}", ts));
     env.mkdir(&test_dir).expect("could not create dir");
 
-    debug!("test #2");
+    utils_log::debug!("test #2");
     let test_file = test_dir.join("test_file");
     assert!(
         !env.exists(&test_file).expect("could not check file existence 1"),
         "file should not exist before creation"
     );
 
-    debug!("test #3");
-    let data = hex!("deadbeefcafebabe");
+    utils_log::debug!("test #3");
+    let data = hex_literal::hex!("deadbeefcafebabe");
 
     {
-        debug!("test #4");
+        utils_log::debug!("test #4");
         let mut f = env.open_writable_file(&test_file).expect("could not open file 1");
         let len = f.write(&data).expect("could not write to a file");
         assert_eq!(data.len(), len, "writting invalid number of bytes");
     }
 
     {
-        debug!("test #5");
+        utils_log::debug!("test #5");
         assert!(
             env.exists(&test_file).expect("could not check file existence 3"),
             "file should exist"
@@ -207,50 +204,50 @@ fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
     }
 
     {
-        debug!("test #6");
+        utils_log::debug!("test #6");
         let mut f = env.open_appendable_file(&test_file).expect("could not open file 3");
         let len = f.write(&data).expect("appendable write failed");
         assert_eq!(data.len(), len, "could not write all bytes to the file");
     }
 
     {
-        debug!("test #7");
+        utils_log::debug!("test #7");
         let len = env.size_of(&test_file).expect("could not get file size");
         assert_eq!(data.len() * 2, len, "file should have twice the length after appending");
     }
 
     {
-        debug!("test #8");
+        utils_log::debug!("test #8");
         let f = env.open_random_access_file(&test_file).expect("could not open file 4");
         let mut buf = [0; 8];
         let len = f.read_at(4, &mut buf).expect("could not read file at 1");
         assert_eq!(len, buf.len(), "could not read all bytes 3");
-        assert_eq!(hex!("cafebabedeadbeef"), buf);
+        assert_eq!(hex_literal::hex!("cafebabedeadbeef"), buf);
 
         let mut buf = [0; 4];
         let len = f.read_at(4, &mut buf).expect("could not read file at 2");
         assert_eq!(len, buf.len(), "could not read all bytes 4");
-        assert_eq!(hex!("cafebabe"), buf, "mismatch random access read bytes 1");
+        assert_eq!(hex_literal::hex!("cafebabe"), buf, "mismatch random access read bytes 1");
 
         let mut buf = [0; 4];
         let len = f.read_at(2, &mut buf).expect("could not read file at 4");
         assert_eq!(len, buf.len(), "could not read all bytes 6");
-        assert_eq!(hex!("beefcafe"), buf, "mismatch random access read bytes 2");
+        assert_eq!(hex_literal::hex!("beefcafe"), buf, "mismatch random access read bytes 2");
     }
 
     {
-        debug!("test #9");
+        utils_log::debug!("test #9");
         let children = env.children(&test_dir).expect("cannot retrieve children of test dir");
         assert_eq!(children.len(), 1, "contains more children");
         assert!(
-            children.contains(&PathBuf::from("test_file".to_string())),
+            children.contains(&std::path::PathBuf::from("test_file".to_string())),
             "children do not contain test file"
         );
     }
 
     let new_file = test_dir.join("new_file");
     {
-        debug!("test #10");
+        utils_log::debug!("test #10");
         env.rename(&test_file, &new_file).expect("rename must not fail");
         assert!(
             !env.exists(&test_file).expect("failed to check existence after rename"),
@@ -263,7 +260,7 @@ fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
     }
 
     {
-        debug!("test #11");
+        utils_log::debug!("test #11");
         env.delete(&new_file).expect("could not delete file");
         assert!(
             !env.exists(&new_file).expect("failed to check existence after deletion"),
@@ -272,7 +269,7 @@ fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
     }
 
     {
-        debug!("test #12");
+        utils_log::debug!("test #12");
         let _ = env.rmdir(&test_dir); // cannot be tested with MemEnv
     }
 }
@@ -428,7 +425,6 @@ pub mod wasm {
     use std::rc::Rc;
     use std::sync::{Arc, Mutex};
     use std::{io, thread, time};
-    use utils_log::debug;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
@@ -451,7 +447,7 @@ pub mod wasm {
             self.0.open_sequential_file(p)
         }
 
-        fn open_random_access_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn rusty_leveldb::RandomAccess>> {
+        fn open_random_access_file(&self, p: &Path) -> rusty_leveldb::Result<Box<dyn RandomAccess>> {
             self.0.open_random_access_file(p)
         }
 
@@ -514,49 +510,6 @@ pub mod wasm {
 
     #[wasm_bindgen(module = "fs")]
     extern "C" {
-        #[derive(Debug, Clone)]
-        pub type Stats;
-
-        #[wasm_bindgen(method, getter)]
-        fn dev(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn ino(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn mode(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn nlink(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn uid(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn gid(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn rdev(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn size(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn blksize(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn blocks(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn atimeMs(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn mtimeMs(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn ctimeMs(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn birthtimeMs(this: &Stats) -> u32;
-        #[wasm_bindgen(method, getter)]
-        fn atime(this: &Stats) -> js_sys::Date;
-        #[wasm_bindgen(method, getter)]
-        fn mtime(this: &Stats) -> js_sys::Date;
-        #[wasm_bindgen(method, getter)]
-        fn ctime(this: &Stats) -> js_sys::Date;
-        #[wasm_bindgen(method, getter)]
-        fn birthtime(this: &Stats) -> js_sys::Date;
-    }
-
-    #[wasm_bindgen(module = "fs")]
-    extern "C" {
         #[wasm_bindgen(catch)]
         fn existsSync(path: &str) -> Result<bool, JsValue>;
         #[wasm_bindgen(catch)]
@@ -580,7 +533,7 @@ pub mod wasm {
         #[wasm_bindgen(catch)]
         fn fsyncSync(fd: i32) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
-        fn fstatSync(fd: i32, options: &JsValue) -> Result<Stats, JsValue>;
+        fn fstatSync(fd: i32, options: &JsValue) -> Result<JsValue, JsValue>;
         #[wasm_bindgen(catch)]
         fn closeSync(fd: i32) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
@@ -618,7 +571,7 @@ pub mod wasm {
         }
 
         let deserialized_error: FsErr = err_res.unwrap();
-        debug!("io error: {:?}", deserialized_error);
+        utils_log::debug!("io error: {:?}", deserialized_error);
 
         if deserialized_error.code.is_some() {
             let code = deserialized_error.code.unwrap();
@@ -756,10 +709,17 @@ pub mod wasm {
         }
 
         fn size_of(&self, p: &Path) -> rusty_leveldb::Result<usize> {
+            #[derive(Serialize, Deserialize)]
+            struct Stats {
+                size: u32
+            }
+
             let fh = FileHandle::open(p.to_str().expect("invalid file path"), Some("r".into()))?;
             fstatSync(fh.0, &JsValue::undefined())
-                .map(|s| s.size() as usize)
                 .map_err(|e| translate_fs_err("fstat error", e))
+                .and_then(|v| serde_wasm_bindgen::from_value::<Stats>(v)
+                    .map_err(|_| Status::new(StatusCode::Unknown, "could not deserialize stats")))
+                .map(|s| s.size as usize)
         }
 
         fn delete(&self, p: &Path) -> rusty_leveldb::Result<()> {
