@@ -56,7 +56,7 @@ describe('db shim tests', function () {
 
   beforeEach(function () {
     db = new LevelDb()
-    db_dir_path = '/tmp/test-shim.db'
+    db_dir_path = '/tmp/test-shim'
   })
 
   afterEach(async function () {
@@ -126,6 +126,14 @@ describe('db functional tests', function () {
 
   it('test rusty level db', async function () {
     test_nodejs_env("/tmp")
+  })
+
+  it('test db creation and simple set', async function () {
+    let db = new Database("/tmp/test", MOCK_PUBLIC_KEY().to_address())
+    let balance_1 = new Balance("100", BalanceType.HOPR)
+    await db.set_hopr_balance(balance_1)
+    let balance_2 = await db.get_hopr_balance()
+    assert.equal(balance_2.to_string(), balance_1.to_string(), 'value must be equal')
   })
 })
 
