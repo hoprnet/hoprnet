@@ -41,7 +41,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: "Update to build version"
-        if: ! contains(github.event.pull_request.labels.*.name, 'release')
+        if: "! ${{ contains(github.event.pull_request.labels.*.name, 'release') }}"
         run: |
           next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
           ./scripts/bump-version.sh ${next_version}
