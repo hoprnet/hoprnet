@@ -12,9 +12,10 @@ workspace_dir="${script_dir}/.."
 
 
 : "${DEPLOYER_PRIVATE_KEY?"Missing environment variable DEPLOYER_PRIVATE_KEY"}"
+: "${PRIVATE_KEY?"Missing environment variable PRIVATE_KEY"}"
 : "${IDENTITY_PASSWORD?"Missing environment variable IDENTITY_PASSWORD"}"
 : "${HOPRD_API_TOKEN?"Missing environment variable HOPRD_API_TOKEN"}"
-export PRIVATE_KEY=${DEPLOYER_PRIVATE_KEY}
+
 
 if ! command -v hopli; then
     export PATH="${PATH}:${workspace_dir}/packages/hopli/.cargo/bin"
