@@ -529,6 +529,12 @@ pub mod wasm {
         fn birthtime(this: &Stats) -> js_sys::Date;
     }
 
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct MkdirOpts {
+        pub recursive: bool,
+        pub mode: JsString
+    }
+
     #[wasm_bindgen(module = "fs")]
     extern "C" {
         #[wasm_bindgen(catch)]
@@ -546,7 +552,7 @@ pub mod wasm {
         #[wasm_bindgen(catch)]
         fn closeSync(fd: i32) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
-        fn mkdirSync(path: &str) -> Result<JsString, JsValue>;
+        fn mkdirSync(path: &str, options: Option<MkdirOpts>) -> Result<JsString, JsValue>;
         #[wasm_bindgen(catch)]
         fn rmdirSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
@@ -562,7 +568,7 @@ pub mod wasm {
     impl FileHandle {
         pub fn open(path: &str, flags: Option<String>) -> rusty_leveldb::Result<Self> {
             let fd = openSync(path, flags.map(JsString::from), None)
-                .map_err(|v| Status::new(StatusCode::IOError, &v.as_string().unwrap_or("n/a".into())))?;
+                .map_err(|v| Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in open".into())))?;
             if fd >= 0 {
                 Ok(Self(fd))
             } else {
@@ -573,7 +579,7 @@ pub mod wasm {
         fn read_from(&self, offset: Option<u32>, dst: &mut [u8]) -> rusty_leveldb::Result<usize> {
             let mut ubuf = Uint8Array::new_with_length(dst.len() as u32);
             let read = readSync(self.0, &mut ubuf, 0, dst.len() as u32, offset)
-                .map_err(|v| Status::new(StatusCode::IOError, &v.as_string().unwrap_or("n/a".into())))?;
+                .map_err(|v| Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in read".into())))?;
 
             if read > 0 {
                 ubuf.copy_to(dst);
@@ -621,7 +627,8 @@ pub mod wasm {
 
     impl Drop for FileHandle {
         fn drop(&mut self) {
-            fsyncSync(self.0).and_then(|_| closeSync(self.0)).expect("failed to write file")
+            let _ = fsyncSync(self.0);
+            let _ = closeSync(self.0);
         }
     }
 
@@ -694,9 +701,20 @@ pub mod wasm {
         }
 
         fn mkdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            mkdirSync(p.to_str().expect("invalid path"))
-                .map(|_| ())
-                .map_err(|v|Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in mkdir".into())))
+            let opts = MkdirOpts {
+                recursive: true,
+                mode: "0o777".into()
+            };
+            if let Err(e) = mkdirSync(p.to_str().expect("invalid path"), Some(opts)).map(|_| ()) {
+                let err_str = e.as_string().unwrap_or("unknown error in mkdir".into());
+                if err_str.contains("EEXIST") { // don't fail if path already exists
+                    Ok(())
+                } else {
+                    Err(Status::new(StatusCode::IOError, &err_str))
+                }
+            } else {
+                Ok(())
+            }
         }
 
         fn rmdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
