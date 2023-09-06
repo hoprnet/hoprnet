@@ -1,11 +1,14 @@
 use async_trait::async_trait;
 use std::cmp::Ordering;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use crate::errors::DbError;
 use crate::traits::{AsyncKVStorage, BatchOperation, StorageValueIterator};
 use futures_lite::stream::iter;
-use rusty_leveldb::{DBIterator, LdbIterator, StatusCode, WriteBatch};
+use hex_literal::hex;
+use rusty_leveldb::{DBIterator, Env, LdbIterator, StatusCode, WriteBatch};
+use utils_log::debug;
 
 struct RustyLevelDbIterator {
     iter: DBIterator,
@@ -168,12 +171,101 @@ impl AsyncKVStorage for RustyLevelDbShim {
     }
 }
 
+#[cfg(any(feature = "wasm", test))]
+fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
+    debug!("test #1");
+    let test_dir = base.join(format!("test_dir_{0}", ts));
+    env.mkdir(&test_dir).expect("could not create dir");
+
+    debug!("test #2");
+    let test_file = test_dir.join("test_file");
+    assert!(!env.exists(&test_file).expect("could not check file existence 1"), "file should not exist before creation");
+
+    debug!("test #3");
+    let data = hex!("deadbeefcafebabe");
+
+    {
+        debug!("test #4");
+        let mut f = env.open_writable_file(&test_file).expect("could not open file 1");
+        let len = f.write(&data).expect("could not write to a file");
+        assert_eq!(data.len(), len, "writting invalid number of bytes");
+    }
+
+    {
+        debug!("test #5");
+        assert!(env.exists(&test_file).expect("could not check file existence 3"), "file should exist");
+        let mut f = env.open_sequential_file(&test_file).expect("could not open file 2");
+        let mut buf = vec![0u8; data.len()];
+        let len = f.read(&mut buf).expect("could not read from file");
+        assert_eq!(data.len(), len, "could not read all bytes from the file 2");
+        assert_eq!(data, buf.as_slice(), "read incorrect data");
+    }
+
+    {
+        debug!("test #6");
+        let mut f = env.open_appendable_file(&test_file).expect("could not open file 3");
+        let len = f.write(&data).expect("appendable write failed");
+        assert_eq!(data.len(), len, "could not write all bytes to the file");
+    }
+
+    {
+        debug!("test #7");
+        let len = env.size_of(&test_file).expect("could not get file size");
+        assert_eq!(data.len() * 2, len, "file should have twice the length after appending");
+    }
+
+    {
+        debug!("test #8");
+        let f = env.open_random_access_file(&test_file).expect("could not open file 4");
+        let mut buf = [0; 8];
+        let len = f.read_at(4, &mut buf).expect("could not read file at 1");
+        assert_eq!(len, buf.len(), "could not read all bytes 3");
+        assert_eq!(hex!("cafebabedeadbeef"), buf);
+
+        let mut buf = [0; 4];
+        let len = f.read_at(4, &mut buf).expect("could not read file at 2");
+        assert_eq!(len, buf.len(), "could not read all bytes 4");
+        assert_eq!(hex!("cafebabe"), buf, "mismatch random access read bytes 1");
+
+        let mut buf = [0; 4];
+        let len = f.read_at(2, &mut buf).expect("could not read file at 4");
+        assert_eq!(len, buf.len(), "could not read all bytes 6");
+        assert_eq!(hex!("beefcafe"), buf, "mismatch random access read bytes 2");
+    }
+
+    {
+        debug!("test #9");
+        let children = env.children(&test_dir).expect("cannot retrieve children of test dir");
+        assert_eq!(children.len(), 1, "contains more children");
+        assert!(children.contains(&PathBuf::from("test_file".to_string())), "children do not contain test file");
+    }
+
+    let new_file = test_dir.join("new_file");
+    {
+        debug!("test #10");
+        env.rename(&test_file, &new_file).expect("rename must not fail");
+        assert!(!env.exists(&test_file).expect("failed to check existence after rename"), "old file must not exist after rename");
+        assert!(env.exists(&new_file).expect("failed to check existence after rename"), "new file must exist after rename");
+    }
+
+    {
+        debug!("test #11");
+        env.delete(&new_file).expect("could not delete file");
+        assert!(!env.exists(&new_file).expect("failed to check existence after deletion"), "file must not exist after deletion");
+    }
+
+    {
+        debug!("test #12");
+        let _ = env.rmdir(&test_dir); // cannot be tested with MemEnv
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
     use rusty_leveldb::MemEnv;
-    use crate::rusty::wasm::test_env;
+    use crate::rusty::test_env;
 
     #[async_std::test]
     async fn rusty_leveldb_sanity_test() {
@@ -295,8 +387,11 @@ mod tests {
         assert_eq!(received, expected, "Test #7 failed: db content mismatch");
     }
 
+
     #[test]
     fn wasm_test_sanity() {
+        // This just tests the sanity of the "test_env" against a known working implementation (MemEnv)
+        // so it can be further used in the WASM test
         test_env(Box::new(MemEnv::new()), Path::new("/"), utils_misc::time::native::current_timestamp())
     }
 }
@@ -309,12 +404,11 @@ pub mod wasm {
     use std::path::{Path, PathBuf};
     use std::rc::Rc;
     use std::sync::{Arc, Mutex};
-    use hex_literal::hex;
     use js_sys::{JsString, Uint8Array};
     use rusty_leveldb::{Env, FileLock, Logger, MemEnv, RandomAccess, Status, StatusCode};
     use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
-    use utils_misc::console_log;
+    use crate::rusty::test_env;
 
     pub struct WasmMemEnv(MemEnv);
 
@@ -563,7 +657,7 @@ pub mod wasm {
         }
 
         fn children(&self, p: &Path) -> rusty_leveldb::Result<Vec<PathBuf>> {
-            Ok(readdirSync(p.to_str().expect("invalid path"), &JsValue::null())
+            Ok(readdirSync(p.to_str().expect("invalid path"), &JsValue::undefined())
                 .into_iter()
                 .map(|s| PathBuf::from(s.as_string().expect("invalid path buf")))
                 .collect())
@@ -571,12 +665,12 @@ pub mod wasm {
 
         fn size_of(&self, p: &Path) -> rusty_leveldb::Result<usize> {
             let fh = FileHandle::open(p.to_str().expect("invalid file path"), Some("r".into()))?;
-            let stat = fstatSync(fh.0, &JsValue::null());
+            let stat = fstatSync(fh.0, &JsValue::undefined());
             Ok(stat.size() as usize)
         }
 
         fn delete(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            rmSync(p.to_str().expect("invalid path"), &JsValue::null());
+            rmSync(p.to_str().expect("invalid path"), &JsValue::undefined());
             Ok(())
         }
 
@@ -586,7 +680,7 @@ pub mod wasm {
         }
 
         fn rmdir(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            rmdirSync(p.to_str().expect("invalid path"), &JsValue::null());
+            rmdirSync(p.to_str().expect("invalid path"), &JsValue::undefined());
             Ok(())
         }
 
@@ -643,95 +737,7 @@ pub mod wasm {
             thread::sleep(time::Duration::new(0, micros * 1000));
         }
     }
-
-    pub(crate) fn test_env(env: Box<dyn Env>, base: &Path, ts: u64) {
-        console_log!("1");
-        let test_dir = base.join(format!("test_dir_{0}", ts));
-        env.mkdir(&test_dir).expect("could not create dir");
-
-        console_log!("2");
-        let test_file = test_dir.join("test_file");
-        assert!(!env.exists(&test_file).expect("could not check file existence 1"), "file should not exist before creation");
-
-        console_log!("3");
-        let data = hex!("deadbeefcafebabe");
-
-        {
-            console_log!("4");
-            let mut f = env.open_writable_file(&test_file).expect("could not open file 1");
-            let len = f.write(&data).expect("could not write to a file");
-            assert_eq!(data.len(), len, "writting invalid number of bytes");
-        }
-
-        {
-            console_log!("5");
-            assert!(env.exists(&test_file).expect("could not check file existence 3"), "file should exist");
-            let mut f = env.open_sequential_file(&test_file).expect("could not open file 2");
-            let mut buf = vec![0u8; data.len()];
-            let len = f.read(&mut buf).expect("could not read from file");
-            assert_eq!(data.len(), len, "could not read all bytes from the file 2");
-            assert_eq!(data, buf.as_slice(), "read incorrect data");
-        }
-
-        {
-            console_log!("6");
-            let mut f = env.open_appendable_file(&test_file).expect("could not open file 3");
-            let len = f.write(&data).expect("appendable write failed");
-            assert_eq!(data.len(), len, "could not write all bytes to the file");
-        }
-
-        {
-            console_log!("7");
-            let len = env.size_of(&test_file).expect("could not get file size");
-            assert_eq!(data.len() * 2, len, "file should have twice the length after appending");
-        }
-
-        {
-            console_log!("8");
-            let f = env.open_random_access_file(&test_file).expect("could not open file 4");
-            let mut buf = [0; 8];
-            let len = f.read_at(4, &mut buf).expect("could not read file at 1");
-            assert_eq!(len, buf.len(), "could not read all bytes 3");
-            assert_eq!(hex!("cafebabedeadbeef"), buf);
-
-            let mut buf = [0; 4];
-            let len = f.read_at(4, &mut buf).expect("could not read file at 2");
-            assert_eq!(len, buf.len(), "could not read all bytes 4");
-            assert_eq!(hex!("cafebabe"), buf, "mismatch random access read bytes 1");
-
-            let mut buf = [0; 4];
-            let len = f.read_at(2, &mut buf).expect("could not read file at 4");
-            assert_eq!(len, buf.len(), "could not read all bytes 6");
-            assert_eq!(hex!("beefcafe"), buf, "mismatch random access read bytes 2");
-        }
-
-        {
-            console_log!("9");
-            let children = env.children(&test_dir).expect("cannot retrieve children of test dir");
-            assert_eq!(children.len(), 1, "contains more children");
-            assert!(children.contains(&PathBuf::from("test_file".to_string())), "children do not contain test file");
-        }
-
-        let new_file = test_dir.join("new_file");
-        {
-            console_log!("10");
-            env.rename(&test_file, &new_file).expect("rename must not fail");
-            assert!(!env.exists(&test_file).expect("failed to check existence after rename"), "old file must not exist after rename");
-            assert!(env.exists(&new_file).expect("failed to check existence after rename"), "new file must exist after rename");
-        }
-
-        {
-            console_log!("11");
-            env.delete(&new_file).expect("could not delete file");
-            assert!(!env.exists(&new_file).expect("failed to check existence after deletion"), "file must not exist after deletion");
-        }
-
-        {
-            console_log!("12");
-            let _ = env.rmdir(&test_dir); // cannot be tested with MemEnv
-        }
-    }
-
+    
     #[wasm_bindgen]
     pub fn test_nodejs_env(base_dir: &str) {
         test_env(Box::new(NodeJsEnv::new()), Path::new(base_dir), utils_misc::time::wasm::current_timestamp());
