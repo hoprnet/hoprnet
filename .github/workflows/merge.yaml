@@ -226,8 +226,8 @@ jobs:
       - name: Tag repository
         id: tag
         run: |
-          git tag v${{ steps.setup.outputs.current_version }}
-          git push origin v${{ steps.setup.outputs.current_version }}
+          git tag ${{ steps.setup.outputs.current_version }}
+          git push origin ${{ steps.setup.outputs.current_version }}
 
       - name: Generate Changelog
         id: changelog
