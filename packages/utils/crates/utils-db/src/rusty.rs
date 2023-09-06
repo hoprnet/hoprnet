@@ -552,7 +552,7 @@ pub mod wasm {
         #[wasm_bindgen(catch)]
         fn closeSync(fd: i32) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
-        fn mkdirSync(path: &str, options: Option<MkdirOpts>) -> Result<JsString, JsValue>;
+        fn mkdirSync(path: &str, options: &JsValue) -> Result<JsString, JsValue>;
         #[wasm_bindgen(catch)]
         fn rmdirSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
         #[wasm_bindgen(catch)]
@@ -705,7 +705,7 @@ pub mod wasm {
                 recursive: true,
                 mode: "0o777".into()
             };
-            if let Err(e) = mkdirSync(p.to_str().expect("invalid path"), Some(opts)).map(|_| ()) {
+            if let Err(e) = mkdirSync(p.to_str().expect("invalid path"), &JsValue::from(opts)).map(|_| ()) {
                 let err_str = e.as_string().unwrap_or("unknown error in mkdir".into());
                 if err_str.contains("EEXIST") { // don't fail if path already exists
                     Ok(())
