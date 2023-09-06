@@ -73,6 +73,7 @@ jobs:
 
       - name: Tag docker images
         run: |
+          set -x
           docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
           # Set docker PR tag
           if echo "${{ github.event.pull_request.labels.*.name }}" | grep -q release; then

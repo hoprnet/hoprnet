@@ -41,6 +41,7 @@ jobs:
 
       - name: "Update version"
         run: |
+          set -x
           if echo "${{ github.event.pull_request.labels.*.name }}" | grep -q release; then
             docker_tag=$(jq -r '.version' packages/hoprd/package.json)
           else
