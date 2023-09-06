@@ -111,14 +111,14 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         Self { backend }
     }
 
-    pub fn contains(&self, key: Key) -> bool {
-        self.backend.contains(key.into()).is_ok_and(|v| v)
+    pub async fn contains(&self, key: Key) -> bool {
+        self.backend.contains(key.into()).await.is_ok_and(|v| v)
     }
 
-    pub fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
+    pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        match self.backend.get(key.into()) {
+        match self.backend.get(key.into()).await {
             Ok(Some(val)) => match bincode::deserialize(&val) {
                 Ok(deserialized) => Ok(Some(deserialized)),
                 Err(e) => Err(DbError::DeserializationError(format!(
@@ -131,7 +131,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         }
     }
 
-    pub fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
+    pub async fn set<V>(&mut self, key: Key, value: &V) -> Result<Option<V>>
     where
         V: Serialize + DeserializeOwned,
     {
@@ -140,7 +140,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
             .map_err(|e| DbError::SerializationError(e.to_string()))?
             .into_boxed_slice();
 
-        match self.backend.set(key, value) {
+        match self.backend.set(key, value).await {
             Ok(Some(v)) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
                 DbError::DeserializationError(format!("during set operation: {}", e.to_string().as_str()))
             }),
@@ -149,10 +149,10 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         }
     }
 
-    pub fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
+    pub async fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        match self.backend.remove(key) {
+        match self.backend.remove(key).await {
             Ok(Some(v)) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
                 DbError::DeserializationError(format!("during remove operation: {}", e.to_string().as_str()))
             }),
@@ -161,13 +161,13 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         }
     }
 
-    pub fn get_more<V: Serialize + DeserializeOwned>(
+    pub async fn get_more<V: Serialize + DeserializeOwned>(
         &self,
         prefix: Box<[u8]>,
         suffix_size: u32,
         filter: &dyn Fn(&V) -> bool,
     ) -> Result<Vec<V>> {
-        match self.backend.iterate(prefix, suffix_size) {
+        match self.backend.iterate(prefix, suffix_size).await {
             Ok(values) => Ok(values
                 .iter()
                 .map(|v| bincode::deserialize(v.as_ref()))
@@ -179,8 +179,8 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         }
     }
 
-    pub fn batch(&mut self, batch: Batch) -> Result<()> {
-        self.backend.batch(batch.ops)
+    pub async fn batch(&mut self, batch: Batch) -> Result<()> {
+        self.backend.batch(batch.ops).await
     }
 }
 

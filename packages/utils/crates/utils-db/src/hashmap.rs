@@ -26,6 +26,7 @@ where
     }
 }
 
+#[async_trait(? Send)]
 impl<K, V> KVStorage for InMemoryHashMapStorage<K, V>
 where
     K: Eq + std::hash::Hash + serde::Serialize,
@@ -34,27 +35,27 @@ where
     type Key = K;
     type Value = V;
 
-    fn get(&self, key: Self::Key) -> Result<Option<Self::Value>, DbError> {
+    async fn get(&self, key: Self::Key) -> Result<Option<Self::Value>, DbError> {
         Ok(self.data.get(&key).cloned())
     }
 
-    fn set(&mut self, key: Self::Key, value: Self::Value) -> Result<Option<Self::Value>, DbError> {
+    async fn set(&mut self, key: Self::Key, value: Self::Value) -> Result<Option<Self::Value>, DbError> {
         Ok(self.data.insert(key, value))
     }
 
-    fn contains(&self, key: Self::Key) -> Result<bool, DbError> {
+    async fn contains(&self, key: Self::Key) -> Result<bool, DbError> {
         Ok(self.data.contains_key(&key))
     }
 
-    fn remove(&mut self, key: Self::Key) -> Result<Option<Self::Value>, DbError> {
+    async fn remove(&mut self, key: Self::Key) -> Result<Option<Self::Value>, DbError> {
         Ok(self.data.remove(&key))
     }
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<Vec<Self::Value>, DbError> {
+    async fn iterate(&self, _prefix: Self::Key, _suffix_size: u32) -> Result<Vec<Self::Value>, DbError> {
         todo!("iterate not implement on InMemoryHashMapStorage")
     }
 
-    fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>) -> Result<(), DbError> {
+    async fn batch(&mut self, _operations: Vec<BatchOperation<Self::Key, Self::Value>>) -> Result<(), DbError> {
         todo!("batch not implement on InMemoryHashMapStorage")
     }
 }

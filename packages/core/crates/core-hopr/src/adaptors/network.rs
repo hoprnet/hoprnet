@@ -104,6 +104,7 @@ pub mod wasm {
                             .read()
                             .await
                             .get_chain_key(&key)
+                            .await
                             .map(|address| (address, quality))
                     }
                 })

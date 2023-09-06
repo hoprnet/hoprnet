@@ -1,8 +1,8 @@
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::errors::DbError;
-    use crate::traits::{BatchOperation, KVStorage, StorageValueIterator};
-    use futures_lite::stream::StreamExt;
+    use crate::traits::{BatchOperation, KVStorage};
+    use async_trait::async_trait;
     use wasm_bindgen::prelude::*;
 
     // https://users.rust-lang.org/t/wasm-web-sys-how-to-manipulate-js-objects-from-rust/36504
@@ -44,11 +44,12 @@ pub mod wasm {
         pub value: Option<Box<[u8]>>,
     }
 
+    #[async_trait(? Send)]
     impl KVStorage for SqliteShim {
         type Key = Box<[u8]>;
         type Value = Box<[u8]>;
 
-        fn get(&self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
+        async fn get(&self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
             match self.db.get(key.clone()) {
                 Ok(val) => Ok(if val.is_undefined() {
                     None
@@ -62,22 +63,22 @@ pub mod wasm {
             }
         }
 
-        fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
+        async fn set(&mut self, key: Self::Key, value: Self::Value) -> crate::errors::Result<Option<Self::Value>> {
             self.db
                 .put(key.clone(), value)
                 .map(|_| None)
                 .map_err(|_| DbError::GenericError("Encountered error on DB put operation".to_string()))
         }
 
-        fn contains(&self, key: Self::Key) -> crate::errors::Result<bool> {
-            match self.get(key) {
+        async fn contains(&self, key: Self::Key) -> crate::errors::Result<bool> {
+            match self.get(key).await {
                 Ok(Some(_)) => Ok(true),
                 Ok(None) => Ok(false),
                 Err(e) => Err(e),
             }
         }
 
-        fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
+        async fn remove(&mut self, key: Self::Key) -> crate::errors::Result<Option<Self::Value>> {
             self.db
                 .remove(key.clone())
                 .map(|v| {
@@ -90,7 +91,7 @@ pub mod wasm {
                 .map_err(|_| DbError::GenericError("Encountered error on DB remove operation".to_string()))
         }
 
-        fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<Vec<Self::Value>> {
+        async fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> crate::errors::Result<Vec<Self::Value>> {
             return self
                 .db
                 .iterValues(js_sys::Uint8Array::from(prefix.as_ref()), suffix_size)
@@ -102,7 +103,10 @@ pub mod wasm {
                 .map_err(|e| DbError::GenericError(format!("Iteration failed with an exception: {:?}", e)));
         }
 
-        fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>) -> crate::errors::Result<()> {
+        async fn batch(
+            &mut self,
+            operations: Vec<BatchOperation<Self::Key, Self::Value>>,
+        ) -> crate::errors::Result<()> {
             let ops = operations
                 .into_iter()
                 .map(|op| match op {
@@ -146,7 +150,7 @@ pub mod wasm {
         //         JsValue::from(JsError::new(format!("Test #0 failed: {:?}", e).as_str())))
         // }
 
-        if kv_storage.contains(key_1.as_bytes().into()).unwrap() {
+        if kv_storage.contains(key_1.as_bytes().into()).await.unwrap() {
             return Err("Test #1 failed: empty DB should not contain any data"
                 .to_string()
                 .into());
@@ -155,7 +159,7 @@ pub mod wasm {
         // ===================================
 
         let _ = kv_storage.set(key_1.as_bytes().into(), value_1.as_bytes().into());
-        if !kv_storage.contains(key_1.as_bytes().into()).unwrap() {
+        if !kv_storage.contains(key_1.as_bytes().into()).await.unwrap() {
             return Err("Test #2 failed: DB should contain the key".to_string().into());
         }
 
@@ -163,6 +167,7 @@ pub mod wasm {
 
         let value = kv_storage
             .get(key_1.as_bytes().into())
+            .await
             .unwrap()
             .expect("Stored empty value");
         let value_converted = std::str::from_utf8(value.as_ref())
@@ -180,7 +185,7 @@ pub mod wasm {
 
         let _ = kv_storage.remove(key_1.as_bytes().into());
 
-        if kv_storage.contains(key_1.as_bytes().into()).unwrap() {
+        if kv_storage.contains(key_1.as_bytes().into()).await.unwrap() {
             return Err("Test #4 failed: removal of key from the DB failed".to_string().into());
         }
 
@@ -199,7 +204,7 @@ pub mod wasm {
                 key: key_2.as_bytes().into(),
             }),
         ];
-        if let Err(e) = kv_storage.batch(batch_data) {
+        if let Err(e) = kv_storage.batch(batch_data).await {
             return Err(format!("Test #5.0 failed: batch operation failed: {e}").into());
         }
 
@@ -208,7 +213,7 @@ pub mod wasm {
         gloo_timers::future::sleep(std::time::Duration::from_millis(10)).await;
 
         // TODO: levelup api with the passed options to do an immediate write does not perform an immediate write
-        if !kv_storage.contains(key_3.as_bytes().into())? {
+        if !kv_storage.contains(key_3.as_bytes().into()).await? {
             return Err("Test #5.1 failed: the key should be present in the DB"
                 .to_string()
                 .into());
@@ -218,29 +223,37 @@ pub mod wasm {
 
         kv_storage
             .set(key_4.as_bytes().into(), Box::new([]))
+            .await
             .expect("Could not write empty value");
 
-        if !kv_storage.contains(key_4.as_bytes().into()).unwrap() {
+        if !kv_storage.contains(key_4.as_bytes().into()).await.unwrap() {
             return Err("Test #5.2 failed: it should be possible to store empty values"
                 .to_string()
                 .into());
         }
 
-        if !kv_storage.get(key_4.as_bytes().into()).is_ok_and(|o| o.is_none()) {
+        if !kv_storage.get(key_4.as_bytes().into()).await.is_ok_and(|o| o.is_none()) {
             return Err("Test #6 failed: could not read empty value from DB".to_string().into());
         }
 
         // ===================================
 
-        let _ = kv_storage.set(prefixed_key_1.as_bytes().into(), value_1.as_bytes().into());
-        let _ = kv_storage.set(prefixed_key_2.as_bytes().into(), value_2.as_bytes().into());
-        let _ = kv_storage.set(prefixed_key_3.as_bytes().into(), value_3.as_bytes().into());
+        let _ = kv_storage
+            .set(prefixed_key_1.as_bytes().into(), value_1.as_bytes().into())
+            .await;
+        let _ = kv_storage
+            .set(prefixed_key_2.as_bytes().into(), value_2.as_bytes().into())
+            .await;
+        let _ = kv_storage
+            .set(prefixed_key_3.as_bytes().into(), value_3.as_bytes().into())
+            .await;
 
         let expected = vec![value_1.as_bytes().into(), value_3.as_bytes().into()];
 
         let mut received = Vec::new();
         let data = kv_storage
             .iterate(prefix.as_bytes().into(), (prefixed_key_1.len() - prefix.len()) as u32)
+            .await
             .map_err(|e| JsValue::from(format!("Test #7.1 failed: failed to iterate over DB {:?}", e)))?;
 
         for value in data.into_iter() {

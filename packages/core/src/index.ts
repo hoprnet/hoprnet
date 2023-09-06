@@ -1436,7 +1436,7 @@ export class Hopr extends EventEmitter {
     let chain_key: Address = await this.peerIdToChainKey(id)
     // Only check if we found a chain key, otherwise peer is not allowed
     if (chain_key) {
-const allowed = await this.db.is_allowed_to_access_network(chain_key)
+      const allowed = await this.db.is_allowed_to_access_network(chain_key)
       return allowed
     }
     return false

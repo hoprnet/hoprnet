@@ -2,17 +2,19 @@
 use {crate::errors::Result, core_ethereum_db::traits::HoprCoreEthereumDbActions, utils_types::primitives::Address};
 
 #[cfg(any(feature = "wasm", test))]
-pub fn is_allowed_to_access_network<T>(db: &T, chain_address: &Address) -> Result<bool>
+pub async fn is_allowed_to_access_network<T>(db: &T, chain_address: &Address) -> Result<bool>
 where
     T: HoprCoreEthereumDbActions,
 {
-    let nr_enabled = db.is_network_registry_enabled()?;
+    let nr_enabled = db.is_network_registry_enabled().await?;
 
     if !nr_enabled {
         return Ok(true);
     }
 
-    db.is_allowed_to_access_network(chain_address).map_err(|e| e.into())
+    db.is_allowed_to_access_network(chain_address)
+        .await
+        .map_err(|e| e.into())
 }
 
 #[cfg(test)]
@@ -40,15 +42,17 @@ mod tests {
     async fn test_is_allowed_to_access_network() {
         let mut db = create_mock_db();
 
-        db.set_network_registry(true, &Snapshot::default()).unwrap();
+        db.set_network_registry(true, &Snapshot::default()).await.unwrap();
 
         db.set_eligible(&Address::from_bytes(&TEST_ADDR).unwrap(), true, &Snapshot::default())
+            .await
             .unwrap();
 
         db.set_allowed_to_access_network(&Address::from_bytes(&TEST_ACCOUNT).unwrap(), true, &Snapshot::default())
+            .await
             .unwrap();
 
-        let is_allowed = super::is_allowed_to_access_network(&db, &Address::from_bytes(&TEST_ACCOUNT).unwrap());
+        let is_allowed = super::is_allowed_to_access_network(&db, &Address::from_bytes(&TEST_ACCOUNT).unwrap()).await;
 
         assert!(is_allowed.is_ok(), "error while checking access in NR");
         assert!(is_allowed.unwrap(), "should be allowed access");
@@ -66,6 +70,6 @@ pub mod wasm {
     pub async fn is_allowed_to_access_network(db: &Database, chain_address: &Address) -> Result<bool, JsValue> {
         let val = db.as_ref_counted();
         let g = val.read().await;
-        ok_or_jserr!(super::is_allowed_to_access_network(&*g, chain_address))
+        ok_or_jserr!(super::is_allowed_to_access_network(&*g, chain_address).await)
     }
 }

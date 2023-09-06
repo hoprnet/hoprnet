@@ -56,19 +56,20 @@ pub trait AsyncKVStorage {
 }
 
 #[cfg_attr(test, mockall::automock(type Key = Box < [u8] >; type Value = Box < [u8] >;))]
+#[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait KVStorage {
     type Key: Serialize;
     type Value: Serialize;
 
-    fn get(&self, key: Self::Key) -> Result<Option<Self::Value>>;
+    async fn get(&self, key: Self::Key) -> Result<Option<Self::Value>>;
 
-    fn set(&mut self, key: Self::Key, value: Self::Value) -> Result<Option<Self::Value>>;
+    async fn set(&mut self, key: Self::Key, value: Self::Value) -> Result<Option<Self::Value>>;
 
-    fn contains(&self, key: Self::Key) -> Result<bool>;
+    async fn contains(&self, key: Self::Key) -> Result<bool>;
 
-    fn remove(&mut self, key: Self::Key) -> Result<Option<Self::Value>>;
+    async fn remove(&mut self, key: Self::Key) -> Result<Option<Self::Value>>;
 
-    fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<Vec<Self::Value>>;
+    async fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<Vec<Self::Value>>;
 
-    fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>) -> Result<()>;
+    async fn batch(&mut self, operations: Vec<BatchOperation<Self::Key, Self::Value>>) -> Result<()>;
 }

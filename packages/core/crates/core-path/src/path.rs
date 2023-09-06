@@ -61,7 +61,8 @@ impl Path {
         // Ignore the last hop in the check, because channels are not required for direct messages
         for hop in path.iter().take(path.len() - 1) {
             ticket_receiver = db
-                .get_chain_key(&OffchainPublicKey::from_peerid(hop)?)?
+                .get_chain_key(&OffchainPublicKey::from_peerid(hop)?)
+                .await?
                 .ok_or(InvalidPeer(format!("could not find channel key for {hop}")))?;
 
             // Check for loops
@@ -74,7 +75,8 @@ impl Path {
 
             // Check if the channel is opened
             let channel = db
-                .get_channel_x(&ticket_issuer, &ticket_receiver)?
+                .get_channel_x(&ticket_issuer, &ticket_receiver)
+                .await?
                 .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
 
             if channel.status != ChannelStatus::Open {
@@ -184,6 +186,7 @@ mod tests {
         peers.push(packet_key.to_peerid());
 
         db.link_chain_and_packet_keys(&chain_key.to_address(), &packet_key, &testing_snapshot)
+            .await
             .unwrap();
 
         for peer in PEERS_PRIVS.iter().skip(1) {
@@ -193,16 +196,19 @@ mod tests {
 
             // Link both keys
             db.link_chain_and_packet_keys(&chain_key.to_address(), &packet_key, &testing_snapshot)
+                .await
                 .unwrap();
 
             // Open channel to self
             let channel = create_dummy_channel(chain_key.to_address(), chain_key.to_address(), ChannelStatus::Open);
             db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
+                .await
                 .unwrap();
 
             // Open channel from last node to us
             let channel = create_dummy_channel(last_addr, chain_key.to_address(), ChannelStatus::Open);
             db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
+                .await
                 .unwrap();
 
             last_addr = chain_key.to_address();
@@ -214,6 +220,7 @@ mod tests {
         let chain_key_4 = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
         let channel = create_dummy_channel(chain_key_4, chain_key_0, ChannelStatus::Closed);
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
+            .await
             .unwrap();
 
         db

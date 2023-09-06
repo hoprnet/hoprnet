@@ -97,12 +97,14 @@ impl WasmIndexerInteractions {
                             let is_allowed = {
                                 let address = {
                                     if let Ok(key) = OffchainPublicKey::from_peerid(&peer) {
-                                        match db_local.read().await.get_chain_key(&key).and_then(|maybe_address| {
-                                            maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!(
-                                                "No address available for peer '{}'",
-                                                peer
-                                            )))
-                                        }) {
+                                        match db_local.read().await.get_chain_key(&key).await.and_then(
+                                            |maybe_address| {
+                                                maybe_address.ok_or(utils_db::errors::DbError::GenericError(format!(
+                                                    "No address available for peer '{}'",
+                                                    peer
+                                                )))
+                                            },
+                                        ) {
                                             Ok(v) => v,
                                             Err(e) => {
                                                 error!("{e}");
@@ -115,7 +117,7 @@ impl WasmIndexerInteractions {
                                     }
                                 };
 
-                                match db_local.read().await.is_allowed_to_access_network(&&address) {
+                                match db_local.read().await.is_allowed_to_access_network(&&address).await {
                                     Ok(v) => v,
                                     Err(_) => continue,
                                 }
