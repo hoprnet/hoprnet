@@ -50,7 +50,7 @@ jobs:
       - name: "Use release version"
         if: ${{ contains(github.event.pull_request.labels.*.name, 'release') }}
         run: |
-          docker_tag=$(jq -r '.version' packages/hoprd/package.json)
+          docker_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
           echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
 
       - name: Build and push docker image
