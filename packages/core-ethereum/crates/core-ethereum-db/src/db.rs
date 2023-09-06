@@ -52,7 +52,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions
 
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
-        let _evicted = self.db.set(prefixed_key, &index).await;
+        let _evicted = self.db.set(prefixed_key, &index).await?;
         // Ignoring evicted value
         Ok(())
     }
@@ -100,11 +100,11 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()> {
         let count = self.get_rejected_tickets_count().await?;
         let count_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;
-        self.db.set(count_key, &(count + 1)).await;
+        let _ = self.db.set(count_key, &(count + 1)).await?;
 
         let balance = self.get_rejected_tickets_value().await?;
         let value_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
-        let _result = self.db.set(value_key, &balance.add(&ticket.amount)).await;
+        let _ = self.db.set(value_key, &balance.add(&ticket.amount)).await?;
 
         Ok(())
     }
@@ -124,7 +124,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions
     ) -> Result<()> {
         let key = utils_db::db::Key::new_with_prefix(&half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
 
-        let _ = self.db.set(key, &pending_acknowledgment).await;
+        let _ = self.db.set(key, &pending_acknowledgment).await?;
 
         Ok(())
     }
@@ -203,7 +203,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions
             .await?
             .unwrap_or(Balance::zero(ticket.amount.balance_type()));
 
-        let _result = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await;
+        let _ = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await?;
         Ok(())
     }
 
@@ -306,7 +306,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions
     async fn update_latest_block_number(&mut self, number: u32) -> Result<()> {
         //utils_log::debug!("DB: update_latest_block_number to {}", number);
         let key = utils_db::db::Key::new_from_str(LATEST_BLOCK_NUMBER_KEY)?;
-        let _ = self.db.set(key, &number).await;
+        let _ = self.db.set(key, &number).await?;
         Ok(())
     }
 
@@ -1521,7 +1521,7 @@ mod tests {
         let backend = InMemoryHashMapStorage::new();
         let mut db = CoreEthereumDb::new(DB::new(backend), Address::random());
 
-        assert_eq!(db.get_ticket_price(), Ok(None).await);
+        assert_eq!(db.get_ticket_price().await, Ok(None));
 
         assert!(db.set_ticket_price(&U256::from(100u64)).await.is_ok());
 

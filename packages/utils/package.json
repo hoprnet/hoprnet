@@ -39,7 +39,8 @@
     "it-pipe": "2.0.5",
     "multiformats": "9.6.5",
     "secp256k1": "4.0.3",
-    "timeout-abort-controller": "3.0.0"
+    "timeout-abort-controller": "3.0.0",
+    "workerpool": "^6.4.2"
   },
   "devDependencies": {
     "@chainsafe/libp2p-noise": "7.0.0",
@@ -53,6 +54,7 @@
     "@libp2p/tcp": "1.0.11",
     "@types/chai": "4.3.5",
     "@types/mocha": "10.0.1",
+    "@types/workerpool": "^6",
     "bl": "5.1.0",
     "chai": "4.3.7",
     "libp2p": "0.37.3",

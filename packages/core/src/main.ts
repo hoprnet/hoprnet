@@ -22,8 +22,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  let dbBackend = new Db()
-
+  let dbBackend: Db = new Db()
   try {
     const dbPath = path.join(options.dataPath, 'db')
     await dbBackend.init(options.createDbIfNotExist, dbPath, options.forceCreateDB, options.network.id)

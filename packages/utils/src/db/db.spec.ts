@@ -142,7 +142,7 @@ describe(`levelup shim tests`, function () {
 
   it('should verify network', async function () {
     db.setNetworkId('test-env')
-    assert(db.verifyNetworkId('wrong-id') === false, `must fail for wrong id`)
-    assert(db.verifyNetworkId('test-env') === true, `must not fail for correct id`)
+    assert(await db.verifyNetworkId('wrong-id') === false, `must fail for wrong id`)
+    assert(await db.verifyNetworkId('test-env') === true, `must not fail for correct id`)
   })
 })

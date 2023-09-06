@@ -18,7 +18,7 @@ describe('DELETE /tokens/{id}', function () {
   before(async function () {
     node = sinon.fake() as any
     let db = new Db()
-    db.open()
+    db.init(true, 'testdb', false)
     node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)

@@ -26,7 +26,7 @@ describe('authentication token', function () {
   beforeEach(async function () {
     node = sinon.fake() as any
     let db = new Db()
-    db.open()
+    await db.init(true, 'testdb', false)
     node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
   })
 
@@ -221,7 +221,7 @@ describe('authentication token authorization', function () {
   before(async function () {
     node = sinon.fake() as any
     let db = new Db()
-    db.open()
+    db.init(true, 'testdb', false)
     node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
   })
 
