@@ -409,6 +409,7 @@ pub mod wasm {
     use serde::{Deserialize, Serialize};
     use wasm_bindgen::JsValue;
     use wasm_bindgen::prelude::wasm_bindgen;
+    use utils_log::debug;
     use crate::rusty::test_env;
 
     pub struct WasmMemEnv(MemEnv);
@@ -562,12 +563,24 @@ pub mod wasm {
 
     impl FileHandle {
         pub fn open(path: &str, flags: Option<String>) -> rusty_leveldb::Result<Self> {
-            let fd = openSync(path, flags.map(JsString::from), None)
-                .map_err(|v| Status::new(StatusCode::IOError, &v.as_string().unwrap_or("unknown error in open".into())))?;
-            if fd >= 0 {
-                Ok(Self(fd))
-            } else {
-                Err(Status::new(StatusCode::IOError, &format!("could not open file {path}")))
+            match openSync(path, flags.map(JsString::from), None) {
+                Ok(fd) => {
+                    if fd >= 0 {
+                        Ok(Self(fd))
+                    } else {
+                        debug!("file {path} could not be opened: -1");
+                        Err(Status::new(StatusCode::IOError, &format!("could not open file {path}")))
+                    }
+                },
+                Err(err) => {
+                    let err_str = err.as_string().unwrap_or("unknown error in open".into());
+                    debug!("file {path} could not be opened: {err_str}");
+                    if err_str.contains("ENOENT") {
+                        Err(Status::new(StatusCode::NotFound, &format!("file not found {path}")))
+                    } else {
+                        Err(Status::new(StatusCode::IOError, &format!("could not open file {path}: {err_str}")))
+                    }
+                },
             }
         }
 
