@@ -69,7 +69,6 @@ jobs:
         run: |
             git fetch
             git checkout feature/create-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
-            gh pr review --approve
             gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
