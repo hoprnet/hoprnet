@@ -64,6 +64,8 @@ jobs:
             delete-branch: true
             assignees: ${{ github.actor }}
             team-reviewers: hoprnet/hopr-development
+        env:
+          GH_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
 
       - name: Enable Auto Merge
         run: |
