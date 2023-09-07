@@ -49,7 +49,7 @@ jobs:
       - name: Bump Version
         id: bump
         run: |
-            next_version=$(./scripts/get-next-version.sh ${{ github.event.inputs.release_type }}
+            next_version=$(./scripts/get-next-version.sh ${{ github.event.inputs.release_type }})
             ./scripts/bump-version.sh ${next_version}
             echo "next_version=${next_version}" >> $GITHUB_OUTPUT
 
