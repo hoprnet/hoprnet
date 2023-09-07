@@ -418,8 +418,10 @@ impl DB {
 
     /// flush makes sure that all pending changes (e.g. from put()) are stored on disk.
     pub fn flush(&mut self) -> Result<()> {
-        assert!(self.log.is_some());
-        self.log.as_mut().unwrap().flush()
+        if let Some(ref mut log) = self.log.as_mut() {
+            log.flush()?;
+        }
+        Ok(())
     }
 }
 
@@ -565,9 +567,7 @@ impl DB {
     /// make_room_for_write checks if the memtable has become too large, and triggers a compaction
     /// if it's the case.
     fn make_room_for_write(&mut self, force: bool) -> Result<()> {
-        if !force && self.mem.approx_mem_usage() < self.opt.write_buffer_size {
-            Ok(())
-        } else if self.mem.len() == 0 {
+        if !force && self.mem.approx_mem_usage() < self.opt.write_buffer_size || self.mem.len() == 0 {
             Ok(())
         } else {
             // Create new memtable.
@@ -594,8 +594,11 @@ impl DB {
     /// maybe_do_compaction starts a blocking compaction if it makes sense.
     fn maybe_do_compaction(&mut self) -> Result<()> {
         if self.imm.is_some() {
-            self.compact_memtable()
-        } else if self.vset.borrow().needs_compaction() {
+            self.compact_memtable()?;
+        }
+        // Issue #34 PR #36: after compacting a memtable into an L0 file, it is possible that the
+        // L0 files need to be merged and promoted.
+        if self.vset.borrow().needs_compaction() {
             let c = self.vset.borrow_mut().pick_compaction();
             if let Some(c) = c {
                 self.start_compaction(c)
@@ -889,10 +892,7 @@ impl DB {
         Ok(())
     }
 
-    fn finish_compaction_output(
-        &mut self,
-        cs: &mut CompactionState,
-    ) -> Result<()> {
+    fn finish_compaction_output(&mut self, cs: &mut CompactionState) -> Result<()> {
         assert!(cs.builder.is_some());
         let output_num = cs.current_output().num;
         assert!(output_num > 0);
@@ -949,6 +949,7 @@ impl DB {
 
 impl Drop for DB {
     fn drop(&mut self) {
+        self.flush().ok();
         let _ = self.release_lock();
     }
 }

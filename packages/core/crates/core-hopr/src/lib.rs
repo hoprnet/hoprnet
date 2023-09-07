@@ -32,7 +32,7 @@ use crate::timer::UniversalTimer;
 use core_types::protocol::TagBloomFilter;
 use utils_types::traits::BinarySerializable;
 #[cfg(feature = "wasm")]
-use {core_ethereum_db::db::wasm::Database, utils_db::leveldb::wasm::LevelDbShim, wasm_bindgen::prelude::wasm_bindgen};
+use {core_ethereum_db::db::wasm::Database, wasm_bindgen::prelude::wasm_bindgen};
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -120,7 +120,7 @@ impl std::fmt::Display for HoprLoopComponents {
 #[cfg(feature = "wasm")]
 pub fn build_components(
     me: libp2p_identity::Keypair,
-    db: Arc<RwLock<CoreEthereumDb<LevelDbShim>>>,
+    db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     network_quality_threshold: f64,
     hb_cfg: HeartbeatConfig,
     ping_cfg: PingConfig,

@@ -1,0 +1,80 @@
+---
+name: Open Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        type: choice
+        required: true
+        description: 'Type of Release to create'
+        options:
+          - ReleaseCandidate
+          - Patch
+          - Minor
+          - Major
+      release_name:
+        type: choice
+        required: true
+        description: 'Name of the release'
+        options:
+          - providence
+
+concurrency:
+  group: open-release
+  cancel-in-progress: true
+
+jobs:
+
+  open-release:
+    name: Open Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup environment variables
+        id: setup
+        run: |
+            if [ "${{ github.event.inputs.release_type }}" == "Patch" ] 
+            then
+                base_branch="release/${{ github.event.inputs.release_name }}"
+            else
+                base_branch="master"
+            fi
+            echo "base_branch=${base_branch}" >> $GITHUB_OUTPUT
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          ref: "${{ steps.setup.outputs.base_branch }}"
+
+      - name: Bump Version
+        id: bump
+        run: |
+            next_version=$(./scripts/get-next-version.sh ${{ github.event.inputs.release_type }})
+            ./scripts/bump-version.sh ${next_version}
+            echo "next_version=${next_version}" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+            commit-message: "Bump to version ${{ steps.bump.outputs.next_version }}"
+            base: ${{ steps.setup.outputs.base_branch }}
+            title: "Create release ${{ steps.bump.outputs.next_version }}"
+            body: "The scope of this PR is to create the contents of the new release ${{ steps.bump.outputs.next_version }}"
+            branch: feature/create-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+            delete-branch: true
+            assignees: ${{ github.actor }}
+            team-reviewers: hoprnet/hopr-development
+
+      - name: Enable Auto Merge
+        run: |
+            git fetch
+            git checkout feature/create-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+            gh pr merge --auto --delete-branch --squash
+        env:
+          GH_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
+
+      - name: Create Milestone
+        run: |
+            echo '{ "title": "${{ steps.bump.outputs.next_version }}", "state": "open" }' | gh api --method POST repos/${{ github.repository }}/milestones --input -
+        env:
+          GH_TOKEN: ${{ github.token }}

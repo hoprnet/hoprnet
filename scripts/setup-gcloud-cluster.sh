@@ -28,19 +28,16 @@ usage() {
   msg "an initial setup script against these nodes. Once testing has"
   msg "completed the script can be used to cleanup the cluster as well."
   msg
-  msg "Usage: $0 <network> [<cluster_template_name> [<cluster_size>]]"
+  msg "Usage: $0 <cluster_template_name> [<cluster_size>]"
   msg
-  msg "where <network>\t\tthe network id from which the smart contract addresses are derived"
-  msg "      <cluster_id>\t\tuses a random value as default"
+  msg "where "
+  msg "      <cluster_template_name>\t"
   msg "      <cluster_size>\t\tnumber of nodes in the deployed cluster, default is 6."
   msg
-  msg "Required environment variables"
-  msg "------------------------------"
   msg
   msg "Optional environment variables"
   msg "------------------------------"
-  msg
-  msg "HOPRD_SHOW_PRESTART_INFO\tset to 'true' to print used parameter values before starting"
+
   msg "HOPRD_PERFORM_CLEANUP\t\tset to 'true' to perform the cleanup process for the given cluster id"
   msg
 }
@@ -49,9 +46,8 @@ usage() {
 { [[ "${1:-}" = "-h" ]] || [[ "${1:-}" = "--help" ]]; } && { usage; exit 0; }
 
 
-declare network="${1?"missing parameter <network>"}"
-declare cluster_template_name="${2:-${network}-topology-${RANDOM}-${RANDOM}}"
-declare cluster_size=${3-6}
+declare cluster_template_name="${1}"
+declare cluster_size=${2-6}
 
 
 declare perform_cleanup="${HOPRD_PERFORM_CLEANUP:-false}"

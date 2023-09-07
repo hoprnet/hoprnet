@@ -20,13 +20,15 @@ pub fn serialize_to_bytes<S: Serialize + BinarySerializable>(s: &S) -> Result<Ve
     // bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
 }
 
-impl Batch {
-    pub fn new() -> Self {
+impl Default for Batch {
+    fn default() -> Self {
         Self {
             ops: Vec::with_capacity(10),
         }
     }
+}
 
+impl Batch {
     pub fn put<U: Serialize>(&mut self, key: Key, value: U) {
         let key: Box<[u8]> = key.into();
         let value: Box<[u8]> = bincode::serialize(&value).unwrap().into_boxed_slice();
@@ -118,7 +120,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
         let key: T::Key = key.into();
 
-        match self.backend.get(key.into()).await {
+        match self.backend.get(key).await {
             Ok(Some(val)) => match bincode::deserialize(&val) {
                 Ok(deserialized) => Ok(Some(deserialized)),
                 Err(e) => Err(DbError::DeserializationError(format!(
