@@ -65,7 +65,7 @@ jobs:
             assignees: ${{ github.actor }}
             team-reviewers: "@hoprnet/hopr-development"
         env:
-          GH_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN_AUSIAS }}
+          token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
 
       - name: Enable Auto Merge
         run: |
@@ -73,7 +73,7 @@ jobs:
             git checkout feature/create-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
             gh pr merge --auto --delete-branch --squash
         env:
-          GH_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN_AUSIAS }}
+          GH_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
 
       - name: Create Milestone
         run: |
