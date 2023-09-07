@@ -1,6 +1,6 @@
 use crate::{
     errors::{DbError, Result},
-    traits::KVStorage,
+    traits::AsyncKVStorage,
 };
 use futures_lite::stream::StreamExt;
 use serde::{de::DeserializeOwned, Serialize};
@@ -103,11 +103,11 @@ impl Deref for Key {
     }
 }
 
-pub struct DB<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
+pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
     backend: T,
 }
 
-impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     pub fn new(backend: T) -> Self {
         Self { backend }
     }
@@ -174,16 +174,21 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         suffix_size: u32,
         filter: &dyn Fn(&V) -> bool,
     ) -> Result<Vec<V>> {
-        match self.backend.iterate(prefix, suffix_size).await {
-            Ok(values) => Ok(values
-                .iter()
-                .map(|v| bincode::deserialize(v.as_ref()))
-                .filter(|v| v.is_ok())
-                .map(|v| v.unwrap())
-                .filter(filter)
-                .collect::<Vec<V>>()),
-            Err(e) => Err(e),
+        let mut output = Vec::new();
+
+        let mut data_stream = Box::into_pin(self.backend.iterate(prefix, suffix_size).await?);
+
+        // fail fast for the first value that cannot be deserialized
+        while let Some(value) = data_stream.next().await {
+            let value =
+                bincode::deserialize::<V>(value?.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string()))?;
+
+            if (*filter)(&value) {
+                output.push(value);
+            }
         }
+
+        Ok(output)
     }
 
     pub async fn batch(&mut self, batch: Batch) -> Result<()> {
@@ -195,7 +200,7 @@ impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
 mod tests {
     use super::*;
     use crate::errors::DbError;
-    use crate::traits::MockKVStorage;
+    use crate::traits::MockAsyncKVStorage;
     use mockall::predicate;
     use serde::Deserialize;
     use utils_types::traits::BinarySerializable;
@@ -234,7 +239,7 @@ mod tests {
 
         let expected = bincode::serialize(&key).unwrap().into_boxed_slice();
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_contains()
             .with(predicate::eq(expected.clone()))
@@ -253,7 +258,7 @@ mod tests {
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
         let ser_value: Result<Option<Box<[u8]>>> = Ok(Some(bincode::serialize(&value).unwrap().into_boxed_slice()));
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_get()
             .with(predicate::eq(expected_key.clone()))
@@ -273,7 +278,7 @@ mod tests {
 
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_get()
             .with(predicate::eq(expected_key.clone()))
@@ -295,7 +300,7 @@ mod tests {
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
         let expected_value = bincode::serialize(&value).unwrap().into_boxed_slice();
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_set()
             .with(
@@ -317,7 +322,7 @@ mod tests {
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
         let expected_value = bincode::serialize(&value).unwrap().into_boxed_slice();
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_set()
             .with(
@@ -343,7 +348,7 @@ mod tests {
         let expected_value = bincode::serialize(&value).unwrap().into_boxed_slice();
         let evicted_value = bincode::serialize(&evicted).unwrap().into_boxed_slice();
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_set()
             .with(
@@ -363,7 +368,7 @@ mod tests {
 
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_remove()
             .with(predicate::eq(expected_key.clone()))
@@ -380,7 +385,7 @@ mod tests {
 
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_remove()
             .with(predicate::eq(expected_key.clone()))
@@ -404,7 +409,7 @@ mod tests {
         let expected_key = bincode::serialize(&key).unwrap().into_boxed_slice();
         let evicted_value = bincode::serialize(&evicted).unwrap().into_boxed_slice();
 
-        let mut backend = MockKVStorage::new();
+        let mut backend = MockAsyncKVStorage::new();
         backend
             .expect_remove()
             .with(predicate::eq(expected_key.clone()))

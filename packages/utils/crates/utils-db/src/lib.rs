@@ -6,7 +6,7 @@ pub mod sqlite;
 pub mod traits;
 pub mod types;
 
-pub use traits::KVStorage;
+pub use traits::AsyncKVStorage;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

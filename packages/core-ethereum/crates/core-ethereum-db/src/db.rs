@@ -9,7 +9,7 @@ use utils_db::db::Batch;
 use utils_db::{
     constants::*,
     db::{serialize_to_bytes, DB},
-    traits::KVStorage,
+    traits::AsyncKVStorage,
 };
 use utils_log::debug;
 use utils_types::{
@@ -30,20 +30,20 @@ fn to_acknowledged_ticket_key(challenge: &EthereumChallenge, epoch: &U256) -> Re
 
 pub struct CoreEthereumDb<T>
 where
-    T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
+    T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>,
 {
     pub db: DB<T>,
     pub me: Address,
 }
 
-impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> CoreEthereumDb<T> {
     pub fn new(db: DB<T>, me: Address) -> Self {
         Self { db, me }
     }
 }
 
 #[async_trait(? Send)]
-impl<T: KVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbActions for CoreEthereumDb<T> {
     // core only part
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
@@ -971,7 +971,7 @@ pub mod wasm {
     #[wasm_bindgen]
     impl Database {
         #[wasm_bindgen(constructor)]
-        pub fn new(db: sqlite::wasm::Sqlite, me_addr: Address) -> Self {
+        pub fn new(db: sqlite::wasm::SqliteDb, me_addr: Address) -> Self {
             Self {
                 core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
                     DB::new(sqlite::wasm::SqliteShim::new(db)),

@@ -1,14 +1,14 @@
 import os from 'os'
 
 import { stat, mkdir, rm } from 'fs/promises'
-import {default as workerpool, type WorkerPool}  from 'workerpool'
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { default as workerpool, type WorkerPool } from 'workerpool'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { debug } from '../process/index.js'
 import { u8aToHex, stringToU8a } from '../u8a/index.js'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const log = debug(`hopr-core:db:master`)
 
@@ -17,28 +17,11 @@ const decoder = new TextDecoder()
 
 const NETWORK_KEY = encoder.encode('network_id')
 
-export class QueryResults {
-  private results: Uint8Array[] = []
-
-  public push(item: Uint8Array) {
-    this.results.push(item)
-  }
-
-  public length(): number {
-    return this.results.length
-  }
-
-  public get(pos: number): Uint8Array{
-    return this.results[pos]
-  }
-}
-
 export class SqliteDb {
   private workerPool: WorkerPool
   private dbPath: string
 
-  constructor() {
-  }
+  constructor() {}
 
   public async init(initializeDb: boolean, dbPath: string, forceCreate: boolean = false, networkId: string = '') {
     this.dbPath = dbPath
@@ -89,8 +72,8 @@ export class SqliteDb {
       workerType: 'thread',
       minWorkers: 'max',
       maxWorkers: workerCount,
-      workerThreadOpts: {argv: [this.dbPath, process.env.HOPRD_DB_DEBUG_LOG]},
-    });
+      workerThreadOpts: { argv: [this.dbPath, process.env.HOPRD_DB_DEBUG_LOG] }
+    })
   }
 
   public async prepare(setNetwork: boolean = false, networkId: string = ''): Promise<void> {
@@ -119,9 +102,9 @@ export class SqliteDb {
 
   public async get(key: Uint8Array): Promise<Uint8Array | undefined> {
     const result = await this.workerPool.exec('get', [u8aToHex(key)])
-    log("DB GET: ", u8aToHex(key), " - ", result)
+    log('DB GET: ', u8aToHex(key), ' - ', result)
     if (result) {
-      log("DB GET: ", u8aToHex(key), " - ", stringToU8a(result))
+      log('DB GET: ', u8aToHex(key), ' - ', stringToU8a(result))
       return stringToU8a(result)
     }
     return undefined
@@ -148,13 +131,9 @@ export class SqliteDb {
     await this.workerPool.exec('batch', [opsConverted])
   }
 
-  public async iterValues(prefix: Uint8Array, _suffix: number): Promise<QueryResults> {
+  public async iterValues(prefix: Uint8Array, _suffix: number): Promise<AsyncIterator<Uint8Array>> {
     const results = await this.workerPool.exec('iterValues', [u8aToHex(prefix)])
-    let qResults = new QueryResults()
-    for (const r of results) {
-      qResults.push(stringToU8a(r))
-    }
-    return qResults
+    return results.map((r: string) => stringToU8a(r))[Symbol.asyncIterator]()
   }
 
   public async close(): Promise<void> {

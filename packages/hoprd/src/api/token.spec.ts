@@ -2,7 +2,7 @@ import { setTimeout } from 'timers/promises'
 import sinon from 'sinon'
 import chai from 'chai'
 import chaiAsPromised from 'chai-as-promised'
-import { Db, Database } from '@hoprnet/hopr-utils'
+import { SqliteDb, Database } from '@hoprnet/hopr-utils'
 
 import {
   authenticateToken,
@@ -25,7 +25,7 @@ describe('authentication token', function () {
 
   beforeEach(async function () {
     node = sinon.fake() as any
-    let db = new Db()
+    let db = new SqliteDb()
     await db.init(true, 'testdb', false)
     node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
   })
@@ -220,7 +220,7 @@ describe('authentication token authorization', function () {
 
   before(async function () {
     node = sinon.fake() as any
-    let db = new Db()
+    let db = new SqliteDb()
     db.init(true, 'testdb', false)
     node.db = new Database(db, ALICE_ETHEREUM_ADDR.clone())
   })
