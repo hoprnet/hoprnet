@@ -999,10 +999,10 @@ impl PacketInteraction {
                     },
                 };
 
-                if processed.is_some() {
+                if let Some(processed_msg) = processed {
                     match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                         Ok(_) => {
-                            match processed_tx.start_send(processed.unwrap()) {
+                            match processed_tx.start_send(processed_msg) {
                                 Ok(_) => {},
                                 Err(e) => error!("Failed to pass a processed ack message: {}", e),
                             }

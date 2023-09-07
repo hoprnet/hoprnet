@@ -2,6 +2,7 @@ use crate::errors::ProtocolError::{ProtocolTicketAggregation, Retry, TransportEr
 use crate::errors::Result;
 use async_lock::RwLock;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
+use core_crypto::types::OffchainPublicKey;
 use core_mixer::future_extensions::StreamThenConcurrentExt;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
@@ -10,15 +11,17 @@ use core_types::{
 use futures::{
     channel::mpsc::{channel, Receiver, Sender, UnboundedSender},
     future::poll_fn,
-    {stream::Stream, StreamExt},
 };
+use futures_lite::stream::{Stream, StreamExt};
 use libp2p_identity::PeerId;
-use std::pin::Pin;
-use std::sync::Arc;
+use std::{pin::Pin, sync::Arc, task::Poll};
 
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use utils_log::{debug, error, info, warn};
-use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
+use utils_types::{
+    primitives::{Address, Balance, BalanceType, EthereumChallenge, U256},
+    traits::PeerIdLike,
+};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
@@ -65,8 +68,7 @@ pub enum TicketAggregationProcessed {
 /// Implements protocol ticket aggregation logic for acknowledgements
 pub struct TicketAggregationProcessor<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
-    chain_key: ChainKeypair, // pub on_received: Option<UnboundedSender<HalfKeyChallenge>>,
-                             // pub on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
+    chain_key: ChainKeypair,
 }
 
 impl<Db: HoprCoreEthereumDbActions> Clone for TicketAggregationProcessor<Db> {
@@ -74,24 +76,18 @@ impl<Db: HoprCoreEthereumDbActions> Clone for TicketAggregationProcessor<Db> {
         Self {
             db: self.db.clone(),
             chain_key: self.chain_key.clone(),
-            // on_acknowledgement: self.on_acknowledgement.clone(),
-            // on_acknowledged_ticket: self.on_acknowledged_ticket.clone(),
         }
     }
 }
 
 impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
     pub fn new(db: Arc<RwLock<Db>>, chain_key: ChainKeypair) -> Self {
-        Self {
-            db,
-            chain_key, // on_acknowledgement,
-                       // on_acknowledged_ticket,
-        }
+        Self { db, chain_key }
     }
 
     pub async fn aggregate_tickets(
         &mut self,
-        destination: Address,
+        destination: PeerId,
         mut acked_tickets: Vec<AcknowledgedTicket>,
     ) -> std::result::Result<Ticket, String> {
         if acked_tickets.len() < 1 {
@@ -111,6 +107,18 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .await
             .map_err(|e| e.to_string())?
             .expect("missing domain separator");
+
+        let destination = self
+            .db
+            .read()
+            .await
+            .get_chain_key(
+                &OffchainPublicKey::from_peerid(&destination)
+                    .expect("Invalid PeerId. Could not convert to OffchainPublicKey"),
+            )
+            .await
+            .map_err(|e| e.to_string())?
+            .expect(format!("Could not find chain key for {}", destination).as_str());
 
         let channel_id = generate_channel_id(&(&self.chain_key).into(), &destination);
 
@@ -184,23 +192,18 @@ impl TicketAggregationActions {
         ticket: std::result::Result<AcknowledgedTicket, String>,
     ) -> Result<()> {
         // TODO: received ticket should be emitted somehow and component tickets removed
-        Err(crate::errors::ProtocolError::ProtocolTicketAggregation(
-            "Failed to process received ticket".to_owned(),
-        ))
+        self.process(TicketAggregationToProcess::ToReceive(source, ticket))
     }
 
     /// Process the received aggregation request
     pub fn receive_aggregation_request(&mut self, source: PeerId, tickets: Vec<AcknowledgedTicket>) -> Result<()> {
         // TODO: received tickets should be processed here and a single Ticket emitted
 
-        for ticket in tickets {}
-        Err(crate::errors::ProtocolError::ProtocolTicketAggregation(
-            "Failed to process received ticket".to_owned(),
-        ))
+        self.process(TicketAggregationToProcess::ToProcess(source, tickets))
     }
 
     /// Pushes a new collection of tickets into the processing.
-    pub fn send_aggregation_request(&mut self, destination: PeerId, tickets: Vec<AcknowledgedTicket>) -> Result<()> {
+    pub fn aggregate_tickets(&mut self, destination: PeerId, tickets: Vec<AcknowledgedTicket>) -> Result<()> {
         // #[cfg(all(feature = "prometheus", not(test)))]
         // METRIC_SENT_ACKS.increment();
         // TODO: metrics here would be nice as well
@@ -238,14 +241,24 @@ impl TicketAggregationInteraction {
 
         let processor = TicketAggregationProcessor::new(db, chain_key);
 
-        let processing_stream = processing_in_rx.then_concurrent(move |event| {
+        let mut processing_stream = processing_in_rx.then_concurrent(move |event| {
             let mut processor = processor.clone();
             let mut processed_tx = processing_out_tx.clone();
 
             async move {
-                let processed = None;
+                let processed = match event {
+                    TicketAggregationToProcess::ToProcess(destination, acked_tickets) => {
+                        processor.aggregate_tickets(destination, acked_tickets);
+                    }
+                    TicketAggregationToProcess::ToReceive(destination, ticket) => {
+                        // instruct processor to replace tickets by aggregated ticket
+                    }
+                    TicketAggregationToProcess::ToSend(destination, tickets) => {
+                        // instruct processor to fetch pending tickets
+                    }
+                };
 
-                if let Some(event) = processed {
+                if let Some(event) = None {
                     match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                         Ok(_) => match processed_tx.start_send(event) {
                             Ok(_) => {}
@@ -260,11 +273,8 @@ impl TicketAggregationInteraction {
         });
 
         spawn_local(async move {
-            processing_stream
-                .map(|x| Ok(x))
-                .forward(futures::sink::drain())
-                .await
-                .unwrap();
+            // poll the stream until it's done
+            while processing_stream.next().await.is_some() {}
         });
 
         Self {
@@ -282,12 +292,8 @@ impl TicketAggregationInteraction {
 impl Stream for TicketAggregationInteraction {
     type Item = TicketAggregationProcessed;
 
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        use futures_lite::stream::StreamExt;
-        return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
+        return Pin::new(self).ack_event_queue.1.poll_next(cx);
     }
 }
 
