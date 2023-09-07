@@ -1187,7 +1187,6 @@ dependencies = [
  "hex-literal",
  "js-sys",
  "libp2p-identity",
- "rusty-leveldb",
  "strum 0.25.0",
  "tempfile",
  "thiserror",

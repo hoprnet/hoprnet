@@ -132,17 +132,9 @@ impl ChannelEntry {
     }
 }
 
-impl std::fmt::Display for ChannelEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("ChannelEntry")
-            .field("source", &self.source.to_string())
-            .field("destination", &self.destination.to_string())
-            .field("balance", &format!("{}", self.balance))
-            .field("ticket_index", &self.ticket_index.to_string())
-            .field("status", &self.status.to_string())
-            .field("channel_epoch", &self.channel_epoch.to_string())
-            .field("closure_time", &self.closure_time.to_string())
-            .finish()
+impl Display for ChannelEntry {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "channel-{}", self.get_id())
     }
 }
 
