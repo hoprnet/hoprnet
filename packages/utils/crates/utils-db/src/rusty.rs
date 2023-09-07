@@ -430,6 +430,7 @@ pub mod wasm {
     use crate::rusty::test_env;
     use js_sys::{JsString, Uint8Array};
     use rusty_leveldb::env::{Env, FileLock, Logger, RandomAccess};
+    use rusty_leveldb::{MemEnv, Status, StatusCode};
     use serde::{Deserialize, Serialize};
     use std::cmp::Ordering;
     use std::collections::HashMap;
@@ -438,7 +439,6 @@ pub mod wasm {
     use std::rc::Rc;
     use std::sync::{Arc, Mutex};
     use std::{io, thread, time};
-    use rusty_leveldb::{MemEnv, Status, StatusCode};
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
