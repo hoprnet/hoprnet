@@ -591,7 +591,12 @@ export default class HoprCoreEthereum extends EventEmitter {
     // the position comes from the order of values in the smart contract
     const ALLOW_ALL_ENUM_POSITION = 3
     const targetAddress = this.chain.getInfo().hoprAnnouncementsAddress
-    const target = await this.chain.getNodeManagementModuleTargetInfo(targetAddress)
+    let target
+    try {
+      target = await this.chain.getNodeManagementModuleTargetInfo(targetAddress)
+    } catch (err) {
+      log(`Error getting module target info for address ${targetAddress}: ${err}`)
+    }
     if (target) {
       const targetAddress2 = target.shr(96)
       const targetPermission = target.shl(176).shr(248)
