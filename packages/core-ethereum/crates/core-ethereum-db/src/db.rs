@@ -1654,55 +1654,80 @@ mod tests {
     async fn test_acknowledged_tickets() {
         let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
-        let hk1 = HalfKey::new(&hex!(
-            "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
-        ));
-        let hk2 = HalfKey::new(&hex!(
-            "4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b"
-        ));
-        let cp1: CurvePoint = hk1.clone().to_challenge().into();
-        let cp2: CurvePoint = hk2.to_challenge().into();
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let mut hk1_seed: [u8; 32] = hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa");
+        let mut hk2_seed: [u8; 32] = hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b");
 
-        let ticket = mock_ticket(
-            &ALICE_KEYPAIR,
-            &BOB_KEYPAIR.public().to_address(),
-            None,
-            Some(23u64.into()),
-            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
-        );
+        let mut acked_tickets: Vec<AcknowledgedTicket> = vec![];
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1.clone(), ALICE_KEYPAIR.public().to_address());
+        let tickets_to_generate = 3u64;
 
-        db.store_pending_acknowledgment(
-            hk1.to_challenge(),
-            PendingAcknowledgement::WaitingAsRelayer(unacked_ticket),
-        )
-        .await
-        .unwrap();
+        for i in 23u64..23u64 + tickets_to_generate {
+            let cp1: CurvePoint = HalfKey::from_bytes(&hk1_seed).unwrap().to_challenge().into();
+            let cp2: CurvePoint = HalfKey::from_bytes(&hk2_seed).unwrap().to_challenge().into();
+            let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let unacked_ticket = match db
-            .get_pending_acknowledgement(&hk1.to_challenge())
-            .await
-            .unwrap()
-            .unwrap()
-        {
-            PendingAcknowledgement::WaitingAsRelayer(unacked) => unacked,
-            _ => panic!("must not happen"),
-        };
+            let ticket = mock_ticket(
+                &ALICE_KEYPAIR,
+                &BOB_KEYPAIR.public().to_address(),
+                None,
+                Some(i.into()),
+                Some(Challenge::from(cp_sum).to_ethereum_challenge()),
+            );
 
-        let acked_ticket = unacked_ticket
-            .acknowledge(&hk2, &BOB_KEYPAIR, &Hash::default())
-            .unwrap();
+            let unacked_ticket = UnacknowledgedTicket::new(
+                ticket,
+                HalfKey::from_bytes(&hk1_seed).unwrap(),
+                ALICE_KEYPAIR.public().to_address(),
+            );
 
-        db.replace_unack_with_ack(&hk1.to_challenge(), acked_ticket.clone())
+            db.store_pending_acknowledgment(
+                HalfKey::from_bytes(&hk1_seed).unwrap().to_challenge(),
+                PendingAcknowledgement::WaitingAsRelayer(unacked_ticket),
+            )
             .await
             .unwrap();
 
-        let acked_from_db = db.get_acknowledged_tickets(None).await.unwrap();
+            let unacked_ticket = match db
+                .get_pending_acknowledgement(&HalfKey::from_bytes(&hk1_seed).unwrap().to_challenge())
+                .await
+                .unwrap()
+                .unwrap()
+            {
+                PendingAcknowledgement::WaitingAsRelayer(unacked) => unacked,
+                _ => panic!("must not happen"),
+            };
 
-        assert_eq!(acked_from_db.len(), 1);
+            let acked_ticket = unacked_ticket
+                .acknowledge(&HalfKey::from_bytes(&hk2_seed).unwrap(), &BOB_KEYPAIR, &Hash::default())
+                .unwrap();
 
-        assert_eq!(acked_ticket, acked_from_db[0]);
+            assert!(acked_ticket
+                .verify(
+                    &ALICE_KEYPAIR.public().to_address(),
+                    &BOB_KEYPAIR.public().to_address(),
+                    &Hash::default()
+                )
+                .is_ok());
+
+            acked_tickets.push(acked_ticket.clone());
+
+            db.replace_unack_with_ack(&HalfKey::from_bytes(&hk1_seed).unwrap().to_challenge(), acked_ticket)
+                .await
+                .unwrap();
+
+            let new_hk1_seed = Hash::create(&[&hk1_seed.clone()]);
+            let new_hk2_seed = Hash::create(&[&hk1_seed.clone()]);
+
+            hk1_seed.copy_from_slice(&new_hk1_seed.to_bytes());
+            hk2_seed.copy_from_slice(&new_hk2_seed.to_bytes());
+        }
+
+        let acked_tickets_from_db = db.get_acknowledged_tickets(None).await.unwrap();
+        let tickets_from_db = db.get_tickets(Some(ALICE_KEYPAIR.public().to_address())).await.unwrap();
+
+        for i in 0usize..tickets_to_generate as usize {
+            assert_eq!(acked_tickets[i], acked_tickets_from_db[i]);
+            assert_eq!(tickets_from_db[i], acked_tickets[i].ticket);
+        }
     }
 }
