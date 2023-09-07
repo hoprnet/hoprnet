@@ -177,11 +177,13 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             defaultChannelsCapabilityPermissions
         );
 
+        bytes32 saltNonce = keccak256(abi.encodePacked(msgSender, vm.getNonce(msgSender)));
+
         // 3. deploy two proxy instances
         (module, safe) = IFactory(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress).clone(
             currentNetworkDetail.addresses.moduleImplementationAddress,
             admins,
-            vm.getNonce(msgSender),
+            uint256(saltNonce),
             bytes32(Target.unwrap(defaultModulePermission))
         );
 
