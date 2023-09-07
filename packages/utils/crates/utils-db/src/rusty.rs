@@ -173,7 +173,7 @@ impl AsyncKVStorage for RustyLevelDbShim {
 }
 
 #[cfg(any(feature = "wasm", test))]
-fn test_env(env: Box<dyn rusty_leveldb::Env>, base: &std::path::Path, ts: u64) {
+fn test_env(env: Box<dyn rusty_leveldb::env::Env>, base: &std::path::Path, ts: u64) {
     utils_log::debug!("test #1");
     let test_dir = base.join(format!("test_dir_{0}", ts));
     env.mkdir(&test_dir).expect("could not create dir");
@@ -429,7 +429,7 @@ mod tests {
 pub mod wasm {
     use crate::rusty::test_env;
     use js_sys::{JsString, Uint8Array};
-    use rusty_leveldb::{Env, FileLock, Logger, MemEnv, RandomAccess, Status, StatusCode};
+    use rusty_leveldb::env::{Env, FileLock, Logger, RandomAccess};
     use serde::{Deserialize, Serialize};
     use std::cmp::Ordering;
     use std::collections::HashMap;
@@ -438,6 +438,7 @@ pub mod wasm {
     use std::rc::Rc;
     use std::sync::{Arc, Mutex};
     use std::{io, thread, time};
+    use rusty_leveldb::{MemEnv, Status, StatusCode};
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
 
@@ -500,15 +501,15 @@ pub mod wasm {
             self.0.rename(old, new)
         }
 
-        fn lock(&self, p: &Path) -> rusty_leveldb::Result<rusty_leveldb::FileLock> {
+        fn lock(&self, p: &Path) -> rusty_leveldb::Result<FileLock> {
             self.0.lock(p)
         }
 
-        fn unlock(&self, l: rusty_leveldb::FileLock) -> rusty_leveldb::Result<()> {
+        fn unlock(&self, l: FileLock) -> rusty_leveldb::Result<()> {
             self.0.unlock(l)
         }
 
-        fn new_logger(&self, p: &Path) -> rusty_leveldb::Result<rusty_leveldb::Logger> {
+        fn new_logger(&self, p: &Path) -> rusty_leveldb::Result<Logger> {
             self.0.new_logger(p)
         }
 

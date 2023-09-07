@@ -41,7 +41,6 @@ hex-literal = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = "1"
-rusty-leveldb = "1.0"
 svm-rs = "0.2.23"
 semver = "1.0"
 hex = "0.4"
