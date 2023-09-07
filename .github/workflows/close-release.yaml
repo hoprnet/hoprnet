@@ -38,12 +38,13 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
+            token: ${{ secrets.GH_RUNNER_TOKEN }}
             commit-message: "Close release ${{ steps.template.outputs.current_version }}"
             title: "Close release ${{ steps.template.outputs.current_version }}"
             body-path: .github/files/${{ steps.template.outputs.pr_template }}
-            branch: feature/close-${{ steps.template.outputs.current_version }}
+            branch: bot/close-${{ steps.template.outputs.current_version }}
             delete-branch: true
             labels: release
             assignees: ${{ github.actor }}
-            team-reviewers: hoprnet/hopr-development
+            team-reviewers: "@hoprnet/hopr-development"
 

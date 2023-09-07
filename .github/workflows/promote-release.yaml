@@ -1,0 +1,57 @@
+---
+name: Promote Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_name:
+        type: string
+        required: true
+        description: 'Release name (providence| bratislava)'
+      tag_name:
+        type: string
+        required: true
+        description: 'Git tag name which the release will be rebased (v2.0.0-rc.2)'
+
+concurrency:
+  group: promote-release
+  cancel-in-progress: true
+
+jobs:
+  promote-release:
+    name: Promote Release
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          ref: master
+
+      - name: Promote release
+        id: promote
+        run: |
+          git fetch
+
+          # Checkout to tag revision
+          if [ `git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}` ];
+          then 
+            echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
+            exit 1
+          fi
+
+          # Create new branch or reuse an existing branch
+          if [ `git branch -al ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}` ];
+          then 
+            git checkout release/${{ github.event.inputs.release_name }}
+            git rebase ${{ github.event.inputs.tag_name }}
+            git push release/${{ github.event.inputs.release_name }}
+          else
+            git checkout ${{ github.event.inputs.tag_name }}
+            git checkout -b release/${{ github.event.inputs.release_name }}
+            git push --set-upstream origin release/${{ github.event.inputs.release_name }}
+          fi
+          
+          # Tag the release
+          git tag --force ${{ github.event.inputs.release_name }}
+          git push --force origin ${{ github.event.inputs.release_name }}

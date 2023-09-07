@@ -59,9 +59,9 @@ jobs:
             token: ${{ secrets.GH_RUNNER_TOKEN }}
             commit-message: "Bump to version ${{ steps.bump.outputs.next_version }}"
             base: ${{ steps.setup.outputs.base_branch }}
-            title: "Create release ${{ steps.bump.outputs.next_version }}"
+            title: "Open release ${{ steps.bump.outputs.next_version }}"
             body: "The scope of this PR is to create the contents of the new release ${{ steps.bump.outputs.next_version }}"
-            branch: feature/create-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+            branch: bot/open-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
             delete-branch: true
             assignees: ${{ github.actor }}
             team-reviewers: "@hoprnet/hopr-development"
