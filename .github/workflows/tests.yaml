@@ -68,19 +68,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/.package-cache/
-            .cargo/bin/
-            .foundry/bin/
+#      - name: restore cargo cache
+#        uses: actions/cache@v3
+#        with:
+#          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+#          path: |
+#            ~/.cargo/bin/
+#            ~/.cargo/registry/index/
+#            ~/.cargo/registry/cache/
+#            ~/.cargo/git/db/
+#            target/
+#            .cargo/.package-cache/
+#            .cargo/bin/
+#            .foundry/bin/
+
+      - name: Clean cargo cache
+        run: cargo clean
 
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
