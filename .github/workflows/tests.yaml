@@ -82,9 +82,6 @@ jobs:
 #            .cargo/bin/
 #            .foundry/bin/
 
-      - name: Clean cargo cache
-        run: cargo clean
-
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
