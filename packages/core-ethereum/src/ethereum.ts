@@ -120,7 +120,7 @@ export async function createChainWrapper(
   )
 
   // Use safe variants of SC calls from the start.
-  chainCalls.set_use_safe(true)
+  await chainCalls.set_use_safe(true)
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -437,7 +437,7 @@ export async function createChainWrapper(
     txHandler: (tx: string) => DeferType<string>
   ): Promise<string> => {
     let to = deploymentExtract.hoprAnnouncementsAddress
-    let data = u8aToHex(chainCalls.get_announce_payload(multiaddr.toString(), offchainKeypair, useSafe))
+    let data = u8aToHex(await chainCalls.get_announce_payload(multiaddr.toString(), offchainKeypair, useSafe))
     if (useSafe) {
       to = safeModuleOptions.moduleAddress.to_hex()
     }
@@ -498,7 +498,10 @@ export async function createChainWrapper(
         case 'HOPR':
           withdrawEssentialTxPayload = {
             data: u8aToHex(
-              chainCalls.get_transfer_payload(Address.from_string(recipient), new Balance(amount, BalanceType.HOPR))
+              await chainCalls.get_transfer_payload(
+                Address.from_string(recipient),
+                new Balance(amount, BalanceType.HOPR)
+              )
             ),
             to: token.address,
             value: BigNumber.from(0)
@@ -545,7 +548,7 @@ export async function createChainWrapper(
 
     // const approveTxPayload: TransactionPayload = {
     //   data: u8aToHex(
-    //     chainCalls.get_approve_payload(
+    //     await chainCalls.get_approve_payload(
     //       amount
     //     )
     //   ),
@@ -572,9 +575,9 @@ export async function createChainWrapper(
     let fundChannelError: unknown
     let fundChannelResult: SendTransactionReturn
 
-    let is_safe_set = chainCalls.get_use_safe()
+    let is_safe_set = await chainCalls.get_use_safe()
     const fundChannelPayload: TransactionPayload = {
-      data: u8aToHex(chainCalls.get_fund_channel_payload(destination, amount)),
+      data: u8aToHex(await chainCalls.get_fund_channel_payload(destination, amount)),
       to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
@@ -610,9 +613,9 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
-    let is_safe_set = chainCalls.get_use_safe()
+    let is_safe_set = await chainCalls.get_use_safe()
     const initiateOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(chainCalls.get_intiate_outgoing_channel_closure_payload(counterparty)),
+      data: u8aToHex(await chainCalls.get_intiate_outgoing_channel_closure_payload(counterparty)),
       to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
@@ -652,9 +655,9 @@ export async function createChainWrapper(
     let sendResult: SendTransactionReturn
     let error: unknown
 
-    let is_safe_set = chainCalls.get_use_safe()
+    let is_safe_set = await chainCalls.get_use_safe()
     const finalizeOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(chainCalls.get_finalize_outgoing_channel_closure_payload(counterparty)),
+      data: u8aToHex(await chainCalls.get_finalize_outgoing_channel_closure_payload(counterparty)),
       to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
@@ -696,10 +699,10 @@ export async function createChainWrapper(
 
     let sendResult: SendTransactionReturn
     let error: unknown
-    let is_safe_set = chainCalls.get_use_safe()
+    let is_safe_set = await chainCalls.get_use_safe()
 
     const redeemTicketEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(chainCalls.get_redeem_ticket_payload(ackTicket)),
+      data: u8aToHex(await chainCalls.get_redeem_ticket_payload(ackTicket)),
       to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
       value: BigNumber.from(0)
     }
@@ -741,7 +744,7 @@ export async function createChainWrapper(
     let error: unknown
 
     const registerSafeByNodeEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(chainCalls.get_register_safe_by_node_payload(safeAddress)),
+      data: u8aToHex(await chainCalls.get_register_safe_by_node_payload(safeAddress)),
       to: nodeSafeRegistry.address,
       value: BigNumber.from(0)
     }

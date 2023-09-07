@@ -29,9 +29,10 @@ const MOCK_PUBLIC_KEY = () =>
 
 const MOCK_ADDRESS = () => Address.from_string('Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9')
 
-import { LevelDb } from './db.js'
-import { db_sanity_test } from '../../../hoprd/lib//hoprd_hoprd.js'
-import fs from 'fs'
+import { rmSync } from 'fs'
+
+import { test_nodejs_env, hoprd_hoprd_initialize_crate } from '../../../hoprd/lib//hoprd_hoprd.js'
+hoprd_hoprd_initialize_crate()
 
 function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, balance: Balance) {
   let chainKp = new ChainKeypair(signerPrivKey)
@@ -49,34 +50,8 @@ function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address, ba
   return tkt
 }
 
-describe('db shim tests', function () {
-  let db: LevelDb
-  let db_dir_path: string
-
-  beforeEach(function () {
-    db = new LevelDb()
-    db_dir_path = '/tmp/test-shim.db'
-  })
-
-  afterEach(async function () {
-    await db.close()
-
-    fs.rmSync(db_dir_path, { recursive: true, force: true })
-  })
-
-  it('basic DB operations are performed in Rust correctly', async function () {
-    await db.init(true, db_dir_path, true, 'monte_rosa')
-
-    try {
-      await db_sanity_test(db)
-    } catch (e) {
-      assert.fail(`db sanity tests should pass: ${e}`)
-    }
-  })
-})
-
 function test_in_memory_db() {
-  return new Database(new LevelDb(), MOCK_PUBLIC_KEY().to_address())
+  return Database.new_in_memory(MOCK_PUBLIC_KEY().to_address())
 }
 
 describe('db functional tests', function () {
@@ -122,27 +97,18 @@ describe('db functional tests', function () {
 
     assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
   })
-})
 
-describe(`levelup shim tests`, function () {
-  let db: LevelDb
-
-  beforeEach(function () {
-    db = new LevelDb()
+  it('test rusty level db', async function () {
+    test_nodejs_env('/tmp')
   })
 
-  afterEach(async function () {
-    await db.close()
-  })
+  it('test db creation and simple set', async function () {
+    rmSync('/tmp/test', { force: true, recursive: true })
 
-  it('should store network', async function () {
-    await db.setNetworkId('test-env')
-    assert.equal(await db.getNetworkId(), 'test-env')
-  })
-
-  it('should verify network', async function () {
-    await db.setNetworkId('test-env')
-    assert((await db.verifyNetworkId('wrong-id')) === false, `must fail for wrong id`)
-    assert((await db.verifyNetworkId('test-env')) === true, `must not fail for correct id`)
+    let db = new Database('/tmp/test', true, MOCK_PUBLIC_KEY().to_address())
+    let balance_1 = new Balance('100', BalanceType.HOPR)
+    await db.set_hopr_balance(balance_1)
+    let balance_2 = await db.get_hopr_balance()
+    assert.equal(balance_2.to_string(), balance_1.to_string(), 'value must be equal')
   })
 })

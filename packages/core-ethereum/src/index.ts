@@ -20,7 +20,6 @@ import {
   OffchainPublicKey,
   ChainKeypair,
   OffchainKeypair,
-  is_allowed_to_access_network,
   CORE_ETHEREUM_CONSTANTS,
   Database
 } from '@hoprnet/hopr-utils'
@@ -396,7 +395,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     // Use an async iterator to make execution interruptable and allow
     // Node.JS to schedule iterations at any time
     const ticketRedeemIterator = async function* () {
-      let serdeChannel = channel
+      let serdeChannel = channel.clone()
       let tickets = await boundGetAckdTickets(serdeChannel)
       log(`there are ${tickets.len()} left to redeem in channel ${channelId.to_hex()}`)
 
@@ -414,11 +413,9 @@ export default class HoprCoreEthereum extends EventEmitter {
 
         ticket = fetched
 
-        log(
-          `redeeming ticket ${ticket.response.to_hex()} in channel ${channelId.to_hex()} from ${channel.source.to_hex()} to ${channel.destination.to_hex()}, porSecret ${ticket.response.to_hex()}`
-        )
+        log(`redeeming ticket ${ticket.response.to_hex()} in channel ${channel.to_string()}`)
 
-        log(ticket.ticket.to_string())
+        log('ticket: ', ticket.ticket.to_string())
 
         const result = await boundRedeemTicket(channel.source, channelId, ticket)
 
@@ -653,17 +650,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.db.set_staking_module_address(this.safeModuleOptions.moduleAddress)
 
     return receipt
-  }
-
-  /**
-   * Checks whether a given `hoprNode` is allowed access.
-   * When the register is disabled, a `hoprNode` is seen as `registered`,
-   * when the register is enabled, a `hoprNode` needs to also be `eligible`.
-   * @param hoprNode Ethereum address of the account we want to check if it's registered
-   * @returns true if registered
-   */
-  public async isAllowedAccessToNetwork(hoprNode: Address): Promise<boolean> {
-    return await is_allowed_to_access_network(this.db, hoprNode)
   }
 
   public static createMockInstance(chainKeypair: ChainKeypair, peerId: PeerId): HoprCoreEthereum {

@@ -2,7 +2,6 @@ pub mod generic;
 
 pub mod passive;
 pub mod promiscuous;
-pub mod random;
 pub mod traits;
 pub mod manager;
 

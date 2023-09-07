@@ -51,7 +51,6 @@ hex = "0.4.3"
 hex-literal = "0.4.1"
 mockall = "0.11.4"
 parameterized = "1.0"
-rusty-leveldb = "1.0"
 serial_test = "2.0"
 
 [package.metadata.wasm-pack.profile.dev]

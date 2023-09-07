@@ -15,7 +15,8 @@ import {
   authenticateWsConnection,
   getStatusCodeForInvalidInputInRequest,
   removeQueryParams,
-  encodeMessage
+  encodeMessage,
+  decodeMessage
 } from './utils.js'
 import { authenticateToken, authorizeToken, validateTokenCapabilities } from './token.js'
 import { STATUS_CODES } from './v3/utils.js'
@@ -352,13 +353,28 @@ export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, opt
 
     if (path === WS_PATHS.MESSAGES) {
       node.on('hopr:message', (data: ApplicationData) => {
-        socket.send(data.plain_text.toString())
+        // We send the message and its application tag in JSON format.
+        let decodedMsg = decodeMessage(data.plain_text)
+        const msg = {
+          type: 'message',
+          tag: data.application_tag ?? 0,
+          body: decodedMsg.msg
+        }
+        socket.send(JSON.stringify(msg))
       })
       node.on('hopr:message-ack-challenge', (ackChallenge: string) => {
-        socket.send(`ack-challenge:${ackChallenge}`)
+        const msg = {
+          type: 'message-ack-challenge',
+          id: ackChallenge
+        }
+        socket.send(JSON.stringify(msg))
       })
       node.on('hopr:message-acknowledged', (ackChallenge: string) => {
-        socket.send(`ack:'${ackChallenge}'`)
+        const msg = {
+          type: 'message-ack',
+          id: ackChallenge
+        }
+        socket.send(JSON.stringify(msg))
       })
     } else {
       // close connection on unsupported paths

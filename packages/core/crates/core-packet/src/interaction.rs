@@ -672,6 +672,9 @@ where
                         );
                         *DEFAULT_PRICE_PER_PACKET
                     });
+
+                debug!("price per packet is {price_per_packet}");
+
                 if let Err(e) = validate_unacknowledged_ticket::<Db>(
                     &*self.db.read().await,
                     &packet.ticket,
@@ -690,6 +693,7 @@ where
                 }
 
                 {
+                    debug!("storing pending acknowledgement for channel {}", channel.get_id());
                     let mut g = self.db.write().await;
                     g.set_current_ticket_index(&channel.get_id().hash(), packet.ticket.index.into())
                         .await?;
@@ -1076,11 +1080,8 @@ mod tests {
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
     use serial_test::serial;
-    use std::{
-        sync::{Arc, Mutex},
-        time::Duration,
-    };
-    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use std::{sync::Arc, time::Duration};
+    use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_log::debug;
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
@@ -1149,37 +1150,28 @@ mod tests {
         )
     }
 
-    fn create_dbs(amount: usize) -> Vec<Arc<Mutex<rusty_leveldb::DB>>> {
-        (0..amount)
-            .map(|i| {
-                Arc::new(Mutex::new(
-                    rusty_leveldb::DB::open(format!("test_db_{i}"), rusty_leveldb::in_memory()).unwrap(),
-                ))
-            })
-            .collect()
+    fn create_dbs(amount: usize) -> Vec<RustyLevelDbShim> {
+        (0..amount).map(|_| RustyLevelDbShim::new_in_memory()).collect()
     }
 
-    fn create_core_dbs(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+    fn create_core_dbs(dbs: &Vec<RustyLevelDbShim>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
         dbs.iter()
             .enumerate()
             .map(|(i, db)| {
                 Arc::new(RwLock::new(CoreEthereumDb::new(
-                    DB::new(RustyLevelDbShim::new(db.clone())),
+                    DB::new(db.clone()),
                     PublicKey::from_privkey(&PEERS_CHAIN_PRIVS[i]).unwrap().to_address(),
                 )))
             })
             .collect::<Vec<_>>()
     }
 
-    async fn create_minimal_topology(dbs: &Vec<Arc<Mutex<rusty_leveldb::DB>>>) -> crate::errors::Result<()> {
+    async fn create_minimal_topology(dbs: &Vec<RustyLevelDbShim>) -> crate::errors::Result<()> {
         let testing_snapshot = Snapshot::default();
         let mut previous_channel: Option<ChannelEntry> = None;
 
         for index in 0..dbs.len() {
-            let mut db = CoreEthereumDb::new(
-                DB::new(RustyLevelDbShim::new(dbs[index].clone())),
-                PEERS_CHAIN[index].public().to_address(),
-            );
+            let mut db = CoreEthereumDb::new(DB::new(dbs[index].clone()), PEERS_CHAIN[index].public().to_address());
 
             // Link all the node keys and chain keys from the simulated announcements
             for i in 0..PEERS_PRIVS.len() {

@@ -33,6 +33,8 @@
 - Prevent relayers from extracting multiple base amounts ([#5385](https://github.com/hoprnet/hoprnet/pull/5385))
 - Added dynamic price per packet via the TicketPriceOracle smart contract ([#5372](https://github.com/hoprnet/hoprnet/pull/5372))
 - Introduced capability-based signature verification for on-chain node management (or staking v2)([#5211](https://github.com/hoprnet/hoprnet/pull/5211))
+- Fixed crash during ticket redemption procedure which prevented channels from being closed ([#5433](https://github.com/hoprnet/hoprnet/pull/5433))
+- Use Rusty-levelDB as a database backend with Node.js FS bindings ([#5433](https://github.com/hoprnet/hoprnet/pull/5435))
 
 <a name="1.93"></a>
 

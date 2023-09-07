@@ -10,33 +10,8 @@ concurrency:
   group: ${{ github.head_ref }}-build
   cancel-in-progress: true
 jobs:
-  check_changeset:
-    name: Check changeset
-    runs-on: ubuntu-2-core
-    if: github.event.pull_request.draft == false
-    outputs:
-      build_toolchain: ${{ steps.check_pr_changeset.outputs.build_toolchain }}
-      build_hopli: ${{ steps.check_pr_changeset.outputs.build_hopli }}
-      build_hoprd: ${{ steps.check_pr_changeset.outputs.build_hoprd }}
-      build_anvil: ${{ steps.check_pr_changeset.outputs.build_anvil }}
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Check PR changes
-        id: check_pr_changeset
-        run: |
-          ./scripts/check-pr.sh --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
-          cat check_pr.log >> $GITHUB_OUTPUT
-          cat check_pr.log
-
   build_toolchain:
     name: Toolchain
-    needs:
-      - check_changeset
-    if: needs.check_changeset.outputs.build_toolchain
     uses: ./.github/workflows/build-toolchain.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -45,30 +20,16 @@ jobs:
   build_hopli:
     name: Hopli
     needs:
-      - check_changeset
       - build_toolchain
-    # Required to add `always()` due to skipped needs
-    if: |
-        always() &&
-        (needs.build_toolchain.result == 'success' || needs.build_toolchain.result == 'skipped') &&
-        (needs.check_changeset.outputs.build_toolchain || needs.check_changeset.outputs.build_hopli)
     uses: ./.github/workflows/build-hopli.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-    with:
-      build_toolchain: ${{ needs.check_changeset.outputs.build_toolchain }}
 
   build_hoprd:
     name: Hoprd
     needs:
-      - check_changeset
       - build_toolchain
-    # Required to add `always()` due to skipped needs
-    if: |
-        always() &&
-        (needs.build_toolchain.result == 'success' || needs.build_toolchain.result == 'skipped') &&
-        (needs.check_changeset.outputs.build_toolchain || needs.check_changeset.outputs.build_hoprd)
     uses: ./.github/workflows/build-hoprd.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
@@ -76,46 +37,23 @@ jobs:
       K8S_SSH_SERVICE_HOST: ${{ secrets.K8S_SSH_SERVICE_HOST }}
       K8S_SSH_SERVICE_USERNAME: ${{ secrets.K8S_SSH_SERVICE_USERNAME }}
       K8S_SSH_SERVICE_PASSWORD: ${{ secrets.K8S_SSH_SERVICE_PASSWORD }}
-    with:
-      build_toolchain: ${{ needs.check_changeset.outputs.build_toolchain }}
 
   build_anvil:
     name: Anvil
     needs:
-      - check_changeset
       - build_toolchain
-    # Required to add `always()` due to skipped needs
-    if: |
-        always() &&
-        (needs.build_toolchain.result == 'success' || needs.build_toolchain.result == 'skipped') &&
-        (needs.check_changeset.outputs.build_toolchain || needs.check_changeset.outputs.build_anvil)
     uses: ./.github/workflows/build-anvil.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-    with:
-      build_toolchain: ${{ needs.check_changeset.outputs.build_toolchain }}
 
   build_pluto:
     name: Pluto
     needs:
-      - check_changeset
-      - build_toolchain
       - build_anvil
       - build_hoprd
       - build_hopli
-    # Required to add `always()` due to skipped needs
-    if: |
-        always() &&
-        (needs.build_toolchain.result == 'success' || needs.build_toolchain.result == 'skipped') &&
-        (needs.build_anvil.result == 'success' || needs.build_anvil.result == 'skipped') &&
-        (needs.build_hoprd.result == 'success' || needs.build_hoprd.result == 'skipped') &&
-        (needs.build_hopli.result == 'success' || needs.build_hopli.result == 'skipped')
     uses: ./.github/workflows/build-pluto.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-    with:
-      build_hoprd: ${{ needs.check_changeset.outputs.build_hoprd }}
-      build_hopli: ${{ needs.check_changeset.outputs.build_hopli }}
-      build_anvil: ${{ needs.check_changeset.outputs.build_anvil }}

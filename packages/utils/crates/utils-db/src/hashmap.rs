@@ -86,7 +86,7 @@ impl AsyncKVStorage for BinaryHashMapStorage {
         let mut first_key: Vec<u8> = prefix.clone().into();
         first_key.extend((0..suffix_size).map(|_| 0u8));
 
-        let mut last_key: Vec<u8> = prefix.clone().into();
+        let mut last_key: Vec<u8> = prefix.into();
         last_key.extend((0..suffix_size).map(|_| 0xffu8));
 
         let d = iter(self.data.clone().into_iter())

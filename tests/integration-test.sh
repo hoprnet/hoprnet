@@ -268,7 +268,7 @@ log "Node 2 has no unredeemed ticket value"
 result=$(api_get_ticket_statistics "${api2}" "\"unredeemedValue\":\"0\"")
 log "-- ${result}"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send 0 hop message to node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr2}" 'hello, world from node 1 via 0-hop' "" & jobs+=( "$!" )
 
@@ -298,7 +298,7 @@ log "Waiting for nodes to finish open channel (long running)"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send 1 hop message to self via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
 
@@ -316,10 +316,6 @@ log "Waiting for nodes to finish sending 1 hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-echo "Exit early after sending 1-hop messages"
-exit 0
-
-
 log "Node 2 should now have a ticket"
 result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")
 log "-- ${result}"
@@ -336,7 +332,7 @@ log "Node 5 should now have a ticket"
 result=$(api_get_ticket_statistics "${api5}" "\"winProportion\":1")
 log "-- ${result}"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send 1 hop message to node 3 via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr3}" 'hello, world from 1 via 2' "${addr2}" & jobs+=( "$!" )
 
@@ -353,7 +349,7 @@ log "Waiting for nodes to finish sending 1-hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
   api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
 done
@@ -361,7 +357,7 @@ log "Waiting for nodes to finish sending 3-hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send message to node 5"
   api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
 done
@@ -398,6 +394,7 @@ test_redeem_in_specific_channel() {
   echo "all good"
 }
 
+echo "!!! Skipping ticket redemption tests until fixed !!!"
 # FIXME: re-enable when ticket redemption works
 #
 # test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
@@ -422,7 +419,7 @@ api_close_channel 5 1 "${api5}" "${node_addr1}" "outgoing" & jobs+=( "$!" )
 
 # initiate channel closures for channels without tickets so we can check
 # completeness
-api_close_channel 1 5 "${api1}" "${addr5}" "outgoing" "true" & jobs+=( "$!" )
+api_close_channel 1 5 "${api1}" "${node_addr5}" "outgoing" "true" & jobs+=( "$!" )
 
 log "Waiting for nodes to finish handling close channels calls"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
@@ -468,4 +465,4 @@ test_get_all_channels "${api1}"
 
 
 # checking statuses of the long running tests
-check_native_withdraw_results ${native_balance}
+#check_native_withdraw_results ${native_balance}

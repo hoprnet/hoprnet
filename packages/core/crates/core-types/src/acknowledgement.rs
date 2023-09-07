@@ -22,16 +22,13 @@ use utils_types::{
 
 /// Represents packet acknowledgement
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Acknowledgement {
     ack_signature: OffchainSignature,
     pub ack_key_share: HalfKey,
     validated: bool,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Acknowledgement {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
         Self {
             ack_signature: OffchainSignature::sign_message(&ack_key_share.to_bytes(), node_keypair),

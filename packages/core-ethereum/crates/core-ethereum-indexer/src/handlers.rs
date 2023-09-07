@@ -441,50 +441,23 @@ where
         match HoprNetworkRegistryEvents::decode_log(log)? {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
                 let node_address = &deregistered.node_address.0.try_into()?;
-                db.remove_from_network_registry(
-                    &deregistered.staking_account.0.try_into()?,
-                    &deregistered.node_address.0.try_into()?,
-                    snapshot,
-                )
-                .await?;
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
-                self.cbs
-                    .node_not_allowed_to_access_network(&deregistered.node_address.0.try_into()?);
+                self.cbs.node_not_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
                 let node_address = &deregistered.node_address.0.try_into()?;
-                db.remove_from_network_registry(
-                    &deregistered.staking_account.0.try_into()?,
-                    &deregistered.node_address.0.try_into()?,
-                    snapshot,
-                )
-                .await?;
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
-                self.cbs
-                    .node_not_allowed_to_access_network(&deregistered.node_address.0.try_into()?);
+                self.cbs.node_not_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
                 let node_address = &registered.node_address.0.try_into()?;
-                db.add_to_network_registry(
-                    &registered.staking_account.0.try_into()?,
-                    &registered.node_address.0.try_into()?,
-                    snapshot,
-                )
-                .await?;
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
                 self.cbs.node_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
                 let node_address = &registered.node_address.0.try_into()?;
-                db.add_to_network_registry(
-                    &registered.staking_account.0.try_into()?,
-                    &registered.node_address.0.try_into()?,
-                    snapshot,
-                )
-                .await?;
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
-                self.cbs
-                    .node_allowed_to_access_network(&registered.node_address.0.try_into()?);
+                self.cbs.node_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
                 let account: Address = eligibility_updated.staking_account.0.try_into()?;
@@ -650,8 +623,7 @@ pub mod tests {
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use std::sync::{Arc, Mutex};
-    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
@@ -673,13 +645,7 @@ pub mod tests {
     }
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
-        let opt = rusty_leveldb::in_memory();
-        let db = rusty_leveldb::DB::open("test", opt).unwrap();
-
-        CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
-            Address::random(),
-        )
+        CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random())
     }
 
     struct DummyCallbacks {}
@@ -937,6 +903,8 @@ pub mod tests {
             data: encode(&[]),
         };
 
+        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+
         handlers
             .on_event(
                 &mut db,
@@ -948,9 +916,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db.get_from_network_registry(&STAKE_ADDRESS).await.unwrap();
-
-        assert_eq!(stored, vec![*SELF_CHAIN_ADDRESS]);
+        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
     }
 
     #[async_std::test]
@@ -967,6 +933,8 @@ pub mod tests {
             data: encode(&[]),
         };
 
+        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+
         handlers
             .on_event(
                 &mut db,
@@ -978,9 +946,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db.get_from_network_registry(&STAKE_ADDRESS).await.unwrap();
-
-        assert_eq!(stored, vec![*SELF_CHAIN_ADDRESS]);
+        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
     }
 
     #[async_std::test]
@@ -988,7 +954,7 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        db.add_to_network_registry(&SELF_CHAIN_ADDRESS, &STAKE_ADDRESS, &Snapshot::default())
+        db.set_allowed_to_access_network(&SELF_CHAIN_ADDRESS, true, &Snapshot::default())
             .await
             .unwrap();
 
@@ -1001,6 +967,8 @@ pub mod tests {
             data: encode(&[]),
         };
 
+        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+
         handlers
             .on_event(
                 &mut db,
@@ -1012,9 +980,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db.get_from_network_registry(&STAKE_ADDRESS).await.unwrap();
-
-        assert_eq!(stored, vec![]);
+        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
     }
 
     #[async_std::test]
@@ -1022,7 +988,7 @@ pub mod tests {
         let handlers = init_handlers();
         let mut db = create_mock_db();
 
-        db.add_to_network_registry(&SELF_CHAIN_ADDRESS, &STAKE_ADDRESS, &Snapshot::default())
+        db.set_allowed_to_access_network(&SELF_CHAIN_ADDRESS, true, &Snapshot::default())
             .await
             .unwrap();
 
@@ -1035,6 +1001,8 @@ pub mod tests {
             data: encode(&[]),
         };
 
+        assert!(db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
+
         handlers
             .on_event(
                 &mut db,
@@ -1046,9 +1014,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let stored = db.get_from_network_registry(&STAKE_ADDRESS).await.unwrap();
-
-        assert_eq!(stored, vec![]);
+        assert!(!db.is_allowed_to_access_network(&SELF_CHAIN_ADDRESS).await.unwrap());
     }
 
     #[async_std::test]
@@ -1717,7 +1683,7 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub async fn on_event(
-            &mut self,
+            &self,
             db: &Database,
             address: &str,
             topics: Array,
