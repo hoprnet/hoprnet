@@ -73,10 +73,15 @@ impl RustyLevelDbShim {
     }
 
     #[cfg(feature = "wasm")]
-    pub fn new(path: &str) -> Self {
+    pub fn new(path: &str, create_if_missing: bool) -> Self {
+        let opts = rusty_leveldb::Options {
+            create_if_missing,
+            error_if_exists: false,
+            ..wasm::NodeJsEnv::create_options()
+        };
         Self {
             db: Arc::new(Mutex::new(
-                rusty_leveldb::DB::open(path, wasm::NodeJsEnv::create_options()).expect("failed to create DB"),
+                rusty_leveldb::DB::open(path, opts).expect("failed to create DB"),
             )),
         }
     }

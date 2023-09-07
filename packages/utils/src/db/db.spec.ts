@@ -105,7 +105,7 @@ describe('db functional tests', function () {
   it('test db creation and simple set', async function () {
     rmSync('/tmp/test', { force: true, recursive: true })
 
-    let db = new Database('/tmp/test', MOCK_PUBLIC_KEY().to_address())
+    let db = new Database('/tmp/test', true, MOCK_PUBLIC_KEY().to_address())
     let balance_1 = new Balance('100', BalanceType.HOPR)
     await db.set_hopr_balance(balance_1)
     let balance_2 = await db.get_hopr_balance()

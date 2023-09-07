@@ -979,10 +979,10 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(constructor)]
-        pub fn new(path: &str, me_addr: Address) -> Self {
+        pub fn new(path: &str, create_if_missing: bool, me_addr: Address) -> Self {
             Self {
                 core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
-                    DB::new(utils_db::rusty::RustyLevelDbShim::new(path)),
+                    DB::new(utils_db::rusty::RustyLevelDbShim::new(path, create_if_missing)),
                     me_addr,
                 ))),
             }
