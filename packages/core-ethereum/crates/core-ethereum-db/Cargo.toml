@@ -34,9 +34,6 @@ serde-wasm-bindgen = { version = "0.5", optional = true }
 async-std = { version = "1.12.0", features = ["attributes"] }
 wasm-bindgen-test = "0.3.30"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-rusty-leveldb = "1.0"
-
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
 wasm-opt = { workspace = true }

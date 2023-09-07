@@ -138,7 +138,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let ack_key =
             to_acknowledged_ticket_key(&ack_ticket.ticket.challenge, &ack_ticket.ticket.channel_epoch.into())?;
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.del(unack_key);
         batch_ops.put(ack_key, ack_ticket);
 
@@ -232,7 +232,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         packet_key: &OffchainPublicKey,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        let mut batch = Batch::new();
+        let mut batch = Batch::default();
         let ck_key = utils_db::db::Key::new_with_prefix(chain_key, CHAIN_KEY_PREFIX)?;
         let pk_key = utils_db::db::Key::new_with_prefix(&Hash::create(&[&packet_key.to_bytes()]), PACKET_KEY_PREFIX)?;
 
@@ -269,7 +269,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(channel_key, channel);
         batch_ops.put(snapshot_key, snapshot);
 
@@ -283,7 +283,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
         let neglected_ticket_count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         for ticket in acknowledged_tickets.iter() {
             batch_ops.del(to_acknowledged_ticket_key(
                 &ticket.ticket.challenge,
@@ -346,7 +346,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let address_key = utils_db::db::Key::new_with_prefix(&account.chain_addr, ACCOUNT_PREFIX)?;
         let snapshot_key = utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?;
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(address_key, account);
         batch_ops.put(snapshot_key, snapshot);
 
@@ -409,7 +409,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         // TODO: NOTE: was there a bug in the original implementation in TS? val.sub(val)?
         batch_ops.put(key.clone(), current_balance.sub(balance));
         batch_ops.put(
@@ -426,7 +426,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             ticket.ticket.index, counterparty
         );
 
-        let mut ops = utils_db::db::Batch::new();
+        let mut ops = utils_db::db::Batch::default();
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
@@ -464,7 +464,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             ticket.ticket.index, counterparty
         );
 
-        let mut ops = utils_db::db::Batch::new();
+        let mut ops = utils_db::db::Batch::default();
 
         let key = utils_db::db::Key::new_from_str(LOSING_TICKET_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
@@ -576,7 +576,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         node_safe_registry_domain_separator: &Hash,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(
             utils_db::db::Key::new_from_str(NODE_SAFE_REGISTRY_DOMAIN_SEPARATOR_KEY)?,
             node_safe_registry_domain_separator,
@@ -599,7 +599,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         channels_domain_separator: &Hash,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(
             utils_db::db::Key::new_from_str(CHANNELS_DOMAIN_SEPARATOR_KEY)?,
             channels_domain_separator,
@@ -622,7 +622,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         channels_ledger_domain_separator: &Hash,
         snapshot: &Snapshot,
     ) -> Result<()> {
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(
             utils_db::db::Key::new_from_str(CHANNELS_LEDGER_DOMAIN_SEPARATOR_KEY)?,
             channels_ledger_domain_separator,
@@ -644,7 +644,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(key, current_balance.add(balance));
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
@@ -663,7 +663,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(key, current_balance.sub(balance));
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
@@ -685,7 +685,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn set_staking_safe_address(&mut self, safe_address: &Address) -> Result<()> {
         let safe_address_key = utils_db::db::Key::new_from_str(STAKING_SAFE_ADDRESS_KEY)?;
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(safe_address_key, safe_address);
 
         self.db.batch(batch_ops, true).await
@@ -703,7 +703,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn set_staking_module_address(&mut self, module_address: &Address) -> Result<()> {
         let module_address_key = utils_db::db::Key::new_from_str(STAKING_MODULE_ADDRESS_KEY)?;
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(module_address_key, module_address);
 
         self.db.batch(batch_ops, true).await
@@ -723,7 +723,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn set_staking_safe_allowance(&mut self, allowance: &Balance, snapshot: &Snapshot) -> Result<()> {
         let key = utils_db::db::Key::new_from_str(STAKING_SAFE_ALLOWANCE_KEY)?;
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(key, allowance);
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
@@ -740,7 +740,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> Result<()> {
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(
             utils_db::db::Key::new_from_str(NETWORK_REGISTRY_ENABLED_PREFIX)?,
             enabled,
@@ -767,7 +767,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     ) -> Result<()> {
         let key = utils_db::db::Key::new_with_prefix(node, NETWORK_REGISTRY_ALLOWED_PREFIX)?;
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
             &snapshot,
@@ -810,7 +810,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     ) -> Result<Vec<Address>> {
         let key = utils_db::db::Key::new_with_prefix(stake_account, NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX)?;
 
-        let mut batch_ops = utils_db::db::Batch::new();
+        let mut batch_ops = utils_db::db::Batch::default();
 
         let registered_nodes = self.get_from_network_registry(stake_account).await?;
 
@@ -865,14 +865,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         match maybe_mfa_address {
             Some(mfa_address) => {
-                let mut batch_ops = utils_db::db::Batch::new();
+                let mut batch_ops = utils_db::db::Batch::default();
                 batch_ops.put(mfa_key, mfa_address);
                 batch_ops.put(snapshot_key, snapshot);
 
                 self.db.batch(batch_ops, true).await
             }
             None => {
-                let mut batch_ops = utils_db::db::Batch::new();
+                let mut batch_ops = utils_db::db::Batch::default();
                 batch_ops.del(mfa_key);
                 batch_ops.put(snapshot_key, snapshot);
 
@@ -906,7 +906,6 @@ pub mod wasm {
         channels::{wasm::Ticket, ChannelEntry},
     };
     use std::sync::Arc;
-    use utils_db::leveldb;
     use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
     use wasm_bindgen::prelude::*;
 
@@ -959,22 +958,31 @@ pub mod wasm {
     #[derive(Clone)]
     #[wasm_bindgen]
     pub struct Database {
-        core_ethereum_db: Arc<RwLock<CoreEthereumDb<leveldb::wasm::LevelDbShim>>>,
+        core_ethereum_db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     }
 
     impl Database {
-        pub fn as_ref_counted(&self) -> Arc<RwLock<CoreEthereumDb<leveldb::wasm::LevelDbShim>>> {
+        pub fn as_ref_counted(&self) -> Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>> {
             self.core_ethereum_db.clone()
         }
     }
 
     #[wasm_bindgen]
     impl Database {
-        #[wasm_bindgen(constructor)]
-        pub fn new(db: leveldb::wasm::LevelDb, me_addr: Address) -> Self {
+        pub fn new_in_memory(me_addr: Address) -> Self {
             Self {
                 core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
-                    DB::new(leveldb::wasm::LevelDbShim::new(db)),
+                    DB::new(utils_db::rusty::RustyLevelDbShim::new_in_memory()),
+                    me_addr,
+                ))),
+            }
+        }
+
+        #[wasm_bindgen(constructor)]
+        pub fn new(path: &str, create_if_missing: bool, me_addr: Address) -> Self {
+            Self {
+                core_ethereum_db: Arc::new(RwLock::new(CoreEthereumDb::new(
+                    DB::new(utils_db::rusty::RustyLevelDbShim::new(path, create_if_missing)),
                     me_addr,
                 ))),
             }
@@ -1456,12 +1464,9 @@ pub mod wasm {
 mod tests {
     use super::*;
     use core_types::channels::ChannelEntry;
-    use std::{
-        str::FromStr,
-        sync::{Arc, Mutex},
-    };
+    use std::str::FromStr;
     use utils_db::db::serialize_to_bytes;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, EthereumChallenge};
     use utils_types::traits::BinarySerializable;
 
@@ -1518,11 +1523,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_ticket_price() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         assert_eq!(db.get_ticket_price().await, Ok(None));
 
@@ -1533,11 +1534,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_network_registry() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         assert_eq!(db.is_network_registry_enabled().await, Ok(true));
 
@@ -1548,11 +1545,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_allowed_to_access_network() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
@@ -1573,10 +1566,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_token_storage() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         let token_id = "test";
 
@@ -1600,10 +1590,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_set_mfa() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new(level_db)), Address::random());
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
 
         let test_address = Address::from_str("0xa6416794a09d1c8c4c6110f83f42cf6f1ed9c416").unwrap();
 
