@@ -268,7 +268,7 @@ log "Node 2 has no unredeemed ticket value"
 result=$(api_get_ticket_statistics "${api2}" "\"unredeemedValue\":\"0\"")
 log "-- ${result}"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send 0 hop message to node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr2}" 'hello, world from node 1 via 0-hop' "" & jobs+=( "$!" )
 
@@ -298,7 +298,7 @@ log "Waiting for nodes to finish open channel (long running)"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send 1 hop message to self via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
 
@@ -332,7 +332,7 @@ log "Node 5 should now have a ticket"
 result=$(api_get_ticket_statistics "${api5}" "\"winProportion\":1")
 log "-- ${result}"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send 1 hop message to node 3 via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr3}" 'hello, world from 1 via 2' "${addr2}" & jobs+=( "$!" )
 
@@ -349,7 +349,7 @@ log "Waiting for nodes to finish sending 1-hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
   api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
 done
@@ -357,7 +357,7 @@ log "Waiting for nodes to finish sending 3-hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-for i in `seq 1 10`; do
+for i in `seq 1 100`; do
   log "Node 1 send message to node 5"
   api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
 done
