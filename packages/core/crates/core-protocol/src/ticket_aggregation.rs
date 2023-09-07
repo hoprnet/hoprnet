@@ -248,9 +248,9 @@ impl TicketAggregationInteraction {
             async move {
                 let processed = match event {
                     TicketAggregationToProcess::ToProcess(destination, acked_tickets) => {
-                        processor.aggregate_tickets(destination, acked_tickets);
+                        TicketAggregationProcessed::Reply(destination, processor.aggregate_tickets(destination, acked_tickets))
                     }
-                    TicketAggregationToProcess::ToReceive(destination, ticket) => {
+                    TicketAggregationToProcess::ToReceive(destination, acked_ticket) => {
                         // instruct processor to replace tickets by aggregated ticket
                     }
                     TicketAggregationToProcess::ToSend(destination, tickets) => {
