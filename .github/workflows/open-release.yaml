@@ -56,7 +56,7 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
-            token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN_AUSIAS }}
+            token: ${{ secrets.GH_RUNNER_TOKEN }}
             commit-message: "Bump to version ${{ steps.bump.outputs.next_version }}"
             base: ${{ steps.setup.outputs.base_branch }}
             title: "Create release ${{ steps.bump.outputs.next_version }}"
@@ -72,7 +72,7 @@ jobs:
             git checkout feature/create-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
             gh pr merge --auto --delete-branch --squash
         env:
-          GH_TOKEN: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Create Milestone
         run: |
