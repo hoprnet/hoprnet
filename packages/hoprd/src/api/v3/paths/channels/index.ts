@@ -1,11 +1,20 @@
 import BN from 'bn.js'
-import { defer, Address, generate_channel_id, channel_status_to_string, ChannelStatus } from '@hoprnet/hopr-utils'
+import {
+  defer,
+  debug,
+  Address,
+  generate_channel_id,
+  channel_status_to_string,
+  ChannelStatus
+} from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../utils.js'
 
 import type { Operation } from 'express-openapi'
 import type { Hopr } from '@hoprnet/hopr-core'
 import type { ChannelEntry, DeferType } from '@hoprnet/hopr-utils'
+
+const log = debug('hoprd:api:v3:channels')
 
 export interface ChannelInfo {
   type: 'outgoing' | 'incoming'
@@ -34,8 +43,20 @@ export interface ChannelTopologyInfo {
  * @returns stringified fields from ChannelEntry and both peer id and address for source/destination
  */
 export const formatChannelTopologyInfo = async (node: Hopr, channel: ChannelEntry): Promise<ChannelTopologyInfo> => {
-  const sourcePeerId = (await node.db.get_account(channel.source)).public_key.to_peerid_str()
-  const destinationPeerId = (await node.db.get_account(channel.destination)).public_key.to_peerid_str()
+  let sourcePeerId = ''
+  let destinationPeerId = ''
+  const sourceAccount = await node.db.get_account(channel.source)
+  const destinationAccount = await node.db.get_account(channel.destination)
+  if (sourceAccount) {
+    sourcePeerId = sourceAccount.public_key.to_peerid_str()
+  } else {
+    log(`Error while formatting information of channel ${channel.get_id().to_hex()}: source not found in db`)
+  }
+  if (destinationAccount) {
+    destinationPeerId = destinationAccount.public_key.to_peerid_str()
+  } else {
+    log(`Error while formatting information of channel ${channel.get_id().to_hex()}: destination not found in db`)
+  }
 
   return {
     channelId: channel.get_id().to_hex(),
@@ -117,6 +138,7 @@ const GET: Operation = [
 
       return res.status(200).send(channels)
     } catch (err) {
+      log(`Error while fetching channels list: ${err}`)
       return res
         .status(422)
         .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
