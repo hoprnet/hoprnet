@@ -198,7 +198,7 @@ pub fn build_components(
     let swarm_network_clone = network.clone();
     let tbf_clone = tbf.clone();
 
-    let ticket_aggregation = TicketAggregationInteraction::new(db.clone());
+    let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &packet_cfg.chain_keypair.clone());
 
     let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
         Box::pin(async move {
