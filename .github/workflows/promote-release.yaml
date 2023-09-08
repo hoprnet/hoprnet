@@ -32,7 +32,7 @@ jobs:
         id: promote
         run: |
           git fetch
-
+          git pull
           # Checkout to tag revision
           if [ `git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}` ];
           then 
