@@ -46,7 +46,6 @@ export {
   create_multi_histogram_with_buckets,
   CurvePoint,
   Database,
-  db_sanity_test,
   derive_commitment_seed,
   derive_mac_key,
   derive_packet_tag,

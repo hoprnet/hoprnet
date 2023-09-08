@@ -10,8 +10,10 @@ concurrency:
   group: merge
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 env:
-  HOPR_GITHUB_REF: ${{ github.ref }}
   MATRIX_ROOM: ${{ secrets.MATRIX_ROOM }}
   MATRIX_CLUSTER_INFO_ROOM: ${{ secrets.MATRIX_CLUSTER_INFO_ROOM }}
   MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
@@ -55,27 +57,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check PR changes
-        id: check_pr_changeset
-        run: |
-          git fetch -u --progress origin pull/${{ github.event.pull_request.number }}/head:${{ github.event.pull_request.head.ref }}
-          ./scripts/check-pr.sh --base-branch ${{ github.event.pull_request.base.sha }} --head-branch ${{ github.event.pull_request.head.sha }}
-          cat check_pr.log >> $GITHUB_OUTPUT
-          cat check_pr.log
-          declare base_branch=${{ github.event.pull_request.base.ref }}
-          if [ "${base_branch}" == "master" ]; then
-            echo "DOCKER_STABLE_TAG=latest"  >> $GITHUB_ENV
-          else
-            echo "DOCKER_STABLE_TAG=${base_branch/release\//}" >> $GITHUB_ENV
-          fi
-          if [ "${{ github.event.pull_request.number }}" == "${{ vars.RELEASE_PR }}" ]; then
-            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }} true
-          else
-            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
-          fi
-          echo "DOCKER_PR_TAG=$(./scripts/get-package-version.sh | sed 's/+/-/' )" >> $GITHUB_ENV
-          echo "DOCKER_REGISTRY=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images" >> $GITHUB_ENV
-
       - name: Set up Google Cloud Credentials
         id: auth
         uses: google-github-actions/auth@v1
@@ -90,35 +71,30 @@ jobs:
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
 
-      - name: Docker Tag Toolchain
-        if: steps.check_pr_changeset.outputs.build_toolchain
+      - name: Tag docker images
         run: |
-          docker pull ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_PR_TAG }}
-          docker tag ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
-          docker push ${{ env.DOCKER_REGISTRY }}/hopr-toolchain:${{ env.DOCKER_STABLE_TAG }}
-      - name: Docker Tag Hopli
-        if: steps.check_pr_changeset.outputs.build_toolchain || steps.check_pr_changeset.outputs.build_hopli
-        run: |
-          docker pull ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_PR_TAG }}
-          docker tag ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_STABLE_TAG }}
-          docker push ${{ env.DOCKER_REGISTRY }}/hopli:${{ env.DOCKER_STABLE_TAG }}
-      - name: Docker Tag Hoprd
-        if: steps.check_pr_changeset.outputs.build_toolchain || steps.check_pr_changeset.outputs.build_hoprd
-        run: |
-          docker pull ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_PR_TAG }}
-          docker tag ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_STABLE_TAG }}
-          docker push ${{ env.DOCKER_REGISTRY }}/hoprd:${{ env.DOCKER_STABLE_TAG }}
-      - name: Docker Tag Anvil
-        if: steps.check_pr_changeset.outputs.build_toolchain || steps.check_pr_changeset.outputs.build_anvil
-        run: |
-          docker pull ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_PR_TAG }}
-          docker tag ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_STABLE_TAG }}
-          docker push ${{ env.DOCKER_REGISTRY }}/hopr-anvil:${{ env.DOCKER_STABLE_TAG }}
-      - name: Docker Tag Pluto
-        run: |
-          docker pull ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_PR_TAG }}
-          docker tag ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_PR_TAG }} ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_STABLE_TAG }}
-          docker push ${{ env.DOCKER_REGISTRY }}/hopr-pluto:${{ env.DOCKER_STABLE_TAG }}
+          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
+          # Set docker PR tag
+          if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
+            docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
+          else
+            docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
+          fi
+          # Set docker stable tag
+          declare base_branch=${{ github.event.pull_request.base.ref }}
+          if [ "${base_branch}" == "master" ]; then
+            docker_stable_tag=latest
+          else
+            docker_stable_tag=${base_branch/release\//}
+          fi
+
+          # Tag images
+          images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
+          for image in ${images[@]}; 
+          do
+            echo "Tagging ${image}:${docker_stable_tag}"
+            gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_stable_tag}
+          done
 
   deploy_prn_nodes:
     name: Deploy PRN nodes
@@ -160,7 +136,7 @@ jobs:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Add ssh key to deploy to Hetzner
-        uses: webfactory/ssh-agent@v0.7.0
+        uses: webfactory/ssh-agent@v0.8.0
         with:
             ssh-private-key: ${{ secrets.HETZNER_ROTSEE_SSH_PRIVATE_KEY }}
 
@@ -207,8 +183,8 @@ jobs:
 #    steps:
 #      - name: Checkout hoprnet repository
 #        uses: actions/checkout@v3
-#
-#      - name: "Restart deployments"
+
+#       - name: "Restart deployments"
 #        run: |
 #          prBase="${{ github.event.pull_request.base.ref }}"
 #          # Identify the network to deploy nodes
@@ -226,35 +202,45 @@ jobs:
 #            kubectl rollout restart deployments -n ${network} $deployment;
 #          done
 
-  cleanup-docker:
-    name: Cleanup Docker
+  create_release:
+    name: Create Release
     runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
       - tag
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
-
-      - name: Cleanup Docker images
+      - name: Setup variables
+        id: setup
         run: |
-          images=('hopli' 'hoprd' 'hopr-anvil' 'hopr-pluto' 'hopr-toolchain' 'hoprd')
-          for image in "${images[@]}"; do
-            image_tags=$(gcloud artifacts docker images list --include-tags europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[] | select(.tags | length > 0) | select(.tags | contains("-pr.${{ github.event.pull_request.number }}")).version')
-            for image_tag in $image_tags; do
-              gcloud artifacts docker images delete --quiet --delete-tags --async europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/${image}@${image_tag}
-            done
-          done
+          current_version=$(jq -r '.version' packages/hoprd/package.json)
+          echo "current_version=${current_version}" >> $GITHUB_OUTPUT
+          if [[ $current_version == *"-rc."* ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
+      - name: Tag repository
+        id: tag
+        run: |
+          git tag v${{ steps.setup.outputs.current_version }}
+          git push origin v${{ steps.setup.outputs.current_version }}
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
+          ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: docs/changelog/changelog.md
+          prerelease: ${{ steps.setup.outputs.prerelease }}
+          name: HOPR - v${{ steps.setup.outputs.current_version }}
+          tag_name: v${{ steps.setup.outputs.current_version }}

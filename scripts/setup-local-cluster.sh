@@ -143,7 +143,7 @@ function setup_node() {
   healthcheck_port=$(( node_healthcheck_base_port + node_id ))
   safe_args="$(<${dir}.safe.args)"
 
-  api_endpoints+="localhost:${api_port} "
+  api_endpoints+="${listen_host}:${api_port} "
 
   log "Run node ${node_id} on rest port ${api_port} -> ${log}"
 
@@ -354,7 +354,7 @@ done
 
 log "NOTE:"
 log ""
-log "\tThe following links expect HOPR Admin to run at http://localhost:3000"
+log "\tThe following links expect HOPR Admin to run at http://${listen_host}:3000"
 log "\tYou may use \`make run-hopr-admin\`"
 log ""
 log "Node port info"
@@ -372,14 +372,14 @@ for node_id in ${!id_files[@]}; do
 
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
-  log "\t\tRest API:\thttp://localhost:${api_port}/api/v3/_swagger"
-  log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:${api_port}&apiToken=${api_token}"
-  log "\t\tHealthcheck:\thttp://localhost:$(( node_healthcheck_base_port + node_id ))/"
-  log "\t\tWebSocket:\tws://localhost:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
-  log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:${api_port}&apiToken=${api_token}"
+  log "\t\tRest API:\thttp://${listen_host}:${api_port}/api/v3/_swagger"
+  log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
+  log "\t\tHealthcheck:\thttp://${listen_host}:$(( node_healthcheck_base_port + node_id ))/"
+  log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
+  log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
 
   cat <<EOF >> "${env_file}"
-export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://127.0.0.1:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://127.0.0.1:${api_port}/api/v3/messages/websocket"
+export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://${listen_host}:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://${listen_host}:${api_port}/api/v3/messages/websocket"
 echo "---"
 echo "Node ${node_name} REST API URL:  \$HOPR_NODE_${node_id}_HTTP_URL"
 echo "Node ${node_name} WebSocket URL: \$HOPR_NODE_${node_id}_WS_URL"

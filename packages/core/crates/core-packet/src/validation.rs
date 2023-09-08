@@ -111,14 +111,12 @@ mod tests {
     use core_types::{
         account::AccountEntry,
         channels::{ChannelEntry, Ticket},
-        protocol::TagBloomFilter,
     };
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use mockall::mock;
-    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{
         Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256,
     };
@@ -155,6 +153,14 @@ mod tests {
                 ack_ticket: AcknowledgedTicket,
             ) -> core_ethereum_db::errors::Result<()>;
             async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
+            async fn get_acknowledged_tickets_range(
+                &self,
+                channel_id: &Hash,
+                epoch: u32,
+                index_start: u64,
+                index_end: u64,
+            ) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
+            async fn replace_acked_tickets_by_aggregated_ticket(&mut self, aggregated_ticket: AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
             async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_balance_to(&self, counterparty: &Address) -> core_ethereum_db::errors::Result<Balance>;
@@ -558,11 +564,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_ticket_workflow() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(level_db)),
+            DB::new(RustyLevelDbShim::new_in_memory()),
             SENDER_PRIV_KEY.public().to_address(),
         );
 
@@ -604,11 +607,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_db_should_store_ticket_index() {
-        let level_db = Arc::new(Mutex::new(
-            rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-        ));
         let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(level_db)),
+            DB::new(RustyLevelDbShim::new_in_memory()),
             SENDER_PRIV_KEY.public().to_address(),
         );
 
