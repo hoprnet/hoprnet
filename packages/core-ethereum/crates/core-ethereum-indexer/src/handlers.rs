@@ -88,7 +88,7 @@ pub struct ContractEventHandlers<Cbs> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: ContractAddresses,
-    /// monitor the Hopr Token events, ignore rest
+    /// Safe on-chain address which we are monitoring
     address_to_monitor: Address,
     /// own address, aka msg.sender
     chain_key: Address,
@@ -421,6 +421,7 @@ where
                     allowance.to_string()
                 );
 
+                // if approval is for tokens on Safe contract to be spend by HoprChannels
                 if owner.eq(&self.address_to_monitor) && spender.eq(&self.addresses.channels) {
                     db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)
                         .await?;
@@ -603,7 +604,7 @@ pub mod tests {
         },
         hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
-        hopr_token::TransferFilter,
+        hopr_token::{ApprovalFilter, TransferFilter},
     };
     use core_crypto::{
         keypairs::{Keypair, OffchainKeypair},
@@ -887,6 +888,58 @@ pub mod tests {
             db.get_hopr_balance().await.unwrap(),
             Balance::new(U256::zero(), BalanceType::HOPR)
         )
+    }
+
+    #[async_std::test]
+    async fn on_token_approval_correct() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let log = RawLog {
+            topics: vec![
+                ApprovalFilter::signature(),
+                H256::from_slice(&handlers.address_to_monitor.to_bytes32()),
+                H256::from_slice(&handlers.addresses.channels.to_bytes32()),
+            ],
+            data: encode(&[Token::Uint(EthU256::from(1000u64))]),
+        };
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(0u64), BalanceType::HOPR)
+        );
+
+        handlers
+            .on_event(&mut db, &handlers.addresses.token, 0u32, &log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(1000u64), BalanceType::HOPR)
+        );
+
+        // reduce allowance manually to verify a second time
+        let _ = db
+            .set_staking_safe_allowance(
+                &Balance::new(U256::from(10u64), BalanceType::HOPR),
+                &Snapshot::default(),
+            )
+            .await;
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(10u64), BalanceType::HOPR)
+        );
+
+        handlers
+            .on_event(&mut db, &handlers.addresses.token, 0u32, &log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(1000u64), BalanceType::HOPR)
+        );
     }
 
     #[async_std::test]

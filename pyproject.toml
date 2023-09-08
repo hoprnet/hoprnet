@@ -2,6 +2,9 @@
 line-length = 120
 target-version = ['py310']
 include = '\.pyi?$'
+exclude = [
+    "scripts/ldbdump.py"
+]
 
 [tool.ruff]
 line-length = 120
@@ -32,5 +35,6 @@ exclude = [
     "node_modules",
     "venv",
     "vendor",
-    "packages/ethereum/contracts/lib"
+    "packages/ethereum/contracts/lib",
+    "scripts/ldbdump.py"
 ]
