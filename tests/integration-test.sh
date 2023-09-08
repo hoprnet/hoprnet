@@ -316,6 +316,8 @@ log "Waiting for nodes to finish sending 1 hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
+sleep 2
+
 log "Node 2 should now have a ticket"
 result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")
 log "-- ${result}"
@@ -374,7 +376,9 @@ test_redeem_in_specific_channel() {
   peer_id=$(get_hopr_address ${api_token}@${node_api})
   second_node_addr=$(get_native_address ${api_token}@${second_node_api})
 
-  api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}"
+  channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}")
+  channel_id=$(echo "${channel_info}" | jq '.channelId')
+  log "Redeem in channel: Opened channel from node ${node_id} to ${second_node_id}: ${channel_id}"
 
   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
@@ -385,12 +389,12 @@ test_redeem_in_specific_channel() {
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
   sleep 2
-  ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
+  ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
   [[ "${ticket_amount}" != "3" ]] && { msg "Ticket amount is different than expected: ${ticket_amount} != 3"; exit 1; }
 
-  api_redeem_tickets_in_channel ${second_node_api} ${peer_id}
+  api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
 
-  api_get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
+  api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
 
   api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
   echo "Redeem in channel test passed"
