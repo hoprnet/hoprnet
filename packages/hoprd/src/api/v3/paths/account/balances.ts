@@ -29,12 +29,13 @@ const GET: Operation = [
     const { node } = req.context
 
     try {
-      const { native, hopr, safeNative, safeHopr } = await getBalances(node)
+      const { native, hopr, safeNative, safeHopr, safeHoprAllowance } = await getBalances(node)
       return res.status(200).send({
         native,
         hopr,
         safeNative,
-        safeHopr
+        safeHopr,
+        safeHoprAllowance
       })
     } catch (err) {
       return res
