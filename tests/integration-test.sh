@@ -376,9 +376,11 @@ test_redeem_in_specific_channel() {
 
   api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}"
 
+  second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
+
   for i in `seq 1 3`; do
     log "Redeem in channel: Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "redeem: hello, world 1 self" "${second_node_addr}"
+    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "redeem: hello, world 1 self" "${second_peer_id}"
   done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
