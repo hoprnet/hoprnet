@@ -212,6 +212,8 @@ export class Hopr extends EventEmitter {
   private index_updater: WasmIndexerInteractions
   private id: PeerId
   private main_loop: Promise<void>
+  private hasAnnounced: boolean = false
+  private hasNodeSafeRegistered: boolean = false
 
   public network: ResolvedNetwork
 
@@ -427,28 +429,34 @@ export class Hopr extends EventEmitter {
       log('No NodeSafeRegistry entry yet, proceeding with direct announcement')
       try {
         await this.announce(this.options.announce)
+        this.hasAnnounced = true
       } catch (err) {
         console.error('Could not announce directly self on-chain: ', err)
-        process.exit(1)
       }
     } else {
       log('NodeSafeRegistry entry already present, proceeding with Safe-Module announcement')
       try {
         await this.announce(this.options.announce, true)
+        this.hasAnnounced = true
       } catch (err) {
         console.error('Could not announce through Safe-Module self on-chain: ', err)
-        process.exit(1)
       }
     }
+    // If the announcement fails we keep going to prevent the node from retrying
+    // after restart. Functionality is limited and users must check the logs for
+    // errors.
 
     // Possibly register node-safe pair to NodeSafeRegistry. Following that the
     // connector is set to use safe tx variants.
     try {
       log(`check node-safe registry`)
       await this.registerSafeByNode()
+      this.hasNodeSafeRegistered = true
     } catch (err) {
       console.error('Could not register node with safe: ', err)
-      process.exit(1)
+      // If the node safe registration fails we keep going to prevent the node from retrying
+      // after restart. Functionality is limited and users must check the logs for
+      // errors.
     }
 
     // subscribe so we can process channel close events
@@ -472,6 +480,10 @@ export class Hopr extends EventEmitter {
   public async startProcessing() {
     await Promise.all([this.main_loop])
     log(`all interactions finished execution`)
+  }
+
+  public isReady(): boolean {
+    return this.hasAnnounced && this.hasNodeSafeRegistered
   }
 
   private getLocalMultiaddresses(): Multiaddr[] {
@@ -1046,9 +1058,13 @@ export class Hopr extends EventEmitter {
       } else {
         const isRegisteredCorrectly = await connector.isNodeSafeRegisteredCorrectly()
         const isAnnouncementAllowed = await connector.isSafeAnnouncementAllowed()
-        if (isRegisteredCorrectly && isAnnouncementAllowed) {
+        // we only log whether announcement is allowed but try either way
+        // because an outdated Module contract might not give back that
+        // information
+        if (isRegisteredCorrectly) {
           log(
-            'announcing via Safe-Module on-chain %s routable address %s',
+            'announcing via Safe-Module on-chain %s with announcement allowed=%s routable address %s',
+            isAnnouncementAllowed,
             announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
             addrToAnnounce.toString()
           )
@@ -1134,6 +1150,10 @@ export class Hopr extends EventEmitter {
       throw Error('Cannot open channel to self!')
     }
 
+    if (!this.isReady) {
+      log('openChannel: Node is not ready for on-chain operations')
+    }
+
     const myAvailableTokens = await HoprCoreEthereum.getInstance().getSafeBalance()
 
     // validate 'amountToFund'
@@ -1166,6 +1186,10 @@ export class Hopr extends EventEmitter {
    * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
    */
   public async fundChannel(counterparty: Address, myFund: BN, counterpartyFund: BN): Promise<string> {
+    if (!this.isReady) {
+      log('fundChannel: Node is not ready for on-chain operations')
+    }
+
     const connector = HoprCoreEthereum.getInstance()
     const myBalance = await connector.getSafeBalance()
     const totalFund = myFund.add(counterpartyFund)
@@ -1197,6 +1221,10 @@ export class Hopr extends EventEmitter {
     counterparty: Address,
     direction: 'incoming' | 'outgoing'
   ): Promise<{ receipt: string; status: ChannelStatus }> {
+    if (!this.isReady) {
+      log('closeChannel: Node is not ready for on-chain operations')
+    }
+
     const connector = HoprCoreEthereum.getInstance()
     const channel = ChannelEntry.deserialize(
       (direction === 'outgoing'
@@ -1321,10 +1349,16 @@ export class Hopr extends EventEmitter {
   }
 
   public async redeemAllTickets() {
+    if (!this.isReady) {
+      log('redeemAllTickets: Node is not ready for on-chain operations')
+    }
     await HoprCoreEthereum.getInstance().redeemAllTickets()
   }
 
   public async redeemTicketsInChannel(channelId: Hash) {
+    if (!this.isReady) {
+      log('redeemTicketsInChannel: Node is not ready for on-chain operations')
+    }
     log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
     const channel = await this.db.get_channel(channelId)
     if (channel) {
@@ -1408,6 +1442,9 @@ export class Hopr extends EventEmitter {
    * @returns
    */
   public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+    if (!this.isReady) {
+      log('withdraw: Node is not ready for on-chain operations')
+    }
     let result: string
     try {
       result = await HoprCoreEthereum.getInstance().withdraw(currency, recipient, amount)

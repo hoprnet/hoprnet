@@ -394,19 +394,18 @@ test_redeem_in_specific_channel() {
   echo "all good"
 }
 
-echo "!!! Skipping ticket redemption tests until fixed !!!"
-# FIXME: re-enable when ticket redemption works
-#
+echo "!!! Skipping ticket redemption in specific channel tests until fixed !!!"
+# FIXME: re-enable when ticket redemption in channel works
 # test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
 
-# redeem_tickets "2" "${api2}" & jobs+=( "$!" )
-# redeem_tickets "3" "${api2}" & jobs+=( "$!" )
-# redeem_tickets "4" "${api2}" & jobs+=( "$!" )
-# redeem_tickets "5" "${api2}" & jobs+=( "$!" )
+redeem_tickets "2" "${api2}" & jobs+=( "$!" )
+redeem_tickets "3" "${api2}" & jobs+=( "$!" )
+redeem_tickets "4" "${api2}" & jobs+=( "$!" )
+redeem_tickets "5" "${api2}" & jobs+=( "$!" )
 
-#log "Waiting for nodes to finish ticket redemption (long running)"
-#for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-#log "Waiting DONE"
+log "Waiting for nodes to finish ticket redemption (long running)"
+for j in ${jobs[@]}; do wait -n $j; done; jobs=()
+log "Waiting DONE"
 
 # initiate channel closures, but don't wait because this will trigger ticket
 # redemption as well

@@ -22,7 +22,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  const dbPath = path.join(options.dataPath, 'db')
+  const dbPath = path.join(options.dataPath, 'db', 'indexer_1')
   if (options.forceCreateDB) {
     log(`force cleaning up existing database`)
     rmSync(dbPath, { recursive: true, force: true })
