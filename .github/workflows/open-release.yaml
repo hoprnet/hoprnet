@@ -69,7 +69,7 @@ jobs:
       - name: Enable Auto Merge
         run: |
             git fetch
-            git checkout feature/create-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+            git checkout bot/open-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
             gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
