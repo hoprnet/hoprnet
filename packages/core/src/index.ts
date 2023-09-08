@@ -1125,7 +1125,7 @@ export class Hopr extends EventEmitter {
 
   public async getSafeAllowance(): Promise<Balance> {
     verbose('Requesting hopr allowance from safe for hopr channels')
-    return await this.db.get_staking_safe_allowance();
+    return await this.db.get_staking_safe_allowance()
   }
 
   public smartContractInfo(): {

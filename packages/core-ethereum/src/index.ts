@@ -572,14 +572,18 @@ export default class HoprCoreEthereum extends EventEmitter {
       BalanceType.HOPR
     )
     if (allowance.lt(myFund)) {
-      throw Error(`We do not have enough allowance (${allowance.to_string()} < ${myFund.to_string()} to fund the channel`)
+      throw Error(
+        `We do not have enough allowance (${allowance.to_string()} < ${myFund.to_string()} to fund the channel`
+      )
     }
-    const receipt = (await this.chain.fundChannel(
-      dest,
-      myFund,
-      (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
-      // we are only interested in fundChannel receipt
-    ))[1]
+    const receipt = (
+      await this.chain.fundChannel(
+        dest,
+        myFund,
+        (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
+        // we are only interested in fundChannel receipt
+      )
+    )[1]
     return receipt
   }
 
