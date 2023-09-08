@@ -71,7 +71,6 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 struct MetaPacket<S: SphinxSuite> {
     packet: Box<[u8]>,
     alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
-    header_len: usize,
 }
 
 #[allow(dead_code)]
@@ -93,6 +92,8 @@ enum ForwardedMetaPacket<S: SphinxSuite> {
 }
 
 impl<S: SphinxSuite> MetaPacket<S> {
+    pub const HEADER_LEN: usize = header_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+
     pub fn new(
         shared_keys: SharedKeys<S::E, S::G>,
         msg: &[u8],
@@ -104,7 +105,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     ) -> Self {
         assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
 
-        let mut padded = add_padding(msg);
+        let mut payload = add_padding(msg);
         let routing_info = RoutingInfo::new::<S>(
             max_hops,
             path,
@@ -117,77 +118,49 @@ impl<S: SphinxSuite> MetaPacket<S> {
         // Encrypt packet payload using the derived shared secrets
         for secret in shared_keys.secrets.iter().rev() {
             let prp = PRP::from_parameters(PRPParameters::new(secret));
-            prp.forward_inplace(&mut padded)
+            prp.forward_inplace(&mut payload)
                 .unwrap_or_else(|e| panic!("onion encryption error {e}"))
         }
 
-        Self::new_from_parts(
-            shared_keys.alpha,
-            &routing_info.routing_information,
-            &routing_info.mac,
-            &padded,
-        )
+        Self::new_from_parts(shared_keys.alpha, routing_info, &payload)
     }
 
     fn new_from_parts(
         alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
-        routing_info: &[u8],
-        mac: &[u8],
+        routing_info: RoutingInfo,
         payload: &[u8],
     ) -> Self {
-        assert!(!routing_info.is_empty(), "routing info must not be empty");
-        assert_eq!(SimpleMac::SIZE, mac.len(), "mac has incorrect length");
+        assert!(
+            !routing_info.routing_information.is_empty(),
+            "routing info must not be empty"
+        );
         assert_eq!(PAYLOAD_SIZE, payload.len(), "payload has incorrect length");
 
-        let mut packet = Vec::with_capacity(Self::size(routing_info.len()));
+        let mut packet = Vec::with_capacity(Self::SIZE);
         packet.extend_from_slice(&alpha);
-        packet.extend_from_slice(routing_info);
-        packet.extend_from_slice(mac);
+        packet.extend_from_slice(&routing_info.routing_information);
+        packet.extend_from_slice(&routing_info.mac);
         packet.extend_from_slice(payload);
 
         Self {
             packet: packet.into_boxed_slice(),
-            header_len: routing_info.len(),
             alpha,
         }
     }
 
     pub fn routing_info(&self) -> &[u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
-        &self.packet[base..base + self.header_len]
+        &self.packet[base..base + Self::HEADER_LEN]
     }
 
     pub fn mac(&self) -> &[u8] {
-        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + self.header_len;
+        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN;
         &self.packet[base..base + SimpleMac::SIZE]
     }
 
     pub fn payload(&self) -> &[u8] {
-        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + self.header_len + SimpleMac::SIZE;
+        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE;
         &self.packet[base..base + PAYLOAD_SIZE]
-    }
-
-    pub const fn size(header_len: usize) -> usize {
-        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + header_len + SimpleMac::SIZE + PAYLOAD_SIZE
-    }
-
-    pub fn from_bytes(packet: &[u8], header_len: usize) -> utils_types::errors::Result<Self> {
-        if packet.len() == Self::size(header_len) {
-            let mut ret = Self {
-                packet: packet.into(),
-                header_len,
-                alpha: Default::default(),
-            };
-            ret.alpha
-                .copy_from_slice(&packet[..<S::G as GroupElement<S::E>>::AlphaLen::USIZE]);
-            Ok(ret)
-        } else {
-            Err(ParseError)
-        }
-    }
-
-    pub fn to_bytes(&self) -> &[u8] {
-        &self.packet
     }
 
     pub fn forward(
@@ -224,7 +197,14 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 next_node,
                 additional_info,
             } => RelayedPacket {
-                packet: Self::new_from_parts(alpha, &header, &mac, &decrypted),
+                packet: Self::new_from_parts(
+                    alpha,
+                    RoutingInfo {
+                        routing_information: header,
+                        mac,
+                    },
+                    &decrypted,
+                ),
                 packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
                 next_node: <S::P as Keypair>::Public::from_bytes(&next_node)
@@ -244,6 +224,29 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 additional_data,
             },
         })
+    }
+}
+
+impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
+    const SIZE: usize =
+        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE + PAYLOAD_SIZE;
+
+    fn from_bytes(data: &[u8]) -> utils_types::errors::Result<Self> {
+        if data.len() == Self::SIZE {
+            let mut ret = Self {
+                packet: data.into(),
+                alpha: Default::default(),
+            };
+            ret.alpha
+                .copy_from_slice(&data[..<S::G as GroupElement<S::E>>::AlphaLen::USIZE]);
+            Ok(ret)
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn to_bytes(&self) -> Box<[u8]> {
+        self.packet.clone()
     }
 }
 
@@ -346,8 +349,7 @@ impl Packet {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let header_len = header_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-            let mp = MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet, header_len)?;
+            let mp = MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
@@ -434,7 +436,7 @@ impl Packet {
 impl Packet {
     pub fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.packet.to_bytes());
+        ret.extend_from_slice(&self.packet.to_bytes());
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.into_boxed_slice()
     }
