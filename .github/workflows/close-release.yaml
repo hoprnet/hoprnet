@@ -28,7 +28,7 @@ jobs:
             echo "pr_template=pr-close-release.md" >> $GITHUB_OUTPUT
           else
             echo "pr_template=pr-close-patch.md" >> $GITHUB_OUTPUT
-          fi          
+          fi
           milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${current_version}"  ' to_entries[] | select(.value.title | test($version)).value.number')
           ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog-${current_version}.md
 
@@ -47,4 +47,12 @@ jobs:
             labels: release
             assignees: ${{ github.actor }}
             team-reviewers: "@hoprnet/hopr-development"
+
+      - name: Enable Auto Merge
+        run: |
+            git fetch
+            git checkout bot/close-${{ steps.template.outputs.current_version }}
+            gh pr merge --auto --delete-branch --squash
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
