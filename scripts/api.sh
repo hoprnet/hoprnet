@@ -300,9 +300,9 @@ api_open_channel() {
   local amount="${5:-100000000000000000000}"
   local result
 
-  log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
-  log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
+  #log "Node ${source_id} open channel to Node ${destination_id}"
+  api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30
+  #log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
 # $1 = node api address (origin)
