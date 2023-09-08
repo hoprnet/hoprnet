@@ -119,8 +119,7 @@ impl ChainPacketComponents {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let header_len = header_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-            let mp: MetaPacket<core_crypto::ec_groups::X25519Suite> = MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet, header_len)?;
+            let mp: MetaPacket<core_crypto::ec_groups::X25519Suite> = MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 ForwardedMetaPacket::RelayedPacket {
