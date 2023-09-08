@@ -10,7 +10,7 @@ use core_crypto::keypairs::Keypair;
 use core_crypto::types::ToChecksum;
 use ethers::{
     types::U256,
-    utils::parse_units, //, types::U256, utils::format_units, ParseUnits
+    utils::parse_units,
 };
 use log::{log, Level};
 use std::{env, str::FromStr};
@@ -49,7 +49,7 @@ pub struct FaucetArgs {
         long,
         short = 't',
         value_parser = clap::value_parser!(f64),
-        default_value_t = 2000.0
+        default_value_t = 4000.0
     )]
     hopr_amount: f64,
 
@@ -58,7 +58,7 @@ pub struct FaucetArgs {
         long,
         short = 'n',
         value_parser = clap::value_parser!(f64),
-        default_value_t = 10.0
+        default_value_t = 20.0
     )]
     native_amount: f64,
 }
