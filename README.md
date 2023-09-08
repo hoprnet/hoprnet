@@ -500,7 +500,7 @@ by using the same script but setting the cleanup switch:
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh dufour my-cluster
+  ./scripts/setup-gcloud-cluster.sh my-cluster 3
 ```
 
 ## Tooling
