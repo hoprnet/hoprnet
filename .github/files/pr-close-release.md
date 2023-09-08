@@ -4,7 +4,7 @@ This Pull requests contains all the required changes needed before releasing a n
    - If the release will run in its own network ($RELEASENAME == $NETWORK) then a new entry in `packages/core/protocol-config.json` should be created for the network.
    - If the release will run in a multinetwork network like `dufour` then update the file `packages/core/protocol-config.json` for the `dufour` entry to accept the new `version_range` of the new release.
 - [ ] Change all occurences of the last release name to the new release name within documentation files and Docker files. Don't touch the `protocol-config.json` and `releases.json` files in this step.
-- [ ] Check the [milestone](https://github.com/hoprnet/hoprnet/milestones) contents and that all items are closed.
+- [ ] Check the [milestone](https://github.com/hoprnet/hoprnet/milestones) contents and that all items are closed. And there is no missing issue or PR to be included.
 - [ ] If the release will run in a new network then, check that the entry `networks` in `contracts-addresses.json`, contains its own network
 
    ```

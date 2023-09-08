@@ -24,7 +24,7 @@ setup_node(){
   instance=${2}
   identity=${3}
   echo "Setting up ${instance} with $identities_path/$identity"
-  gcloud compute ssh --zone ${zone} ${instance} --command 'sudo rm -f /opt/hoprd/{.hoprd.id,.env}'
+  gcloud compute ssh --zone ${zone} ${instance} --command 'sudo rm -rf /opt/hoprd/{.hoprd.id,.env,db}'
   gcloud compute scp --zone ${zone}  $identities_path/$identity/{.hoprd.id,.env} ${instance}:/opt/hoprd/
   echo "Ensure host ip is set in environment file"
   gcloud compute ssh --zone ${zone} ${instance} --command '
