@@ -12,6 +12,7 @@ concurrency:
 jobs:
   build_toolchain:
     name: Toolchain
+    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/build-toolchain.yaml
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
