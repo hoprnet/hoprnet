@@ -1,8 +1,9 @@
+use core_types::errors::CoreTypesError;
 use thiserror::Error;
-
 use utils_db::errors::DbError;
+use utils_types::errors::GeneralError;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum ProtocolError {
     #[error("tx queue is full, retry later")]
     Retry,
@@ -18,6 +19,12 @@ pub enum ProtocolError {
 
     #[error("Ticket aggregation error: {0}")]
     ProtocolTicketAggregation(String),
+
+    #[error("General error {0}")]
+    GeneralError(#[from] GeneralError),
+
+    #[error("Core error {0}")]
+    CoreError(#[from] CoreTypesError),
 
     #[error("Failed on a logical error: {0}")]
     Logic(String),
