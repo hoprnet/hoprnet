@@ -3,7 +3,7 @@ use crate::errors::PacketError::{
     PacketConstructionError, PacketDecodingError, PathError, PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use crate::errors::Result;
-use crate::packet::{Packet, PacketState, MixerPayload};
+use crate::packet::{MixerPayload, Packet, PacketState};
 use async_lock::RwLock;
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};

@@ -12,7 +12,7 @@ use core_path::path::Path;
 use core_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
 use core_types::{acknowledgement::Acknowledgement, channels::Ticket};
 use libp2p_identity::PeerId;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use typenum::Unsigned;
 use utils_types::{
@@ -72,14 +72,14 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MixerPayload {
     data: Box<[u8]>,
-    ticket: Ticket
+    ticket: Ticket,
 }
 
 impl From<Packet> for MixerPayload {
     fn from(value: Packet) -> Self {
         Self {
             data: value.packet.packet,
-            ticket: value.ticket
+            ticket: value.ticket,
         }
     }
 }
@@ -89,7 +89,7 @@ impl MixerPayload {
         self.data.clone()
     }
 
-    pub fn ticket(&self) -> Ticket{
+    pub fn ticket(&self) -> Ticket {
         self.ticket.clone()
     }
 
@@ -100,7 +100,6 @@ impl MixerPayload {
         ret.into_boxed_slice()
     }
 }
-
 
 struct MetaPacket<S: SphinxSuite> {
     packet: Box<[u8]>,

@@ -7,7 +7,10 @@ use futures_concurrency::stream::Merge;
 use core_network::network::{Network, NetworkEvent, PeerOrigin};
 pub use core_p2p::{api, libp2p_identity};
 use core_p2p::{libp2p_request_response, libp2p_swarm::SwarmEvent, HoprNetworkBehaviorEvent, Ping, Pong};
-use core_packet::{interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction}, packet::MixerPayload};
+use core_packet::{
+    interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction},
+    packet::MixerPayload,
+};
 use core_types::acknowledgement::Acknowledgement;
 use utils_log::{debug, error, info};
 
