@@ -161,7 +161,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         }
     }
 
-    pub async fn get_more<V: DeserializeOwned>(
+    pub async fn get_more<V: Serialize + DeserializeOwned>(
         &self,
         prefix: Box<[u8]>,
         suffix_size: u32,

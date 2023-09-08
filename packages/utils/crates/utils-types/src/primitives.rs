@@ -481,12 +481,6 @@ impl U256 {
     }
 }
 
-impl Default for U256 {
-    fn default() -> Self {
-        U256::one()
-    }
-}
-
 impl Display for U256 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
