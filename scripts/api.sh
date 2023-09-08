@@ -297,7 +297,7 @@ api_open_channel() {
   local destination_id="${2}"
   local source_api="${3}"
   local destination_address="${4}"
-  local amount="${5:-100000000000000000000}"
+  local amount="${5:-1000000000000000000000}"
   local result
 
   #log "Node ${source_id} open channel to Node ${destination_id}"

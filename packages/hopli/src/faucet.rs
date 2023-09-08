@@ -49,7 +49,7 @@ pub struct FaucetArgs {
         long,
         short = 't',
         value_parser = clap::value_parser!(f64),
-        default_value_t = 4000.0
+        default_value_t = 20000.0
     )]
     hopr_amount: f64,
 
@@ -58,7 +58,7 @@ pub struct FaucetArgs {
         long,
         short = 'n',
         value_parser = clap::value_parser!(f64),
-        default_value_t = 20.0
+        default_value_t = 100.0
     )]
     native_amount: f64,
 }
