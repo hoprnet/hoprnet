@@ -1101,7 +1101,11 @@ export class Hopr extends EventEmitter {
 
   public async getBalance(): Promise<Balance> {
     verbose('Requesting hopr balance for node')
-    return await HoprCoreEthereum.getInstance().getBalance(true)
+    // we do not keep the node's hopr balance in the db anymore, therefore use
+    // the RPC API instead
+    // FIXME: remove these functions entirely since the HOPR balance isn't used
+    // anymore by the node
+    return await HoprCoreEthereum.getInstance().getBalance(false)
   }
 
   public async getNativeBalance(): Promise<Balance> {
@@ -1117,6 +1121,11 @@ export class Hopr extends EventEmitter {
   public async getSafeNativeBalance(): Promise<Balance> {
     verbose('Requesting native balance from safe')
     return await HoprCoreEthereum.getInstance().getNativeBalance(this.smartContractInfo().safeAddress, true)
+  }
+
+  public async getSafeAllowance(): Promise<Balance> {
+    verbose('Requesting hopr allowance from safe for hopr channels')
+    return await this.db.get_staking_safe_allowance();
   }
 
   public smartContractInfo(): {
