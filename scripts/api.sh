@@ -198,7 +198,7 @@ api_redeem_tickets() {
 api_get_tickets_in_channel() {
   local node_api="${1}"
   local channel_id="${2}"
-  local assertion="${3:-"counterparty"}"
+  local assertion="${3:-"signature"}"
 
   api_call "${node_api}" "/channels/${channel_id}/tickets" "GET" "" "${assertion}" 600
 }
