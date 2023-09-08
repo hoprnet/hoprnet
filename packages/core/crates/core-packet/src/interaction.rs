@@ -3,7 +3,7 @@ use crate::errors::PacketError::{
     PacketConstructionError, PacketDecodingError, PathError, PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use crate::errors::Result;
-use crate::packet::{Packet, PacketState};
+use crate::packet::{Packet, PacketState, MixerPayload};
 use async_lock::RwLock;
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
@@ -72,14 +72,14 @@ pub const ACK_RX_QUEUE_SIZE: usize = 2048;
 #[derive(Debug, Clone)]
 pub(crate) struct Payload {
     pub(crate) remote_peer: PeerId,
-    pub(crate) data: Box<[u8]>,
+    pub(crate) data: MixerPayload,
 }
 
 impl Display for Payload {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Payload")
             .field("remote_peer", &self.remote_peer)
-            .field("data", &hex::encode(&self.data))
+            .field("data", &hex::encode(&self.data.to_bytes()))
             .finish()
     }
 }
@@ -372,16 +372,16 @@ const PACKET_RX_QUEUE_SIZE: usize = 2048;
 
 #[derive(Debug)]
 pub enum MsgToProcess {
-    ToReceive(Box<[u8]>, PeerId),
-    ToSend(Box<[u8]>, Path, PacketSendFinalizer),
-    ToForward(Box<[u8]>, PeerId),
+    ToReceive(MixerPayload, PeerId),
+    ToSend(ApplicationData, Path, PacketSendFinalizer),
+    ToForward(MixerPayload, PeerId),
 }
 
 #[derive(Debug)]
 pub enum MsgProcessed {
-    Receive(PeerId, Box<[u8]>),
-    Send(PeerId, Box<[u8]>),
-    Forward(PeerId, Box<[u8]>),
+    Receive(PeerId, ApplicationData),
+    Send(PeerId, MixerPayload),
+    Forward(PeerId, MixerPayload),
 }
 
 /// Implements protocol acknowledgement logic for msg packets
@@ -546,7 +546,6 @@ where
 
         // Create the packet
         let packet = Packet::new(&data, &path, &self.cfg.chain_keypair, next_ticket, &domain_separator)?;
-        debug!("packet state {}", packet.state());
         match packet.state() {
             PacketState::Outgoing { ack_challenge, .. } => {
                 self.db
@@ -555,12 +554,13 @@ where
                     .store_pending_acknowledgment(*ack_challenge, PendingAcknowledgement::WaitingAsSender)
                     .await?;
 
+                let ack_challenge = ack_challenge.clone();
                 Ok((
                     Payload {
                         remote_peer: path.hops()[0],
-                        data: packet.to_bytes(),
+                        data: MixerPayload::from(packet),
                     },
-                    ack_challenge.clone(),
+                    ack_challenge,
                 ))
             }
             _ => {
@@ -820,7 +820,7 @@ impl PacketActions {
 
         let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
 
-        self.process(MsgToProcess::ToSend(msg.to_bytes(), path, PacketSendFinalizer::new(tx)))
+        self.process(MsgToProcess::ToSend(msg, path, PacketSendFinalizer::new(tx)))
             .map(move |_| {
                 let awaiter: PacketSendAwaiter = rx.into();
                 awaiter
@@ -828,12 +828,12 @@ impl PacketActions {
     }
 
     /// Pushes a packet received from the transport designated for forwarding.
-    pub fn forward_packet(&mut self, msg: Box<[u8]>, peer: PeerId) -> Result<()> {
+    pub fn forward_packet(&mut self, msg: MixerPayload, peer: PeerId) -> Result<()> {
         self.process(MsgToProcess::ToForward(msg, peer))
     }
 
     /// Pushes the packet received from the transport layer into processing.
-    pub fn receive_packet(&mut self, payload: Box<[u8]>, source: PeerId) -> Result<()> {
+    pub fn receive_packet(&mut self, payload: MixerPayload, source: PeerId) -> Result<()> {
         self.process(MsgToProcess::ToReceive(payload, source))
     }
 
@@ -921,7 +921,7 @@ impl PacketInteraction {
                     let processed: Option<MsgProcessed> = match event {
                     MsgToProcess::ToReceive(data, peer) |
                     MsgToProcess::ToForward(data, peer) => {
-                        match processor.create_packet_from_bytes(&data, &peer) {
+                        match processor.create_packet_from_bytes(&data.to_bytes(), &peer) {
                             Ok(packet) => {
                                 match processor.handle_mixed_packet(packet).await {
                                     Ok(value) => match value {
@@ -929,27 +929,30 @@ impl PacketInteraction {
                                             // We're the destination of the packet, so emit the packet contents
                                             match packet.state() {
                                                 PacketState::Final { plain_text, previous_hop, .. } => {
-                                                    if let Some(emitter) = &mut on_final_packet {
-                                                        match ApplicationData::from_bytes(&plain_text) {
-                                                            Ok(app_data) => {
-                                                                if let Err(e) = emitter.try_send(app_data) {
+                                                    match ApplicationData::from_bytes(&plain_text) {
+                                                        Ok(data) => {
+                                                            if let Some(emitter) = &mut on_final_packet {
+                                                                if let Err(e) = emitter.try_send(data.clone()) {
                                                                     error!("failed to emit received final packet: {e}");
                                                                 }
                                                             }
-                                                            Err(e) => error!("failed to reconstruct application data from final packet: {e}")
+
+                                                            if let Some(ack) = ack {
+                                                                if let Err(e) = ack_interaction.send_acknowledgement(previous_hop.to_peerid(), ack) {
+                                                                    error!("failed to acknowledge relayed packet: {e}");
+                                                                }
+                                                            }
+
+                                                            #[cfg(all(feature = "prometheus", not(test)))]
+                                                            METRIC_RECV_MESSAGE_COUNT.increment();
+
+                                                            Some(MsgProcessed::Receive(previous_hop.to_peerid(), data))
+                                                        }
+                                                        Err(e) => {
+                                                            error!("failed to reconstruct application data from final packet: {e}");
+                                                            None
                                                         }
                                                     }
-
-                                                    if let Some(ack) = ack {
-                                                        if let Err(e) = ack_interaction.send_acknowledgement(previous_hop.to_peerid(), ack) {
-                                                            error!("failed to acknowledge relayed packet: {e}");
-                                                        }
-                                                    }
-
-                                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                                    METRIC_RECV_MESSAGE_COUNT.increment();
-
-                                                    Some(MsgProcessed::Receive(previous_hop.to_peerid(), plain_text.clone()))
                                                 },
                                                 _ => {
                                                     error!("A presumed final packet was not in fact final");
@@ -967,7 +970,7 @@ impl PacketInteraction {
                                             #[cfg(all(feature = "prometheus", not(test)))]
                                             METRIC_FWD_MESSAGE_COUNT.increment();
 
-                                            Some(MsgProcessed::Forward(next_peer, packet.to_bytes()))
+                                            Some(MsgProcessed::Forward(next_peer, MixerPayload::from(packet)))
                                         },
                                     },
                                     Err(e) => {
@@ -983,7 +986,7 @@ impl PacketInteraction {
                         }
                     },
                     MsgToProcess::ToSend(data, path, finalizer) => {
-                        match processor.create_outgoing_packet(data, path).await {
+                        match processor.create_outgoing_packet(data.to_bytes(), path).await {
                             Ok((payload, challenge)) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 METRIC_PACKETS_COUNT.increment();
@@ -1450,7 +1453,6 @@ mod tests {
                             .expect("Send of ack from relayer to receiver should succeed")
                     }
                     MsgProcessed::Receive(_peer, packet) => {
-                        ApplicationData::from_bytes(&packet).expect("could not deserialize app data");
                         assert_eq!(i, component_length - 1, "Only the last peer can be a recipient");
                     }
                     _ => panic!("Should have gotten a send request or a final packet"),

@@ -3,6 +3,7 @@ pub mod errors;
 
 use std::fmt::Debug;
 
+use core_packet::packet::MixerPayload;
 use libp2p::StreamProtocol;
 
 pub use libp2p::identity;
@@ -44,7 +45,7 @@ const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT: std::time::Duration = std::time::Dur
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
     pub heartbeat: libp2p_request_response::cbor::Behaviour<Ping, Pong>,
-    pub msg: libp2p_request_response::cbor::Behaviour<Box<[u8]>, ()>,
+    pub msg: libp2p_request_response::cbor::Behaviour<MixerPayload, ()>,
     pub ack: libp2p_request_response::cbor::Behaviour<Acknowledgement, ()>,
     keep_alive: libp2p_swarm::keep_alive::Behaviour, // run the business logic loop indefinitely
 }
@@ -59,7 +60,7 @@ impl Debug for HoprNetworkBehavior {
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p_request_response::Event<Ping, Pong>),
-    Message(libp2p_request_response::Event<Box<[u8]>, ()>),
+    Message(libp2p_request_response::Event<MixerPayload, ()>),
     Acknowledgement(libp2p_request_response::Event<Acknowledgement, ()>),
     KeepAlive(void::Void),
 }
@@ -76,8 +77,8 @@ impl From<libp2p_request_response::Event<Ping, Pong>> for HoprNetworkBehaviorEve
     }
 }
 
-impl From<libp2p_request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p_request_response::Event<Box<[u8]>, ()>) -> Self {
+impl From<libp2p_request_response::Event<MixerPayload, ()>> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p_request_response::Event<MixerPayload, ()>) -> Self {
         Self::Message(event)
     }
 }
@@ -103,7 +104,7 @@ impl Default for HoprNetworkBehavior {
                     cfg
                 },
             ),
-            msg: libp2p_request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
+            msg: libp2p_request_response::cbor::Behaviour::<MixerPayload, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
                     libp2p_request_response::ProtocolSupport::Full,

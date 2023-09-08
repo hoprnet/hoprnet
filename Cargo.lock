@@ -1035,7 +1035,7 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "core-crypto"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "aes 0.8.3",
  "async-std",
@@ -1291,6 +1291,7 @@ dependencies = [
  "async-std",
  "console_error_panic_hook",
  "core-network",
+ "core-packet",
  "core-types",
  "env_logger",
  "futures",
@@ -1314,7 +1315,7 @@ dependencies = [
 
 [[package]]
 name = "core-packet"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "async-lock",
  "async-process",

@@ -7,7 +7,7 @@ use futures_concurrency::stream::Merge;
 use core_network::network::{Network, NetworkEvent, PeerOrigin};
 pub use core_p2p::{api, libp2p_identity};
 use core_p2p::{libp2p_request_response, libp2p_swarm::SwarmEvent, HoprNetworkBehaviorEvent, Ping, Pong};
-use core_packet::interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction};
+use core_packet::{interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction}, packet::MixerPayload};
 use core_types::acknowledgement::Acknowledgement;
 use utils_log::{debug, error, info};
 
@@ -168,11 +168,11 @@ pub(crate) async fn p2p_loop(
                     MsgProcessed::Receive(peer, _octets) => {
                         debug!("Nothing needs to be done here, as long as the packet interactions emit the received packet from peer: {peer}")
                     },
-                    MsgProcessed::Send(peer, octets) => {
-                        let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
+                    MsgProcessed::Send(peer, payload) => {
+                        let _request_id = swarm.behaviour_mut().msg.send_request(&peer, payload);
                     },
-                    MsgProcessed::Forward(peer, octets) => {
-                        let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
+                    MsgProcessed::Forward(peer, payload) => {
+                        let _request_id = swarm.behaviour_mut().msg.send_request(&peer, payload);
                     }
                 },
                 Inputs::Indexer(task) => match task {
@@ -220,10 +220,10 @@ pub(crate) async fn p2p_loop(
             event = swarm.select_next_some() => match event {
                 // ---------------
                 // msg protocol
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<Box<[u8]>, ()>::Message {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<MixerPayload, ()>::Message {
                     peer,
                     message:
-                    libp2p_request_response::Message::<Box<[u8]>, ()>::Request {
+                    libp2p_request_response::Message::<MixerPayload, ()>::Request {
                         request_id, request, channel
                     },
                 })) => {
@@ -237,22 +237,22 @@ pub(crate) async fn p2p_loop(
                         error!("Message protocol: Failed to send a response to {}, likely a timeout", &peer);
                     };
                 },
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<Box<[u8]>, ()>::Message {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<MixerPayload, ()>::Message {
                     peer,
                     message:
-                    libp2p_request_response::Message::<Box<[u8]>, ()>::Response {
+                    libp2p_request_response::Message::<MixerPayload, ()>::Response {
                         request_id, ..
                     },
                 })) => {
                     debug!("Message protocol: Received a response for sending message with id {} from {}", &request_id, &peer);
                 },
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<MixerPayload, ()>::OutboundFailure {
                     peer, error, request_id
                 })) => {
                     error!("Message protocol: Failed to send a message (#{}) to peer {} with an error: {}", request_id, peer, error);
                 },
-                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<Box<[u8]>, ()>::InboundFailure {..}))
-                | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<Box<[u8]>, ()>::ResponseSent {..})) => {
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<MixerPayload, ()>::InboundFailure {..}))
+                | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<MixerPayload, ()>::ResponseSent {..})) => {
                     // debug!("Discarded messages not relevant for the protocol!");
                 },
                 // ---------------
