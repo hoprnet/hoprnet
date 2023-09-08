@@ -903,7 +903,7 @@ impl PacketInteraction {
 
         let processor = PacketProcessor::new(db, tbf, cfg);
 
-        let processing_stream = to_process_rx
+        let mut processing_stream = to_process_rx
             .then_concurrent(move |event| async move {
                 match event {
                     MsgToProcess::ToSend(_, _, _)
@@ -999,10 +999,10 @@ impl PacketInteraction {
                     },
                 };
 
-                if processed.is_some() {
+                if let Some(processed_msg) = processed {
                     match poll_fn(|cx| Pin::new(&mut processed_tx).poll_ready(cx)).await {
                         Ok(_) => {
-                            match processed_tx.start_send(processed.unwrap()) {
+                            match processed_tx.start_send(processed_msg) {
                                 Ok(_) => {},
                                 Err(e) => error!("Failed to pass a processed ack message: {}", e),
                             }
@@ -1015,11 +1015,8 @@ impl PacketInteraction {
             }});
 
         spawn_local(async move {
-            processing_stream
-                .map(|x| Ok(x))
-                .forward(futures::sink::drain())
-                .await
-                .unwrap();
+            // poll the stream until it's done
+            while processing_stream.next().await.is_some() {}
         });
 
         Self {

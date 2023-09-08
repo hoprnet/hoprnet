@@ -41,6 +41,17 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all acknowledged tickets within the filter criteria.
     async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>>;
 
+    async fn get_acknowledged_tickets_range(
+        &self,
+        channel_id: &Hash,
+        epoch: u32,
+        index_start: u64,
+        index_end: u64,
+    ) -> Result<Vec<AcknowledgedTicket>>;
+
+    async fn replace_acked_tickets_by_aggregated_ticket(&mut self, aggregated_ticket: AcknowledgedTicket)
+        -> Result<()>;
+
     /// Get all unacknowledged tickets within the filter criteria.
     async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>>;
 
