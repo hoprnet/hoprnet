@@ -172,17 +172,27 @@ The process of promoting the named release (bratislava, providence, etc) consist
 1. Update the named release
 
 ```
-echo RELEASE_NAME=providence
-echo RELEASE_NUMBER=2.0.0-rc.3
-git pull
+export RELEASE_NAME=providence
+export RELEASE_NUMBER=2.0.0-rc.3
+
 git checkout ${RELEASE_NUMBER}
-git checkout -b release/${RELEASE_NAME}
-git push --set-upstream origin release/${RELEASE_NAME}
-git tag ${RELEASE_NAME}
-git push origin ${RELEASE_NAME}
+git pull
+git checkout release/${RELEASE_NAME}
+git pull
+git rebase
+git push --force 
+git tag --force ${RELEASE_NAME}
+git push --force origin ${RELEASE_NAME}
+docker_registry="europe-west3-docker.pkg.dev/hoprassociation/docker-images"
+docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
+images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
+for image in ${images[@]}; 
+do
+  echo "Tagging ${image}:${RELEASE_NAME}"
+  gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${RELEASE_NAME}
+done
 ```
 
-2. Open [GCP Console](https://console.cloud.google.com/artifacts/docker/hoprassociation/europe-west3/docker-images?orgonly=true&project=hoprassociation&supportedpurview=organizationIdhttps://console.cloud.google.com/artifacts/docker/hoprassociation/europe-west3/docker-images?orgonly=true&project=hoprassociation&supportedpurview=organizationId) and tag the images with the new tags ${RELEASE_NUMBER} with the tag ${RELEASE_NAME}
 
 3. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.

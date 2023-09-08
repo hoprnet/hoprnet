@@ -45,7 +45,7 @@ jobs:
           then 
             git checkout release/${{ github.event.inputs.release_name }}
             git rebase ${{ github.event.inputs.tag_name }}
-            git push release/${{ github.event.inputs.release_name }}
+            git push
           else
             git checkout ${{ github.event.inputs.tag_name }}
             git checkout -b release/${{ github.event.inputs.release_name }}
