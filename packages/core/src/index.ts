@@ -1063,7 +1063,7 @@ export class Hopr extends EventEmitter {
         // information
         if (isRegisteredCorrectly) {
           log(
-            'announcing via Safe-Module on-chain %s with announcement allowed=%s routable address %s',
+            'announcing via Safe-Module on-chain with announcement allowed=%s %s routable address %s',
             isAnnouncementAllowed,
             announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
             addrToAnnounce.toString()
