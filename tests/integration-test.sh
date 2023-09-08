@@ -377,8 +377,8 @@ test_redeem_in_specific_channel() {
   api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}"
 
   for i in `seq 1 3`; do
-    log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "hello, world 1 self" "${second_peer_id}"
+    log "Redeem in channel: Node ${node_id} send 1 hop message to self via node ${second_node_id}"
+    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "redeem: hello, world 1 self" "${second_node_addr}"
   done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
@@ -390,13 +390,11 @@ test_redeem_in_specific_channel() {
 
   api_get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
 
-  api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_peer_id}" "outgoing"
-  echo "all good"
+  api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
+  echo "Redeem in channel test passed"
 }
 
-echo "!!! Skipping ticket redemption in specific channel tests until fixed !!!"
-# FIXME: re-enable when ticket redemption in channel works
-# test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
+test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
 
 redeem_tickets "2" "${api2}" & jobs+=( "$!" )
 redeem_tickets "3" "${api2}" & jobs+=( "$!" )
