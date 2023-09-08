@@ -161,7 +161,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         }
     }
 
-    pub async fn get_more<V: Serialize + DeserializeOwned>(
+    pub async fn get_more<V: DeserializeOwned>(
         &self,
         prefix: Box<[u8]>,
         suffix_size: u32,
@@ -170,6 +170,35 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         let mut output = Vec::new();
 
         let mut data_stream = Box::into_pin(self.backend.iterate(prefix, suffix_size)?);
+
+        // fail fast for the first value that cannot be deserialized
+        while let Some(value) = data_stream.next().await {
+            let value =
+                bincode::deserialize::<V>(value?.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string()))?;
+
+            if (*filter)(&value) {
+                output.push(value);
+            }
+        }
+
+        Ok(output)
+    }
+
+    pub async fn get_more_range<V: DeserializeOwned>(
+        &self,
+        start: Box<[u8]>,
+        end: Box<[u8]>,
+        filter: &dyn Fn(&V) -> bool,
+    ) -> Result<Vec<V>> {
+        if start.len() != end.len() {
+            return Err(DbError::InvalidInput(
+                "length of provided suffixes does not match".into(),
+            ));
+        }
+
+        let mut output = Vec::new();
+
+        let mut data_stream = Box::into_pin(self.backend.iterate_range(start, end)?);
 
         // fail fast for the first value that cannot be deserialized
         while let Some(value) = data_stream.next().await {

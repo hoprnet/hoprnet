@@ -54,6 +54,8 @@ pub trait AsyncKVStorage {
 
     fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<StorageValueIterator<Self::Value>>;
 
+    fn iterate_range(&self, start: Self::Key, end: Self::Key) -> Result<StorageValueIterator<Self::Value>>;
+
     async fn batch(
         &mut self,
         operations: Vec<BatchOperation<Self::Key, Self::Value>>,
