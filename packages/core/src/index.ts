@@ -572,6 +572,10 @@ export class Hopr extends EventEmitter {
     log(`Processing multiaddresses for peer ${peer.id.toString()}: ${peer.multiaddrs}`)
     const addrsToAdd: Multiaddr[] = []
     for (const addr of peer.multiaddrs) {
+      // safeguard against empty multiaddrs, skip
+      if (addr.toString() == '') {
+        continue
+      }
       const tuples = addr.tuples()
 
       if (tuples.length <= 1 && tuples[0][0] == CODE_P2P) {
@@ -1031,6 +1035,12 @@ export class Hopr extends EventEmitter {
       }
     } else {
       addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toString())
+    }
+
+    // skip if no address to announce has been found
+    if (!addrToAnnounce || addrToAnnounce.toString() == '') {
+      log('Error: could not find an address to announce')
+      return
     }
 
     // Check if there was a previous announcement from us

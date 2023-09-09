@@ -168,6 +168,10 @@ where
                     &address_announcement.base_multiaddr,
                     &address_announcement.node.to_string()
                 );
+                // safeguard against empty multiaddrs, skip
+                if address_announcement.base_multiaddr.is_empty() {
+                    return Err(CoreEthereumIndexerError::AnnounceEmptyMultiaddr);
+                }
 
                 if let Some(mut account) = maybe_account {
                     let new_entry_type = AccountType::Announced {
@@ -732,6 +736,32 @@ pub mod tests {
         db.update_account_and_snapshot(&account_entry, &Snapshot::default())
             .await
             .unwrap();
+
+        let test_multiaddr_empty: Multiaddr = "".parse().unwrap();
+
+        let address_announcement_empty_log = RawLog {
+            topics: vec![AddressAnnouncementFilter::signature()],
+            data: encode(&[
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::String(test_multiaddr_empty.to_string()),
+            ]),
+        };
+
+        let _error = handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.announcements,
+                0u32,
+                &address_announcement_empty_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            account_entry
+        );
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
 
