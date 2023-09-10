@@ -277,6 +277,7 @@ where
 
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::Closed;
+                    channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel.destination.eq(&self.chain_key) {
@@ -1347,13 +1348,14 @@ pub mod tests {
         let mut db = create_mock_db();
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
+        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR);
 
         db.update_channel_and_snapshot(
             &channel_id,
             &ChannelEntry::new(
                 *SELF_CHAIN_ADDRESS,
                 *COUNTERPARTY_CHAIN_ADDRESS,
-                Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+                starting_balance,
                 U256::zero(),
                 ChannelStatus::Open,
                 U256::one(),
@@ -1383,10 +1385,11 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            db.get_channel(&channel_id).await.unwrap().unwrap().status,
-            ChannelStatus::Closed
-        );
+        let closed_channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(closed_channel.status, ChannelStatus::Closed);
+
+        assert!(closed_channel.balance.value().eq(&U256::zero()));
     }
 
     #[async_std::test]
