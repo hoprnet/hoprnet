@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-misc"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -17,6 +17,7 @@ async-trait = "0.1"
 async-lock = { workspace = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 futures = "0.3"
+hex = "0.4.3"
 js-sys = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 thiserror = "1.0"

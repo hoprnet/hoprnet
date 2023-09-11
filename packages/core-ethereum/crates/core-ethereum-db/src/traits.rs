@@ -55,6 +55,8 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all unacknowledged tickets within the filter criteria.
     async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>>;
 
+    async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
+
     /// Mark the ticket as pending.
     async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> Result<()>;
 

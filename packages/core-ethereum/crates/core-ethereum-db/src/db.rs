@@ -263,6 +263,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .collect::<Vec<UnacknowledgedTicket>>())
     }
 
+    async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+        todo!("implement this")
+    }
+
     async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> Result<()> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
         let balance = self

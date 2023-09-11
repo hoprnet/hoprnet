@@ -2,6 +2,7 @@ pub mod chain;
 pub mod constants;
 pub mod errors;
 pub mod network_registry;
+pub mod redeem;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
