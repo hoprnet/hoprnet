@@ -50,6 +50,9 @@ impl PingExternalAPI for PingExternalInteractions {
 pub mod wasm {
     use super::*;
     use core_network::ping::Pinging;
+    use futures::{FutureExt, pin_mut, future::{select, Either}};
+    use gloo_timers::future::sleep;
+    use utils_log::info;
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
 
@@ -76,7 +79,17 @@ pub mod wasm {
         pub async fn ping(&self, peer: js_sys::JsString) {
             let x: String = peer.into();
             if let Some(converted) = core_network::PeerId::from_str(&x).ok() {
-                self.ping.write().await.ping(vec![converted]).await;
+                let mut pinger = self.ping.write().await;
+
+                let timeout = sleep(std::time::Duration::from_millis(30_000)).fuse();
+                let ping = pinger.ping(vec![converted]).fuse();
+
+                pin_mut!(timeout, ping);
+
+                match select(timeout, ping).await {
+                    Either::Left(_) => info!("Manual ping to peer '{}' timed out", converted),
+                    Either::Right(_) => info!("Manual ping succeeded"),
+                };
             }
         }
     }
