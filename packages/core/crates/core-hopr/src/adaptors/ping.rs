@@ -50,10 +50,13 @@ impl PingExternalAPI for PingExternalInteractions {
 pub mod wasm {
     use super::*;
     use core_network::ping::Pinging;
-    use futures::{FutureExt, pin_mut, future::{select, Either}};
+    use futures::{
+        future::{select, Either},
+        pin_mut, FutureExt,
+    };
     use gloo_timers::future::sleep;
-    use utils_log::info;
     use std::str::FromStr;
+    use utils_log::info;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
