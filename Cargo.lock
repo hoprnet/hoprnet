@@ -1286,7 +1286,7 @@ dependencies = [
 
 [[package]]
 name = "core-p2p"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-std",
  "console_error_panic_hook",

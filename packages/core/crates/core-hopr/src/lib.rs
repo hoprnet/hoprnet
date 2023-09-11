@@ -119,7 +119,7 @@ impl std::fmt::Display for HoprLoopComponents {
 /// until the first unrecoverable error/panic is encountered.
 #[cfg(feature = "wasm")]
 pub fn build_components(
-    me: libp2p_identity::Keypair,
+    me: core_crypto::keypairs::OffchainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     network_quality_threshold: f64,
     hb_cfg: HeartbeatConfig,
@@ -134,7 +134,7 @@ pub fn build_components(
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     use core_mixer::mixer::{Mixer, MixerConfig};
 
-    let identity = me;
+    let identity: libp2p_identity::Keypair = (&me).into();
 
     let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
     let on_ack_tkt_tx = adaptors::interactions::wasm::spawn_ack_tkt_receiver_loop(on_acknowledged_ticket);
@@ -216,7 +216,7 @@ pub fn build_components(
         }),
         Box::pin(
             p2p::p2p_loop(
-                identity,
+                me,
                 swarm_network_clone,
                 network_events_rx,
                 indexer_update_rx,
@@ -302,7 +302,7 @@ pub mod wasm_impl {
         #[wasm_bindgen(constructor)]
         pub fn new(
             me: &OffchainKeypair,
-            db: Database, // TODO: replace the string with the KeyPair
+            db: Database,
             network_quality_threshold: f64,
             hb_cfg: HeartbeatConfig,
             ping_cfg: PingConfig,
@@ -314,9 +314,8 @@ pub mod wasm_impl {
             save_tbf: js_sys::Function,
             my_multiaddresses: Vec<js_sys::JsString>,
         ) -> Self {
-            let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
-                me,
+                me.clone(),
                 db.as_ref_counted(),
                 network_quality_threshold,
                 hb_cfg,

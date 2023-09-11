@@ -69,7 +69,7 @@ impl From<IndexerProcessed> for Inputs {
 ///
 /// This future can only be resolved by an unrecoverable error or a panic.
 pub(crate) async fn p2p_loop(
-    me: libp2p_identity::Keypair,
+    me: core_crypto::keypairs::OffchainKeypair,
     network: Arc<RwLock<Network<crate::adaptors::network::ExternalNetworkInteractions>>>,
     network_update_input: Receiver<NetworkEvent>,
     indexer_update_input: Receiver<IndexerProcessed>,
@@ -81,7 +81,9 @@ pub(crate) async fn p2p_loop(
     manual_ping_responds: api::HeartbeatResponder,
     my_multiaddresses: Vec<multiaddr::Multiaddr>,
 ) {
-    let mut swarm = core_p2p::build_p2p_network(me);
+    let me_libp2p_identity: libp2p_identity::Keypair = (&me).into();
+
+    let mut swarm = core_p2p::build_p2p_network(me_libp2p_identity);
 
     let mut valid_mas: Vec<multiaddr::Multiaddr> = vec![];
     for multiaddress in my_multiaddresses.iter() {
@@ -221,6 +223,46 @@ pub(crate) async fn p2p_loop(
                 }
             },
             event = swarm.select_next_some() => match event {
+                // ---------------
+                // msg protocol (version 0.1.0 - deprecated)
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message010(libp2p_request_response::Event::<Box<[u8]>, ()>::Message {
+                    peer,
+                    message:
+                    libp2p_request_response::Message::<Box<[u8]>, ()>::Request {
+                        request_id, request, channel
+                    },
+                })) => {
+                    debug!("Message protocol (v0.1.0 - deprecated): Received a message from {}", &peer);
+
+                    match core_packet::packet::Packet::from_bytes(&request, &me, &peer) {
+                        Ok(packet) => {
+                            if let Err(e) = pkt_writer.receive_packet(MixerPayload::from(packet), peer.clone()) {
+                                error!("Message protocol (v0.1.0 - deprecated): Failed to process a message from {}: {} (#{})", &peer, e, request_id);
+                            };
+
+                            if let Err(_) = swarm.behaviour_mut().msg.send_response(channel, ()) {
+                                error!("Message protocol (v0.1.0 - deprecated): Failed to send a response to {}, likely a timeout", &peer);
+                            };
+                        },
+                        Err(e) => {
+                            error!("Message protocol (v0.1.0 - deprecated): Failed to deserialize packet from peer '{}': {}", &peer, e);
+                        }
+                    }
+                },
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message010(libp2p_request_response::Event::<Box<[u8]>, ()>::Message {
+                    peer,
+                    message:
+                    libp2p_request_response::Message::<Box<[u8]>, ()>::Response {
+                        request_id, ..
+                    },
+                })) => {
+                    debug!("Message protocol (v0.1.0 - deprecated): Received a response for sending message with id {} from {}", &request_id, &peer);
+                },
+                SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message010(libp2p_request_response::Event::<Box<[u8]>, ()>::OutboundFailure {..}))
+                | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message010(libp2p_request_response::Event::<Box<[u8]>, ()>::InboundFailure {..}))
+                | SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message010(libp2p_request_response::Event::<Box<[u8]>, ()>::ResponseSent {..})) => {
+                    // debug!("Discarded messages not relevant for the protocol!");
+                },
                 // ---------------
                 // msg protocol
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Message(libp2p_request_response::Event::<MixerPayload, ()>::Message {

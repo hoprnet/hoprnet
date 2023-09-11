@@ -29,7 +29,8 @@ pub struct Ping(pub ControlMessage);
 pub struct Pong(pub ControlMessage, pub String);
 
 pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
-pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.2.0";
+pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";
+pub const HOPR_MESSAGE_PROTOCOL_V_0_2_0: &str = "/hopr/msg/0.2.0";
 pub const HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0: &str = "/hopr/ack/0.1.0";
 
 const HOPR_HEARTBEAT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
@@ -45,6 +46,7 @@ const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT: std::time::Duration = std::time::Dur
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
     pub heartbeat: libp2p_request_response::cbor::Behaviour<Ping, Pong>,
+    pub msg010: libp2p_request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub msg: libp2p_request_response::cbor::Behaviour<MixerPayload, ()>,
     pub ack: libp2p_request_response::cbor::Behaviour<Acknowledgement, ()>,
     keep_alive: libp2p_swarm::keep_alive::Behaviour, // run the business logic loop indefinitely
@@ -60,6 +62,7 @@ impl Debug for HoprNetworkBehavior {
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p_request_response::Event<Ping, Pong>),
+    Message010(libp2p_request_response::Event<Box<[u8]>, ()>),
     Message(libp2p_request_response::Event<MixerPayload, ()>),
     Acknowledgement(libp2p_request_response::Event<Acknowledgement, ()>),
     KeepAlive(void::Void),
@@ -74,6 +77,12 @@ impl From<void::Void> for HoprNetworkBehaviorEvent {
 impl From<libp2p_request_response::Event<Ping, Pong>> for HoprNetworkBehaviorEvent {
     fn from(event: libp2p_request_response::Event<Ping, Pong>) -> Self {
         Self::Heartbeat(event)
+    }
+}
+
+impl From<libp2p_request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p_request_response::Event<Box<[u8]>, ()>) -> Self {
+        Self::Message010(event)
     }
 }
 
@@ -104,9 +113,21 @@ impl Default for HoprNetworkBehavior {
                     cfg
                 },
             ),
-            msg: libp2p_request_response::cbor::Behaviour::<MixerPayload, ()>::new(
+            msg010: libp2p_request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
                 [(
                     StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
+                    libp2p_request_response::ProtocolSupport::Full,
+                )],
+                {
+                    let mut cfg = libp2p_request_response::Config::default();
+                    cfg.set_connection_keep_alive(HOPR_MESSAGE_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(HOPR_MESSAGE_REQUEST_TIMEOUT);
+                    cfg
+                },
+            ),
+            msg: libp2p_request_response::cbor::Behaviour::<MixerPayload, ()>::new(
+                [(
+                    StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_2_0),
                     libp2p_request_response::ProtocolSupport::Full,
                 )],
                 {
