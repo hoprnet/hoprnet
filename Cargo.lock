@@ -1404,6 +1404,7 @@ dependencies = [
 name = "core-types"
 version = "0.4.1"
 dependencies = [
+ "bincode",
  "bindings",
  "bloomfilter",
  "console_error_panic_hook",
