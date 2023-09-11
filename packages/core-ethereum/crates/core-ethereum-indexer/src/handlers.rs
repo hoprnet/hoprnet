@@ -1334,7 +1334,7 @@ pub mod tests {
 
         assert_eq!(
             *db.get_channel(&channel_id).await.unwrap().unwrap().balance.value(),
-            U256::zero()
+            solidity_balance
         );
     }
 
