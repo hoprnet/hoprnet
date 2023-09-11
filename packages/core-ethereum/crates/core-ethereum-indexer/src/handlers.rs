@@ -240,9 +240,7 @@ where
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    channel.balance = channel
-                        .balance
-                        .sub(&Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR));
+                    channel.balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
@@ -258,9 +256,7 @@ where
                 let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    channel.balance = channel
-                        .balance
-                        .add(&Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR));
+                    channel.balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
