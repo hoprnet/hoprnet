@@ -112,7 +112,10 @@ export async function setupRestApi(
   }
 ): Promise<ReturnType<typeof initialize>> {
   // log request and responses
-  service.use(urlPath, morgan('combined'))
+  service.use(
+    urlPath,
+    morgan('[:date[clf]] ":method :url" :status :res[content-length] :response-time ":referrer" ":user-agent"')
+  )
 
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
