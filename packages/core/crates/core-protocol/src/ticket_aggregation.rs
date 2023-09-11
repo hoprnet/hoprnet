@@ -44,11 +44,6 @@ use wasm_bindgen_futures::spawn_local;
 //     .unwrap();
 // }
 
-// lazy_static::lazy_static! {
-//     /// Fixed price per packet to 0.01 HOPR
-//     static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
-// }
-
 // Default sizes of the acknowledgement queues
 pub const TICKET_AGGREGATION_TX_QUEUE_SIZE: usize = 2048;
 pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
@@ -86,7 +81,10 @@ impl<Db: HoprCoreEthereumDbActions> Clone for TicketAggregationProcessor<Db> {
 
 impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
     pub fn new(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
-        Self { db, chain_key: chain_key.clone() }
+        Self {
+            db,
+            chain_key: chain_key.clone(),
+        }
     }
 
     pub async fn aggregate_tickets(
@@ -183,7 +181,8 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             first_acked_ticket.ticket.challenge.clone(),
             &self.chain_key,
             &domain_separator,
-        ).map_err(|e| e.into())
+        )
+        .map_err(|e| e.into())
     }
 
     pub async fn handle_aggregated_ticket(&self, aggregated_ticket: Ticket) -> Result<()> {

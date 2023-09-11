@@ -3,16 +3,11 @@ pub mod errors;
 
 use std::fmt::Debug;
 
-use core_types::channels::Ticket;
-use libp2p::StreamProtocol;
-
-pub use libp2p::identity;
-
-use libp2p::core as libp2p_core;
-pub use libp2p::identity as libp2p_identity;
-use libp2p::noise as libp2p_noise;
-pub use libp2p::request_response as libp2p_request_response;
-pub use libp2p::swarm as libp2p_swarm;
+use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
+pub use libp2p::{
+    core as libp2p_core, identity as libp2p_identity, identity, noise as libp2p_noise,
+    request_response as libp2p_request_response, swarm as libp2p_swarm, StreamProtocol,
+};
 
 use libp2p_core::{upgrade, Transport};
 use libp2p_identity::PeerId;
@@ -51,7 +46,8 @@ pub struct HoprNetworkBehavior {
     pub heartbeat: libp2p_request_response::cbor::Behaviour<Ping, Pong>,
     pub msg: libp2p_request_response::cbor::Behaviour<Box<[u8]>, ()>,
     pub ack: libp2p_request_response::cbor::Behaviour<Acknowledgement, ()>,
-    pub ticket_aggregation: libp2p_request_response::cbor::Behaviour<Vec<Ticket>, std::result::Result<Ticket, String>>,
+    pub ticket_aggregation:
+        libp2p_request_response::cbor::Behaviour<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>,
     keep_alive: libp2p_swarm::keep_alive::Behaviour, // run the business logic loop indefinitely
 }
 
@@ -67,7 +63,7 @@ pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p_request_response::Event<Ping, Pong>),
     Message(libp2p_request_response::Event<Box<[u8]>, ()>),
     Acknowledgement(libp2p_request_response::Event<Acknowledgement, ()>),
-    TicketAggregation(libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>),
+    TicketAggregation(libp2p_request_response::Event<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>),
     KeepAlive(void::Void),
 }
 
@@ -89,8 +85,9 @@ impl From<libp2p_request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehavior
     }
 }
 
-
-impl From<libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>> for HoprNetworkBehaviorEvent {
+impl From<libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>>
+    for HoprNetworkBehaviorEvent
+{
     fn from(event: libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>) -> Self {
         Self::TicketAggregation(event)
     }
@@ -141,7 +138,10 @@ impl Default for HoprNetworkBehavior {
                     cfg
                 },
             ),
-            ticket_aggregation: libp2p_request_response::cbor::Behaviour::<Vec<Ticket>, std::result::Result<Ticket, String>>::new(
+            ticket_aggregation: libp2p_request_response::cbor::Behaviour::<
+                Vec<AcknowledgedTicket>,
+                std::result::Result<Ticket, String>,
+            >::new(
                 [(
                     StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
                     libp2p_request_response::ProtocolSupport::Full,
