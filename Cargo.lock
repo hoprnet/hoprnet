@@ -1132,7 +1132,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1148,6 +1148,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "js-sys",
+ "lazy_static",
  "libp2p-identity",
  "mockall",
  "multiaddr",
