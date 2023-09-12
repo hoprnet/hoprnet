@@ -135,15 +135,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use async_lock::RwLock;
     use core_crypto::random::random_bytes;
     use core_crypto::types::Hash;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use std::sync::Arc;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::traits::BinarySerializable;
 
-    fn fake_on_chain_redeemer(ack: AcknowledgedTicket) -> Result<String,String> {
+    fn fake_on_chain_redeemer(ack: AcknowledgedTicket) -> Result<String, String> {
         Ok(Hash::new(&random_bytes::<{ Hash::SIZE }>()).to_string())
     }
 
