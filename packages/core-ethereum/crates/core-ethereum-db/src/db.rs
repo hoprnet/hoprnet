@@ -160,14 +160,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
-                &|ack: &AcknowledgedTicket| match &filter {
-                    Some(f) => {
-                        f.destination.eq(&self.me)
-                            && f.channel_epoch.eq(&ack.ticket.channel_epoch.into())
-                            && f.source.eq(&ack.signer)
-                    }
-                    None => true,
-                },
+                &|ack: &AcknowledgedTicket| filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true),
             )
             .await?;
 
@@ -244,14 +237,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 EthereumChallenge::SIZE as u32,
                 &|pending: &PendingAcknowledgement| match pending {
                     PendingAcknowledgement::WaitingAsSender => false,
-                    PendingAcknowledgement::WaitingAsRelayer(unack) => match &filter {
-                        Some(f) => {
-                            f.destination.eq(&self.me)
-                                && f.channel_epoch.eq(&unack.ticket.channel_epoch.into())
-                                && f.source.eq(&unack.signer)
-                        }
-                        None => true,
-                    },
+                    PendingAcknowledgement::WaitingAsRelayer(unack) =>filter.map(|f| f.get_id() == unack.ticket.channel_id).unwrap_or(true)
                 },
             )
             .await?

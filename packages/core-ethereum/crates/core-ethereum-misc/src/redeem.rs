@@ -39,6 +39,7 @@ where
 }
 
 lazy_static::lazy_static! {
+    /// Used as a placeholder when the redeem transaction has not yet been published on-chain
     static ref EMPTY_TX_HASH: Hash = Hash::default();
 }
 
@@ -134,7 +135,22 @@ where
 
 #[cfg(test)]
 mod tests {
-    fn test_ticket_redeem_flow() {}
+    use std::sync::Arc;
+    use async_lock::RwLock;
+    use core_crypto::random::random_bytes;
+    use core_crypto::types::Hash;
+    use core_types::acknowledgement::AcknowledgedTicket;
+    use utils_db::rusty::RustyLevelDbShim;
+    use utils_types::traits::BinarySerializable;
+
+    fn fake_on_chain_redeemer(ack: AcknowledgedTicket) -> Result<String,String> {
+        Ok(Hash::new(&random_bytes::<{ Hash::SIZE }>()).to_string())
+    }
+
+    #[test]
+    fn test_ticket_redeem_flow() {
+        let db = Arc::new(RwLock::new(RustyLevelDbShim::new_in_memory()));
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -148,7 +164,8 @@ pub mod wasm {
 
     macro_rules! make_js_on_chain_sender {
         ($on_chain_tx_sender:expr) => {
-            |ack: core_types::acknowledgement::AcknowledgedTicket| -> std::pin::Pin<Box<dyn futures::Future<Output = Result<String, String>>>> {
+            |ack: core_types::acknowledgement::AcknowledgedTicket|
+            -> std::pin::Pin<Box<dyn futures::Future<Output = Result<String, String>>>> {
             Box::pin(async move {
                 let serialized_ack: core_types::acknowledgement::wasm::AcknowledgedTicket = ack.into();
                 match $on_chain_tx_sender.call1(&wasm_bindgen::JsValue::null(), &wasm_bindgen::JsValue::from(serialized_ack)) {
