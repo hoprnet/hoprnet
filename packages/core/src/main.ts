@@ -11,8 +11,7 @@ import { rmSync } from 'fs'
 const log = debug(`hopr-core:create-hopr`)
 
 /*
- * General function to create a HOPR node given an identity an
- * range of options.
+ * General function to create a HOPR node given an identity and configuration
  * @param peerId:PeerId - Identity used by the HOPR node
  * @param cfg:HoprdConfig - Required configuration to create node
  * @returns {Hopr} - HOPR node

@@ -346,28 +346,28 @@ pub struct CliArgs {
         long = "heartbeatInterval",
         help = "Interval in milliseconds in which the availability of other nodes get measured",
         value_name = "MILLISECONDS",
-        value_parser = clap::value_parser ! (u32),
+        value_parser = clap::value_parser ! (u64),
         env = "HOPRD_HEARTBEAT_INTERVAL",
     )]
-    pub heartbeat_interval: Option<u32>,
+    pub heartbeat_interval: Option<u64>,
 
     #[arg(
         long = "heartbeatThreshold",
         help = "Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since",
         value_name = "MILLISECONDS",
-        value_parser = clap::value_parser ! (u32),
+        value_parser = clap::value_parser ! (u64),
         env = "HOPRD_HEARTBEAT_THRESHOLD",
     )]
-    pub heartbeat_threshold: Option<u32>,
+    pub heartbeat_threshold: Option<u64>,
 
     #[arg(
         long = "heartbeatVariance",
         help = "Upper bound for variance applied to heartbeat interval in milliseconds",
         value_name = "MILLISECONDS",
-        value_parser = clap::value_parser ! (u32),
+        value_parser = clap::value_parser ! (u64),
         env = "HOPRD_HEARTBEAT_VARIANCE"
     )]
-    pub heartbeat_variance: Option<u32>,
+    pub heartbeat_variance: Option<u64>,
 
     #[arg(
         long = "onChainConfirmations",

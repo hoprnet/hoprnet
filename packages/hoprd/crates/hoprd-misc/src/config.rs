@@ -1,6 +1,10 @@
+use core_network::heartbeat::HeartbeatConfig;
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use validator::{Validate, ValidationError};
+
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_misc::constants::{
-    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
     DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
 use proc_macro_regex::regex;
@@ -163,24 +167,6 @@ impl Default for HealthCheck {
             enable: false,
             host: DEFAULT_HEALTH_CHECK_HOST.to_string(),
             port: DEFAULT_HEALTH_CHECK_PORT,
-        }
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
-pub struct Heartbeat {
-    pub interval: u32,
-    pub threshold: u32,
-    pub variance: u32,
-}
-
-impl Default for Heartbeat {
-    fn default() -> Self {
-        Self {
-            interval: DEFAULT_HEARTBEAT_INTERVAL,
-            threshold: DEFAULT_HEARTBEAT_THRESHOLD,
-            variance: DEFAULT_HEARTBEAT_INTERVAL_VARIANCE,
         }
     }
 }
@@ -363,7 +349,7 @@ pub struct HoprdConfig {
     #[validate]
     pub strategy: Strategy,
     #[validate]
-    pub heartbeat: Heartbeat,
+    pub heartbeat: HeartbeatConfig,
     #[validate]
     pub network_options: NetworkOptions,
     #[validate]
@@ -389,7 +375,7 @@ impl Default for HoprdConfig {
             db: Db::default(),
             api: Api::default(),
             strategy: Strategy::default(),
-            heartbeat: Heartbeat::default(),
+            heartbeat: HeartbeatConfig::default(),
             network_options: NetworkOptions::default(),
             healthcheck: HealthCheck::default(),
             network: String::default(),
@@ -610,7 +596,7 @@ mod tests {
                     port: 1233,
                 },
             },
-            heartbeat: Heartbeat {
+            heartbeat: HeartbeatConfig {
                 interval: 0,
                 threshold: 0,
                 variance: 0,

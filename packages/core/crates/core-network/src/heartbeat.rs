@@ -28,26 +28,40 @@ use gloo_timers::future::sleep;
 use utils_misc::time::wasm::current_timestamp;
 
 use crate::ping::Pinging;
+use crate::constants::{
+    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_THRESHOLD, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE
+};
 
 /// Configuration of the Heartbeat
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct HeartbeatConfig {
-    pub heartbeat_variance: f32,
+    /// Round-to-round variance to complicate network sync
+    pub variance: u64,
     /// Interval in which the heartbeat is triggered
-    pub heartbeat_interval: u32,
-    /// The maximum number of concurrent heartbeats
-    pub heartbeat_threshold: u64,
+    pub interval: u64,
+    /// The maximum number of concurrent heartbeat pings
+    pub threshold: u64,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl HeartbeatConfig {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn new(heartbeat_variance: f32, heartbeat_interval: u32, heartbeat_threshold: u64) -> HeartbeatConfig {
+    pub fn new(variance: u64, interval: u64, threshold: u64) -> HeartbeatConfig {
         HeartbeatConfig {
-            heartbeat_variance,
-            heartbeat_interval,
-            heartbeat_threshold,
+            variance,
+            interval,
+            threshold,
+        }
+    }
+}
+
+impl Default for HeartbeatConfig {
+    fn default() -> Self {
+        Self {
+            interval: DEFAULT_HEARTBEAT_INTERVAL,
+            threshold: DEFAULT_HEARTBEAT_THRESHOLD,
+            variance: DEFAULT_HEARTBEAT_INTERVAL_VARIANCE,
         }
     }
 }
@@ -107,11 +121,8 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             };
 
             let start = current_timestamp();
-            let from_timestamp = if start > self.config.heartbeat_threshold {
-                start - self.config.heartbeat_threshold
-            } else {
-                start
-            };
+            let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
+
             info!(
                 "Starting a heartbeat round for peers since timestamp {}",
                 from_timestamp
@@ -119,18 +130,13 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             let peers = self.external_api.get_peers(from_timestamp).await;
 
             // random timeout to avoid network sync:
-            let timeout_in_ms: u64 = if self.config.heartbeat_variance > 1.0 {
-                self.rng
-                    .gen_range(
-                        self.config.heartbeat_interval
-                            ..(self.config.heartbeat_interval + (self.config.heartbeat_variance as u32)),
-                    )
-                    .into()
-            } else {
-                self.config.heartbeat_interval as u64
-            };
+            let this_round_planned_duration_in_ms: u64 = self.rng
+                .gen_range(
+                    self.config.interval..self.config.interval.checked_add(self.config.variance.max(1)).unwrap_or(u64::MAX),
+                )
+                .into();
 
-            let timeout = sleep(std::time::Duration::from_millis(timeout_in_ms)).fuse();
+            let timeout = sleep(std::time::Duration::from_millis(this_round_planned_duration_in_ms)).fuse();
             let ping = self.pinger.ping(peers).fuse();
 
             pin_mut!(timeout, ping);
@@ -144,16 +150,12 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 metric_time_to_heartbeat.record_measure(heartbeat_round_timer.unwrap());
             };
 
-            let last_heartbeat_duration_in_ms = 0u64.max(current_timestamp() - start);
-            if last_heartbeat_duration_in_ms < self.config.heartbeat_interval as u64 {
-                debug!(
-                    "Heartbeat sleeping for: {}ms",
-                    self.config.heartbeat_interval as u64 - last_heartbeat_duration_in_ms
-                );
-                sleep(std::time::Duration::from_millis(
-                    self.config.heartbeat_interval as u64 - last_heartbeat_duration_in_ms,
-                ))
-                .await
+            let this_round_actual_duration_in_ms = current_timestamp().checked_sub(start).unwrap_or(0u64);
+            if this_round_actual_duration_in_ms < this_round_planned_duration_in_ms {
+                let time_to_wait_for_next_round = this_round_planned_duration_in_ms - this_round_actual_duration_in_ms;
+                
+                debug!("Heartbeat sleeping for: {}ms", time_to_wait_for_next_round);
+                sleep(std::time::Duration::from_millis(time_to_wait_for_next_round)).await
             }
         }
     }
@@ -165,9 +167,9 @@ mod tests {
 
     fn simple_heartbeat_config() -> HeartbeatConfig {
         HeartbeatConfig {
-            heartbeat_variance: 0.0f32,
-            heartbeat_interval: 5u32,
-            heartbeat_threshold: 0u64,
+            variance: 0u64,
+            interval: 5u64,
+            threshold: 0u64,
         }
     }
 
@@ -208,9 +210,9 @@ mod tests {
     #[async_std::test]
     async fn test_heartbeat_should_interrupt_long_running_heartbeats() {
         let mut config = simple_heartbeat_config();
-        config.heartbeat_interval = 5u32;
+        config.interval = 5u64;
 
-        let ping_delay = 2 * config.heartbeat_interval as u64;
+        let ping_delay = 2 * config.interval;
         let expected_loop_count = 2;
 
         let mut mock = MockHeartbeatExternalApi::new();
@@ -223,7 +225,7 @@ mod tests {
         futures_lite::future::race(
             heartbeat.heartbeat_loop(),
             sleep(std::time::Duration::from_millis(
-                (expected_loop_count as u64) * config.heartbeat_interval as u64,
+                (expected_loop_count as u64) * config.interval,
             )),
         )
         .await;

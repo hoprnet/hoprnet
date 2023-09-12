@@ -25,7 +25,8 @@ members = [
     "packages/utils/crates/utils-log",
     "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-misc",
-    "packages/utils/crates/utils-types"
+    "packages/utils/crates/utils-types",
+    "packages/utils/crates/utils-validation"
 ]
 
 [workspace.dependencies]
@@ -69,6 +70,7 @@ utils-log = { path = "packages/utils/crates/utils-log", default-features = false
 utils-misc = { path = "packages/utils/crates/utils-misc", default-features = false}
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
 utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
+utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }
 
 
 [profile.release]

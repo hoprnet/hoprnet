@@ -6445,6 +6445,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "utils-validation"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
