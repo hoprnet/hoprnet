@@ -588,7 +588,10 @@ pub mod test {
 
         deserialized_ticket.status(super::AcknowledgedTicketStatus::BeingAggregated { start: 1u64, end: 2u64 });
 
-        assert_eq!(deserialized_ticket, deserialize(&serialize(&deserialized_ticket).unwrap()).unwrap());
+        assert_eq!(
+            deserialized_ticket,
+            deserialize(&serialize(&deserialized_ticket).unwrap()).unwrap()
+        );
     }
 
     #[test]

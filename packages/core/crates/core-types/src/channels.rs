@@ -208,6 +208,7 @@ pub struct Ticket {
     pub signature: Option<Signature>,
 }
 
+// Use compact serialization for ticket as they are used very often
 impl Serialize for Ticket {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -225,6 +226,7 @@ impl<'de> Visitor<'de> for TicketVisitor {
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_fmt(format_args!("a byte-array with {} elements", Ticket::SIZE))
     }
+
     fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
     where
         E: de::Error,
@@ -233,6 +235,7 @@ impl<'de> Visitor<'de> for TicketVisitor {
     }
 }
 
+// Use compact deserialization for tickets as they are used very often
 impl<'de> Deserialize<'de> for Ticket {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
