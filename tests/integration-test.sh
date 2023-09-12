@@ -246,7 +246,7 @@ result=$(api_ping "${api2}" ${addr3} "\"latency\":[0-9]+,\"reportedVersion\":")
 log "-- ${result}"
 
 log "Node 1 ping itself (should timeout)"
-result=$(api_ping "${api2}" ${addr3} "\"status\":\"TIMEOUT\"")
+result=$(api_ping "${api1}" ${addr1} "\"status\":\"TIMEOUT\"")
 log "-- ${result}"
 
 # FIXME: re-enable when network check works

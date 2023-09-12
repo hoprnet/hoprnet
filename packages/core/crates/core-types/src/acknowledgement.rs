@@ -140,7 +140,7 @@ impl AcknowledgedTicket {
         )?;
 
         Ok(Self {
-            // FIXME: think about serialization and deserialization
+            // new tickets are always untouched
             status: AcknowledgedTicketStatus::Untouched,
             ticket,
             response,
@@ -182,6 +182,10 @@ impl AcknowledgedTicket {
         Ok(())
     }
 
+    pub fn status(&mut self, new_status: AcknowledgedTicketStatus) {
+        self.status = new_status;
+    }
+
     pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
         let mut luck = [0u8; 7];
 
@@ -219,6 +223,45 @@ impl AcknowledgedTicket {
 impl Display for AcknowledgedTicket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "acknowledged {} in state '{}'", self.ticket, self.status)
+    }
+}
+
+impl BinarySerializable for AcknowledgedTicket {
+    const SIZE: usize = Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE;
+
+    fn from_bytes(data: &[u8]) -> Result<Self> {
+        if data.len() == Self::SIZE {
+            let ticket = Ticket::from_bytes(&data[0..Ticket::SIZE])?;
+            let response = Response::from_bytes(&data[Ticket::SIZE..Ticket::SIZE + Response::SIZE])?;
+            let vrf_params = VrfParameters::from_bytes(
+                &data[Ticket::SIZE + Response::SIZE..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE],
+            )?;
+            let signer = Address::from_bytes(
+                &data[Ticket::SIZE + Response::SIZE + VrfParameters::SIZE
+                    ..Ticket::SIZE + Response::SIZE + VrfParameters::SIZE + Address::SIZE],
+            )?;
+
+            Ok(Self {
+                // BinarySerializable is only used for over-the-wire encoding,
+                // so acked tickets are always untouched
+                status: AcknowledgedTicketStatus::Untouched,
+                ticket,
+                response,
+                vrf_params,
+                signer,
+            })
+        } else {
+            Err(ParseError)
+        }
+    }
+
+    fn to_bytes(&self) -> Box<[u8]> {
+        let mut ret = Vec::with_capacity(Self::SIZE);
+        ret.extend_from_slice(&self.ticket.to_bytes());
+        ret.extend_from_slice(&self.response.to_bytes());
+        ret.extend_from_slice(&self.vrf_params.to_bytes());
+        ret.extend_from_slice(&self.signer.to_bytes());
+        ret.into_boxed_slice()
     }
 }
 
@@ -539,15 +582,46 @@ pub mod test {
         let acked_ticket =
             AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
 
-        assert_eq!(acked_ticket, deserialize(&serialize(&acked_ticket).unwrap()).unwrap());
+        let mut deserialized_ticket = deserialize(&serialize(&acked_ticket).unwrap()).unwrap();
+        assert_eq!(acked_ticket, deserialized_ticket);
 
-        assert!(acked_ticket
+        assert!(deserialized_ticket
             .verify(
                 &ALICE.public().to_address(),
                 &BOB.public().to_address(),
                 &Hash::default()
             )
             .is_ok());
+
+        deserialized_ticket.status(super::AcknowledgedTicketStatus::BeingAggregated { start: 1u64, end: 2u64 });
+
+        assert_eq!(
+            deserialized_ticket,
+            deserialize(&serialize(&deserialized_ticket).unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_acknowledged_ticket_serialize_deserialize() {
+        let response = Response::from_bytes(&hex!(
+            "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
+        ))
+        .unwrap();
+
+        let ticket = mock_ticket(
+            &ALICE,
+            &BOB.public().to_address(),
+            None,
+            Some(response.to_challenge().into()),
+        );
+
+        let acked_ticket =
+            AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
+
+        assert_eq!(
+            acked_ticket,
+            AcknowledgedTicket::from_bytes(&acked_ticket.to_bytes()).unwrap()
+        );
     }
 }
 
