@@ -306,8 +306,10 @@ api_open_channel() {
 }
 
 # $1 = node api address (origin)
-# validate that node is funded
-api_validate_node_balance_gt0() {
+# validate that node is funded with xdai
+# validate that safe is funded with hopr and xdai
+# validate that hoprchannels has allowance for hopr tokens on safe
+api_validate_balances_gt0() {
   local balance eth_balance safe_hopr_balance
   local endpoint=${1:-localhost:3001}
 

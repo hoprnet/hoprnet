@@ -572,6 +572,10 @@ export class Hopr extends EventEmitter {
     log(`Processing multiaddresses for peer ${peer.id.toString()}: ${peer.multiaddrs}`)
     const addrsToAdd: Multiaddr[] = []
     for (const addr of peer.multiaddrs) {
+      // safeguard against empty multiaddrs, skip
+      if (addr.toString() == '') {
+        continue
+      }
       const tuples = addr.tuples()
 
       if (tuples.length <= 1 && tuples[0][0] == CODE_P2P) {
@@ -1033,6 +1037,12 @@ export class Hopr extends EventEmitter {
       addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toString())
     }
 
+    // skip if no address to announce has been found
+    if (!addrToAnnounce || addrToAnnounce.toString() == '') {
+      log('Error: could not find an address to announce')
+      return
+    }
+
     // Check if there was a previous announcement from us
     const ownAccount = await connector.getAccount(this.getEthereumAddress())
 
@@ -1063,7 +1073,7 @@ export class Hopr extends EventEmitter {
         // information
         if (isRegisteredCorrectly) {
           log(
-            'announcing via Safe-Module on-chain %s with announcement allowed=%s routable address %s',
+            'announcing via Safe-Module on-chain with announcement allowed=%s %s routable address %s',
             isAnnouncementAllowed,
             announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
             addrToAnnounce.toString()
@@ -1101,7 +1111,11 @@ export class Hopr extends EventEmitter {
 
   public async getBalance(): Promise<Balance> {
     verbose('Requesting hopr balance for node')
-    return await HoprCoreEthereum.getInstance().getBalance(true)
+    // we do not keep the node's hopr balance in the db anymore, therefore use
+    // the RPC API instead
+    // FIXME: remove these functions entirely since the HOPR balance isn't used
+    // anymore by the node
+    return await HoprCoreEthereum.getInstance().getBalance(false)
   }
 
   public async getNativeBalance(): Promise<Balance> {
@@ -1117,6 +1131,11 @@ export class Hopr extends EventEmitter {
   public async getSafeNativeBalance(): Promise<Balance> {
     verbose('Requesting native balance from safe')
     return await HoprCoreEthereum.getInstance().getNativeBalance(this.smartContractInfo().safeAddress, true)
+  }
+
+  public async getSafeAllowance(): Promise<Balance> {
+    verbose('Requesting hopr allowance from safe for hopr channels')
+    return await this.db.get_staking_safe_allowance()
   }
 
   public smartContractInfo(): {

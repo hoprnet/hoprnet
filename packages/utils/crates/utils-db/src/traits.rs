@@ -42,18 +42,31 @@ pub trait AsyncKVStorage {
     type Key: Serialize;
     type Value: Serialize;
 
+    /// Gets a single database entry
     async fn get(&self, key: Self::Key) -> Result<Option<Self::Value>>;
 
+    /// Sets a single database entry
     async fn set(&mut self, key: Self::Key, value: Self::Value) -> Result<Option<Self::Value>>;
 
+    /// Returns true if database contains an entry that matches the given key
     async fn contains(&self, key: Self::Key) -> Result<bool>;
 
+    /// Removes the database entry that matches the given key
     async fn remove(&mut self, key: Self::Key) -> Result<Option<Self::Value>>;
 
+    /// Dumps the contents of the database into a file
     async fn dump(&self, destination: String) -> Result<()>;
 
+    /// Returns an iterator that yields all database entries whose key matches
+    /// the given prefix and the length of the suffix. Does not match shorter
+    /// or longer suffixes, even though they have the right suffix.
     fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<StorageValueIterator<Self::Value>>;
 
+    /// Returns an iterator that yields all database entries whose is in the
+    /// interval from `start` (inclusive) and `end` (inclusive).
+    fn iterate_range(&self, start: Self::Key, end: Self::Key) -> Result<StorageValueIterator<Self::Value>>;
+
+    /// Constructs batch query
     async fn batch(
         &mut self,
         operations: Vec<BatchOperation<Self::Key, Self::Value>>,

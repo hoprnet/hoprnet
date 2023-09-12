@@ -28,6 +28,15 @@ impl RustyLevelDbIterator {
             last_key: last_key.into_boxed_slice(),
         }
     }
+
+    pub fn new_range(iter: DBIterator, start: &[u8], end: &[u8]) -> Self {
+        // This implementation does not use the `seek` method, because it is not working properly
+        Self {
+            iter,
+            first_key: start.into(),
+            last_key: end.into(),
+        }
+    }
 }
 
 impl Iterator for RustyLevelDbIterator {
@@ -149,6 +158,20 @@ impl AsyncKVStorage for RustyLevelDbShim {
             &prefix,
             suffix_size as usize,
         ))))
+    }
+
+    fn iterate_range(
+        &self,
+        start: Self::Key,
+        end: Self::Key,
+    ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+        let i = self
+            .db
+            .lock()
+            .unwrap()
+            .new_iter()
+            .map_err(|e| DbError::GenericError(e.err))?;
+        Ok(Box::new(iter(RustyLevelDbIterator::new_range(i, &start, &end))))
     }
 
     async fn batch(
@@ -524,40 +547,40 @@ pub mod wasm {
 
     #[wasm_bindgen(module = "fs")]
     extern "C" {
-        #[wasm_bindgen(catch)]
-        fn existsSync(path: &str) -> Result<bool, JsValue>;
-        #[wasm_bindgen(catch)]
-        fn openSync(path: &str, flags: Option<JsString>, mode: Option<JsString>) -> Result<i32, JsValue>;
-        #[wasm_bindgen(catch)]
-        fn readSync(
+        #[wasm_bindgen(catch, js_name = "existsSync")]
+        fn exists_sync(path: &str) -> Result<bool, JsValue>;
+        #[wasm_bindgen(catch, js_name = "openSync")]
+        fn open_sync(path: &str, flags: Option<JsString>, mode: Option<JsString>) -> Result<i32, JsValue>;
+        #[wasm_bindgen(catch, js_name = "readSync")]
+        fn read_sync(
             fd: i32,
             buffer: &Uint8Array,
             offset: u32,
             length: u32,
             position: Option<u32>,
         ) -> Result<i32, JsValue>;
-        #[wasm_bindgen(catch)]
-        fn writeSync(
+        #[wasm_bindgen(catch, js_name = "writeSync")]
+        fn write_sync(
             fd: i32,
             buffer: &Uint8Array,
             offset: u32,
             length: Option<u32>,
             position: Option<u32>,
         ) -> Result<i32, JsValue>;
-        #[wasm_bindgen(catch)]
-        fn fsyncSync(fd: i32) -> Result<(), JsValue>;
-        #[wasm_bindgen(catch)]
-        fn fstatSync(fd: i32, options: &JsValue) -> Result<JsValue, JsValue>;
-        #[wasm_bindgen(catch)]
-        fn closeSync(fd: i32) -> Result<(), JsValue>;
-        #[wasm_bindgen(catch)]
-        fn mkdirSync(path: &str, options: &JsValue) -> Result<JsString, JsValue>;
-        #[wasm_bindgen(catch)]
-        fn rmSync(path: &str, options: &JsValue) -> Result<(), JsValue>;
-        #[wasm_bindgen(catch)]
-        fn readdirSync(path: &str, options: &JsValue) -> Result<Vec<JsString>, JsValue>;
-        #[wasm_bindgen(catch)]
-        fn renameSync(old: &str, new: &str) -> Result<(), JsValue>;
+        #[wasm_bindgen(catch, js_name = "fsyncSync")]
+        fn fsync_sync(fd: i32) -> Result<(), JsValue>;
+        #[wasm_bindgen(catch, js_name = "fstatSync")]
+        fn fstat_sync(fd: i32, options: &JsValue) -> Result<JsValue, JsValue>;
+        #[wasm_bindgen(catch, js_name = "closeSync")]
+        fn close_sync(fd: i32) -> Result<(), JsValue>;
+        #[wasm_bindgen(catch, js_name = "mkdirSync")]
+        fn mkdir_sync(path: &str, options: &JsValue) -> Result<JsString, JsValue>;
+        #[wasm_bindgen(catch, js_name = "rmSync")]
+        fn rm_sync(path: &str, options: &JsValue) -> Result<(), JsValue>;
+        #[wasm_bindgen(catch, js_name = "readdirSync")]
+        fn readdir_sync(path: &str, options: &JsValue) -> Result<Vec<JsString>, JsValue>;
+        #[wasm_bindgen(catch, js_name = "renameSync")]
+        fn rename_sync(old: &str, new: &str) -> Result<(), JsValue>;
     }
 
     /// Represents a file handle (descriptor) in NodeJS FS
@@ -608,7 +631,7 @@ pub mod wasm {
 
     impl FileHandle {
         pub fn open(path: &str, flags: Option<String>) -> rusty_leveldb::Result<Self> {
-            openSync(path, flags.map(JsString::from), None)
+            open_sync(path, flags.map(JsString::from), None)
                 .map_err(|e| translate_fs_err("could not open file", e))
                 .map(|fd| {
                     assert!(fd >= 0, "negative fd");
@@ -618,7 +641,7 @@ pub mod wasm {
 
         fn read_from(&self, offset: Option<u32>, dst: &mut [u8]) -> rusty_leveldb::Result<usize> {
             let ubuf = Uint8Array::new_with_length(dst.len() as u32);
-            let read = readSync(self.0, &ubuf, 0, dst.len() as u32, offset)
+            let read = read_sync(self.0, &ubuf, 0, dst.len() as u32, offset)
                 .map_err(|e| translate_fs_err("could not read", e))?;
 
             match 0.cmp(&read) {
@@ -643,7 +666,7 @@ pub mod wasm {
             let arr = Uint8Array::new_with_length(buf.len() as u32);
             arr.copy_from(buf);
 
-            let written = writeSync(self.0, &arr, 0, Some(buf.len() as u32), None)
+            let written = write_sync(self.0, &arr, 0, Some(buf.len() as u32), None)
                 .map_err(|_| io::Error::from(io::ErrorKind::Other))?;
 
             if written >= 0 {
@@ -654,7 +677,7 @@ pub mod wasm {
         }
 
         fn flush(&mut self) -> io::Result<()> {
-            fsyncSync(self.0).map_err(|_| io::Error::from(io::ErrorKind::Other))
+            fsync_sync(self.0).map_err(|_| io::Error::from(io::ErrorKind::Other))
         }
     }
 
@@ -666,8 +689,8 @@ pub mod wasm {
 
     impl Drop for FileHandle {
         fn drop(&mut self) {
-            let _ = fsyncSync(self.0);
-            let _ = closeSync(self.0);
+            let _ = fsync_sync(self.0);
+            let _ = close_sync(self.0);
         }
     }
 
@@ -711,11 +734,11 @@ pub mod wasm {
         }
 
         fn exists(&self, p: &Path) -> rusty_leveldb::Result<bool> {
-            existsSync(p.to_str().expect("invalid path")).map_err(|e| translate_fs_err("exists error", e))
+            exists_sync(p.to_str().expect("invalid path")).map_err(|e| translate_fs_err("exists error", e))
         }
 
         fn children(&self, p: &Path) -> rusty_leveldb::Result<Vec<PathBuf>> {
-            Ok(readdirSync(p.to_str().expect("invalid path"), &JsValue::undefined())
+            Ok(readdir_sync(p.to_str().expect("invalid path"), &JsValue::undefined())
                 .map_err(|e| translate_fs_err("readdir error", e))?
                 .into_iter()
                 .map(|s| PathBuf::from(s.as_string().expect("invalid path buf")))
@@ -729,7 +752,7 @@ pub mod wasm {
             }
 
             let fh = FileHandle::open(p.to_str().expect("invalid file path"), Some("r".into()))?;
-            fstatSync(fh.0, &JsValue::undefined())
+            fstat_sync(fh.0, &JsValue::undefined())
                 .map_err(|e| translate_fs_err("fstat error", e))
                 .and_then(|v| {
                     serde_wasm_bindgen::from_value::<Stats>(v)
@@ -739,7 +762,7 @@ pub mod wasm {
         }
 
         fn delete(&self, p: &Path) -> rusty_leveldb::Result<()> {
-            rmSync(p.to_str().expect("invalid path"), &JsValue::undefined())
+            rm_sync(p.to_str().expect("invalid path"), &JsValue::undefined())
                 .map_err(|e| translate_fs_err("delete error", e))
         }
 
@@ -752,7 +775,7 @@ pub mod wasm {
             let opts = serde_wasm_bindgen::to_value(&MkDirOpts { recursive: true })
                 .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
 
-            if let Err(err) = mkdirSync(p.to_str().expect("invalid path"), &opts)
+            if let Err(err) = mkdir_sync(p.to_str().expect("invalid path"), &opts)
                 .map(|_| ())
                 .map_err(|e| translate_fs_err("mkdir error", e))
             {
@@ -779,11 +802,11 @@ pub mod wasm {
             })
             .map_err(|_| Status::new(StatusCode::IOError, "failed to convert opts"))?;
 
-            rmSync(p.to_str().expect("invalid path"), &opts).map_err(|e| translate_fs_err("rmdir error", e))
+            rm_sync(p.to_str().expect("invalid path"), &opts).map_err(|e| translate_fs_err("rmdir error", e))
         }
 
         fn rename(&self, old: &Path, new: &Path) -> rusty_leveldb::Result<()> {
-            renameSync(
+            rename_sync(
                 old.to_str().expect("invalid old path"),
                 new.to_str().expect("invalid new path"),
             )

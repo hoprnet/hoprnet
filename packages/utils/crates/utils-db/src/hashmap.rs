@@ -100,6 +100,22 @@ impl AsyncKVStorage for BinaryHashMapStorage {
         Ok(Box::new(d))
     }
 
+    fn iterate_range(
+        &self,
+        start: Self::Key,
+        end: Self::Key,
+    ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+        let d = iter(self.data.clone().into_iter())
+            .filter(move |(key, _)| {
+                let upper_bound = key.as_ref().cmp(&start);
+                let lower_bound = key.as_ref().cmp(&end);
+                upper_bound != Ordering::Greater && lower_bound != Ordering::Less
+            })
+            .map(|(_, v)| Ok(v));
+
+        Ok(Box::new(d))
+    }
+
     async fn batch(
         &mut self,
         operations: Vec<BatchOperation<Self::Key, Self::Value>>,

@@ -14,6 +14,9 @@ pub enum DbError {
     #[error("deserialization error: {0}")]
     DeserializationError(String),
 
+    #[error("invalid input values: {0}")]
+    InvalidInput(String),
+
     #[error("failed DB operation: {0}")]
     GenericError(String),
 }

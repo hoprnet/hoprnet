@@ -22,6 +22,8 @@ utils-log = { path = "../../../utils/crates/utils-log", default-features = false
 utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 hex = "0.4.3"
+hex-literal = "0.4"
+lazy_static = "1.4.0"
 js-sys = { workspace = true, optional = true }
 serde = { version = "1.0", features = ["derive"] }
 stdext = "0.3.1"

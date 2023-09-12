@@ -1,10 +1,11 @@
 black==23.3.0
 hoprd-sdk @ git+https://github.com/hoprnet/hoprd-sdk-python.git@98885255e5c5b47bec7c3aa11cfff93e37068a3b
+leveldb==0.201
+pytest-asyncio==0.21.0
+pytest==7.2.1
 requests==2.28.2
 rlp==3.0.0
 ruff==0.0.261
-pytest==7.2.1
-pytest-asyncio==0.21.0
 waiting==1.4.1
-websockets==11.0.1
 websocket-client==1.5.1
+websockets==11.0.1

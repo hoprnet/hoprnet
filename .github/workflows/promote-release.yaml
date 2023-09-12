@@ -32,7 +32,6 @@ jobs:
         id: promote
         run: |
           git fetch
-          git pull
           # Checkout to tag revision
           if [ `git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}` ];
           then 
@@ -42,7 +41,7 @@ jobs:
 
           # Create new branch or reuse an existing branch
           if [ `git branch -al ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}` ];
-          then 
+          then
             git checkout release/${{ github.event.inputs.release_name }}
             git rebase ${{ github.event.inputs.tag_name }}
             git push

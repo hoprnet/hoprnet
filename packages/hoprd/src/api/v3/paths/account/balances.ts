@@ -7,18 +7,20 @@ import type { Operation } from 'express-openapi'
  * @returns Current HOPR and native balance.
  */
 export const getBalances = async (node: Hopr) => {
-  const [nativeBalance, hoprBalance, safeNativeBalance, safeHoprBalance] = await Promise.all([
+  const [nativeBalance, hoprBalance, safeNativeBalance, safeHoprBalance, safeHoprAllowance] = await Promise.all([
     await node.getNativeBalance(),
     await node.getBalance(),
     await node.getSafeNativeBalance(),
-    await node.getSafeBalance()
+    await node.getSafeBalance(),
+    await node.getSafeAllowance()
   ])
 
   return {
     native: nativeBalance.to_string(),
     hopr: hoprBalance.to_string(),
     safeNative: safeNativeBalance.to_string(),
-    safeHopr: safeHoprBalance.to_string()
+    safeHopr: safeHoprBalance.to_string(),
+    safeHoprAllowance: safeHoprAllowance.to_string()
   }
 }
 
@@ -27,12 +29,13 @@ const GET: Operation = [
     const { node } = req.context
 
     try {
-      const { native, hopr, safeNative, safeHopr } = await getBalances(node)
+      const { native, hopr, safeNative, safeHopr, safeHoprAllowance } = await getBalances(node)
       return res.status(200).send({
         native,
         hopr,
         safeNative,
-        safeHopr
+        safeHopr,
+        safeHoprAllowance
       })
     } catch (err) {
       return res
@@ -44,7 +47,7 @@ const GET: Operation = [
 
 GET.apiDoc = {
   description:
-    "Get node's and associated Safe's HOPR and native balances. HOPR tokens from the Safe balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance of the Node is used to pay for the gas fees for the blockchain.",
+    "Get node's and associated Safe's HOPR and native balances as well as the allowance for HOPR tokens to be drawn by HoprChannels from Safe. HOPR tokens from the Safe balance is used to fund payment channels between this node and other nodes on the network. NATIVE balance of the Node is used to pay for the gas fees for the blockchain.",
   tags: ['Account'],
   operationId: 'accountGetBalances',
   responses: {
@@ -65,6 +68,9 @@ GET.apiDoc = {
                 $ref: '#/components/schemas/NativeBalance'
               },
               safeHopr: {
+                $ref: '#/components/schemas/HoprBalance'
+              },
+              safeHoprAllowance: {
                 $ref: '#/components/schemas/HoprBalance'
               }
             }

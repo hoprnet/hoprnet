@@ -539,6 +539,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Channel is already opened')
     }
 
+    // Safe HOPR balance must be larger or equal to the amount to be funded
     const myBalance = await this.getSafeBalance()
     if (myBalance.lt(amount)) {
       throw Error('We do not have enough balance to open a channel')
@@ -546,11 +547,9 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
 
-    const allowance = Balance.deserialize(
-      (await this.db.get_staking_safe_allowance()).serialize_value(),
-      BalanceType.HOPR
-    )
-    if (allowance.lt(myBalance)) {
+    // allowance must be larger or equal to the amount to be funded
+    const allowance = await this.db.get_staking_safe_allowance()
+    if (allowance.lt(amount)) {
       throw Error('We do not have enough allowance to fund the channel')
     }
 
@@ -575,9 +574,11 @@ export default class HoprCoreEthereum extends EventEmitter {
       BalanceType.HOPR
     )
     if (allowance.lt(myFund)) {
-      throw Error('We do not have enough allowance to fund the channel')
+      throw Error(
+        `We do not have enough allowance (${allowance.to_string()} < ${myFund.to_string()} to fund the channel`
+      )
     }
-    return (
+    const receipt = (
       await this.chain.fundChannel(
         dest,
         myFund,
@@ -585,6 +586,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         // we are only interested in fundChannel receipt
       )
     )[1]
+    return receipt
   }
 
   public async isSafeAnnouncementAllowed(): Promise<boolean> {

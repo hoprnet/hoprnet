@@ -81,9 +81,24 @@ impl BinarySerializable for Acknowledgement {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum AcknowledgedTicketStatus {
+    Untouched,
+    BeingRedeemed { tx_hash: Hash },
+    BeingAggregated { start: u64, end: u64 },
+}
+
+impl Default for AcknowledgedTicketStatus {
+    fn default() -> Self {
+        AcknowledgedTicketStatus::Untouched
+    }
+}
+
 /// Contains acknowledgment information and the respective ticket
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
+    #[serde(default)]
+    pub status: AcknowledgedTicketStatus,
     pub ticket: Ticket,
     pub response: Response,
     pub vrf_params: VrfParameters,
@@ -112,6 +127,8 @@ impl AcknowledgedTicket {
         )?;
 
         Ok(Self {
+            // new tickets are always untouched
+            status: AcknowledgedTicketStatus::Untouched,
             ticket,
             response,
             vrf_params,
@@ -152,6 +169,10 @@ impl AcknowledgedTicket {
         Ok(())
     }
 
+    pub fn status(&mut self, new_status: AcknowledgedTicketStatus) {
+        self.status = new_status;
+    }
+
     pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
         let mut luck = [0u8; 7];
 
@@ -182,7 +203,19 @@ impl AcknowledgedTicket {
         let mut computed_ticket_luck = [0u8; 8];
         computed_ticket_luck[1..].copy_from_slice(&self.get_luck(domain_separator).expect("unsigned ticket"));
 
-        u64::from_be_bytes(signed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
+        u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
+    }
+}
+
+impl std::fmt::Display for AcknowledgedTicket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AcknowledgedTicket")
+            .field("status", &self.status)
+            .field("ticket", &self.ticket)
+            .field("response", &self.response)
+            .field("vrf_params", &self.vrf_params)
+            .field("signer", &self.signer)
+            .finish()
     }
 }
 
@@ -202,6 +235,9 @@ impl BinarySerializable for AcknowledgedTicket {
             )?;
 
             Ok(Self {
+                // BinarySerializable is only used for over-the-wire encoding,
+                // so acked tickets are always untouched
+                status: AcknowledgedTicketStatus::Untouched,
                 ticket,
                 response,
                 vrf_params,
@@ -219,17 +255,6 @@ impl BinarySerializable for AcknowledgedTicket {
         ret.extend_from_slice(&self.vrf_params.to_bytes());
         ret.extend_from_slice(&self.signer.to_bytes());
         ret.into_boxed_slice()
-    }
-}
-
-impl std::fmt::Display for AcknowledgedTicket {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AcknowledgedTicket")
-            .field("ticket", &self.ticket)
-            .field("response", &self.response)
-            .field("vrf_params", &self.vrf_params)
-            .field("signer", &self.signer)
-            .finish()
     }
 }
 
@@ -375,8 +400,11 @@ impl BinarySerializable for PendingAcknowledgement {
 
 #[cfg(test)]
 pub mod test {
-    use crate::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
-    use crate::channels::Ticket;
+    use crate::{
+        acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket},
+        channels::Ticket,
+    };
+    use bincode::{deserialize, serialize};
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, OffchainPublicKey, Response},
@@ -387,9 +415,10 @@ pub mod test {
         traits::BinarySerializable,
     };
 
-    const ALICE: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-
-    const BOB: [u8; 32] = hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c");
+    lazy_static::lazy_static! {
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+    }
 
     fn mock_ticket(
         pk: &ChainKeypair,
@@ -449,13 +478,10 @@ pub mod test {
 
     #[test]
     fn test_unacknowledged_ticket_serialize_deserialize() {
-        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
-        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
-
         let unacked_ticket = UnacknowledgedTicket::new(
-            mock_ticket(&keypair, &keypair_counterparty.public().to_address(), None, None),
+            mock_ticket(&ALICE, &BOB.public().to_address(), None, None),
             HalfKey::default(),
-            keypair.public().to_address(),
+            ALICE.public().to_address(),
         );
 
         assert_eq!(
@@ -466,13 +492,10 @@ pub mod test {
 
     #[test]
     fn test_unacknowledged_ticket_sign_verify() {
-        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
-        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
-
         let unacked_ticket = UnacknowledgedTicket::new(
-            mock_ticket(&keypair, &keypair_counterparty.public().to_address(), None, None),
+            mock_ticket(&ALICE, &BOB.public().to_address(), None, None),
             HalfKey::default(),
-            keypair.public().to_address(),
+            ALICE.public().to_address(),
         );
 
         assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());
@@ -480,9 +503,6 @@ pub mod test {
 
     #[test]
     fn test_unacknowledged_ticket_challenge_response() {
-        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
-        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
-
         let hk1 = HalfKey::new(&hex!(
             "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
         ));
@@ -494,13 +514,13 @@ pub mod test {
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let ticket = mock_ticket(
-            &keypair,
-            &keypair_counterparty.public().to_address(),
+            &ALICE,
+            &BOB.public().to_address(),
             None,
             Some(Challenge::from(cp_sum).to_ethereum_challenge()),
         );
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, keypair.public().to_address());
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, ALICE.public().to_address());
 
         assert!(unacked_ticket.verify_signature(&Hash::default()).is_ok());
         assert!(unacked_ticket.verify_challenge(&hk2).is_ok())
@@ -508,9 +528,6 @@ pub mod test {
 
     #[test]
     fn test_unack_transformation() {
-        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
-        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
-
         let hk1 = HalfKey::new(&hex!(
             "3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"
         ));
@@ -522,22 +539,20 @@ pub mod test {
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
         let ticket = mock_ticket(
-            &keypair,
-            &keypair_counterparty.public().to_address(),
+            &ALICE,
+            &BOB.public().to_address(),
             None,
             Some(Challenge::from(cp_sum).to_ethereum_challenge()),
         );
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, keypair.public().to_address());
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, ALICE.public().to_address());
 
-        let acked_ticket = unacked_ticket
-            .acknowledge(&hk2, &keypair_counterparty, &Hash::default())
-            .unwrap();
+        let acked_ticket = unacked_ticket.acknowledge(&hk2, &BOB, &Hash::default()).unwrap();
 
         assert!(acked_ticket
             .verify(
-                &keypair.public().to_address(),
-                &keypair_counterparty.public().to_address(),
+                &ALICE.public().to_address(),
+                &BOB.public().to_address(),
                 &Hash::default()
             )
             .is_ok());
@@ -545,45 +560,61 @@ pub mod test {
 
     #[test]
     fn test_acknowledged_ticket() {
-        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
-        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
-
         let response = Response::from_bytes(&hex!(
             "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
         ))
         .unwrap();
 
         let ticket = mock_ticket(
-            &keypair,
-            &keypair_counterparty.public().to_address(),
+            &ALICE,
+            &BOB.public().to_address(),
             None,
             Some(response.to_challenge().into()),
         );
 
-        let keypair = ChainKeypair::from_secret(&ALICE).unwrap();
-        let keypair_counterparty = ChainKeypair::from_secret(&BOB).unwrap();
+        let acked_ticket =
+            AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
 
-        let acked_ticket = AcknowledgedTicket::new(
-            ticket,
-            response,
-            keypair.public().to_address(),
-            &keypair_counterparty,
-            &Hash::default(),
-        )
+        let mut deserialized_ticket = deserialize(&serialize(&acked_ticket).unwrap()).unwrap();
+        assert_eq!(acked_ticket, deserialized_ticket);
+
+        assert!(deserialized_ticket
+            .verify(
+                &ALICE.public().to_address(),
+                &BOB.public().to_address(),
+                &Hash::default()
+            )
+            .is_ok());
+
+        deserialized_ticket.status(super::AcknowledgedTicketStatus::BeingAggregated { start: 1u64, end: 2u64 });
+
+        assert_eq!(
+            deserialized_ticket,
+            deserialize(&serialize(&deserialized_ticket).unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_acknowledged_ticket_serialize_deserialize() {
+        let response = Response::from_bytes(&hex!(
+            "876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73"
+        ))
         .unwrap();
+
+        let ticket = mock_ticket(
+            &ALICE,
+            &BOB.public().to_address(),
+            None,
+            Some(response.to_challenge().into()),
+        );
+
+        let acked_ticket =
+            AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
 
         assert_eq!(
             acked_ticket,
             AcknowledgedTicket::from_bytes(&acked_ticket.to_bytes()).unwrap()
         );
-
-        assert!(acked_ticket
-            .verify(
-                &keypair.public().to_address(),
-                &keypair_counterparty.public().to_address(),
-                &Hash::default()
-            )
-            .is_ok());
     }
 }
 

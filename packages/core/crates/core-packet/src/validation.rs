@@ -153,6 +153,14 @@ mod tests {
                 ack_ticket: AcknowledgedTicket,
             ) -> core_ethereum_db::errors::Result<()>;
             async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
+            async fn get_acknowledged_tickets_range(
+                &self,
+                channel_id: &Hash,
+                epoch: u32,
+                index_start: u64,
+                index_end: u64,
+            ) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
+            async fn replace_acked_tickets_by_aggregated_ticket(&mut self, aggregated_ticket: AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
             async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_balance_to(&self, counterparty: &Address) -> core_ethereum_db::errors::Result<Balance>;

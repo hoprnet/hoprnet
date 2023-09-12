@@ -88,7 +88,7 @@ pub struct ContractEventHandlers<Cbs> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: ContractAddresses,
-    /// monitor the Hopr Token events, ignore rest
+    /// Safe on-chain address which we are monitoring
     address_to_monitor: Address,
     /// own address, aka msg.sender
     chain_key: Address,
@@ -168,6 +168,10 @@ where
                     &address_announcement.base_multiaddr,
                     &address_announcement.node.to_string()
                 );
+                // safeguard against empty multiaddrs, skip
+                if address_announcement.base_multiaddr.is_empty() {
+                    return Err(CoreEthereumIndexerError::AnnounceEmptyMultiaddr);
+                }
 
                 if let Some(mut account) = maybe_account {
                     let new_entry_type = AccountType::Announced {
@@ -236,9 +240,7 @@ where
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    channel.balance = channel
-                        .balance
-                        .sub(&Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR));
+                    channel.balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
@@ -254,9 +256,7 @@ where
                 let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    channel.balance = channel
-                        .balance
-                        .add(&Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR));
+                    channel.balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
@@ -273,6 +273,7 @@ where
 
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::Closed;
+                    channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel.destination.eq(&self.chain_key) {
@@ -421,6 +422,7 @@ where
                     allowance.to_string()
                 );
 
+                // if approval is for tokens on Safe contract to be spend by HoprChannels
                 if owner.eq(&self.address_to_monitor) && spender.eq(&self.addresses.channels) {
                     db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)
                         .await?;
@@ -603,7 +605,7 @@ pub mod tests {
         },
         hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
-        hopr_token::TransferFilter,
+        hopr_token::{ApprovalFilter, TransferFilter},
     };
     use core_crypto::{
         keypairs::{Keypair, OffchainKeypair},
@@ -731,6 +733,32 @@ pub mod tests {
         db.update_account_and_snapshot(&account_entry, &Snapshot::default())
             .await
             .unwrap();
+
+        let test_multiaddr_empty: Multiaddr = "".parse().unwrap();
+
+        let address_announcement_empty_log = RawLog {
+            topics: vec![AddressAnnouncementFilter::signature()],
+            data: encode(&[
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::String(test_multiaddr_empty.to_string()),
+            ]),
+        };
+
+        let _error = handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.announcements,
+                0u32,
+                &address_announcement_empty_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            account_entry
+        );
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
 
@@ -887,6 +915,58 @@ pub mod tests {
             db.get_hopr_balance().await.unwrap(),
             Balance::new(U256::zero(), BalanceType::HOPR)
         )
+    }
+
+    #[async_std::test]
+    async fn on_token_approval_correct() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let log = RawLog {
+            topics: vec![
+                ApprovalFilter::signature(),
+                H256::from_slice(&handlers.address_to_monitor.to_bytes32()),
+                H256::from_slice(&handlers.addresses.channels.to_bytes32()),
+            ],
+            data: encode(&[Token::Uint(EthU256::from(1000u64))]),
+        };
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(0u64), BalanceType::HOPR)
+        );
+
+        handlers
+            .on_event(&mut db, &handlers.addresses.token, 0u32, &log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(1000u64), BalanceType::HOPR)
+        );
+
+        // reduce allowance manually to verify a second time
+        let _ = db
+            .set_staking_safe_allowance(
+                &Balance::new(U256::from(10u64), BalanceType::HOPR),
+                &Snapshot::default(),
+            )
+            .await;
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(10u64), BalanceType::HOPR)
+        );
+
+        handlers
+            .on_event(&mut db, &handlers.addresses.token, 0u32, &log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(1000u64), BalanceType::HOPR)
+        );
     }
 
     #[async_std::test]
@@ -1254,7 +1334,7 @@ pub mod tests {
 
         assert_eq!(
             *db.get_channel(&channel_id).await.unwrap().unwrap().balance.value(),
-            U256::zero()
+            solidity_balance
         );
     }
 
@@ -1264,13 +1344,14 @@ pub mod tests {
         let mut db = create_mock_db();
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
+        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR);
 
         db.update_channel_and_snapshot(
             &channel_id,
             &ChannelEntry::new(
                 *SELF_CHAIN_ADDRESS,
                 *COUNTERPARTY_CHAIN_ADDRESS,
-                Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+                starting_balance,
                 U256::zero(),
                 ChannelStatus::Open,
                 U256::one(),
@@ -1300,10 +1381,11 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            db.get_channel(&channel_id).await.unwrap().unwrap().status,
-            ChannelStatus::Closed
-        );
+        let closed_channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(closed_channel.status, ChannelStatus::Closed);
+
+        assert!(closed_channel.balance.value().eq(&U256::zero()));
     }
 
     #[async_std::test]
