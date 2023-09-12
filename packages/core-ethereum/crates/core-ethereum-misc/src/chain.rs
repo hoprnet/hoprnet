@@ -370,7 +370,7 @@ pub fn convert_acknowledged_ticket(off_chain: &AcknowledgedTicket) -> Result<Red
             por_secret: U256::from_big_endian(&off_chain.response.to_bytes()),
         })
     } else {
-        return Err(InvalidArguments("Acknowledged ticket must be signed".into()));
+        Err(InvalidArguments("Acknowledged ticket must be signed".into()))
     }
 }
 
@@ -767,7 +767,7 @@ pub mod wasm {
                         )
                         .as_slice(),
                 )),
-                Err(e) => return Err(JsValue::from(e.to_string())),
+                Err(e) => Err(JsValue::from(e.to_string())),
             }
         }
 

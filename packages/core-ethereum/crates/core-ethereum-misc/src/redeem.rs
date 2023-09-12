@@ -1,22 +1,32 @@
-use std::ops::DerefMut;
-use std::sync::Arc;
+use crate::errors::CoreEthereumError::{TransactionSubmissionFailed, WrongTicketState};
+use crate::errors::Result;
 use async_lock::RwLock;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
+use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use core_types::channels::ChannelEntry;
+use std::ops::DerefMut;
+use std::sync::Arc;
 use utils_log::{debug, error, info};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
 use utils_types::traits::BinarySerializable;
-use crate::errors::CoreEthereumError::{TransactionSubmissionFailed, WrongTicketState};
-use crate::errors::Result;
 
-pub async fn redeem_all_tickets<Db, F>(db: Arc<RwLock<Db>>, self_addr: &Address, onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F) -> Result<()>
-    where Db: HoprCoreEthereumDbActions, F: futures::Future<Output = std::result::Result<String, String>> {
+pub async fn redeem_all_tickets<Db, F>(
+    db: Arc<RwLock<Db>>,
+    self_addr: &Address,
+    onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F,
+) -> Result<()>
+where
+    Db: HoprCoreEthereumDbActions,
+    F: futures::Future<Output = std::result::Result<String, String>>,
+{
     let incoming_channels = db.read().await.get_channels_to(self_addr).await?;
-    debug!("starting to redeem all tickets in {} incoming channels to us.", incoming_channels.len());
+    debug!(
+        "starting to redeem all tickets in {} incoming channels to us.",
+        incoming_channels.len()
+    );
 
     for channel in incoming_channels {
         let channel_id = channel.get_id();
@@ -33,20 +43,32 @@ lazy_static::lazy_static! {
 }
 
 async fn set_being_redeemed<Db>(db: &mut Db, ack_ticket: &mut AcknowledgedTicket, tx_hash: Hash) -> Result<()>
-where Db: HoprCoreEthereumDbActions {
+where
+    Db: HoprCoreEthereumDbActions,
+{
     ack_ticket.status = BeingRedeemed { tx_hash };
     debug!("setting {} as being redeemed with TX hash {tx_hash}", ack_ticket.ticket);
     Ok(db.update_acknowledged_ticket(ack_ticket).await?)
 }
 
-pub async fn redeem_tickets_in_channel<Db, F>(db: Arc<RwLock<Db>>, channel: ChannelEntry, onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F) -> Result<()>
-where Db: HoprCoreEthereumDbActions, F: futures::Future<Output = std::result::Result<String, String>> {
+pub async fn redeem_tickets_in_channel<Db, F>(
+    db: Arc<RwLock<Db>>,
+    channel: ChannelEntry,
+    onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F,
+) -> Result<()>
+where
+    Db: HoprCoreEthereumDbActions,
+    F: futures::Future<Output = std::result::Result<String, String>>,
+{
     let channel_id = channel.get_id();
     let mut to_redeem = Vec::new();
     {
         let mut db = db.write().await;
         let ack_tickets = db.get_acknowledged_tickets(Some(channel)).await?;
-        debug!("there are {} acknowledged tickets in channel {channel_id}", ack_tickets.len());
+        debug!(
+            "there are {} acknowledged tickets in channel {channel_id}",
+            ack_tickets.len()
+        );
 
         for mut avail_to_redeem in ack_tickets.into_iter().filter(|t| Untouched == t.status) {
             if let Err(e) = set_being_redeemed(db.deref_mut(), &mut avail_to_redeem, *EMPTY_TX_HASH).await {
@@ -56,7 +78,10 @@ where Db: HoprCoreEthereumDbActions, F: futures::Future<Output = std::result::Re
             }
         }
     }
-    info!("{} acknowledged tickets are still available to redeem in {channel_id}", to_redeem.len());
+    info!(
+        "{} acknowledged tickets are still available to redeem in {channel_id}",
+        to_redeem.len()
+    );
 
     let mut redeemed = 0;
     for (i, ack_ticket) in to_redeem.into_iter().enumerate() {
@@ -72,16 +97,25 @@ where Db: HoprCoreEthereumDbActions, F: futures::Future<Output = std::result::Re
     Ok(())
 }
 
-pub async fn redeem_ticket<Db, F>(db: Arc<RwLock<Db>>, mut ack_ticket: AcknowledgedTicket, on_chain_tx_sender: impl Fn(AcknowledgedTicket) -> F) -> Result<Hash>
-where Db: HoprCoreEthereumDbActions, F: futures::Future<Output = std::result::Result<String, String>> {
+pub async fn redeem_ticket<Db, F>(
+    db: Arc<RwLock<Db>>,
+    mut ack_ticket: AcknowledgedTicket,
+    on_chain_tx_sender: impl Fn(AcknowledgedTicket) -> F,
+) -> Result<Hash>
+where
+    Db: HoprCoreEthereumDbActions,
+    F: futures::Future<Output = std::result::Result<String, String>>,
+{
     match ack_ticket.status {
         Untouched => {
             set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-        },
-        BeingRedeemed { tx_hash } => if tx_hash != *EMPTY_TX_HASH {
-            return Err(WrongTicketState(ack_ticket))
         }
-        AcknowledgedTicketStatus::BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket))
+        BeingRedeemed { tx_hash } => {
+            if tx_hash != *EMPTY_TX_HASH {
+                return Err(WrongTicketState(ack_ticket.to_string()));
+            }
+        }
+        AcknowledgedTicketStatus::BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
     };
 
     debug!("sending {} for on-chain redemption", ack_ticket.ticket);
@@ -94,15 +128,13 @@ where Db: HoprCoreEthereumDbActions, F: futures::Future<Output = std::result::Re
             set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, tx_hash).await?;
             Ok(tx_hash)
         }
-        Err(err) => Err(TransactionSubmissionFailed(err))
+        Err(err) => Err(TransactionSubmissionFailed(err)),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    fn test_ticket_redeem_flow() {
-
-    }
+    fn test_ticket_redeem_flow() {}
 }
 
 #[cfg(feature = "wasm")]
@@ -135,21 +167,32 @@ pub mod wasm {
         };
     }
 
-    pub async fn redeem_all_tickets(db: &Database, self_addr: &Address, on_chain_tx_sender: &js_sys::Function) -> JsResult<()> {
+    pub async fn redeem_all_tickets(
+        db: &Database,
+        self_addr: &Address,
+        on_chain_tx_sender: &js_sys::Function,
+    ) -> JsResult<()> {
         let js_on_chain_tx_sender = make_js_on_chain_sender!(on_chain_tx_sender);
         super::redeem_all_tickets(db.as_ref_counted().clone(), self_addr, &js_on_chain_tx_sender).await?;
         Ok(())
     }
 
-    pub async fn redeem_tickets_in_channel(db: &Database, channel: &ChannelEntry, on_chain_tx_sender: &js_sys::Function) -> JsResult<()> {
+    pub async fn redeem_tickets_in_channel(
+        db: &Database,
+        channel: &ChannelEntry,
+        on_chain_tx_sender: &js_sys::Function,
+    ) -> JsResult<()> {
         let js_on_chain_tx_sender = make_js_on_chain_sender!(on_chain_tx_sender);
-        super::redeem_tickets_in_channel(db.as_ref_counted().clone(), channel.clone(), &js_on_chain_tx_sender).await?;
+        super::redeem_tickets_in_channel(db.as_ref_counted().clone(), *channel, &js_on_chain_tx_sender).await?;
         Ok(())
     }
 
-    pub async fn redeem_ticket(db: &Database, ack_ticket: &AcknowledgedTicket, on_chain_tx_sender: &js_sys::Function) -> JsResult<Hash> {
+    pub async fn redeem_ticket(
+        db: &Database,
+        ack_ticket: &AcknowledgedTicket,
+        on_chain_tx_sender: &js_sys::Function,
+    ) -> JsResult<Hash> {
         let js_on_chain_tx_sender = make_js_on_chain_sender!(on_chain_tx_sender);
         Ok(super::redeem_ticket(db.as_ref_counted().clone(), ack_ticket.into(), &js_on_chain_tx_sender).await?)
     }
-
 }

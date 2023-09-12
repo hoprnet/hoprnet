@@ -460,10 +460,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  public async redeemTicket(
-    counterparty: Address,
-    ackTicket: AcknowledgedTicket
-  ): Promise<RedeemTicketResponse> {
+  public async redeemTicket(counterparty: Address, ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
     try {
       log(
         `Performing ticket redemption ticket for channel ${ackTicket.ticket.channel_id.to_hex()} in channel ${channelId.to_hex()}`
@@ -489,7 +486,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     return {
       status: 'SUCCESS',
       ackTicket,
-      receipt: "" // not used atm
+      receipt: '' // not used atm
     }
   }
 

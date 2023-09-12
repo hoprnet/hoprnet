@@ -264,7 +264,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
-        let key = to_acknowledged_ticket_key(&ticket.ticket.channel_id, ticket.ticket.channel_epoch, ticket.ticket.index)?;
+        let key = to_acknowledged_ticket_key(
+            &ticket.ticket.channel_id,
+            ticket.ticket.channel_epoch,
+            ticket.ticket.index,
+        )?;
         self.db.set(key, ticket).await.map(|_| ())
     }
 

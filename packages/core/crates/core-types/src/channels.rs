@@ -222,7 +222,11 @@ impl Default for Ticket {
 
 impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ticket #{}, epoch {} in channel {}", self.index, self.channel_epoch, self.channel_id)
+        write!(
+            f,
+            "ticket #{}, epoch {} in channel {}",
+            self.index, self.channel_epoch, self.channel_id
+        )
     }
 }
 

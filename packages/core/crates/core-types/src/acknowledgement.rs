@@ -13,6 +13,7 @@ use core_crypto::{
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use utils_log::debug;
 use utils_types::{
     errors::{GeneralError::ParseError, Result},
@@ -86,6 +87,16 @@ pub enum AcknowledgedTicketStatus {
     Untouched,
     BeingRedeemed { tx_hash: Hash },
     BeingAggregated { start: u64, end: u64 },
+}
+
+impl Display for AcknowledgedTicketStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AcknowledgedTicketStatus::Untouched => write!(f, "untouched"),
+            AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => write!(f, "being redeemed (tx hash: {tx_hash})"),
+            AcknowledgedTicketStatus::BeingAggregated { start, end } => write!(f, "being aggregated ({start}-{end})"),
+        }
+    }
 }
 
 impl Default for AcknowledgedTicketStatus {
@@ -205,15 +216,9 @@ impl AcknowledgedTicket {
     }
 }
 
-impl std::fmt::Display for AcknowledgedTicket {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AcknowledgedTicket")
-            .field("status", &self.status)
-            .field("ticket", &self.ticket)
-            .field("response", &self.response)
-            .field("vrf_params", &self.vrf_params)
-            .field("signer", &self.signer)
-            .finish()
+impl Display for AcknowledgedTicket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "acknowledged {} in state '{}'", self.ticket, self.status)
     }
 }
 
