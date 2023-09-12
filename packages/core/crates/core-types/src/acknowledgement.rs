@@ -95,8 +95,6 @@ impl Default for AcknowledgedTicketStatus {
 }
 
 /// Contains acknowledgment information and the respective ticket
-///
-/// FIXME: think about serialization and deserialization
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
@@ -129,7 +127,7 @@ impl AcknowledgedTicket {
         )?;
 
         Ok(Self {
-            // FIXME: think about serialization and deserialization
+            // new tickets are always untouched
             status: AcknowledgedTicketStatus::Untouched,
             ticket,
             response,
@@ -169,6 +167,10 @@ impl AcknowledgedTicket {
         }
 
         Ok(())
+    }
+
+    pub fn status(&mut self, new_status: AcknowledgedTicketStatus) {
+        self.status = new_status;
     }
 
     pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {
@@ -573,15 +575,20 @@ pub mod test {
         let acked_ticket =
             AcknowledgedTicket::new(ticket, response, ALICE.public().to_address(), &BOB, &Hash::default()).unwrap();
 
-        assert_eq!(acked_ticket, deserialize(&serialize(&acked_ticket).unwrap()).unwrap());
+        let mut deserialized_ticket = deserialize(&serialize(&acked_ticket).unwrap()).unwrap();
+        assert_eq!(acked_ticket, deserialized_ticket);
 
-        assert!(acked_ticket
+        assert!(deserialized_ticket
             .verify(
                 &ALICE.public().to_address(),
                 &BOB.public().to_address(),
                 &Hash::default()
             )
             .is_ok());
+
+        deserialized_ticket.status(super::AcknowledgedTicketStatus::BeingAggregated { start: 1u64, end: 2u64 });
+
+        assert_eq!(deserialized_ticket, deserialize(&serialize(&deserialized_ticket).unwrap()).unwrap());
     }
 
     #[test]
