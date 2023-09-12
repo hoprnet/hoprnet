@@ -1,7 +1,9 @@
 use async_lock::Mutex;
 use async_trait::async_trait;
-use core_types::protocol::{ApplicationData, Tag, DEFAULT_APPLICATION_TAG};
+use core_types::protocol::{ApplicationData, Tag};
 use std::time::Duration;
+
+use crate::config::MessageInboxConfiguration;
 
 /// Represents a simple timestamping function.
 /// This is useful if used in WASM or environment which might have different means of measuring time.
@@ -34,28 +36,6 @@ pub trait InboxBackend<T: Copy + Default, M> {
     async fn purge(&mut self, older_than_ts: Duration);
 }
 
-/// Holds basic configuration parameters of the `MessageInbox`.
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-pub struct MessageInboxConfiguration {
-    /// Maximum capacity per-each application tag.
-    /// In the current implementation, the capacity must be a power of two.
-    pub capacity: u32,
-    /// Maximum age of a message held in the inbox until it is purged.
-    pub max_age_sec: u64, // cannot use std::time::Duration here due to wasm-bindgen
-    /// List of tags that are excluded on `push`.
-    pub excluded_tags: Vec<Tag>,
-}
-
-impl Default for MessageInboxConfiguration {
-    fn default() -> Self {
-        Self {
-            capacity: 512,                                // must be a power of 2 with this implementation
-            max_age_sec: 15 * 60,                         // 15 minutes
-            excluded_tags: vec![DEFAULT_APPLICATION_TAG], // exclude untagged messages pre default
-        }
-    }
-}
 
 /// Represents a thread-safe message inbox of messages of type `M`
 /// This type is thin frontend over `InboxBackend` using 16-bit unsigned integer tags.

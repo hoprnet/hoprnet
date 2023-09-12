@@ -1,7 +1,29 @@
-pub mod generic;
+use std::str::FromStr;
 
+pub mod config;
+pub mod generic;
 pub mod passive;
 pub mod promiscuous;
+
+
+pub enum Strategies {
+    Passive,
+    Generic,
+    Promiscuous
+}
+
+impl FromStr for Strategies {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "passive" => Ok(Strategies::Passive),
+            "generic" => Ok(Strategies::Generic),
+            "promiscuous" => Ok(Strategies::Promiscuous),
+            _ => Err(format!("No such strategy exists: {}", s))
+        }
+    }
+}
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

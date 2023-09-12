@@ -256,11 +256,7 @@ impl HoprKeys {
             keys.write_eth_keystore(
                 &opts.id_path,
                 &opts.password,
-                if let Some(true) = opts.use_weak_crypto {
-                    true
-                } else {
-                    false
-                },
+                opts.use_weak_crypto.unwrap_or(false),
             )?;
 
             return Ok(keys);
@@ -274,11 +270,7 @@ impl HoprKeys {
                         keys.write_eth_keystore(
                             &opts.id_path,
                             &opts.password,
-                            if let Some(true) = opts.use_weak_crypto {
-                                true
-                            } else {
-                                false
-                            },
+                            opts.use_weak_crypto.unwrap_or(false),
                         )?
                     }
                     return Ok(keys);
@@ -298,11 +290,7 @@ impl HoprKeys {
             keys.write_eth_keystore(
                 &opts.id_path,
                 &opts.password,
-                if let Some(true) = opts.use_weak_crypto {
-                    true
-                } else {
-                    false
-                },
+                opts.use_weak_crypto.unwrap_or(false),
             )?;
 
             return Ok(keys);

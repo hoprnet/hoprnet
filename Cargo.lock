@@ -1396,6 +1396,7 @@ dependencies = [
  "utils-log",
  "utils-misc",
  "utils-types",
+ "validator",
  "vector_assertions",
  "wasm-bindgen",
  "wasm-opt",

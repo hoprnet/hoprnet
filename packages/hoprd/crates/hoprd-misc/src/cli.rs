@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::ffi::OsString;
+use std::str::FromStr;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
+use core_strategy::config::StrategyConfig;
 use core_strategy::{generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy};
 use hex;
 use serde::{Deserialize, Serialize};
@@ -42,7 +44,7 @@ fn parse_host(s: &str) -> Result<crate::config::Host, String> {
         ));
     }
 
-    crate::config::Host::from_host_string(s)
+    crate::config::Host::from_str(s)
 }
 
 /// Parse a hex string private key to a boxed u8 slice
@@ -120,9 +122,9 @@ pub struct CliArgs {
     #[arg(
         long,
         env = "HOPRD_ANNOUNCE",
-        help = "Run as a Public Relay Node (PRN)",
+        help = "Announce the node on chain with a public address",
         action = ArgAction::SetTrue,
-        default_value_t = crate::config::NetworkOptions::default().announce
+        default_value_t = crate::config::Chain::default().announce
     )]
     pub announce: bool,
 
@@ -229,7 +231,7 @@ pub struct CliArgs {
         env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
         help = "Disables automatic redeeming of winning tickets.",
         action = ArgAction::SetFalse,
-        default_value_t = crate::config::Strategy::default().auto_redeem_tickets
+        default_value_t = StrategyConfig::default().auto_redeem_tickets
     )]
     pub auto_redeem_tickets: bool,
 
@@ -286,32 +288,32 @@ pub struct CliArgs {
     )]
     pub private_key: Option<String>,
 
-    #[arg(
-        long = "allowLocalNodeConnections",
-        env = "HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS",
-        action = ArgAction::SetTrue,
-        help = "Allow connections to other nodes running on localhost",
-        default_value_t = crate::config::NetworkOptions::default().allow_local_node_connections
-    )]
-    pub allow_local_node_connections: bool,
+    // #[arg(
+    //     long = "allowLocalNodeConnections",
+    //     env = "HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS",
+    //     action = ArgAction::SetTrue,
+    //     help = "Allow connections to other nodes running on localhost",
+    //     default_value_t = crate::config::NetworkOptions::default().allow_local_node_connections
+    // )]
+    // pub allow_local_node_connections: bool,
 
-    #[arg(
-        long = "allowPrivateNodeConnections",
-        env = "HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS",
-        action = ArgAction::SetTrue,
-        help = "Allow connections to other nodes running on private addresses",
-        default_value_t = crate::config::NetworkOptions::default().allow_private_node_connections
-    )]
-    pub allow_private_node_connections: bool,
+    // #[arg(
+    //     long = "allowPrivateNodeConnections",
+    //     env = "HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS",
+    //     action = ArgAction::SetTrue,
+    //     help = "Allow connections to other nodes running on private addresses",
+    //     default_value_t = crate::config::NetworkOptions::default().allow_private_node_connections
+    // )]
+    // pub allow_private_node_connections: bool,
 
-    #[arg(
-        long = "maxParallelConnections",
-        value_parser = clap::value_parser ! (u32).range(1..),
-        value_name = "CONNECTIONS",
-        help = "Set maximum parallel connections",
-        env = "HOPRD_MAX_PARALLEL_CONNECTIONS"
-    )]
-    pub max_parallel_connections: Option<u32>,
+    // #[arg(
+    //     long = "maxParallelConnections",
+    //     value_parser = clap::value_parser ! (u32).range(1..),
+    //     value_name = "CONNECTIONS",
+    //     help = "Set maximum parallel connections",
+    //     env = "HOPRD_MAX_PARALLEL_CONNECTIONS"
+    // )]
+    // pub max_parallel_connections: Option<u32>,
 
     #[arg(
         long = "testAnnounceLocalAddresses",

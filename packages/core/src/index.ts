@@ -49,7 +49,6 @@ import {
   PeerStatus,
   Health,
   Snapshot,
-  HeartbeatConfig,
   CoreApp,
   get_peers_with_quality,
   HoprTools,
@@ -251,12 +250,6 @@ export class Hopr extends EventEmitter {
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
     connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
-    let heartbeat_cfg = new HeartbeatConfig(
-      this.cfg.heartbeat.variance,
-      this.cfg.heartbeat.interval,
-      BigInt(this.cfg.heartbeat.threshold)
-    )
-
     let ping_cfg = new PingConfig(
       MAX_PARALLEL_PINGS,
       BigInt(2000) // in millis
@@ -302,7 +295,7 @@ export class Hopr extends EventEmitter {
       new OffchainKeypair(this.packetKeypair.secret()),
       this.db.clone(),
       this.cfg.network_options.network_quality_threshold,
-      heartbeat_cfg,
+      this.cfg.heartbeat,
       ping_cfg,
       onAcknowledgement,
       onAcknowledgedTicket,
@@ -439,12 +432,12 @@ export class Hopr extends EventEmitter {
     let mas: Multiaddr[] = []
 
     // at this point the values were parsed and validated already
-    for (const host of this.cfg.host) {
-      if (host.is_ipv4()) {
-        mas.push(multiaddr(`/ip4/${host.address()}/tcp/${host.port}`))
-      } else {
-        mas.push(multiaddr(`/dns4/${host.address()}/tcp/${host.port}`))
-      }
+    if (this.cfg.host.is_ipv4()) {
+      mas.push(multiaddr(`/ip4/${this.cfg.host.address()}/tcp/${this.cfg.host.port}`))
+    } else if (this.cfg.host.is_domain() ) {
+      mas.push(multiaddr(`/dns4/${this.cfg.host.address()}/tcp/${this.cfg.host.port}`))
+    } else {
+      new Error("Unknown format specified for host")
     }
 
     return mas

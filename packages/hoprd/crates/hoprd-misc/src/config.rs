@@ -1,17 +1,14 @@
-use core_network::heartbeat::HeartbeatConfig;
+use std::str::FromStr;
+
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
-use core_misc::constants::{
-    DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
-};
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use core_misc::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
+use core_network::heartbeat::HeartbeatConfig;
+use core_strategy::config::StrategyConfig;
 use utils_types::primitives::Address;
-use validator::{Validate, ValidationError};
 
 #[cfg(not(feature = "wasm"))]
 use crate::network::native::is_dns_address;
@@ -47,6 +44,13 @@ fn validate_dns_address(s: &str) -> Result<(), ValidationError> {
     }
 }
 
+fn validate_host_address(host: &HostType) -> Result<(), ValidationError> {
+    match host {
+        HostType::IPv4(ip4) => validate_ipv4_address(ip4),
+        HostType::Domain(domain) => validate_dns_address(domain),
+    }
+}
+
 fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
     match &token {
         Auth::None => Ok(()),
@@ -61,21 +65,62 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
     }
 }
 
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum HostType {
+    IPv4(String),
+    Domain(String)
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Host {
-    #[validate(custom = "validate_ipv4_address")]
-    pub ip: Option<String>,
-    #[validate(custom = "validate_dns_address")]
-    pub dns: Option<String>,
+    #[validate(custom = "validate_host_address")]
+    address: HostType,
     #[validate(range(min = 1u16))]
     pub port: u16,
 }
 
+#[cfg(feature = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
 impl Host {
-    pub fn from_host_string(s: &str) -> Result<Self, String> {
+    #[wasm_bindgen::prelude::wasm_bindgen]
+    pub fn is_ipv4(&self) -> bool {
+        match &self.address {
+            HostType::IPv4(_) => true,
+            _ => false
+        }
+    }
+
+    #[wasm_bindgen::prelude::wasm_bindgen]
+    pub fn is_domain(&self) -> bool {
+        match &self.address {
+            HostType::Domain(_) => true,
+            _ => false
+        }
+    }
+
+    #[wasm_bindgen::prelude::wasm_bindgen]
+    pub fn address(&self) -> String {
+        match &self.address {
+            HostType::IPv4(s) => s.clone(),
+            HostType::Domain(s) => s.clone(),
+        }
+    }
+}
+
+impl Default for Host {
+    fn default() -> Self {
+        Self { address: HostType::IPv4("127.0.0.1".to_owned()), port: 0 }
+    }
+}
+
+impl FromStr for Host {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (ip_or_dns, str_port) = match s.split_once(":") {
-            None => return Err(format!("Invalid host")),
+            None => return Err(format!("Invalid host, is not in the '<host>:<port>' format")),
             Some(split) => split,
         };
 
@@ -83,26 +128,23 @@ impl Host {
 
         if validator::validate_ip_v4(ip_or_dns) {
             Ok(Self {
-                ip: Some(ip_or_dns.to_owned()),
-                dns: None,
+                address: HostType::IPv4(ip_or_dns.to_owned()),
                 port,
             })
         } else if is_dns_address(ip_or_dns) {
             Ok(Self {
-                ip: None,
-                dns: Some(ip_or_dns.to_owned()),
+                address: HostType::Domain(ip_or_dns.to_owned()),
                 port,
             })
         } else {
-            Err(format!("Not a valid IPv4 or DNS address"))
+            Err(format!("Not a valid IPv4 or domain host"))
         }
     }
 }
 
 impl ToString for Host {
     fn to_string(&self) -> String {
-        let address = self.ip.clone().unwrap_or(self.dns.clone().unwrap());
-        format!("{}:{}", address, self.port)
+        format!("{:?}:{}", self.address, self.port)
     }
 }
 
@@ -145,8 +187,7 @@ impl Default for Api {
             enable: false,
             auth: Auth::Token("".to_owned()),
             host: Host {
-                ip: Some(DEFAULT_API_HOST.to_string()),
-                dns: None,
+                address: HostType::IPv4(DEFAULT_API_HOST.to_string()),
                 port: DEFAULT_API_PORT,
             },
         }
@@ -174,23 +215,13 @@ impl Default for HealthCheck {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct NetworkOptions {
-    pub announce: bool,
-    pub allow_local_node_connections: bool,
-    pub allow_private_node_connections: bool,
-    pub max_parallel_connections: u32,
     pub network_quality_threshold: f32,
-    pub no_relay: bool,
 }
 
 impl Default for NetworkOptions {
     fn default() -> Self {
         Self {
-            announce: false,
-            allow_local_node_connections: false,
-            allow_private_node_connections: false,
-            max_parallel_connections: DEFAULT_MAX_PARALLEL_CONNECTIONS,
             network_quality_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
-            no_relay: false,
         }
     }
 }
@@ -198,6 +229,7 @@ impl Default for NetworkOptions {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Chain {
+    pub announce: bool,
     pub provider: Option<String>,
     pub check_unrealized_balance: bool,
     pub on_chain_confirmations: u32,
@@ -206,6 +238,7 @@ pub struct Chain {
 impl Default for Chain {
     fn default() -> Self {
         Self {
+            announce: false,
             provider: None,
             check_unrealized_balance: true,
             on_chain_confirmations: DEFAULT_CONFIRMATIONS,
@@ -227,25 +260,6 @@ impl Default for SafeModule {
             safe_transaction_service_provider: None,
             safe_address: None,
             module_address: None,
-        }
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
-pub struct Strategy {
-    // TODO: implement checks
-    pub name: String,
-    pub max_auto_channels: Option<u32>,
-    pub auto_redeem_tickets: bool,
-}
-
-impl Default for Strategy {
-    fn default() -> Self {
-        Self {
-            name: "passive".to_owned(),
-            max_auto_channels: None,
-            auto_redeem_tickets: true,
         }
     }
 }
@@ -347,7 +361,7 @@ pub struct HoprdConfig {
     #[validate]
     pub api: Api,
     #[validate]
-    pub strategy: Strategy,
+    pub strategy: StrategyConfig,
     #[validate]
     pub heartbeat: HeartbeatConfig,
     #[validate]
@@ -367,14 +381,13 @@ impl Default for HoprdConfig {
     fn default() -> Self {
         Self {
             host: Host {
-                ip: Some(DEFAULT_HOST.to_string()),
-                dns: None,
+                address: HostType::IPv4(DEFAULT_HOST.to_string()),
                 port: DEFAULT_PORT,
             },
             identity: Identity::default(),
             db: Db::default(),
             api: Api::default(),
-            strategy: Strategy::default(),
+            strategy: StrategyConfig::default(),
             heartbeat: HeartbeatConfig::default(),
             network_options: NetworkOptions::default(),
             healthcheck: HealthCheck::default(),
@@ -429,7 +442,11 @@ impl HoprdConfig {
             cfg.api.auth = Auth::Token(x);
         };
         if let Some(x) = cli_args.api_host {
-            cfg.api.host.ip = Some(x)
+            cfg.api.host.address = if validator::validate_ip_v4(x.as_str()) { 
+                HostType::IPv4(x) 
+            } else {
+                HostType::Domain(x) 
+            }
         };
         if let Some(x) = cli_args.api_port {
             cfg.api.host.port = x
@@ -447,14 +464,6 @@ impl HoprdConfig {
         };
 
         // network options
-        cfg.network_options.announce = cli_args.announce;
-        cfg.network_options.allow_local_node_connections = cli_args.allow_local_node_connections;
-        cfg.network_options.allow_private_node_connections = cli_args.allow_private_node_connections;
-        if let Some(x) = cli_args.max_parallel_connections {
-            cfg.network_options.max_parallel_connections = x
-        } else if cfg.network_options.announce {
-            cfg.network_options.max_parallel_connections = DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY
-        };
         if let Some(x) = cli_args.network_quality_threshold {
             cfg.network_options.network_quality_threshold = x
         };
@@ -488,6 +497,8 @@ impl HoprdConfig {
         cfg.strategy.auto_redeem_tickets = cli_args.auto_redeem_tickets;
 
         // chain
+        cfg.chain.announce = cli_args.announce;
+
         if let Some(x) = cli_args.provider {
             cfg.chain.provider = Some(x)
         };
@@ -568,8 +579,7 @@ mod tests {
     pub fn example_cfg() -> HoprdConfig {
         HoprdConfig {
             host: Host {
-                ip: Some("127.0.0.1".to_owned()),
-                dns: None,
+                address: HostType::IPv4("127.0.0.1".to_owned()),
                 port: 47462,
             },
             identity: Identity {
@@ -577,7 +587,7 @@ mod tests {
                 password: "".to_owned(),
                 private_key: Some("".to_owned()),
             },
-            strategy: Strategy {
+            strategy: StrategyConfig {
                 name: "passive".to_owned(),
                 max_auto_channels: None,
                 auto_redeem_tickets: true,
@@ -591,8 +601,7 @@ mod tests {
                 enable: false,
                 auth: Auth::None,
                 host: Host {
-                    ip: Some("127.0.0.1".to_string()),
-                    dns: None,
+                    address: HostType::IPv4("127.0.0.1".to_string()),
                     port: 1233,
                 },
             },
@@ -602,12 +611,7 @@ mod tests {
                 variance: 0,
             },
             network_options: NetworkOptions {
-                announce: false,
-                allow_local_node_connections: false,
-                allow_private_node_connections: false,
-                max_parallel_connections: 0,
                 network_quality_threshold: 0.0,
-                no_relay: false,
             },
             healthcheck: HealthCheck {
                 enable: false,
@@ -616,6 +620,7 @@ mod tests {
             },
             network: "testing".to_string(),
             chain: Chain {
+                announce: false,
                 provider: None,
                 check_unrealized_balance: true,
                 on_chain_confirmations: 0,
@@ -634,8 +639,7 @@ mod tests {
     }
 
     const EXAMPLE_YAML: &'static str = r#"host:
-  ip: 127.0.0.1
-  dns: null
+  address: !IPv4 127.0.0.1
   port: 47462
 identity:
   file: identity
@@ -649,30 +653,25 @@ api:
   enable: false
   auth: None
   host:
-    ip: 127.0.0.1
-    dns: null
+    address: !IPv4 127.0.0.1
     port: 1233
 strategy:
   name: passive
   max_auto_channels: null
   auto_redeem_tickets: true
 heartbeat:
+  variance: 0
   interval: 0
   threshold: 0
-  variance: 0
 network_options:
-  announce: false
-  allow_local_node_connections: false
-  allow_private_node_connections: false
-  max_parallel_connections: 0
   network_quality_threshold: 0.0
-  no_relay: false
 healthcheck:
   enable: false
   host: 127.0.0.1
   port: 0
 network: testing
 chain:
+  announce: false
   provider: null
   check_unrealized_balance: true
   on_chain_confirmations: 0
@@ -777,7 +776,7 @@ test:
     fn test_verify_invalid_dns_addresses() {
         assert!(validate_dns_address("org").is_err());
         assert!(validate_dns_address(".org").is_err());
-        assert!(validate_dns_address("-hoprnet.org").is_err());
+        assert!(validate_dns_address("-hoprnet-.org").is_err());
         assert!(validate_dns_address("unknown.sub.sub.hoprnet.org").is_err());
     }
 }
