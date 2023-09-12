@@ -340,12 +340,13 @@ pub struct Db {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Testing {
+    /// When true, assume that the node is running in an isolated network and does
+    /// not need any connection to nodes outside of the subnet
     pub announce_local_addresses: bool,
+    /// When true, assume a testnet with multiple nodes running on the same machine
+    /// or in the same private IPv4 network
     pub prefer_local_addresses: bool,
     pub use_weak_crypto: bool,
-    pub no_direct_connections: bool,
-    pub no_webrtc_upgrade: bool,
-    pub local_mode_stun: bool,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -471,7 +472,6 @@ impl HoprdConfig {
         if let Some(x) = cli_args.network_quality_threshold {
             cfg.network_options.network_quality_threshold = x
         };
-        cfg.network_options.no_relay = cli_args.no_relay;
 
         // healthcheck
         cfg.healthcheck.enable = cli_args.health_check;
@@ -524,9 +524,6 @@ impl HoprdConfig {
         // test
         cfg.test.announce_local_addresses = cli_args.test_announce_local_addresses;
         cfg.test.prefer_local_addresses = cli_args.test_prefer_local_addresses;
-        cfg.test.local_mode_stun = cli_args.test_local_mode_stun;
-        cfg.test.no_webrtc_upgrade = cli_args.test_no_webrtc_upgrade;
-        cfg.test.no_direct_connections = cli_args.test_no_direct_connections;
         cfg.test.use_weak_crypto = cli_args.test_use_weak_crypto;
 
         if skip_validation {
@@ -549,6 +546,12 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl HoprdConfig {
+        #[wasm_bindgen(constructor)]
+        pub fn _new() -> Self {
+            Self::default()
+        }
+
+        #[wasm_bindgen]
         pub fn as_redacted_string(&self) -> Result<String, JsValue> {
             let mut redacted_cfg = self.clone();
 
@@ -640,9 +643,6 @@ mod tests {
                 announce_local_addresses: false,
                 prefer_local_addresses: false,
                 use_weak_crypto: false,
-                no_direct_connections: false,
-                no_webrtc_upgrade: false,
-                local_mode_stun: false,
             },
         }
     }
@@ -698,9 +698,6 @@ test:
   announce_local_addresses: false
   prefer_local_addresses: false
   use_weak_crypto: false
-  no_direct_connections: false
-  no_webrtc_upgrade: false
-  local_mode_stun: false
 "#;
 
     #[test]

@@ -343,45 +343,6 @@ pub struct CliArgs {
     pub test_use_weak_crypto: bool,
 
     #[arg(
-        long = "testNoDirectConnections",
-        help = "NAT traversal testing: prevent nodes from establishing direct TCP connections",
-        env = "HOPRD_TEST_NO_DIRECT_CONNECTIONS",
-        action = ArgAction::SetTrue,
-        hide = true,
-        default_value_t = crate::config::Testing::default().no_direct_connections
-    )]
-    pub test_no_direct_connections: bool,
-
-    #[arg(
-        long = "testNoWebRTCUpgrade",
-        help = "NAT traversal testing: prevent nodes from establishing direct TCP connections",
-        env = "HOPRD_TEST_NO_WEBRTC_UPGRADE",
-        action = ArgAction::SetTrue,
-        hide = true,
-        default_value_t = crate::config::Testing::default().no_webrtc_upgrade
-    )]
-    pub test_no_webrtc_upgrade: bool,
-
-    #[arg(
-        long = "noRelay",
-        help = "disable NAT relay functionality entirely",
-        env = "HOPRD_NO_RELAY",
-        action = ArgAction::SetTrue,
-        default_value_t = crate::config::NetworkOptions::default().no_relay
-    )]
-    pub no_relay: bool,
-
-    #[arg(
-        long = "testLocalModeStun",
-        help = "Transport testing: use full-featured STUN with local addresses",
-        env = "HOPRD_TEST_LOCAL_MODE_STUN",
-        action = ArgAction::SetTrue,
-        hide = true,
-        default_value_t = crate::config::Testing::default().local_mode_stun
-    )]
-    pub test_local_mode_stun: bool,
-
-    #[arg(
         long = "heartbeatInterval",
         help = "Interval in milliseconds in which the availability of other nodes get measured",
         value_name = "MILLISECONDS",
