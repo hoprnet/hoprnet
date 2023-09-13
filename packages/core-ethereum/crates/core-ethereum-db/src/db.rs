@@ -490,10 +490,13 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
         ops.put(key, new_redeemed_balance);
 
-        if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id)
-            .await?
-            .map(|c| if c.source == self.me { c.destination } else { c.source }) {
-
+        if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
+            if c.source == self.me {
+                c.destination
+            } else {
+                c.source
+            }
+        }) {
             let key = utils_db::db::Key::new_with_prefix(&counterparty, PENDING_TICKETS_COUNT)?;
             let pending_balance = self
                 .db
@@ -504,7 +507,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
             ops.put(key, new_pending_balance);
         } else {
-            error!("could not update redeemed tickets count: unable to find channel with id {}", acked_ticket.ticket.channel_id)
+            error!(
+                "could not update redeemed tickets count: unable to find channel with id {}",
+                acked_ticket.ticket.channel_id
+            )
         }
 
         self.db.batch(ops, true).await
@@ -1292,10 +1298,7 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_redeemed(
-            &self,
-            acked_ticket: &AcknowledgedTicket,
-        ) -> Result<(), JsValue> {
+        pub async fn mark_redeemed(&self, acked_ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;

@@ -6403,7 +6403,7 @@ dependencies = [
 
 [[package]]
 name = "utils-misc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "console_error_panic_hook",
  "futures",
@@ -6421,7 +6421,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "bincode",
  "console_error_panic_hook",

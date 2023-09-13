@@ -15,7 +15,9 @@ pub trait ToHex {
     fn to_hex(&self) -> String;
 
     /// Tries to parse the type from the hexadecimal representation.
-    fn from_hex(str: &str) -> Result<Self> where Self: Sized;
+    fn from_hex(str: &str) -> Result<Self>
+    where
+        Self: Sized;
 }
 
 /// A type that can be serialized and deserialized to a binary form.

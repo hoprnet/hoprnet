@@ -661,7 +661,9 @@ pub mod wasm {
         }
 
         #[wasm_bindgen(js_name = "to_string")]
-        pub fn _to_string(&self) -> String { self.w.to_string() }
+        pub fn _to_string(&self) -> String {
+            self.w.to_string()
+        }
     }
 
     impl From<super::AcknowledgedTicket> for AcknowledgedTicket {

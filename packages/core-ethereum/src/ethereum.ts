@@ -692,9 +692,7 @@ export async function createChainWrapper(
     ackTicket: AcknowledgedTicket,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    log(
-      `Redeeming ${ackTicket.to_string()} on-chain for challenge ${ackTicket.ticket.challenge.to_hex()}`
-    )
+    log(`Redeeming ${ackTicket.to_string()} on-chain for challenge ${ackTicket.ticket.challenge.to_hex()}`)
 
     let sendResult: SendTransactionReturn
     let error: unknown
@@ -721,9 +719,7 @@ export async function createChainWrapper(
           `Failed in sending redeem ${ackTicket.to_string()} transaction because transaction is a duplicate`
         )
       default:
-        throw new Error(
-          `Failed in sending redeem ${ackTicket.to_string()} transaction due to ${error}`
-        )
+        throw new Error(`Failed in sending redeem ${ackTicket.to_string()} transaction due to ${error}`)
     }
   }
 

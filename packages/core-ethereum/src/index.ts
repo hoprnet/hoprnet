@@ -20,7 +20,10 @@ import {
   ChainKeypair,
   OffchainKeypair,
   CORE_ETHEREUM_CONSTANTS,
-  Database, redeem_all_tickets, redeem_tickets_with_counterparty, redeem_tickets_in_channel
+  Database,
+  redeem_all_tickets,
+  redeem_tickets_with_counterparty,
+  redeem_tickets_in_channel
 } from '@hoprnet/hopr-utils'
 
 import Indexer from './indexer/index.js'
@@ -310,11 +313,9 @@ export default class HoprCoreEthereum extends EventEmitter {
   private async sendTicketRedeemTx(ackTicket: AcknowledgedTicket): Promise<String> {
     try {
       return await this.chain.redeemTicket(ackTicket, (txHash: string) => {
-          this.emit('ticket:redeemed', ackTicket)
-          return this.setTxHandler(`channel-updated-${txHash}`, txHash)
-        }
-      )
-
+        this.emit('ticket:redeemed', ackTicket)
+        return this.setTxHandler(`channel-updated-${txHash}`, txHash)
+      })
     } catch (err) {
       log(`ticket redemption error: ${err.toString()}`)
       throw new Error(`ticket redemption error: ${err.toString()}`)
