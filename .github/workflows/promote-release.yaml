@@ -57,7 +57,7 @@ jobs:
       - name: Tag docker images
         run: |
           docker_registry="europe-west3-docker.pkg.dev/{{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-          docker_version_tag=$(jq -r '.version' packages/hoprd/package.json')
+          docker_version_tag=$(jq -r '.version' packages/hoprd/package.json)
           images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
           for image in ${images[@]};
           do
