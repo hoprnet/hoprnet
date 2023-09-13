@@ -205,7 +205,7 @@ jobs:
   create_release:
     name: Create Release
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'release')
+    # if: contains(github.event.pull_request.labels.*.name, 'release')
     # needs:
     #   - tag
     steps:
