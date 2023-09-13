@@ -239,7 +239,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
     async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
         let key = get_acknowledged_ticket_key(&ticket)?;
-        if !self.db.contains(key.clone()).await {
+        if self.db.contains(key.clone()).await {
             self.db.set(key, ticket).await.map(|_| ())
         } else {
             Err(DbError::NotFound)

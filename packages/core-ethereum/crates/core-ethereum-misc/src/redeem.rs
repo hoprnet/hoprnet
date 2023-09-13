@@ -10,9 +10,8 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use utils_db::errors::DbError;
 use utils_log::{debug, error, info};
-use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
-use utils_types::traits::BinarySerializable;
+use utils_types::traits::ToHex;
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -160,10 +159,8 @@ where
     debug!("sending {} for on-chain redemption", ack_ticket.ticket);
     match (on_chain_tx_sender)(ack_ticket.clone()).await {
         Ok(tx_hash_str) => {
-            let tx_hash = hex::decode(tx_hash_str)
-                .map_err(|_| ParseError)
-                .and_then(|s| Hash::from_bytes(&s))?;
-
+            debug!("on-chain redeem tx returned: {tx_hash_str}");
+            let tx_hash = Hash::from_hex(&tx_hash_str)?;
             set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, tx_hash).await?;
             Ok(tx_hash)
         }
@@ -173,21 +170,128 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_lock::RwLock;
+    use std::ops::Deref;
+    use async_lock::{Mutex, RwLock};
     use core_crypto::random::random_bytes;
-    use core_crypto::types::Hash;
-    use core_types::acknowledgement::AcknowledgedTicket;
+    use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
+    use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, UnacknowledgedTicket};
     use std::sync::Arc;
+    use hex_literal::hex;
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use core_ethereum_db::db::CoreEthereumDb;
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
+    use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
-    use utils_types::traits::BinarySerializable;
+    use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
+    use utils_types::traits::{BinarySerializable, ToHex};
+    use crate::redeem::redeem_all_tickets;
 
-    fn fake_on_chain_redeemer(ack: AcknowledgedTicket) -> Result<String, String> {
-        Ok(Hash::new(&random_bytes::<{ Hash::SIZE }>()).to_string())
+    lazy_static::lazy_static! {
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
     }
 
-    #[test]
-    fn test_ticket_redeem_flow() {
-        let db = Arc::new(RwLock::new(RustyLevelDbShim::new_in_memory()));
+    fn mock_ticket(
+        pk: &ChainKeypair,
+        counterparty: &Address,
+        domain_separator: Option<Hash>,
+        challenge: Option<EthereumChallenge>,
+        idx: u32,
+    ) -> Ticket {
+        let win_prob = 1.0f64; // 100 %
+        let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
+        let path_pos = 5u64;
+
+        Ticket::new(
+            counterparty,
+            &Balance::new(
+                price_per_packet.divide_f64(win_prob).unwrap() * path_pos.into(),
+                BalanceType::HOPR,
+            ),
+            idx.into(),
+            U256::one(),
+            1.0f64,
+            4u64.into(),
+            challenge.unwrap_or_default(),
+            pk,
+            &domain_separator.unwrap_or_default(),
+        )
+            .unwrap()
+    }
+
+    fn generate_random_ack_ticket(idx: u32) -> AcknowledgedTicket {
+        let hk1 = HalfKey::random();
+        let hk2 = HalfKey::random();
+
+        let cp1: CurvePoint = hk1.to_challenge().into();
+        let cp2: CurvePoint = hk2.to_challenge().into();
+        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+
+        let ticket = mock_ticket(
+            &BOB,
+            &ALICE.public().to_address(),
+            None,
+            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
+            idx
+        );
+
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, BOB.public().to_address());
+        unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
+    }
+
+    fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
+        let mut ack_key = Vec::new();
+
+        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
+        ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
+        ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
+
+        utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
+    }
+
+    #[async_std::test]
+    async fn test_ticket_redeem_flow() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let ticket_count: usize = 3;
+
+        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut input_tickets = Vec::new();
+
+        for i in 0..ticket_count {
+            let ack_ticket = generate_random_ack_ticket(i as u32);
+            inner_db.set(to_acknowledged_ticket_key(&ack_ticket), &ack_ticket).await.unwrap();
+            input_tickets.push(ack_ticket);
+        }
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, ALICE.public().to_address())));
+        let channel = ChannelEntry::new(BOB.public().to_address(),ALICE.public().to_address(),  Balance::zero(BalanceType::HOPR), U256::zero(), ChannelStatus::Open, U256::zero(), U256::zero());
+        db.write().await.update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default()).await.unwrap();
+        db.write().await.set_channels_domain_separator(&Hash::default(), &Snapshot::default()).await.unwrap();
+
+        let dummy_tx_hash = Hash::new(&random_bytes::<{Hash::SIZE}>());
+        let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
+
+        let rt_clone = redeemed_tickets.clone();
+        redeem_all_tickets(db.clone(), &ALICE.public().to_address(), &|ack: AcknowledgedTicket| async {
+            rt_clone.lock().await.push(ack);
+            Ok(dummy_tx_hash.to_hex())
+        }).await.unwrap();
+
+        let db_acks = db.read().await.get_acknowledged_tickets(Some(channel)).await.unwrap();
+
+        assert_eq!(ticket_count, db_acks.len(), "must have {ticket_count} tickets");
+
+        assert!(db_acks.iter().all(|t| match t.status {
+            AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
+            _ => false
+        }), "all tickets must be in the BeingRedeemed state with correct tx hash");
+
+        assert_eq!(db_acks.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+                   redeemed_tickets.lock().await.deref().iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+                   "on-chain redeemed tickets must be equal");
     }
 }
 
@@ -213,7 +317,7 @@ pub mod wasm {
                         let ret = wasm_bindgen_futures::JsFuture::from(promise)
                             .await
                             .map(|v| v.as_string().expect("on-chain ticket redeem did not yield a string"))
-                            .map_err(|v| v.as_string().unwrap_or("unknown error".to_string()))?;
+                            .map_err(|v| utils_misc::utils::wasm::js_value_to_error_msg(v).unwrap_or("unknown error".to_string()))?;
                         Ok(ret)
                     }
                     Err(_) => Err("failed to call on-chain redeem TX closure".to_string())

@@ -13,6 +13,9 @@ use std::str::FromStr;
 pub trait ToHex {
     /// Hexadecimal representation of this type.
     fn to_hex(&self) -> String;
+
+    /// Tries to parse the type from the hexadecimal representation.
+    fn from_hex(str: &str) -> Result<Self> where Self: Sized;
 }
 
 /// A type that can be serialized and deserialized to a binary form.
@@ -59,6 +62,18 @@ where
 {
     fn to_hex(&self) -> String {
         format!("0x{}", hex::encode(&self.to_bytes()))
+    }
+
+    fn from_hex(str: &str) -> Result<Self> {
+        let data = if &str[..2] == "0x" || &str[..2] == "0X" {
+            &str[2..]
+        } else {
+            str
+        };
+
+        hex::decode(data)
+            .map_err(|_| ParseError)
+            .and_then(|bytes| T::from_bytes(&bytes))
     }
 }
 

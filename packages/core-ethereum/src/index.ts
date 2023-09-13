@@ -16,12 +16,11 @@ import {
   type DeferType,
   PublicKey,
   AccountEntry,
-  create_counter,
   OffchainPublicKey,
   ChainKeypair,
   OffchainKeypair,
   CORE_ETHEREUM_CONSTANTS,
-  Database
+  Database, redeem_all_tickets, redeem_tickets_with_counterparty, redeem_tickets_in_channel
 } from '@hoprnet/hopr-utils'
 
 import Indexer from './indexer/index.js'
@@ -40,21 +39,6 @@ export {
 
 const log = debug('hopr-core-ethereum')
 
-export type RedeemTicketResponse =
-  | {
-      status: 'SUCCESS'
-      receipt: string
-      ackTicket: AcknowledgedTicket
-    }
-  | {
-      status: 'FAILURE'
-      message: string
-    }
-  | {
-      status: 'ERROR'
-      error: Error | string
-    }
-
 export type ChainOptions = {
   provider: string
   maxConfirmations?: number
@@ -71,14 +55,8 @@ export type SafeModuleOptions = {
   moduleAddress: Address
 }
 
-type ticketRedemtionInChannelOperations = Map<string, Promise<void>>
-
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
-
-// Metrics
-const metric_losingTickets = create_counter('core_ethereum_counter_losing_tickets', 'Number of losing tickets')
-const metric_winningTickets = create_counter('core_ethereum_counter_winning_tickets', 'Number of winning tickets')
 
 export default class HoprCoreEthereum extends EventEmitter {
   private static _instance: HoprCoreEthereum
@@ -86,9 +64,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   public indexer: Indexer
   private chain: ChainWrapper
   private started: Promise<HoprCoreEthereum> | undefined
-  private redeemingAll: Promise<void> | undefined = undefined
   // Used to store ongoing operations to prevent duplicate redemption attempts
-  private ticketRedemtionInChannelOperations: ticketRedemtionInChannelOperations = new Map()
 
   private constructor(
     private db: Database,
@@ -315,24 +291,23 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async redeemAllTickets(): Promise<void> {
-
+    await redeem_all_tickets(this.db, this.chainKeypair.to_address(), this.sendTicketRedeemTx.bind(this))
   }
 
   public async redeemTicketsInChannelByCounterparty(counterparty: Address) {
-
+    await redeem_tickets_with_counterparty(this.db, counterparty, this.sendTicketRedeemTx.bind(this))
   }
 
   public async redeemTicketsInChannel(channel: ChannelEntry) {
-
+    await redeem_tickets_in_channel(this.db, channel, this.sendTicketRedeemTx.bind(this))
   }
 
   private async onTicketRedeemed(ackTicket: AcknowledgedTicket) {
     await this.db.mark_redeemed(ackTicket)
-    metric_winningTickets.increment()
-    log(`full redemption of ${ackTicket.to_string()} completed successully.`)
+    log(`full redemption of ${ackTicket.to_string()} completed successfully.`)
   }
 
-  public async redeemTicket(ackTicket: AcknowledgedTicket): Promise<String> {
+  private async sendTicketRedeemTx(ackTicket: AcknowledgedTicket): Promise<String> {
     try {
       return await this.chain.redeemTicket(ackTicket, (txHash: string) => {
           this.emit('ticket:redeemed', ackTicket)

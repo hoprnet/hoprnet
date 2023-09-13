@@ -57,6 +57,10 @@ lazy_static::lazy_static! {
         SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap();
     static ref METRIC_PACKETS_COUNT: SimpleCounter =
         SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
+    static ref METRIC_WINNING_TICKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_winning_tickets", "Number of winning tickets").unwrap();
+    static ref METRIC_LOSING_TICKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_losing_tickets", "Number of losing tickets").unwrap();
 }
 
 lazy_static::lazy_static! {
@@ -172,9 +176,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 METRIC_RECEIVED_SUCCESSFUL_ACKS.increment();
             }
 
-            PendingAcknowledgement::WaitingAsRelayer(unackowledged) => {
+            PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                 // Try to unlock our incentive
-                unackowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
+                unacknowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
@@ -186,7 +190,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 self.db
                     .read()
                     .await
-                    .get_channel_from(&unackowledged.signer)
+                    .get_channel_from(&unacknowledged.signer)
                     .await
                     .map_err(|e| {
                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -206,14 +210,25 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     .unwrap()
                     .ok_or(MissingDomainSeparator)?;
 
-                let ack_ticket = unackowledged.acknowledge(&ack.ack_key_share, &self.chain_key, &domain_separator)?;
+                let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share, &self.chain_key, &domain_separator)?;
 
-                // replace the un-acked ticket with acked ticket.
-                self.db
-                    .write()
-                    .await
-                    .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
-                    .await?;
+                // Check if ticket it a win
+                if ack_ticket.is_winning_ticket(&domain_separator) {
+                    // replace the un-acked ticket with acked ticket.
+                    self.db
+                        .write()
+                        .await
+                        .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
+                        .await?;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_WINNING_TICKETS_COUNT.increment();
+                } else {
+                    warn!("encountered losing {ack_ticket}");
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_LOSING_TICKETS_COUNT.increment();
+                }
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACKED_TICKETS.increment();
