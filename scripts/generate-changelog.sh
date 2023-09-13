@@ -14,9 +14,9 @@ jq_decode() {
 
 declare -a section_feature section_bugs section_documentation
 
-section_feature="### 🚀 New Features\n\n"
-section_bugs="### 🐛 Bug\n\n"
-section_other="### ⚡ Other\n\n"
+section_feature="\n### 🚀 New Features\n"
+section_bugs="\n### 🐛 Bug\n"
+section_other="\n### ⚡ Other\n"
 
 # Adds an entry into the ChangeLog
 add_entry_type() {
@@ -25,12 +25,12 @@ add_entry_type() {
     labels=${3}
     if [[ ${labels} == *"feature"* ]]
     then
-        section_feature="${section_feature} - #${id} - ${title}\n"
+        section_feature="${section_feature}\n- #${id} - ${title}"
     elif [[ ${labels} == *"bug"* ]]
     then
-        section_bugs="${section_bugs} - #${id} - ${title}\n"
+        section_bugs="${section_bugs}\n- #${id} - ${title}"
     else
-        section_other="${section_other} - #${id} - ${title}\n"
+        section_other="${section_other}\n- #${id} - ${title}"
     fi
 }
 
@@ -48,18 +48,18 @@ process_entries() {
 }
 
 build_change_log() {
-    change_log_content="Below there is a list with the contents of this release\n\n"
+    change_log_content="Below there is a list with the contents of this release\n"
     if [[ ${section_feature} == *"-"* ]]
     then
-        change_log_content="${change_log_content} ${section_feature}\n"
+        change_log_content="${change_log_content}${section_feature}\n"
     fi
     if [[ ${section_bugs} == *"-"* ]]
     then
-        change_log_content="${change_log_content} ${section_bugs}\n"
+        change_log_content="${change_log_content}${section_bugs}\n"
     fi
     if [[ ${section_other} == *"-"* ]]
     then
-        change_log_content="${change_log_content} ${section_other}\n"
+        change_log_content="${change_log_content}${section_other}"
     fi
     echo -e ${change_log_content}
 }
