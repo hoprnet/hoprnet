@@ -18,12 +18,12 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 hex = "0.4.3"
 js-sys = { workspace = true, optional = true }
 proc-macro-regex = "~1.1.0"
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true }
 serde_yaml = "0.9"
 serde_json = "1.0"
 thiserror = "1.0"
 serde-wasm-bindgen = { version = "0.5", optional = true }
-validator = { version = "0.16.1", features = ["derive"] }
+validator = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 core-misc = { path = "../../../core/crates/core-misc", default-features = false }

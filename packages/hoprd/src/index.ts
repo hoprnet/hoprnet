@@ -101,7 +101,7 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
     createDbIfNotExist: cfg.db.initialize,
     announce: cfg.network_options.announce,
     dataPath: cfg.db.data,
-    hosts: { ip4: cfg.host },
+    hosts: [cfg.host],
     network,
     allowLocalConnections: cfg.network_options.allow_local_node_connections,
     allowPrivateConnections: cfg.network_options.allow_private_node_connections,
