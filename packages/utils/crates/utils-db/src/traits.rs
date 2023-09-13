@@ -62,8 +62,8 @@ pub trait AsyncKVStorage {
     /// or longer suffixes, even though they have the right suffix.
     fn iterate(&self, prefix: Self::Key, suffix_size: u32) -> Result<StorageValueIterator<Self::Value>>;
 
-    /// Returns an iterator that yields all database entries whose is in the 
-    /// interval from `start` (inclusive) and `end` (inclusive). 
+    /// Returns an iterator that yields all database entries whose is in the
+    /// interval from `start` (inclusive) and `end` (inclusive).
     fn iterate_range(&self, start: Self::Key, end: Self::Key) -> Result<StorageValueIterator<Self::Value>>;
 
     /// Constructs batch query

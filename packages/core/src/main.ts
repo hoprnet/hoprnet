@@ -3,6 +3,7 @@ import { debug, Database, ChainKeypair, OffchainKeypair } from '@hoprnet/hopr-ut
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Hopr, type HoprOptions } from './index.js'
+import { DB_VERSION_TAG } from './constants.js'
 import { getContractData } from './network.js'
 import path from 'path'
 import { rmSync } from 'fs'
@@ -22,7 +23,7 @@ export async function createHoprNode(
   options: HoprOptions,
   automaticChainCreation = true
 ): Promise<Hopr> {
-  const dbPath = path.join(options.dataPath, 'db', 'indexer_2')
+  const dbPath = path.join(options.dataPath, 'db', DB_VERSION_TAG)
   if (options.forceCreateDB) {
     log(`force cleaning up existing database`)
     rmSync(dbPath, { recursive: true, force: true })

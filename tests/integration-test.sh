@@ -139,15 +139,14 @@ validate_native_address "${api7}" "${api_token}" & jobs+=( "$!" )
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "ETH addresses exist"
 
-# TODO: Update check of safe's token balance instead of HOPR node's token balance
-# api_validate_node_balance_gt0 "${api1}"
-# api_validate_node_balance_gt0 "${api2}"
-# api_validate_node_balance_gt0 "${api3}"
-# api_validate_node_balance_gt0 "${api4}"
-# api_validate_node_balance_gt0 "${api5}"
-# api_validate_node_balance_gt0 "${api6}"
-# api_validate_node_balance_gt0 "${api7}"
-# log "Nodes are funded"
+api_validate_balances_gt0 "${api_token}@${api1}"
+api_validate_balances_gt0 "${api_token}@${api2}"
+api_validate_balances_gt0 "${api_token}@${api3}"
+api_validate_balances_gt0 "${api_token}@${api4}"
+api_validate_balances_gt0 "${api_token}@${api5}"
+api_validate_balances_gt0 "${api_token}@${api6}"
+api_validate_balances_gt0 "${api_token}@${api7}"
+log "Nodes and Safes are funded"
 
 declare addr1 addr2 addr3 addr4 addr5 addr6 addr7 result
 addr1="$(get_hopr_address "${api_token}@${api1}")"
@@ -244,6 +243,10 @@ done
 
 log "Node 2 ping node 3"
 result=$(api_ping "${api2}" ${addr3} "\"latency\":[0-9]+,\"reportedVersion\":")
+log "-- ${result}"
+
+log "Node 1 ping itself (should timeout)"
+result=$(api_ping "${api1}" ${addr1} "\"status\":\"TIMEOUT\"")
 log "-- ${result}"
 
 # FIXME: re-enable when network check works

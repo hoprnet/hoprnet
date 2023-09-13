@@ -25,6 +25,7 @@ describe('GET /account/balances', () => {
     node.getBalance = sinon.fake.returns(balance)
     node.getSafeNativeBalance = sinon.fake.returns(nativeBalance)
     node.getSafeBalance = sinon.fake.returns(balance)
+    node.getSafeAllowance = sinon.fake.returns(balance)
 
     const res = await request(service).get('/api/v3/account/balances')
     expect(res.status).to.equal(200)
@@ -33,7 +34,8 @@ describe('GET /account/balances', () => {
       native: nativeBalance.to_string(),
       hopr: balance.to_string(),
       safeNative: nativeBalance.to_string(),
-      safeHopr: balance.to_string()
+      safeHopr: balance.to_string(),
+      safeHoprAllowance: balance.to_string()
     })
   })
 

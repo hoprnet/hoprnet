@@ -144,6 +144,7 @@ pub(crate) async fn p2p_loop(
                     swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
                 },
                 Inputs::ManualPing(api::ManualPingChallenge(peer, challenge)) => {
+                    debug!("Executing manual ping to peer '{}'", peer);
                     let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
                     active_manual_pings.insert(req_id);
                 },
@@ -154,7 +155,7 @@ pub(crate) async fn p2p_loop(
                         }
                     },
                     NetworkEvent::PeerOffline(_peer) => {
-                        // NOTE: this functionality is not be needed after swtich to rust-libp2p
+                        // NOTE: this functionality is not needed after swtich to rust-libp2p
                     },
                     NetworkEvent::Register(peer, origin, metadata) => {
                         let mut writer = network.write().await;
