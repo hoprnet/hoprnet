@@ -180,19 +180,18 @@ git pull
 git checkout release/${RELEASE_NAME}
 git pull
 git rebase
-git push --force 
+git push --force
 git tag --force ${RELEASE_NAME}
 git push --force origin ${RELEASE_NAME}
 docker_registry="europe-west3-docker.pkg.dev/hoprassociation/docker-images"
 docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
 images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
-for image in ${images[@]}; 
+for image in ${images[@]};
 do
   echo "Tagging ${image}:${RELEASE_NAME}"
   gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${RELEASE_NAME}
 done
 ```
-
 
 3. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
