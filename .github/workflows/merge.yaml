@@ -96,8 +96,8 @@ jobs:
             gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_stable_tag}
           done
 
-  deploy_prn_nodes:
-    name: Deploy PRN nodes
+  deploy_nodes:
+    name: Deploy nodes
     runs-on: ubuntu-latest
     if: needs.tag.result == 'success'
     needs:
@@ -124,7 +124,7 @@ jobs:
           if [[ "${base_branch}" == "master" ]]; then
             ./scripts/deploy.sh rotsee
           elif [[ "${base_branch}" =~ ^"release" ]]; then
-            ./scripts/deploy.sh "${base_branch/release\/}-dufour"
+            ./scripts/deploy.sh "dufour-${base_branch/release\/}"
           else
             echo "Skipping deployment"
           fi
@@ -234,13 +234,20 @@ jobs:
         run: |
           milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
           ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog.md
+          echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Release
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           body_path: docs/changelog/changelog.md
           prerelease: ${{ steps.setup.outputs.prerelease }}
           name: HOPR - v${{ steps.setup.outputs.current_version }}
           tag_name: v${{ steps.setup.outputs.current_version }}
+
+      - name: Close Milestone
+        run: | 
+          gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
