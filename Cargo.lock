@@ -1315,7 +1315,7 @@ dependencies = [
 
 [[package]]
 name = "core-packet"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "async-lock",
  "async-process",
