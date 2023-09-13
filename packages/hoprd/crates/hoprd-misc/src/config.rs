@@ -785,16 +785,16 @@ test:
 
     #[test]
     fn test_verify_valid_dns_addresses() {
-        assert!(validate_dns_address("localhost:80").is_ok());
-        assert!(validate_dns_address("hoprnet.org:80").is_ok());
-        assert!(validate_dns_address("hub.hoprnet.org:80").is_ok());
+        assert!(validate_dns_address("localhost").is_ok());
+        assert!(validate_dns_address("hoprnet.org").is_ok());
+        assert!(validate_dns_address("hub.hoprnet.org").is_ok());
     }
 
     #[test]
     fn test_verify_invalid_dns_addresses() {
-        assert!(validate_dns_address("org:80").is_err());
-        assert!(validate_dns_address(".org:80").is_err());
-        assert!(validate_dns_address("-hoprnet.org:80").is_err());
-        assert!(validate_dns_address("unknown.sub.sub.hoprnet.org:80").is_err());
+        assert!(validate_dns_address("org").is_err());
+        assert!(validate_dns_address(".org").is_err());
+        assert!(validate_dns_address("-hoprnet.org").is_err());
+        assert!(validate_dns_address("unknown.sub.sub.hoprnet.org").is_err());
     }
 }
