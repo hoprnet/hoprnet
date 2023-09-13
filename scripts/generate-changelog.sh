@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 
 milestone_number=${1}
-
+include_open=${2:-false}
 
 
 # Decode the entry of a changelog
@@ -43,6 +43,12 @@ process_entries() {
         id=$(echo "${item_decoded}" | jq -r '.number')
         title=$(echo "${item_decoded}" | jq -r '.title')
         labels=$(echo "${item_decoded}" | jq -r '.labels[].name' | tr '\n' ',' | sed 's/,$//')
+        state=$(echo "${item_decoded}" | jq -r '.state' | tr '[:upper:]' '[:lower:]')
+        if [[ "$state" == "open" ]] && [[ $include_open == false ]];
+        then
+            echo "Error generating changelog from a milestone with open items"
+            exit 1
+        fi
         add_entry_type "${id}" "${title}" "${labels}"
     done
 }
@@ -66,11 +72,11 @@ build_change_log() {
 
 
 # Process Issues
-issues=$(gh issue list --milestone ${milestone_number} --state all --json number,title,labels | jq -r 'to_entries[] | .value | @base64')
+issues=$(gh issue list --milestone ${milestone_number} --state all --json number,title,labels,state | jq -r 'to_entries[] | .value | @base64')
 process_entries "$issues"
 
 # Process PR
-prs=$(gh pr list --state all --json number,title,labels,milestone | jq -r --argjson milestone_number ${milestone_number} 'to_entries[] | select(.value.milestone) | select(.value.milestone.number == $milestone_number).value | @base64')
+prs=$(gh pr list --state all --json number,title,labels,milestone,state | jq -r --argjson milestone_number ${milestone_number} 'to_entries[] | select(.value.milestone) | select(.value.milestone.number == $milestone_number).value | @base64')
 process_entries "$prs"
 build_change_log
 
