@@ -40,7 +40,7 @@ jobs:
           fi
 
           # Create new branch or reuse an existing branch
-          if [ `git branch -al ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}` ];
+          if [ `git branch -al ${{ github.event.inputs.release_name }} | grep ${{ github.event.inputs.release_name }}` ];
           then
             git checkout release/${{ github.event.inputs.release_name }}
             git rebase ${{ github.event.inputs.tag_name }}
