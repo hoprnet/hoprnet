@@ -54,8 +54,10 @@ case "$release_type" in
     pre_release=$((pre_release+1))
     ;;
   Patch)
+    if [ -z ${pre_release+x} ]; then
+      patch_version=$((patch_version+1))
+    fi
     unset pre_release
-    patch_version=$((patch_version+1))
     ;;
   Minor)
     unset pre_release
