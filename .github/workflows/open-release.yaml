@@ -30,21 +30,21 @@ jobs:
     name: Open Release
     runs-on: ubuntu-latest
     steps:
-      # - name: Setup environment variables
-      #   id: setup
-      #   run: |
-      #       if [ "${{ github.event.inputs.release_type }}" == "Patch" ] 
-      #       then
-      #           base_branch="release/${{ github.event.inputs.release_name }}"
-      #       else
-      #           base_branch="master"
-      #       fi
-      #       echo "base_branch=${base_branch}" >> $GITHUB_OUTPUT
+      - name: Setup environment variables
+        id: setup
+        run: |
+            if [ "${{ github.event.inputs.release_type }}" == "Patch" ] 
+            then
+                base_branch="release/${{ github.event.inputs.release_name }}"
+            else
+                base_branch="master"
+            fi
+            echo "base_branch=${base_branch}" >> $GITHUB_OUTPUT
 
-      # - name: Checkout hoprnet repository
-      #   uses: actions/checkout@v3
-      #   with:
-      #     ref: "${{ steps.setup.outputs.base_branch }}"
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          ref: "${{ steps.setup.outputs.base_branch }}"
 
       # - name: Bump Version
       #   id: bump
