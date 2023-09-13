@@ -191,7 +191,7 @@ mod tests {
             async fn get_pending_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_losing_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn mark_redeemed(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
+            async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_rejected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;

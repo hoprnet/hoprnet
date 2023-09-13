@@ -1,17 +1,23 @@
-use crate::errors::CoreEthereumError::{TransactionSubmissionFailed, WrongTicketState};
+use crate::errors::CoreEthereumError::{InvalidArguments, NotAWinningTicket, TransactionSubmissionFailed, WrongTicketState};
 use crate::errors::Result;
 use async_lock::RwLock;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
-use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
+use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
+use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 use std::ops::DerefMut;
 use std::sync::Arc;
+use utils_db::errors::DbError;
 use utils_log::{debug, error, info};
 use utils_types::errors::GeneralError::ParseError;
 use utils_types::primitives::Address;
 use utils_types::traits::BinarySerializable;
+
+lazy_static::lazy_static! {
+    /// Used as a placeholder when the redeem transaction has not yet been published on-chain
+    static ref EMPTY_TX_HASH: Hash = Hash::default();
+}
 
 pub async fn redeem_all_tickets<Db, F>(
     db: Arc<RwLock<Db>>,
@@ -28,7 +34,7 @@ where
         incoming_channels.len()
     );
 
-    for channel in incoming_channels {
+    for channel in incoming_channels.iter() {
         let channel_id = channel.get_id();
         if let Err(e) = redeem_tickets_in_channel(db.clone(), channel, onchain_tx_sender).await {
             error!("failed to redeem tickets in channel {channel_id}: {e}");
@@ -38,23 +44,51 @@ where
     Ok(())
 }
 
-lazy_static::lazy_static! {
-    /// Used as a placeholder when the redeem transaction has not yet been published on-chain
-    static ref EMPTY_TX_HASH: Hash = Hash::default();
-}
-
 async fn set_being_redeemed<Db>(db: &mut Db, ack_ticket: &mut AcknowledgedTicket, tx_hash: Hash) -> Result<()>
 where
     Db: HoprCoreEthereumDbActions,
 {
+    match ack_ticket.status {
+        Untouched => {
+            let dst = db.get_channels_domain_separator()
+                .await
+                .and_then(|separator| separator.ok_or(DbError::NotFound))?;
+
+            // Check if we're going to redeem a winning ticket
+            if !ack_ticket.is_winning_ticket(&dst) {
+                return Err(NotAWinningTicket);
+            }
+        }
+        BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
+        BeingRedeemed { .. } => {} // Just let the TX hash to be updated
+    }
+
     ack_ticket.status = BeingRedeemed { tx_hash };
-    debug!("setting {} as being redeemed with TX hash {tx_hash}", ack_ticket.ticket);
+    debug!("setting a winning {} as being redeemed with TX hash {tx_hash}", ack_ticket.ticket);
     Ok(db.update_acknowledged_ticket(ack_ticket).await?)
+
+}
+
+pub async fn redeem_tickets_with_counterparty<Db, F>(
+    db: Arc<RwLock<Db>>,
+    counterparty: &Address,
+    onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F,
+) -> Result<()>
+    where
+        Db: HoprCoreEthereumDbActions,
+        F: futures::Future<Output = std::result::Result<String, String>>,
+{
+    let ch = db.read().await.get_channel_from(counterparty).await?;
+    if let Some(channel) = ch {
+        redeem_tickets_in_channel(db, &channel, onchain_tx_sender).await
+    } else {
+        Err(InvalidArguments(format!("cannot find channel with {counterparty}")))
+    }
 }
 
 pub async fn redeem_tickets_in_channel<Db, F>(
     db: Arc<RwLock<Db>>,
-    channel: ChannelEntry,
+    channel: &ChannelEntry,
     onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F,
 ) -> Result<()>
 where
@@ -62,10 +96,12 @@ where
     F: futures::Future<Output = std::result::Result<String, String>>,
 {
     let channel_id = channel.get_id();
+
+    // Keep holding the DB write lock until we mark all the eligible tickets as BeginRedeemed
     let mut to_redeem = Vec::new();
     {
         let mut db = db.write().await;
-        let ack_tickets = db.get_acknowledged_tickets(Some(channel)).await?;
+        let ack_tickets = db.get_acknowledged_tickets(Some(channel.clone())).await?;
         debug!(
             "there are {} acknowledged tickets in channel {channel_id}",
             ack_tickets.len()
@@ -79,6 +115,7 @@ where
             }
         }
     }
+
     info!(
         "{} acknowledged tickets are still available to redeem in {channel_id}",
         to_redeem.len()
@@ -112,11 +149,12 @@ where
             set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
         }
         BeingRedeemed { tx_hash } => {
+            // Allow sending TX only if there's no TX hash set
             if tx_hash != *EMPTY_TX_HASH {
                 return Err(WrongTicketState(ack_ticket.to_string()));
             }
         }
-        AcknowledgedTicketStatus::BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
+        BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
     };
 
     debug!("sending {} for on-chain redemption", ack_ticket.ticket);
@@ -155,6 +193,7 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use wasm_bindgen::prelude::wasm_bindgen;
     use core_crypto::types::Hash;
     use core_ethereum_db::db::wasm::Database;
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
@@ -184,6 +223,7 @@ pub mod wasm {
         };
     }
 
+    #[wasm_bindgen]
     pub async fn redeem_all_tickets(
         db: &Database,
         self_addr: &Address,
@@ -194,16 +234,25 @@ pub mod wasm {
         Ok(())
     }
 
+    #[wasm_bindgen]
+    pub async fn redeem_tickets_with_counterparty(db: &Database, counterparty: &Address, on_chain_tx_sender: &js_sys::Function) -> JsResult<()> {
+        let js_on_chain_tx_sender = make_js_on_chain_sender!(on_chain_tx_sender);
+        super::redeem_tickets_with_counterparty(db.as_ref_counted(), counterparty, &js_on_chain_tx_sender).await?;
+        Ok(())
+    }
+
+    #[wasm_bindgen]
     pub async fn redeem_tickets_in_channel(
         db: &Database,
         channel: &ChannelEntry,
         on_chain_tx_sender: &js_sys::Function,
     ) -> JsResult<()> {
         let js_on_chain_tx_sender = make_js_on_chain_sender!(on_chain_tx_sender);
-        super::redeem_tickets_in_channel(db.as_ref_counted().clone(), *channel, &js_on_chain_tx_sender).await?;
+        super::redeem_tickets_in_channel(db.as_ref_counted().clone(), channel, &js_on_chain_tx_sender).await?;
         Ok(())
     }
 
+    #[wasm_bindgen]
     pub async fn redeem_ticket(
         db: &Database,
         ack_ticket: &AcknowledgedTicket,

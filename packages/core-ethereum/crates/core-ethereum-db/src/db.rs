@@ -11,7 +11,7 @@ use utils_db::{
     db::{Batch, DB},
     traits::AsyncKVStorage,
 };
-use utils_log::debug;
+use utils_log::{debug, error};
 use utils_types::{
     primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
@@ -468,13 +468,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    async fn mark_redeemed(&mut self, counterparty: &Address, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        debug!(
-            "marking ticket #{} in channel with {} as redeemed",
-            acked_ticket.ticket.index, counterparty
-        );
+    async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
+        debug!("marking {} as redeemed", acked_ticket);
 
-        let mut ops = utils_db::db::Batch::default();
+        let mut ops = Batch::default();
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
@@ -493,15 +490,22 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
         ops.put(key, new_redeemed_balance);
 
-        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
-        let pending_balance = self
-            .db
-            .get_or_none::<Balance>(key.clone())
+        if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id)
             .await?
-            .unwrap_or(Balance::zero(BalanceType::HOPR));
+            .map(|c| if c.source == self.me { c.destination } else { c.source }) {
 
-        let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
-        ops.put(key, new_pending_balance);
+            let key = utils_db::db::Key::new_with_prefix(&counterparty, PENDING_TICKETS_COUNT)?;
+            let pending_balance = self
+                .db
+                .get_or_none::<Balance>(key.clone())
+                .await?
+                .unwrap_or(Balance::zero(BalanceType::HOPR));
+
+            let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
+            ops.put(key, new_pending_balance);
+        } else {
+            error!("could not update redeemed tickets count: unable to find channel with id {}", acked_ticket.ticket.channel_id)
+        }
 
         self.db.batch(ops, true).await
     }
@@ -1290,13 +1294,12 @@ pub mod wasm {
         #[wasm_bindgen]
         pub async fn mark_redeemed(
             &self,
-            counterparty: &Address,
             acked_ticket: &AcknowledgedTicket,
         ) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_redeemed(counterparty, &acked_ticket.into()).await)
+            utils_misc::ok_or_jserr!(db.mark_redeemed(&acked_ticket.into()).await)
             //}
         }
 

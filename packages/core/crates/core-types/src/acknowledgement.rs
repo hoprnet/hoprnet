@@ -632,7 +632,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
 
     use crate::channels::wasm::Ticket;
-
+    #[derive(Clone)]
     #[wasm_bindgen]
     pub struct AcknowledgedTicket {
         w: super::AcknowledgedTicket,
@@ -654,12 +654,14 @@ pub mod wasm {
         pub fn signer(&self) -> Address {
             self.w.signer.clone()
         }
-    }
 
-    impl AcknowledgedTicket {
-        pub fn clone(&self) -> AcknowledgedTicket {
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> AcknowledgedTicket {
             Self { w: self.w.clone() }
         }
+
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String { self.w.to_string() }
     }
 
     impl From<super::AcknowledgedTicket> for AcknowledgedTicket {

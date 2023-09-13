@@ -140,7 +140,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance, snapshot: &Snapshot) -> Result<()>;
 
     /// Mark the ticket as redeemed.
-    async fn mark_redeemed(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()>;
+    async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
     /// Mark an acknowledged ticket as losing.
     async fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()>;

@@ -1073,7 +1073,7 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub fn to_string(&self) -> String {
-            format!("{:?}", self.w)
+            self.w.to_string()
         }
 
         pub fn clone(&self) -> Ticket {
