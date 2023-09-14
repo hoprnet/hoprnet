@@ -343,7 +343,7 @@ mod tests {
         let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
         let rt_clone = redeemed_tickets.clone();
 
-        redeem_all_tickets(
+        let actually_redeemed = redeem_all_tickets(
             db.clone(),
             &ALICE.public().to_address(),
             &|ack: AcknowledgedTicket| async {
@@ -377,6 +377,12 @@ mod tests {
             0,
             db_acks_charlie.len(),
             "no unredeemed tickets should be remaining for Charlie"
+        );
+
+        assert_eq!(
+            2 * ticket_count,
+            actually_redeemed,
+            "all tickets must be reported as redeemed"
         );
 
         assert_eq!(
@@ -437,7 +443,7 @@ mod tests {
         let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
         let rt_clone = redeemed_tickets.clone();
 
-        redeem_tickets_with_counterparty(
+        let actually_redeemed = redeem_tickets_with_counterparty(
             db.clone(),
             &BOB.public().to_address(),
             &|ack: AcknowledgedTicket| async {
@@ -460,6 +466,11 @@ mod tests {
             .get_acknowledged_tickets(Some(channel_from_charlie))
             .await
             .unwrap();
+
+        assert_eq!(
+            ticket_count, actually_redeemed,
+            "{ticket_count} must be reported as be redeemed"
+        );
 
         assert_eq!(
             ticket_count,
@@ -530,12 +541,19 @@ mod tests {
         let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
         let rt_clone = redeemed_tickets.clone();
 
-        redeem_tickets_in_channel(db.clone(), &channel_from_bob, &|ack: AcknowledgedTicket| async {
-            rt_clone.lock().await.push(ack);
-            Ok(dummy_tx_hash.to_hex())
-        })
-        .await
-        .unwrap();
+        let actually_redeemed =
+            redeem_tickets_in_channel(db.clone(), &channel_from_bob, &|ack: AcknowledgedTicket| async {
+                rt_clone.lock().await.push(ack);
+                Ok(dummy_tx_hash.to_hex())
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(
+            ticket_count - 2,
+            actually_redeemed,
+            "remaining redeemable tickets must be reported as redeemed"
+        );
 
         assert_eq!(
             ticket_count - 2,
