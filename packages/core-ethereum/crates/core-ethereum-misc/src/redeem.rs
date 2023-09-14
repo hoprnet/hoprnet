@@ -180,13 +180,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::redeem::{redeem_all_tickets, redeem_ticket, redeem_tickets_with_counterparty};
+    use crate::redeem::{
+        redeem_all_tickets, redeem_ticket, redeem_tickets_in_channel, redeem_tickets_with_counterparty,
+    };
     use async_lock::{Mutex, RwLock};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::random::random_bytes;
     use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
     use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, UnacknowledgedTicket};
     use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use hex_literal::hex;
@@ -490,6 +493,48 @@ mod tests {
                 .map(|t| t.ticket.clone())
                 .collect::<Vec<_>>(),
             "all redeemed tickets from Bob must make it to on-chain redemption"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_redeem_should_not_work_for_aggregated() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let rdb = RustyLevelDbShim::new_in_memory();
+
+        let ticket_count = 3;
+
+        let (channel_from_bob, tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(rdb.clone()),
+            ALICE.public().to_address(),
+        )));
+
+        let mut agg = tickets[0].clone();
+        agg.status = BeingAggregated { start: 0, end: 1 };
+        db.write().await.update_acknowledged_ticket(&agg).await.unwrap();
+
+        let mut agg = tickets[1].clone();
+        agg.status = BeingRedeemed {
+            tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
+        };
+        db.write().await.update_acknowledged_ticket(&agg).await.unwrap();
+
+        let dummy_tx_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
+        let rt_clone = redeemed_tickets.clone();
+
+        redeem_tickets_in_channel(db.clone(), &channel_from_bob, &|ack: AcknowledgedTicket| async {
+            rt_clone.lock().await.push(ack);
+            Ok(dummy_tx_hash.to_hex())
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(
+            ticket_count - 2,
+            redeemed_tickets.lock().await.len(),
+            "tickets being redeemed and aggregated must be skipped during redemption"
         );
     }
 }
