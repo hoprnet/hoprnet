@@ -294,7 +294,7 @@ export class Hopr extends EventEmitter {
     let coreApp = new CoreApp(
       new OffchainKeypair(this.packetKeypair.secret()),
       this.db.clone(),
-      this.cfg.network_options.network_quality_threshold,
+      this.cfg.network_options,
       this.cfg.heartbeat,
       ping_cfg,
       onAcknowledgement,

@@ -289,7 +289,7 @@ async function main() {
       { getState, setState },
       {
         disableApiAuthentication: api.is_auth_disabled(),
-        apiHost: api.host.ip,
+        apiHost: api.host.address(),
         apiPort: api.host.port,
         apiToken: api.is_auth_disabled() ? null : api.auth_token()
       }

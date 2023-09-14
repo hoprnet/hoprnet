@@ -1277,6 +1277,7 @@ dependencies = [
  "multiaddr",
  "rand 0.8.5",
  "serde",
+ "serde_with",
  "thiserror",
  "utils-log",
  "utils-metrics",

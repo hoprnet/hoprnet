@@ -6,8 +6,10 @@ use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
-use core_misc::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
-use core_network::heartbeat::HeartbeatConfig;
+use core_network::{
+    heartbeat::HeartbeatConfig,
+    network::NetworkConfig
+};
 use core_strategy::config::StrategyConfig;
 use utils_types::primitives::Address;
 
@@ -212,19 +214,6 @@ impl Default for HealthCheck {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
-pub struct NetworkOptions {
-    pub network_quality_threshold: f32,
-}
-
-impl Default for NetworkOptions {
-    fn default() -> Self {
-        Self {
-            network_quality_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
-        }
-    }
-}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
@@ -367,7 +356,7 @@ pub struct HoprdConfig {
     #[validate]
     pub heartbeat: HeartbeatConfig,
     #[validate]
-    pub network_options: NetworkOptions,
+    pub network_options: NetworkConfig,
     #[validate]
     pub healthcheck: HealthCheck,
     pub network: String,
@@ -392,7 +381,7 @@ impl Default for HoprdConfig {
             api: Api::default(),
             strategy: StrategyConfig::default(),
             heartbeat: HeartbeatConfig::default(),
-            network_options: NetworkOptions::default(),
+            network_options: NetworkConfig::default(),
             healthcheck: HealthCheck::default(),
             network: String::default(),
             chain: Chain::default(),
@@ -473,7 +462,7 @@ impl HoprdConfig {
 
         // network options
         if let Some(x) = cli_args.network_quality_threshold {
-            cfg.network_options.network_quality_threshold = x
+            cfg.network_options.quality_offline_threshold = x
         };
 
         // healthcheck
@@ -619,8 +608,10 @@ mod tests {
                 threshold: 0,
                 variance: 0,
             },
-            network_options: NetworkOptions {
-                network_quality_threshold: 0.0,
+            network_options: {
+                let mut c = NetworkConfig::default();
+                c.quality_offline_threshold = 0.0;
+                c
             },
             healthcheck: HealthCheck {
                 enable: false,
@@ -678,7 +669,15 @@ heartbeat:
   interval: 0
   threshold: 0
 network_options:
-  network_quality_threshold: 0.0
+  min_delay: 1
+  max_delay: 300
+  quality_bad_threshold: 0.2
+  quality_offline_threshold: 0.0
+  quality_step: 0.1
+  ignore_timeframe: 600
+  backoff_exponent: 1.5
+  backoff_min: 2.0
+  backoff_max: 300.0
 healthcheck:
   enable: false
   host: 127.0.0.1

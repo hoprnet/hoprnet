@@ -24,6 +24,8 @@ use core_network::{
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
 use utils_log::{error, info};
+use core_mixer::mixer::{Mixer, MixerConfig};
+use core_network::network::NetworkConfig;
 
 use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;
@@ -133,7 +135,7 @@ impl std::fmt::Display for HoprLoopComponents {
 pub fn build_components(
     me: libp2p_identity::Keypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-    network_quality_threshold: f64,
+    network_cfg: NetworkConfig,
     hb_cfg: HeartbeatConfig,
     ping_cfg: PingConfig,
     on_acknowledgement: Option<js_sys::Function>,
@@ -145,8 +147,6 @@ pub fn build_components(
     tx_executor: WasmTxExecutor,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
-    use core_mixer::mixer::{Mixer, MixerConfig};
-
     let identity = me;
 
     let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
@@ -157,7 +157,7 @@ pub fn build_components(
 
     let network = Arc::new(RwLock::new(Network::new(
         identity.public().to_peer_id(),
-        network_quality_threshold,
+        network_cfg,
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
     )));
 
@@ -287,6 +287,7 @@ pub mod wasm_impl {
     use super::*;
     use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
     use core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor;
+    use core_network::network::NetworkConfig;
     use core_path::path::Path;
     use core_types::protocol::ApplicationData;
     use wasm_bindgen::prelude::*;
@@ -330,7 +331,7 @@ pub mod wasm_impl {
         pub fn new(
             me: &OffchainKeypair,
             db: Database, // TODO: replace the string with the KeyPair
-            network_quality_threshold: f64,
+            network_cfg: NetworkConfig,
             hb_cfg: HeartbeatConfig,
             ping_cfg: PingConfig,
             on_acknowledgement: Option<js_sys::Function>,
@@ -346,7 +347,7 @@ pub mod wasm_impl {
             let (tools, run_loop) = build_components(
                 me,
                 db.as_ref_counted(),
-                network_quality_threshold,
+                network_cfg,
                 hb_cfg,
                 ping_cfg,
                 on_acknowledgement,

@@ -289,7 +289,7 @@ pub struct CliArgs {
     pub private_key: Option<String>,
 
     #[arg(
-        long = "hoprd-inbox-capacity",
+        long = "inbox-capacity",
         value_parser = clap::value_parser ! (u32).range(1..),
         value_name = "INBOX_CAPACITY",
         help = "Set maximum capacity of the HOPRd inbox",
@@ -366,10 +366,10 @@ pub struct CliArgs {
         long = "networkQualityThreshold",
         help = "Minimum quality of a peer connection to be considered usable",
         value_name = "THRESHOLD",
-        value_parser = clap::value_parser ! (f32),
+        value_parser = clap::value_parser ! (f64),
         env = "HOPRD_NETWORK_QUALITY_THRESHOLD"
     )]
-    pub network_quality_threshold: Option<f32>,
+    pub network_quality_threshold: Option<f64>,
 
     #[arg(
         long = "configurationFilePath",
