@@ -230,7 +230,6 @@ mod tests {
         )
         .unwrap();
 
-
         let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
         unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
     }
@@ -245,7 +244,11 @@ mod tests {
         utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
     }
 
-    async fn create_channel_with_ack_tickets(rdb: RustyLevelDbShim, ticket_count: usize, counterparty: &ChainKeypair) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
+    async fn create_channel_with_ack_tickets(
+        rdb: RustyLevelDbShim,
+        ticket_count: usize,
+        counterparty: &ChainKeypair,
+    ) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
         let mut inner_db = DB::new(rdb);
         let mut input_tickets = Vec::new();
 
@@ -288,7 +291,10 @@ mod tests {
         let (channel_from_bob, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
         let (channel_from_charlie, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), ALICE.public().to_address())));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(rdb.clone()),
+            ALICE.public().to_address(),
+        )));
 
         let dummy_tx_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
@@ -305,10 +311,24 @@ mod tests {
         .await
         .unwrap();
 
-        let db_acks_bob = db.read().await.get_acknowledged_tickets(Some(channel_from_bob)).await.unwrap();
-        let db_acks_charlie = db.read().await.get_acknowledged_tickets(Some(channel_from_charlie)).await.unwrap();
+        let db_acks_bob = db
+            .read()
+            .await
+            .get_acknowledged_tickets(Some(channel_from_bob))
+            .await
+            .unwrap();
+        let db_acks_charlie = db
+            .read()
+            .await
+            .get_acknowledged_tickets(Some(channel_from_charlie))
+            .await
+            .unwrap();
 
-        assert_eq!(2 * ticket_count, db_acks_charlie.len() + db_acks_bob.len(), "must have {ticket_count} tickets from each channel");
+        assert_eq!(
+            2 * ticket_count,
+            db_acks_charlie.len() + db_acks_bob.len(),
+            "must have {ticket_count} tickets from each channel"
+        );
         assert!(
             db_acks_bob.iter().all(|t| match t.status {
                 AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
@@ -323,7 +343,11 @@ mod tests {
             }),
             "all tickets from Bob must be in the BeingRedeemed state with correct tx hash"
         );
-        assert_eq!(2 * ticket_count, redeemed_tickets.lock().await.len(), "all tickets must make it to on chain redemption");
+        assert_eq!(
+            2 * ticket_count,
+            redeemed_tickets.lock().await.len(),
+            "all tickets must make it to on chain redemption"
+        );
         assert_eq!(
             db_acks_bob.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
             redeemed_tickets
@@ -349,10 +373,22 @@ mod tests {
             "all redeemed tickets from Charlie must make it to on-chain redemption"
         );
 
-        assert!(redeem_ticket(db.clone(), db_acks_bob[0].clone(), &|_| async { Ok(dummy_tx_hash.to_hex()) })
-            .await.is_err(), "cannot redeem ticket twice");
-        assert!(redeem_ticket(db.clone(), db_acks_charlie[0].clone(), &|_| async { Ok(dummy_tx_hash.to_hex()) })
-            .await.is_err(), "cannot redeem ticket twice");
+        assert!(
+            redeem_ticket(db.clone(), db_acks_bob[0].clone(), &|_| async {
+                Ok(dummy_tx_hash.to_hex())
+            })
+            .await
+            .is_err(),
+            "cannot redeem ticket twice"
+        );
+        assert!(
+            redeem_ticket(db.clone(), db_acks_charlie[0].clone(), &|_| async {
+                Ok(dummy_tx_hash.to_hex())
+            })
+            .await
+            .is_err(),
+            "cannot redeem ticket twice"
+        );
 
         // Try to redeem again
 
@@ -370,7 +406,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(redeemed_tickets.lock().await.is_empty(), "should not send redeem TX again");
+        assert!(
+            redeemed_tickets.lock().await.is_empty(),
+            "should not send redeem TX again"
+        );
     }
 
     #[async_std::test]
@@ -383,21 +422,44 @@ mod tests {
         let (channel_from_bob, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
         let (channel_from_charlie, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), ALICE.public().to_address())));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(rdb.clone()),
+            ALICE.public().to_address(),
+        )));
 
         let dummy_tx_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
         let rt_clone = redeemed_tickets.clone();
 
-        redeem_tickets_with_counterparty(db.clone(), &BOB.public().to_address(), &|ack: AcknowledgedTicket| async {
-            rt_clone.lock().await.push(ack);
-            Ok(dummy_tx_hash.to_hex())
-        }).await.unwrap();
+        redeem_tickets_with_counterparty(
+            db.clone(),
+            &BOB.public().to_address(),
+            &|ack: AcknowledgedTicket| async {
+                rt_clone.lock().await.push(ack);
+                Ok(dummy_tx_hash.to_hex())
+            },
+        )
+        .await
+        .unwrap();
 
-        let db_acks_bob = db.read().await.get_acknowledged_tickets(Some(channel_from_bob)).await.unwrap();
-        let db_acks_charlie = db.read().await.get_acknowledged_tickets(Some(channel_from_charlie)).await.unwrap();
+        let db_acks_bob = db
+            .read()
+            .await
+            .get_acknowledged_tickets(Some(channel_from_bob))
+            .await
+            .unwrap();
+        let db_acks_charlie = db
+            .read()
+            .await
+            .get_acknowledged_tickets(Some(channel_from_charlie))
+            .await
+            .unwrap();
 
-        assert_eq!(2 * ticket_count, db_acks_charlie.len() + db_acks_bob.len(), "must have {ticket_count} tickets from each channel");
+        assert_eq!(
+            2 * ticket_count,
+            db_acks_charlie.len() + db_acks_bob.len(),
+            "must have {ticket_count} tickets from each channel"
+        );
         assert!(
             db_acks_bob.iter().all(|t| match t.status {
                 AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
@@ -412,7 +474,11 @@ mod tests {
             }),
             "all tickets from Charlie must be Untouched"
         );
-        assert_eq!(ticket_count, redeemed_tickets.lock().await.len(), "exactly {ticket_count} tickets must make it to on-chain redemption");
+        assert_eq!(
+            ticket_count,
+            redeemed_tickets.lock().await.len(),
+            "exactly {ticket_count} tickets must make it to on-chain redemption"
+        );
         assert_eq!(
             db_acks_bob.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
             redeemed_tickets
