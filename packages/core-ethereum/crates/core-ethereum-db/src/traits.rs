@@ -41,6 +41,15 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all acknowledged tickets within the filter criteria.
     async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<AcknowledgedTicket>>;
 
+    /// Gets all acknowledged tickets in the channel and marks the as being aggregated
+    async fn prepare_aggregatable_tickets(
+        &mut self,
+        channel_id: &Hash,
+        epoch: u32,
+        index_start: u64,
+        index_end: u64,
+    ) -> Result<Vec<AcknowledgedTicket>>;
+
     async fn get_acknowledged_tickets_range(
         &self,
         channel_id: &Hash,
@@ -267,4 +276,11 @@ pub trait HoprCoreEthereumDbActions {
 
     /// Deletes the REST API token given its ID.
     async fn delete_authorization(&mut self, id: String) -> Result<()>;
+}
+
+/// Only meant for testing!
+#[async_trait(? Send)]
+pub trait HoprCoreEthereumTestActions {
+    /// Store acknowledged ticket, only for testing
+    async fn store_acknowledged_tickets(&mut self, acked_tickets: Vec<AcknowledgedTicket>) -> Result<()>;
 }

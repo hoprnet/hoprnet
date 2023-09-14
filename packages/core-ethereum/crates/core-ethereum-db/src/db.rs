@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_types::{
     account::AccountEntry,
-    acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
+    acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
 use utils_db::{
@@ -16,8 +16,10 @@ use utils_types::{
     traits::BinarySerializable,
 };
 
-use crate::errors::Result;
-use crate::traits::HoprCoreEthereumDbActions;
+use crate::{
+    errors::Result,
+    traits::{HoprCoreEthereumDbActions, HoprCoreEthereumTestActions},
+};
 
 const ACKNOWLEDGED_TICKETS_KEY_LENGTH: usize = Hash::SIZE + (u32::BITS / 8) as usize + (u64::BITS / 8) as usize;
 
@@ -172,6 +174,46 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .await?;
 
         tickets.sort_by(|a, b| a.ticket.index.cmp(&b.ticket.index));
+
+        Ok(tickets)
+    }
+
+    async fn prepare_aggregatable_tickets(
+        &mut self,
+        channel_id: &Hash,
+        epoch: u32,
+        index_start: u64,
+        index_end: u64,
+    ) -> Result<Vec<AcknowledgedTicket>> {
+        let mut tickets = self
+            .db
+            .get_more_range::<AcknowledgedTicket>(
+                to_acknowledged_ticket_key(channel_id, epoch, index_start)?.into(),
+                to_acknowledged_ticket_key(channel_id, epoch, index_end)?.into(),
+                &|_| true,
+            )
+            .await?;
+
+        tickets.sort_by(|a, b| a.ticket.index.cmp(&b.ticket.index));
+
+        let mut batch_ops = utils_db::db::Batch::default();
+
+        for ticket in tickets.iter_mut() {
+            ticket.status(AcknowledgedTicketStatus::BeingAggregated {
+                start: index_start,
+                end: index_end,
+            });
+            batch_ops.put(
+                to_acknowledged_ticket_key(
+                    &ticket.ticket.channel_id,
+                    ticket.ticket.channel_epoch,
+                    ticket.ticket.index,
+                )?,
+                ticket,
+            )
+        }
+
+        self.db.batch(batch_ops, true).await?;
 
         Ok(tickets)
     }
@@ -973,6 +1015,28 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
         let _ = self.db.remove::<AuthorizationToken>(key).await?;
         Ok(())
+    }
+}
+
+/// Only meant for testing!
+#[async_trait(? Send)]
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumTestActions for CoreEthereumDb<T> {
+    async fn store_acknowledged_tickets(&mut self, acked_tickets: Vec<AcknowledgedTicket>) -> Result<()> {
+        let mut batch_ops = utils_db::db::Batch::default();
+
+        for acked_ticket in acked_tickets {
+            batch_ops.put(
+                to_acknowledged_ticket_key(
+                    &acked_ticket.ticket.channel_id,
+                    acked_ticket.ticket.channel_epoch,
+                    acked_ticket.ticket.index,
+                )?
+                .into(),
+                acked_ticket,
+            );
+        }
+
+        self.db.batch(batch_ops, true).await
     }
 }
 

@@ -85,10 +85,12 @@ impl From<libp2p_request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehavior
     }
 }
 
-impl From<libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>>
+impl From<libp2p_request_response::Event<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>>
     for HoprNetworkBehaviorEvent
 {
-    fn from(event: libp2p_request_response::Event<Vec<Ticket>, std::result::Result<Ticket, String>>) -> Self {
+    fn from(
+        event: libp2p_request_response::Event<Vec<AcknowledgedTicket>, std::result::Result<Ticket, String>>,
+    ) -> Self {
         Self::TicketAggregation(event)
     }
 }

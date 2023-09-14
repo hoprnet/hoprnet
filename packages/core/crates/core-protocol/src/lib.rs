@@ -1,8 +1,5 @@
-pub mod ticket_aggregation;
 pub mod errors;
-
-
-
+pub mod ticket_aggregation;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

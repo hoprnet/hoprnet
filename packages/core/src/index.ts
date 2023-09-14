@@ -127,6 +127,8 @@ const metric_strategyMaxChannels = create_gauge(
 /// Maximum time to wait for a packet to be pushed to the interaction queue in milliseconds
 const PACKET_QUEUE_TIMEOUT_MILLISECONDS = 15000n
 
+const TICKET_AGGREGATION_TIMEOUT_MILLISECONDS = 10000n
+
 interface NetOptions {
   ip: string
   port: number
@@ -362,6 +364,7 @@ export class Hopr extends EventEmitter {
     log('Constructing the core application and tools')
     let coreApp = new CoreApp(
       new OffchainKeypair(this.packetKeypair.secret()),
+      this.chainKeypair,
       this.db.clone(),
       this.options.networkQualityThreshold,
       heartbeat_cfg,
@@ -800,6 +803,14 @@ export class Hopr extends EventEmitter {
     return addrs.sort(
       this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
     )
+  }
+  
+  /**
+   * Attempts to all tickets in the given channel.
+   * @param channelId id of the channel
+   */
+  public async aggregateTickets(channelId: Hash) {
+    await this.tools.aggregate_tickets(channelId, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
   }
 
   /**
