@@ -20,6 +20,7 @@ lazy_static::lazy_static! {
     static ref EMPTY_TX_HASH: Hash = Hash::default();
 }
 
+/// Redeems all redeemable tickets in all channels.
 pub async fn redeem_all_tickets<Db, F>(
     db: Arc<RwLock<Db>>,
     self_addr: &Address,
@@ -73,6 +74,7 @@ where
     Ok(db.update_acknowledged_ticket(ack_ticket).await?)
 }
 
+/// Redeems all redeemable tickets in the incoming channel from the given counterparty.
 pub async fn redeem_tickets_with_counterparty<Db, F>(
     db: Arc<RwLock<Db>>,
     counterparty: &Address,
@@ -90,6 +92,7 @@ where
     }
 }
 
+/// Redeems all redeemable tickets in the given channel.
 pub async fn redeem_tickets_in_channel<Db, F>(
     db: Arc<RwLock<Db>>,
     channel: &ChannelEntry,
@@ -139,6 +142,8 @@ where
     Ok(())
 }
 
+/// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
+/// Otherwise, the transaction hash of the on-chain redemption is returned.
 pub async fn redeem_ticket<Db, F>(
     db: Arc<RwLock<Db>>,
     mut ack_ticket: AcknowledgedTicket,
@@ -175,7 +180,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::redeem::redeem_all_tickets;
+    use crate::redeem::{redeem_all_tickets, redeem_ticket, redeem_tickets_with_counterparty};
     use async_lock::{Mutex, RwLock};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::random::random_bytes;
@@ -190,43 +195,16 @@ mod tests {
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
-    use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
+    use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::{BinarySerializable, ToHex};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+        static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).unwrap();
     }
 
-    fn mock_ticket(
-        pk: &ChainKeypair,
-        counterparty: &Address,
-        domain_separator: Option<Hash>,
-        challenge: Option<EthereumChallenge>,
-        idx: u32,
-    ) -> Ticket {
-        let win_prob = 1.0f64; // 100 %
-        let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
-        let path_pos = 5u64;
-
-        Ticket::new(
-            counterparty,
-            &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * path_pos.into(),
-                BalanceType::HOPR,
-            ),
-            idx.into(),
-            U256::one(),
-            1.0f64,
-            4u64.into(),
-            challenge.unwrap_or_default(),
-            pk,
-            &domain_separator.unwrap_or_default(),
-        )
-        .unwrap()
-    }
-
-    fn generate_random_ack_ticket(idx: u32) -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(idx: u32, counterparty: &ChainKeypair) -> AcknowledgedTicket {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -234,15 +212,26 @@ mod tests {
         let cp2: CurvePoint = hk2.to_challenge().into();
         let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
 
-        let ticket = mock_ticket(
-            &BOB,
-            &ALICE.public().to_address(),
-            None,
-            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
-            idx,
-        );
+        let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
 
-        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, BOB.public().to_address());
+        let ticket = Ticket::new(
+            &ALICE.public().to_address(),
+            &Balance::new(
+                price_per_packet.divide_f64(1.0f64).unwrap() * 5u64.into(),
+                BalanceType::HOPR,
+            ),
+            idx.into(),
+            U256::one(),
+            1.0f64,
+            4u64.into(),
+            Challenge::from(cp_sum).to_ethereum_challenge(),
+            counterparty,
+            &Hash::default(),
+        )
+        .unwrap();
+
+
+        let unacked_ticket = UnacknowledgedTicket::new(ticket, hk1, counterparty.public().to_address());
         unacked_ticket.acknowledge(&hk2, &ALICE, &Hash::default()).unwrap()
     }
 
@@ -256,17 +245,12 @@ mod tests {
         utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
     }
 
-    #[async_std::test]
-    async fn test_ticket_redeem_flow() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let ticket_count: usize = 3;
-
-        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+    async fn create_channel_with_ack_tickets(rdb: RustyLevelDbShim, ticket_count: usize, counterparty: &ChainKeypair) -> (ChannelEntry, Vec<AcknowledgedTicket>) {
+        let mut inner_db = DB::new(rdb);
         let mut input_tickets = Vec::new();
 
         for i in 0..ticket_count {
-            let ack_ticket = generate_random_ack_ticket(i as u32);
+            let ack_ticket = generate_random_ack_ticket(i as u32, counterparty);
             inner_db
                 .set(to_acknowledged_ticket_key(&ack_ticket), &ack_ticket)
                 .await
@@ -274,9 +258,9 @@ mod tests {
             input_tickets.push(ack_ticket);
         }
 
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, ALICE.public().to_address())));
+        let mut db = CoreEthereumDb::new(inner_db, ALICE.public().to_address());
         let channel = ChannelEntry::new(
-            BOB.public().to_address(),
+            counterparty.public().to_address(),
             ALICE.public().to_address(),
             Balance::zero(BalanceType::HOPR),
             U256::zero(),
@@ -284,21 +268,32 @@ mod tests {
             U256::zero(),
             U256::zero(),
         );
-        db.write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
+        db.update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
             .await
             .unwrap();
-        db.write()
-            .await
-            .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
+        db.set_channels_domain_separator(&Hash::default(), &Snapshot::default())
             .await
             .unwrap();
+
+        (channel, input_tickets)
+    }
+
+    #[async_std::test]
+    async fn test_ticket_redeem_flow() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let rdb = RustyLevelDbShim::new_in_memory();
+
+        let ticket_count = 3;
+
+        let (channel_from_bob, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
+        let (channel_from_charlie, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), ALICE.public().to_address())));
 
         let dummy_tx_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
         let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
-
         let rt_clone = redeemed_tickets.clone();
+
         redeem_all_tickets(
             db.clone(),
             &ALICE.public().to_address(),
@@ -310,28 +305,125 @@ mod tests {
         .await
         .unwrap();
 
-        let db_acks = db.read().await.get_acknowledged_tickets(Some(channel)).await.unwrap();
+        let db_acks_bob = db.read().await.get_acknowledged_tickets(Some(channel_from_bob)).await.unwrap();
+        let db_acks_charlie = db.read().await.get_acknowledged_tickets(Some(channel_from_charlie)).await.unwrap();
 
-        assert_eq!(ticket_count, db_acks.len(), "must have {ticket_count} tickets");
-
+        assert_eq!(2 * ticket_count, db_acks_charlie.len() + db_acks_bob.len(), "must have {ticket_count} tickets from each channel");
         assert!(
-            db_acks.iter().all(|t| match t.status {
+            db_acks_bob.iter().all(|t| match t.status {
                 AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
                 _ => false,
             }),
-            "all tickets must be in the BeingRedeemed state with correct tx hash"
+            "all tickets from Charlie must be in the BeingRedeemed state with correct tx hash"
         );
-
+        assert!(
+            db_acks_charlie.iter().all(|t| match t.status {
+                AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
+                _ => false,
+            }),
+            "all tickets from Bob must be in the BeingRedeemed state with correct tx hash"
+        );
+        assert_eq!(2 * ticket_count, redeemed_tickets.lock().await.len(), "all tickets must make it to on chain redemption");
         assert_eq!(
-            db_acks.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+            db_acks_bob.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
             redeemed_tickets
                 .lock()
                 .await
                 .deref()
                 .iter()
+                .filter(|t| t.signer == BOB.public().to_address())
                 .map(|t| t.ticket.clone())
                 .collect::<Vec<_>>(),
-            "on-chain redeemed tickets must be equal"
+            "all redeemed tickets from Bob must make it to on-chain redemption"
+        );
+        assert_eq!(
+            db_acks_charlie.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+            redeemed_tickets
+                .lock()
+                .await
+                .deref()
+                .iter()
+                .filter(|t| t.signer == CHARLIE.public().to_address())
+                .map(|t| t.ticket.clone())
+                .collect::<Vec<_>>(),
+            "all redeemed tickets from Charlie must make it to on-chain redemption"
+        );
+
+        assert!(redeem_ticket(db.clone(), db_acks_bob[0].clone(), &|_| async { Ok(dummy_tx_hash.to_hex()) })
+            .await.is_err(), "cannot redeem ticket twice");
+        assert!(redeem_ticket(db.clone(), db_acks_charlie[0].clone(), &|_| async { Ok(dummy_tx_hash.to_hex()) })
+            .await.is_err(), "cannot redeem ticket twice");
+
+        // Try to redeem again
+
+        let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
+        let rt_clone = redeemed_tickets.clone();
+
+        redeem_all_tickets(
+            db.clone(),
+            &ALICE.public().to_address(),
+            &|ack: AcknowledgedTicket| async {
+                rt_clone.lock().await.push(ack);
+                Ok(dummy_tx_hash.to_hex())
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(redeemed_tickets.lock().await.is_empty(), "should not send redeem TX again");
+    }
+
+    #[async_std::test]
+    async fn test_ticket_redeem_in_channel() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let rdb = RustyLevelDbShim::new_in_memory();
+
+        let ticket_count = 3;
+
+        let (channel_from_bob, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
+        let (channel_from_charlie, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(DB::new(rdb.clone()), ALICE.public().to_address())));
+
+        let dummy_tx_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+        let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
+        let rt_clone = redeemed_tickets.clone();
+
+        redeem_tickets_with_counterparty(db.clone(), &BOB.public().to_address(), &|ack: AcknowledgedTicket| async {
+            rt_clone.lock().await.push(ack);
+            Ok(dummy_tx_hash.to_hex())
+        }).await.unwrap();
+
+        let db_acks_bob = db.read().await.get_acknowledged_tickets(Some(channel_from_bob)).await.unwrap();
+        let db_acks_charlie = db.read().await.get_acknowledged_tickets(Some(channel_from_charlie)).await.unwrap();
+
+        assert_eq!(2 * ticket_count, db_acks_charlie.len() + db_acks_bob.len(), "must have {ticket_count} tickets from each channel");
+        assert!(
+            db_acks_bob.iter().all(|t| match t.status {
+                AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
+                _ => false,
+            }),
+            "all tickets from Bob must be in the BeingRedeemed state with correct tx hash"
+        );
+        assert!(
+            db_acks_charlie.iter().all(|t| match t.status {
+                AcknowledgedTicketStatus::Untouched => true,
+                _ => false,
+            }),
+            "all tickets from Charlie must be Untouched"
+        );
+        assert_eq!(ticket_count, redeemed_tickets.lock().await.len(), "exactly {ticket_count} tickets must make it to on-chain redemption");
+        assert_eq!(
+            db_acks_bob.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+            redeemed_tickets
+                .lock()
+                .await
+                .deref()
+                .iter()
+                .filter(|t| t.signer == BOB.public().to_address())
+                .map(|t| t.ticket.clone())
+                .collect::<Vec<_>>(),
+            "all redeemed tickets from Bob must make it to on-chain redemption"
         );
     }
 }
