@@ -794,6 +794,41 @@ pub mod tests {
             db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
             announced_account_entry
         );
+
+        let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse().unwrap();
+
+        let address_announcement_dns_log = RawLog {
+            topics: vec![AddressAnnouncementFilter::signature()],
+            data: encode(&[
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::String(test_multiaddr_dns.to_string()),
+            ]),
+        };
+
+        let announced_dns_account_entry = AccountEntry::new(
+            SELF_PRIV_KEY.public().clone(),
+            *SELF_CHAIN_ADDRESS,
+            AccountType::Announced {
+                multiaddr: test_multiaddr_dns,
+                updated_block: 0,
+            },
+        );
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.announcements,
+                0u32,
+                &address_announcement_dns_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            announced_dns_account_entry
+        );
     }
 
     #[async_std::test]
