@@ -32,6 +32,7 @@ fn to_acknowledged_ticket_key(channel_id: &Hash, epoch: u32, index: u64) -> Resu
     utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)
 }
 
+#[inline]
 fn get_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> Result<utils_db::db::Key> {
     to_acknowledged_ticket_key(&ack.ticket.channel_id, ack.ticket.channel_epoch, ack.ticket.index)
 }
