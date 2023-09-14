@@ -516,15 +516,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(ops, true).await
     }
 
-    async fn mark_losing_acked_ticket(
-        &mut self,
-        counterparty: &Address,
-        acked_ticket: &AcknowledgedTicket,
-    ) -> Result<()> {
-        debug!(
-            "marking ticket #{} in channel with {} as losing",
-            acked_ticket.ticket.index, counterparty
-        );
+    async fn mark_losing_acked_ticket(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
+        debug!("marking {acked_ticket} as losing",);
 
         let mut ops = utils_db::db::Batch::default();
 
@@ -535,13 +528,26 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = get_acknowledged_ticket_key(&acked_ticket)?;
         ops.del(key);
 
-        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
-        let balance = self
-            .db
-            .get_or_none::<Balance>(key.clone())
-            .await?
-            .unwrap_or(Balance::zero(BalanceType::HOPR));
-        ops.put(key, balance.sub(&acked_ticket.ticket.amount));
+        if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
+            if c.source == self.me {
+                c.destination
+            } else {
+                c.source
+            }
+        }) {
+            let key = utils_db::db::Key::new_with_prefix(&counterparty, PENDING_TICKETS_COUNT)?;
+            let balance = self
+                .db
+                .get_or_none::<Balance>(key.clone())
+                .await?
+                .unwrap_or(Balance::zero(BalanceType::HOPR));
+            ops.put(key, balance.sub(&acked_ticket.ticket.amount));
+        } else {
+            error!(
+                "could not update losing tickets count: unable to find channel with id {}",
+                acked_ticket.ticket.channel_id
+            )
+        }
 
         self.db.batch(ops, true).await
     }
@@ -1317,15 +1323,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_losing_acked_ticket(
-            &self,
-            counterparty: &Address,
-            ticket: &AcknowledgedTicket,
-        ) -> Result<(), JsValue> {
+        pub async fn mark_losing_acked_ticket(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(counterparty, &ticket.into()).await)
+            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(&ticket.into()).await)
             //}
         }
 

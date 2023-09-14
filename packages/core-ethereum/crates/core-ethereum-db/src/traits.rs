@@ -143,7 +143,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
     /// Mark an acknowledged ticket as losing.
-    async fn mark_losing_acked_ticket(&mut self, counterparty: &Address, ticket: &AcknowledgedTicket) -> Result<()>;
+    async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
     /// Get the total value of all rejected tickets.
     async fn get_rejected_tickets_value(&self) -> Result<Balance>;

@@ -212,26 +212,29 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
 
                 let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share, &self.chain_key, &domain_separator)?;
 
+                // replace the un-acked ticket with acked ticket.
+                self.db
+                    .write()
+                    .await
+                    .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
+                    .await?;
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_ACKED_TICKETS.increment();
+
                 // Check if ticket it a win
                 if ack_ticket.is_winning_ticket(&domain_separator) {
-                    // replace the un-acked ticket with acked ticket.
-                    self.db
-                        .write()
-                        .await
-                        .replace_unack_with_ack(&ack.ack_challenge(), ack_ticket.clone())
-                        .await?;
+                    debug!("{ack_ticket} is a win");
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_WINNING_TICKETS_COUNT.increment();
                 } else {
                     warn!("encountered losing {ack_ticket}");
+                    self.db.write().await.mark_losing_acked_ticket(&ack_ticket).await?;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_LOSING_TICKETS_COUNT.increment();
                 }
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACKED_TICKETS.increment();
 
                 if let Some(emitter) = &mut self.on_acknowledged_ticket {
                     if let Err(e) = emitter.unbounded_send(ack_ticket) {
