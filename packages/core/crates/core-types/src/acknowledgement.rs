@@ -627,11 +627,13 @@ pub mod test {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::types::Response;
+    use crate::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
+    use crate::channels::wasm::Ticket;
+    use core_crypto::types::{Hash, Response};
     use utils_types::primitives::Address;
+    use utils_types::traits::ToHex;
     use wasm_bindgen::prelude::*;
 
-    use crate::channels::wasm::Ticket;
     #[derive(Clone)]
     #[wasm_bindgen]
     pub struct AcknowledgedTicket {
@@ -663,6 +665,20 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "to_string")]
         pub fn _to_string(&self) -> String {
             self.w.to_string()
+        }
+
+        #[wasm_bindgen]
+        pub fn set_redeem_tx_hash(&mut self, tx_hash_str: &str) {
+            if let Ok(tx_hash) = Hash::from_hex(tx_hash_str) {
+                match self.w.status {
+                    BeingRedeemed { .. } => {
+                        if !tx_hash.eq(&Hash::default()) {
+                            self.w.status = BeingRedeemed { tx_hash }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 

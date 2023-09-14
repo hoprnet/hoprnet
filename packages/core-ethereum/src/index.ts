@@ -168,7 +168,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       return this.started
     }
 
-    this.on('ticket:redeemed', this.onTicketRedeemed.bind(this))
+    this.on('ticket:being-redeemed', this.onTicketBeingRedeemed.bind(this))
 
     const _start = async (): Promise<HoprCoreEthereum> => {
       try {
@@ -305,15 +305,20 @@ export default class HoprCoreEthereum extends EventEmitter {
     await redeem_tickets_in_channel(this.db, channel, this.sendTicketRedeemTx.bind(this))
   }
 
-  private async onTicketRedeemed(ackTicket: AcknowledgedTicket) {
-    await this.db.mark_redeemed(ackTicket)
-    log(`full redemption of ${ackTicket.to_string()} completed successfully.`)
+  private async onTicketBeingRedeemed(txHash: string, ackTicket: AcknowledgedTicket) {
+    try {
+      ackTicket.set_redeem_tx_hash(txHash)
+      await this.db.update_acknowledged_ticket(ackTicket)
+      log(`tx hash updated for ${ackTicket.to_string()}`)
+    } catch (e) {
+      log(`could not update ticket redemption TX hash: ${e}`)
+    }
   }
 
   private async sendTicketRedeemTx(ackTicket: AcknowledgedTicket): Promise<String> {
     try {
       return await this.chain.redeemTicket(ackTicket, (txHash: string) => {
-        this.emit('ticket:redeemed', ackTicket)
+        this.emit('ticket:being-redeemed', ackTicket)
         return this.setTxHandler(`channel-updated-${txHash}`, txHash)
       })
     } catch (err) {

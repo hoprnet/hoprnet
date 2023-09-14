@@ -63,7 +63,12 @@ where
             }
         }
         BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
-        BeingRedeemed { .. } => {} // Just let the TX hash to be updated
+        BeingRedeemed { tx_hash: txh } => {
+            // If there's already some hash set for this ticket, do not allow unsetting it
+            if txh != Hash::default() && tx_hash == Hash::default() {
+                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")));
+            }
+        }
     }
 
     ack_ticket.status = BeingRedeemed { tx_hash };
@@ -108,7 +113,7 @@ where
     let mut to_redeem = Vec::new();
     {
         let mut db = db.write().await;
-        let ack_tickets = db.get_acknowledged_tickets(Some(channel.clone())).await?;
+        let ack_tickets = db.get_acknowledged_tickets(Some(*channel)).await?;
         debug!(
             "there are {} acknowledged tickets in channel {channel_id}",
             ack_tickets.len()
@@ -131,7 +136,7 @@ where
     let mut redeemed = 0;
     for (i, ack_ticket) in to_redeem.into_iter().enumerate() {
         let ticket_id = ack_ticket.to_string();
-        if let Err(e) = redeem_ticket(db.clone(), ack_ticket, onchain_tx_sender).await {
+        if let Err(e) = unchecked_ticket_redeem(db.clone(), ack_ticket, onchain_tx_sender).await {
             error!("#{i} failed to redeem {ticket_id}: {e}");
         } else {
             redeemed += 1;
@@ -142,9 +147,7 @@ where
     Ok(())
 }
 
-/// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
-/// Otherwise, the transaction hash of the on-chain redemption is returned.
-pub async fn redeem_ticket<Db, F>(
+async fn unchecked_ticket_redeem<Db, F>(
     db: Arc<RwLock<Db>>,
     mut ack_ticket: AcknowledgedTicket,
     on_chain_tx_sender: impl Fn(AcknowledgedTicket) -> F,
@@ -153,28 +156,36 @@ where
     Db: HoprCoreEthereumDbActions,
     F: futures::Future<Output = std::result::Result<String, String>>,
 {
-    match ack_ticket.status {
-        Untouched => {
-            set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-        }
-        BeingRedeemed { tx_hash } => {
-            // Allow sending TX only if there's no TX hash set
-            if tx_hash != *EMPTY_TX_HASH {
-                return Err(WrongTicketState(ack_ticket.to_string()));
-            }
-        }
-        BeingAggregated { .. } => return Err(WrongTicketState(ack_ticket.to_string())),
-    };
-
+    set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
     debug!("sending {} for on-chain redemption", ack_ticket.ticket);
     match (on_chain_tx_sender)(ack_ticket.clone()).await {
         Ok(tx_hash_str) => {
-            debug!("on-chain redeem tx returned: {tx_hash_str}");
             let tx_hash = Hash::from_hex(&tx_hash_str)?;
-            set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, tx_hash).await?;
+            debug!("{ack_ticket} tx {tx_hash} completed");
+
+            db.write().await.mark_redeemed(&ack_ticket).await?;
+            info!("redemption of {ack_ticket} completed successfully in {tx_hash} !");
             Ok(tx_hash)
         }
         Err(err) => Err(TransactionSubmissionFailed(err)),
+    }
+}
+
+/// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
+/// Otherwise, the transaction hash of the on-chain redemption is returned.
+pub async fn redeem_ticket<Db, F>(
+    db: Arc<RwLock<Db>>,
+    ack_ticket: AcknowledgedTicket,
+    on_chain_tx_sender: impl Fn(AcknowledgedTicket) -> F,
+) -> Result<Hash>
+where
+    Db: HoprCoreEthereumDbActions,
+    F: futures::Future<Output = std::result::Result<String, String>>,
+{
+    if let Untouched = ack_ticket.status {
+        unchecked_ticket_redeem(db, ack_ticket, on_chain_tx_sender).await
+    } else {
+        Err(WrongTicketState(ack_ticket.to_string()))
     }
 }
 
@@ -287,12 +298,13 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_redeem_flow() {
         let _ = env_logger::builder().is_test(true).try_init();
+
+        let ticket_count = 5;
         let rdb = RustyLevelDbShim::new_in_memory();
 
-        let ticket_count = 3;
-
-        let (channel_from_bob, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
-        let (channel_from_charlie, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
+        let (channel_from_bob, bob_tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
+        let (channel_from_charlie, charlie_tickets) =
+            create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -328,31 +340,31 @@ mod tests {
             .unwrap();
 
         assert_eq!(
+            0,
+            db_acks_bob.len(),
+            "no unredeemed tickets should be remaining for Bob"
+        );
+
+        assert_eq!(
+            0,
+            db_acks_charlie.len(),
+            "no unredeemed tickets should be remaining for Charlie"
+        );
+
+        assert_eq!(
             2 * ticket_count,
-            db_acks_charlie.len() + db_acks_bob.len(),
-            "must have {ticket_count} tickets from each channel"
+            db.read().await.get_redeemed_tickets_count().await.unwrap(),
+            "all tickets have to be redeemed"
         );
-        assert!(
-            db_acks_bob.iter().all(|t| match t.status {
-                BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
-                _ => false,
-            }),
-            "all tickets from Charlie must be in the BeingRedeemed state with correct tx hash"
-        );
-        assert!(
-            db_acks_charlie.iter().all(|t| match t.status {
-                BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
-                _ => false,
-            }),
-            "all tickets from Bob must be in the BeingRedeemed state with correct tx hash"
-        );
+
         assert_eq!(
             2 * ticket_count,
             redeemed_tickets.lock().await.len(),
             "all tickets must make it to on chain redemption"
         );
+
         assert_eq!(
-            db_acks_bob.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+            bob_tickets.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
             redeemed_tickets
                 .lock()
                 .await
@@ -363,8 +375,9 @@ mod tests {
                 .collect::<Vec<_>>(),
             "all redeemed tickets from Bob must make it to on-chain redemption"
         );
+
         assert_eq!(
-            db_acks_charlie.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+            charlie_tickets.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
             redeemed_tickets
                 .lock()
                 .await
@@ -375,54 +388,16 @@ mod tests {
                 .collect::<Vec<_>>(),
             "all redeemed tickets from Charlie must make it to on-chain redemption"
         );
-
-        assert!(
-            redeem_ticket(db.clone(), db_acks_bob[0].clone(), &|_| async {
-                Ok(dummy_tx_hash.to_hex())
-            })
-            .await
-            .is_err(),
-            "cannot redeem ticket twice"
-        );
-        assert!(
-            redeem_ticket(db.clone(), db_acks_charlie[0].clone(), &|_| async {
-                Ok(dummy_tx_hash.to_hex())
-            })
-            .await
-            .is_err(),
-            "cannot redeem ticket twice"
-        );
-
-        // Try to redeem again
-
-        let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
-        let rt_clone = redeemed_tickets.clone();
-
-        redeem_all_tickets(
-            db.clone(),
-            &ALICE.public().to_address(),
-            &|ack: AcknowledgedTicket| async {
-                rt_clone.lock().await.push(ack);
-                Ok(dummy_tx_hash.to_hex())
-            },
-        )
-        .await
-        .unwrap();
-
-        assert!(
-            redeemed_tickets.lock().await.is_empty(),
-            "should not send redeem TX again"
-        );
     }
 
     #[async_std::test]
     async fn test_ticket_redeem_in_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
+
+        let ticket_count = 5;
         let rdb = RustyLevelDbShim::new_in_memory();
 
-        let ticket_count = 3;
-
-        let (channel_from_bob, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
+        let (channel_from_bob, bob_tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
         let (channel_from_charlie, _) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &CHARLIE).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
@@ -459,17 +434,17 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            2 * ticket_count,
-            db_acks_charlie.len() + db_acks_bob.len(),
-            "must have {ticket_count} tickets from each channel"
+            ticket_count,
+            db_acks_charlie.len(),
+            "charlie must still have {ticket_count} unredeemed"
         );
-        assert!(
-            db_acks_bob.iter().all(|t| match t.status {
-                BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
-                _ => false,
-            }),
-            "all tickets from Bob must be in the BeingRedeemed state with correct tx hash"
+
+        assert_eq!(
+            0,
+            db_acks_bob.len(),
+            "bob must have all {ticket_count} tickets redeemed"
         );
+
         assert!(
             db_acks_charlie.iter().all(|t| match t.status {
                 Untouched => true,
@@ -477,13 +452,15 @@ mod tests {
             }),
             "all tickets from Charlie must be Untouched"
         );
+
         assert_eq!(
             ticket_count,
             redeemed_tickets.lock().await.len(),
             "exactly {ticket_count} tickets must make it to on-chain redemption"
         );
+
         assert_eq!(
-            db_acks_bob.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+            bob_tickets.iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
             redeemed_tickets
                 .lock()
                 .await
@@ -497,13 +474,13 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_redeem_should_not_work_for_aggregated() {
+    async fn test_redeem_must_not_work_for_tickets_being_aggregated_and_being_redeemed() {
         let _ = env_logger::builder().is_test(true).try_init();
-        let rdb = RustyLevelDbShim::new_in_memory();
 
         let ticket_count = 3;
+        let rdb = RustyLevelDbShim::new_in_memory();
 
-        let (channel_from_bob, tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
+        let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(rdb.clone(), ticket_count, &BOB).await;
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(rdb.clone()),
@@ -511,18 +488,17 @@ mod tests {
         )));
 
         // Make the first ticket unredeemable
-        let mut agg = tickets[0].clone();
-        agg.status = BeingAggregated { start: 0, end: 1 };
-        db.write().await.update_acknowledged_ticket(&agg).await.unwrap();
+        tickets[0].status = BeingAggregated { start: 0, end: 1 };
+        db.write().await.update_acknowledged_ticket(&tickets[0]).await.unwrap();
 
         // Make the second ticket unredeemable
-        let mut agg = tickets[1].clone();
-        agg.status = BeingRedeemed {
+        tickets[1].status = BeingRedeemed {
             tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
         };
-        db.write().await.update_acknowledged_ticket(&agg).await.unwrap();
+        db.write().await.update_acknowledged_ticket(&tickets[1]).await.unwrap();
 
         let dummy_tx_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+
         let redeemed_tickets = Arc::new(Mutex::new(Vec::new()));
         let rt_clone = redeemed_tickets.clone();
 
@@ -548,6 +524,24 @@ mod tests {
                 .map(|t| t.ticket.clone())
                 .collect::<Vec<_>>(),
             "only redeemable tickets must be redeemed"
+        );
+
+        assert!(
+            redeem_ticket(db.clone(), tickets[0].clone(), &|_| async {
+                Ok(dummy_tx_hash.to_hex())
+            })
+            .await
+            .is_err(),
+            "cannot redeem a ticket that's being aggregated"
+        );
+
+        assert!(
+            redeem_ticket(db.clone(), tickets[1].clone(), &|_| async {
+                Ok(dummy_tx_hash.to_hex())
+            })
+            .await
+            .is_err(),
+            "cannot redeem a ticket that's being redeemed"
         );
     }
 }

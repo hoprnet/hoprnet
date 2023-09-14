@@ -65,7 +65,7 @@ impl ChainCalls {
     /// See whether the struct is generating Safe-compliant (returns true)
     /// or legacy transaction payload (returns false).
     pub fn get_use_safe(&self) -> bool {
-        return self.use_safe;
+        self.use_safe
     }
 
     /// Creates the transaction payload to announce a node on-chain.

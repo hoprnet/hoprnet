@@ -1745,7 +1745,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]

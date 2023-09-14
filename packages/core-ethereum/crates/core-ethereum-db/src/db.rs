@@ -1214,6 +1214,15 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
+        pub async fn update_acknowledged_ticket(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.update_acknowledged_ticket(&ticket.into()).await)
+            //}
+        }
+
+        #[wasm_bindgen]
         pub async fn get_neglected_tickets_count(&self) -> Result<usize, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {

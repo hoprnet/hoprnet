@@ -90,9 +90,9 @@ impl Key {
     }
 }
 
-impl Into<Box<[u8]>> for Key {
-    fn into(self) -> Box<[u8]> {
-        self.key
+impl From<Key> for Box<[u8]> {
+    fn from(value: Key) -> Self {
+        value.key
     }
 }
 
