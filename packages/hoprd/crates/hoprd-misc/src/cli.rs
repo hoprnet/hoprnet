@@ -288,32 +288,14 @@ pub struct CliArgs {
     )]
     pub private_key: Option<String>,
 
-    // #[arg(
-    //     long = "allowLocalNodeConnections",
-    //     env = "HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS",
-    //     action = ArgAction::SetTrue,
-    //     help = "Allow connections to other nodes running on localhost",
-    //     default_value_t = crate::config::NetworkOptions::default().allow_local_node_connections
-    // )]
-    // pub allow_local_node_connections: bool,
-
-    // #[arg(
-    //     long = "allowPrivateNodeConnections",
-    //     env = "HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS",
-    //     action = ArgAction::SetTrue,
-    //     help = "Allow connections to other nodes running on private addresses",
-    //     default_value_t = crate::config::NetworkOptions::default().allow_private_node_connections
-    // )]
-    // pub allow_private_node_connections: bool,
-
-    // #[arg(
-    //     long = "maxParallelConnections",
-    //     value_parser = clap::value_parser ! (u32).range(1..),
-    //     value_name = "CONNECTIONS",
-    //     help = "Set maximum parallel connections",
-    //     env = "HOPRD_MAX_PARALLEL_CONNECTIONS"
-    // )]
-    // pub max_parallel_connections: Option<u32>,
+    #[arg(
+        long = "hoprd-inbox-capacity",
+        value_parser = clap::value_parser ! (u32).range(1..),
+        value_name = "INBOX_CAPACITY",
+        help = "Set maximum capacity of the HOPRd inbox",
+        env = "HOPRD_INBOX_CAPACITY"
+    )]
+    pub inbox_capacity: Option<u32>,
 
     #[arg(
         long = "testAnnounceLocalAddresses",

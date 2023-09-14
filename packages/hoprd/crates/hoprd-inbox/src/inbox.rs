@@ -91,7 +91,7 @@ where
         // Push only if there is no tag, or if the tag is not excluded
         let mut db = self.backend.lock().await;
         db.push(payload.application_tag, payload).await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec))
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
 
         true
@@ -105,7 +105,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec))
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
         db.count(tag).await
     }
@@ -119,7 +119,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec))
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
         db.pop(tag).await
     }
@@ -132,7 +132,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec))
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
         db.pop_all(tag).await
     }
@@ -147,11 +147,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_basic_flow() {
-        let cfg = MessageInboxConfiguration {
-            capacity: 4,
-            excluded_tags: vec![2],
-            max_age_sec: 2,
-        };
+        let mut cfg = MessageInboxConfiguration::default();
+        cfg.capacity = 4;
+        cfg.excluded_tags = vec![2];
+        cfg.set_max_age_sec(2);
 
         let mi = MessageInbox::<RingBufferInboxBackend<Tag, ApplicationData>>::new(cfg);
 

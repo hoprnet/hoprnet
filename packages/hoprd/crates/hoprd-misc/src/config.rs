@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use hoprd_inbox::config::MessageInboxConfiguration;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
@@ -64,7 +65,6 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
         }
     }
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum HostType {
@@ -359,6 +359,8 @@ pub struct HoprdConfig {
     #[validate]
     pub db: Db,
     #[validate]
+    inbox: MessageInboxConfiguration,
+    #[validate]
     pub api: Api,
     #[validate]
     pub strategy: StrategyConfig,
@@ -386,6 +388,7 @@ impl Default for HoprdConfig {
             },
             identity: Identity::default(),
             db: Db::default(),
+            inbox: MessageInboxConfiguration::default(),
             api: Api::default(),
             strategy: StrategyConfig::default(),
             heartbeat: HeartbeatConfig::default(),
@@ -430,6 +433,11 @@ impl HoprdConfig {
         cfg.db.data = cli_args.data;
         cfg.db.initialize = cli_args.init;
         cfg.db.force_initialize = cli_args.force_init;
+
+        // inbox
+        if let Some(x) = cli_args.inbox_capacity {
+            cfg.inbox.capacity = x;
+        }
 
         // api
         cfg.api.enable = cli_args.api;
@@ -597,6 +605,7 @@ mod tests {
                 initialize: false,
                 force_initialize: false,
             },
+            inbox: MessageInboxConfiguration::default(),
             api: Api {
                 enable: false,
                 auth: Auth::None,
@@ -649,6 +658,11 @@ db:
   data: /tmp/db
   initialize: false
   force_initialize: false
+inbox:
+  capacity: 512
+  max_age: 900
+  excluded_tags:
+  - 0
 api:
   enable: false
   auth: None
