@@ -189,8 +189,8 @@ mod tests {
     use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed};
-    use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, UnacknowledgedTicket};
+    use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
+    use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
     use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
     use hex_literal::hex;
     use std::ops::Deref;
@@ -334,14 +334,14 @@ mod tests {
         );
         assert!(
             db_acks_bob.iter().all(|t| match t.status {
-                AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
+                BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
                 _ => false,
             }),
             "all tickets from Charlie must be in the BeingRedeemed state with correct tx hash"
         );
         assert!(
             db_acks_charlie.iter().all(|t| match t.status {
-                AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
+                BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
                 _ => false,
             }),
             "all tickets from Bob must be in the BeingRedeemed state with correct tx hash"
@@ -465,14 +465,14 @@ mod tests {
         );
         assert!(
             db_acks_bob.iter().all(|t| match t.status {
-                AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
+                BeingRedeemed { tx_hash } => tx_hash == dummy_tx_hash,
                 _ => false,
             }),
             "all tickets from Bob must be in the BeingRedeemed state with correct tx hash"
         );
         assert!(
             db_acks_charlie.iter().all(|t| match t.status {
-                AcknowledgedTicketStatus::Untouched => true,
+                Untouched => true,
                 _ => false,
             }),
             "all tickets from Charlie must be Untouched"
@@ -510,10 +510,12 @@ mod tests {
             ALICE.public().to_address(),
         )));
 
+        // Make the first ticket unredeemable
         let mut agg = tickets[0].clone();
         agg.status = BeingAggregated { start: 0, end: 1 };
         db.write().await.update_acknowledged_ticket(&agg).await.unwrap();
 
+        // Make the second ticket unredeemable
         let mut agg = tickets[1].clone();
         agg.status = BeingRedeemed {
             tx_hash: Hash::new(&random_bytes::<{ Hash::SIZE }>()),
@@ -535,6 +537,17 @@ mod tests {
             ticket_count - 2,
             redeemed_tickets.lock().await.len(),
             "tickets being redeemed and aggregated must be skipped during redemption"
+        );
+
+        assert_eq!(
+            tickets[2..].iter().map(|t| t.ticket.clone()).collect::<Vec<_>>(),
+            redeemed_tickets
+                .lock()
+                .await
+                .iter()
+                .map(|t| t.ticket.clone())
+                .collect::<Vec<_>>(),
+            "only redeemable tickets must be redeemed"
         );
     }
 }
