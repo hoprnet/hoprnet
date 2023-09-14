@@ -74,7 +74,7 @@ impl AccountEntry {
         match &self.entry_type {
             NotAnnounced => false,
             Announced { multiaddr, .. } => {
-                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "ip6")
+                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "dns4")
                     && multiaddr.protocol_stack().any(|p| p == "tcp")
             }
         }
