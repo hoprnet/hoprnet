@@ -240,7 +240,8 @@ function create_local_safes() {
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
-# $7 = OPTIONAL: additional args to hoprd
+# $7 = node host addr
+# $8 = OPTIONAL: additional args to hoprd
 function setup_node() {
   local api_port=${1}
   local api_token=${2}
@@ -248,7 +249,8 @@ function setup_node() {
   local dir=${4}
   local log=${5}
   local id=${6}
-  local additional_args=${7:-""}
+  local host_addr=${7}
+  local additional_args=${8:-""}
 
   local safe_args
   safe_args="$(<${dir}.safe.args)"
@@ -287,7 +289,7 @@ function setup_node() {
     NODE_OPTIONS="--experimental-wasm-modules" \
     node packages/hoprd/lib/main.cjs \
       --data="${dir}" \
-      --host="127.0.0.1:${node_port}" \
+      --host="${host_addr}:${node_port}" \
       --identity="${id}" \
       --init \
       --password="${password}" \
@@ -377,16 +379,16 @@ reuse_pregenerated_identities
 create_local_safes
 
 #  --- Run nodes --- {{{
-setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
 # use empty auth token to be able to test this in the security tests
-setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce"
-setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "--announce"
-setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections --announce"
-setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections --announce"
+setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "127.0.0.1" "--announce"
+setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "localhost" "--announce"
+setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "127.0.0.1" "--testNoDirectConnections --announce"
+setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "localhost" "--testNoDirectConnections --announce"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --network anvil-localhost2"
+setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "127.0.0.1" "--announce --network anvil-localhost2"
 # node n7 will be the only one NOT registered
-setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce"
+setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "localhost" "--announce"
 # }}}
 
 # DO NOT MOVE THIS STEP
@@ -425,7 +427,7 @@ sleep 30
 log "Restarting node 1 to ensure restart works as expected"
 #  --- Restart check --- {{{
 lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
-setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
 wait_for_regex "${node1_log}" "STARTED NODE"
 # }}}
 
