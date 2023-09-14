@@ -6,10 +6,14 @@ use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
 use core_strategy::{generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy};
 use hex;
-use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use utils_misc::ok_or_str;
+
+#[cfg(not(feature = "wasm"))]
+use crate::network::native::is_dns_address;
+#[cfg(feature = "wasm")]
+use crate::network::wasm::is_dns_address;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use real_base::file::native::read_file;
@@ -27,10 +31,9 @@ pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
-regex!(is_ipv4_host "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}[:]{1}[0-9]{1,6}$");
-
 fn parse_host(s: &str) -> Result<crate::config::Host, String> {
-    if !is_ipv4_host(s) {
+    let host = s.split_once(":").map_or(s, |(h, _)| h);
+    if !(validator::validate_ip_v4(host) || is_dns_address(host)) {
         return Err(format!(
             "Given string {} is not a valid host, Example: {}:{}",
             s,
@@ -39,7 +42,7 @@ fn parse_host(s: &str) -> Result<crate::config::Host, String> {
         ));
     }
 
-    crate::config::Host::from_ipv4_host_string(s)
+    crate::config::Host::from_host_string(s)
 }
 
 /// Parse a hex string private key to a boxed u8 slice
@@ -559,6 +562,7 @@ fn get_data_path(mono_repo_path: &str, maybe_default_network: Option<String>) ->
 
 #[cfg(test)]
 mod tests {
+
     #[test]
     fn parse_private_key() {
         let parsed =
