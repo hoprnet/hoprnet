@@ -12,10 +12,14 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# serde = { version = "1.0", features = ["derive"] }
-# serde_json = "1.0"
+proc-macro-regex = "~1.1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 # serde_bytes = "0.11"
 console_error_panic_hook = { version = "0.1.7", optional = true }
+
+real-base = { workspace = true }
+utils-types = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

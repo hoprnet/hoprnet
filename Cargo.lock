@@ -2902,8 +2902,9 @@ dependencies = [
 
 [[package]]
 name = "hoprd-hoprd"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "clap 4.0.32",
  "console_error_panic_hook",
  "core-ethereum-db",
  "core-ethereum-indexer",
@@ -2915,13 +2916,24 @@ dependencies = [
  "core-path",
  "core-strategy",
  "core-types",
+ "hex",
  "hoprd-inbox",
  "hoprd-keypair",
- "hoprd-misc",
  "js-sys",
+ "proc-macro-regex",
+ "real-base",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "thiserror",
  "utils-log",
  "utils-metrics",
  "utils-misc",
+ "utils-types",
+ "utils-validation",
+ "validator",
  "wasm-bindgen",
  "wasm-opt",
  "wasm-pack",
@@ -2976,36 +2988,6 @@ dependencies = [
  "utils-misc",
  "utils-types",
  "uuid 1.4.1",
- "wasm-bindgen",
- "wasm-opt",
- "wasm-pack",
-]
-
-[[package]]
-name = "hoprd-misc"
-version = "0.2.1"
-dependencies = [
- "clap 4.0.32",
- "console_error_panic_hook",
- "core-ethereum-misc",
- "core-misc",
- "core-network",
- "core-strategy",
- "hex",
- "hoprd-inbox",
- "js-sys",
- "proc-macro-regex",
- "real-base",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "serde_yaml",
- "tempfile",
- "thiserror",
- "utils-log",
- "utils-misc",
- "utils-types",
- "validator",
  "wasm-bindgen",
  "wasm-opt",
  "wasm-pack",
@@ -6530,6 +6512,11 @@ name = "utils-validation"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "proc-macro-regex",
+ "real-base",
+ "serde",
+ "serde_json",
+ "utils-types",
  "wasm-opt",
  "wasm-pack",
 ]

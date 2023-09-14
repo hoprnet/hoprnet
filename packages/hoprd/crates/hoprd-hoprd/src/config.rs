@@ -12,9 +12,9 @@ use core_strategy::config::StrategyConfig;
 use utils_types::primitives::Address;
 
 #[cfg(not(feature = "wasm"))]
-use crate::network::native::is_dns_address;
+use utils_validation::network::native::is_dns_address;
 #[cfg(feature = "wasm")]
-use crate::network::wasm::is_dns_address;
+use utils_validation::network::wasm::is_dns_address;
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3001;

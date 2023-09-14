@@ -13,9 +13,9 @@ use serde_json;
 use utils_misc::ok_or_str;
 
 #[cfg(not(feature = "wasm"))]
-use crate::network::native::is_dns_address;
+use utils_validation::network::native::is_dns_address;
 #[cfg(feature = "wasm")]
-use crate::network::wasm::is_dns_address;
+use utils_validation::network::wasm::is_dns_address;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use real_base::file::native::read_file;
