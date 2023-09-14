@@ -36,7 +36,6 @@ pub trait InboxBackend<T: Copy + Default, M> {
     async fn purge(&mut self, older_than_ts: Duration);
 }
 
-
 /// Represents a thread-safe message inbox of messages of type `M`
 /// This type is thin frontend over `InboxBackend` using 16-bit unsigned integer tags.
 /// Each operation also performs `purge` of the backend.

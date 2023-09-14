@@ -5,11 +5,10 @@ pub mod generic;
 pub mod passive;
 pub mod promiscuous;
 
-
 pub enum Strategies {
     Passive,
     Generic,
-    Promiscuous
+    Promiscuous,
 }
 
 impl FromStr for Strategies {
@@ -20,7 +19,7 @@ impl FromStr for Strategies {
             "passive" => Ok(Strategies::Passive),
             "generic" => Ok(Strategies::Generic),
             "promiscuous" => Ok(Strategies::Promiscuous),
-            _ => Err(format!("No such strategy exists: {}", s))
+            _ => Err(format!("No such strategy exists: {}", s)),
         }
     }
 }

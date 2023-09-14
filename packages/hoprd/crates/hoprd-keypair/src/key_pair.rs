@@ -253,11 +253,7 @@ impl HoprKeys {
             } else {
                 HoprKeys::random()
             };
-            keys.write_eth_keystore(
-                &opts.id_path,
-                &opts.password,
-                opts.use_weak_crypto.unwrap_or(false),
-            )?;
+            keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?;
 
             return Ok(keys);
         }
@@ -267,11 +263,7 @@ impl HoprKeys {
                 Ok((keys, needs_migration)) => {
                     info!("migration needed = {}", needs_migration);
                     if needs_migration {
-                        keys.write_eth_keystore(
-                            &opts.id_path,
-                            &opts.password,
-                            opts.use_weak_crypto.unwrap_or(false),
-                        )?
+                        keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?
                     }
                     return Ok(keys);
                 }
@@ -287,11 +279,7 @@ impl HoprKeys {
                 &opts.id_path
             );
             let keys = HoprKeys::random();
-            keys.write_eth_keystore(
-                &opts.id_path,
-                &opts.password,
-                opts.use_weak_crypto.unwrap_or(false),
-            )?;
+            keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?;
 
             return Ok(keys);
         }

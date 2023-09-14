@@ -27,10 +27,8 @@ use gloo_timers::future::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
+use crate::constants::{DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD};
 use crate::ping::Pinging;
-use crate::constants::{
-    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_THRESHOLD, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE
-};
 
 /// Configuration of the Heartbeat
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -130,9 +128,15 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             let peers = self.external_api.get_peers(from_timestamp).await;
 
             // random timeout to avoid network sync:
-            let this_round_planned_duration_in_ms: u64 = self.rng
+            let this_round_planned_duration_in_ms: u64 = self
+                .rng
                 .gen_range(
-                    self.config.interval..self.config.interval.checked_add(self.config.variance.max(1)).unwrap_or(u64::MAX),
+                    self.config.interval
+                        ..self
+                            .config
+                            .interval
+                            .checked_add(self.config.variance.max(1))
+                            .unwrap_or(u64::MAX),
                 )
                 .into();
 
@@ -153,7 +157,7 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             let this_round_actual_duration_in_ms = current_timestamp().checked_sub(start).unwrap_or(0u64);
             if this_round_actual_duration_in_ms < this_round_planned_duration_in_ms {
                 let time_to_wait_for_next_round = this_round_planned_duration_in_ms - this_round_actual_duration_in_ms;
-                
+
                 debug!("Heartbeat sleeping for: {}ms", time_to_wait_for_next_round);
                 sleep(std::time::Duration::from_millis(time_to_wait_for_next_round)).await
             }

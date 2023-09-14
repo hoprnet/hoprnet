@@ -1,11 +1,10 @@
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
-use serde::{Serialize, Deserialize};
 use validator::{Validate, ValidationError};
 
 use core_types::protocol::{Tag, DEFAULT_APPLICATION_TAG};
-
 
 pub fn validate_is_power_of_two(value: u32) -> Result<(), ValidationError> {
     if (value & (value - 1)) != 0 {
@@ -26,7 +25,7 @@ pub struct MessageInboxConfiguration {
     pub capacity: u32,
     /// Maximum age of a message held in the inbox until it is purged.
     #[serde_as(as = "DurationSeconds<u64>")]
-    max_age: Duration,          // TODO: with the removal of wasm-bindgen this value can be public
+    max_age: Duration, // TODO: with the removal of wasm-bindgen this value can be public
     /// List of tags that are excluded on `push`.
     pub excluded_tags: Vec<Tag>,
 }
@@ -52,5 +51,3 @@ impl MessageInboxConfiguration {
         self.max_age = Duration::from_secs(age)
     }
 }
-
-

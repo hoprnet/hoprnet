@@ -6,7 +6,7 @@ use std::time::Duration;
 use libp2p_identity::PeerId;
 
 use multiaddr::Multiaddr;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use validator::Validate;
 

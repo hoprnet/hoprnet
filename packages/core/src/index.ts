@@ -434,10 +434,10 @@ export class Hopr extends EventEmitter {
     // at this point the values were parsed and validated already
     if (this.cfg.host.is_ipv4()) {
       mas.push(multiaddr(`/ip4/${this.cfg.host.address()}/tcp/${this.cfg.host.port}`))
-    } else if (this.cfg.host.is_domain() ) {
+    } else if (this.cfg.host.is_domain()) {
       mas.push(multiaddr(`/dns4/${this.cfg.host.address()}/tcp/${this.cfg.host.port}`))
     } else {
-      new Error("Unknown format specified for host")
+      new Error('Unknown format specified for host')
     }
 
     return mas
@@ -719,9 +719,7 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
   }
 
   /**
@@ -734,9 +732,7 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
   }
 
   /**
@@ -901,9 +897,7 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
   }
 
   /*

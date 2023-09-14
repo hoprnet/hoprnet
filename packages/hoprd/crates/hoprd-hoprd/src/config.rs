@@ -6,10 +6,7 @@ use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
-use core_network::{
-    heartbeat::HeartbeatConfig,
-    network::NetworkConfig
-};
+use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
 use core_strategy::config::StrategyConfig;
 use utils_types::primitives::Address;
 
@@ -71,7 +68,7 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum HostType {
     IPv4(String),
-    Domain(String)
+    Domain(String),
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -90,7 +87,7 @@ impl Host {
     pub fn is_ipv4(&self) -> bool {
         match &self.address {
             HostType::IPv4(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -98,7 +95,7 @@ impl Host {
     pub fn is_domain(&self) -> bool {
         match &self.address {
             HostType::Domain(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -113,7 +110,10 @@ impl Host {
 
 impl Default for Host {
     fn default() -> Self {
-        Self { address: HostType::IPv4("127.0.0.1".to_owned()), port: 0 }
+        Self {
+            address: HostType::IPv4("127.0.0.1".to_owned()),
+            port: 0,
+        }
     }
 }
 
@@ -213,7 +213,6 @@ impl Default for HealthCheck {
         }
     }
 }
-
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
@@ -439,10 +438,10 @@ impl HoprdConfig {
             cfg.api.auth = Auth::Token(x);
         };
         if let Some(x) = cli_args.api_host {
-            cfg.api.host.address = if validator::validate_ip_v4(x.as_str()) { 
-                HostType::IPv4(x) 
+            cfg.api.host.address = if validator::validate_ip_v4(x.as_str()) {
+                HostType::IPv4(x)
             } else {
-                HostType::Domain(x) 
+                HostType::Domain(x)
             }
         };
         if let Some(x) = cli_args.api_port {

@@ -15,6 +15,8 @@ use multiaddr::Multiaddr;
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 
 use core_ethereum_db::db::CoreEthereumDb;
+use core_mixer::mixer::{Mixer, MixerConfig};
+use core_network::network::NetworkConfig;
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
@@ -24,8 +26,6 @@ use core_network::{
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
 use utils_log::{error, info};
-use core_mixer::mixer::{Mixer, MixerConfig};
-use core_network::network::NetworkConfig;
 
 use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;

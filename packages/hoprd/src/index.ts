@@ -20,11 +20,7 @@ import {
   ApplicationData,
   MessageInboxConfiguration
 } from '@hoprnet/hopr-utils'
-import {
-  Health,
-  createHoprNode,
-  type Hopr,
-} from '@hoprnet/hopr-core'
+import { Health, createHoprNode, type Hopr } from '@hoprnet/hopr-core'
 
 import {
   parse_cli_arguments,
@@ -74,7 +70,6 @@ const metric_version = create_multi_gauge('hoprd_mgauge_version', 'Executed vers
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
 const version = get_package_version(packageFile)
 const on_dappnode = (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true'
-
 
 // Parse the CLI arguments and return the processed object.
 // This function may exit the calling process entirely if an error is
