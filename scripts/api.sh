@@ -211,7 +211,8 @@ api_ping() {
   local peer_id="${2}"
   local assertion="${3}"
 
-  api_call "${origin}" "/peers/${peer_id}/ping" "POST" "{}" "${assertion}" 600
+  # use 60sec step time to accomodate ping timeouts
+  api_call "${origin}" "/peers/${peer_id}/ping" "POST" "{}" "${assertion}" 600 60
 }
 
 # $1 = node api endpoint
