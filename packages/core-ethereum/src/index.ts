@@ -315,10 +315,10 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  private async sendTicketRedeemTx(ackTicket: AcknowledgedTicket): Promise<String> {
+  private async sendTicketRedeemTx(ackTicket: AcknowledgedTicket): Promise<string> {
     try {
       return await this.chain.redeemTicket(ackTicket, (txHash: string) => {
-        this.emit('ticket:being-redeemed', ackTicket)
+        this.emit('ticket:being-redeemed', txHash, ackTicket)
         return this.setTxHandler(`channel-updated-${txHash}`, txHash)
       })
     } catch (err) {

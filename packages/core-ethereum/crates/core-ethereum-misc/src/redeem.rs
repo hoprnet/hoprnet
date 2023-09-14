@@ -25,7 +25,7 @@ pub async fn redeem_all_tickets<Db, F>(
     db: Arc<RwLock<Db>>,
     self_addr: &Address,
     onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F,
-) -> Result<()>
+) -> Result<usize>
 where
     Db: HoprCoreEthereumDbActions,
     F: futures::Future<Output = std::result::Result<String, String>>,
@@ -36,14 +36,22 @@ where
         incoming_channels.len()
     );
 
-    for channel in incoming_channels.iter() {
+    let redeemed = futures::future::join_all(incoming_channels.iter().map(|channel| async {
         let channel_id = channel.get_id();
-        if let Err(e) = redeem_tickets_in_channel(db.clone(), channel, onchain_tx_sender).await {
-            error!("failed to redeem tickets in channel {channel_id}: {e}");
+        let redeem_res = redeem_tickets_in_channel(db.clone(), channel, onchain_tx_sender).await;
+        match redeem_res {
+            Ok(count) => count,
+            Err(e) => {
+                error!("failed to redeem tickets in channel {channel_id}: {e}");
+                0
+            }
         }
-    }
+    }))
+    .await
+    .into_iter()
+    .sum();
 
-    Ok(())
+    Ok(redeemed)
 }
 
 async fn set_being_redeemed<Db>(db: &mut Db, ack_ticket: &mut AcknowledgedTicket, tx_hash: Hash) -> Result<()>
@@ -84,7 +92,7 @@ pub async fn redeem_tickets_with_counterparty<Db, F>(
     db: Arc<RwLock<Db>>,
     counterparty: &Address,
     onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F,
-) -> Result<()>
+) -> Result<usize>
 where
     Db: HoprCoreEthereumDbActions,
     F: futures::Future<Output = std::result::Result<String, String>>,
@@ -102,24 +110,40 @@ pub async fn redeem_tickets_in_channel<Db, F>(
     db: Arc<RwLock<Db>>,
     channel: &ChannelEntry,
     onchain_tx_sender: &impl Fn(AcknowledgedTicket) -> F,
-) -> Result<()>
+) -> Result<usize>
 where
     Db: HoprCoreEthereumDbActions,
     F: futures::Future<Output = std::result::Result<String, String>>,
 {
     let channel_id = channel.get_id();
 
+    let count_redeemable_tickets = db
+        .read()
+        .await
+        .get_acknowledged_tickets(Some(*channel))
+        .await?
+        .iter()
+        .filter(|t| t.status == Untouched)
+        .count();
+    info!("there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed");
+
+    // Return fast if there are no redeemable tickets
+    if count_redeemable_tickets == 0 {
+        return Ok(0);
+    }
+
     // Keep holding the DB write lock until we mark all the eligible tickets as BeginRedeemed
     let mut to_redeem = Vec::new();
     {
+        // Lock the database and retrieve again all the redeemable tickets
         let mut db = db.write().await;
-        let ack_tickets = db.get_acknowledged_tickets(Some(*channel)).await?;
-        debug!(
-            "there are {} acknowledged tickets in channel {channel_id}",
-            ack_tickets.len()
-        );
+        let redeemable = db
+            .get_acknowledged_tickets(Some(*channel))
+            .await?
+            .into_iter()
+            .filter(|t| Untouched == t.status);
 
-        for mut avail_to_redeem in ack_tickets.into_iter().filter(|t| Untouched == t.status) {
+        for mut avail_to_redeem in redeemable {
             if let Err(e) = set_being_redeemed(db.deref_mut(), &mut avail_to_redeem, *EMPTY_TX_HASH).await {
                 error!("failed to update state of {}: {e}", avail_to_redeem.ticket)
             } else {
@@ -133,18 +157,22 @@ where
         to_redeem.len()
     );
 
-    let mut redeemed = 0;
-    for (i, ack_ticket) in to_redeem.into_iter().enumerate() {
+    let redeemed = futures::future::join_all(to_redeem.into_iter().map(|ack_ticket| async {
         let ticket_id = ack_ticket.to_string();
         if let Err(e) = unchecked_ticket_redeem(db.clone(), ack_ticket, onchain_tx_sender).await {
-            error!("#{i} failed to redeem {ticket_id}: {e}");
+            error!("failed to redeem {ticket_id}: {e}");
+            false
         } else {
-            redeemed += 1;
+            true
         }
-    }
+    }))
+    .await
+    .into_iter()
+    .filter(|r| *r)
+    .count();
 
-    info!("{redeemed} tickets have been sent for redeeming in channel {channel_id}");
-    Ok(())
+    info!("{redeemed} tickets have been redeemed in channel {channel_id}");
+    Ok(redeemed)
 }
 
 async fn unchecked_ticket_redeem<Db, F>(
