@@ -197,8 +197,8 @@ api_redeem_tickets() {
 # $3 = assertion
 api_get_tickets_in_channel() {
   local node_api="${1}"
-  local channel id="${2}"
-  local assertion="${3:-"counterparty"}"
+  local channel_id="${2}"
+  local assertion="${3:-"signature"}"
 
   api_call "${node_api}" "/channels/${channel_id}/tickets" "GET" "" "${assertion}" 600
 }
@@ -297,12 +297,12 @@ api_open_channel() {
   local destination_id="${2}"
   local source_api="${3}"
   local destination_address="${4}"
-  local amount="${5:-100000000000000000000}"
+  local amount="${5:-1000000000000000000000}"
   local result
 
-  log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
-  log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
+  #log "Node ${source_id} open channel to Node ${destination_id}"
+  api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30
+  #log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
 # $1 = node api address (origin)

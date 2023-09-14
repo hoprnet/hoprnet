@@ -319,6 +319,8 @@ log "Waiting for nodes to finish sending 1 hop messages"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
+sleep 2
+
 log "Node 2 should now have a ticket"
 result=$(api_get_ticket_statistics "${api2}" "\"winProportion\":1")
 log "-- ${result}"
@@ -373,34 +375,39 @@ test_redeem_in_specific_channel() {
   local second_node_id="${2}"
   local node_api="${3}"
   local second_node_api="${4}"
+  local expected_tickets="3"
 
   peer_id=$(get_hopr_address ${api_token}@${node_api})
   second_node_addr=$(get_native_address ${api_token}@${second_node_api})
 
-  api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}"
+  channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}")
+  channel_id=$(echo "${channel_info}" | jq -r '.channelId')
+  log "Redeem in channel: Opened channel from node ${node_id} to ${second_node_id}: ${channel_id}"
 
-  for i in `seq 1 3`; do
-    log "Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "hello, world 1 self" "${second_peer_id}"
+  second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
+
+  for i in `seq 1 ${expected_tickets}`; do
+    log "Redeem in channel: Node ${node_id} send 1 hop message to self via node ${second_node_id}"
+    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "redeem: hello, world 1 self" "${second_peer_id}"
   done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
   sleep 2
-  ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${peer_id} | jq '. | length')
-  [[ "${ticket_amount}" != "3" ]] && { msg "Ticket amount is different than expected: ${ticket_amount} != 3"; exit 1; }
+  ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
+  [[ "${ticket_amount}" != "${expected_tickets}" ]] && { msg "Ticket amount ${ticket_amount} is different than expected ${expected_tickets}"; exit 1; }
 
-  api_redeem_tickets_in_channel ${second_node_api} ${peer_id}
+  api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
 
-  api_get_tickets_in_channel ${second_node_api} ${peer_id} "TICKETS_NOT_FOUND"
+  api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
 
-  api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_peer_id}" "outgoing"
-  echo "all good"
+  api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
+  echo "Redeem in channel test passed"
 }
 
-echo "!!! Skipping ticket redemption in specific channel tests until fixed !!!"
-# FIXME: re-enable when ticket redemption in channel works
-# test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
+log "Test redeeming in a specific channel"
+test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
 
+log "Test redeeming all tickets"
 redeem_tickets "2" "${api2}" & jobs+=( "$!" )
 redeem_tickets "3" "${api2}" & jobs+=( "$!" )
 redeem_tickets "4" "${api2}" & jobs+=( "$!" )
