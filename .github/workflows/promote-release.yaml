@@ -78,3 +78,4 @@ jobs:
             echo "Tagging ${image}:${{ github.event.inputs.release_name }}"
             gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_version_tag} ${docker_registry}/${image}:${{ github.event.inputs.release_name }}
           done
+
