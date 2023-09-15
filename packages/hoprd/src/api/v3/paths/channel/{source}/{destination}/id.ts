@@ -1,19 +1,15 @@
 import type { Operation } from 'express-openapi'
-import { STATUS_CODES } from '../../../utils.js'
-import type { Hopr } from '@hoprnet/hopr-core'
-import { Hash, stringToU8a } from '@hoprnet/hopr-utils'
+import { STATUS_CODES } from '../../../../utils.js'
+import { generate_channel_id, Address, stringToU8a } from '@hoprnet/hopr-utils'
 
-const POST: Operation = [
+const GET: Operation = [
   async (req, res, _next) => {
-    const { node }: { node: Hopr } = req.context
-    const channelIdString = req.body.channelId
+    const { source, destination } = req.params
 
     try {
-      let channel_id = Hash.deserialize(stringToU8a(channelIdString))
+      let channel_id = generate_channel_id(Address.deserialize(stringToU8a(source)), Address.deserialize(stringToU8a(destination))).to_hex()
 
-      console.log(`about to aggregate tickets`)
-      await node.aggregateTickets(channel_id)
-      return res.status(204).send()
+      return res.status(204).send(channel_id)
     } catch (err) {
       return res
         .status(422)
@@ -22,14 +18,13 @@ const POST: Operation = [
   }
 ]
 
-POST.apiDoc = {
-  description:
-    'Takes all acknowledged and winning tickets from the given channel (if any) and aggregates them into a single ticket. Requires cooperation of the ticket issuer.',
+GET.apiDoc = {
+  description: 'Converts two native addresses into a channel_id',
   tags: ['Tickets'],
-  operationId: 'ticketsRedeemTickets',
+  operationId: 'channelId',
   responses: {
     '204': {
-      description: 'Tickets redeemed succesfully.'
+      description: 'ChannelId'
     },
     '401': {
       $ref: '#/components/responses/Unauthorized'
@@ -55,4 +50,4 @@ POST.apiDoc = {
   }
 }
 
-export default { POST }
+export default { GET }
