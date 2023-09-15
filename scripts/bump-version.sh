@@ -33,5 +33,7 @@ for package in "${versioned_packages[@]}"; do
   mv package.json.new package.json
   cd "${mydir}/.."
 done
+
+# Update Rust constant
 sed -i'.original' 's/const APP_VERSION.*/const APP_VERSION: \&str = "'${new_version}'";/' ${mydir}/../packages/core/crates/core-hopr/src/constants.rs 
 rm ${mydir}/../packages/core/crates/core-hopr/src/constants.rs.original
