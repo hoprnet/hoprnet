@@ -40,6 +40,8 @@ COPY scripts/toolchain/install-toolchain.sh ./scripts/toolchain
 # Make sure that Rust toolchain utilities can be found
 ENV PATH=${PATH}:${HOME}/.cargo/bin:/app/hoprnet-toolchain/.foundry/bin
 
+RUN sleep 99999999999999
+
 # Install foundry
 RUN make install-foundry
 
