@@ -207,6 +207,7 @@ api_redeem_tickets() {
 # $2 = channel id
 api_aggregate_tickets() {
   local origin=${1:-localhost:3001}
+  local channel_id="${2}"
 
   log "aggregating tickets in channel ${channel_id}"
   api_call "${origin}" "/tickets/${channel_id}/aggregate" "POST" "" "" 600
