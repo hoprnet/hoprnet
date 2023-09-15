@@ -299,7 +299,11 @@ api_open_channel() {
   local source_api="${3}"
   local destination_address="${4}"
   local amount="${5:-1000000000000000000000}"
-  local result
+  local result balances hopr_balance
+
+  balances=$(api_get_balances ${api1})
+  hopr_balance=$(echo ${balances} | jq -r .safeHopr)
+  log "Safe balance of node ${source_api} before opening new channel: ${hopr_balance} weiHOPR, need ${amount} weiHOPR"
 
   #log "Node ${source_id} open channel to Node ${destination_id}"
   api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30

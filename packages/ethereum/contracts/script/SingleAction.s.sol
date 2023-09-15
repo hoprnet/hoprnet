@@ -1128,11 +1128,19 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
             if (senderHoprTokenBalance >= hoprTokenToTransfer) {
                 // call transfer
-                (bool successTransfserTokens,) = hoprTokenContractAddress.call(
+                (bool successTransferTokens,) = hoprTokenContractAddress.call(
                     abi.encodeWithSignature("transfer(address,uint256)", recipient, hoprTokenToTransfer)
                 );
-                if (!successTransfserTokens) {
+                if (!successTransferTokens) {
                     emit log_string("Cannot transfer HOPR tokens to the recipient");
+                } else {
+                    emit log_string(
+                        string(
+                            abi.encodePacked(
+                                "Transferred ", vm.toString(hoprTokenToTransfer), " weiHOPR to ", vm.toString(recipient)
+                            )
+                        )
+                    );
                 }
             } else {
                 // if transfer cannot be called, try minting token as a minter
@@ -1151,10 +1159,30 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                         "mint(address,uint256,bytes,bytes)", recipient, hoprTokenToTransfer, hex"00", hex"00"
                     )
                 );
+                emit log_string(
+                    string(
+                        abi.encodePacked(
+                            "Minted ", vm.toString(hoprTokenToTransfer), " weiHOPR to ", vm.toString(recipient)
+                        )
+                    )
+                );
+
                 if (!successMintTokens) {
                     emit log_string("Cannot mint HOPR tokens to the recipient");
                 }
             }
+        } else {
+            emit log_string(
+                string(
+                    abi.encodePacked(
+                        "Skipping HOPR funding, balance ",
+                        vm.toString(recipientTokenBalance),
+                        " weiHOPR > requested funds ",
+                        vm.toString(hoprTokenAmountInWei),
+                        " weiHOPR"
+                    )
+                )
+            );
         }
     }
 }
