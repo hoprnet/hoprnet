@@ -169,7 +169,6 @@ The process of closing a release consists of building, tagging and publishing th
 
 The process of promoting the named release (bratislava, providence, etc) consists of creating or updating a given ${RELEASE_NAME} tag, branch and artifacts based on the recently closed released. This process should be executed after the closure of release candidates only or the first minor version (X.X.0).
 
-
 1. Execute the manual workflow named [Promote Release](https://github.com/hoprnet/hoprnet/actions/workflows/promote-release.yaml) specifying the name of the release and the tag you want to bind it
 2. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
