@@ -380,7 +380,7 @@ test_redeem_in_specific_channel() {
   peer_id=$(get_hopr_address ${api_token}@${node_api})
   second_node_addr=$(get_native_address ${api_token}@${second_node_api})
 
-  channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "${amount}")
+  channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}")
   channel_id=$(echo "${channel_info}" | jq -r '.channelId')
   log "Redeem in channel: Opened channel from node ${node_id} to ${second_node_id}: ${channel_id}"
 
@@ -392,7 +392,7 @@ test_redeem_in_specific_channel() {
   done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
-  sleep 2
+  sleep 5
   ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
   [[ "${ticket_amount}" != "${expected_tickets}" ]] && { msg "Ticket amount ${ticket_amount} is different than expected ${expected_tickets}"; exit 1; }
 
