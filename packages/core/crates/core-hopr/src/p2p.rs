@@ -28,7 +28,7 @@ pub enum Inputs {
     ManualPing(api::ManualPingChallenge),
     NetworkUpdate(NetworkEvent),
     Message(MsgProcessed),
-    TicketAggregation(TicketAggregationProcessed),
+    TicketAggregation(TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>>),
     Acknowledgement(AckProcessed),
     Indexer(IndexerProcessed),
 }
@@ -63,8 +63,8 @@ impl From<MsgProcessed> for Inputs {
     }
 }
 
-impl From<TicketAggregationProcessed> for Inputs {
-    fn from(value: TicketAggregationProcessed) -> Self {
+impl From<TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>>> for Inputs {
+    fn from(value: TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>>) -> Self {
         Self::TicketAggregation(value)
     }
 }
@@ -88,7 +88,7 @@ pub(crate) async fn p2p_loop(
     indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
     pkt_interactions: PacketInteraction,
-    ticket_aggregation_interactions: TicketAggregationInteraction,
+    ticket_aggregation_interactions: TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>>,
     heartbeat_requests: api::HeartbeatRequester,
     heartbeat_responds: api::HeartbeatResponder,
     manual_ping_requests: api::ManualPingRequester,
@@ -133,10 +133,6 @@ pub(crate) async fn p2p_loop(
     let mut active_manual_pings: HashSet<libp2p_request_response::RequestId> = HashSet::new();
     let mut active_aggregation_requests: HashMap<libp2p_request_response::RequestId, TicketAggregationFinalizer> =
         HashMap::new();
-    let mut handling_aggregation_requests: HashMap<
-        libp2p_request_response::RequestId,
-        ResponseChannel<Result<Ticket, String>>,
-    > = HashMap::new();
 
     let mut allowed_peers: HashSet<PeerId> = HashSet::new();
 
@@ -206,14 +202,11 @@ pub(crate) async fn p2p_loop(
                         // TODO: add some timeout to prevent memory leaks
                         active_aggregation_requests.insert(request_id, finalizer);
                     },
-                    TicketAggregationProcessed::Reply(peer, ticket, request_id) => {
-                        match handling_aggregation_requests.remove(&request_id) {
-                            Some(response_channel) => if let Err(_) = swarm.behaviour_mut().ticket_aggregation.send_response(response_channel, ticket) {
-                                error!("Ticket aggregation: Failed send reply to {}", peer);
-                            },
-                            None => error!("Ticket aggregation: response channel already used")
-                        }
+                    TicketAggregationProcessed::Reply(peer, ticket, response) => {
+                        if let Err(_) = swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket) {
+                            error!("Ticket aggregation: Failed send reply to {}", peer);
 
+                        }
                     },
                     TicketAggregationProcessed::Receive(_peer, _ticket) => {
                         // Nothing to do here
@@ -347,13 +340,8 @@ pub(crate) async fn p2p_loop(
                     },
                 })) => {
                     info!("Ticket aggregation protocol: Received an aggregation request {} from {}", request_id, peer);
-                    match aggregation_writer.receive_aggregation_request(peer, request, request_id) {
-                        Err(e) => {
-                            debug!("Aggregation protocol: Failed to aggregate tickets for {} with an error: {}", peer, e);
-                        },
-                        Ok(()) => {
-                            handling_aggregation_requests.insert(request_id, channel);
-                        }
+                    if let Err(e) = aggregation_writer.receive_aggregation_request(peer, request, channel) {
+                        debug!("Aggregation protocol: Failed to aggregate tickets for {} with an error: {}", peer, e);
                     }
                 },
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p_request_response::Event::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::Message {

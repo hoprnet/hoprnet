@@ -20,8 +20,9 @@ use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
 use core_protocol::ticket_aggregation::{TicketAggregationActions, TicketAggregationInteraction};
-use core_types::protocol::TagBloomFilter;
+use core_types::{channels::Ticket, protocol::TagBloomFilter};
 use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
+use libp2p::request_response::ResponseChannel;
 use multiaddr::Multiaddr;
 use std::{sync::Arc, time::Duration};
 use utils_log::{error, info};
@@ -39,7 +40,7 @@ pub struct HoprTools {
     network: adaptors::network::wasm::WasmNetwork,
     indexer: adaptors::indexer::WasmIndexerInteractions,
     pkt_sender: PacketActions,
-    ticket_aggregate_actions: TicketAggregationActions,
+    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>>,
 }
 
 #[cfg(feature = "wasm")]
@@ -50,7 +51,7 @@ impl HoprTools {
         change_notifier: Sender<NetworkEvent>,
         indexer: adaptors::indexer::WasmIndexerInteractions,
         pkt_sender: PacketActions,
-        ticket_aggregate_actions: TicketAggregationActions,
+        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>>,
     ) -> Self {
         Self {
             ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),

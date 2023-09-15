@@ -22,7 +22,6 @@ use futures::{
     pin_mut,
 };
 use futures_lite::stream::{Stream, StreamExt};
-use libp2p::request_response::RequestId;
 use libp2p_identity::PeerId;
 use std::{pin::Pin, sync::Arc, task::Poll};
 use utils_log::{debug, error, warn};
@@ -54,17 +53,17 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 
 /// The input to the processor background pipeline
 #[derive(Debug)]
-pub enum TicketAggregationToProcess {
+pub enum TicketAggregationToProcess<T> {
     ToReceive(PeerId, std::result::Result<Ticket, String>),
-    ToProcess(PeerId, Vec<AcknowledgedTicket>, RequestId),
+    ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
     ToSend(Hash, TicketAggregationFinalizer),
 }
 
 /// Emitted by the processor background pipeline once processed
 #[derive(Debug)]
-pub enum TicketAggregationProcessed {
+pub enum TicketAggregationProcessed<T> {
     Receive(PeerId, std::result::Result<Ticket, String>),
-    Reply(PeerId, std::result::Result<Ticket, String>, RequestId),
+    Reply(PeerId, std::result::Result<Ticket, String>, T),
     Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer),
 }
 
@@ -385,12 +384,21 @@ impl TicketAggregationFinalizer {
 
 /// External API for feeding Ticket Aggregation actions into the Ticket Aggregation
 /// processor processing the elements independently in the background.
-#[derive(Debug, Clone)]
-pub struct TicketAggregationActions {
-    pub queue: Sender<TicketAggregationToProcess>,
+#[derive(Debug)]
+pub struct TicketAggregationActions<T> {
+    pub queue: Sender<TicketAggregationToProcess<T>>,
 }
 
-impl TicketAggregationActions {
+impl<T> Clone for TicketAggregationActions<T> {
+    /// Generic type requires handwritten clone function
+    fn clone(&self) -> Self {
+        Self {
+            queue: self.queue.clone(),
+        }
+    }
+}
+
+impl<T> TicketAggregationActions<T> {
     /// Pushes the aggregated ticket received from the transport layer into processing.
     pub fn receive_ticket(&mut self, source: PeerId, ticket: std::result::Result<Ticket, String>) -> Result<()> {
         self.process(TicketAggregationToProcess::ToReceive(source, ticket))
@@ -401,11 +409,11 @@ impl TicketAggregationActions {
         &mut self,
         source: PeerId,
         tickets: Vec<AcknowledgedTicket>,
-        request_id: RequestId,
+        request: T,
     ) -> Result<()> {
         // TODO: received tickets should be processed here and a single Ticket emitted
 
-        self.process(TicketAggregationToProcess::ToProcess(source, tickets, request_id))
+        self.process(TicketAggregationToProcess::ToProcess(source, tickets, request))
     }
 
     /// Pushes a new collection of tickets into the processing.
@@ -424,7 +432,7 @@ impl TicketAggregationActions {
         Ok(rx.into())
     }
 
-    fn process(&mut self, event: TicketAggregationToProcess) -> Result<()> {
+    fn process(&mut self, event: TicketAggregationToProcess<T>) -> Result<()> {
         self.queue.try_send(event).map_err(|e| {
             if e.is_full() {
                 Retry
@@ -440,17 +448,22 @@ impl TicketAggregationActions {
 /// Sets up processing of ticket aggregation interactions and returns relevant read and write mechanism.
 ///
 /// <ADD SPECIFIC DETAILS HERE>
-pub struct TicketAggregationInteraction {
-    ack_event_queue: (Sender<TicketAggregationToProcess>, Receiver<TicketAggregationProcessed>),
+pub struct TicketAggregationInteraction<T> {
+    ack_event_queue: (
+        Sender<TicketAggregationToProcess<T>>,
+        Receiver<TicketAggregationProcessed<T>>,
+    ),
 }
 
-impl TicketAggregationInteraction {
+impl<T: 'static> TicketAggregationInteraction<T> {
     /// Creates a new instance given the DB to process the ticket aggregation requests.
     pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
-        let (processing_in_tx, processing_in_rx) =
-            channel::<TicketAggregationToProcess>(TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE);
-        let (processing_out_tx, processing_out_rx) =
-            channel::<TicketAggregationProcessed>(TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE);
+        let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T>>(
+            TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
+        );
+        let (processing_out_tx, processing_out_rx) = channel::<TicketAggregationProcessed<T>>(
+            TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
+        );
 
         let processor = TicketAggregationProcessor::new(db, chain_key);
 
@@ -521,15 +534,15 @@ impl TicketAggregationInteraction {
         }
     }
 
-    pub fn writer(&self) -> TicketAggregationActions {
+    pub fn writer(&self) -> TicketAggregationActions<T> {
         TicketAggregationActions {
             queue: self.ack_event_queue.0.clone(),
         }
     }
 }
 
-impl Stream for TicketAggregationInteraction {
-    type Item = TicketAggregationProcessed;
+impl<T> Stream for TicketAggregationInteraction<T> {
+    type Item = TicketAggregationProcessed<T>;
 
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         return Pin::new(self).ack_event_queue.1.poll_next(cx);
@@ -540,7 +553,7 @@ impl Stream for TicketAggregationInteraction {
 mod tests {
     use async_std::sync::RwLock;
     use core_crypto::{
-        keypairs::{ChainKeypair, Keypair},
+        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
     use core_ethereum_db::{
@@ -549,7 +562,7 @@ mod tests {
     };
     use core_types::{
         acknowledgement::AcknowledgedTicket,
-        channels::{generate_channel_id, Ticket},
+        channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
     };
     use futures_lite::StreamExt;
     use hex_literal::hex;
@@ -557,13 +570,20 @@ mod tests {
     use std::sync::Arc;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
-        primitives::{Balance, BalanceType, U256},
+        primitives::{Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
     };
 
     use super::TicketAggregationProcessed;
 
     lazy_static! {
+        static ref PEERS: Vec<OffchainKeypair> = vec![
+            hex!("b91a28ff9840e9c93e5fafd581131f0b9f33f3e61b02bf5dd83458aa0221f572"),
+            hex!("82283757872f99541ce33a47b90c2ce9f64875abf08b5119a8a434b2fa83ea98")
+        ]
+        .iter()
+        .map(|private| OffchainKeypair::from_secret(private).unwrap())
+        .collect();
         static ref PEERS_CHAIN: Vec<ChainKeypair> = vec![
             hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a"),
             hex!("e1f89073a01831d0eed9fe2c67e7d65c144b9d9945320f6d325b1cccc2d124e9"),
@@ -619,36 +639,84 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn ticket_aggregation_single_ticket() {
+    async fn ticket_aggregation() {
         let dbs = create_dbs(2);
         let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
 
-        let alice = super::TicketAggregationInteraction::new(dbs[0].clone(), &PEERS_CHAIN[0]);
-        let bob = super::TicketAggregationInteraction::new(dbs[1].clone(), &PEERS_CHAIN[1]);
+        let mut alice = super::TicketAggregationInteraction::<()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
+        let mut bob = super::TicketAggregationInteraction::<()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
 
-        let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], 1u64);
+        for db in dbs.iter() {
+            db.write()
+                .await
+                .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
+                .await
+                .unwrap();
+            for i in 0..PEERS.len() {
+                db.write()
+                    .await
+                    .link_chain_and_packet_keys(&(&PEERS_CHAIN[i]).into(), PEERS[i].public(), &Snapshot::default())
+                    .await
+                    .unwrap();
+            }
+        }
+
+        let acked_tickets: Vec<AcknowledgedTicket> = (1..23u64)
+            .map(|i| mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i))
+            .collect();
 
         dbs[1]
             .write()
             .await
-            .store_acknowledged_tickets(vec![acked_ticket])
+            .store_acknowledged_tickets(acked_tickets)
             .await
             .unwrap();
 
-        let awaiter = bob.writer().aggregate_tickets(&channel_id_alice_bob).unwrap();
+        dbs[1]
+            .write()
+            .await
+            .update_channel_and_snapshot(
+                &channel_id_alice_bob,
+                &ChannelEntry {
+                    source: (&PEERS_CHAIN[0]).into(),
+                    destination: (&PEERS_CHAIN[1]).into(),
+                    balance: Balance::new(1u64.into(), BalanceType::HOPR),
+                    ticket_index: 1u64.into(),
+                    status: ChannelStatus::Open,
+                    channel_epoch: 1u32.into(),
+                    closure_time: 0u64.into(),
+                },
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        let _awaiter = bob.writer().aggregate_tickets(&channel_id_alice_bob).unwrap();
         match bob.next().await {
-            Some(TicketAggregationProcessed::Send(destination, acked_tickets, finalizer)) => {
-                alice.writer().receive_aggregation_request(source, tickets, response)
+            Some(TicketAggregationProcessed::Send(destination, acked_tickets, _finalizer)) => {
+                alice
+                    .writer()
+                    .receive_aggregation_request(destination, acked_tickets, ())
+                    .unwrap();
             }
             //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
             _ => panic!("unexpected action happened"),
         };
 
-        alice.ack_event_queue.0.start_send(event).unwrap();
-
-        let event = match alice.next().await {
-            Some(ev) => ev,
+        match alice.next().await {
+            Some(TicketAggregationProcessed::Reply(destination, aggregated_ticket, ())) => {
+                bob.writer().receive_ticket(destination, aggregated_ticket).unwrap()
+            }
             _ => panic!("unexpected action happened"),
         };
+
+        let stored_acked_tickets = dbs[1]
+            .read()
+            .await
+            .get_acknowledged_tickets_range(&channel_id_alice_bob, 1u32, 0, u64::MAX)
+            .await
+            .unwrap();
+
+        assert_eq!(stored_acked_tickets.len(), 1);
     }
 }

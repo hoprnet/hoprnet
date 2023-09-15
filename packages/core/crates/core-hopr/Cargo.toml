@@ -27,6 +27,7 @@ futures = { workspace = true }
 futures-concurrency = "7.3.0"
 gloo-timers = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
+libp2p = { workspace = true, features = ["request-response"] }
 multiaddr = { workspace = true }
 js-sys = { workspace = true, optional = true }
 serde-wasm-bindgen = {version = "0.5.0", optional = true}

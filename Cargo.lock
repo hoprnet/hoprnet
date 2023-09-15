@@ -1203,6 +1203,7 @@ dependencies = [
  "futures-concurrency",
  "gloo-timers 0.3.0",
  "js-sys",
+ "libp2p",
  "multiaddr",
  "serde-wasm-bindgen",
  "thiserror",
