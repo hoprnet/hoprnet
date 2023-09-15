@@ -83,7 +83,6 @@ import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 
-import { isIP } from 'node:net'
 import { TagBloomFilter } from '@hoprnet/hoprd/lib/hoprd_hoprd.js'
 
 const CODE_P2P = protocols('p2p').code
@@ -130,7 +129,8 @@ const PACKET_QUEUE_TIMEOUT_MILLISECONDS = 15000n
 const TICKET_AGGREGATION_TIMEOUT_MILLISECONDS = 10000n
 
 interface NetOptions {
-  ip: string
+  ip?: string
+  dns?: string
   port: number
 }
 
@@ -150,10 +150,7 @@ export type HoprOptions = {
   password: string
   connector?: HoprCoreEthereum
   strategy: ChannelStrategyInterface
-  hosts: {
-    ip4?: NetOptions
-    ip6?: NetOptions
-  }
+  hosts: NetOptions[]
   heartbeatInterval?: number
   heartbeatThreshold?: number
   heartbeatVariance?: number
@@ -492,18 +489,15 @@ export class Hopr extends EventEmitter {
   private getLocalMultiaddresses(): Multiaddr[] {
     let mas: Multiaddr[] = []
 
-    if (this.options.hosts.ip4 == undefined) {
-      throw new Error('IP address of the host must be specified')
-    }
-
-    if (isIP(this.options.hosts.ip4.ip) == 0) {
-      throw new Error('IP address of the host is not a valid IPv4 or IPv6 address')
-    }
-
-    if (this.options.hosts.ip4.ip == '0.0.0.0') {
-      throw new Error('IP address of the host must be a specific IPv4 or IPv6 address')
-    } else {
-      mas.push(multiaddr(`/ip4/${this.options.hosts.ip4.ip}/tcp/${this.options.hosts.ip4.port}`))
+    // at this point the values were parsed and validated already
+    for (const host of this.options.hosts) {
+      if (host.ip) {
+        mas.push(multiaddr(`/ip4/${host.ip}/tcp/${host.port}`))
+      } else if (host.dns) {
+        mas.push(multiaddr(`/dns4/${host.dns}/tcp/${host.port}`))
+      } else {
+        log('Error: Unhandled host type in multiaddress conversion')
+      }
     }
 
     return mas
@@ -1032,24 +1026,20 @@ export class Hopr extends EventEmitter {
       }
 
       const ip4 = multiaddrs.find((ma) => ma.toString().startsWith('/ip4/'))
-      const ip6 = multiaddrs.find((ma) => ma.toString().startsWith('/ip6/'))
+      const dns4 = multiaddrs.find((ma) => ma.toString().startsWith('/dns4/'))
 
-      // Prefer IPv4 addresses over IPv6 addresses, if any
-      addrToAnnounce = ip4 ?? ip6
+      // Prefer DNS addresses over IPv4 addresses, if any
+      addrToAnnounce = dns4 ?? ip4
 
       // Submit P2P address if IPv4 or IPv6 address is not routable because link-locale, reserved or private address
       // except if testing locally, e.g. as part of an integration test
-      if (addrToAnnounce == undefined) {
-        addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toString())
-      } else {
+      if (addrToAnnounce && addrToAnnounce.toString().length > 0) {
         routableAddressAvailable = true
       }
-    } else {
-      addrToAnnounce = new Multiaddr('/p2p/' + this.getId().toString())
     }
 
     // skip if no address to announce has been found
-    if (!addrToAnnounce || addrToAnnounce.toString() == '') {
+    if (!routableAddressAvailable) {
       log('Error: could not find an address to announce')
       return
     }

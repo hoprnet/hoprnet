@@ -5,6 +5,7 @@ import type { NetworkInterfaceInfo } from 'os'
 const CODE_IP4 = protocols('ip4').code
 const CODE_IP6 = protocols('ip6').code
 const CODE_P2P = protocols('p2p').code
+const CODE_DNS4 = protocols('dns4').code
 
 /**
  * Checks if given Multiaddr encodes a private address
@@ -20,10 +21,13 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
       return false
     case CODE_IP4:
       ipFamily = 'IPv4'
-      break
+      return isLocalhost(tuples[0][1], ipFamily) || isPrivateAddress(tuples[0][1], ipFamily)
     case CODE_IP6:
       ipFamily = 'IPv6'
-      break
+      return isLocalhost(tuples[0][1], ipFamily) || isPrivateAddress(tuples[0][1], ipFamily)
+    case CODE_DNS4:
+      const strTuples = multiaddr.stringTuples() as [code: number, addr: string][]
+      return strTuples[0][1] == 'localhost'
     default:
       throw Error(`invalid input arguments`)
   }

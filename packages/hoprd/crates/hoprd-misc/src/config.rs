@@ -1,14 +1,18 @@
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use validator::{Validate, ValidationError};
-
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_misc::constants::{
     DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
     DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_PARALLEL_CONNECTION_PUBLIC_RELAY, DEFAULT_NETWORK_QUALITY_THRESHOLD,
 };
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use utils_types::primitives::Address;
+use validator::{Validate, ValidationError};
+
+#[cfg(not(feature = "wasm"))]
+use crate::network::native::is_dns_address;
+#[cfg(feature = "wasm")]
+use crate::network::wasm::is_dns_address;
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -31,6 +35,14 @@ fn validate_ipv4_address(s: &str) -> Result<(), ValidationError> {
     }
 }
 
+fn validate_dns_address(s: &str) -> Result<(), ValidationError> {
+    if is_dns_address(s) {
+        Ok(())
+    } else {
+        Err(ValidationError::new("Invalid DNS address provided"))
+    }
+}
+
 fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
     match &token {
         Auth::None => Ok(()),
@@ -49,30 +61,44 @@ fn validate_api_auth(token: &Auth) -> Result<(), ValidationError> {
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Host {
     #[validate(custom = "validate_ipv4_address")]
-    pub ip: String,
+    pub ip: Option<String>,
+    #[validate(custom = "validate_dns_address")]
+    pub dns: Option<String>,
     #[validate(range(min = 1u16))]
     pub port: u16,
 }
 
 impl Host {
-    pub fn from_ipv4_host_string(s: &str) -> Result<Self, String> {
-        let (ip, str_port) = match s.split_once(":") {
+    pub fn from_host_string(s: &str) -> Result<Self, String> {
+        let (ip_or_dns, str_port) = match s.split_once(":") {
             None => return Err(format!("Invalid host")),
             Some(split) => split,
         };
 
         let port = u16::from_str_radix(str_port, 10).map_err(|e| e.to_string())?;
 
-        Ok(Self {
-            ip: ip.to_owned(),
-            port,
-        })
+        if validator::validate_ip_v4(ip_or_dns) {
+            Ok(Self {
+                ip: Some(ip_or_dns.to_owned()),
+                dns: None,
+                port,
+            })
+        } else if is_dns_address(ip_or_dns) {
+            Ok(Self {
+                ip: None,
+                dns: Some(ip_or_dns.to_owned()),
+                port,
+            })
+        } else {
+            Err(format!("Not a valid IPv4 or DNS address"))
+        }
     }
 }
 
 impl ToString for Host {
     fn to_string(&self) -> String {
-        format!("{}:{}", self.ip, self.port)
+        let address = self.ip.clone().unwrap_or(self.dns.clone().unwrap());
+        format!("{}:{}", address, self.port)
     }
 }
 
@@ -115,7 +141,8 @@ impl Default for Api {
             enable: false,
             auth: Auth::Token("".to_owned()),
             host: Host {
-                ip: DEFAULT_API_HOST.to_string(),
+                ip: Some(DEFAULT_API_HOST.to_string()),
+                dns: None,
                 port: DEFAULT_API_PORT,
             },
         }
@@ -353,7 +380,8 @@ impl Default for HoprdConfig {
     fn default() -> Self {
         Self {
             host: Host {
-                ip: DEFAULT_HOST.to_string(),
+                ip: Some(DEFAULT_HOST.to_string()),
+                dns: None,
                 port: DEFAULT_PORT,
             },
             identity: Identity::default(),
@@ -414,7 +442,7 @@ impl HoprdConfig {
             cfg.api.auth = Auth::Token(x);
         };
         if let Some(x) = cli_args.api_host {
-            cfg.api.host.ip = x
+            cfg.api.host.ip = Some(x)
         };
         if let Some(x) = cli_args.api_port {
             cfg.api.host.port = x
@@ -551,7 +579,8 @@ mod tests {
     pub fn example_cfg() -> HoprdConfig {
         HoprdConfig {
             host: Host {
-                ip: "127.0.0.1".to_owned(),
+                ip: Some("127.0.0.1".to_owned()),
+                dns: None,
                 port: 47462,
             },
             identity: Identity {
@@ -573,7 +602,8 @@ mod tests {
                 enable: false,
                 auth: Auth::None,
                 host: Host {
-                    ip: "127.0.0.1".to_string(),
+                    ip: Some("127.0.0.1".to_string()),
+                    dns: None,
                     port: 1233,
                 },
             },
@@ -619,6 +649,7 @@ mod tests {
 
     const EXAMPLE_YAML: &'static str = r#"host:
   ip: 127.0.0.1
+  dns: null
   port: 47462
 identity:
   file: identity
@@ -633,6 +664,7 @@ api:
   auth: None
   host:
     ip: 127.0.0.1
+    dns: null
     port: 1233
 strategy:
   name: passive
@@ -729,5 +761,40 @@ test:
         assert_eq!(cfg.chain.provider, Some(pwnd.to_owned()));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_verify_valid_ip4_addresses() {
+        assert!(validate_ipv4_address("1.1.1.1").is_ok());
+        assert!(validate_ipv4_address("1.255.1.1").is_ok());
+        assert!(validate_ipv4_address("187.1.1.255").is_ok());
+        assert!(validate_ipv4_address("127.0.0.1").is_ok());
+        assert!(validate_ipv4_address("0.0.0.0").is_ok());
+    }
+
+    #[test]
+    fn test_verify_invalid_ip4_addresses() {
+        assert!(validate_ipv4_address("1.256.1.1").is_err());
+        assert!(validate_ipv4_address("-1.1.1.255").is_err());
+        assert!(validate_ipv4_address("127.0.0.256").is_err());
+        assert!(validate_ipv4_address("1").is_err());
+        assert!(validate_ipv4_address("1.1").is_err());
+        assert!(validate_ipv4_address("1.1.1").is_err());
+        assert!(validate_ipv4_address("1.1.1.1.1").is_err());
+    }
+
+    #[test]
+    fn test_verify_valid_dns_addresses() {
+        assert!(validate_dns_address("localhost").is_ok());
+        assert!(validate_dns_address("hoprnet.org").is_ok());
+        assert!(validate_dns_address("hub.hoprnet.org").is_ok());
+    }
+
+    #[test]
+    fn test_verify_invalid_dns_addresses() {
+        assert!(validate_dns_address("org").is_err());
+        assert!(validate_dns_address(".org").is_err());
+        assert!(validate_dns_address("-hoprnet.org").is_err());
+        assert!(validate_dns_address("unknown.sub.sub.hoprnet.org").is_err());
     }
 }
