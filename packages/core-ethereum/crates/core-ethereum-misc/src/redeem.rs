@@ -177,14 +177,13 @@ where
 
 async fn unchecked_ticket_redeem<Db, F>(
     db: Arc<RwLock<Db>>,
-    mut ack_ticket: AcknowledgedTicket,
+    ack_ticket: AcknowledgedTicket,
     on_chain_tx_sender: impl Fn(AcknowledgedTicket) -> F,
 ) -> Result<Hash>
 where
     Db: HoprCoreEthereumDbActions,
     F: futures::Future<Output = std::result::Result<String, String>>,
 {
-    set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
     debug!("sending {} for on-chain redemption", ack_ticket.ticket);
     match (on_chain_tx_sender)(ack_ticket.clone()).await {
         Ok(tx_hash_str) => {
