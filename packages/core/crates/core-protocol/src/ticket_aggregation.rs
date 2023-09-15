@@ -53,16 +53,16 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 
 /// The input to the processor background pipeline
 #[derive(Debug)]
-pub enum TicketAggregationToProcess<T> {
-    ToReceive(PeerId, std::result::Result<Ticket, String>),
+pub enum TicketAggregationToProcess<T, U> {
+    ToReceive(PeerId, std::result::Result<Ticket, String>, U),
     ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
     ToSend(Hash, TicketAggregationFinalizer),
 }
 
 /// Emitted by the processor background pipeline once processed
 #[derive(Debug)]
-pub enum TicketAggregationProcessed<T> {
-    Receive(PeerId, std::result::Result<Ticket, String>),
+pub enum TicketAggregationProcessed<T, U> {
+    Receive(PeerId, U),
     Reply(PeerId, std::result::Result<Ticket, String>, T),
     Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer),
 }
@@ -350,7 +350,7 @@ impl TicketAggregationAwaiter {
                 let timeout = sleep(until_timeout);
                 pin_mut!(resolve, timeout);
                 match futures::future::select(resolve, timeout).await {
-                    Either::Left((challenge, _)) => challenge.map_err(|_| TransportError("Canceled".to_owned())),
+                    Either::Left((result, _)) => result.map_err(|_| TransportError("Canceled".to_owned())),
                     Either::Right(_) => Err(TransportError("Timed out on sending a packet".to_owned())),
                 }
             }
@@ -385,11 +385,11 @@ impl TicketAggregationFinalizer {
 /// External API for feeding Ticket Aggregation actions into the Ticket Aggregation
 /// processor processing the elements independently in the background.
 #[derive(Debug)]
-pub struct TicketAggregationActions<T> {
-    pub queue: Sender<TicketAggregationToProcess<T>>,
+pub struct TicketAggregationActions<T, U> {
+    pub queue: Sender<TicketAggregationToProcess<T, U>>,
 }
 
-impl<T> Clone for TicketAggregationActions<T> {
+impl<T, U> Clone for TicketAggregationActions<T, U> {
     /// Generic type requires handwritten clone function
     fn clone(&self) -> Self {
         Self {
@@ -398,10 +398,15 @@ impl<T> Clone for TicketAggregationActions<T> {
     }
 }
 
-impl<T> TicketAggregationActions<T> {
+impl<T, U> TicketAggregationActions<T, U> {
     /// Pushes the aggregated ticket received from the transport layer into processing.
-    pub fn receive_ticket(&mut self, source: PeerId, ticket: std::result::Result<Ticket, String>) -> Result<()> {
-        self.process(TicketAggregationToProcess::ToReceive(source, ticket))
+    pub fn receive_ticket(
+        &mut self,
+        source: PeerId,
+        ticket: std::result::Result<Ticket, String>,
+        request: U,
+    ) -> Result<()> {
+        self.process(TicketAggregationToProcess::ToReceive(source, ticket, request))
     }
 
     /// Process the received aggregation request
@@ -432,7 +437,7 @@ impl<T> TicketAggregationActions<T> {
         Ok(rx.into())
     }
 
-    fn process(&mut self, event: TicketAggregationToProcess<T>) -> Result<()> {
+    fn process(&mut self, event: TicketAggregationToProcess<T, U>) -> Result<()> {
         self.queue.try_send(event).map_err(|e| {
             if e.is_full() {
                 Retry
@@ -448,20 +453,20 @@ impl<T> TicketAggregationActions<T> {
 /// Sets up processing of ticket aggregation interactions and returns relevant read and write mechanism.
 ///
 /// <ADD SPECIFIC DETAILS HERE>
-pub struct TicketAggregationInteraction<T> {
+pub struct TicketAggregationInteraction<T, U> {
     ack_event_queue: (
-        Sender<TicketAggregationToProcess<T>>,
-        Receiver<TicketAggregationProcessed<T>>,
+        Sender<TicketAggregationToProcess<T, U>>,
+        Receiver<TicketAggregationProcessed<T, U>>,
     ),
 }
 
-impl<T: 'static> TicketAggregationInteraction<T> {
+impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
     /// Creates a new instance given the DB to process the ticket aggregation requests.
     pub fn new<Db: HoprCoreEthereumDbActions + 'static>(db: Arc<RwLock<Db>>, chain_key: &ChainKeypair) -> Self {
-        let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T>>(
+        let (processing_in_tx, processing_in_rx) = channel::<TicketAggregationToProcess<T, U>>(
             TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
         );
-        let (processing_out_tx, processing_out_rx) = channel::<TicketAggregationProcessed<T>>(
+        let (processing_out_tx, processing_out_rx) = channel::<TicketAggregationProcessed<T, U>>(
             TICKET_AGGREGATION_RX_QUEUE_SIZE + TICKET_AGGREGATION_TX_QUEUE_SIZE,
         );
 
@@ -490,18 +495,21 @@ impl<T: 'static> TicketAggregationInteraction<T> {
                             }
                         }
                     }
-                    TicketAggregationToProcess::ToReceive(_destination, aggregated_ticket) => match aggregated_ticket {
-                        Ok(ticket) => {
-                            if let Err(e) = processor.handle_aggregated_ticket(ticket).await {
-                                debug!("Error while handling aggregated ticket {}", e)
+                    TicketAggregationToProcess::ToReceive(_destination, aggregated_ticket, request) => {
+                        match aggregated_ticket {
+                            Ok(ticket) => {
+                                if let Err(e) = processor.handle_aggregated_ticket(ticket.clone()).await {
+                                    debug!("Error while handling aggregated ticket {}", e)
+                                }
+                                println!("handling done");
+                                Some(TicketAggregationProcessed::Receive(_destination, request))
                             }
-                            None
+                            Err(e) => {
+                                debug!("Counterparty refused to aggregrate tickets. {}", e);
+                                None
+                            }
                         }
-                        Err(e) => {
-                            debug!("Counterparty refused to aggregrate tickets. {}", e);
-                            None
-                        }
-                    },
+                    }
                     TicketAggregationToProcess::ToSend(channel_id, finalizer) => {
                         match processor.prepare_aggregatable_tickets(&channel_id).await {
                             Ok((source, tickets)) => Some(TicketAggregationProcessed::Send(source, tickets, finalizer)),
@@ -534,15 +542,15 @@ impl<T: 'static> TicketAggregationInteraction<T> {
         }
     }
 
-    pub fn writer(&self) -> TicketAggregationActions<T> {
+    pub fn writer(&self) -> TicketAggregationActions<T, U> {
         TicketAggregationActions {
             queue: self.ack_event_queue.0.clone(),
         }
     }
 }
 
-impl<T> Stream for TicketAggregationInteraction<T> {
-    type Item = TicketAggregationProcessed<T>;
+impl<T, U> Stream for TicketAggregationInteraction<T, U> {
+    type Item = TicketAggregationProcessed<T, U>;
 
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         return Pin::new(self).ack_event_queue.1.poll_next(cx);
@@ -567,7 +575,7 @@ mod tests {
     use futures_lite::StreamExt;
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use std::sync::Arc;
+    use std::{sync::Arc, time::Duration};
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Balance, BalanceType, Snapshot, U256},
@@ -643,8 +651,8 @@ mod tests {
         let dbs = create_dbs(2);
         let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
 
-        let mut alice = super::TicketAggregationInteraction::<()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
-        let mut bob = super::TicketAggregationInteraction::<()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
+        let mut alice = super::TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
+        let mut bob = super::TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
 
         for db in dbs.iter() {
             db.write()
@@ -691,9 +699,11 @@ mod tests {
             .await
             .unwrap();
 
-        let _awaiter = bob.writer().aggregate_tickets(&channel_id_alice_bob).unwrap();
+        let mut awaiter = bob.writer().aggregate_tickets(&channel_id_alice_bob).unwrap();
+        let mut finalizer = None;
         match bob.next().await {
-            Some(TicketAggregationProcessed::Send(destination, acked_tickets, _finalizer)) => {
+            Some(TicketAggregationProcessed::Send(destination, acked_tickets, request_finalizer)) => {
+                let _ = finalizer.insert(request_finalizer);
                 alice
                     .writer()
                     .receive_aggregation_request(destination, acked_tickets, ())
@@ -705,10 +715,15 @@ mod tests {
 
         match alice.next().await {
             Some(TicketAggregationProcessed::Reply(destination, aggregated_ticket, ())) => {
-                bob.writer().receive_ticket(destination, aggregated_ticket).unwrap()
+                bob.writer().receive_ticket(destination, aggregated_ticket, ()).unwrap()
             }
             _ => panic!("unexpected action happened"),
         };
+
+        match bob.next().await {
+            Some(TicketAggregationProcessed::Receive(_destination, ())) => finalizer.take().unwrap().finalize(),
+            _ => panic!("unexpected action happened"),
+        }
 
         let stored_acked_tickets = dbs[1]
             .read()
@@ -718,5 +733,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(stored_acked_tickets.len(), 1);
+
+        awaiter.consume_and_wait(Duration::from_millis(2000u64)).await.unwrap();
     }
 }

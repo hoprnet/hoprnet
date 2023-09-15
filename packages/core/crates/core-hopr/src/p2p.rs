@@ -19,6 +19,7 @@ use core_types::{
 };
 use futures::{channel::mpsc::Receiver, select, StreamExt};
 use futures_concurrency::stream::Merge;
+use libp2p::request_response::RequestId;
 use std::collections::{HashMap, HashSet};
 use utils_log::{debug, error, info};
 
@@ -28,7 +29,7 @@ pub enum Inputs {
     ManualPing(api::ManualPingChallenge),
     NetworkUpdate(NetworkEvent),
     Message(MsgProcessed),
-    TicketAggregation(TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>>),
+    TicketAggregation(TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, RequestId>),
     Acknowledgement(AckProcessed),
     Indexer(IndexerProcessed),
 }
@@ -63,8 +64,8 @@ impl From<MsgProcessed> for Inputs {
     }
 }
 
-impl From<TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>>> for Inputs {
-    fn from(value: TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>>) -> Self {
+impl From<TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, RequestId>> for Inputs {
+    fn from(value: TicketAggregationProcessed<ResponseChannel<Result<Ticket, String>>, RequestId>) -> Self {
         Self::TicketAggregation(value)
     }
 }
@@ -88,7 +89,7 @@ pub(crate) async fn p2p_loop(
     indexer_update_input: Receiver<IndexerProcessed>,
     ack_interactions: AcknowledgementInteraction,
     pkt_interactions: PacketInteraction,
-    ticket_aggregation_interactions: TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>>,
+    ticket_aggregation_interactions: TicketAggregationInteraction<ResponseChannel<Result<Ticket, String>>, RequestId>,
     heartbeat_requests: api::HeartbeatRequester,
     heartbeat_responds: api::HeartbeatResponder,
     manual_ping_requests: api::ManualPingRequester,
@@ -205,11 +206,15 @@ pub(crate) async fn p2p_loop(
                     TicketAggregationProcessed::Reply(peer, ticket, response) => {
                         if let Err(_) = swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket) {
                             error!("Ticket aggregation: Failed send reply to {}", peer);
-
                         }
                     },
-                    TicketAggregationProcessed::Receive(_peer, _ticket) => {
-                        // Nothing to do here
+                    TicketAggregationProcessed::Receive(_peer, request) => {
+                        match active_aggregation_requests.remove(&request) {
+                            Some(finalizer) => finalizer.finalize(),
+                            None => {
+                                debug!("Ticket aggregation: response already handled")
+                            }
+                        }
                     }
                 },
                 Inputs::Indexer(task) => match task {
@@ -351,11 +356,8 @@ pub(crate) async fn p2p_loop(
                         request_id, response
                     },
                 })) => {
-                    if let Err(e) = aggregation_writer.receive_ticket(peer, response) {
+                    if let Err(e) = aggregation_writer.receive_ticket(peer, response, request_id) {
                         debug!("Aggregation protocol: Error while handling aggregated ticket from {}, error: {}", peer, e);
-                    }
-                    if let Some(finalizer) = active_aggregation_requests.remove(&request_id) {
-                        finalizer.finalize();
                     }
                 },
                 SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(libp2p_request_response::Event::<Vec<AcknowledgedTicket>, std::result::Result<Ticket,String>>::OutboundFailure {

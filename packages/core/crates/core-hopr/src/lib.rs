@@ -22,7 +22,7 @@ use core_packet::interaction::{AcknowledgementInteraction, PacketActions, Packet
 use core_protocol::ticket_aggregation::{TicketAggregationActions, TicketAggregationInteraction};
 use core_types::{channels::Ticket, protocol::TagBloomFilter};
 use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
-use libp2p::request_response::ResponseChannel;
+use libp2p::request_response::{RequestId, ResponseChannel};
 use multiaddr::Multiaddr;
 use std::{sync::Arc, time::Duration};
 use utils_log::{error, info};
@@ -40,7 +40,7 @@ pub struct HoprTools {
     network: adaptors::network::wasm::WasmNetwork,
     indexer: adaptors::indexer::WasmIndexerInteractions,
     pkt_sender: PacketActions,
-    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>>,
+    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
 }
 
 #[cfg(feature = "wasm")]
@@ -51,7 +51,7 @@ impl HoprTools {
         change_notifier: Sender<NetworkEvent>,
         indexer: adaptors::indexer::WasmIndexerInteractions,
         pkt_sender: PacketActions,
-        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>>,
+        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
     ) -> Self {
         Self {
             ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
