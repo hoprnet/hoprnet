@@ -28,11 +28,12 @@ jobs:
       - name: Merge back
 
         run: |
-          set -x
           git fetch
           git checkout release/${{ github.event.inputs.release_name }}
           git checkout -b merge-back-release-${{ github.event.inputs.release_name }}
           git merge master > /tmp/merge.log || true
+
+          # Check if there are conflicts
           conflicts=$(grep "CONFLICT" /tmp/merge.log | grep -v package.json | wc -l)
           if [[ "$conflicts" -gt "0" ]];
           then
@@ -40,6 +41,7 @@ jobs:
             echo "exit 1"
           fi
 
+          # Resolve conflicts for package.json
           packages=(connect core-ethereum core hoprd real utils)
           for package in "${packages[@]}"; do
             if [ `git diff packages/$package/package.json | wc -l` -gt "0" ]; then 
