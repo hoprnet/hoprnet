@@ -804,7 +804,7 @@ export class Hopr extends EventEmitter {
       this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
     )
   }
-  
+
   /**
    * Attempts to all tickets in the given channel.
    * @param channelId id of the channel
