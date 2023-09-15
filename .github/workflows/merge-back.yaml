@@ -39,6 +39,7 @@ jobs:
             echo "There are conflicts in source code files"
             echo "exit 1"
           fi
+
           packages=(connect core-ethereum core hoprd real utils)
           for package in "${packages[@]}"; do
             if [ `git diff packages/$package/package.json | wc -l` -gt "0" ]; then 
