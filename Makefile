@@ -140,7 +140,7 @@ install-foundry: ## install foundry
 		echo "foundryup already installed under "${FOUNDRY_DIR}/bin", skipping"; \
 	else \
 		echo "installing foundryup (vsn ${FOUNDRYUP_VSN})"; \
-		curl -L "https://raw.githubusercontent.com/${FOUNDRY_REPO}/${FOUNDRYUP_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
+		curl -kL "https://raw.githubusercontent.com/${FOUNDRY_REPO}/${FOUNDRYUP_VSN}/foundryup/foundryup" > "${FOUNDRY_DIR}/bin/foundryup"; \
 	  chmod +x "${FOUNDRY_DIR}/bin/foundryup"; \
 	fi
 	@if [ ! -f "${FOUNDRY_DIR}/bin/anvil" ] || [ ! -f "${FOUNDRY_DIR}/bin/cast" ] || [ ! -f "${FOUNDRY_DIR}/bin/forge" ]; then \
