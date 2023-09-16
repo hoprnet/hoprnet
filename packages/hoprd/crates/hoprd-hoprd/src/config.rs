@@ -317,12 +317,22 @@ fn validate_directory_path(s: &str) -> Result<(), ValidationError> {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct Db {
     /// Path to the directory containing the database
     pub data: String,
     pub initialize: bool,
     pub force_initialize: bool,
+}
+
+impl Default for Db {
+    fn default() -> Self {
+        Self {
+            data: "".to_owned(),
+            initialize: true,
+            force_initialize: false,
+        }
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]

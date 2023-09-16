@@ -180,8 +180,6 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
-      --allowLocalNodeConnections \
-      --allowPrivateNodeConnections \
       --healthCheck \
       --healthCheckHost "${host}" \
       --healthCheckPort "${healthcheck_port}" \

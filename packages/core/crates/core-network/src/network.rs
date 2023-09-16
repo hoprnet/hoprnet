@@ -33,9 +33,9 @@ pub struct NetworkConfig {
     /// Maximum delay
     #[serde_as(as = "DurationSeconds<u64>")]
     max_delay: Duration,
-    #[validate(range(min = 0.0, max = 0.1))]
+    #[validate(range(min = 0.0, max = 1.0))]
     quality_bad_threshold: f64,
-    #[validate(range(min = 0.0, max = 0.1))]
+    #[validate(range(min = 0.0, max = 1.0))]
     pub quality_offline_threshold: f64,
     quality_step: f64,
     #[serde_as(as = "DurationSeconds<u64>")]

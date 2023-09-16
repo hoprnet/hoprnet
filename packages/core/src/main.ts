@@ -28,7 +28,7 @@ export async function createHoprNode(
     rmSync(dbPath, { recursive: true, force: true })
     cfg.db.initialize = true
   }
-  let db = new Database(dbPath.toString(), cfg.db.force_initialize, chainKeypair.public().to_address())
+  let db = new Database(dbPath.toString(), cfg.db.initialize, chainKeypair.public().to_address())
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = cfg.safe_module.safe_address
