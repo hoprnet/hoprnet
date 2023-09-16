@@ -1155,25 +1155,8 @@ export class Hopr extends EventEmitter {
     channelId: Hash
     receipt: string
   }> {
-    if (this.getEthereumAddress().eq(counterparty)) {
-      throw Error('Cannot open channel to self!')
-    }
-
     if (!this.isReady) {
       log('openChannel: Node is not ready for on-chain operations')
-    }
-
-    const myAvailableTokens = await HoprCoreEthereum.getInstance().getSafeBalance()
-
-    // validate 'amountToFund'
-    if (amountToFund.lten(0)) {
-      throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    } else if (amountToFund.gt(new BN(myAvailableTokens.to_string()))) {
-      throw Error(
-        `You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.to_string()} at safe address ${
-          this.smartContractInfo().safeAddress
-        }`
-      )
     }
 
     try {
@@ -1190,36 +1173,28 @@ export class Hopr extends EventEmitter {
   /**
    * Fund a payment channel
    *
-   * @param counterparty the counter party's peerId
-   * @param myFund the amount to fund the channel in my favor HOPR(wei)
-   * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
+   * @param channelId the id of the channel
+   * @param amount the amount to fund the channel
    */
-  public async fundChannel(counterparty: Address, myFund: BN, counterpartyFund: BN): Promise<string> {
+  public async fundChannel(channelId: Hash, amount: BN): Promise<string> {
     if (!this.isReady) {
       log('fundChannel: Node is not ready for on-chain operations')
     }
 
     const connector = HoprCoreEthereum.getInstance()
-    const myBalance = await connector.getSafeBalance()
-    const totalFund = myFund.add(counterpartyFund)
+    const channel = await this.db.get_channel(channelId)
 
-    // validate 'amountToFund'
-    if (totalFund.lten(0)) {
-      throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
-    } else if (totalFund.gt(new BN(myBalance.to_string()))) {
-      throw Error(
-        `You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.to_string()} at safe address ${
-          this.smartContractInfo().safeAddress
-        }`
-      )
+    // make additional assertions
+    if (!channel) {
+      throw new Error('Cannot fund non-existing channel')
+    }
+    if (channel.status !== ChannelStatus.Open) {
+      throw new Error('Cannot fund channel when not in status OPEN')
     }
 
     try {
-      return connector.fundChannel(
-        counterparty,
-        new Balance(myFund.toString(10), BalanceType.HOPR),
-        new Balance(counterpartyFund.toString(10), BalanceType.HOPR)
-      )
+      const counterparty = channel.destination
+      return connector.fundChannel(counterparty, new Balance(amount.toString(10), BalanceType.HOPR))
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)
