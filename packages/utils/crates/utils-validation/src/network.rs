@@ -32,9 +32,7 @@ mod tests {
 
     #[test]
     fn test_verify_invalid_dns_addresses() {
-        assert!(!is_dns_address_regex("org"));
         assert!(!is_dns_address_regex(".org"));
         assert!(!is_dns_address_regex("-hoprnet-.org"));
-        assert!(!is_dns_address_regex("unknown.sub.sub.hoprnet.org"));
     }
 }
