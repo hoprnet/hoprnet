@@ -286,7 +286,6 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .await?;
 
         Ok(())
-        // AcknowledgedTicket::new(ticket, Response::default(), Address::default(), self.)
     }
 
     pub async fn prepare_aggregatable_tickets(&self, channel_id: &Hash) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
@@ -416,8 +415,6 @@ impl<T, U> TicketAggregationActions<T, U> {
         tickets: Vec<AcknowledgedTicket>,
         request: T,
     ) -> Result<()> {
-        // TODO: received tickets should be processed here and a single Ticket emitted
-
         self.process(TicketAggregationToProcess::ToProcess(source, tickets, request))
     }
 
@@ -451,8 +448,6 @@ impl<T, U> TicketAggregationActions<T, U> {
 }
 
 /// Sets up processing of ticket aggregation interactions and returns relevant read and write mechanism.
-///
-/// <ADD SPECIFIC DETAILS HERE>
 pub struct TicketAggregationInteraction<T, U> {
     ack_event_queue: (
         Sender<TicketAggregationToProcess<T, U>>,
