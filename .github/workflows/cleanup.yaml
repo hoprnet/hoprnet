@@ -9,7 +9,7 @@ on:
 jobs:
   stale:
     name: Close stale issues
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     timeout-minutes: 10
     steps:
       - uses: actions/stale@v8
@@ -24,7 +24,7 @@ jobs:
 
   cleanup-docker:
     name: Cleanup Docker images
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     timeout-minutes: 30
     steps:
       - name: Set up Google Cloud Credentials
@@ -53,3 +53,18 @@ jobs:
               gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/${image}@${old_image_tag}
             done
           done
+
+  # cleanup-git:
+  #   name: Cleanup Git
+  #   runs-on: ubuntu-2-core
+  #   steps:
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v3
+
+  #     - name: Cleanup git branches older than a year
+  #       run: |
+  #         for branch in $(git branch -al | sed /release/d | sed /HEAD/d ); do
+  #           if [[ -z "$(git log -1 --since='1 year ago' -s $branch)" ]] then
+  #             git push origin -d ${branch/remotes\/origin\/}
+  #           fi
+  #         done
