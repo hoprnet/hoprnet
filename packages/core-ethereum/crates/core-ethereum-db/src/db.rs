@@ -173,7 +173,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             )
             .await?;
 
-        tickets.sort_by(|a, b| a.ticket.index.cmp(&b.ticket.index));
+        tickets.sort();
 
         Ok(tickets)
     }
@@ -194,23 +194,31 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             )
             .await?;
 
-        tickets.sort_by(|a, b| a.ticket.index.cmp(&b.ticket.index));
+        tickets.sort();
 
         let mut batch_ops = utils_db::db::Batch::default();
 
-        for ticket in tickets.iter_mut() {
-            ticket.status(AcknowledgedTicketStatus::BeingAggregated {
-                start: index_start,
-                end: index_end,
-            });
-            batch_ops.put(
-                to_acknowledged_ticket_key(
-                    &ticket.ticket.channel_id,
-                    ticket.ticket.channel_epoch,
-                    ticket.ticket.index,
-                )?,
-                ticket,
-            )
+        while tickets.len() > 0 {
+            for (index, ticket) in tickets.iter_mut().enumerate() {
+                if let AcknowledgedTicketStatus::BeingRedeemed { tx_hash: _ } = ticket.status {
+                    tickets = tickets.split_at_mut(index).1.to_vec();
+                    batch_ops = utils_db::db::Batch::default();
+                    break;
+                }
+                ticket.status(AcknowledgedTicketStatus::BeingAggregated {
+                    start: index_start,
+                    end: index_end,
+                });
+                batch_ops.put(
+                    to_acknowledged_ticket_key(
+                        &ticket.ticket.channel_id,
+                        ticket.ticket.channel_epoch,
+                        ticket.ticket.index,
+                    )?,
+                    ticket,
+                )
+            }
+            break;
         }
 
         self.db.batch(batch_ops, true).await?;
@@ -234,7 +242,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             )
             .await?;
 
-        tickets.sort_by(|a, b| a.ticket.index.cmp(&b.ticket.index));
+        tickets.sort();
 
         Ok(tickets)
     }
@@ -255,6 +263,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch = utils_db::db::Batch::default();
 
         for acked_ticket in acked_tickets_to_replace.iter() {
+            if let AcknowledgedTicketStatus::BeingRedeemed { tx_hash: _ } = acked_ticket.status {
+                return Ok(());
+            }
             batch.del(
                 to_acknowledged_ticket_key(
                     &acked_ticket.ticket.channel_id,
@@ -275,7 +286,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             aggregated_ticket,
         );
 
-        self.db.batch(batch, true).await
+        self.db.batch(batch, true).await?;
+        Ok(())
     }
 
     async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> Result<Vec<UnacknowledgedTicket>> {
@@ -1610,7 +1622,7 @@ mod tests {
     use super::*;
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair},
-        types::{Challenge, CurvePoint, HalfKey},
+        types::{Challenge, CurvePoint, HalfKey, Response},
     };
     use core_types::channels::ChannelEntry;
     use hex_literal::hex;
@@ -1919,5 +1931,58 @@ mod tests {
 
         // only one ticket after replacing with aggregated ticket
         assert_eq!(acked_tickets_range.len(), 1);
+    }
+
+    #[async_std::test]
+    async fn test_acknowledged_ticket_status() {
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+
+        let mut challenge_seed: [u8; 32] = hex!("c04824c574e562b3b96725c8aa6e5b0426a3900cd9efbe48ddf7e754a552abdf");
+
+        let amount_tickets = 29u64;
+        let domain_separator = Hash::default();
+        let mut acked_tickets = (0..amount_tickets)
+            .map(|i| {
+                let challenge =
+                    Challenge::from(CurvePoint::from_exponent(&challenge_seed).unwrap()).to_ethereum_challenge();
+
+                let ticket = mock_ticket(
+                    &ALICE_KEYPAIR,
+                    &(&*BOB_KEYPAIR).into(),
+                    Some(domain_separator),
+                    Some(i.into()),
+                    Some(1u64.into()),
+                    Some(1u64.into()),
+                    Some(challenge),
+                );
+
+                challenge_seed = Hash::create(&[&challenge_seed]).into();
+
+                AcknowledgedTicket::new(
+                    ticket,
+                    Response::from_bytes(&challenge_seed.clone()).unwrap(),
+                    (&*ALICE_KEYPAIR).into(),
+                    &BOB_KEYPAIR,
+                    &domain_separator,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<AcknowledgedTicket>>();
+
+        acked_tickets[17].status(AcknowledgedTicketStatus::BeingRedeemed {
+            tx_hash: Hash::default(),
+        });
+
+        db.store_acknowledged_tickets(acked_tickets).await.unwrap();
+
+        let channel_id = generate_channel_id(&(&*ALICE_KEYPAIR).into(), &(&*BOB_KEYPAIR).into());
+
+        assert_eq!(
+            db.prepare_aggregatable_tickets(&channel_id, 1u32, 0u64, u64::MAX)
+                .await
+                .unwrap()
+                .len(),
+            12
+        );
     }
 }
