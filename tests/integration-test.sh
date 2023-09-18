@@ -96,6 +96,8 @@ redeem_tickets() {
   redeemed=$(echo "${result}" | jq -r .redeemed)
   [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
   [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
+
+  log "Redeem all test passed on node ${node_id} !"
 }
 
 # $1 native addresses ("Ethereum addresses"), comma-separated list
@@ -403,7 +405,7 @@ test_redeem_in_specific_channel() {
 }
 
 log "Test redeeming in a specific channel"
-test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
+test_redeem_in_specific_channel "1" "3" ${api1} ${api3}
 
 log "Test redeeming all tickets"
 redeem_tickets "2" "${api2}" & jobs+=( "$!" )
