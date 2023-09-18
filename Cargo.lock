@@ -316,6 +316,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-oneshot"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ec7c75bcbcb0139e9177f30692fd617405ca4e0c27802e128d53171f7042e2c"
+dependencies = [
+ "futures-micro",
+]
+
+[[package]]
 name = "async-process"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1135,6 +1144,7 @@ name = "core-ethereum-misc"
 version = "0.5.0"
 dependencies = [
  "async-lock",
+ "async-oneshot",
  "async-std",
  "async-trait",
  "bindings",
@@ -1184,7 +1194,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "core-hopr"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1192,6 +1202,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
+ "core-ethereum-misc",
  "core-mixer",
  "core-network",
  "core-p2p",
@@ -2573,6 +2584,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.29",
+]
+
+[[package]]
+name = "futures-micro"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b460264b3593d68b16a7bc35f7bc226ddfebdf9a1c8db1ed95d5cc6b7168c826"
+dependencies = [
+ "pin-project-lite",
 ]
 
 [[package]]

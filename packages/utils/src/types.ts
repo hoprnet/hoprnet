@@ -113,5 +113,6 @@ export {
   WasmNetwork,
   WasmPing,
   WasmIndexerInteractions,
-  PingConfig
+  PingConfig,
+  WasmTxExecutor
 } from '../../hoprd/lib/hoprd_hoprd.js'

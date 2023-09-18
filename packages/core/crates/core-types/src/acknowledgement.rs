@@ -93,7 +93,7 @@ impl Display for AcknowledgedTicketStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             AcknowledgedTicketStatus::Untouched => write!(f, "untouched"),
-            AcknowledgedTicketStatus::BeingRedeemed { tx_hash } => write!(f, "being redeemed (tx hash: {tx_hash})"),
+            AcknowledgedTicketStatus::BeingRedeemed { .. } => write!(f, "being redeemed"),
             AcknowledgedTicketStatus::BeingAggregated { start, end } => write!(f, "being aggregated ({start}-{end})"),
         }
     }

@@ -3,6 +3,7 @@ pub mod constants;
 pub mod errors;
 pub mod network_registry;
 pub mod redeem;
+pub mod transaction_queue;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

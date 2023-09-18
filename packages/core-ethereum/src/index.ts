@@ -20,10 +20,7 @@ import {
   ChainKeypair,
   OffchainKeypair,
   CORE_ETHEREUM_CONSTANTS,
-  Database,
-  redeem_all_tickets,
-  redeem_tickets_with_counterparty,
-  redeem_tickets_in_channel
+  Database
 } from '@hoprnet/hopr-utils'
 
 import Indexer from './indexer/index.js'
@@ -168,8 +165,6 @@ export default class HoprCoreEthereum extends EventEmitter {
       return this.started
     }
 
-    this.on('ticket:being-redeemed', this.onTicketBeingRedeemed.bind(this))
-
     const _start = async (): Promise<HoprCoreEthereum> => {
       try {
         await this.chain.waitUntilReady()
@@ -293,32 +288,9 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.chain.getInfo()
   }
 
-  public async redeemAllTickets(): Promise<void> {
-    await redeem_all_tickets(this.db, this.chainKeypair.to_address(), this.sendTicketRedeemTx.bind(this))
-  }
-
-  public async redeemTicketsInChannelByCounterparty(counterparty: Address) {
-    await redeem_tickets_with_counterparty(this.db, counterparty, this.sendTicketRedeemTx.bind(this))
-  }
-
-  public async redeemTicketsInChannel(channel: ChannelEntry) {
-    await redeem_tickets_in_channel(this.db, channel, this.sendTicketRedeemTx.bind(this))
-  }
-
-  private async onTicketBeingRedeemed(txHash: string, ackTicket: AcknowledgedTicket) {
-    try {
-      ackTicket.set_redeem_tx_hash(txHash)
-      await this.db.update_acknowledged_ticket(ackTicket)
-      log(`tx hash updated for ${ackTicket.to_string()}`)
-    } catch (e) {
-      log(`could not update ticket redemption TX hash: ${e}`)
-    }
-  }
-
-  private async sendTicketRedeemTx(ackTicket: AcknowledgedTicket): Promise<string> {
+  public async sendTicketRedeemTx(ackTicket: AcknowledgedTicket): Promise<string> {
     try {
       return await this.chain.redeemTicket(ackTicket, (txHash: string) => {
-        this.emit('ticket:being-redeemed', txHash, ackTicket)
         return this.setTxHandler(`channel-updated-${txHash}`, txHash)
       })
     } catch (err) {

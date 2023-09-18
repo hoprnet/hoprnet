@@ -29,10 +29,15 @@ use crate::adaptors::indexer::IndexerProcessed;
 use crate::p2p::api;
 
 use crate::timer::UniversalTimer;
+use core_ethereum_misc::transaction_queue::{TransactionQueue, TransactionSender};
 use core_types::protocol::TagBloomFilter;
 use utils_types::traits::BinarySerializable;
+
 #[cfg(feature = "wasm")]
 use {core_ethereum_db::db::wasm::Database, wasm_bindgen::prelude::wasm_bindgen};
+
+#[cfg(feature = "wasm")]
+use core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -44,6 +49,7 @@ pub struct HoprTools {
     network: adaptors::network::wasm::WasmNetwork,
     indexer: adaptors::indexer::WasmIndexerInteractions,
     pkt_sender: PacketActions,
+    tx_sender: TransactionSender,
 }
 
 #[cfg(feature = "wasm")]
@@ -54,12 +60,14 @@ impl HoprTools {
         change_notifier: Sender<NetworkEvent>,
         indexer: adaptors::indexer::WasmIndexerInteractions,
         packet_sender: PacketActions,
+        tx_sender: TransactionSender,
     ) -> Self {
         Self {
             ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
             network: adaptors::network::wasm::WasmNetwork::new(peers, change_notifier),
             indexer,
             pkt_sender: packet_sender,
+            tx_sender,
         }
     }
 }
@@ -92,6 +100,7 @@ pub enum HoprLoopComponents {
     Swarm,
     Heartbeat,
     Timer,
+    TxQueue,
 }
 
 impl std::fmt::Display for HoprLoopComponents {
@@ -106,6 +115,7 @@ impl std::fmt::Display for HoprLoopComponents {
                 "heartbeat component responsible for maintaining the network quality measurements"
             ),
             HoprLoopComponents::Timer => write!(f, "universal timer component for executing timed actions"),
+            HoprLoopComponents::TxQueue => write!(f, "outgoing ethereum transaction queue"),
         }
     }
 }
@@ -130,6 +140,7 @@ pub fn build_components(
     on_final_packet: Option<js_sys::Function>,
     tbf: TagBloomFilter,
     save_tbf: js_sys::Function,
+    tx_executor: WasmTxExecutor,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     use core_mixer::mixer::{Mixer, MixerConfig};
@@ -180,12 +191,15 @@ pub fn build_components(
     let indexer_updater =
         adaptors::indexer::WasmIndexerInteractions::new(db.clone(), network.clone(), indexer_update_tx);
 
+    let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
+
     let hopr_tools = HoprTools::new(
         ping,
         network.clone(),
         network_events_tx,
         indexer_updater,
         packet_actions.writer(),
+        tx_queue.new_sender(),
     );
 
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
@@ -245,6 +259,7 @@ pub fn build_components(
                 .map(|_| HoprLoopComponents::Timer)
                 .await
         }),
+        Box::pin(async move { tx_queue.transaction_loop().map(|_| HoprLoopComponents::TxQueue).await }),
     ];
     let mut futs = helpers::to_futures_unordered(ready_loops);
 
@@ -264,6 +279,7 @@ pub mod wasm_impl {
 
     use super::*;
     use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
+    use core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor;
     use core_path::path::Path;
     use core_types::protocol::ApplicationData;
     use wasm_bindgen::prelude::*;
@@ -287,6 +303,10 @@ pub mod wasm_impl {
                 }
                 Err(e) => Err(wasm_bindgen::JsValue::from(e.to_string())),
             }
+        }
+
+        pub fn get_tx_sender(&self) -> TransactionSender {
+            self.tx_sender.clone()
         }
     }
 
@@ -312,6 +332,7 @@ pub mod wasm_impl {
             on_final_packet: Option<js_sys::Function>,
             tbf: TagBloomFilter,
             save_tbf: js_sys::Function,
+            tx_executor: WasmTxExecutor,
             my_multiaddresses: Vec<js_sys::JsString>,
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
@@ -327,6 +348,7 @@ pub mod wasm_impl {
                 on_final_packet,
                 tbf,
                 save_tbf,
+                tx_executor,
                 my_multiaddresses
                     .into_iter()
                     .map(|ma| {

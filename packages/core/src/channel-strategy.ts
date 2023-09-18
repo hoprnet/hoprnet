@@ -1,4 +1,3 @@
-import { debug } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { CHECK_TIMEOUT } from './constants.js'
 
@@ -10,6 +9,7 @@ import { webcrypto } from 'node:crypto'
 globalThis.crypto = webcrypto
 
 import {
+  debug,
   PromiscuousStrategy,
   PassiveStrategy,
   StrategyTickResult,
@@ -17,12 +17,12 @@ import {
   BalanceType,
   ChannelStatus,
   AcknowledgedTicket,
-  ChannelEntry
+  ChannelEntry,
 } from '@hoprnet/hopr-utils'
 
 import { PeerQuality } from '../../hoprd/lib/hoprd_hoprd.js'
 
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { Hopr } from './index.js'
 
 const STRATEGIES = ['passive', 'promiscuous', 'random']
 export type Strategy = (typeof STRATEGIES)[number]
@@ -67,11 +67,13 @@ export interface ChannelStrategyInterface {
 export abstract class SaneDefaults {
   protected autoRedeemTickets: boolean = true
 
+  constructor(private hopr: Hopr) {}
+
   async onAckedTicket(ackTicket: AcknowledgedTicket) {
     if (this.autoRedeemTickets) {
       const counterparty = ackTicket.signer
       log(`auto redeeming tickets in channel to ${counterparty.to_string()}`)
-      await HoprCoreEthereum.getInstance().redeemTicketsInChannelByCounterparty(counterparty)
+      await this.hopr.redeemTicketsWithCounterparty(counterparty)
     } else {
       log(`encountered winning ticket, not auto-redeeming`)
     }
@@ -83,16 +85,11 @@ export abstract class SaneDefaults {
    */
   async onChannelWillClose(channel: ChannelEntry) {
     if (this.autoRedeemTickets) {
-      const chain = HoprCoreEthereum.getInstance()
       const counterparty = channel.source
-      const selfPubKey = chain.getPublicKey()
-      if (!counterparty.eq(selfPubKey.to_address())) {
+      const selfPubKey = this.hopr.getEthereumAddress()
+      if (!counterparty.eq(selfPubKey)) {
         log(`auto redeeming tickets in channel to ${counterparty.to_string()}`)
-        try {
-          await chain.redeemTicketsInChannel(channel)
-        } catch (err) {
-          log(`Could not redeem tickets in channel ${channel.get_id().to_hex()}`, err)
-        }
+        await this.hopr.redeemTicketsInChannel(channel.get_id())
       }
     } else {
       log(`channel ${channel.get_id().to_hex()} is closing, not auto-redeeming tickets`)
@@ -120,8 +117,8 @@ interface RustStrategyInterface {
   Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
  */
 class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults implements ChannelStrategyInterface {
-  constructor(private strategy: T) {
-    super()
+  constructor(private strategy: T, hopr: Hopr) {
+    super(hopr)
   }
 
   configure(settings: any) {
@@ -143,15 +140,15 @@ class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults 
 }
 
 export class StrategyFactory {
-  public static getStrategy(strategy: Strategy): ChannelStrategyInterface {
+  public static getStrategy(strategy: Strategy, hopr: Hopr): ChannelStrategyInterface {
     switch (strategy) {
       case 'promiscuous':
-        return new RustStrategyWrapper(new PromiscuousStrategy())
+        return new RustStrategyWrapper(new PromiscuousStrategy(), hopr)
       case 'random':
         log(`error: random strategy not implemented, falling back to 'passive'.`)
       case 'passive':
       default:
-        return new RustStrategyWrapper(new PassiveStrategy())
+        return new RustStrategyWrapper(new PassiveStrategy(), hopr)
     }
   }
 }
