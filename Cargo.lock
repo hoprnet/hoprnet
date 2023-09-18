@@ -1075,7 +1075,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-db"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1132,7 +1132,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1148,6 +1148,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "js-sys",
+ "lazy_static",
  "libp2p-identity",
  "mockall",
  "multiaddr",
@@ -1183,7 +1184,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "core-hopr"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1191,6 +1192,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
+ "core-ethereum-misc",
  "core-mixer",
  "core-network",
  "core-p2p",
@@ -1316,7 +1318,7 @@ dependencies = [
 
 [[package]]
 name = "core-packet"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "async-lock",
  "async-process",
@@ -6436,7 +6438,7 @@ dependencies = [
 
 [[package]]
 name = "utils-misc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "console_error_panic_hook",
  "futures",
@@ -6454,7 +6456,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "bincode",
  "console_error_panic_hook",

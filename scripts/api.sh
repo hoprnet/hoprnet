@@ -176,9 +176,9 @@ api_set_setting() {
 api_redeem_tickets_in_channel() {
   local node_api="${1}"
   local channel_id="${2}"
-  local timeout="${3:-600}"
+  local timeout="${3:-30}"
 
-  log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of unredeemed tickets in that channel"
+  log "redeeming tickets in channel ${channel_id}"
   api_call "${node_api}" "/channels/${channel_id}/tickets/redeem" "POST" "" "" "${timeout}" "${timeout}"
 }
 
@@ -186,9 +186,9 @@ api_redeem_tickets_in_channel() {
 # $2 = OPTIONAL: call timeout
 api_redeem_tickets() {
   local node_api="${1}"
-  local timeout="${2:-600}"
+  local timeout="${2:-30}"
 
-  log "redeeming all tickets, this can take up to 5 minutes depending on the amount of unredeemed tickets"
+  log "redeeming all tickets"
   api_call "${node_api}" "/tickets/redeem" "POST" "" "" "${timeout}" "${timeout}"
 }
 
@@ -207,10 +207,10 @@ api_aggregate_tickets() {
 # $3 = assertion
 api_get_tickets_in_channel() {
   local node_api="${1}"
-  local channel id="${2}"
-  local assertion="${3:-"counterparty"}"
+  local channel_id="${2}"
+  local assertion="${3:-"signature"}"
 
-  api_call "${node_api}" "/channels/${channel_id}/tickets" "GET" "" "${assertion}" 600
+  api_call "${node_api}" "/channels/${channel_id}/tickets" "GET" "" "${assertion}" 600 30
 }
 
 # $1 = node api endpoint
@@ -308,12 +308,16 @@ api_open_channel() {
   local destination_id="${2}"
   local source_api="${3}"
   local destination_address="${4}"
-  local amount="${5:-100000000000000000000}"
-  local result
+  local amount="${5:-1000000000000000000000}"
+  local result balances hopr_balance
 
-  log "Node ${source_id} open channel to Node ${destination_id}"
-  result=$(api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30)
-  log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
+  balances=$(api_get_balances ${api1})
+  hopr_balance=$(echo ${balances} | jq -r .safeHopr)
+  log "Safe balance of node ${source_api} before opening new channel: ${hopr_balance} weiHOPR, need ${amount} weiHOPR"
+
+  #log "Node ${source_id} open channel to Node ${destination_id}"
+  api_call "${source_api}" "/channels" "POST" "{ \"peerAddress\": \"${destination_address}\", \"amount\": \"${amount}\" }" 'channelId|CHANNEL_ALREADY_OPEN' 600 30
+  #log "Node ${source_id} open channel to Node ${destination_id} result -- ${result}"
 }
 
 # $1 = node api address (origin)

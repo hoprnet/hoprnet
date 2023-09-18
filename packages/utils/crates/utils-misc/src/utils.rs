@@ -49,6 +49,32 @@ pub mod wasm {
         }
     }
 
+    pub fn js_value_to_error_msg(val: JsValue) -> Option<String> {
+        if val.is_undefined() || val.is_null() {
+            return None;
+        }
+
+        if val.is_string() {
+            return val.as_string();
+        }
+
+        if val.is_object() {
+            val.dyn_into::<js_sys::Error>()
+                .map(|err| {
+                    let msg = err.message();
+                    if msg.is_undefined() || !msg.is_string() {
+                        None
+                    } else {
+                        msg.as_string()
+                    }
+                })
+                .ok()
+                .flatten()
+        } else {
+            None
+        }
+    }
+
     /// Reads the given package.json file and determines its version.
     #[wasm_bindgen]
     pub fn get_package_version(package_file: &str) -> Result<String, JsValue> {

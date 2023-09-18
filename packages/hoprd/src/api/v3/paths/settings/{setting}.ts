@@ -42,7 +42,7 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
     case SettingKey.STRATEGY:
       if (!isStrategy(value)) throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
 
-      let strategy = StrategyFactory.getStrategy(value)
+      let strategy = StrategyFactory.getStrategy(value, node)
       strategy.configure({
         max_channels: state.settings[SettingKey.MAX_AUTO_CHANNELS],
         auto_redeem_tickets: state.settings[SettingKey.AUTO_REDEEM_TICKETS]

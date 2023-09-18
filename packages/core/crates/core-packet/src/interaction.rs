@@ -57,6 +57,10 @@ lazy_static::lazy_static! {
         SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap();
     static ref METRIC_PACKETS_COUNT: SimpleCounter =
         SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
+    static ref METRIC_WINNING_TICKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_winning_tickets", "Number of winning tickets").unwrap();
+    static ref METRIC_LOSING_TICKETS_COUNT: SimpleCounter =
+        SimpleCounter::new("core_counter_losing_tickets", "Number of losing tickets").unwrap();
 }
 
 lazy_static::lazy_static! {
@@ -172,9 +176,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 METRIC_RECEIVED_SUCCESSFUL_ACKS.increment();
             }
 
-            PendingAcknowledgement::WaitingAsRelayer(unackowledged) => {
+            PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                 // Try to unlock our incentive
-                unackowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
+                unacknowledged.verify_challenge(&ack.ack_key_share).map_err(|e| {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
@@ -186,7 +190,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 self.db
                     .read()
                     .await
-                    .get_channel_from(&unackowledged.signer)
+                    .get_channel_from(&unacknowledged.signer)
                     .await
                     .map_err(|e| {
                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -206,7 +210,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     .unwrap()
                     .ok_or(MissingDomainSeparator)?;
 
-                let ack_ticket = unackowledged.acknowledge(&ack.ack_key_share, &self.chain_key, &domain_separator)?;
+                let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share, &self.chain_key, &domain_separator)?;
 
                 // replace the un-acked ticket with acked ticket.
                 self.db
@@ -217,6 +221,20 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACKED_TICKETS.increment();
+
+                // Check if ticket it a win
+                if ack_ticket.is_winning_ticket(&domain_separator) {
+                    debug!("{ack_ticket} is a win");
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_WINNING_TICKETS_COUNT.increment();
+                } else {
+                    warn!("encountered losing {ack_ticket}");
+                    self.db.write().await.mark_losing_acked_ticket(&ack_ticket).await?;
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_LOSING_TICKETS_COUNT.increment();
+                }
 
                 if let Some(emitter) = &mut self.on_acknowledged_ticket {
                     if let Err(e) = emitter.unbounded_send(ack_ticket) {
@@ -621,6 +639,9 @@ where
                     return Err(TagReplay);
                 }
 
+                previous_peer = previous_hop.to_peerid();
+                next_peer = next_hop.to_peerid();
+
                 let previous_hop_addr =
                     self.db
                         .read()
@@ -628,7 +649,7 @@ where
                         .get_chain_key(previous_hop)
                         .await?
                         .ok_or(PacketDecodingError(format!(
-                            "failed to find channel key for packet key {previous_hop} on previous hop"
+                            "failed to find channel key for packet key {previous_peer} on previous hop"
                         )))?;
 
                 let next_hop_addr = self
@@ -638,11 +659,11 @@ where
                     .get_chain_key(next_hop)
                     .await?
                     .ok_or(PacketDecodingError(format!(
-                        "failed to find channel key for packet key {next_hop} on next hop"
+                        "failed to find channel key for packet key {next_peer} on next hop",
                     )))?;
 
                 // Find the corresponding channel
-                debug!("looking for channel with {previous_hop}");
+                debug!("looking for channel with {previous_hop_addr} ({previous_peer})");
                 let channel = self
                     .db
                     .read()
@@ -723,8 +744,6 @@ where
                 } else {
                     self.create_multihop_ticket(next_hop_addr, ticket_path_pos).await?
                 };
-                previous_peer = previous_hop.to_peerid();
-                next_peer = next_hop.to_peerid();
             }
         }
 

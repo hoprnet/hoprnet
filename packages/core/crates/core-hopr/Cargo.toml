@@ -1,6 +1,6 @@
 [package]
 name = "core-hopr"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR interface for the core library"
 edition = "2021"
@@ -38,6 +38,7 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 core-network = { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
+core-ethereum-misc = { workspace = true, default-features = false }
 core-mixer = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false }
 core-p2p = { workspace = true, default-features = false }

@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-misc"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -17,7 +17,9 @@ async-trait = "0.1"
 async-lock = { workspace = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 futures = "0.3"
+hex = "0.4.3"
 js-sys = { workspace = true, optional = true }
+lazy_static = "1.4.0"
 libp2p-identity = { workspace = true }
 thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
@@ -35,6 +37,7 @@ utils-log = { path = "../../../utils/crates/utils-log", default-features = false
 utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
 
 [dev-dependencies]
+async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
 env_logger = "0.10"
 mockall = "0.11.4"
 hex-literal = "0.4"
