@@ -81,7 +81,6 @@ const version = get_package_version(packageFile)
 const on_dappnode = (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true'
 
 function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOptions {
-
   if (!isStrategy(cfg.strategy.name)) {
     throw Error(`Invalid strategy selected`)
   }

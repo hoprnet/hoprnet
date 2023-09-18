@@ -343,7 +343,7 @@ mod tests {
             redeem_all_tickets(db.clone(), &ALICE.public().to_address(), tx_sender.clone())
                 .await
                 .expect("redeem_all_tickets should succeed")
-                .into_iter()
+                .into_iter(),
         )
         .await;
 
@@ -413,7 +413,7 @@ mod tests {
             redeem_tickets_with_counterparty(db.clone(), &BOB.public().to_address(), tx_sender.clone())
                 .await
                 .expect("redeem_tickets_with_counterparty should succeed")
-                .into_iter()
+                .into_iter(),
         )
         .await;
 
@@ -495,7 +495,7 @@ mod tests {
             redeem_tickets_in_channel(db.clone(), &channel_from_bob, tx_sender.clone())
                 .await
                 .expect("redeem_tickets_in_channel should succeed")
-                .into_iter()
+                .into_iter(),
         )
         .await;
 

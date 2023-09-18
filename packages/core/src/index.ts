@@ -56,7 +56,11 @@ import {
   WasmNetwork,
   WasmPing,
   WasmIndexerInteractions,
-  PingConfig, redeem_all_tickets, redeem_tickets_in_channel, WasmTxExecutor, redeem_tickets_with_counterparty
+  PingConfig,
+  redeem_all_tickets,
+  redeem_tickets_in_channel,
+  WasmTxExecutor,
+  redeem_tickets_with_counterparty
 } from '@hoprnet/hopr-utils'
 
 import { INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -148,7 +152,7 @@ export type HoprOptions = {
   password: string
   connector?: HoprCoreEthereum
   strategy?: {
-    name: Strategy,
+    name: Strategy
     settings?: any
   }
   hosts: NetOptions[]
@@ -1352,8 +1356,7 @@ export class Hopr extends EventEmitter {
     }
     try {
       await redeem_all_tickets(this.db, this.chainKeypair.to_address(), this.tools.get_tx_sender())
-    }
-    catch (err) {
+    } catch (err) {
       log(`error during all tickets redemption: ${err}`)
     }
   }
@@ -1370,8 +1373,7 @@ export class Hopr extends EventEmitter {
       } else {
         log(`cannot redeem tickets in channel ${channelId.to_hex()}`)
       }
-    }
-    catch (err) {
+    } catch (err) {
       log(`error during tickets redemption in channel ${channelId.to_hex()}: ${err}`)
     }
   }
@@ -1383,8 +1385,7 @@ export class Hopr extends EventEmitter {
 
     try {
       await redeem_tickets_with_counterparty(this.db, counterparty, this.tools.get_tx_sender())
-    }
-    catch (err) {
+    } catch (err) {
       log(`error during ticket redemption with counterparty ${counterparty.to_hex()}: ${err}`)
     }
   }

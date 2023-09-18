@@ -17,7 +17,7 @@ import {
   BalanceType,
   ChannelStatus,
   AcknowledgedTicket,
-  ChannelEntry,
+  ChannelEntry
 } from '@hoprnet/hopr-utils'
 
 import { PeerQuality } from '../../hoprd/lib/hoprd_hoprd.js'
