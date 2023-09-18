@@ -1380,7 +1380,7 @@ export class Hopr extends EventEmitter {
 
   public async redeemTicketsWithCounterparty(counterparty: Address) {
     if (!this.isReady) {
-      log('redeemTicketsInChannel: Node is not ready for on-chain operations')
+      log('redeemTicketsWithCounterparty: Node is not ready for on-chain operations')
     }
 
     try {
