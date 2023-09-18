@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use std::sync::Arc;
+use core_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
 use utils_log::{error, warn};
 
 /// Enumerates all possible outgoing transactions
@@ -82,11 +83,16 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
         while let Ok(req) = self.queue_recv.recv().await {
             match req.0 {
                 Transaction::RedeemTicket(ack) => {
-                    if let Err(e) = self.tx_exec.redeem_ticket(ack.clone()).await {
-                        error!("redeem tx of {ack} failed: {e}")
-                    } else if let Err(e) = self.db.write().await.mark_redeemed(&ack).await {
-                        error!("failed to mark {ack} as redeemed: {e}");
-                    }
+                    match ack.status {
+                        BeingRedeemed { .. } => {
+                            if let Err(e) = self.tx_exec.redeem_ticket(ack.clone()).await {
+                                error!("redeem tx of {ack} failed: {e}")
+                            } else if let Err(e) = self.db.write().await.mark_redeemed(&ack).await {
+                                error!("failed to mark {ack} as redeemed: {e}");
+                            }
+                        }
+                        _ => error!("invalid state of {ack}")
+                    };
                     let _ = req.1.send(TransactionResult);
                 }
             }
