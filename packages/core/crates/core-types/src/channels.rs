@@ -213,7 +213,7 @@ pub struct Ticket {
 
 impl PartialOrd for Ticket {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
@@ -333,7 +333,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(&own_address, counterparty);
 
         let mut ret = Ticket {
             channel_id,
@@ -373,7 +373,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(own_address, counterparty);
 
         let ret = Ticket {
             channel_id,
@@ -386,7 +386,7 @@ impl Ticket {
             signature: Some(signature),
         };
 
-        ret.verify(&own_address, domain_separator)
+        ret.verify(own_address, domain_separator)
             .map_err(|_| CoreTypesError::InvalidInputData("Invalid signature".into()))?;
 
         Ok(ret)
@@ -413,7 +413,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(own_address, counterparty);
 
         Ok(Ticket {
             channel_id,
@@ -439,7 +439,7 @@ impl Ticket {
         win_prob: f64,
         channel_epoch: U256,
     ) -> Result<()> {
-        if own_address.eq(&counterparty) {
+        if own_address.eq(counterparty) {
             return Err(CoreTypesError::InvalidInputData(
                 "Source and destination must be different".into(),
             ));
@@ -571,7 +571,7 @@ impl Ticket {
     ///
     /// Does not support path lengths greater than 255
     pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
-        Ok((self.get_expected_payout() / price_per_packet)
+        (self.get_expected_payout() / price_per_packet)
             .as_u64()
             .try_into() // convert to u8
             .map_err(|_| {
@@ -579,7 +579,7 @@ impl Ticket {
                     "Cannot convert {} to u8",
                     price_per_packet / self.get_expected_payout()
                 ))
-            })?)
+            })
     }
 
     pub fn get_expected_payout(&self) -> U256 {
@@ -1005,7 +1005,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         pub fn size() -> u32 {
@@ -1047,8 +1047,8 @@ pub mod wasm {
             })
         }
 
-        #[wasm_bindgen]
-        pub fn default() -> Ticket {
+        #[wasm_bindgen(js_name = "default")]
+        pub fn _default() -> Ticket {
             Self {
                 w: super::Ticket::default(),
             }
@@ -1056,12 +1056,12 @@ pub mod wasm {
 
         #[wasm_bindgen(getter)]
         pub fn channel_id(&self) -> Hash {
-            self.w.channel_id.clone()
+            self.w.channel_id
         }
 
         #[wasm_bindgen(getter)]
         pub fn amount(&self) -> Balance {
-            self.w.amount.clone()
+            self.w.amount
         }
 
         #[wasm_bindgen(getter)]
@@ -1094,12 +1094,13 @@ pub mod wasm {
             self.w.signature.clone()
         }
 
-        #[wasm_bindgen]
-        pub fn to_string(&self) -> String {
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
             self.w.to_string()
         }
 
-        pub fn clone(&self) -> Ticket {
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Ticket {
             Self { w: self.w.clone() }
         }
     }

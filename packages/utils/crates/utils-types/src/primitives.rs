@@ -410,7 +410,7 @@ impl U256 {
     /// Multiply with float in the interval [0.0, 1.0]
     pub fn multiply_f64(&self, rhs: f64) -> Result<Self> {
         if rhs < 0.0 || rhs > 1.0 {
-            return Err(GeneralError::InvalidInput);
+            return Err(InvalidInput);
         }
 
         if rhs == 1.0 {

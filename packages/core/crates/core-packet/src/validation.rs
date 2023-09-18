@@ -26,7 +26,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 
     // ticket signer MUST be the sender
     ticket
-        .verify(sender, &domain_separator)
+        .verify(sender, domain_separator)
         .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
 
     // ticket amount MUST be greater or equal to minTicketAmount

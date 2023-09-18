@@ -24,7 +24,7 @@ use futures::{
 use futures_lite::stream::{Stream, StreamExt};
 use libp2p_identity::PeerId;
 use std::{pin::Pin, sync::Arc, task::Poll};
-use utils_log::{debug, error, warn};
+use utils_log::{debug, error, info, warn};
 use utils_types::{
     primitives::{Balance, BalanceType, U256},
     traits::PeerIdLike,
@@ -101,7 +101,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         destination: PeerId,
         mut acked_tickets: Vec<AcknowledgedTicket>,
     ) -> Result<Ticket> {
-        if acked_tickets.len() < 1 {
+        if acked_tickets.is_empty() {
             return Err(ProtocolTicketAggregation("At least one ticket required".to_owned()));
         }
 
@@ -180,6 +180,11 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             METRIC_AGGREGATED_TICKETS.increment();
         }
 
+        info!(
+            "aggregated {} tickets in channel {channel_id} with total value {final_value}",
+            acked_tickets.len()
+        );
+
         let first_acked_ticket = acked_tickets.first().unwrap();
         let last_acked_ticket = acked_tickets.last().unwrap();
 
@@ -201,7 +206,9 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
     }
 
     pub async fn handle_aggregated_ticket(&self, aggregated_ticket: Ticket) -> Result<()> {
-        let channel_id = aggregated_ticket.channel_id.clone();
+        let channel_id = aggregated_ticket.channel_id;
+        debug!("received aggregated {aggregated_ticket}");
+
         let stored_acked_tickets = self
             .db
             .read()
@@ -214,7 +221,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             )
             .await?;
 
-        if stored_acked_tickets.len() == 0 {
+        if stored_acked_tickets.is_empty() {
             debug!("Received unexpected aggregated ticket in channel {}", channel_id);
             return Err(ProtocolTicketAggregation("Unexpected ticket".into()));
         }
@@ -265,7 +272,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         let acked_aggregated_ticket = AcknowledgedTicket::new(
             aggregated_ticket,
             first_stored_ticket.response.clone(),
-            first_stored_ticket.signer.clone(),
+            first_stored_ticket.signer,
             &self.chain_key,
             &domain_separator,
         )
@@ -291,6 +298,8 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             return Err(ProtocolTicketAggregation("Aggregated ticket is invalid".into()));
         }
 
+        info!("storing received aggregated {acked_aggregated_ticket}");
+
         self.db
             .write()
             .await
@@ -301,7 +310,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
     }
 
     pub async fn prepare_aggregatable_tickets(&self, channel_id: &Hash) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
-        let channel = self.db.read().await.get_channel(&channel_id).await?.ok_or_else(|| {
+        let channel = self.db.read().await.get_channel(channel_id).await?.ok_or_else(|| {
             ProtocolTicketAggregation(format!(
                 "Cannot aggregate tickets in channel {} because indexer has no record for that particular channel",
                 channel_id
@@ -313,11 +322,11 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .db
             .write()
             .await
-            .prepare_aggregatable_tickets(&channel_id, channel.channel_epoch.as_u32(), 0u64, u64::MAX)
+            .prepare_aggregatable_tickets(channel_id, channel.channel_epoch.as_u32(), 0u64, u64::MAX)
             .await?;
 
-        if tickets_to_aggregate.len() == 0 {
-            debug!("Dropping request to aggretate tickets in channel {}", channel_id);
+        if tickets_to_aggregate.is_empty() {
+            debug!("Dropping request to aggretate tickets in channel {channel_id}");
             return Err(ProtocolTicketAggregation("No tickets to aggregate".into()));
         }
 
@@ -340,11 +349,11 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
 #[derive(Debug)]
 pub struct TicketAggregationAwaiter {
-    rx: Option<futures::channel::oneshot::Receiver<()>>,
+    rx: Option<oneshot::Receiver<()>>,
 }
 
-impl From<futures::channel::oneshot::Receiver<()>> for TicketAggregationAwaiter {
-    fn from(value: futures::channel::oneshot::Receiver<()>) -> Self {
+impl From<oneshot::Receiver<()>> for TicketAggregationAwaiter {
+    fn from(value: oneshot::Receiver<()>) -> Self {
         Self { rx: Some(value) }
     }
 }
@@ -384,7 +393,7 @@ impl TicketAggregationFinalizer {
 
     pub fn finalize(mut self) {
         if let Some(sender) = self.tx.take() {
-            if let Err(_) = sender.send(()) {
+            if sender.send(()).is_err() {
                 error!("Failed to notify the awaiter about the successful ticket aggregation")
             }
         } else {
@@ -432,10 +441,6 @@ impl<T, U> TicketAggregationActions<T, U> {
 
     /// Pushes a new collection of tickets into the processing.
     pub fn aggregate_tickets(&mut self, channel_id: &Hash) -> Result<TicketAggregationAwaiter> {
-        // #[cfg(all(feature = "prometheus", not(test)))]
-        // METRIC_SENT_ACKS.increment();
-        // TODO: metrics here would be nice as well
-
         let (tx, rx) = oneshot::channel::<()>();
 
         self.process(TicketAggregationToProcess::ToSend(
@@ -490,11 +495,7 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                             Ok(tickets) => Some(TicketAggregationProcessed::Reply(destination, Ok(tickets), response)),
                             Err(ProtocolTicketAggregation(e)) => {
                                 // forward error to counterparty
-                                Some(TicketAggregationProcessed::Reply(
-                                    destination,
-                                    Err(e.to_string()),
-                                    response,
-                                ))
+                                Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
                             }
                             Err(e) => {
                                 debug!("Dropping tickets aggregation request due unexpected error {}", e);
@@ -560,7 +561,7 @@ impl<T, U> Stream for TicketAggregationInteraction<T, U> {
     type Item = TicketAggregationProcessed<T, U>;
 
     fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
-        return Pin::new(self).ack_event_queue.1.poll_next(cx);
+        Pin::new(self).ack_event_queue.1.poll_next(cx)
     }
 }
 

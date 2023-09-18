@@ -82,11 +82,17 @@ impl BinarySerializable for Acknowledgement {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AcknowledgedTicketStatus {
+    #[default]
     Untouched,
-    BeingRedeemed { tx_hash: Hash },
-    BeingAggregated { start: u64, end: u64 },
+    BeingRedeemed {
+        tx_hash: Hash,
+    },
+    BeingAggregated {
+        start: u64,
+        end: u64,
+    },
 }
 
 impl Display for AcknowledgedTicketStatus {
@@ -96,12 +102,6 @@ impl Display for AcknowledgedTicketStatus {
             AcknowledgedTicketStatus::BeingRedeemed { .. } => write!(f, "being redeemed"),
             AcknowledgedTicketStatus::BeingAggregated { start, end } => write!(f, "being aggregated ({start}-{end})"),
         }
-    }
-}
-
-impl Default for AcknowledgedTicketStatus {
-    fn default() -> Self {
-        AcknowledgedTicketStatus::Untouched
     }
 }
 
@@ -664,7 +664,7 @@ pub mod wasm {
 
         #[wasm_bindgen(getter)]
         pub fn signer(&self) -> Address {
-            self.w.signer.clone()
+            self.w.signer
         }
 
         #[wasm_bindgen(js_name = "clone")]

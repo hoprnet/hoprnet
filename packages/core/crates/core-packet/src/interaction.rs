@@ -375,12 +375,9 @@ impl AcknowledgementInteraction {
 impl Stream for AcknowledgementInteraction {
     type Item = AckProcessed;
 
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
         use futures_lite::stream::StreamExt;
-        return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
+        Pin::new(self).ack_event_queue.1.poll_next(cx)
     }
 }
 
@@ -578,7 +575,7 @@ where
                         remote_peer: path.hops()[0],
                         data: packet.to_bytes(),
                     },
-                    ack_challenge.clone(),
+                    *ack_challenge,
                 ))
             }
             _ => {
@@ -732,7 +729,7 @@ where
                 }
 
                 // Check that the calculated path position from the ticket matches value from the packet header
-                let ticket_path_pos = packet.ticket.get_path_position(U256::from(price_per_packet))?;
+                let ticket_path_pos = packet.ticket.get_path_position(price_per_packet)?;
                 if !ticket_path_pos.eq(path_pos) {
                     error!("path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}");
                     return Err(PathPositionMismatch);
@@ -949,7 +946,7 @@ impl PacketInteraction {
                                             match packet.state() {
                                                 PacketState::Final { plain_text, previous_hop, .. } => {
                                                     if let Some(emitter) = &mut on_final_packet {
-                                                        match ApplicationData::from_bytes(&plain_text) {
+                                                        match ApplicationData::from_bytes(plain_text) {
                                                             Ok(app_data) => {
                                                                 if let Err(e) = emitter.try_send(app_data) {
                                                                     error!("failed to emit received final packet: {e}");
@@ -1053,12 +1050,9 @@ impl PacketInteraction {
 impl Stream for PacketInteraction {
     type Item = MsgProcessed;
 
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
         use futures_lite::stream::StreamExt;
-        return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
+        Pin::new(self).ack_event_queue.1.poll_next(cx)
     }
 }
 
