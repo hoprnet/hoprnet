@@ -5,8 +5,8 @@ use async_std::channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::acknowledgement::AcknowledgedTicket;
-use std::sync::Arc;
 use core_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
+use std::sync::Arc;
 use utils_log::{error, warn};
 
 /// Enumerates all possible outgoing transactions
@@ -91,7 +91,7 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
                                 error!("failed to mark {ack} as redeemed: {e}");
                             }
                         }
-                        _ => error!("invalid state of {ack}")
+                        _ => error!("invalid state of {ack}"),
                     };
                     let _ = req.1.send(TransactionResult);
                 }

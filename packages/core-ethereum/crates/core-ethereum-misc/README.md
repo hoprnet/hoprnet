@@ -10,7 +10,9 @@ This crate contains various on-chain related modules and types:
 - `transaction_queue`: implements a queue of outgoing transactions that is executed one-by-one in the background
 
 ## `redeem`
+
 There are 4 functions that can be used to redeem tickets:
+
 - `redeem_all_tickets`
 - `redeem_tickets_in_channel`
 - `redeem_tickets_by_counterparty`
@@ -25,7 +27,7 @@ confirmation of each ticket redemption.
 ## `transaction_queue`
 
 The `TransactionQueue` object acts as general outgoing on-chain transaction MPSC queue. The queue is picked up
-one-by-one in an infinite loop that's executed in `core-hopr`. Any component that gets a `TransactionSender` type, 
+one-by-one in an infinite loop that's executed in `core-hopr`. Any component that gets a `TransactionSender` type,
 can send new transaction requests to the queue via its `send` method.
 A new `TransactionSender` can be obtained by calling `new_sender` method on the `TransactionQueue` and can be subsequently cloned.
 The possible transactions that can be sent into the queue are declared in the `Transaction` enum.
