@@ -368,9 +368,6 @@ log "Waiting for node 1 to send messages to node 5"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-# declare channel_id
-# channel_id=$(api_get_channel_id "${api1}" "${node_addr1}" "${node_addr2}")
-
 api_aggregate_tickets "${api2}" "0x8b4f8683b34e36012804062d6a6dbb2b1f814876a59fe566d4badf0b011db756" 
 
 test_redeem_in_specific_channel() {

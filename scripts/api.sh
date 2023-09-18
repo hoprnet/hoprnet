@@ -153,17 +153,6 @@ api_get_all_channels() {
 }
 
 # $1 = node api endpoint
-# $2 = source
-# $3 = destination
-api_get_channel_id() {
-  local node_api="${1}"
-  local source="${2}"
-  local destination="${3}"
-
-  api_call "${node_api}" "/channel/${source}/${destination}/id" "GET" "" "" 600
-}
-
-# $1 = node api endpoint
 api_get_settings() {
   local node_api="${1}"
 
@@ -210,7 +199,7 @@ api_aggregate_tickets() {
   local channel_id="${2}"
 
   log "aggregating tickets in channel ${channel_id}"
-  api_call "${origin}" "/tickets/${channel_id}/aggregate" "POST" "" "" 600
+  api_call "${origin}" "/channels/${channel_id}/tickets/aggregate" "POST" "" "" 600
 }
 
 # $1 = node api endpoint

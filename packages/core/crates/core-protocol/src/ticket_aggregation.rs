@@ -26,7 +26,7 @@ use libp2p_identity::PeerId;
 use std::{pin::Pin, sync::Arc, task::Poll};
 use utils_log::{debug, error, warn};
 use utils_types::{
-    primitives::{Balance, BalanceType, U256},
+    primitives::{Address, Balance, BalanceType, U256},
     traits::PeerIdLike,
 };
 
@@ -149,7 +149,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
             if i + 1 < acked_tickets.len() {
                 if acked_ticket.ticket.index + acked_ticket.ticket.index_offset as u64
-                    >= acked_tickets[i + 1].ticket.index
+                    > acked_tickets[i + 1].ticket.index
                 {
                     return Err(ProtocolTicketAggregation(
                         "Tickets with overlapping index intervals".to_owned(),
@@ -573,8 +573,8 @@ mod tests {
     use std::{sync::Arc, time::Duration};
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
-        primitives::{Balance, BalanceType, Snapshot, U256},
-        traits::BinarySerializable,
+        primitives::{Address, Balance, BalanceType, Snapshot, U256},
+        traits::{BinarySerializable, PeerIdLike},
     };
 
     use super::TicketAggregationProcessed;
@@ -617,7 +617,7 @@ mod tests {
         let ticket = Ticket::new(
             &destination.into(),
             &Balance::new(price_per_packet.divide_f64(ticket_win_prob).unwrap(), BalanceType::HOPR),
-            1u64.into(),
+            index.into(),
             1u64.into(),
             ticket_win_prob,
             1u64.into(),
@@ -648,6 +648,12 @@ mod tests {
 
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
+
+        let alice_addr: Address = (&PEERS_CHAIN[0]).into();
+        let bob_addr: Address = (&PEERS_CHAIN[1]).into();
+
+        let alice_packet_key = PEERS[0].public().to_peerid();
+        let bob_packet_key = PEERS[1].public().to_peerid();
 
         for db in dbs.iter() {
             db.write()
@@ -681,8 +687,8 @@ mod tests {
             .update_channel_and_snapshot(
                 &channel_id_alice_bob,
                 &ChannelEntry {
-                    source: (&PEERS_CHAIN[0]).into(),
-                    destination: (&PEERS_CHAIN[1]).into(),
+                    source: alice_addr,
+                    destination: bob_addr,
                     balance: Balance::new(1u64.into(), BalanceType::HOPR),
                     ticket_index: 1u64.into(),
                     status: ChannelStatus::Open,
@@ -697,11 +703,11 @@ mod tests {
         let mut awaiter = bob.writer().aggregate_tickets(&channel_id_alice_bob).unwrap();
         let mut finalizer = None;
         match bob.next().await {
-            Some(TicketAggregationProcessed::Send(destination, acked_tickets, request_finalizer)) => {
+            Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {
                 let _ = finalizer.insert(request_finalizer);
                 alice
                     .writer()
-                    .receive_aggregation_request(destination, acked_tickets, ())
+                    .receive_aggregation_request(bob_packet_key, acked_tickets, ())
                     .unwrap();
             }
             //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
@@ -709,9 +715,10 @@ mod tests {
         };
 
         match alice.next().await {
-            Some(TicketAggregationProcessed::Reply(destination, aggregated_ticket, ())) => {
-                bob.writer().receive_ticket(destination, aggregated_ticket, ()).unwrap()
-            }
+            Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ())) => bob
+                .writer()
+                .receive_ticket(alice_packet_key, aggregated_ticket, ())
+                .unwrap(),
             _ => panic!("unexpected action happened"),
         };
 

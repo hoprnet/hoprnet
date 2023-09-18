@@ -178,6 +178,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(tickets)
     }
 
+    /// Fetches all acknowledged tickets in given range.
+    /// If any of the tickets is marked as being redeemed, drop this acknowledged ticket
+    /// and all previous tickets as aggregation does not make any sense.
     async fn prepare_aggregatable_tickets(
         &mut self,
         channel_id: &Hash,
@@ -198,10 +201,17 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let mut batch_ops = utils_db::db::Batch::default();
 
-        while tickets.len() > 0 {
+        let mut done = false;
+        while tickets.len() > 0 && !done {
+            let tickets_len = tickets.len();
             for (index, ticket) in tickets.iter_mut().enumerate() {
                 if let AcknowledgedTicketStatus::BeingRedeemed { tx_hash: _ } = ticket.status {
-                    tickets = tickets.split_at_mut(index).1.to_vec();
+                    if index + 1 > tickets_len {
+                        tickets = vec![];
+                        done = true;
+                    } else {
+                        tickets = tickets.split_at_mut(index + 1).1.to_vec();
+                    }
                     batch_ops = utils_db::db::Batch::default();
                     break;
                 }
@@ -216,9 +226,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                         ticket.ticket.index,
                     )?,
                     ticket,
-                )
+                );
+
+                if index == tickets_len - 1 {
+                    done = true;
+                }
             }
-            break;
         }
 
         self.db.batch(batch_ops, true).await?;
@@ -256,7 +269,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 &aggregated_ticket.ticket.channel_id,
                 aggregated_ticket.ticket.channel_epoch,
                 aggregated_ticket.ticket.index,
-                aggregated_ticket.ticket.index + aggregated_ticket.ticket.index_offset as u64 - 1u64,
+                aggregated_ticket.ticket.index + aggregated_ticket.ticket.index_offset as u64,
             )
             .await?;
 
@@ -1969,6 +1982,10 @@ mod tests {
             })
             .collect::<Vec<AcknowledgedTicket>>();
 
+        // Add some being redeemed tickets
+        acked_tickets[12].status(AcknowledgedTicketStatus::BeingRedeemed {
+            tx_hash: Hash::default(),
+        });
         acked_tickets[17].status(AcknowledgedTicketStatus::BeingRedeemed {
             tx_hash: Hash::default(),
         });
@@ -1977,12 +1994,18 @@ mod tests {
 
         let channel_id = generate_channel_id(&(&*ALICE_KEYPAIR).into(), &(&*BOB_KEYPAIR).into());
 
-        assert_eq!(
-            db.prepare_aggregatable_tickets(&channel_id, 1u32, 0u64, u64::MAX)
-                .await
-                .unwrap()
-                .len(),
-            12
-        );
+        let stored_acked_tickets = db
+            .prepare_aggregatable_tickets(&channel_id, 1u32, 0u64, u64::MAX)
+            .await
+            .unwrap();
+
+        assert_eq!(stored_acked_tickets.len(), 11);
+
+        assert!(stored_acked_tickets
+            .iter()
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
+                start: 0u64,
+                end: u64::MAX,
+            } == acked_ticket.status));
     }
 }
