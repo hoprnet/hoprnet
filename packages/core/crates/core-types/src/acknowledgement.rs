@@ -82,7 +82,7 @@ impl BinarySerializable for Acknowledgement {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AcknowledgedTicketStatus {
     Untouched,
     BeingRedeemed { tx_hash: Hash },

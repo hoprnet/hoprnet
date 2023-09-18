@@ -28,9 +28,7 @@ use std::{sync::Arc, time::Duration};
 use utils_log::{error, info};
 use utils_types::traits::BinarySerializable;
 
-use crate::timer::UniversalTimer;
 use core_ethereum_misc::transaction_queue::{TransactionQueue, TransactionSender};
-use core_types::protocol::TagBloomFilter;
 
 #[cfg(feature = "wasm")]
 use {

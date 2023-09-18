@@ -26,7 +26,7 @@ use libp2p_identity::PeerId;
 use std::{pin::Pin, sync::Arc, task::Poll};
 use utils_log::{debug, error, warn};
 use utils_types::{
-    primitives::{Address, Balance, BalanceType, U256},
+    primitives::{Balance, BalanceType, U256},
     traits::PeerIdLike,
 };
 
