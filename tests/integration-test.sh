@@ -412,7 +412,7 @@ redeem_tickets "4" "${api2}" & jobs+=( "$!" )
 redeem_tickets "5" "${api2}" & jobs+=( "$!" )
 
 log "Waiting for nodes to finish ticket redemption (long running)"
-#for j in ${jobs[@]}; do wait -n $j; done; jobs=()
+for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
 # initiate channel closures, but don't wait because this will trigger ticket
