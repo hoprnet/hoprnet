@@ -997,7 +997,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Snapshot {
-        #[wasm_bindgen(js_name = "default")]
+        #[wasm_bindgen(js_name = "make_default")]
         pub fn _default() -> Self {
             Snapshot::default()
         }

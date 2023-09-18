@@ -25,9 +25,20 @@ const POST: Operation = [
 
 POST.apiDoc = {
   description:
-    'Takes all acknowledged and winning tickets from the given channel (if any) and aggregates them into a single ticket. Requires cooperation of the ticket issuer.',
-  tags: ['Tickets'],
-  operationId: 'ticketsAggregateTickets',
+    'Takes all acknowledged and winning tickets (if any) from the given channel and aggregates them into a single ticket. Requires cooperation of the ticket issuer.',
+  tags: ['Channels'],
+  operationId: 'channelsAggregateTickets',
+  parameters: [
+    {
+      in: 'path',
+      name: 'channelid',
+      required: true,
+      schema: {
+        format: 'channelid',
+        type: 'string'
+      }
+    }
+  ],
   responses: {
     '204': {
       description: 'Tickets successfully aggregated'
