@@ -36,16 +36,22 @@ use async_std::task::spawn_local;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
-// #[cfg(all(feature = "prometheus", not(test)))]
-// use utils_metrics::metrics::SimpleCounter;
-// #[cfg(all(feature = "prometheus", not(test)))]
-// lazy_static::lazy_static! {
-//     static ref METRIC_RECEIVED_SUCCESSFUL_ACKS: SimpleCounter = SimpleCounter::new(
-//         "core_counter_received_successful_acks",
-//         "Number of received successful acknowledgements"
-//     )
-//     .unwrap();
-// }
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+     static ref METRIC_AGGREGATED_TICKETS: SimpleCounter = SimpleCounter::new(
+         "core_counter_aggregated_tickets",
+         "Number of aggregated tickets"
+     )
+     .unwrap();
+    static ref METRIC_AGGREGATION_COUNT: SimpleCounter = SimpleCounter::new(
+         "core_counter_aggregations",
+         "Number of performed ticket aggregations"
+     )
+     .unwrap();
+}
 
 // Default sizes of the acknowledgement queues
 pub const TICKET_AGGREGATION_TX_QUEUE_SIZE: usize = 2048;
@@ -165,14 +171,20 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             }
 
             if !acked_ticket.is_winning_ticket(&domain_separator) {
-                return Err(ProtocolTicketAggregation("Not a winnign ticket".to_owned()));
+                return Err(ProtocolTicketAggregation("Not a winning ticket".to_owned()));
             }
 
             final_value += acked_ticket.ticket.amount.amount();
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_AGGREGATED_TICKETS.increment();
         }
 
         let first_acked_ticket = acked_tickets.first().unwrap();
         let last_acked_ticket = acked_tickets.last().unwrap();
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_AGGREGATION_COUNT.increment();
 
         Ticket::new(
             &destination,
