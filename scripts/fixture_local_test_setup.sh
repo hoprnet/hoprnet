@@ -226,7 +226,8 @@ function create_local_safes() {
       hopli create-safe-module \
         --network anvil-localhost \
         --identity-from-path "${id_file}" \
-        --contracts-root "./packages/ethereum/contracts" > "${id_file%.id}.safe.log"
+        --contracts-root "./packages/ethereum/contracts" > "${id_file%.id}.safe.log" \
+        --hopr-amount "20000.0"
 
     # store safe arguments in separate file for later use
     grep -oE "\--safeAddress.*--moduleAddress.*" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
@@ -405,8 +406,15 @@ wait_for_regex "${node7_log}" "please fund this node"
 
 log "Funding nodes"
 #  --- Fund nodes --- {{{
-make -C "${mydir}/../" fund-local-all \
-  id_password="${password}" id_prefix="${node_prefix}" id_dir="${tmp_dir}"
+env \
+  ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
+  PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  hopli faucet \
+  --network anvil-localhost \
+  --identity-prefix "${node_prefix}" \
+  --identity-directory "${tmp_dir}" \
+  --contracts-root "./packages/ethereum/contracts" \
+  --hopr-amount "0.0"
 # }}}
 
 log "Waiting for port binding"
@@ -434,9 +442,9 @@ wait_for_regex "${node1_log}" "STARTED NODE"
 
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
-  declare node_dir_db="${node_dir}/db/db.sqlite"
+  declare node_dir_db="${node_dir}/db"
   declare node_dir_tbf="${node_dir}/tbf"
-  [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
+  [ -d "${node_dir_db}" ] || { echo "Data directory ${node_dir_db} missing"; exit 1; }
   [ -f "${node_dir_tbf}" ] || { echo "Data file ${node_dir_tbf} missing"; exit 1; }
 done
 # }}}

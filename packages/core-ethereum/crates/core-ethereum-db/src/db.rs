@@ -5,12 +5,13 @@ use core_types::{
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
+use utils_db::errors::DbError;
 use utils_db::{
     constants::*,
     db::{Batch, DB},
     traits::AsyncKVStorage,
 };
-use utils_log::debug;
+use utils_log::{debug, error};
 use utils_types::{
     primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
@@ -29,6 +30,11 @@ fn to_acknowledged_ticket_key(channel_id: &Hash, epoch: u32, index: u64) -> Resu
     ack_key.extend_from_slice(&index.to_be_bytes());
 
     utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX)
+}
+
+#[inline]
+fn get_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> Result<utils_db::db::Key> {
+    to_acknowledged_ticket_key(&ack.ticket.channel_id, ack.ticket.channel_epoch, ack.ticket.index)
 }
 
 pub struct CoreEthereumDb<T>
@@ -140,11 +146,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         acked_ticket: AcknowledgedTicket,
     ) -> Result<()> {
         let unack_key = utils_db::db::Key::new_with_prefix(half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
-        let ack_key = to_acknowledged_ticket_key(
-            &acked_ticket.ticket.channel_id,
-            acked_ticket.ticket.channel_epoch,
-            acked_ticket.ticket.index,
-        )?;
+        let ack_key = get_acknowledged_ticket_key(&acked_ticket)?;
 
         let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.del(unack_key);
@@ -160,14 +162,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .get_more::<AcknowledgedTicket>(
                 Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
                 ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
-                &|ack: &AcknowledgedTicket| match &filter {
-                    Some(f) => {
-                        f.destination.eq(&self.me)
-                            && f.channel_epoch.eq(&ack.ticket.channel_epoch.into())
-                            && f.source.eq(&ack.signer)
-                    }
-                    None => true,
-                },
+                &|ack: &AcknowledgedTicket| filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true),
             )
             .await?;
 
@@ -213,25 +208,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch = utils_db::db::Batch::default();
 
         for acked_ticket in acked_tickets_to_replace.iter() {
-            batch.del(
-                to_acknowledged_ticket_key(
-                    &acked_ticket.ticket.channel_id,
-                    acked_ticket.ticket.channel_epoch,
-                    acked_ticket.ticket.index,
-                )?
-                .into(),
-            );
+            batch.del(get_acknowledged_ticket_key(&acked_ticket)?);
         }
 
-        batch.put(
-            to_acknowledged_ticket_key(
-                &aggregated_ticket.ticket.channel_id,
-                aggregated_ticket.ticket.channel_epoch,
-                aggregated_ticket.ticket.index,
-            )?
-            .into(),
-            aggregated_ticket,
-        );
+        batch.put(get_acknowledged_ticket_key(&aggregated_ticket)?, aggregated_ticket);
 
         self.db.batch(batch, true).await
     }
@@ -244,14 +224,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 EthereumChallenge::SIZE as u32,
                 &|pending: &PendingAcknowledgement| match pending {
                     PendingAcknowledgement::WaitingAsSender => false,
-                    PendingAcknowledgement::WaitingAsRelayer(unack) => match &filter {
-                        Some(f) => {
-                            f.destination.eq(&self.me)
-                                && f.channel_epoch.eq(&unack.ticket.channel_epoch.into())
-                                && f.source.eq(&unack.signer)
-                        }
-                        None => true,
-                    },
+                    PendingAcknowledgement::WaitingAsRelayer(unack) => {
+                        filter.map(|f| f.get_id() == unack.ticket.channel_id).unwrap_or(true)
+                    }
                 },
             )
             .await?
@@ -261,6 +236,15 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 PendingAcknowledgement::WaitingAsRelayer(unack) => Some(unack),
             })
             .collect::<Vec<UnacknowledgedTicket>>())
+    }
+
+    async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
+        let key = get_acknowledged_ticket_key(&ticket)?;
+        if self.db.contains(key.clone()).await {
+            self.db.set(key, ticket).await.map(|_| ())
+        } else {
+            Err(DbError::NotFound)
+        }
     }
 
     async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> Result<()> {
@@ -353,11 +337,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let mut batch_ops = utils_db::db::Batch::default();
         for acked_ticket in acknowledged_tickets.iter() {
-            batch_ops.del(to_acknowledged_ticket_key(
-                &acked_ticket.ticket.channel_id,
-                acked_ticket.ticket.channel_epoch,
-                acked_ticket.ticket.index,
-            )?);
+            batch_ops.del(get_acknowledged_ticket_key(&acked_ticket)?);
         }
 
         if !acknowledged_tickets.is_empty() {
@@ -489,23 +469,16 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         self.db.batch(batch_ops, true).await
     }
 
-    async fn mark_redeemed(&mut self, counterparty: &Address, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        debug!(
-            "marking ticket #{} in channel with {} as redeemed",
-            acked_ticket.ticket.index, counterparty
-        );
+    async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
+        debug!("marking {} as redeemed", acked_ticket);
 
-        let mut ops = utils_db::db::Batch::default();
+        let mut ops = Batch::default();
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
         ops.put(key, count + 1);
 
-        let key = to_acknowledged_ticket_key(
-            &acked_ticket.ticket.channel_id,
-            acked_ticket.ticket.channel_epoch,
-            acked_ticket.ticket.index,
-        )?;
+        let key = get_acknowledged_ticket_key(&acked_ticket)?;
         ops.del(key);
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
@@ -518,28 +491,34 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
         ops.put(key, new_redeemed_balance);
 
-        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
-        let pending_balance = self
-            .db
-            .get_or_none::<Balance>(key.clone())
-            .await?
-            .unwrap_or(Balance::zero(BalanceType::HOPR));
+        if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
+            if c.source == self.me {
+                c.destination
+            } else {
+                c.source
+            }
+        }) {
+            let key = utils_db::db::Key::new_with_prefix(&counterparty, PENDING_TICKETS_COUNT)?;
+            let pending_balance = self
+                .db
+                .get_or_none::<Balance>(key.clone())
+                .await?
+                .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-        let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
-        ops.put(key, new_pending_balance);
+            let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
+            ops.put(key, new_pending_balance);
+        } else {
+            error!(
+                "could not update redeemed tickets count: unable to find channel with id {}",
+                acked_ticket.ticket.channel_id
+            )
+        }
 
         self.db.batch(ops, true).await
     }
 
-    async fn mark_losing_acked_ticket(
-        &mut self,
-        counterparty: &Address,
-        acked_ticket: &AcknowledgedTicket,
-    ) -> Result<()> {
-        debug!(
-            "marking ticket #{} in channel with {} as losing",
-            acked_ticket.ticket.index, counterparty
-        );
+    async fn mark_losing_acked_ticket(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
+        debug!("marking {acked_ticket} as losing",);
 
         let mut ops = utils_db::db::Batch::default();
 
@@ -547,20 +526,29 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
         ops.put(key, count + 1);
 
-        let key = to_acknowledged_ticket_key(
-            &acked_ticket.ticket.channel_id,
-            acked_ticket.ticket.channel_epoch,
-            acked_ticket.ticket.index,
-        )?;
+        let key = get_acknowledged_ticket_key(&acked_ticket)?;
         ops.del(key);
 
-        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
-        let balance = self
-            .db
-            .get_or_none::<Balance>(key.clone())
-            .await?
-            .unwrap_or(Balance::zero(BalanceType::HOPR));
-        ops.put(key, balance.sub(&acked_ticket.ticket.amount));
+        if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
+            if c.source == self.me {
+                c.destination
+            } else {
+                c.source
+            }
+        }) {
+            let key = utils_db::db::Key::new_with_prefix(&counterparty, PENDING_TICKETS_COUNT)?;
+            let balance = self
+                .db
+                .get_or_none::<Balance>(key.clone())
+                .await?
+                .unwrap_or(Balance::zero(BalanceType::HOPR));
+            ops.put(key, balance.sub(&acked_ticket.ticket.amount));
+        } else {
+            error!(
+                "could not update losing tickets count: unable to find channel with id {}",
+                acked_ticket.ticket.channel_id
+            )
+        }
 
         self.db.batch(ops, true).await
     }
@@ -1226,6 +1214,15 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
+        pub async fn update_acknowledged_ticket(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_write! {
+            let mut db = data.write().await;
+            utils_misc::ok_or_jserr!(db.update_acknowledged_ticket(&ticket.into()).await)
+            //}
+        }
+
+        #[wasm_bindgen]
         pub async fn get_neglected_tickets_count(&self) -> Result<usize, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
@@ -1317,15 +1314,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_redeemed(
-            &self,
-            counterparty: &Address,
-            acked_ticket: &AcknowledgedTicket,
-        ) -> Result<(), JsValue> {
+        pub async fn mark_redeemed(&self, acked_ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_redeemed(counterparty, &acked_ticket.into()).await)
+            utils_misc::ok_or_jserr!(db.mark_redeemed(&acked_ticket.into()).await)
             //}
         }
 
@@ -1340,15 +1333,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn mark_losing_acked_ticket(
-            &self,
-            counterparty: &Address,
-            ticket: &AcknowledgedTicket,
-        ) -> Result<(), JsValue> {
+        pub async fn mark_losing_acked_ticket(&self, ticket: &AcknowledgedTicket) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(counterparty, &ticket.into()).await)
+            utils_misc::ok_or_jserr!(db.mark_losing_acked_ticket(&ticket.into()).await)
             //}
         }
 

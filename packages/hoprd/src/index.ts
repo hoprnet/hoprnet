@@ -14,7 +14,12 @@ import {
   defer,
   Address,
   debug,
-  health_to_string
+  health_to_string,
+  MessageInbox,
+  HoprKeys,
+  IdentityOptions,
+  ApplicationData,
+  MessageInboxConfiguration
 } from '@hoprnet/hopr-utils'
 import {
   Health,
@@ -37,20 +42,11 @@ import {
 } from '../lib/hoprd_hoprd.js'
 hoprd_hoprd_initialize_crate()
 
-import {
-  MessageInbox,
-  HoprKeys,
-  IdentityOptions,
-  ApplicationData,
-  MessageInboxConfiguration
-} from '@hoprnet/hopr-utils'
-
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
 import setupHealthcheck from './healthcheck.js'
 
 import { decodeMessage } from './api/utils.js'
-import { type ChannelStrategyInterface, StrategyFactory } from '@hoprnet/hopr-core/lib/channel-strategy.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
 
 const ONBOARDING_INFORMATION_INTERVAL = 30000 // show information every 30sec
@@ -85,15 +81,7 @@ const version = get_package_version(packageFile)
 const on_dappnode = (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true'
 
 function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOptions {
-  let strategy: ChannelStrategyInterface
-
-  if (isStrategy(cfg.strategy.name)) {
-    strategy = StrategyFactory.getStrategy(cfg.strategy.name)
-    strategy.configure({
-      auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
-      max_channels: cfg.strategy.max_auto_channels ?? undefined
-    })
-  } else {
+  if (!isStrategy(cfg.strategy.name)) {
     throw Error(`Invalid strategy selected`)
   }
 
@@ -120,7 +108,13 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
       localModeStun: cfg.test.local_mode_stun
     },
     password: cfg.identity.password,
-    strategy,
+    strategy: {
+      name: cfg.strategy.name,
+      settings: {
+        auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
+        max_channels: cfg.strategy.max_auto_channels ?? undefined
+      }
+    },
     forceCreateDB: cfg.db.force_initialize,
     noRelay: cfg.network_options.no_relay,
     safeModule: {
@@ -128,14 +122,6 @@ function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOp
       safeAddress: cfg.safe_module.safe_address,
       moduleAddress: cfg.safe_module.module_address
     }
-  }
-
-  if (isStrategy(cfg.strategy.name)) {
-    options.strategy = StrategyFactory.getStrategy(cfg.strategy.name)
-    options.strategy.configure({
-      auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
-      max_channels: cfg.strategy.max_auto_channels ?? undefined
-    })
   }
 
   if (cfg.safe_module.safe_address) {
@@ -159,7 +145,7 @@ export function parseCliArguments(args: string[]) {
   } catch (err) {
     // both --version and --help are treated as errors, therefore we need some
     // special handling here to be able to return exit code 0 in such cases
-    const message = err instanceof Error ? err.message : (err as String)
+    const message = err instanceof Error ? err.message : (err as string)
     if (message.startsWith('hoprd') || message.startsWith('HOPRd')) {
       console.log(err)
       process.exit(0)

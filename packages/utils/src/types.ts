@@ -89,6 +89,10 @@ export {
   random_fill,
   random_float,
   random_integer,
+  redeem_ticket,
+  redeem_all_tickets,
+  redeem_tickets_in_channel,
+  redeem_tickets_with_counterparty,
   Response,
   Signature,
   SimpleCounter,
@@ -109,5 +113,6 @@ export {
   WasmNetwork,
   WasmPing,
   WasmIndexerInteractions,
-  PingConfig
+  PingConfig,
+  WasmTxExecutor
 } from '../../hoprd/lib/hoprd_hoprd.js'

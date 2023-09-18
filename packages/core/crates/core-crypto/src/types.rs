@@ -323,6 +323,11 @@ impl HalfKey {
         ret
     }
 
+    /// Generates random half key, useful for tests.
+    pub fn random() -> Self {
+        Self::new(&random_group_element().0)
+    }
+
     /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
@@ -1740,7 +1745,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]

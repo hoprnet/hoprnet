@@ -689,13 +689,10 @@ export async function createChainWrapper(
    * @returns a Promise that resolve with the transaction hash
    */
   const redeemTicket = async (
-    counterparty: Address,
     ackTicket: AcknowledgedTicket,
     txHandler: (tx: string) => DeferType<string>
   ): Promise<Receipt> => {
-    log(
-      `Redeeming ticket on-chain for challenge ${ackTicket.ticket.challenge.to_hex()} in channel to ${counterparty.to_hex()}`
-    )
+    log(`Redeeming ${ackTicket.to_string()} on-chain for challenge ${ackTicket.ticket.challenge.to_hex()}`)
 
     let sendResult: SendTransactionReturn
     let error: unknown
@@ -715,16 +712,14 @@ export async function createChainWrapper(
 
     switch (sendResult.code) {
       case SendTransactionStatus.SUCCESS:
-        log(`On-chain TX for ticket redemption in channel to ${counterparty.to_hex()} was successful`)
+        log(`On-chain TX for ticket redemption of ${ackTicket.to_string()} was successful`)
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
         throw new Error(
-          `Failed in sending redeem ticket in channel to ${counterparty.to_hex()} transaction because transaction is a duplicate`
+          `Failed in sending redeem ${ackTicket.to_string()} transaction because transaction is a duplicate`
         )
       default:
-        throw new Error(
-          `Failed in sending redeem ticket in channel to ${counterparty.to_hex()} transaction due to ${error}`
-        )
+        throw new Error(`Failed in sending redeem ${ackTicket.to_string()} transaction due to ${error}`)
     }
   }
 
