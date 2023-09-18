@@ -1,6 +1,6 @@
 [package]
 name = "real-base"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust WASM modules for HOPR"
@@ -14,11 +14,11 @@ crate-type = ["cdylib", "rlib"] # rlib is necessary to run integration tests
 
 [features]
 default = [ "wasm" ]
-wasm = [ "dep:wasm-bindgen" ]
+wasm = [ "dep:wasm-bindgen", "dep:bitflags" ]
 
 [dependencies]
 thiserror = "1.0"
-bitflags = "2.4"
+bitflags = { version = "2.4", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
