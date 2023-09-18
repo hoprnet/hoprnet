@@ -331,6 +331,10 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public async openChannel(dest: Address, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {
+    if (this.chainKeypair.to_address().eq(dest)) {
+      throw Error('Cannot open channel to self!')
+    }
+
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
@@ -343,49 +347,36 @@ export default class HoprCoreEthereum extends EventEmitter {
       throw Error('Channel is already opened')
     }
 
-    // Safe HOPR balance must be larger or equal to the amount to be funded
-    const myBalance = await this.getSafeBalance()
-    if (myBalance.lt(amount)) {
-      throw Error('We do not have enough balance to open a channel')
-    }
-
     log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
-
-    // allowance must be larger or equal to the amount to be funded
-    const allowance = await this.db.get_staking_safe_allowance()
-    if (allowance.lt(amount)) {
-      throw Error('We do not have enough allowance to fund the channel')
-    }
-
-    const receipt = await this.fundChannel(dest, amount, Balance.zero(BalanceType.HOPR))
+    const receipt = await this.fundChannel(dest, amount)
     return { channelId: generate_channel_id(this.chainKeypair.to_address(), dest), receipt }
   }
 
-  public async fundChannel(dest: Address, myFund: Balance, counterpartyFund: Balance): Promise<Receipt> {
-    const totalFund = myFund.add(counterpartyFund)
+  // This operation works on open and closed channels. More assertions must be
+  // enforced on a higher layer.
+  public async fundChannel(dest: Address, amount: Balance): Promise<Receipt> {
     const myBalance = await this.getSafeBalance()
-    if (totalFund.gt(myBalance)) {
-      throw Error('We do not have enough balance to fund the channel')
+    if (amount.lte(Balance.zero(BalanceType.HOPR))) {
+      throw Error('Amount must be more than 0')
+    }
+    if (amount.gt(myBalance)) {
+      throw Error(`Not enough balance (${myBalance.to_string()} < ${amount.to_string()})`)
     }
     log(
       `====> fundChannel: src: ${this.chainKeypair
         .to_address()
-        .to_string()} dest: ${dest.to_string()} amount: ${myFund.to_string()} | ${counterpartyFund.to_string()}`
+        .to_string()} dest: ${dest.to_string()} amount: ${amount.to_string()}`
     )
 
-    const allowance = Balance.deserialize(
-      (await this.db.get_staking_safe_allowance()).serialize_value(),
-      BalanceType.HOPR
-    )
-    if (allowance.lt(myFund)) {
-      throw Error(
-        `We do not have enough allowance (${allowance.to_string()} < ${myFund.to_string()} to fund the channel`
-      )
+    // allowance must be larger or equal to the amount
+    const allowance = await this.db.get_staking_safe_allowance()
+    if (allowance.lt(amount)) {
+      throw Error(`Not enough allowance (${allowance.to_string()} < ${amount.to_string()})`)
     }
     const receipt = (
       await this.chain.fundChannel(
         dest,
-        myFund,
+        amount,
         (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
         // we are only interested in fundChannel receipt
       )

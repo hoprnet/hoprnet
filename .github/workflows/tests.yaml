@@ -24,7 +24,7 @@ concurrency:
 jobs:
   unit_testing:
     name: Unit
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     timeout-minutes: 90
     if: github.event.pull_request.draft == false
     steps:

@@ -161,39 +161,16 @@ The process of closing a release consists of building, tagging and publishing th
 
 1. Make sure that the [milestone](https://github.com/hoprnet/hoprnet/milestones) issues are all close. Do not start the next step until all the issues and PR are closed.
 2. Execute the manual workflow named [Close Release](https://github.com/hoprnet/hoprnet/actions/workflows/close-release.yaml) selecting the branch where you want to close it.
-3. A new PR will be created with the name `Close release <RELEASE_NUMBER>`. Follow the instructions on the PR until merge it.
+3. A new PR will be created with the name `Close release <RELEASE_NUMBER>`. Follow the instructions on the PR and merge it.
 4. Review the contents of the new [Github Release](https://github.com/hoprnet/hoprnet/releases) created and modify accordingly
 5. Share the links to the Github release and testnet wiki page in the `#release` Element channel.
 
 ### Promote release
 
-The process of promoting the named release (bratislava, providence, etc) consists of creating or updating a given ${RELEASE_NAME} tag and artifacts to the newly closed released. This process should be executed after the closure of release.
+The process of promoting the named release (bratislava, providence, etc) consists of creating or updating a given ${RELEASE_NAME} tag, branch and artifacts based on the recently closed released. This process should be executed after the closure of release candidates only or the first minor version (X.X.0).
 
-1. Update the named release
-
-```
-export RELEASE_NAME=providence
-export RELEASE_NUMBER=2.0.0-rc.3
-
-git checkout ${RELEASE_NUMBER}
-git pull
-git checkout release/${RELEASE_NAME}
-git pull
-git rebase
-git push --force
-git tag --force ${RELEASE_NAME}
-git push --force origin ${RELEASE_NAME}
-docker_registry="europe-west3-docker.pkg.dev/hoprassociation/docker-images"
-docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
-images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
-for image in ${images[@]};
-do
-  echo "Tagging ${image}:${RELEASE_NAME}"
-  gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${RELEASE_NAME}
-done
-```
-
-3. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
+1. Execute the manual workflow named [Promote Release](https://github.com/hoprnet/hoprnet/actions/workflows/promote-release.yaml) specifying the name of the release and the tag you want to bind it
+2. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
 
 ### Merge Back

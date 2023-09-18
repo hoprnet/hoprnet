@@ -20,7 +20,7 @@ concurrency:
 jobs:
   lint:
     name: Linter
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     timeout-minutes: 30
     if: github.event.pull_request.draft == false
     steps:
@@ -85,7 +85,7 @@ jobs:
 
   # shellcheck:
   #   name: Shellcheck
-  #   runs-on: ubuntu-latest-4-cores
+  #   runs-on: ubuntu-2-core
   #   timeout-minutes: 15
   #   if: github.event.pull_request.draft == false
   #   steps:
