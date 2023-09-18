@@ -101,9 +101,12 @@ pub mod wasm {
     use crate::transaction_queue::TransactionExecutor;
     use async_trait::async_trait;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use js_sys::Promise;
+    use utils_log::debug;
     use utils_misc::utils::wasm::js_value_to_error_msg;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
+    use wasm_bindgen_futures::JsFuture;
 
     #[wasm_bindgen]
     pub struct WasmTxExecutor {
@@ -123,7 +126,18 @@ pub mod wasm {
         async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> crate::errors::Result<()> {
             let wasm_ack: core_types::acknowledgement::wasm::AcknowledgedTicket = ticket.into();
             match self.redeem_ticket_fn.call1(&JsValue::null(), &JsValue::from(wasm_ack)) {
-                Ok(_) => Ok(()),
+                Ok(ret) => {
+                    let promise = Promise::from(ret);
+                    match JsFuture::from(promise).await {
+                        Ok(res) => {
+                            debug!("JS redeem transaction completed: {:?}", res.as_string());
+                            Ok(())
+                        }
+                        Err(e) => Err(TransactionSubmissionFailed(
+                            js_value_to_error_msg(e).unwrap_or("unknown error".to_string()),
+                        )),
+                    }
+                }
                 Err(e) => Err(TransactionSubmissionFailed(
                     js_value_to_error_msg(e).unwrap_or("unknown error".to_string()),
                 )),
