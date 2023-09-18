@@ -23,4 +23,3 @@ jobs:
           gh pr ready ${{ github.event.pull_request.number }} --undo
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  

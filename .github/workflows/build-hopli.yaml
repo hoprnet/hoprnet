@@ -16,7 +16,7 @@ jobs:
 
   build:
     name: docker
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     timeout-minutes: 60
     steps:
       - name: Checkout hoprnet repository
@@ -39,6 +39,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          driver: kubernetes
 
       - name: "Update version"
         run: |

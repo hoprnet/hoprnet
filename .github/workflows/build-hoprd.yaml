@@ -22,7 +22,7 @@ jobs:
 
   build:
     name: docker
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     timeout-minutes: 60
     steps:
       - name: Checkout hoprnet repository
@@ -45,6 +45,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          driver: kubernetes
 
       - name: "Update version"
         run: |
@@ -71,7 +73,7 @@ jobs:
 
   restart_deployment:
     name: Restart deployment
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     needs: build
     if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
     steps:

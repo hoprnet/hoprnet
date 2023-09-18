@@ -1,0 +1,101 @@
+# See docs: https://github.com/actions/stale
+
+name: Cleanup
+
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        type: number
+        required: true
+        description: 'Pull request number'
+
+jobs:
+  cleanup:
+    name: Clean up cache
+    runs-on: ubuntu-2-core
+    timeout-minutes: 10
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          ref: master
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Login Google Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Cleanup Github pipeline cache
+        run: |
+          cacheKeysForPR=($(gh actions-cache list -R ${{ github.repository }} -B refs/pull/${{ github.event.inputs.pr_number }}/merge | cut -f 1 | tr '\n' ' '))
+          for cacheKey in $cacheKeysForPR
+          do
+            gh actions-cache delete $cacheKey -R hoprnet/hoprnet -B refs/pull/${{ github.event.inputs.pr_number }}/merge --confirm
+          done
+
+      - name: Cleanup Docker Registry
+        run: |
+          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
+          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.inputs.pr_number }})
+          ./scripts/bump-version.sh ${next_version}
+          images=('hopli' 'hoprd' 'hopr-anvil' 'hopr-pluto' 'hopr-toolchain' 'hoprd')
+          for image in "${images[@]}"; do
+            gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:2.0.0-rc.5-pr.5496
+            gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:2.0.0-rc.5-pr.5496-cache
+          done
+
+      - name: Sccache Setup
+        uses: mozilla-actions/sccache-action@v0.0.3
+        with:
+          version: "v0.4.0"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v20
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v12
+        with:
+          name: hoprnet
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        continue-on-error: true
+
+      - name: get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
+
+      - name: restore yarn cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: restore cargo cache
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            .cargo/.package-cache/
+            .cargo/bin/
+            .foundry/bin/
+
+      - name: Clean build
+        run: nix develop -c make clean
