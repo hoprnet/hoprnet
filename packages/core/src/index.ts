@@ -354,7 +354,11 @@ export class Hopr extends EventEmitter {
     }
 
     log('Linking chain and packet keys')
-    this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot.make_default())
+    this.db.link_chain_and_packet_keys(
+      this.chainKeypair.to_address(),
+      this.packetKeypair.public(),
+      Snapshot.make_default()
+    )
 
     const tbfPath = path.join(this.options.dataPath, 'tbf')
     let tagBloomFilter = new TagBloomFilter()
