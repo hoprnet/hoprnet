@@ -61,7 +61,7 @@ redeem_tickets() {
   local node_api="${2}"
   local rejected redeemed
 
-  # First get the inital ticket statistics for reference
+  # First get the initial ticket statistics for reference
   result=$(api_get_ticket_statistics ${node_api} "winProportion")
   log "Node ${node_id} ticket information (before redemption) -- ${result}"
   rejected=$(echo "${result}" | jq -r .rejected)
@@ -405,7 +405,7 @@ test_redeem_in_specific_channel() {
 }
 
 log "Test redeeming in a specific channel"
-test_redeem_in_specific_channel "1" "3" ${api1} ${api3}
+test_redeem_in_specific_channel "3" "1" ${api3} ${api1} & jobs+=( "$!" )
 
 log "Test redeeming all tickets"
 redeem_tickets "2" "${api2}" & jobs+=( "$!" )
