@@ -60,7 +60,7 @@ redeem_tickets() {
   local node_id="${1}"
   local node_api="${2}"
   local rejected redeemed last_redeemed
-  local success="false"
+  local successful=0
 
   # First get the initial ticket statistics for reference
   result=$(api_get_ticket_statistics ${node_api} "winProportion")
@@ -76,7 +76,7 @@ redeem_tickets() {
   result=$(api_redeem_tickets ${node_api} 20)
   log "--${result}"
 
-  for i in `seq 1 20`; do
+  for i in `seq 1 12`; do
     sleep 5
 
     # Get ticket statistics again and compare with previous state. Ensure we redeemed tickets.
@@ -92,8 +92,7 @@ redeem_tickets() {
     fi
 
     if [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]]; then
-      success="true"
-      break
+      ((successful+=1))
     else
       # continue trying
       msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"
@@ -102,7 +101,8 @@ redeem_tickets() {
     last_redeemed="${redeemed}"
   done
 
-  if [[ "${success}" == "true" ]]; then
+  # Check there are at least 3 consecutive ticket redemptions
+  if [[ ${successful} -ge 3 ]]; then
     log "Redeem all test passed on node ${node_id} !"
     return 0
   else
