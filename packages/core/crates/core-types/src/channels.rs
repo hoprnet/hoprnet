@@ -260,6 +260,16 @@ impl Default for Ticket {
     }
 }
 
+impl Display for Ticket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ticket #{}, epoch {} in channel {}",
+            self.index, self.channel_epoch, self.channel_id
+        )
+    }
+}
+
 impl std::fmt::Debug for Ticket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Ticket")
@@ -1063,7 +1073,7 @@ pub mod wasm {
 
         #[wasm_bindgen]
         pub fn to_string(&self) -> String {
-            format!("{:?}", self.w)
+            self.w.to_string()
         }
 
         pub fn clone(&self) -> Ticket {

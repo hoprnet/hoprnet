@@ -89,7 +89,6 @@ $(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
 .PHONY: $(HOPLI_CRATE)
 $(HOPLI_CRATE): ## builds hopli Rust crates with cargo
 	echo "use cargo build"
-	cargo build --manifest-path $@/Cargo.toml
 # install the package
 	cargo install --path $@ --force
 

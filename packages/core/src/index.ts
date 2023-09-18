@@ -56,7 +56,11 @@ import {
   WasmNetwork,
   WasmPing,
   WasmIndexerInteractions,
-  PingConfig
+  PingConfig,
+  redeem_all_tickets,
+  redeem_tickets_in_channel,
+  WasmTxExecutor,
+  redeem_tickets_with_counterparty
 } from '@hoprnet/hopr-utils'
 
 import { INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -147,7 +151,10 @@ export type HoprOptions = {
   allowPrivateConnections: boolean
   password: string
   connector?: HoprCoreEthereum
-  strategy: ChannelStrategyInterface
+  strategy?: {
+    name: Strategy
+    settings?: any
+  }
   hosts: NetOptions[]
   heartbeatInterval?: number
   heartbeatThreshold?: number
@@ -356,6 +363,8 @@ export class Hopr extends EventEmitter {
       error(`no tag bloom filter file found, using empty`)
     }
 
+    let txExecutor = new WasmTxExecutor(connector.sendTicketRedeemTx.bind(connector))
+
     log('Constructing the core application and tools')
     let coreApp = new CoreApp(
       new OffchainKeypair(this.packetKeypair.secret()),
@@ -375,6 +384,7 @@ export class Hopr extends EventEmitter {
           error(`failed to save tag bloom filter data`)
         }
       },
+      txExecutor,
       this.getLocalMultiaddresses().map((x) => x.toString())
     )
 
@@ -459,7 +469,15 @@ export class Hopr extends EventEmitter {
     // subscribe so we can process channel close events
     connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
-    this.setChannelStrategy(this.options.strategy || StrategyFactory.getStrategy('passive'))
+    let strategy: ChannelStrategyInterface
+    if (this.options.strategy) {
+      strategy = StrategyFactory.getStrategy(this.options.strategy.name, this)
+      strategy.configure(this.options.strategy.settings)
+    } else {
+      strategy = StrategyFactory.getStrategy('passive', this)
+    }
+
+    this.setChannelStrategy(strategy)
 
     log('announcing done, strategy interval')
     this.startPeriodicStrategyCheck()
@@ -1336,23 +1354,40 @@ export class Hopr extends EventEmitter {
     if (!this.isReady) {
       log('redeemAllTickets: Node is not ready for on-chain operations')
     }
-    await HoprCoreEthereum.getInstance().redeemAllTickets()
+    try {
+      await redeem_all_tickets(this.db, this.chainKeypair.to_address(), this.tools.get_tx_sender())
+    } catch (err) {
+      log(`error during all tickets redemption: ${err}`)
+    }
   }
 
   public async redeemTicketsInChannel(channelId: Hash) {
     if (!this.isReady) {
       log('redeemTicketsInChannel: Node is not ready for on-chain operations')
     }
-    log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
-    const channel = await this.db.get_channel(channelId)
-    if (channel) {
-      if (channel.destination.eq(this.getEthereumAddress())) {
-        await HoprCoreEthereum.getInstance().redeemTicketsInChannel(channel)
-        return
+    try {
+      log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
+      const channel = await this.db.get_channel(channelId)
+      if (channel?.destination.eq(this.getEthereumAddress())) {
+        await redeem_tickets_in_channel(this.db, channel, this.tools.get_tx_sender())
+      } else {
+        log(`cannot redeem tickets in channel ${channelId.to_hex()}`)
       }
-      log(`cannot redeem tickets in outgoing channel ${channelId.to_hex()}`)
+    } catch (err) {
+      log(`error during tickets redemption in channel ${channelId.to_hex()}: ${err}`)
     }
-    log(`cannot redeem tickets in unknown channel ${channelId.to_hex()}`)
+  }
+
+  public async redeemTicketsWithCounterparty(counterparty: Address) {
+    if (!this.isReady) {
+      log('redeemTicketsWithCounterparty: Node is not ready for on-chain operations')
+    }
+
+    try {
+      await redeem_tickets_with_counterparty(this.db, counterparty, this.tools.get_tx_sender())
+    } catch (err) {
+      log(`error during ticket redemption with counterparty ${counterparty.to_hex()}: ${err}`)
+    }
   }
 
   /**
