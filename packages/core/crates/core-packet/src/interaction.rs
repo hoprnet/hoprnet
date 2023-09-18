@@ -639,6 +639,9 @@ where
                     return Err(TagReplay);
                 }
 
+                previous_peer = previous_hop.to_peerid();
+                next_peer = next_hop.to_peerid();
+
                 let previous_hop_addr =
                     self.db
                         .read()
@@ -646,7 +649,7 @@ where
                         .get_chain_key(previous_hop)
                         .await?
                         .ok_or(PacketDecodingError(format!(
-                            "failed to find channel key for packet key {previous_hop} on previous hop"
+                            "failed to find channel key for packet key {previous_peer} on previous hop"
                         )))?;
 
                 let next_hop_addr = self
@@ -656,11 +659,11 @@ where
                     .get_chain_key(next_hop)
                     .await?
                     .ok_or(PacketDecodingError(format!(
-                        "failed to find channel key for packet key {next_hop} on next hop"
+                        "failed to find channel key for packet key {next_peer} on next hop",
                     )))?;
 
                 // Find the corresponding channel
-                debug!("looking for channel with {previous_hop}");
+                debug!("looking for channel with {previous_hop_addr} ({previous_peer})");
                 let channel = self
                     .db
                     .read()
@@ -741,8 +744,6 @@ where
                 } else {
                     self.create_multihop_ticket(next_hop_addr, ticket_path_pos).await?
                 };
-                previous_peer = previous_hop.to_peerid();
-                next_peer = next_hop.to_peerid();
             }
         }
 

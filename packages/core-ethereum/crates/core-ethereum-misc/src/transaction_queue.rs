@@ -26,9 +26,9 @@ pub trait TransactionExecutor {
 pub struct TransactionResult;
 
 /// Notifies about completion of a transaction (success or failure).
-pub type TransactionCompleted = async_oneshot::Receiver<TransactionResult>;
+pub type TransactionCompleted = futures::channel::oneshot::Receiver<TransactionResult>;
 
-type TransactionFinisher = async_oneshot::Sender<TransactionResult>;
+type TransactionFinisher = futures::channel::oneshot::Sender<TransactionResult>;
 
 /// Sends a future Ethereum transaction into the `TransactionQueue`.
 #[derive(Clone)]
@@ -38,7 +38,7 @@ pub struct TransactionSender(Sender<(Transaction, TransactionFinisher)>);
 impl TransactionSender {
     /// Delivers the future transaction into the `TransactionQueue` for processing.
     pub async fn send(&self, transaction: Transaction) -> Result<TransactionCompleted> {
-        let completer = async_oneshot::oneshot();
+        let completer = futures::channel::oneshot::channel();
         self.0
             .send((transaction, completer.0))
             .await
@@ -79,7 +79,7 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
 
     /// Runs the main queue processing loop until the queue is closed.
     pub async fn transaction_loop(&self) {
-        while let Ok(mut req) = self.queue_recv.recv().await {
+        while let Ok(req) = self.queue_recv.recv().await {
             match req.0 {
                 Transaction::RedeemTicket(ack) => {
                     if let Err(e) = self.tx_exec.redeem_ticket(ack.clone()).await {

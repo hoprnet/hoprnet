@@ -34,10 +34,10 @@ use core_types::protocol::TagBloomFilter;
 use utils_types::traits::BinarySerializable;
 
 #[cfg(feature = "wasm")]
-use {core_ethereum_db::db::wasm::Database, wasm_bindgen::prelude::wasm_bindgen};
-
-#[cfg(feature = "wasm")]
-use core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor;
+use {
+    core_ethereum_db::db::wasm::Database, core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor,
+    wasm_bindgen::prelude::wasm_bindgen,
+};
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -100,7 +100,7 @@ pub enum HoprLoopComponents {
     Swarm,
     Heartbeat,
     Timer,
-    TxQueue,
+    OutgoingOnchainTxQueue,
 }
 
 impl std::fmt::Display for HoprLoopComponents {
@@ -115,7 +115,9 @@ impl std::fmt::Display for HoprLoopComponents {
                 "heartbeat component responsible for maintaining the network quality measurements"
             ),
             HoprLoopComponents::Timer => write!(f, "universal timer component for executing timed actions"),
-            HoprLoopComponents::TxQueue => write!(f, "outgoing ethereum transaction queue"),
+            HoprLoopComponents::OutgoingOnchainTxQueue => {
+                write!(f, "on-chain transaction queue component for outgoing transactions")
+            }
         }
     }
 }
@@ -259,7 +261,12 @@ pub fn build_components(
                 .map(|_| HoprLoopComponents::Timer)
                 .await
         }),
-        Box::pin(async move { tx_queue.transaction_loop().map(|_| HoprLoopComponents::TxQueue).await }),
+        Box::pin(async move {
+            tx_queue
+                .transaction_loop()
+                .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
+                .await
+        }),
     ];
     let mut futs = helpers::to_futures_unordered(ready_loops);
 

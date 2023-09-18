@@ -59,7 +59,8 @@ declare -a jobs
 redeem_tickets() {
   local node_id="${1}"
   local node_api="${2}"
-  local rejected redeemed
+  local rejected redeemed last_redeemed
+  local success="false"
 
   # First get the initial ticket statistics for reference
   result=$(api_get_ticket_statistics ${node_api} "winProportion")
@@ -75,29 +76,39 @@ redeem_tickets() {
   result=$(api_redeem_tickets ${node_api} 20)
   log "--${result}"
 
-  sleep 45
+  for i in `seq 1 20`; do
+    sleep 5
 
-  # Get ticket statistics again and compare with previous state. Ensure we
-  # redeemed tickets.
-  result=$(api_get_ticket_statistics ${node_api} "winProportion")
-  log "Node ${node_id} ticket information (after redemption) -- ${result}"
-  rejected=$(echo "${result}" | jq -r .rejected)
-  redeemed=$(echo "${result}" | jq -r .redeemed)
-  [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
-  [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
-  last_redeemed="${redeemed}"
+    # Get ticket statistics again and compare with previous state. Ensure we redeemed tickets.
+    result=$(api_get_ticket_statistics ${node_api} "winProportion")
+    log "Node ${node_id} ticket information (check #${i} after redemption) -- ${result}"
 
-  sleep 45
+    rejected=$(echo "${result}" | jq -r .rejected)
+    redeemed=$(echo "${result}" | jq -r .redeemed)
 
-  # Get final ticket statistics
-  result=$(api_get_ticket_statistics ${node_api} "winProportion")
-  log "Node ${node_id} ticket information (after second redemption) -- ${result}"
-  rejected=$(echo "${result}" | jq -r .rejected)
-  redeemed=$(echo "${result}" | jq -r .redeemed)
-  [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
-  [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
+    if [[ ${rejected} -gt 0 ]]; then
+      msg "rejected tickets count on node ${node_id} is ${rejected}"
+      break
+    fi
 
-  log "Redeem all test passed on node ${node_id} !"
+    if [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]]; then
+      success="true"
+      break
+    else
+      # continue trying
+      msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"
+    fi
+
+    last_redeemed="${redeemed}"
+  done
+
+  if [[ "${success}" == "true" ]]; then
+    log "Redeem all test passed on node ${node_id} !"
+    return 0
+  else
+    log "Redeem all test FAILED on node ${node_id} !"
+    return 1
+  fi
 }
 
 # $1 native addresses ("Ethereum addresses"), comma-separated list
@@ -385,6 +396,8 @@ test_redeem_in_specific_channel() {
 
   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
+  # need to wait a little to allow the other side to index the channel open event
+  sleep 10
   for i in `seq 1 ${expected_tickets}`; do
     log "Redeem in channel: Node ${node_id} send 1 hop message to self via node ${second_node_id}"
     api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "redeem: hello, world 1 self" "${second_peer_id}"
@@ -392,11 +405,15 @@ test_redeem_in_specific_channel() {
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
   sleep 5
+
   ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
-  [[ "${ticket_amount}" != "${expected_tickets}" ]] && { msg "Ticket amount ${ticket_amount} is different than expected ${expected_tickets}"; exit 1; }
+  if [[ "${ticket_amount}" != "${expected_tickets}" ]]; then
+    msg "Ticket amount ${ticket_amount} is different than expected ${expected_tickets}"
+    exit 1
+  fi
 
   api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
-  sleep 15
+  sleep 5
 
   api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
 
@@ -409,9 +426,9 @@ test_redeem_in_specific_channel "3" "1" ${api3} ${api1} & jobs+=( "$!" )
 
 log "Test redeeming all tickets"
 redeem_tickets "2" "${api2}" & jobs+=( "$!" )
-redeem_tickets "3" "${api2}" & jobs+=( "$!" )
-redeem_tickets "4" "${api2}" & jobs+=( "$!" )
-redeem_tickets "5" "${api2}" & jobs+=( "$!" )
+redeem_tickets "3" "${api3}" & jobs+=( "$!" )
+redeem_tickets "4" "${api4}" & jobs+=( "$!" )
+redeem_tickets "5" "${api5}" & jobs+=( "$!" )
 
 log "Waiting for nodes to finish ticket redemption (long running)"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()

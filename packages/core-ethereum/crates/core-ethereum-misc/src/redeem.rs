@@ -561,7 +561,7 @@ pub mod wasm {
         ack_ticket: &AcknowledgedTicket,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
-        super::redeem_ticket(
+        let _ = super::redeem_ticket(
             db.as_ref_counted().clone(),
             ack_ticket.into(),
             on_chain_tx_sender.clone(),
