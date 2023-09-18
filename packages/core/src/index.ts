@@ -1549,14 +1549,15 @@ export class Hopr extends EventEmitter {
               const nativeBalance = await HoprCoreEthereum.getInstance().getNativeBalance(
                 this.getEthereumAddress().to_string()
               )
+              log(`waitforfunds: current balance is ${nativeBalance.to_formatted_string()}`)
               if (nativeBalance.gte(nativeBalance.of_same(MIN_NATIVE_BALANCE.toString(10)))) {
                 resolve()
               } else {
-                log('still unfunded, trying again soon')
+                log('waitforfunds: still unfunded, trying again soon')
                 reject()
               }
             } catch (e) {
-              log('error with native balance call, trying again soon')
+              log('waitforfunds: error with native balance call, trying again soon')
               reject()
             }
           }),
