@@ -35,6 +35,7 @@ pub mod native {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::error::{RealError, Result};
+    use bitflags::bitflags;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
@@ -47,24 +48,25 @@ pub mod wasm {
         pub fn write_file_js(path: &str, contents: &[u8]) -> std::result::Result<(), JsValue>;
 
         #[wasm_bindgen(catch, js_name = "accessSync")]
-        pub fn access_js(path: &str) -> std::result::Result<u32, JsValue>;
+        pub fn access_js(path: &str, mode: u32) -> std::result::Result<JsValue, JsValue>;
     }
 
-    #[allow(dead_code)]
     // Copied from Node.js
-    enum NodeJsFsConstants {
-        /// File exists
-        #[allow(non_camel_case_types)]
-        F_OK = 0,
-        /// File is executable
-        #[allow(non_camel_case_types)]
-        X_OK = 1,
-        /// File is writable
-        #[allow(non_camel_case_types)]
-        W_OK = 2,
-        /// File is readable
-        #[allow(non_camel_case_types)]
-        R_OK = 4,
+    bitflags! {
+        struct NodeJsFsConstants: u32 {
+            /// File exists
+            #[allow(non_camel_case_types)]
+            const F_OK = 0;
+            /// File is executable
+            #[allow(non_camel_case_types)]
+            const X_OK = 1;
+            /// File is writable
+            #[allow(non_camel_case_types)]
+            const W_OK = 2;
+            /// File is readable
+            #[allow(non_camel_case_types)]
+            const R_OK = 4;
+        }
     }
 
     pub fn read_file(path: &str) -> Result<Box<[u8]>> {
@@ -85,8 +87,10 @@ pub mod wasm {
     }
 
     pub fn metadata(path: &str) -> Result<()> {
-        match access_js(path) {
-            Ok(_) => Ok(()), // currently not interested in details
+        // pass in same mode as default (read + write)
+        let mode = (NodeJsFsConstants::W_OK | NodeJsFsConstants::R_OK).bits();
+        match access_js(path, mode) {
+            Ok(_) => Ok(()),
             Err(e) => Err(RealError::JsError(format!("{:?}", e))),
         }
     }

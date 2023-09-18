@@ -18,6 +18,7 @@ wasm = [ "dep:wasm-bindgen" ]
 
 [dependencies]
 thiserror = "1.0"
+bitflags = "2.4"
 wasm-bindgen = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]

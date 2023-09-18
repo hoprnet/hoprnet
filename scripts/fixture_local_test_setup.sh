@@ -187,6 +187,7 @@ function reuse_pregenerated_identities() {
     native_address="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.native_address")"
 
     log "\tnode ${i}"
+    log "\t\tidentity file: ${tmp_dir}/${node_prefix}_${i}.id"
     log "\t\tpeer id: ${peer_id}"
     log "\t\tnative address: ${native_address}"
   done
