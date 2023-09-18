@@ -59,7 +59,7 @@ declare -a jobs
 redeem_tickets() {
   local node_id="${1}"
   local node_api="${2}"
-  local rejected redeemed prev_redeemed
+  local rejected redeemed
 
   # First get the inital ticket statistics for reference
   result=$(api_get_ticket_statistics ${node_api} "winProportion")
@@ -70,10 +70,12 @@ redeem_tickets() {
   last_redeemed="${redeemed}"
 
   # Trigger a redemption run, but cap it at 20 seconds. We only want to measure
-  # progress, not redeeem all tickets which takes too long.
+  # progress.
   log "Node ${node_id} should redeem all tickets"
   result=$(api_redeem_tickets ${node_api} 20)
   log "--${result}"
+
+  sleep 45
 
   # Get ticket statistics again and compare with previous state. Ensure we
   # redeemed tickets.
@@ -85,12 +87,7 @@ redeem_tickets() {
   [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]] || { msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"; exit 1; }
   last_redeemed="${redeemed}"
 
-  # Trigger another redemption run, but cap it at 20 seconds. We only want to measure
-  # progress, not redeeem all tickets which takes too long.
-  log "Node ${node_id} should redeem all tickets (again to ensure re-run of operation)"
-  # add 60 second timeout
-  result=$(api_redeem_tickets ${node_api} 20)
-  log "--${result}"
+  sleep 45
 
   # Get final ticket statistics
   result=$(api_get_ticket_statistics ${node_api} "winProportion")
@@ -397,6 +394,7 @@ test_redeem_in_specific_channel() {
   [[ "${ticket_amount}" != "${expected_tickets}" ]] && { msg "Ticket amount ${ticket_amount} is different than expected ${expected_tickets}"; exit 1; }
 
   api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
+  sleep 15
 
   api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
 
@@ -405,13 +403,13 @@ test_redeem_in_specific_channel() {
 }
 
 log "Test redeeming in a specific channel"
-test_redeem_in_specific_channel "1" "3" ${api1} ${api3} #& jobs+=( "$!" )
+test_redeem_in_specific_channel "1" "3" ${api1} ${api3} & jobs+=( "$!" )
 
 log "Test redeeming all tickets"
-redeem_tickets "2" "${api2}" #& jobs+=( "$!" )
-redeem_tickets "3" "${api2}" #& jobs+=( "$!" )
-redeem_tickets "4" "${api2}" #& jobs+=( "$!" )
-redeem_tickets "5" "${api2}" #& jobs+=( "$!" )
+redeem_tickets "2" "${api2}" & jobs+=( "$!" )
+redeem_tickets "3" "${api2}" & jobs+=( "$!" )
+redeem_tickets "4" "${api2}" & jobs+=( "$!" )
+redeem_tickets "5" "${api2}" & jobs+=( "$!" )
 
 log "Waiting for nodes to finish ticket redemption (long running)"
 #for j in ${jobs[@]}; do wait -n $j; done; jobs=()

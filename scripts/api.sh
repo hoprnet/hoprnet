@@ -176,9 +176,9 @@ api_set_setting() {
 api_redeem_tickets_in_channel() {
   local node_api="${1}"
   local channel_id="${2}"
-  local timeout="${3:-600}"
+  local timeout="${3:-30}"
 
-  log "redeeming tickets in specific channel, this can take up to 5 minutes depending on the amount of unredeemed tickets in that channel"
+  log "redeeming tickets in channel ${channel_id}"
   api_call "${node_api}" "/channels/${channel_id}/tickets/redeem" "POST" "" "" "${timeout}" "${timeout}"
 }
 
@@ -186,9 +186,9 @@ api_redeem_tickets_in_channel() {
 # $2 = OPTIONAL: call timeout
 api_redeem_tickets() {
   local node_api="${1}"
-  local timeout="${2:-600}"
+  local timeout="${2:-30}"
 
-  log "redeeming all tickets, this can take up to 5 minutes depending on the amount of unredeemed tickets"
+  log "redeeming all tickets"
   api_call "${node_api}" "/tickets/redeem" "POST" "" "" "${timeout}" "${timeout}"
 }
 
@@ -200,7 +200,7 @@ api_get_tickets_in_channel() {
   local channel_id="${2}"
   local assertion="${3:-"signature"}"
 
-  api_call "${node_api}" "/channels/${channel_id}/tickets" "GET" "" "${assertion}" 600
+  api_call "${node_api}" "/channels/${channel_id}/tickets" "GET" "" "${assertion}" 600 30
 }
 
 # $1 = node api endpoint
