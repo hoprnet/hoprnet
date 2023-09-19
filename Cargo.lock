@@ -5259,8 +5259,9 @@ checksum = "7ffc183a10b4478d04cbbbfc96d0873219d962dd5accaff2ffbd4ceb7df837f4"
 
 [[package]]
 name = "rusty-leveldb"
-version = "2.0.0"
-source = "git+https://github.com/hoprnet/leveldb-rs?branch=feature/no-fs#5fe91287ba37de730b921101a264d7abc35f95dc"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3453f8c92d48f99810f59095444eda0622ae8485ac899ad97a574fd7cb9aa9c4"
 dependencies = [
  "crc",
  "integer-encoding",
@@ -6452,7 +6453,7 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utils-db"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-lock",
  "async-std",
