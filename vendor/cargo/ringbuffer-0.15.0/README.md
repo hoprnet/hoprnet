@@ -34,7 +34,7 @@ fn main() {
     buffer.push(5);
 
     // The last item we pushed is 5
-    assert_eq!(buffer.get(-1), Some(&5));
+    assert_eq!(buffer.back(), Some(&5));
 
     // Second entry is now 42.
     buffer.push(42);

@@ -82,7 +82,7 @@ where
         }
     }
 
-    async fn pop(&mut self, tag: Option<T>) -> Option<M> {
+    async fn pop(&mut self, tag: Option<T>) -> Option<(M, Duration)> {
         let specific_tag = match tag {
             // If no tag was given, we need to find a tag which has the oldest entry in it
             None => self
@@ -103,17 +103,17 @@ where
 
         self.buffers
             .get_mut(&specific_tag)
-            .and_then(|buf| buf.dequeue().map(|w| w.payload))
+            .and_then(|buf| buf.dequeue().map(|w| (w.payload, w.ts)))
     }
 
-    async fn pop_all(&mut self, tag: Option<T>) -> Vec<M> {
+    async fn pop_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)> {
         match tag {
             Some(specific_tag) => {
                 // Pop only all messages of a specific tag
                 self.buffers
                     .get_mut(&specific_tag)
-                    .map(|buf| buf.drain().map(|w| w.payload).collect::<Vec<_>>())
-                    .unwrap_or_else(Vec::<M>::new)
+                    .map(|buf| buf.drain().map(|w| (w.payload, w.ts)).collect::<Vec<_>>())
+                    .unwrap_or_else(Vec::<(M, Duration)>::new)
             }
             None => {
                 // Pop across all the tags, need to sort again based on the timestamp
@@ -128,7 +128,7 @@ where
                 // If this requirement was relaxed, the drained entries could be collected into a BTreeSet.
                 all.sort_unstable_by(|a, b| a.ts.cmp(&b.ts));
 
-                all.into_iter().map(|w| w.payload).collect()
+                all.into_iter().map(|w| (w.payload, w.ts)).collect()
             }
         }
     }
@@ -185,23 +185,23 @@ mod test {
         assert_eq!(7, rb.count(None).await);
         assert_eq!(1, rb.count_untagged());
 
-        assert_eq!(2, rb.pop(Some(1)).await.unwrap());
-        assert_eq!(3, rb.pop(Some(1)).await.unwrap());
-        assert_eq!(4, rb.pop(Some(1)).await.unwrap());
-        assert_eq!(5, rb.pop(Some(1)).await.unwrap());
+        assert_eq!(2, rb.pop(Some(1)).await.unwrap().0);
+        assert_eq!(3, rb.pop(Some(1)).await.unwrap().0);
+        assert_eq!(4, rb.pop(Some(1)).await.unwrap().0);
+        assert_eq!(5, rb.pop(Some(1)).await.unwrap().0);
         assert_eq!(0, rb.count(Some(1)).await);
         assert!(rb.pop(Some(1)).await.is_none());
 
         assert!(rb.pop(Some(100)).await.is_none());
         assert!(rb.pop(Some(23)).await.is_none());
 
-        assert_eq!(6, rb.pop(Some(10)).await.unwrap());
+        assert_eq!(6, rb.pop(Some(10)).await.unwrap().0);
         assert_eq!(0, rb.count(Some(10)).await);
 
-        assert_eq!(7, rb.pop(Some(11)).await.unwrap());
+        assert_eq!(7, rb.pop(Some(11)).await.unwrap().0);
         assert_eq!(0, rb.count(Some(11)).await);
 
-        assert_eq!(0, rb.pop(None).await.unwrap());
+        assert_eq!(0, rb.pop(None).await.unwrap().0);
         assert_eq!(0, rb.count_untagged());
 
         assert_eq!(0, rb.count(None).await);
@@ -225,7 +225,10 @@ mod test {
 
         rb.push(None, 5).await;
 
-        assert_eq!(vec![1, 2, 3, 4, 5], rb.pop_all(None).await);
+        assert_eq!(
+            vec![1, 2, 3, 4, 5],
+            rb.pop_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+        );
         assert_eq!(0, rb.count(None).await);
         assert_eq!(0, rb.count_untagged());
     }
@@ -243,7 +246,14 @@ mod test {
 
         rb.push(None, 5).await;
 
-        assert_eq!(vec![2, 1], rb.pop_all(Some(1)).await);
+        assert_eq!(
+            vec![2, 1],
+            rb.pop_all(Some(1))
+                .await
+                .into_iter()
+                .map(|(d, _)| d)
+                .collect::<Vec<_>>()
+        );
         assert_eq!(2, rb.count(Some(2)).await);
         assert_eq!(3, rb.count(None).await);
     }
@@ -262,19 +272,19 @@ mod test {
 
         assert_eq!(5, rb.count(None).await);
 
-        assert_eq!(10, rb.pop(None).await.unwrap());
+        assert_eq!(10, rb.pop(None).await.unwrap().0);
 
         assert_eq!(0, rb.count(Some(3)).await);
         assert_eq!(4, rb.count(None).await);
 
-        assert_eq!(1, rb.pop(None).await.unwrap());
-        assert_eq!(2, rb.pop(None).await.unwrap());
+        assert_eq!(1, rb.pop(None).await.unwrap().0);
+        assert_eq!(2, rb.pop(None).await.unwrap().0);
 
         assert_eq!(0, rb.count(Some(1)).await);
         assert_eq!(2, rb.count(Some(2)).await);
 
-        assert_eq!(3, rb.pop(None).await.unwrap());
-        assert_eq!(4, rb.pop(None).await.unwrap());
+        assert_eq!(3, rb.pop(None).await.unwrap().0);
+        assert_eq!(4, rb.pop(None).await.unwrap().0);
 
         assert_eq!(0, rb.count(Some(2)).await);
         assert_eq!(0, rb.count(None).await);
@@ -304,7 +314,10 @@ mod test {
         rb.purge(ts).await;
 
         assert_eq!(4, rb.count(None).await);
-        assert_eq!(vec![4, 5, 6, 7], rb.pop_all(None).await);
+        assert_eq!(
+            vec![4, 5, 6, 7],
+            rb.pop_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+        );
     }
 
     #[async_std::test]
@@ -323,6 +336,9 @@ mod test {
         rb.push(Some(1), 0).await;
         rb.push(Some(1), 0).await;
 
-        assert_eq!(vec![0, 0, 0, 0, 0, 0, 0, 0], rb.pop_all(None).await);
+        assert_eq!(
+            vec![0, 0, 0, 0, 0, 0, 0, 0],
+            rb.pop_all(None).await.into_iter().map(|(d, _)| d).collect::<Vec<_>>()
+        );
     }
 }
