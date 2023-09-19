@@ -494,6 +494,18 @@ fn bytes_as_array() {
 }
 
 #[wasm_bindgen_test]
+fn bytes_from_mixed_array() {
+    // The string "xyz" cannot convert to a u8
+    let value = (100, "xyz".to_string(), true)
+        .serialize(&SERIALIZER)
+        .unwrap();
+    from_value::<serde_bytes::ByteBuf>(value).unwrap_err();
+    // The number 256 cannot convert to a u8
+    let value = (100, 256, 100).serialize(&SERIALIZER).unwrap();
+    from_value::<serde_bytes::ByteBuf>(value).unwrap_err();
+}
+
+#[wasm_bindgen_test]
 fn options() {
     test_via_into(Some(0_u32), 0_u32);
     test_via_into(Some(32_u32), 32_u32);
@@ -632,6 +644,42 @@ fn enums() {
         #[serde(untagged)]
         Untagged
     }
+}
+
+#[wasm_bindgen_test]
+fn preserved_value() {
+    #[derive(serde::Deserialize, serde::Serialize, PartialEq, Clone, Debug)]
+    #[serde(bound = "T: JsCast")]
+    struct PreservedValue<T: JsCast>(#[serde(with = "serde_wasm_bindgen::preserve")] T);
+
+    test_via_into(PreservedValue(JsValue::from_f64(42.0)), 42);
+    test_via_into(PreservedValue(JsValue::from_str("hello")), "hello");
+
+    let res: PreservedValue<JsValue> = from_value(JsValue::from_f64(42.0)).unwrap();
+    assert_eq!(res.0.as_f64(), Some(42.0));
+
+    // Check that object identity is preserved.
+    let big_array = js_sys::Int8Array::new_with_length(64);
+    let val = PreservedValue(big_array);
+    let res = to_value(&val).unwrap();
+    assert_eq!(res, JsValue::from(val.0));
+
+    // The JsCasts are checked on deserialization.
+    let bool = js_sys::Boolean::from(true);
+    let serialized = to_value(&PreservedValue(bool)).unwrap();
+    let res: Result<PreservedValue<Number>, _> = from_value(serialized);
+    assert_eq!(
+        res.unwrap_err().to_string(),
+        Error::custom("incompatible JS value JsValue(true) for type js_sys::Number").to_string()
+    );
+
+    // serde_json must fail to round-trip our special wrapper
+    let s = serde_json::to_string(&PreservedValue(JsValue::from_f64(42.0))).unwrap();
+    serde_json::from_str::<PreservedValue<JsValue>>(&s).unwrap_err();
+
+    // bincode must fail to round-trip our special wrapper
+    let s = bincode::serialize(&PreservedValue(JsValue::from_f64(42.0))).unwrap();
+    bincode::deserialize::<PreservedValue<JsValue>>(&s).unwrap_err();
 }
 
 #[wasm_bindgen_test]
