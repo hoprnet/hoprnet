@@ -380,7 +380,54 @@ log "Waiting for node 1 to send messages to node 5"
 for j in ${jobs[@]}; do wait -n $j; done; jobs=()
 log "Waiting DONE"
 
-api_aggregate_tickets "${api2}" "0x8b4f8683b34e36012804062d6a6dbb2b1f814876a59fe566d4badf0b011db756" 
+test_aggregate_redeem_in_specific_channel() {
+  local node_id="${1}"
+  local second_node_id="${2}"
+  local node_api="${3}"
+  local second_node_api="${4}"
+  local generated_tickets="10"
+  local expected_tickets="1"
+
+  peer_id=$(get_hopr_address ${api_token}@${node_api})
+  second_node_addr=$(get_native_address ${api_token}@${second_node_api})
+
+  channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}")
+  channel_id=$(echo "${channel_info}" | jq -r '.channelId')
+  log "Aggregate/Redeem in channel: Opened channel from node ${node_id} to ${second_node_id}: ${channel_id}"
+
+  second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
+
+  # need to wait a little to allow the other side to index the channel open event
+  sleep 10
+  for i in `seq 1 ${generated_tickets}`; do
+    log "Aggregate/Redeem in channel: Node ${node_id} send 1 hop message to self via node ${second_node_id}"
+    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "aggregate/redeem: hello, world 1 self" "${second_peer_id}"
+  done
+
+  # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
+  sleep 5
+
+  ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
+  if [[ "${ticket_amount}" != "${generated_tickets}" ]]; then
+    msg "Aggregate/Reddem: Ticket amount ${ticket_amount} is different than expected ${generated_tickets} before aggregation"
+    exit 1
+  fi
+
+  api_aggregate_tickets "${second_node_api}" "${channel_id}"
+  ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
+  if [[ "${ticket_amount}" != "${expected_tickets}" ]]; then
+    msg "Aggregate/Reddem: Ticket amount ${ticket_amount} is different than expected ${generated_tickets} after aggregation"
+    exit 1
+  fi
+
+  api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
+  sleep 5
+
+  api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
+
+  api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
+  echo "Aggregate/Redeem: test passed"
+}
 
 test_redeem_in_specific_channel() {
   local node_id="${1}"
@@ -423,8 +470,9 @@ test_redeem_in_specific_channel() {
   echo "Redeem in channel test passed"
 }
 
-log "Test redeeming in a specific channel"
+log "Test aggregating and redeeming in a specific channel"
 test_redeem_in_specific_channel "3" "1" ${api3} ${api1} & jobs+=( "$!" )
+test_aggregate_redeem_in_specific_channel "4" "1" ${api4} ${api1} & jobs+=( "$!" )
 
 log "Test redeeming all tickets"
 redeem_tickets "2" "${api2}" & jobs+=( "$!" )
