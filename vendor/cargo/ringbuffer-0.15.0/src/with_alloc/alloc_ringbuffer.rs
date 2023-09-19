@@ -7,59 +7,8 @@ use crate::ringbuffer_trait::{
 extern crate alloc;
 
 // We need boxes, so depend on alloc
-use crate::GrowableAllocRingBuffer;
-use core::marker::PhantomData;
+use crate::{mask_and, GrowableAllocRingBuffer};
 use core::ptr;
-
-#[derive(Debug, Copy, Clone)]
-/// Represents that an alloc ringbuffer must have a size that's a power of two.
-/// This means slightly more optimizations can be performed, but it is less flexible.
-pub struct PowerOfTwo;
-
-#[derive(Debug, Copy, Clone)]
-/// Represents that an alloc ringbuffer can have a size that's not a power of two.
-/// This means slightly fewer optimizations can be performed, but it is more flexible.
-pub struct NonPowerOfTwo;
-mod private {
-    use crate::with_alloc::alloc_ringbuffer::{NonPowerOfTwo, PowerOfTwo};
-
-    pub trait Sealed {}
-
-    impl Sealed for PowerOfTwo {}
-    impl Sealed for NonPowerOfTwo {}
-}
-
-/// Sealed trait with two implementations that represent the kinds of sizes a ringbuffer can have
-/// *[`NonPowerOfTwo`]
-/// *[`PowerOfTwo`]
-pub trait RingbufferSize: private::Sealed {
-    /// the mask function to use for wrapping indices in the ringbuffer
-    fn mask(cap: usize, index: usize) -> usize;
-    /// true in [`PowerOfTwo`], false in [`NonPowerOfTwo`]
-    fn must_be_power_of_two() -> bool;
-}
-
-impl RingbufferSize for PowerOfTwo {
-    #[inline]
-    fn mask(cap: usize, index: usize) -> usize {
-        crate::mask(cap, index)
-    }
-
-    fn must_be_power_of_two() -> bool {
-        true
-    }
-}
-
-impl RingbufferSize for NonPowerOfTwo {
-    #[inline]
-    fn mask(cap: usize, index: usize) -> usize {
-        crate::mask_modulo(cap, index)
-    }
-
-    fn must_be_power_of_two() -> bool {
-        false
-    }
-}
 
 /// The `AllocRingBuffer` is a `RingBuffer` which is based on a Vec. This means it allocates at runtime
 /// on the heap, and therefore needs the [`alloc`] crate. This struct and therefore the dependency on
@@ -75,7 +24,7 @@ impl RingbufferSize for NonPowerOfTwo {
 /// buffer.push(5);
 ///
 /// // The last item we pushed is 5
-/// assert_eq!(buffer.get(-1), Some(&5));
+/// assert_eq!(buffer.back(), Some(&5));
 ///
 /// // Second entry is now 42.
 /// buffer.push(42);
@@ -88,12 +37,17 @@ impl RingbufferSize for NonPowerOfTwo {
 /// assert_eq!(buffer.to_vec(), vec![42, 1]);
 /// ```
 #[derive(Debug)]
-pub struct AllocRingBuffer<T, SIZE: RingbufferSize = PowerOfTwo> {
+pub struct AllocRingBuffer<T> {
     buf: *mut T,
+
+    // the size of the allocation. Next power of 2 up from the capacity
+    size: usize,
+    // maximum number of elements actually allowed in the ringbuffer.
+    // Always less than or equal than the size
     capacity: usize,
+
     readptr: usize,
     writeptr: usize,
-    mode: PhantomData<SIZE>,
 }
 
 // SAFETY: all methods that require mutable access take &mut,
@@ -101,15 +55,15 @@ pub struct AllocRingBuffer<T, SIZE: RingbufferSize = PowerOfTwo> {
 unsafe impl<T: Sync> Sync for AllocRingBuffer<T> {}
 unsafe impl<T: Send> Send for AllocRingBuffer<T> {}
 
-impl<T, const N: usize> From<[T; N]> for AllocRingBuffer<T, NonPowerOfTwo> {
+impl<T, const N: usize> From<[T; N]> for AllocRingBuffer<T> {
     fn from(value: [T; N]) -> Self {
-        let mut rb = Self::with_capacity_non_power_of_two(value.len());
-        rb.extend(value.into_iter());
+        let mut rb = Self::new(value.len());
+        rb.extend(value);
         rb
     }
 }
 
-impl<T: Clone, const N: usize> From<&[T; N]> for AllocRingBuffer<T, NonPowerOfTwo> {
+impl<T: Clone, const N: usize> From<&[T; N]> for AllocRingBuffer<T> {
     // the cast here is actually not trivial
     #[allow(trivial_casts)]
     fn from(value: &[T; N]) -> Self {
@@ -117,109 +71,104 @@ impl<T: Clone, const N: usize> From<&[T; N]> for AllocRingBuffer<T, NonPowerOfTw
     }
 }
 
-impl<T: Clone> From<&[T]> for AllocRingBuffer<T, NonPowerOfTwo> {
+impl<T: Clone> From<&[T]> for AllocRingBuffer<T> {
     fn from(value: &[T]) -> Self {
-        let mut rb = Self::with_capacity_non_power_of_two(value.len());
+        let mut rb = Self::new(value.len());
         rb.extend(value.iter().cloned());
         rb
     }
 }
 
-impl<T> From<GrowableAllocRingBuffer<T>> for AllocRingBuffer<T, NonPowerOfTwo> {
-    fn from(mut v: GrowableAllocRingBuffer<T>) -> AllocRingBuffer<T, NonPowerOfTwo> {
-        let mut rb = AllocRingBuffer::with_capacity_non_power_of_two(v.len());
+impl<T> From<GrowableAllocRingBuffer<T>> for AllocRingBuffer<T> {
+    fn from(mut v: GrowableAllocRingBuffer<T>) -> AllocRingBuffer<T> {
+        let mut rb = AllocRingBuffer::new(v.len());
         rb.extend(v.drain());
         rb
     }
 }
 
-impl<T: Clone> From<&mut [T]> for AllocRingBuffer<T, NonPowerOfTwo> {
+impl<T: Clone> From<&mut [T]> for AllocRingBuffer<T> {
     fn from(value: &mut [T]) -> Self {
         Self::from(&*value)
     }
 }
 
-impl<T: Clone, const CAP: usize> From<&mut [T; CAP]> for AllocRingBuffer<T, NonPowerOfTwo> {
+impl<T: Clone, const CAP: usize> From<&mut [T; CAP]> for AllocRingBuffer<T> {
     fn from(value: &mut [T; CAP]) -> Self {
         Self::from(value.clone())
     }
 }
 
-impl<T> From<alloc::vec::Vec<T>> for AllocRingBuffer<T, NonPowerOfTwo> {
+impl<T> From<alloc::vec::Vec<T>> for AllocRingBuffer<T> {
     fn from(value: alloc::vec::Vec<T>) -> Self {
-        let mut res = AllocRingBuffer::with_capacity_non_power_of_two(value.len());
-        res.extend(value.into_iter());
+        let mut res = AllocRingBuffer::new(value.len());
+        res.extend(value);
         res
     }
 }
 
-impl<T> From<alloc::collections::VecDeque<T>> for AllocRingBuffer<T, NonPowerOfTwo> {
+impl<T> From<alloc::collections::VecDeque<T>> for AllocRingBuffer<T> {
     fn from(value: alloc::collections::VecDeque<T>) -> Self {
-        let mut res = AllocRingBuffer::with_capacity_non_power_of_two(value.len());
-        res.extend(value.into_iter());
+        let mut res = AllocRingBuffer::new(value.len());
+        res.extend(value);
         res
     }
 }
 
-impl<T> From<alloc::collections::LinkedList<T>> for AllocRingBuffer<T, NonPowerOfTwo> {
+impl<T> From<alloc::collections::LinkedList<T>> for AllocRingBuffer<T> {
     fn from(value: alloc::collections::LinkedList<T>) -> Self {
-        let mut res = AllocRingBuffer::with_capacity_non_power_of_two(value.len());
-        res.extend(value.into_iter());
+        let mut res = AllocRingBuffer::new(value.len());
+        res.extend(value);
         res
     }
 }
 
-impl From<alloc::string::String> for AllocRingBuffer<char, NonPowerOfTwo> {
+impl From<alloc::string::String> for AllocRingBuffer<char> {
     fn from(value: alloc::string::String) -> Self {
-        let mut res = AllocRingBuffer::with_capacity_non_power_of_two(value.len());
+        let mut res = AllocRingBuffer::new(value.len());
         res.extend(value.chars());
         res
     }
 }
 
-impl From<&str> for AllocRingBuffer<char, NonPowerOfTwo> {
+impl From<&str> for AllocRingBuffer<char> {
     fn from(value: &str) -> Self {
-        let mut res = AllocRingBuffer::with_capacity_non_power_of_two(value.len());
+        let mut res = AllocRingBuffer::new(value.len());
         res.extend(value.chars());
         res
     }
 }
 
-impl<T, const CAP: usize> From<crate::ConstGenericRingBuffer<T, CAP>>
-    for AllocRingBuffer<T, NonPowerOfTwo>
-{
+impl<T, const CAP: usize> From<crate::ConstGenericRingBuffer<T, CAP>> for AllocRingBuffer<T> {
     fn from(mut value: crate::ConstGenericRingBuffer<T, CAP>) -> Self {
-        let mut res = AllocRingBuffer::with_capacity_non_power_of_two(value.len());
+        let mut res = AllocRingBuffer::new(value.len());
         res.extend(value.drain());
         res
     }
 }
 
-impl<T, SIZE: RingbufferSize> Drop for AllocRingBuffer<T, SIZE> {
+impl<T> Drop for AllocRingBuffer<T> {
     fn drop(&mut self) {
         self.drain().for_each(drop);
 
-        let layout = alloc::alloc::Layout::array::<T>(self.capacity).unwrap();
+        let layout = alloc::alloc::Layout::array::<T>(self.size).unwrap();
         unsafe {
             alloc::alloc::dealloc(self.buf as *mut u8, layout);
         }
     }
 }
 
-impl<T: Clone, SIZE: RingbufferSize> Clone for AllocRingBuffer<T, SIZE> {
+impl<T: Clone> Clone for AllocRingBuffer<T> {
     fn clone(&self) -> Self {
         debug_assert_ne!(self.capacity, 0);
-        debug_assert!(!SIZE::must_be_power_of_two() || self.capacity.is_power_of_two());
 
-        // whatever the previous capacity was, we can just use the same one again.
-        // It should be valid.
-        let mut new = unsafe { Self::with_capacity_unchecked(self.capacity) };
+        let mut new = Self::new(self.capacity);
         self.iter().cloned().for_each(|i| new.push(i));
         new
     }
 }
 
-impl<T: PartialEq, SIZE: RingbufferSize> PartialEq for AllocRingBuffer<T, SIZE> {
+impl<T: PartialEq> PartialEq for AllocRingBuffer<T> {
     fn eq(&self, other: &Self) -> bool {
         self.capacity == other.capacity
             && self.len() == other.len()
@@ -227,9 +176,9 @@ impl<T: PartialEq, SIZE: RingbufferSize> PartialEq for AllocRingBuffer<T, SIZE> 
     }
 }
 
-impl<T: Eq + PartialEq, SIZE: RingbufferSize> Eq for AllocRingBuffer<T, SIZE> {}
+impl<T: Eq + PartialEq> Eq for AllocRingBuffer<T> {}
 
-impl<T, SIZE: RingbufferSize> IntoIterator for AllocRingBuffer<T, SIZE> {
+impl<T> IntoIterator for AllocRingBuffer<T> {
     type Item = T;
     type IntoIter = RingBufferIntoIterator<T, Self>;
 
@@ -238,25 +187,25 @@ impl<T, SIZE: RingbufferSize> IntoIterator for AllocRingBuffer<T, SIZE> {
     }
 }
 
-impl<'a, T, SIZE: RingbufferSize> IntoIterator for &'a AllocRingBuffer<T, SIZE> {
+impl<'a, T> IntoIterator for &'a AllocRingBuffer<T> {
     type Item = &'a T;
-    type IntoIter = RingBufferIterator<'a, T, AllocRingBuffer<T, SIZE>>;
+    type IntoIter = RingBufferIterator<'a, T, AllocRingBuffer<T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, T, SIZE: RingbufferSize> IntoIterator for &'a mut AllocRingBuffer<T, SIZE> {
+impl<'a, T> IntoIterator for &'a mut AllocRingBuffer<T> {
     type Item = &'a mut T;
-    type IntoIter = RingBufferMutIterator<'a, T, AllocRingBuffer<T, SIZE>>;
+    type IntoIter = RingBufferMutIterator<'a, T, AllocRingBuffer<T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
 }
 
-impl<T, SIZE: RingbufferSize> Extend<T> for AllocRingBuffer<T, SIZE> {
+impl<T> Extend<T> for AllocRingBuffer<T> {
     fn extend<A: IntoIterator<Item = T>>(&mut self, iter: A) {
         let iter = iter.into_iter();
 
@@ -266,10 +215,15 @@ impl<T, SIZE: RingbufferSize> Extend<T> for AllocRingBuffer<T, SIZE> {
     }
 }
 
-unsafe impl<T, SIZE: RingbufferSize> RingBuffer<T> for AllocRingBuffer<T, SIZE> {
+unsafe impl<T> RingBuffer<T> for AllocRingBuffer<T> {
     #[inline]
     unsafe fn ptr_capacity(rb: *const Self) -> usize {
         (*rb).capacity
+    }
+
+    #[inline]
+    unsafe fn ptr_buffer_size(rb: *const Self) -> usize {
+        (*rb).size
     }
 
     impl_ringbuffer!(readptr, writeptr);
@@ -277,12 +231,9 @@ unsafe impl<T, SIZE: RingbufferSize> RingBuffer<T> for AllocRingBuffer<T, SIZE> 
     #[inline]
     fn push(&mut self, value: T) {
         if self.is_full() {
-            let previous_value = unsafe {
-                ptr::read(get_unchecked_mut(
-                    self,
-                    SIZE::mask(self.capacity, self.readptr),
-                ))
-            };
+            // mask with and is allowed here because size is always a power of two
+            let previous_value =
+                unsafe { ptr::read(get_unchecked_mut(self, mask_and(self.size, self.readptr))) };
 
             // make sure we drop whatever is being overwritten
             // SAFETY: the buffer is full, so this must be initialized
@@ -295,7 +246,8 @@ unsafe impl<T, SIZE: RingbufferSize> RingBuffer<T> for AllocRingBuffer<T, SIZE> 
             self.readptr += 1;
         }
 
-        let index = SIZE::mask(self.capacity, self.writeptr);
+        // mask with and is allowed here because size is always a power of two
+        let index = mask_and(self.size, self.writeptr);
 
         unsafe {
             ptr::write(get_unchecked_mut(self, index), value);
@@ -308,7 +260,8 @@ unsafe impl<T, SIZE: RingbufferSize> RingBuffer<T> for AllocRingBuffer<T, SIZE> 
         if self.is_empty() {
             None
         } else {
-            let index = SIZE::mask(self.capacity, self.readptr);
+            // mask with and is allowed here because size is always a power of two
+            let index = mask_and(self.size, self.readptr);
             let res = unsafe { get_unchecked_mut(self, index) };
             self.readptr += 1;
 
@@ -324,7 +277,7 @@ unsafe impl<T, SIZE: RingbufferSize> RingBuffer<T> for AllocRingBuffer<T, SIZE> 
         get_unchecked_mut,
         readptr,
         writeptr,
-        SIZE::mask
+        mask_and
     );
 
     #[inline]
@@ -340,59 +293,13 @@ unsafe impl<T, SIZE: RingbufferSize> RingBuffer<T> for AllocRingBuffer<T, SIZE> 
     }
 }
 
-impl<T, SIZE: RingbufferSize> AllocRingBuffer<T, SIZE> {
-    /// Creates a `AllocRingBuffer` with a certain capacity. This capacity is fixed.
-    /// for this ringbuffer to work, cap must be a power of two and greater than zero.
-    ///
-    /// # Safety
-    /// Only safe if the capacity is greater than zero, and a power of two.
-    /// Only if `MODE` == [`NonPowerOfTwo`](NonPowerOfTwo) can the capacity be not a power of two, in which case this function is also safe.
-    #[inline]
-    unsafe fn with_capacity_unchecked(cap: usize) -> Self {
-        let layout = alloc::alloc::Layout::array::<T>(cap).unwrap();
-        let buf = unsafe { alloc::alloc::alloc(layout) as *mut T };
-
-        Self {
-            buf,
-            capacity: cap,
-            readptr: 0,
-            writeptr: 0,
-            mode: PhantomData,
-        }
-    }
-}
-
-impl<T> AllocRingBuffer<T, NonPowerOfTwo> {
-    /// Creates a `AllocRingBuffer` with a certain capacity. This capacity is fixed.
-    /// for this ringbuffer to work, and must not be zero.
-    ///
-    /// Note, that not using a power of two means some operations can't be optimized as well.
-    /// For example, bitwise ands might become modulos.
-    ///
-    /// For example, on push operations, benchmarks have shown that a ringbuffer with a power-of-two
-    /// capacity constructed with `with_capacity_non_power_of_two` (so which don't get the same optimization
-    /// as the ones constructed with `with_capacity`) can be up to 3x slower
-    ///
-    /// # Panics
-    /// if the capacity is zero
-    #[inline]
-    #[must_use]
-    pub fn with_capacity_non_power_of_two(cap: usize) -> Self {
-        assert_ne!(cap, 0, "Capacity must be greater than 0");
-
-        // Safety: Mode is NonPowerOfTwo and we checked above that the capacity isn't zero
-        unsafe { Self::with_capacity_unchecked(cap) }
-    }
-}
-
-impl<T> AllocRingBuffer<T, PowerOfTwo> {
+impl<T> AllocRingBuffer<T> {
     /// Creates a `AllocRingBuffer` with a certain capacity. The actual capacity is the input to the
     /// function raised to the power of two (effectively the input is the log2 of the actual capacity)
     #[inline]
     #[must_use]
     pub fn with_capacity_power_of_2(cap_power_of_two: usize) -> Self {
-        // Safety: 1 << n is always a power of two, and nonzero
-        unsafe { Self::with_capacity_unchecked(1 << cap_power_of_two) }
+        Self::new(1 << cap_power_of_two)
     }
 
     #[inline]
@@ -403,27 +310,32 @@ impl<T> AllocRingBuffer<T, PowerOfTwo> {
         Self::new(cap)
     }
 
-    /// Creates a `AllocRingBuffer` with a certain capacity. The capacity must be a power of two.
+    /// Creates a `AllocRingBuffer` with a certain capacity. The capacity must not be zero.
+    ///
     /// # Panics
-    /// Panics when capacity is zero or not a power of two
+    /// Panics when capacity is zero
     #[inline]
     #[must_use]
-    pub fn new(cap: usize) -> Self {
-        assert_ne!(cap, 0, "Capacity must be greater than 0");
-        assert!(cap.is_power_of_two(), "Capacity must be a power of two");
-
-        // Safety: assertions check that cap is a power of two and nonzero
-        unsafe { Self::with_capacity_unchecked(cap) }
+    pub fn new(capacity: usize) -> Self {
+        assert_ne!(capacity, 0, "Capacity must be greater than 0");
+        let size = capacity.next_power_of_two();
+        let layout = alloc::alloc::Layout::array::<T>(size).unwrap();
+        let buf = unsafe { alloc::alloc::alloc(layout) as *mut T };
+        Self {
+            buf,
+            size,
+            capacity,
+            readptr: 0,
+            writeptr: 0,
+        }
     }
 }
 
 /// Get a reference from the buffer without checking it is initialized.
+///
 /// Caller must be sure the index is in bounds, or this will panic.
 #[inline]
-unsafe fn get_unchecked<'a, T, SIZE: RingbufferSize>(
-    rb: *const AllocRingBuffer<T, SIZE>,
-    index: usize,
-) -> &'a T {
+unsafe fn get_unchecked<'a, T>(rb: *const AllocRingBuffer<T>, index: usize) -> &'a T {
     let p = (*rb).buf.add(index);
     // Safety: caller makes sure the index is in bounds for the ringbuffer.
     // All in bounds values in the ringbuffer are initialized
@@ -431,12 +343,10 @@ unsafe fn get_unchecked<'a, T, SIZE: RingbufferSize>(
 }
 
 /// Get a mut reference from the buffer without checking it is initialized.
+///
 /// Caller must be sure the index is in bounds, or this will panic.
 #[inline]
-unsafe fn get_unchecked_mut<T, SIZE: RingbufferSize>(
-    rb: *mut AllocRingBuffer<T, SIZE>,
-    index: usize,
-) -> *mut T {
+unsafe fn get_unchecked_mut<T>(rb: *mut AllocRingBuffer<T>, index: usize) -> *mut T {
     let p = (*rb).buf.add(index);
 
     // Safety: caller makes sure the index is in bounds for the ringbuffer.
@@ -444,41 +354,38 @@ unsafe fn get_unchecked_mut<T, SIZE: RingbufferSize>(
     p.cast()
 }
 
-impl<T, SIZE: RingbufferSize> Index<isize> for AllocRingBuffer<T, SIZE> {
+impl<T> Index<usize> for AllocRingBuffer<T> {
     type Output = T;
 
-    fn index(&self, index: isize) -> &Self::Output {
+    fn index(&self, index: usize) -> &Self::Output {
         self.get(index).expect("index out of bounds")
     }
 }
 
-impl<T, SIZE: RingbufferSize> IndexMut<isize> for AllocRingBuffer<T, SIZE> {
-    fn index_mut(&mut self, index: isize) -> &mut Self::Output {
+impl<T> IndexMut<usize> for AllocRingBuffer<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         self.get_mut(index).expect("index out of bounds")
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::with_alloc::alloc_ringbuffer::RingbufferSize;
     use crate::{AllocRingBuffer, RingBuffer};
 
     // just test that this compiles
     #[test]
     fn test_generic_clone() {
-        fn helper<SIZE: RingbufferSize>(
-            a: &AllocRingBuffer<i32, SIZE>,
-        ) -> AllocRingBuffer<i32, SIZE> {
+        fn helper(a: &AllocRingBuffer<i32>) -> AllocRingBuffer<i32> {
             a.clone()
         }
 
         _ = helper(&AllocRingBuffer::new(2));
-        _ = helper(&AllocRingBuffer::with_capacity_non_power_of_two(5));
+        _ = helper(&AllocRingBuffer::new(5));
     }
 
     #[test]
     fn test_not_power_of_two() {
-        let mut rb = AllocRingBuffer::with_capacity_non_power_of_two(10);
+        let mut rb = AllocRingBuffer::new(10);
         const NUM_VALS: usize = 1000;
 
         // recycle the ringbuffer a bunch of time to see if noneof the logic
@@ -505,12 +412,6 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_with_capacity_no_power_of_two() {
-        let _ = AllocRingBuffer::<i32>::new(10);
-    }
-
-    #[test]
-    #[should_panic]
     fn test_index_zero_length() {
         let b = AllocRingBuffer::<i32>::new(2);
         let _ = b[2];
@@ -527,7 +428,7 @@ mod tests {
         let expected = [0, 0, 1, 2];
 
         for i in 0..4 {
-            let actual = buf[i as isize];
+            let actual = buf[i];
             let expected = expected[i];
             assert_eq!(actual, expected);
         }
@@ -544,7 +445,7 @@ mod tests {
         let expected = [2, 3, 4, 5, 6, 7, 8, 9];
 
         for i in 0..8 {
-            let actual = buf[i as isize];
+            let actual = buf[i];
             let expected = expected[i];
             assert_eq!(actual, expected);
         }

@@ -23,10 +23,10 @@ pub trait InboxBackend<T: Copy + Default, M> {
 
     /// Pops oldest entry with the given `tag` or oldest entry in general, if no `tag` was given.
     /// Returns `None` if queue with the given `tag` is empty, or the entire store is empty (if no `tag` was given).
-    async fn pop(&mut self, tag: Option<T>) -> Option<M>;
+    async fn pop(&mut self, tag: Option<T>) -> Option<(M, Duration)>;
 
     /// Pops all entries of the given `tag`, or all entries (tagged and untagged) and returns them.
-    async fn pop_all(&mut self, tag: Option<T>) -> Vec<M>;
+    async fn pop_all(&mut self, tag: Option<T>) -> Vec<(M, Duration)>;
 
     // TODO: consider adding a stream version for `pop_all`
 
@@ -133,7 +133,7 @@ where
     /// Pop the oldest message with the given tag, or the oldest message regardless the tag
     /// if it is not given. Returns `None` if there's no message with such `tag` (if given) in the inbox
     /// or if the whole inbox is empty (if no `tag` is given).
-    pub async fn pop(&self, tag: Option<Tag>) -> Option<ApplicationData> {
+    pub async fn pop(&self, tag: Option<Tag>) -> Option<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {
             return None;
         }
@@ -146,7 +146,7 @@ where
 
     /// Pops all the messages with the given `tag` (ordered oldest to latest) or
     /// all the messages from the entire inbox (ordered oldest to latest) if no `tag` is given.
-    pub async fn pop_all(&self, tag: Option<Tag>) -> Vec<ApplicationData> {
+    pub async fn pop_all(&self, tag: Option<Tag>) -> Vec<(ApplicationData, Duration)> {
         if self.is_excluded_tag(&tag) {
             return Vec::new();
         }
@@ -208,10 +208,10 @@ mod tests {
         assert_eq!(0, mi.size(Some(2)).await);
 
         let ad = mi.pop(None).await.unwrap();
-        assert_eq!(b"test msg 0", ad.plain_text.as_ref());
+        assert_eq!(b"test msg 0", ad.0.plain_text.as_ref());
 
         let ad = mi.pop(Some(1)).await.unwrap();
-        assert_eq!(b"test msg 1", ad.plain_text.as_ref());
+        assert_eq!(b"test msg 1", ad.0.plain_text.as_ref());
         assert_eq!(1, mi.size(Some(1)).await);
 
         assert_eq!(1, mi.size(None).await);
@@ -228,11 +228,28 @@ pub mod wasm {
     use crate::ring::RingBufferInboxBackend;
     use core_types::protocol::ApplicationData;
     use core_types::protocol::Tag;
+    use serde::{Deserialize, Serialize};
     use std::time::Duration;
     use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct MessageInboxEntry {
+        pub data: ApplicationData,
+        pub ts_seconds: u64,
+    }
+
+    impl From<(ApplicationData, Duration)> for MessageInboxEntry {
+        fn from(value: (ApplicationData, Duration)) -> Self {
+            Self {
+                data: value.0,
+                ts_seconds: value.1.as_secs(),
+            }
+        }
+    }
 
     #[wasm_bindgen]
     impl MessageInboxConfiguration {
@@ -262,12 +279,19 @@ pub mod wasm {
             self.w.push(payload).await
         }
 
-        pub async fn pop(&self, tag: Option<u16>) -> Option<ApplicationData> {
-            self.w.pop(tag).await
+        pub async fn pop(&self, tag: Option<u16>) -> Option<MessageInboxEntry> {
+            self.w.pop(tag).await.map(MessageInboxEntry::from)
         }
 
         pub async fn pop_all(&self, tag: Option<u16>) -> JsResult<JsValue> {
-            let all = self.w.pop_all(tag).await;
+            let all = self
+                .w
+                .pop_all(tag)
+                .await
+                .into_iter()
+                .map(MessageInboxEntry::from)
+                .collect::<Vec<MessageInboxEntry>>();
+
             ok_or_jserr!(serde_wasm_bindgen::to_value(&all))
         }
 

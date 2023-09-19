@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.59"
 name = "ringbuffer"
-version = "0.14.2"
+version = "0.15.0"
 authors = [
     "Victor Roest <victor@xirion.net>",
     "Jonathan Dönszelmann <jonabent@gmail.com>",

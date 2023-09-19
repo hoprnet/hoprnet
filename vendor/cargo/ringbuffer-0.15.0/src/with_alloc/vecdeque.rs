@@ -1,5 +1,4 @@
 use crate::ringbuffer_trait::{RingBufferIntoIterator, RingBufferIterator, RingBufferMutIterator};
-use crate::with_alloc::alloc_ringbuffer::RingbufferSize;
 use crate::{AllocRingBuffer, RingBuffer};
 use alloc::collections::VecDeque;
 use core::ops::{Deref, DerefMut, Index, IndexMut};
@@ -40,8 +39,8 @@ impl<T: Clone> From<&[T]> for GrowableAllocRingBuffer<T> {
     }
 }
 
-impl<T, SIZE: RingbufferSize> From<AllocRingBuffer<T, SIZE>> for GrowableAllocRingBuffer<T> {
-    fn from(mut v: AllocRingBuffer<T, SIZE>) -> GrowableAllocRingBuffer<T> {
+impl<T> From<AllocRingBuffer<T>> for GrowableAllocRingBuffer<T> {
+    fn from(mut v: AllocRingBuffer<T>) -> GrowableAllocRingBuffer<T> {
         let mut rb = GrowableAllocRingBuffer::new();
         rb.extend(v.drain());
         rb
@@ -63,7 +62,7 @@ impl<T: Clone, const CAP: usize> From<&mut [T; CAP]> for GrowableAllocRingBuffer
 impl<T> From<alloc::vec::Vec<T>> for GrowableAllocRingBuffer<T> {
     fn from(value: alloc::vec::Vec<T>) -> Self {
         let mut res = GrowableAllocRingBuffer::new();
-        res.extend(value.into_iter());
+        res.extend(value);
         res
     }
 }
@@ -71,7 +70,7 @@ impl<T> From<alloc::vec::Vec<T>> for GrowableAllocRingBuffer<T> {
 impl<T> From<alloc::collections::LinkedList<T>> for GrowableAllocRingBuffer<T> {
     fn from(value: alloc::collections::LinkedList<T>) -> Self {
         let mut res = GrowableAllocRingBuffer::new();
-        res.extend(value.into_iter());
+        res.extend(value);
         res
     }
 }
@@ -174,7 +173,12 @@ unsafe impl<T> RingBuffer<T> for GrowableAllocRingBuffer<T> {
         (*rb).0.len()
     }
 
+    #[inline]
     unsafe fn ptr_capacity(rb: *const Self) -> usize {
+        (*rb).0.capacity()
+    }
+    #[inline]
+    unsafe fn ptr_buffer_size(rb: *const Self) -> usize {
         (*rb).0.capacity()
     }
 
@@ -200,7 +204,15 @@ unsafe impl<T> RingBuffer<T> for GrowableAllocRingBuffer<T> {
         self.0.clear();
     }
 
-    fn get(&self, index: isize) -> Option<&T> {
+    fn get(&self, index: usize) -> Option<&T> {
+        if self.is_empty() {
+            None
+        } else {
+            self.0.get(crate::mask_modulo(self.0.len(), index))
+        }
+    }
+
+    fn get_signed(&self, index: isize) -> Option<&T> {
         if self.is_empty() {
             None
         } else if index >= 0 {
@@ -214,7 +226,7 @@ unsafe impl<T> RingBuffer<T> for GrowableAllocRingBuffer<T> {
         }
     }
 
-    unsafe fn ptr_get_mut(rb: *mut Self, index: isize) -> Option<*mut T> {
+    unsafe fn ptr_get_mut_signed(rb: *mut Self, index: isize) -> Option<*mut T> {
         #[allow(trivial_casts)]
         if RingBuffer::ptr_len(rb) == 0 {
             None
@@ -232,12 +244,14 @@ unsafe impl<T> RingBuffer<T> for GrowableAllocRingBuffer<T> {
         .map(|i| i as *mut T)
     }
 
-    fn get_absolute(&self, _index: usize) -> Option<&T> {
-        unimplemented!()
-    }
-
-    fn get_absolute_mut(&mut self, _index: usize) -> Option<&mut T> {
-        unimplemented!()
+    unsafe fn ptr_get_mut(rb: *mut Self, index: usize) -> Option<*mut T> {
+        #[allow(trivial_casts)]
+        if RingBuffer::ptr_len(rb) == 0 {
+            None
+        } else {
+            (*rb).0.get_mut(index)
+        }
+        .map(|i| i as *mut T)
     }
 }
 
@@ -247,16 +261,16 @@ impl<T> Extend<T> for GrowableAllocRingBuffer<T> {
     }
 }
 
-impl<T> Index<isize> for GrowableAllocRingBuffer<T> {
+impl<T> Index<usize> for GrowableAllocRingBuffer<T> {
     type Output = T;
 
-    fn index(&self, index: isize) -> &Self::Output {
+    fn index(&self, index: usize) -> &Self::Output {
         self.get(index).expect("index out of bounds")
     }
 }
 
-impl<T> IndexMut<isize> for GrowableAllocRingBuffer<T> {
-    fn index_mut(&mut self, index: isize) -> &mut Self::Output {
+impl<T> IndexMut<usize> for GrowableAllocRingBuffer<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         self.get_mut(index).expect("index out of bounds")
     }
 }
