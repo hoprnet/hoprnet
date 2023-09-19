@@ -8,7 +8,6 @@ export * from './u8a/index.js'
 export * from './time.js'
 export * from './constants.js'
 export * from './ethereum/index.js'
-export * from './utils.js'
 
 export {
   app_version,
