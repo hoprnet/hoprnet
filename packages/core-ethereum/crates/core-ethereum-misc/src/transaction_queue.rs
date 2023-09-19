@@ -1,6 +1,6 @@
 use crate::errors::CoreEthereumError::TransactionSubmissionFailed;
 use crate::errors::Result;
-use crate::transaction_queue::TransactionResult::Failure;
+use crate::transaction_queue::TransactionResult::{Failure, RedeemTicket};
 use async_lock::RwLock;
 use async_std::channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
@@ -10,8 +10,9 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
 use core_types::channels::ChannelStatus;
 use core_types::channels::ChannelStatus::{Closed, Open, PendingToClose};
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use utils_log::{error, info, warn};
+use utils_log::{error, warn};
 use utils_types::primitives::{Address, Balance};
 
 /// Enumerates all possible outgoing transactions
@@ -33,27 +34,39 @@ pub enum Transaction {
     Withdraw(Address, Balance),
 }
 
+impl Display for Transaction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Transaction::RedeemTicket(ack) => write!(f, "redeem tx of {ack}"),
+            Transaction::OpenChannel(dst, amount) => write!(f, "open channel tx to {dst} with {amount}"),
+            Transaction::FundChannel(channel_id, amount) => write!(f, "fund channel tx for {channel_id} with {amount}"),
+            Transaction::CloseChannel(src, dst) => write!(f, "closure tx of channel from {src} to {dst}"),
+            Transaction::Withdraw(dst, amount) => write!(f, "withdraw tx of {amount} to {dst}"),
+        }
+    }
+}
+
 /// Implements execution of each `Transaction` and also **awaits** its confirmation.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait TransactionExecutor {
-    async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> Result<Hash>;
-    async fn open_channel(&self, destination: Address, balance: Balance) -> Result<(Hash, Hash)>;
-    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<Hash>;
-    async fn close_channel_initialize(&self, src: Address, dst: Address) -> Result<Hash>;
-    async fn close_channel_finalize(&self, src: Address, dst: Address) -> Result<Hash>;
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<Hash>;
+    async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
+    async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
+    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> TransactionResult;
+    async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
+    async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
+    async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
 }
 
 /// Represents a result of an Ethereum transaction after it has been confirmed.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum TransactionResult {
     RedeemTicket { tx_hash: Hash },
     OpenChannel { tx_hash: Hash, channel_id: Hash },
     FundChannel { tx_hash: Hash },
     CloseChannel { tx_hash: Hash, status: ChannelStatus },
     Withdraw { tx_hash: Hash },
-    Failure,
+    Failure(String),
 }
 
 /// Notifies about completion of a transaction (success or failure).
@@ -111,43 +124,36 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
     /// Runs the main queue processing loop until the queue is closed.
     pub async fn transaction_loop(&self) {
         while let Ok(req) = self.queue_recv.recv().await {
-            let mut tx_result = Failure;
-            match req.0 {
-                Transaction::RedeemTicket(ack) => {
-                    match ack.status {
-                        BeingRedeemed { .. } => match self.tx_exec.redeem_ticket(ack.clone()).await {
-                            Ok(tx_hash) => {
+            let tx_result = match req.0.clone() {
+                Transaction::RedeemTicket(ack) => match ack.status {
+                    BeingRedeemed { .. } => {
+                        let res = self.tx_exec.redeem_ticket(ack.clone()).await;
+                        match res {
+                            RedeemTicket { .. } => {
                                 if let Err(e) = self.db.write().await.mark_redeemed(&ack).await {
                                     error!("failed to mark {ack} as redeemed: {e}");
                                 }
-                                tx_result = TransactionResult::RedeemTicket { tx_hash }
                             }
-                            Err(e) => error!("failed to redeem {ack}: {e}"),
-                        },
-                        _ => error!("invalid state of {ack}"),
-                    };
-                }
-
-                Transaction::OpenChannel(address, stake) => match self.tx_exec.open_channel(address, stake).await {
-                    Ok((tx_hash, channel_id)) => {
-                        tx_result = TransactionResult::OpenChannel { tx_hash, channel_id };
+                            Failure(_) => {}
+                            _ => panic!("invalid tx result from ticket redeem"),
+                        }
+                        res
                     }
-                    Err(e) => error!("failed to open channel to {address} with {stake}: {e}"),
+                    _ => Failure(format!("invalid state of {ack}")),
                 },
+
+                Transaction::OpenChannel(address, stake) => self.tx_exec.open_channel(address, stake).await,
 
                 Transaction::FundChannel(channel_id, amount) => {
                     let maybe_channel = self.db.read().await.get_channel(&channel_id).await.ok().flatten();
                     if let Some(channel) = maybe_channel {
                         if channel.status == Open {
-                            match self.tx_exec.fund_channel(channel_id, amount).await {
-                                Ok(tx_hash) => tx_result = TransactionResult::FundChannel { tx_hash },
-                                Err(e) => error!("failed to fund channel {channel_id} with {amount}: {e}"),
-                            }
+                            self.tx_exec.fund_channel(channel_id, amount).await
                         } else {
-                            error!("cannot fund channel {channel_id} that is not opened");
+                            Failure(format!("cannot fund channel {channel_id} that is not opened"))
                         }
                     } else {
-                        error!("cannot obtain channel {channel_id} for funding");
+                        Failure(format!("cannot obtain channel {channel_id} for funding"))
                     }
                 }
 
@@ -164,55 +170,38 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
                     if let Some(channel) = maybe_channel {
                         let channel_id = channel.get_id();
                         match channel.status {
-                            Open => match self.tx_exec.close_channel_initialize(source, destination).await {
-                                Ok(tx_hash) => {
-                                    info!("closure of channel {channel_id} initialized: {tx_hash}");
-                                    tx_result = TransactionResult::CloseChannel {
-                                        tx_hash,
-                                        status: channel.status,
-                                    }
-                                }
-                                Err(e) => {
-                                    error!("failed to initialize closure of channel {channel_id}: {e}");
-                                }
-                            },
+                            Open => self.tx_exec.close_channel_initialize(source, destination).await,
                             PendingToClose => {
                                 if channel.closure_time_passed().unwrap_or(false) {
-                                    match self.tx_exec.close_channel_finalize(source, destination).await {
-                                        Ok(tx_hash) => {
-                                            info!("closure of channel {channel_id} finalized: {tx_hash}");
-                                            tx_result = TransactionResult::CloseChannel {
-                                                tx_hash,
-                                                status: channel.status,
-                                            }
-                                        }
-                                        Err(e) => {
-                                            error!("failed to initialize closure of channel {channel_id}: {e}");
-                                        }
-                                    }
+                                    self.tx_exec.close_channel_finalize(source, destination).await
                                 } else {
                                     warn!("cannot close channel {channel_id} because closure time has not passed, remaining {} seconds", channel.remaining_closure_time().unwrap_or(u32::MAX as u64));
-                                    tx_result = TransactionResult::CloseChannel {
+                                    TransactionResult::CloseChannel {
                                         tx_hash: Hash::default(),
-                                        status: channel.status,
+                                        status: PendingToClose,
                                     }
                                 }
                             }
                             Closed => {
                                 warn!("channel {channel_id} is already closed");
+                                TransactionResult::CloseChannel {
+                                    tx_hash: Hash::default(),
+                                    status: Closed,
+                                }
                             }
                         }
+                    } else {
+                        Failure(format!("cannot find channel {source} -> {destination}"))
                     }
                 }
 
-                Transaction::Withdraw(recipient, amount) => match self.tx_exec.withdraw(recipient, amount).await {
-                    Ok(tx_hash) => {
-                        info!("successfully withdrawn {amount} to {recipient}");
-                        tx_result = TransactionResult::Withdraw { tx_hash }
-                    }
-                    Err(e) => error!("failed to withdraw {amount} to {recipient}: {e}"),
-                },
+                Transaction::Withdraw(recipient, amount) => self.tx_exec.withdraw(recipient, amount).await,
+            };
+
+            if let Failure(err) = &tx_result {
+                error!("{} failed: {err}", req.0);
             }
+
             let _ = req.1.send(tx_result);
         }
         warn!("transaction queue has finished");
@@ -221,15 +210,14 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::errors::CoreEthereumError::TransactionSubmissionFailed;
-    use crate::transaction_queue::TransactionExecutor;
+    use crate::transaction_queue::{TransactionExecutor, TransactionResult};
     use async_trait::async_trait;
     use core_crypto::types::Hash;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use core_types::channels::ChannelStatus;
     use js_sys::Promise;
     use serde::{Deserialize, Serialize};
     use utils_misc::utils::wasm::js_value_to_error_msg;
-    use utils_types::errors::GeneralError::ParseError;
     use utils_types::primitives::{Address, Balance};
     use utils_types::traits::ToHex;
     use wasm_bindgen::prelude::wasm_bindgen;
@@ -290,76 +278,93 @@ pub mod wasm {
 
     #[async_trait(? Send)]
     impl TransactionExecutor for WasmTxExecutor {
-        async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> crate::errors::Result<Hash> {
+        async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult {
             let wasm_ack: core_types::acknowledgement::wasm::AcknowledgedTicket = ticket.into();
-            await_js_promise(self.redeem_ticket_fn.call1(&JsValue::null(), &JsValue::from(wasm_ack)))
-                .await
-                .map(|r| r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default())
-                .map_err(|s| TransactionSubmissionFailed(s))
+            match await_js_promise(self.redeem_ticket_fn.call1(&JsValue::null(), &JsValue::from(wasm_ack))).await {
+                Ok(r) => TransactionResult::RedeemTicket {
+                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
+                },
+                Err(e) => TransactionResult::Failure(e),
+            }
         }
 
-        async fn open_channel(&self, destination: Address, balance: Balance) -> crate::errors::Result<(Hash, Hash)> {
-            await_js_promise(self.open_channel_fn.call2(
+        async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult {
+            match await_js_promise(self.open_channel_fn.call2(
                 &JsValue::null(),
                 &JsValue::from(destination),
                 &JsValue::from(balance),
             ))
             .await
-            .map_err(|s| TransactionSubmissionFailed(s))
-            .and_then(|v| {
-                serde_wasm_bindgen::from_value::<OpenChannelResult>(v)
-                    .map_err(|_| crate::errors::CoreEthereumError::OtherError(ParseError))
-            })
-            .map(|v| {
-                (
-                    Hash::from_hex(&v.receipt).unwrap_or_default(),
-                    Hash::from_hex(&v.receipt).unwrap_or_default(),
-                )
-            })
+            .and_then(|v| serde_wasm_bindgen::from_value::<OpenChannelResult>(v).map_err(|_| "parse error".to_string()))
+            {
+                Ok(v) => TransactionResult::OpenChannel {
+                    tx_hash: Hash::from_hex(&v.receipt).unwrap_or_default(),
+                    channel_id: Hash::from_hex(&v.channel_id).unwrap_or_default(),
+                },
+                Err(e) => TransactionResult::Failure(e),
+            }
         }
 
-        async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> crate::errors::Result<Hash> {
-            await_js_promise(self.fund_channel_fn.call2(
+        async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> TransactionResult {
+            match await_js_promise(self.fund_channel_fn.call2(
                 &JsValue::null(),
                 &JsValue::from(channel_id),
                 &JsValue::from(amount),
             ))
             .await
-            .map(|r| r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default())
-            .map_err(|s| TransactionSubmissionFailed(s))
+            {
+                Ok(r) => TransactionResult::FundChannel {
+                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
+                },
+                Err(e) => TransactionResult::Failure(e),
+            }
         }
 
-        async fn close_channel_initialize(&self, src: Address, dst: Address) -> crate::errors::Result<Hash> {
-            await_js_promise(self.close_channel_init_fn.call2(
+        async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult {
+            match await_js_promise(self.close_channel_init_fn.call2(
                 &JsValue::null(),
                 &JsValue::from(src),
                 &JsValue::from(dst),
             ))
             .await
-            .map(|r| r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default())
-            .map_err(|s| TransactionSubmissionFailed(s))
+            {
+                Ok(r) => TransactionResult::CloseChannel {
+                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
+                    status: ChannelStatus::PendingToClose,
+                },
+                Err(e) => TransactionResult::Failure(e),
+            }
         }
 
-        async fn close_channel_finalize(&self, src: Address, dst: Address) -> crate::errors::Result<Hash> {
-            await_js_promise(self.close_channel_finish_fn.call2(
+        async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult {
+            match await_js_promise(self.close_channel_finish_fn.call2(
                 &JsValue::null(),
                 &JsValue::from(src),
                 &JsValue::from(dst),
             ))
             .await
-            .map(|r| r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default())
-            .map_err(|s| TransactionSubmissionFailed(s))
+            {
+                Ok(r) => TransactionResult::CloseChannel {
+                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
+                    status: ChannelStatus::Closed,
+                },
+                Err(e) => TransactionResult::Failure(e),
+            }
         }
 
-        async fn withdraw(&self, recipient: Address, amount: Balance) -> crate::errors::Result<Hash> {
-            await_js_promise(self.withdraw_fn.call2(
+        async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult {
+            match await_js_promise(self.withdraw_fn.call2(
                 &JsValue::null(),
                 &JsValue::from(recipient),
                 &JsValue::from(amount),
             ))
             .await
-            .map(|r| r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default())
-            .map_err(|s| TransactionSubmissionFailed(s))
+            {
+                Ok(r) => TransactionResult::Withdraw {
+                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
+                },
+                Err(e) => TransactionResult::Failure(e),
+            }
         }
     }
 }
