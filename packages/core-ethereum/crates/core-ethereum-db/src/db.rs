@@ -1984,7 +1984,10 @@ mod tests {
 
         // Store ack tickets
         for ack in acked_tickets.iter() {
-            inner_db.set(get_acknowledged_ticket_key(ack).unwrap(), ack).await.unwrap();
+            inner_db
+                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .await
+                .unwrap();
         }
 
         let mut db = CoreEthereumDb::new(inner_db, Address::random());
