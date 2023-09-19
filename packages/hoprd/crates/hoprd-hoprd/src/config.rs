@@ -710,13 +710,13 @@ healthcheck:
   port: 0
 protocol:
   ack:
-    timeout: 900
+    timeout: 15
   heartbeat:
-    timeout: 900
+    timeout: 15
   msg:
-    timeout: 900
+    timeout: 15
   ticket_aggregation:
-    timeout: 900
+    timeout: 15
 network: testing
 chain:
   announce: false

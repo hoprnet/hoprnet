@@ -317,7 +317,11 @@ export class Hopr extends EventEmitter {
         }
       },
       txExecutor,
-      this.getLocalMultiaddresses().map((x) => x.toString())
+      this.getLocalMultiaddresses().map((x) => x.toString()),
+      this.cfg.protocol.ack,
+      this.cfg.protocol.heartbeat,
+      this.cfg.protocol.msg,
+      this.cfg.protocol.ticket_aggregation,
     )
 
     this.tools = coreApp.tools()
