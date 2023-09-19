@@ -18,7 +18,6 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 gloo-timers = { workspace = true, optional = true }
 hex = "0.4.3"
 ringbuffer = "0.15.0"
-serde = { workspace = true }
 serde_with = { workspace = true }
 validator = { workspace = true }
 js-sys = { version = "0.3.63", optional = true }
