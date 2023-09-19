@@ -1,3 +1,4 @@
+pub mod constants;
 pub mod errors;
 pub mod heartbeat;
 pub mod messaging;
