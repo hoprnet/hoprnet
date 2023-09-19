@@ -10,10 +10,9 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 // @ts-ignore untyped library
 import retimer from 'retimer'
 
-import { compareAddressesLocalMode, compareAddressesPublicMode } from '@hoprnet/hopr-connect'
-
 import {
   app_version,
+  compareAddressesLocalMode, compareAddressesPublicMode,
   create_counter,
   create_gauge,
   create_histogram_with_buckets,
