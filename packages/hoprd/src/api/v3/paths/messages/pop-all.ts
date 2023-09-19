@@ -9,7 +9,7 @@ const POST: Operation = [
       return {
         tag: msg.data.application_tag,
         body: new TextDecoder().decode(msg.data.plain_text),
-        receivedAt: msg.ts_seconds
+        receivedAt: Number(msg.ts_seconds)
       }
     })
 
