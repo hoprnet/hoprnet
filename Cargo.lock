@@ -1295,6 +1295,7 @@ dependencies = [
  "async-std",
  "console_error_panic_hook",
  "core-network",
+ "core-protocol",
  "core-types",
  "env_logger",
  "futures",

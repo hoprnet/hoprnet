@@ -3,6 +3,16 @@ pub mod errors;
 
 use std::fmt::Debug;
 
+use core_protocol::constants::{
+    HOPR_MESSAGE_PROTOCOL_V_0_1_0,
+    HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0,
+    HOPR_HEARTBEAT_PROTOCOL_V_0_1_0,
+    HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
+    HOPR_HEARTBEAT_CONNECTION_KEEPALIVE,
+    HOPR_MESSAGE_CONNECTION_KEEPALIVE,
+    HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE,
+    HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE
+};
 use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
 pub use libp2p::{
     core as libp2p_core, identity as libp2p_identity, identity, noise as libp2p_noise,
@@ -23,23 +33,20 @@ pub struct Ping(pub ControlMessage);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pong(pub ControlMessage, pub String);
 
-pub const HOPR_HEARTBEAT_PROTOCOL_V_0_1_0: &str = "/hopr/heartbeat/0.1.0";
-pub const HOPR_MESSAGE_PROTOCOL_V_0_1_0: &str = "/hopr/msg/0.1.0";
-pub const HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0: &str = "/hopr/ack/0.1.0";
-pub const HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0: &str = "/hopr/ticket-aggregation/0.1.0";
 
-const HOPR_HEARTBEAT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_HEARTBEAT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
-const HOPR_MESSAGE_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_MESSAGE_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
-const HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
-const HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE: std::time::Duration = std::time::Duration::from_secs(3600); // 1 hour
 const HOPR_TICKET_AGGREGATION_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
+/// Network Behavior definition for aggregated HOPR network functionality.
+/// 
+/// Individual network behaviors from the libp2p perspectives are aggregated
+/// under this type in order to create an aggregated network behavior capable
+/// of generating events for all component behaviors.
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
@@ -57,7 +64,10 @@ impl Debug for HoprNetworkBehavior {
     }
 }
 
-/// Aggregated network behavior inheriting the component behaviors.
+/// Aggregated network behavior event inheriting the component behaviors' events.
+/// 
+/// Necessary to allow the libp2p handler to properly distribute the events for 
+/// processing in the business logic loop.
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
     Heartbeat(libp2p_request_response::Event<Ping, Pong>),

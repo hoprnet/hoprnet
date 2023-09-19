@@ -41,16 +41,16 @@ use utils_metrics::metrics::SimpleCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-     static ref METRIC_AGGREGATED_TICKETS: SimpleCounter = SimpleCounter::new(
-         "core_counter_aggregated_tickets",
-         "Number of aggregated tickets"
-     )
-     .unwrap();
+    static ref METRIC_AGGREGATED_TICKETS: SimpleCounter = SimpleCounter::new(
+        "core_counter_aggregated_tickets",
+        "Number of aggregated tickets"
+    )
+    .unwrap();
     static ref METRIC_AGGREGATION_COUNT: SimpleCounter = SimpleCounter::new(
-         "core_counter_aggregations",
-         "Number of performed ticket aggregations"
-     )
-     .unwrap();
+        "core_counter_aggregations",
+        "Number of performed ticket aggregations"
+    )
+    .unwrap();
 }
 
 // Default sizes of the acknowledgement queues
@@ -109,7 +109,6 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             return Ok(acked_tickets[0].ticket.clone());
         }
 
-        // @TODO who's receiving this error?
         let domain_separator = self
             .db
             .read()

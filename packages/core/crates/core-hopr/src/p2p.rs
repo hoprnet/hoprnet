@@ -200,7 +200,7 @@ pub(crate) async fn p2p_loop(
                 Inputs::TicketAggregation(task) => match task {
                     TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
                         let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
-                        // TODO: add some timeout to prevent memory leaks
+                        error!("Ticket aggregation: Sent request (#{}) to {}", request_id, peer);
                         active_aggregation_requests.insert(request_id, finalizer);
                     },
                     TicketAggregationProcessed::Reply(peer, ticket, response) => {
