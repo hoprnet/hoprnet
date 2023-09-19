@@ -12,7 +12,8 @@ import retimer from 'retimer'
 
 import {
   app_version,
-  compareAddressesLocalMode, compareAddressesPublicMode,
+  compareAddressesLocalMode,
+  compareAddressesPublicMode,
   create_counter,
   create_gauge,
   create_histogram_with_buckets,

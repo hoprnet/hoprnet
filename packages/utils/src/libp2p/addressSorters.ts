@@ -3,7 +3,11 @@ import {
   isLocalhost,
   inSameNetwork,
   PRIVATE_V4_CLASS_A,
-  PRIVATE_V4_CLASS_B, PRIVATE_V4_CLASS_C, CARRIER_GRADE_NAT_NETWORK, isReservedAddress, isLinkLocaleAddress
+  PRIVATE_V4_CLASS_B,
+  PRIVATE_V4_CLASS_C,
+  CARRIER_GRADE_NAT_NETWORK,
+  isReservedAddress,
+  isLinkLocaleAddress
 } from '../network/index.js'
 
 import { type Multiaddr, protocols } from '@multiformats/multiaddr'
