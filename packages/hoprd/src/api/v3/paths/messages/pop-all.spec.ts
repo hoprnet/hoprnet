@@ -50,6 +50,7 @@ describe('POST /messages/pop-all', function () {
     expect(res.body.messages.length).to.equal(1)
     expect(res.body.messages[0].tag).to.equal(tag)
     expect(res.body.messages[0].body).to.equal('hello world')
+    expect(res.body.messages[0].receivedAt).to.greaterThan(0)
     expect(await inbox.size(tag)).to.equal(0)
   })
 
@@ -68,8 +69,10 @@ describe('POST /messages/pop-all', function () {
     expect(res.body.messages.length).to.equal(2)
     expect(res.body.messages[0].tag).to.equal(tag)
     expect(res.body.messages[0].body).to.equal('hello world 1')
+    expect(res.body.messages[0].receivedAt).to.greaterThan(0)
     expect(res.body.messages[1].tag).to.equal(tag)
     expect(res.body.messages[1].body).to.equal('hello world 2')
+    expect(res.body.messages[1].receivedAt).to.greaterThan(0)
     expect(await inbox.size(tag)).to.equal(0)
   })
 
