@@ -168,8 +168,6 @@ Options:
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit
           initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
-      --maxParallelConnections <CONNECTIONS>
-          Set maximum parallel connections [env: HOPRD_MAX_PARALLEL_CONNECTIONS=] [default: 50000]
       --testAnnounceLocalAddresses
           For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES=]
       --heartbeatInterval <MILLISECONDS>
