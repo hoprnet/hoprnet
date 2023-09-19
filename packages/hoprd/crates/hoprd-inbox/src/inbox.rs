@@ -1,7 +1,9 @@
 use async_lock::Mutex;
 use async_trait::async_trait;
-use core_types::protocol::{ApplicationData, Tag, DEFAULT_APPLICATION_TAG};
+use core_types::protocol::{ApplicationData, Tag};
 use std::time::Duration;
+
+use crate::config::MessageInboxConfiguration;
 
 /// Represents a simple timestamping function.
 /// This is useful if used in WASM or environment which might have different means of measuring time.
@@ -32,29 +34,6 @@ pub trait InboxBackend<T: Copy + Default, M> {
 
     /// Purges all entries strictly older than the given timestamp.
     async fn purge(&mut self, older_than_ts: Duration);
-}
-
-/// Holds basic configuration parameters of the `MessageInbox`.
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-pub struct MessageInboxConfiguration {
-    /// Maximum capacity per-each application tag.
-    /// In the current implementation, the capacity must be a power of two.
-    pub capacity: u32,
-    /// Maximum age of a message held in the inbox until it is purged.
-    pub max_age_sec: u64, // cannot use std::time::Duration here due to wasm-bindgen
-    /// List of tags that are excluded on `push`.
-    pub excluded_tags: Vec<Tag>,
-}
-
-impl Default for MessageInboxConfiguration {
-    fn default() -> Self {
-        Self {
-            capacity: 512,                                // must be a power of 2 with this implementation
-            max_age_sec: 15 * 60,                         // 15 minutes
-            excluded_tags: vec![DEFAULT_APPLICATION_TAG], // exclude untagged messages pre default
-        }
-    }
 }
 
 /// Represents a thread-safe message inbox of messages of type `M`
@@ -111,7 +90,7 @@ where
         // Push only if there is no tag, or if the tag is not excluded
         let mut db = self.backend.lock().await;
         db.push(payload.application_tag, payload).await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec))
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
 
         true
@@ -125,7 +104,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec))
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
         db.count(tag).await
     }
@@ -139,7 +118,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec))
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
         db.pop(tag).await
     }
@@ -152,7 +131,7 @@ where
         }
 
         let mut db = self.backend.lock().await;
-        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec))
+        db.purge((self.time)() - Duration::from_secs(self.cfg.max_age_sec()))
             .await;
         db.pop_all(tag).await
     }
@@ -167,11 +146,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_basic_flow() {
-        let cfg = MessageInboxConfiguration {
-            capacity: 4,
-            excluded_tags: vec![2],
-            max_age_sec: 2,
-        };
+        let mut cfg = MessageInboxConfiguration::default();
+        cfg.capacity = 4;
+        cfg.excluded_tags = vec![2];
+        cfg.set_max_age_sec(2);
 
         let mi = MessageInbox::<RingBufferInboxBackend<Tag, ApplicationData>>::new(cfg);
 
