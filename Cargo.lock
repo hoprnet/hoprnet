@@ -1089,7 +1089,7 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "stdext",
  "utils-db",
  "utils-log",
@@ -1121,7 +1121,7 @@ dependencies = [
  "multiaddr",
  "primitive-types",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "thiserror",
  "utils-db",
  "utils-log",
@@ -1206,7 +1206,7 @@ dependencies = [
  "gloo-timers 0.3.0",
  "js-sys",
  "multiaddr",
- "serde-wasm-bindgen 0.5.0",
+ "serde-wasm-bindgen",
  "thiserror",
  "utils-db",
  "utils-log",
@@ -1225,7 +1225,7 @@ dependencies = [
  "js-sys",
  "real-base",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "serde_json",
  "utils-misc",
  "wasm-bindgen",
@@ -1344,7 +1344,7 @@ dependencies = [
  "mockall",
  "parameterized",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "serial_test",
  "thiserror",
  "typenum",
@@ -1393,7 +1393,7 @@ dependencies = [
  "js-sys",
  "rand 0.8.5",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "simple_moving_average",
  "utils-log",
  "utils-misc",
@@ -2924,7 +2924,7 @@ dependencies = [
  "proc-macro-regex",
  "real-base",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "serde_json",
  "serde_yaml",
  "tempfile",
@@ -2954,7 +2954,7 @@ dependencies = [
  "js-sys",
  "ringbuffer",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "serde_with",
  "tempfile",
  "utils-log",
@@ -5385,17 +5385,6 @@ dependencies = [
 
 [[package]]
 name = "serde-wasm-bindgen"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
-dependencies = [
- "js-sys",
- "serde",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "serde-wasm-bindgen"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30c9933e5689bd420dc6c87b7a1835701810cbc10cd86a26e4da45b73e6b1d78"
@@ -6442,7 +6431,7 @@ dependencies = [
  "rusty-leveldb",
  "scopeguard",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "tempfile",
  "thiserror",
  "utils-log",
@@ -6487,7 +6476,7 @@ dependencies = [
  "js-sys",
  "real-base",
  "serde",
- "serde-wasm-bindgen 0.6.0",
+ "serde-wasm-bindgen",
  "serde_bytes",
  "serde_json",
  "wasm-bindgen",
