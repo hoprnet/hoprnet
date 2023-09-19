@@ -5,35 +5,38 @@ mod helpers;
 mod p2p;
 mod timer;
 
-use std::sync::Arc;
-use std::time::Duration;
-
+use crate::{adaptors::indexer::IndexerProcessed, p2p::api, timer::UniversalTimer};
 use async_lock::RwLock;
-use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
-use multiaddr::Multiaddr;
-
-use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
-
+use core_crypto::keypairs::ChainKeypair;
 use core_ethereum_db::db::CoreEthereumDb;
 use core_mixer::mixer::{Mixer, MixerConfig};
-use core_network::network::NetworkConfig;
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
-    network::{Network, NetworkEvent},
+    network::{Network, NetworkConfig, NetworkEvent},
     ping::Ping,
 };
+use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
+use core_protocol::{
+    ack::config::AckProtocolConfig,
+    heartbeat::config::HeartbeatProtocolConfig,
+    msg::config::MsgProtocolConfig,
+    ticket_aggregation::{
+        config::TicketAggregationProtocolConfig,
+        processor::{TicketAggregationActions, TicketAggregationInteraction},
+    },
+};
+use core_types::{channels::Ticket, protocol::TagBloomFilter};
+use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
+use libp2p::request_response::{RequestId, ResponseChannel};
+use multiaddr::Multiaddr;
+use std::{sync::Arc, time::Duration};
 use utils_log::{error, info};
-
-use crate::adaptors::indexer::IndexerProcessed;
-use crate::p2p::api;
-
-use crate::timer::UniversalTimer;
-use core_ethereum_misc::transaction_queue::{TransactionQueue, TransactionSender};
-use core_types::protocol::TagBloomFilter;
 use utils_types::traits::BinarySerializable;
+
+use core_ethereum_misc::transaction_queue::{TransactionQueue, TransactionSender};
 
 #[cfg(feature = "wasm")]
 use {
@@ -52,6 +55,7 @@ pub struct HoprTools {
     indexer: adaptors::indexer::WasmIndexerInteractions,
     pkt_sender: PacketActions,
     tx_sender: TransactionSender,
+    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
 }
 
 #[cfg(feature = "wasm")]
@@ -61,14 +65,16 @@ impl HoprTools {
         peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
         change_notifier: Sender<NetworkEvent>,
         indexer: adaptors::indexer::WasmIndexerInteractions,
-        packet_sender: PacketActions,
+        pkt_sender: PacketActions,
         tx_sender: TransactionSender,
+        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
     ) -> Self {
         Self {
             ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
             network: adaptors::network::wasm::WasmNetwork::new(peers, change_notifier),
             indexer,
-            pkt_sender: packet_sender,
+            pkt_sender,
+            ticket_aggregate_actions,
             tx_sender,
         }
     }
@@ -134,6 +140,7 @@ impl std::fmt::Display for HoprLoopComponents {
 #[cfg(feature = "wasm")]
 pub fn build_components(
     me: libp2p_identity::Keypair,
+    me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     network_cfg: NetworkConfig,
     hb_cfg: HeartbeatConfig,
@@ -146,6 +153,10 @@ pub fn build_components(
     save_tbf: js_sys::Function,
     tx_executor: WasmTxExecutor,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
+    ack_proto_cfg: AckProtocolConfig,
+    heartbeat_proto_cfg: HeartbeatProtocolConfig,
+    msg_proto_cfg: MsgProtocolConfig,
+    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     let identity = me;
 
@@ -194,6 +205,7 @@ pub fn build_components(
         adaptors::indexer::WasmIndexerInteractions::new(db.clone(), network.clone(), indexer_update_tx);
 
     let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
+    let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
     let hopr_tools = HoprTools::new(
         ping,
@@ -202,6 +214,7 @@ pub fn build_components(
         indexer_updater,
         packet_actions.writer(),
         tx_queue.new_sender(),
+        ticket_aggregation.writer(),
     );
 
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
@@ -238,11 +251,16 @@ pub fn build_components(
                 indexer_update_rx,
                 ack_actions,
                 packet_actions,
+                ticket_aggregation,
                 api::HeartbeatRequester::new(hb_ping_rx),
                 api::HeartbeatResponder::new(hb_pong_tx),
                 api::ManualPingRequester::new(ping_rx),
                 api::HeartbeatResponder::new(pong_tx),
                 my_multiaddresses,
+                ack_proto_cfg,
+                heartbeat_proto_cfg,
+                msg_proto_cfg,
+                ticket_aggregation_proto_cfg,
             )
             .map(|_| HoprLoopComponents::Swarm),
         ),
@@ -285,11 +303,15 @@ pub mod wasm_impl {
     use std::str::FromStr;
 
     use super::*;
-    use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
+    use core_crypto::{
+        keypairs::OffchainKeypair,
+        types::{HalfKeyChallenge, Hash},
+    };
     use core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor;
     use core_network::network::NetworkConfig;
     use core_path::path::Path;
     use core_types::protocol::ApplicationData;
+    use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
@@ -304,15 +326,26 @@ pub mod wasm_impl {
             match self.pkt_sender.clone().send_packet(msg, path) {
                 Ok(mut awaiter) => {
                     utils_log::debug!("Awaiting the HalfKeyChallenge");
-                    awaiter
-                        .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
-                        .await
-                        .map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))
+                    ok_or_jserr!(
+                        awaiter
+                            .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
+                            .await
+                    )
                 }
                 Err(e) => Err(wasm_bindgen::JsValue::from(e.to_string())),
             }
         }
 
+        #[wasm_bindgen]
+        pub async fn aggregate_tickets(&mut self, channel_id: &Hash, timeout_in_millis: u64) -> Result<(), JsValue> {
+            ok_or_jserr!(
+                ok_or_jserr!(self.ticket_aggregate_actions.aggregate_tickets(channel_id))?
+                    .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
+                    .await
+            )
+        }
+
+        #[wasm_bindgen]
         pub fn get_tx_sender(&self) -> TransactionSender {
             self.tx_sender.clone()
         }
@@ -330,6 +363,7 @@ pub mod wasm_impl {
         #[wasm_bindgen(constructor)]
         pub fn new(
             me: &OffchainKeypair,
+            me_onchain: &ChainKeypair,
             db: Database, // TODO: replace the string with the KeyPair
             network_cfg: NetworkConfig,
             hb_cfg: HeartbeatConfig,
@@ -342,10 +376,15 @@ pub mod wasm_impl {
             save_tbf: js_sys::Function,
             tx_executor: WasmTxExecutor,
             my_multiaddresses: Vec<js_sys::JsString>,
+            ack_proto_cfg: AckProtocolConfig,
+            heartbeat_proto_cfg: HeartbeatProtocolConfig,
+            msg_proto_cfg: MsgProtocolConfig,
+            ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
                 me,
+                me_onchain.clone(),
                 db.as_ref_counted(),
                 network_cfg,
                 hb_cfg,
@@ -364,6 +403,10 @@ pub mod wasm_impl {
                         multiaddr::Multiaddr::from_str(ma.as_str()).expect("Should be a valid multiaddress string")
                     })
                     .collect::<Vec<_>>(),
+                ack_proto_cfg,
+                heartbeat_proto_cfg,
+                msg_proto_cfg,
+                ticket_aggregation_proto_cfg,
             );
 
             Self {

@@ -375,12 +375,9 @@ impl AcknowledgementInteraction {
 impl Stream for AcknowledgementInteraction {
     type Item = AckProcessed;
 
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
         use futures_lite::stream::StreamExt;
-        return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
+        Pin::new(self).ack_event_queue.1.poll_next(cx)
     }
 }
 
@@ -578,7 +575,7 @@ where
                         remote_peer: path.hops()[0],
                         data: packet.to_bytes(),
                     },
-                    ack_challenge.clone(),
+                    *ack_challenge,
                 ))
             }
             _ => {
@@ -732,7 +729,7 @@ where
                 }
 
                 // Check that the calculated path position from the ticket matches value from the packet header
-                let ticket_path_pos = packet.ticket.get_path_position(U256::from(price_per_packet))?;
+                let ticket_path_pos = packet.ticket.get_path_position(price_per_packet)?;
                 if !ticket_path_pos.eq(path_pos) {
                     error!("path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}");
                     return Err(PathPositionMismatch);
@@ -949,7 +946,7 @@ impl PacketInteraction {
                                             match packet.state() {
                                                 PacketState::Final { plain_text, previous_hop, .. } => {
                                                     if let Some(emitter) = &mut on_final_packet {
-                                                        match ApplicationData::from_bytes(&plain_text) {
+                                                        match ApplicationData::from_bytes(plain_text) {
                                                             Ok(app_data) => {
                                                                 if let Err(e) = emitter.try_send(app_data) {
                                                                     error!("failed to emit received final packet: {e}");
@@ -1053,19 +1050,16 @@ impl PacketInteraction {
 impl Stream for PacketInteraction {
     type Item = MsgProcessed;
 
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
         use futures_lite::stream::StreamExt;
-        return std::pin::Pin::new(self).ack_event_queue.1.poll_next(cx);
+        Pin::new(self).ack_event_queue.1.poll_next(cx)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::interaction::DEFAULT_PRICE_PER_PACKET;
     use crate::{
+        interaction::DEFAULT_PRICE_PER_PACKET,
         interaction::{
             AckProcessed, AcknowledgementInteraction, ApplicationData, MsgProcessed, PacketInteraction,
             PacketInteractionConfig,
@@ -1073,25 +1067,26 @@ mod tests {
         por::ProofOfRelayValues,
     };
     use async_std::sync::RwLock;
-    use core_crypto::random::random_integer;
     use core_crypto::{
         derivation::derive_ack_key_share,
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        random::random_bytes,
+        random::{random_bytes, random_integer},
         shared_keys::SharedSecret,
-        types::{HalfKeyChallenge, Hash, PublicKey},
+        types::{HalfKeyChallenge, Hash},
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_mixer::mixer::{Mixer, MixerConfig};
     use core_path::path::Path;
-    use core_types::protocol::{Tag, TagBloomFilter};
     use core_types::{
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
         channels::{ChannelEntry, ChannelStatus},
+        protocol::{Tag, TagBloomFilter},
     };
-    use futures::channel::mpsc::{Sender, UnboundedSender};
-    use futures::future::{join3, select, Either};
-    use futures::{pin_mut, StreamExt};
+    use futures::{
+        channel::mpsc::{Sender, UnboundedSender},
+        future::{join3, select, Either},
+        pin_mut, StreamExt,
+    };
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use libp2p_identity::PeerId;
@@ -1104,51 +1099,30 @@ mod tests {
         traits::{BinarySerializable, PeerIdLike},
     };
 
-    use super::{PacketSendAwaiter, PacketSendFinalizer};
-
-    #[async_std::test]
-    pub async fn test_packet_send_finalizer_succeeds_with_a_stored_challenge() {
-        let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
-
-        let finalizer = PacketSendFinalizer::new(tx);
-        let challenge = HalfKeyChallenge::default();
-        let mut awaiter: PacketSendAwaiter = rx.into();
-
-        finalizer.finalize(challenge.clone());
-
-        let result = awaiter.consume_and_wait(Duration::from_millis(20)).await;
-
-        assert_eq!(challenge, result.expect("HalfKeyChallange should be transmitted"));
-    }
-
-    const PEERS_PRIVS: [[u8; 32]; 5] = [
-        hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
-        hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
-        hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"),
-        hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92"),
-        hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc"),
-    ];
-
-    const PEERS_CHAIN_PRIVS: [[u8; 32]; 5] = [
-        hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056"),
-        hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b"),
-        hex!("99facd2cd33664d65826ad220920a6b356e31d18c1ce1734303b70a962664d71"),
-        hex!("62b362fd3295caf8657b8cf4f65d6e2cbb1ef81754f7bdff65e510220611afc2"),
-        hex!("40ed717eb285dea3921a8346155d988b7ed5bf751bc4eee3cd3a64f4c692396f"),
-    ];
-
     lazy_static! {
-        static ref PEERS: Vec<OffchainKeypair> = PEERS_PRIVS
-            .iter()
-            .map(|private| OffchainKeypair::from_secret(private).unwrap())
-            .collect();
+        static ref PEERS: Vec<OffchainKeypair> = vec![
+            hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
+            hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
+            hex!("3477d7de923ba3a7d5d72a7d6c43fd78395453532d03b2a1e2b9a7cc9b61bafa"),
+            hex!("db7e3e8fcac4c817aa4cecee1d6e2b4d53da51f9881592c0e1cc303d8a012b92"),
+            hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc"),
+        ]
+        .iter()
+        .map(|private| OffchainKeypair::from_secret(private).unwrap())
+        .collect();
     }
 
     lazy_static! {
-        static ref PEERS_CHAIN: Vec<ChainKeypair> = PEERS_CHAIN_PRIVS
-            .iter()
-            .map(|private| ChainKeypair::from_secret(private).unwrap())
-            .collect();
+        static ref PEERS_CHAIN: Vec<ChainKeypair> = vec![
+            hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056"),
+            hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b"),
+            hex!("99facd2cd33664d65826ad220920a6b356e31d18c1ce1734303b70a962664d71"),
+            hex!("62b362fd3295caf8657b8cf4f65d6e2cbb1ef81754f7bdff65e510220611afc2"),
+            hex!("40ed717eb285dea3921a8346155d988b7ed5bf751bc4eee3cd3a64f4c692396f"),
+        ]
+        .iter()
+        .map(|private| ChainKeypair::from_secret(private).unwrap())
+        .collect();
     }
 
     async fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
@@ -1176,7 +1150,7 @@ mod tests {
             .map(|(i, db)| {
                 Arc::new(RwLock::new(CoreEthereumDb::new(
                     DB::new(db.clone()),
-                    PublicKey::from_privkey(&PEERS_CHAIN_PRIVS[i]).unwrap().to_address(),
+                    (&PEERS_CHAIN[i]).into(),
                 )))
             })
             .collect::<Vec<_>>()
@@ -1190,7 +1164,7 @@ mod tests {
             let mut db = CoreEthereumDb::new(DB::new(dbs[index].clone()), PEERS_CHAIN[index].public().to_address());
 
             // Link all the node keys and chain keys from the simulated announcements
-            for i in 0..PEERS_PRIVS.len() {
+            for i in 0..PEERS.len() {
                 let node_key = PEERS[i].public();
                 let chain_key = PEERS_CHAIN[i].public();
                 db.link_chain_and_packet_keys(&chain_key.to_address(), node_key, &Snapshot::default())
@@ -1230,6 +1204,21 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[async_std::test]
+    pub async fn test_packet_send_finalizer_succeeds_with_a_stored_challenge() {
+        let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
+
+        let finalizer = super::PacketSendFinalizer::new(tx);
+        let challenge = HalfKeyChallenge::default();
+        let mut awaiter: super::PacketSendAwaiter = rx.into();
+
+        finalizer.finalize(challenge.clone());
+
+        let result = awaiter.consume_and_wait(Duration::from_millis(20)).await;
+
+        assert_eq!(challenge, result.expect("HalfKeyChallange should be transmitted"));
     }
 
     #[serial]
@@ -1284,10 +1273,7 @@ mod tests {
         for (ack_key, _) in sent_challenges.clone() {
             ack_interaction_counterparty
                 .writer()
-                .send_acknowledgement(
-                    PEERS[0].public().to_peerid(),
-                    Acknowledgement::new(ack_key, &OffchainKeypair::from_secret(&PEERS_PRIVS[1]).unwrap()),
-                )
+                .send_acknowledgement(PEERS[0].public().to_peerid(), Acknowledgement::new(ack_key, &PEERS[1]))
                 .expect("failed to send ack");
 
             // emulate channel to another peer
@@ -1392,8 +1378,8 @@ mod tests {
                     },
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
-                        packet_keypair: OffchainKeypair::from_secret(&PEERS_PRIVS[i]).unwrap(),
-                        chain_keypair: ChainKeypair::from_secret(&PEERS_CHAIN_PRIVS[i]).unwrap(),
+                        packet_keypair: PEERS[i].clone(),
+                        chain_keypair: PEERS_CHAIN[i].clone(),
                         mixer: MixerConfig::default(), // TODO: unnecessary, can be removed
                     },
                 );

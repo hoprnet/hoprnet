@@ -129,6 +129,8 @@ const metric_strategyMaxChannels = create_gauge(
 /// Maximum time to wait for a packet to be pushed to the interaction queue in milliseconds
 const PACKET_QUEUE_TIMEOUT_MILLISECONDS = 15000n
 
+const TICKET_AGGREGATION_TIMEOUT_MILLISECONDS = 10000n
+
 type PeerStoreAddress = {
   id: PeerId
   multiaddrs: Multiaddr[]
@@ -277,7 +279,11 @@ export class Hopr extends EventEmitter {
     }
 
     log('Linking chain and packet keys')
-    this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot._default())
+    this.db.link_chain_and_packet_keys(
+      this.chainKeypair.to_address(),
+      this.packetKeypair.public(),
+      Snapshot.make_default()
+    )
 
     const tbfPath = path.join(this.cfg.db.data, 'tbf')
     let tagBloomFilter = new TagBloomFilter()
@@ -293,6 +299,7 @@ export class Hopr extends EventEmitter {
     log('Constructing the core application and tools')
     let coreApp = new CoreApp(
       new OffchainKeypair(this.packetKeypair.secret()),
+      this.chainKeypair,
       this.db.clone(),
       this.cfg.network_options,
       this.cfg.heartbeat,
@@ -310,7 +317,11 @@ export class Hopr extends EventEmitter {
         }
       },
       txExecutor,
-      this.getLocalMultiaddresses().map((x) => x.toString())
+      this.getLocalMultiaddresses().map((x) => x.toString()),
+      this.cfg.protocol.ack,
+      this.cfg.protocol.heartbeat,
+      this.cfg.protocol.msg,
+      this.cfg.protocol.ticket_aggregation
     )
 
     this.tools = coreApp.tools()
@@ -733,6 +744,29 @@ export class Hopr extends EventEmitter {
     )
 
     return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
+  }
+
+  /**
+   * Attempts to all tickets in the given channel.
+   * @param channelId id of the channel
+   */
+  public async aggregateTickets(channelId: Hash) {
+    const channel = await this.db.get_channel(channelId)
+
+    // make additional assertions
+    if (!channel) {
+      throw new Error('Cannot aggregate tickets in non-existing channel')
+    }
+    if (!(channel.status in [ChannelStatus.Open, ChannelStatus.PendingToClose])) {
+      throw new Error('Cannot aggregate tickets in channel when not in status OPEN or PENDING_TO_CLOSE')
+    }
+
+    let ticketCount = await this.db.get_acknowledged_tickets_count()
+    if (ticketCount < 1) {
+      throw new Error('No tickets found in channel')
+    }
+
+    await this.tools.aggregate_tickets(channelId, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
   }
 
   /**

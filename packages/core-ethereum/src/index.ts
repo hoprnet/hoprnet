@@ -308,7 +308,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
 
     if (c.status !== ChannelStatus.Open) {
-      throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
+      throw Error('Channel status is not OPEN')
     }
     return this.chain.initiateOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)

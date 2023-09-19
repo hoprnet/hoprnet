@@ -8,6 +8,7 @@ members = [
     "packages/core/crates/core-network",
     "packages/core/crates/core-path",
     "packages/core/crates/core-packet",
+    "packages/core/crates/core-protocol",
     "packages/core/crates/core-p2p",
     "packages/core/crates/core-strategy",
     "packages/core/crates/core-types",
@@ -64,6 +65,7 @@ core-mixer = { path = "packages/core/crates/core-mixer", default-features = fals
 core-network = { path = "packages/core/crates/core-network", default-features = false }
 core-packet = { path = "packages/core/crates/core-packet", default-features = false }
 core-path = { path = "packages/core/crates/core-path", default-features = false }
+core-protocol = { path = "packages/core/crates/core-protocol", default-features = false }
 core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
 core-strategy = { path = "packages/core/crates/core-strategy", default-features = false }
 core-types = { path = "packages/core/crates/core-types", default-features = false }

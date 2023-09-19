@@ -348,6 +348,19 @@ pub struct Testing {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+pub struct Protocol {
+    /// `ack` protocol config
+    pub ack: core_protocol::ack::config::AckProtocolConfig,
+    /// `heartbeat` protocol config
+    pub heartbeat: core_protocol::heartbeat::config::HeartbeatProtocolConfig,
+    /// `msg` protocol config
+    pub msg: core_protocol::msg::config::MsgProtocolConfig,
+    /// `ticket_aggregation` protocol config
+    pub ticket_aggregation: core_protocol::ticket_aggregation::config::TicketAggregationProtocolConfig,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
     #[validate]
@@ -368,6 +381,8 @@ pub struct HoprdConfig {
     pub network_options: NetworkConfig,
     #[validate]
     pub healthcheck: HealthCheck,
+    #[validate]
+    pub protocol: Protocol,
     pub network: String,
     #[validate]
     pub chain: Chain,
@@ -392,6 +407,7 @@ impl Default for HoprdConfig {
             heartbeat: HeartbeatConfig::default(),
             network_options: NetworkConfig::default(),
             healthcheck: HealthCheck::default(),
+            protocol: Protocol::default(),
             network: String::default(),
             chain: Chain::default(),
             safe_module: SafeModule::default(),
@@ -627,6 +643,7 @@ mod tests {
                 host: "127.0.0.1".to_string(),
                 port: 0,
             },
+            protocol: Protocol::default(),
             network: "testing".to_string(),
             chain: Chain {
                 announce: false,
@@ -691,6 +708,15 @@ healthcheck:
   enable: false
   host: 127.0.0.1
   port: 0
+protocol:
+  ack:
+    timeout: 15
+  heartbeat:
+    timeout: 15
+  msg:
+    timeout: 15
+  ticket_aggregation:
+    timeout: 15
 network: testing
 chain:
   announce: false
