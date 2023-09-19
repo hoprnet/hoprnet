@@ -5,8 +5,12 @@ const POST: Operation = [
   async (req, res, _next) => {
     const tag = req.body.tag
     const msgs = await req.context.inbox.pop_all(tag)
-    const messages = msgs.map((m) => {
-      return { tag: m.application_tag, body: new TextDecoder().decode(m.plain_text) }
+    const messages = msgs.map((msg) => {
+      return {
+        tag: msg.data.application_tag,
+        body: new TextDecoder().decode(msg.data.plain_text),
+        receivedAt: Number(msg.ts_seconds)
+      }
     })
 
     return res.status(200).send({ messages })
