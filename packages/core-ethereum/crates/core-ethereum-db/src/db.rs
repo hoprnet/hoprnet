@@ -17,10 +17,7 @@ use utils_types::{
     traits::BinarySerializable,
 };
 
-use crate::{
-    errors::Result,
-    traits::{HoprCoreEthereumDbActions, HoprCoreEthereumTestActions},
-};
+use crate::{errors::Result, traits::HoprCoreEthereumDbActions};
 
 const ACKNOWLEDGED_TICKETS_KEY_LENGTH: usize = Hash::SIZE + (u32::BITS / 8) as usize + (u64::BITS / 8) as usize;
 
@@ -1028,28 +1025,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
         let _ = self.db.remove::<AuthorizationToken>(key).await?;
         Ok(())
-    }
-}
-
-/// Only meant for testing!
-#[async_trait(? Send)]
-impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumTestActions for CoreEthereumDb<T> {
-    async fn store_acknowledged_tickets(&mut self, acked_tickets: Vec<AcknowledgedTicket>) -> Result<()> {
-        let mut batch_ops = utils_db::db::Batch::default();
-
-        for acked_ticket in acked_tickets {
-            batch_ops.put(
-                to_acknowledged_ticket_key(
-                    &acked_ticket.ticket.channel_id,
-                    acked_ticket.ticket.channel_epoch,
-                    acked_ticket.ticket.index,
-                )?
-                .into(),
-                acked_ticket,
-            );
-        }
-
-        self.db.batch(batch_ops, true).await
     }
 }
 

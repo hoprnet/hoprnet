@@ -326,7 +326,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .await?;
 
         if tickets_to_aggregate.is_empty() {
-            debug!("Dropping request to aggretate tickets in channel {channel_id}");
+            debug!("No tickets to aggregate in {channel_id}, dropping request");
             return Err(ProtocolTicketAggregation("No tickets to aggregate".into()));
         }
 
@@ -383,11 +383,11 @@ impl TicketAggregationAwaiter {
 
 #[derive(Debug)]
 pub struct TicketAggregationFinalizer {
-    tx: Option<futures::channel::oneshot::Sender<()>>,
+    tx: Option<oneshot::Sender<()>>,
 }
 
 impl TicketAggregationFinalizer {
-    pub fn new(tx: futures::channel::oneshot::Sender<()>) -> Self {
+    pub fn new(tx: oneshot::Sender<()>) -> Self {
         Self { tx: Some(tx) }
     }
 
@@ -509,7 +509,6 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                                 if let Err(e) = processor.handle_aggregated_ticket(ticket.clone()).await {
                                     debug!("Error while handling aggregated ticket {}", e)
                                 }
-                                println!("handling done");
                                 Some(TicketAggregationProcessed::Receive(_destination, request))
                             }
                             Err(e) => {
@@ -560,7 +559,7 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
 impl<T, U> Stream for TicketAggregationInteraction<T, U> {
     type Item = TicketAggregationProcessed<T, U>;
 
-    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Option<Self::Item>> {
         Pin::new(self).ack_event_queue.1.poll_next(cx)
     }
 }
@@ -572,10 +571,8 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use core_ethereum_db::{
-        db::CoreEthereumDb,
-        traits::{HoprCoreEthereumDbActions, HoprCoreEthereumTestActions},
-    };
+    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
+    use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingRedeemed, Untouched};
     use core_types::{
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
@@ -584,6 +581,7 @@ mod tests {
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use std::{sync::Arc, time::Duration};
+    use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
@@ -643,37 +641,17 @@ mod tests {
         AcknowledgedTicket::new(ticket, response, signer.into(), destination, &domain_separator).unwrap()
     }
 
-    fn create_dbs(amount: usize) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
-        (0..amount)
-            .map(|i| {
-                Arc::new(RwLock::new(CoreEthereumDb::new(
-                    DB::new(RustyLevelDbShim::new_in_memory()),
-                    (&PEERS_CHAIN[i]).into(),
-                )))
-            })
-            .collect()
-    }
+    async fn init_dbs(inner_dbs: Vec<DB<RustyLevelDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
+        let mut dbs = Vec::new();
+        for (i, inner_db) in inner_dbs.into_iter().enumerate() {
+            let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, (&PEERS_CHAIN[i]).into())));
 
-    #[async_std::test]
-    async fn ticket_aggregation() {
-        let dbs = create_dbs(2);
-        let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
-
-        let mut alice = super::TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
-        let mut bob = super::TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
-
-        let alice_addr: Address = (&PEERS_CHAIN[0]).into();
-        let bob_addr: Address = (&PEERS_CHAIN[1]).into();
-
-        let alice_packet_key = PEERS[0].public().to_peerid();
-        let bob_packet_key = PEERS[1].public().to_peerid();
-
-        for db in dbs.iter() {
             db.write()
                 .await
                 .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
                 .await
                 .unwrap();
+
             for i in 0..PEERS.len() {
                 db.write()
                     .await
@@ -681,18 +659,61 @@ mod tests {
                     .await
                     .unwrap();
             }
+
+            dbs.push(db);
+        }
+        dbs
+    }
+
+    fn to_acknowledged_ticket_key(ack: &AcknowledgedTicket) -> utils_db::db::Key {
+        let mut ack_key = Vec::new();
+
+        ack_key.extend_from_slice(&ack.ticket.channel_id.to_bytes());
+        ack_key.extend_from_slice(&ack.ticket.channel_epoch.to_be_bytes());
+        ack_key.extend_from_slice(&ack.ticket.index.to_be_bytes());
+
+        utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
+    }
+
+    #[async_std::test]
+    async fn ticket_aggregation() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut inner_dbs = (0..2)
+            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
+            .collect::<Vec<_>>();
+
+        const NUM_TICKETS: u64 = 30;
+
+        let mut agg_balance = Balance::zero(BalanceType::HOPR);
+        // Generate acknowledged tickets
+        for i in 1..=NUM_TICKETS {
+            let mut ack_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i);
+
+            // Mark the first ticket as redeemed, so it does not enter the aggregation
+            if i == 1 {
+                ack_ticket.status = BeingRedeemed {
+                    tx_hash: Hash::default(),
+                };
+            } else {
+                agg_balance = agg_balance.add(&ack_ticket.ticket.amount);
+            }
+
+            inner_dbs[1]
+                .set(to_acknowledged_ticket_key(&ack_ticket), &ack_ticket)
+                .await
+                .unwrap();
         }
 
-        let acked_tickets: Vec<AcknowledgedTicket> = (1..23u64)
-            .map(|i| mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i))
-            .collect();
+        let dbs = init_dbs(inner_dbs).await;
 
-        dbs[1]
-            .write()
-            .await
-            .store_acknowledged_tickets(acked_tickets)
-            .await
-            .unwrap();
+        let alice_addr: Address = (&PEERS_CHAIN[0]).into();
+        let bob_addr: Address = (&PEERS_CHAIN[1]).into();
+
+        let alice_packet_key = PEERS[0].public().to_peerid();
+        let bob_packet_key = PEERS[1].public().to_peerid();
+
+        let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
 
         dbs[1]
             .write()
@@ -712,6 +733,9 @@ mod tests {
             )
             .await
             .unwrap();
+
+        let mut alice = super::TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
+        let mut bob = super::TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
 
         let mut awaiter = bob.writer().aggregate_tickets(&channel_id_alice_bob).unwrap();
         let mut finalizer = None;
@@ -747,8 +771,28 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(stored_acked_tickets.len(), 1);
+        assert_eq!(
+            stored_acked_tickets.len(),
+            2,
+            "there should be 1 aggregated ticket and 1 ticket being redeemed"
+        );
 
-        awaiter.consume_and_wait(Duration::from_millis(2000u64)).await.unwrap();
+        assert_eq!(
+            BeingRedeemed {
+                tx_hash: Hash::default()
+            },
+            stored_acked_tickets[0].status,
+            "first ticket must being redeemed"
+        );
+        assert_eq!(
+            Untouched, stored_acked_tickets[1].status,
+            "second ticket must be untouched"
+        );
+        assert_eq!(
+            agg_balance, stored_acked_tickets[1].ticket.amount,
+            "aggregated balance invalid"
+        );
+
+        awaiter.consume_and_wait(Duration::from_millis(2000)).await.unwrap();
     }
 }

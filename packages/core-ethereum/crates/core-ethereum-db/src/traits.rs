@@ -279,10 +279,3 @@ pub trait HoprCoreEthereumDbActions {
     /// Deletes the REST API token given its ID.
     async fn delete_authorization(&mut self, id: String) -> Result<()>;
 }
-
-/// Only meant for testing!
-#[async_trait(? Send)]
-pub trait HoprCoreEthereumTestActions {
-    /// Store acknowledged ticket, only for testing
-    async fn store_acknowledged_tickets(&mut self, acked_tickets: Vec<AcknowledgedTicket>) -> Result<()>;
-}
