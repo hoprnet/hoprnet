@@ -170,6 +170,20 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(tickets)
     }
 
+    // core and core-ethereum part
+    async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> Result<usize> {
+        let tickets = self
+            .db
+            .get_more::<AcknowledgedTicket>(
+                Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
+                ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
+                &|ack: &AcknowledgedTicket| filter.map(|f| f.get_id() == ack.ticket.channel_id).unwrap_or(true),
+            )
+            .await?;
+
+        Ok(tickets.len())
+    }
+
     /// Fetches all acknowledged tickets in given range.
     /// If any of the tickets is marked as being redeemed, drop this acknowledged ticket
     /// and all previous tickets as aggregation does not make any sense.
@@ -1171,6 +1185,15 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
+        pub async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> Result<usize, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_acknowledged_tickets_count(filter).await)
+            //}
+        }
+
+        #[wasm_bindgen]
         pub async fn delete_acknowledged_tickets_from(&self, source: ChannelEntry) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
@@ -1858,12 +1881,17 @@ mod tests {
         }
 
         let acked_tickets_from_db = db.get_acknowledged_tickets(None).await.unwrap();
+        let acked_tickets_count = db.get_acknowledged_tickets_count(None).await.unwrap();
         let tickets_from_db = db.get_tickets(Some(ALICE_KEYPAIR.public().to_address())).await.unwrap();
 
         for i in 0usize..tickets_to_generate as usize {
             assert_eq!(acked_tickets[i], acked_tickets_from_db[i]);
             assert_eq!(tickets_from_db[i], acked_tickets[i].ticket);
         }
+
+        assert_eq!(acked_tickets_count, acked_tickets.len());
+        assert_eq!(acked_tickets_count, acked_tickets_from_db.len());
+        assert_eq!(acked_tickets_count, tickets_from_db.len());
 
         let channel_id = generate_channel_id(&ALICE_KEYPAIR.public().to_address(), &BOB_KEYPAIR.public().to_address());
 

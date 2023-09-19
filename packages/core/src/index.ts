@@ -826,6 +826,21 @@ export class Hopr extends EventEmitter {
    * @param channelId id of the channel
    */
   public async aggregateTickets(channelId: Hash) {
+    const channel = await this.db.get_channel(channelId)
+
+    // make additional assertions
+    if (!channel) {
+      throw new Error('Cannot aggregate tickets in non-existing channel')
+    }
+    if (!(channel.status in [ChannelStatus.Open, ChannelStatus.PendingToClose])) {
+      throw new Error('Cannot aggregate tickets in channel when not in status OPEN or PENDING_TO_CLOSE')
+    }
+
+    let ticketCount = await this.db.get_acknowledged_tickets_count()
+    if (ticketCount < 1) {
+      throw new Error('No tickets found in channel')
+    }
+
     await this.tools.aggregate_tickets(channelId, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
   }
 

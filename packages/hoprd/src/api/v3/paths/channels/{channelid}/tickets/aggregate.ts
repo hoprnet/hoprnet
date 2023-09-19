@@ -1,7 +1,10 @@
-import type { Operation } from 'express-openapi'
+import { Hash, stringToU8a, debug } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../../../utils.js'
+
 import type { Hopr } from '@hoprnet/hopr-core'
-import { Hash, stringToU8a } from '@hoprnet/hopr-utils'
+import type { Operation } from 'express-openapi'
+
+const log = debug('hoprd:api:v3:channel-ticket-aggregate')
 
 const POST: Operation = [
   async (req, res, _next) => {
@@ -9,15 +12,26 @@ const POST: Operation = [
     const { channelid } = req.params
 
     try {
-      let channelIdHash = Hash.deserialize(stringToU8a(channelid))
-      const tickets = await node.getTickets(channelIdHash)
-      if (tickets.length <= 0) {
-        return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
-      }
-
+      const channelIdHash = Hash.deserialize(stringToU8a(channelid))
       await node.aggregateTickets(channelIdHash)
       return res.status(204).send()
     } catch (err) {
+      log(`${err}`)
+      const error = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+
+      let status = STATUS_CODES.UNKNOWN_FAILURE
+
+      if (error.match(/non-existing channel/)) {
+        res.status(404).send()
+        return
+      } else if (error.match(/not in status OPEN/)) {
+        status = STATUS_CODES.CHANNEL_NOT_OPEN
+      } else if (error.match(/No tickets found/)) {
+        status = STATUS_CODES.TICKETS_NOT_FOUND
+      }
+
+      res.status(422).send({ status, error })
+
       return res
         .status(422)
         .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
@@ -65,18 +79,7 @@ POST.apiDoc = {
       $ref: '#/components/responses/Forbidden'
     },
     '404': {
-      description:
-        'Tickets were not found for that channel. That means that no messages were sent inside this channel yet.',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/RequestStatus'
-          },
-          example: {
-            status: STATUS_CODES.TICKETS_NOT_FOUND
-          }
-        }
-      }
+      $ref: '#/components/responses/NotFound'
     },
     '422': {
       description: 'Unknown failure.',
