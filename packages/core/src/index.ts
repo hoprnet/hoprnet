@@ -49,7 +49,6 @@ import {
   PeerStatus,
   Health,
   Snapshot,
-  HeartbeatConfig,
   CoreApp,
   get_peers_with_quality,
   HoprTools,
@@ -60,7 +59,8 @@ import {
   redeem_all_tickets,
   redeem_tickets_in_channel,
   WasmTxExecutor,
-  redeem_tickets_with_counterparty
+  redeem_tickets_with_counterparty,
+  HoprdConfig
 } from '@hoprnet/hopr-utils'
 
 import { INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
@@ -82,8 +82,7 @@ import {
   StrategyFactory
 } from './channel-strategy.js'
 
-import type { ResolvedNetwork } from './network.js'
-import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
+import { type ResolvedNetwork, resolveNetwork } from './network.js'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 
@@ -130,77 +129,9 @@ const metric_strategyMaxChannels = create_gauge(
 /// Maximum time to wait for a packet to be pushed to the interaction queue in milliseconds
 const PACKET_QUEUE_TIMEOUT_MILLISECONDS = 15000n
 
-interface NetOptions {
-  ip?: string
-  dns?: string
-  port: number
-}
-
 type PeerStoreAddress = {
   id: PeerId
   multiaddrs: Multiaddr[]
-}
-
-export type HoprOptions = {
-  network: ResolvedNetwork
-  announce: boolean
-  dataPath: string
-  createDbIfNotExist: boolean
-  forceCreateDB: boolean
-  allowLocalConnections: boolean
-  allowPrivateConnections: boolean
-  password: string
-  connector?: HoprCoreEthereum
-  strategy?: {
-    name: Strategy
-    settings?: any
-  }
-  hosts: NetOptions[]
-  heartbeatInterval?: number
-  heartbeatThreshold?: number
-  heartbeatVariance?: number
-  networkQualityThreshold?: number
-  onChainConfirmations?: number
-  checkUnrealizedBalance?: boolean
-  maxParallelConnections?: number
-  // disable NAT relay functionality
-  noRelay?: boolean
-  testing?: {
-    // when true, assume that the node is running in an isolated network and does
-    // not need any connection to nodes outside of the subnet
-    // default: false
-    announceLocalAddresses?: boolean
-    // when true, assume a testnet with multiple nodes running on the same machine
-    // or in the same private IPv4 network
-    // default: false
-    preferLocalAddresses?: boolean
-    // when true, intentionally fail on direct connections
-    // to test NAT behavior
-    // default: false
-    noDirectConnections?: boolean
-    // local-mode STUN, used for unit testing and e2e testing
-    // default: false
-    localModeStun?: boolean
-    // when true, even if a direct WebRTC connection is possible,
-    // don't do the upgrade to it to test bidirectional NAT
-    // default: false
-    noWebRTCUpgrade?: boolean
-    // Use mocked libp2p instance instead of real one
-    useMockedLibp2p?: boolean
-    // When using mocked libp2p instance, use existing mocked
-    // DHT to simulate decentralized networks
-    mockedDHT?: Map<string, string[]>
-    // When using mocked libp2p instances
-    mockedNetwork?: Libp2pEmitter<any>
-  }
-  safeModule: {
-    // Base URL to interact with safe transaction service
-    safeTransactionServiceProvider?: string
-    // Address of node's safe proxy instance
-    safeAddress?: Address
-    // Address of node's safe-module proxy instance
-    moduleAddress?: Address
-  }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -238,13 +169,13 @@ export class Hopr extends EventEmitter {
     private chainKeypair: ChainKeypair,
     private packetKeypair: OffchainKeypair,
     public db: Database,
-    private options: HoprOptions
+    private cfg: HoprdConfig
   ) {
     super()
 
-    this.network = options.network
-    log(`using network: ${this.network.id}`)
-    this.indexer = HoprCoreEthereum.getInstance().indexer // TODO temporary
+    this.network = resolveNetwork(cfg.network, cfg.chain.provider)
+    log(`Using network: ${this.network.id}`)
+    this.indexer = HoprCoreEthereum.getInstance().indexer
     this.id = peerIdFromString(packetKeypair.to_peerid_str())
   }
 
@@ -296,7 +227,7 @@ export class Hopr extends EventEmitter {
     verbose('Waiting for indexer to find connected nodes.')
 
     // Add us as public node if announced
-    if (!this.options.announce) {
+    if (!this.cfg.chain.announce) {
       throw new Error('Announce option should be turned ON in Providence, only public nodes are supported')
     }
 
@@ -319,12 +250,6 @@ export class Hopr extends EventEmitter {
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
     connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
-    let heartbeat_cfg = new HeartbeatConfig(
-      this.options?.heartbeatVariance,
-      this.options?.heartbeatInterval,
-      BigInt(this.options?.heartbeatThreshold)
-    )
-
     let ping_cfg = new PingConfig(
       MAX_PARALLEL_PINGS,
       BigInt(2000) // in millis
@@ -341,7 +266,7 @@ export class Hopr extends EventEmitter {
     }
 
     let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
-    packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
+    packetCfg.check_unrealized_balance = this.cfg.chain.check_unrealized_balance
 
     const onReceivedMessage = (msg: Uint8Array) => {
       try {
@@ -354,7 +279,7 @@ export class Hopr extends EventEmitter {
     log('Linking chain and packet keys')
     this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot._default())
 
-    const tbfPath = path.join(this.options.dataPath, 'tbf')
+    const tbfPath = path.join(this.cfg.db.data, 'tbf')
     let tagBloomFilter = new TagBloomFilter()
     try {
       let tbfData = new Uint8Array(fs.readFileSync(tbfPath))
@@ -369,8 +294,8 @@ export class Hopr extends EventEmitter {
     let coreApp = new CoreApp(
       new OffchainKeypair(this.packetKeypair.secret()),
       this.db.clone(),
-      this.options.networkQualityThreshold,
-      heartbeat_cfg,
+      this.cfg.network_options,
+      this.cfg.heartbeat,
       ping_cfg,
       onAcknowledgement,
       onAcknowledgedTicket,
@@ -435,7 +360,7 @@ export class Hopr extends EventEmitter {
     if (await connector.isNodeSafeNotRegistered()) {
       log('No NodeSafeRegistry entry yet, proceeding with direct announcement')
       try {
-        await this.announce(this.options.announce)
+        await this.announce(this.cfg.chain.announce)
         this.hasAnnounced = true
       } catch (err) {
         console.error('Could not announce directly self on-chain: ', err)
@@ -443,7 +368,7 @@ export class Hopr extends EventEmitter {
     } else {
       log('NodeSafeRegistry entry already present, proceeding with Safe-Module announcement')
       try {
-        await this.announce(this.options.announce, true)
+        await this.announce(this.cfg.chain.announce, true)
         this.hasAnnounced = true
       } catch (err) {
         console.error('Could not announce through Safe-Module self on-chain: ', err)
@@ -470,13 +395,15 @@ export class Hopr extends EventEmitter {
     connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
     let strategy: ChannelStrategyInterface
-    if (this.options.strategy) {
-      strategy = StrategyFactory.getStrategy(this.options.strategy.name, this)
-      strategy.configure(this.options.strategy.settings)
+    if (isStrategy(this.cfg.strategy.name)) {
+      strategy = StrategyFactory.getStrategy(this.cfg.strategy.name, this)
+      strategy.configure({
+        auto_redeem_tickets: this.cfg.strategy.auto_redeem_tickets,
+        max_channels: this.cfg.strategy.max_auto_channels ?? undefined
+      })
     } else {
       strategy = StrategyFactory.getStrategy('passive', this)
     }
-
     this.setChannelStrategy(strategy)
 
     log('announcing done, strategy interval')
@@ -505,14 +432,12 @@ export class Hopr extends EventEmitter {
     let mas: Multiaddr[] = []
 
     // at this point the values were parsed and validated already
-    for (const host of this.options.hosts) {
-      if (host.ip) {
-        mas.push(multiaddr(`/ip4/${host.ip}/tcp/${host.port}`))
-      } else if (host.dns) {
-        mas.push(multiaddr(`/dns4/${host.dns}/tcp/${host.port}`))
-      } else {
-        log('Error: Unhandled host type in multiaddress conversion')
-      }
+    if (this.cfg.host.is_ipv4()) {
+      mas.push(multiaddr(`/ip4/${this.cfg.host.address()}/tcp/${this.cfg.host.port}`))
+    } else if (this.cfg.host.is_domain()) {
+      mas.push(multiaddr(`/dns4/${this.cfg.host.address()}/tcp/${this.cfg.host.port}`))
+    } else {
+      new Error('Unknown format specified for host')
     }
 
     return mas
@@ -794,9 +719,7 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
   }
 
   /**
@@ -809,9 +732,7 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
   }
 
   /**
@@ -976,9 +897,7 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
   }
 
   /*
@@ -1017,9 +936,9 @@ export class Hopr extends EventEmitter {
     if (announceRoutableAddress) {
       let multiaddrs = this.getLocalMultiaddresses()
 
-      if (this.options.testing?.announceLocalAddresses) {
+      if (this.cfg.test.announce_local_addresses) {
         multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))
-      } else if (this.options.testing?.preferLocalAddresses) {
+      } else if (this.cfg.test.prefer_local_addresses) {
         // If we need local addresses, sort them first according to their class
         multiaddrs.sort(compareAddressesLocalMode)
       } else {
@@ -1606,4 +1525,3 @@ export {
   type ChannelStrategyInterface
 }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
-export { sampleOptions } from './index.mock.js'

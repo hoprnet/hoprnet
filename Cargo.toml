@@ -20,12 +20,12 @@ members = [
     "packages/hoprd/crates/hoprd-hoprd",
     "packages/hoprd/crates/hoprd-inbox",
     "packages/hoprd/crates/hoprd-keypair",
-    "packages/hoprd/crates/hoprd-misc",
     "packages/utils/crates/utils-db",
     "packages/utils/crates/utils-log",
     "packages/utils/crates/utils-metrics",
     "packages/utils/crates/utils-misc",
-    "packages/utils/crates/utils-types"
+    "packages/utils/crates/utils-types",
+    "packages/utils/crates/utils-validation"
 ]
 
 [workspace.dependencies]
@@ -44,6 +44,9 @@ libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch =
 libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
 multiaddr = "0.18.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_with = { version = "3.3" }
+serde-wasm-bindgen = { version = "0.5" }
 thiserror = "1.0"
 validator = { version = "0.16.1", features = ["derive"] }
 wasm-pack = "0.12.0"
@@ -64,11 +67,15 @@ core-path = { path = "packages/core/crates/core-path", default-features = false 
 core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
 core-strategy = { path = "packages/core/crates/core-strategy", default-features = false }
 core-types = { path = "packages/core/crates/core-types", default-features = false }
+hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
+hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
+real-base = { path = "packages/real/crates/real-base", default-features = false }
 utils-db = { path = "packages/utils/crates/utils-db", default-features = false }
 utils-log = { path = "packages/utils/crates/utils-log", default-features = false }
 utils-misc = { path = "packages/utils/crates/utils-misc", default-features = false}
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
 utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
+utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }
 
 
 [profile.release]

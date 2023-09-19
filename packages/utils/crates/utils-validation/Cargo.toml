@@ -1,0 +1,37 @@
+[package]
+name = "utils-validation"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Common validation utilities used in most configuration objects of the packages."
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+proc-macro-regex = "~1.1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+# serde_bytes = "0.11"
+console_error_panic_hook = { version = "0.1.7", optional = true }
+
+real-base = { workspace = true }
+utils-types = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = []
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]

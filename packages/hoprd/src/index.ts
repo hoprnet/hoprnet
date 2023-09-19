@@ -12,7 +12,6 @@ import {
   create_histogram_with_buckets,
   pickVersion,
   defer,
-  Address,
   debug,
   health_to_string,
   MessageInbox,
@@ -21,15 +20,7 @@ import {
   ApplicationData,
   MessageInboxConfiguration
 } from '@hoprnet/hopr-utils'
-import {
-  Health,
-  createHoprNode,
-  type Hopr,
-  type HoprOptions,
-  isStrategy,
-  ResolvedNetwork,
-  resolveNetwork
-} from '@hoprnet/hopr-core'
+import { Health, createHoprNode, type Hopr } from '@hoprnet/hopr-core'
 
 import {
   parse_cli_arguments,
@@ -79,60 +70,6 @@ const metric_version = create_multi_gauge('hoprd_mgauge_version', 'Executed vers
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
 const version = get_package_version(packageFile)
 const on_dappnode = (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true'
-
-function generateNodeOptions(cfg: HoprdConfig, network: ResolvedNetwork): HoprOptions {
-  if (!isStrategy(cfg.strategy.name)) {
-    throw Error(`Invalid strategy selected`)
-  }
-
-  let options: HoprOptions = {
-    createDbIfNotExist: cfg.db.initialize,
-    announce: cfg.network_options.announce,
-    dataPath: cfg.db.data,
-    hosts: [cfg.host],
-    network,
-    allowLocalConnections: cfg.network_options.allow_local_node_connections,
-    allowPrivateConnections: cfg.network_options.allow_private_node_connections,
-    heartbeatInterval: cfg.heartbeat.interval,
-    heartbeatThreshold: cfg.heartbeat.threshold,
-    heartbeatVariance: cfg.heartbeat.variance,
-    networkQualityThreshold: cfg.network_options.network_quality_threshold,
-    onChainConfirmations: cfg.chain.on_chain_confirmations,
-    checkUnrealizedBalance: cfg.chain.check_unrealized_balance,
-    maxParallelConnections: cfg.network_options.max_parallel_connections,
-    testing: {
-      announceLocalAddresses: cfg.test.announce_local_addresses,
-      preferLocalAddresses: cfg.test.prefer_local_addresses,
-      noWebRTCUpgrade: cfg.test.no_webrtc_upgrade,
-      noDirectConnections: cfg.test.no_direct_connections,
-      localModeStun: cfg.test.local_mode_stun
-    },
-    password: cfg.identity.password,
-    strategy: {
-      name: cfg.strategy.name,
-      settings: {
-        auto_redeem_tickets: cfg.strategy.auto_redeem_tickets,
-        max_channels: cfg.strategy.max_auto_channels ?? undefined
-      }
-    },
-    forceCreateDB: cfg.db.force_initialize,
-    noRelay: cfg.network_options.no_relay,
-    safeModule: {
-      safeTransactionServiceProvider: cfg.safe_module.safe_transaction_service_provider,
-      safeAddress: cfg.safe_module.safe_address,
-      moduleAddress: cfg.safe_module.module_address
-    }
-  }
-
-  if (cfg.safe_module.safe_address) {
-    options.safeModule.safeAddress = Address.deserialize(cfg.safe_module.safe_address.serialize())
-  }
-  if (cfg.safe_module.module_address) {
-    options.safeModule.moduleAddress = Address.deserialize(cfg.safe_module.module_address.serialize())
-  }
-
-  return options
-}
 
 // Parse the CLI arguments and return the processed object.
 // This function may exit the calling process entirely if an error is
@@ -287,10 +224,6 @@ async function main() {
     state.settings.maxAutoChannels = cfg.strategy.max_auto_channels
   }
 
-  const network = resolveNetwork(cfg.network, cfg.chain.provider)
-
-  let options = generateNodeOptions(cfg, network)
-
   try {
     log(`This is HOPRd version ${version}`)
     metric_version.set([pickVersion(version)], 1.0)
@@ -315,7 +248,7 @@ async function main() {
 
     // 2. Create node instance
     log('Creating HOPR Node')
-    node = await createHoprNode(keypair.chain_key, keypair.packet_key, options, false)
+    node = await createHoprNode(keypair.chain_key, keypair.packet_key, cfg, false)
     log('Status: PENDING')
 
     // Subscribe to node events
@@ -351,7 +284,7 @@ async function main() {
       { getState, setState },
       {
         disableApiAuthentication: api.is_auth_disabled(),
-        apiHost: api.host.ip,
+        apiHost: api.host.address(),
         apiPort: api.host.port,
         apiToken: api.is_auth_disabled() ? null : api.auth_token()
       }
