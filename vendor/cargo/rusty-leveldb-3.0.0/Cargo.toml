@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "rusty-leveldb"
-version = "2.0.0"
+version = "3.0.0"
 authors = ["Lewin Bormann <lbo@spheniscida.de>"]
 include = [
     "src/**/*",
@@ -46,11 +46,8 @@ name = "maps_bench"
 path = "src/benches/maps_bench.rs"
 harness = false
 
-[dependencies]
-crc = "1.8"
-integer-encoding = "3.0"
-rand = "0.8.5"
-snap = "1.0"
+[dependencies.crc]
+version = "1.8"
 
 [dependencies.errno]
 version = "0.2"
@@ -60,6 +57,15 @@ optional = true
 version = "0.4.3"
 optional = true
 
+[dependencies.integer-encoding]
+version = "3.0"
+
+[dependencies.rand]
+version = "0.8.5"
+
+[dependencies.snap]
+version = "1.0"
+
 [dependencies.tokio]
 version = ">= 1.21"
 features = [
@@ -68,9 +74,11 @@ features = [
 ]
 optional = true
 
-[dev-dependencies]
-bencher = "0.1"
-time-test = "0.2"
+[dev-dependencies.bencher]
+version = "0.1"
+
+[dev-dependencies.time-test]
+version = "0.2"
 
 [features]
 async = ["tokio"]
@@ -78,15 +86,4 @@ default = ["fs"]
 fs = [
     "errno",
     "fs2",
-]
-
-[workspace]
-members = [
-    "examples/write-a-lot",
-    "examples/leveldb-tool",
-    "examples/word-analyze",
-    "examples/stresstest",
-    "examples/asyncdb",
-    "examples/mcpe",
-    "examples/kvserver",
 ]
