@@ -48,7 +48,7 @@ multiaddr = "0.18.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = { version = "3.3" }
-serde-wasm-bindgen = { version = "0.5" }
+serde-wasm-bindgen = { version = "0.6" }
 thiserror = "1.0"
 validator = { version = "0.16.1", features = ["derive"] }
 wasm-pack = "0.12.0"

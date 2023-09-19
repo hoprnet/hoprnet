@@ -22,7 +22,7 @@ serde = { workspace = true }
 serde_with = { workspace = true }
 validator = { workspace = true }
 js-sys = { version = "0.3.63", optional = true }
-serde-wasm-bindgen = { version = "0.5", optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 

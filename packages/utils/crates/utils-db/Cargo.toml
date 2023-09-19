@@ -21,7 +21,7 @@ hex-literal = "0.4.1"
 js-sys = { workspace = true, optional = true }
 pin-project-lite = "0.2.13"
 serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = { version = "0.5.0", optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 thiserror = "1.0"
 rusty-leveldb = { git = "https://github.com/hoprnet/leveldb-rs", branch = "feature/no-fs", default-features = false }
 wasm-bindgen = { workspace = true, optional = true }

@@ -25,7 +25,7 @@ js-sys = { version = "0.3.63", optional = true }
 hex = "0.4.3"
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = { version = "0.5", optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 
 bindings = { path = "../../../ethereum/crates/bindings", default-features = false }
 core-types = { path = "../../../core/crates/core-types", default-features = false }
