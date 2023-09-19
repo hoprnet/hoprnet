@@ -20,7 +20,7 @@ serde = { workspace = true }
 serde_yaml = "0.9"
 serde_json = "1.0"
 thiserror = "1.0"
-serde-wasm-bindgen = { wokrspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 validator = { workspace = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }

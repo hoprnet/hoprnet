@@ -1,5 +1,7 @@
 [workspace]
 
+resolver = "2"
+
 members = [
     "packages/core/crates/core-crypto",
     "packages/core/crates/core-hopr",

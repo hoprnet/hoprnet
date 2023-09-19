@@ -26,7 +26,6 @@
     "reset": "rm -Rf packages/*/node_modules node_modules"
   },
   "devDependencies": {
-    "@ethersproject/cli": "5.7.0",
     "@types/node": "18",
     "prettier": "2.8.8",
     "solhint-community": "3.6.1",
