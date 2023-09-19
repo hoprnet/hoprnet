@@ -1,9 +1,9 @@
 [package]
-name = "core-ethereum-misc"
-version = "0.6.0"
+name = "core-ethereum-actions"
+version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Core-Ethereum-specific interaction with the backend database"
+description = "High-level Core-Ethereum functions that translate to on-chain transactions"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -27,10 +27,11 @@ wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream
 multiaddr = "0.18"
 ethers = { version = "2", default-features = false, features = ["ethers-solc"] }
 serde = { workspace = true, features = ["derive"] }
-serde-wasm-bindgen = { workspace = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 
 core-crypto = { path = "../../../core/crates/core-crypto", default-features = false }
 core-ethereum-db = { path = "../core-ethereum-db", default-features = false }
+core-ethereum-misc = { path = "../core-ethereum-misc", default-features = false }
 core-types = { path = "../../../core/crates/core-types", default-features = false }
 bindings = { path = "../../../ethereum/crates/bindings", default-features = false }
 utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
@@ -44,23 +45,10 @@ env_logger = "0.10"
 mockall = "0.11.4"
 hex-literal = "0.4"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio = "1"
-svm-rs = "0.2.23"
-semver = "1.0"
-hex = "0.4"
-
-[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
-wasm-pack = { workspace = true }
-wasm-opt = { workspace = true }
-
-[package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
-
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-crypto/wasm", "core-ethereum-db/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

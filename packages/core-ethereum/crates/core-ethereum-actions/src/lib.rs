@@ -1,7 +1,6 @@
-pub mod chain;
-pub mod constants;
-pub mod errors;
-pub mod network_registry;
+pub mod channels;
+pub mod redeem;
+pub mod transaction_queue;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -12,7 +11,7 @@ pub mod wasm {
 
     #[allow(dead_code)]
     #[wasm_bindgen]
-    pub fn core_ethereum_misc_initialize_crate() {
+    pub fn core_ethereum_actions_initialize_crate() {
         // When the `console_error_panic_hook` feature is enabled, we can call the
         // `set_panic_hook` function at least once during initialization, and then
         // we will get better error messages if our code ever panics.
@@ -31,3 +30,4 @@ pub mod wasm {
     // #[global_allocator]
     // static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 }
+

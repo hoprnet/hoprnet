@@ -1,5 +1,5 @@
-use crate::errors::CoreEthereumError::{InvalidArguments, NotAWinningTicket, WrongTicketState};
-use crate::errors::Result;
+use core_ethereum_misc::errors::CoreEthereumError::{InvalidArguments, NotAWinningTicket, WrongTicketState};
+use core_ethereum_misc::errors::Result;
 use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 use async_lock::RwLock;
 use core_crypto::types::Hash;
@@ -196,7 +196,7 @@ mod tests {
     use crate::redeem::{
         redeem_all_tickets, redeem_ticket, redeem_tickets_in_channel, redeem_tickets_with_counterparty,
     };
-    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue};
+    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
     use async_lock::RwLock;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::random::random_bytes;
@@ -322,7 +322,7 @@ mod tests {
             .times(ticket_count)
             .in_sequence(&mut seq)
             .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| Ok(()));
+            .returning(|_| TransactionResult::RedeemTicket { tx_hash: Hash::default() });
 
         // and then all Charlie's tickets get redeemed
         tx_exec
@@ -330,7 +330,7 @@ mod tests {
             .times(ticket_count)
             .in_sequence(&mut seq)
             .withf(move |t| charlie_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| Ok(()));
+            .returning(|_| TransactionResult::RedeemTicket { tx_hash: Hash::default() });
 
         // Start the TransactionQueue with the mock TransactionExecutor
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
@@ -400,7 +400,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| Ok(()));
+            .returning(|_| TransactionResult::RedeemTicket { tx_hash: Hash::default() });
 
         // Start the TransactionQueue with the mock TransactionExecutor
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
@@ -482,7 +482,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count - 2)
             .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| Ok(()));
+            .returning(|_| TransactionResult::RedeemTicket { tx_hash: Hash::default() });
 
         // Start the TransactionQueue with the mock TransactionExecutor
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));

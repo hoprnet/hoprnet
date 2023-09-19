@@ -1,5 +1,5 @@
-use crate::errors::CoreEthereumError::TransactionSubmissionFailed;
-use crate::errors::Result;
+use core_ethereum_misc::errors::CoreEthereumError::TransactionSubmissionFailed;
+use core_ethereum_misc::errors::Result;
 use crate::transaction_queue::TransactionResult::{Failure, RedeemTicket};
 use async_lock::RwLock;
 use async_std::channel::{bounded, Receiver, Sender};
@@ -47,6 +47,7 @@ impl Display for Transaction {
 }
 
 /// Implements execution of each `Transaction` and also **awaits** its confirmation.
+/// Each operation must return the corresponding `TransactionResult` variant or `Failure`.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait TransactionExecutor {
@@ -132,6 +133,7 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
                             RedeemTicket { .. } => {
                                 if let Err(e) = self.db.write().await.mark_redeemed(&ack).await {
                                     error!("failed to mark {ack} as redeemed: {e}");
+                                    // Still declare the TX a success
                                 }
                             }
                             Failure(_) => {}
@@ -171,6 +173,7 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
                         let channel_id = channel.get_id();
                         match channel.status {
                             Open => self.tx_exec.close_channel_initialize(source, destination).await,
+
                             PendingToClose => {
                                 if channel.closure_time_passed().unwrap_or(false) {
                                     self.tx_exec.close_channel_finalize(source, destination).await
@@ -182,6 +185,7 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
                                     }
                                 }
                             }
+
                             Closed => {
                                 warn!("channel {channel_id} is already closed");
                                 TransactionResult::CloseChannel {

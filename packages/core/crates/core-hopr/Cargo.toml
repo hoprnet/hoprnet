@@ -37,6 +37,7 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 
 core-network = { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
+core-ethereum-actions = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-misc = { workspace = true, default-features = false }
 core-mixer = { workspace = true, default-features = false }
