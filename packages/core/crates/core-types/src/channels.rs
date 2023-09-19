@@ -63,6 +63,12 @@ impl Display for ChannelStatus {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChannelDirection {
+    Incoming,
+    Outgoing,
+}
+
 /// Overall description of a channel
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -118,7 +124,7 @@ impl ChannelEntry {
         }
     }
 
-    /// Calculates the remaining channel closure grace period.
+    /// Calculates the remaining channel closure grace period in seconds.
     pub fn remaining_closure_time(&self) -> Option<u64> {
         // round clock ms to seconds
         let now_seconds = U256::from(current_timestamp()) / 1000u64.into();
@@ -138,17 +144,30 @@ impl ChannelEntry {
     }
 }
 
-impl std::fmt::Display for ChannelEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("ChannelEntry")
-            .field("source", &self.source.to_string())
-            .field("destination", &self.destination.to_string())
-            .field("balance", &format!("{}", self.balance))
-            .field("ticket_index", &self.ticket_index.to_string())
-            .field("status", &self.status.to_string())
-            .field("channel_epoch", &self.channel_epoch.to_string())
-            .field("closure_time", &self.closure_time.to_string())
-            .finish()
+impl ChannelEntry {
+    /// Determines the channel direction given the self address.
+    /// Panics if source nor destination are equal to the given address.
+    pub fn direction(&self, me: &Address) -> ChannelDirection {
+        if self.source.eq(me) {
+            ChannelDirection::Outgoing
+        } else if self.destination.eq(me) {
+            ChannelDirection::Incoming
+        } else {
+            panic!("foreign channel: {self}")
+        }
+    }
+}
+
+impl Display for ChannelEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} channel {}: {} -> {}",
+            self.status,
+            self.get_id(),
+            self.source,
+            self.destination
+        )
     }
 }
 

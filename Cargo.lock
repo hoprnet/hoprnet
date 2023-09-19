@@ -1154,6 +1154,8 @@ dependencies = [
  "mockall",
  "multiaddr",
  "semver",
+ "serde",
+ "serde-wasm-bindgen",
  "svm-rs",
  "thiserror",
  "tokio",
