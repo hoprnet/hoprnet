@@ -10,9 +10,9 @@ use core_p2p::{
     HoprNetworkBehaviorEvent, Ping, Pong,
 };
 use core_packet::interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction};
-use core_protocol::ticket_aggregation::{
+use core_protocol::{ticket_aggregation::{processor::{
     TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
-};
+}, config::TicketAggregationProtocolConfig}, ack::config::AckProtocolConfig, heartbeat::config::HeartbeatProtocolConfig, msg::config::MsgProtocolConfig};
 use core_types::{
     acknowledgement::{AcknowledgedTicket, Acknowledgement},
     channels::Ticket,
@@ -95,8 +95,12 @@ pub(crate) async fn p2p_loop(
     manual_ping_requests: api::ManualPingRequester,
     manual_ping_responds: api::HeartbeatResponder,
     my_multiaddresses: Vec<multiaddr::Multiaddr>,
+    ack_proto_cfg: AckProtocolConfig,
+    heartbeat_proto_cfg: HeartbeatProtocolConfig,
+    msg_proto_cfg: MsgProtocolConfig,
+    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig
 ) {
-    let mut swarm = core_p2p::build_p2p_network(me);
+    let mut swarm = core_p2p::build_p2p_network(me, ack_proto_cfg, heartbeat_proto_cfg, msg_proto_cfg, ticket_aggregation_proto_cfg);
 
     let mut valid_mas: Vec<multiaddr::Multiaddr> = vec![];
     for multiaddress in my_multiaddresses.iter() {

@@ -3,7 +3,7 @@ pub mod errors;
 
 use std::fmt::Debug;
 
-use core_protocol::constants::{
+use core_protocol::{constants::{
     HOPR_MESSAGE_PROTOCOL_V_0_1_0,
     HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0,
     HOPR_HEARTBEAT_PROTOCOL_V_0_1_0,
@@ -12,7 +12,7 @@ use core_protocol::constants::{
     HOPR_MESSAGE_CONNECTION_KEEPALIVE,
     HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE,
     HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE
-};
+}, ack::config::AckProtocolConfig, heartbeat::config::HeartbeatProtocolConfig, msg::config::MsgProtocolConfig, ticket_aggregation::config::TicketAggregationProtocolConfig};
 use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
 pub use libp2p::{
     core as libp2p_core, identity as libp2p_identity, identity, noise as libp2p_noise,
@@ -33,14 +33,6 @@ pub struct Ping(pub ControlMessage);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pong(pub ControlMessage, pub String);
 
-
-const HOPR_HEARTBEAT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
-
-const HOPR_MESSAGE_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
-
-const HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
-
-const HOPR_TICKET_AGGREGATION_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// Network Behavior definition for aggregated HOPR network functionality.
 /// 
@@ -63,6 +55,77 @@ impl Debug for HoprNetworkBehavior {
         f.debug_struct("HoprNetworkBehavior").finish()
     }
 }
+
+impl HoprNetworkBehavior {
+    pub fn new(msg_cfg: MsgProtocolConfig, ack_cfg: AckProtocolConfig, hb_cfg: HeartbeatProtocolConfig, ticket_aggregation_cfg: TicketAggregationProtocolConfig) -> Self {
+        Self {
+            heartbeat: libp2p_request_response::cbor::Behaviour::<Ping, Pong>::new(
+                [(
+                    StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_1_0),
+                    libp2p_request_response::ProtocolSupport::Full,
+                )],
+                {
+                    let mut cfg = libp2p_request_response::Config::default();
+                    cfg.set_connection_keep_alive(HOPR_HEARTBEAT_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(hb_cfg.timeout());
+                    cfg
+                },
+            ),
+            msg: libp2p_request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
+                [(
+                    StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
+                    libp2p_request_response::ProtocolSupport::Full,
+                )],
+                {
+                    let mut cfg = libp2p_request_response::Config::default();
+                    cfg.set_connection_keep_alive(HOPR_MESSAGE_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(msg_cfg.timeout());
+                    cfg
+                },
+            ),
+            ack: libp2p_request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
+                [(
+                    StreamProtocol::new(HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0),
+                    libp2p_request_response::ProtocolSupport::Full,
+                )],
+                {
+                    let mut cfg = libp2p_request_response::Config::default();
+                    cfg.set_connection_keep_alive(HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(ack_cfg.timeout());
+                    cfg
+                },
+            ),
+            ticket_aggregation: libp2p_request_response::cbor::Behaviour::<
+                Vec<AcknowledgedTicket>,
+                std::result::Result<Ticket, String>,
+            >::new(
+                [(
+                    StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
+                    libp2p_request_response::ProtocolSupport::Full,
+                )],
+                {
+                    let mut cfg = libp2p_request_response::Config::default();
+                    cfg.set_connection_keep_alive(HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE);
+                    cfg.set_request_timeout(ticket_aggregation_cfg.timeout());
+                    cfg
+                },
+            ),
+            keep_alive: libp2p_swarm::keep_alive::Behaviour::default(),
+        }
+    }
+}
+
+impl Default for HoprNetworkBehavior {
+    fn default() -> Self {
+        Self::new(
+            MsgProtocolConfig::default(),
+            AckProtocolConfig::default(),
+            HeartbeatProtocolConfig::default(),
+            TicketAggregationProtocolConfig::default()
+        ) 
+    }
+}
+
 
 /// Aggregated network behavior event inheriting the component behaviors' events.
 /// 
@@ -111,65 +174,6 @@ impl From<libp2p_request_response::Event<Acknowledgement, ()>> for HoprNetworkBe
     }
 }
 
-impl Default for HoprNetworkBehavior {
-    fn default() -> Self {
-        Self {
-            heartbeat: libp2p_request_response::cbor::Behaviour::<Ping, Pong>::new(
-                [(
-                    StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_1_0),
-                    libp2p_request_response::ProtocolSupport::Full,
-                )],
-                {
-                    let mut cfg = libp2p_request_response::Config::default();
-                    cfg.set_connection_keep_alive(HOPR_HEARTBEAT_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(HOPR_HEARTBEAT_REQUEST_TIMEOUT);
-                    cfg
-                },
-            ),
-            msg: libp2p_request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
-                [(
-                    StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
-                    libp2p_request_response::ProtocolSupport::Full,
-                )],
-                {
-                    let mut cfg = libp2p_request_response::Config::default();
-                    cfg.set_connection_keep_alive(HOPR_MESSAGE_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(HOPR_MESSAGE_REQUEST_TIMEOUT);
-                    cfg
-                },
-            ),
-            ack: libp2p_request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
-                [(
-                    StreamProtocol::new(HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0),
-                    libp2p_request_response::ProtocolSupport::Full,
-                )],
-                {
-                    let mut cfg = libp2p_request_response::Config::default();
-                    cfg.set_connection_keep_alive(HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(HOPR_ACKNOWLEDGEMENT_REQUEST_TIMEOUT);
-                    cfg
-                },
-            ),
-            ticket_aggregation: libp2p_request_response::cbor::Behaviour::<
-                Vec<AcknowledgedTicket>,
-                std::result::Result<Ticket, String>,
-            >::new(
-                [(
-                    StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
-                    libp2p_request_response::ProtocolSupport::Full,
-                )],
-                {
-                    let mut cfg = libp2p_request_response::Config::default();
-                    cfg.set_connection_keep_alive(HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE);
-                    cfg.set_request_timeout(HOPR_TICKET_AGGREGATION_REQUEST_TIMEOUT);
-                    cfg
-                },
-            ),
-            keep_alive: libp2p_swarm::keep_alive::Behaviour::default(),
-        }
-    }
-}
-
 /// Build wasm variant of `Transport` for the Node environment
 #[cfg(all(feature = "wasm", not(test)))]
 pub fn build_basic_transport() -> libp2p_wasm_ext::ExtTransport {
@@ -205,7 +209,12 @@ fn build_swarm<T: NetworkBehaviour>(
 /// Build objects comprising the p2p network.
 ///
 /// @return A built `Swarm` object implementing the HoprNetworkBehavior functionality
-pub fn build_p2p_network(me: libp2p_identity::Keypair) -> libp2p_swarm::Swarm<HoprNetworkBehavior> {
+pub fn build_p2p_network(me: libp2p_identity::Keypair,     
+    ack_proto_cfg: AckProtocolConfig,
+    heartbeat_proto_cfg: HeartbeatProtocolConfig,
+    msg_proto_cfg: MsgProtocolConfig,
+    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig
+) -> libp2p_swarm::Swarm<HoprNetworkBehavior> {
     let transport = build_basic_transport()
         .upgrade(upgrade::Version::V1)
         .authenticate(libp2p_noise::Config::new(&me).expect("signing libp2p-noise static keypair"))
@@ -213,7 +222,7 @@ pub fn build_p2p_network(me: libp2p_identity::Keypair) -> libp2p_swarm::Swarm<Ho
         .timeout(std::time::Duration::from_secs(60))
         .boxed();
 
-    let behavior = HoprNetworkBehavior::default();
+    let behavior = HoprNetworkBehavior::new(msg_proto_cfg, ack_proto_cfg, heartbeat_proto_cfg, ticket_aggregation_proto_cfg);
 
     build_swarm(transport, behavior, PeerId::from(me.public()))
 }

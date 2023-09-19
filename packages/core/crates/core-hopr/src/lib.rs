@@ -19,7 +19,15 @@ use core_network::{
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
-use core_protocol::ticket_aggregation::{TicketAggregationActions, TicketAggregationInteraction};
+use core_protocol::{
+    ack::config::AckProtocolConfig,
+    msg::config::MsgProtocolConfig,
+    heartbeat::config::HeartbeatProtocolConfig,
+    ticket_aggregation::{
+        config::TicketAggregationProtocolConfig,
+        processor::{TicketAggregationActions, TicketAggregationInteraction}
+    }
+};
 use core_types::{channels::Ticket, protocol::TagBloomFilter};
 use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
@@ -146,6 +154,10 @@ pub fn build_components(
     save_tbf: js_sys::Function,
     tx_executor: WasmTxExecutor,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
+    ack_proto_cfg: AckProtocolConfig,
+    heartbeat_proto_cfg: HeartbeatProtocolConfig,
+    msg_proto_cfg: MsgProtocolConfig,
+    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     let identity = me;
 
@@ -246,6 +258,10 @@ pub fn build_components(
                 api::ManualPingRequester::new(ping_rx),
                 api::HeartbeatResponder::new(pong_tx),
                 my_multiaddresses,
+                ack_proto_cfg,
+                heartbeat_proto_cfg,
+                msg_proto_cfg,
+                ticket_aggregation_proto_cfg
             )
             .map(|_| HoprLoopComponents::Swarm),
         ),
@@ -361,6 +377,10 @@ pub mod wasm_impl {
             save_tbf: js_sys::Function,
             tx_executor: WasmTxExecutor,
             my_multiaddresses: Vec<js_sys::JsString>,
+            ack_proto_cfg: AckProtocolConfig,
+            heartbeat_proto_cfg: HeartbeatProtocolConfig,
+            msg_proto_cfg: MsgProtocolConfig,
+            ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
@@ -384,6 +404,10 @@ pub mod wasm_impl {
                         multiaddr::Multiaddr::from_str(ma.as_str()).expect("Should be a valid multiaddress string")
                     })
                     .collect::<Vec<_>>(),
+                ack_proto_cfg,
+                heartbeat_proto_cfg,
+                msg_proto_cfg,
+                ticket_aggregation_proto_cfg
             );
 
             Self {

@@ -22,9 +22,12 @@ async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
-serde = { workspace = true, features = ["derive"]}
 hex-literal = "0.4"
 lazy_static = "1.4"
+serde = { workspace = true, features = ["derive"]}
+serde_with = { workspace = true }
+thiserror = { workspace = true }
+validator = { workspace = true }
 
 # wasm
 getrandom = { version = "0.2.8", features = ["js"], optional = true }
@@ -34,7 +37,6 @@ libp2p-identity = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 gloo-timers = { workspace = true, optional = true}
 
-thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
