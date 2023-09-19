@@ -1912,7 +1912,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_acknowledged_ticket_status() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
+        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
 
         let mut challenge_seed: [u8; 32] = hex!("c04824c574e562b3b96725c8aa6e5b0426a3900cd9efbe48ddf7e754a552abdf");
 
@@ -1954,7 +1954,12 @@ mod tests {
             tx_hash: Hash::default(),
         });
 
-        db.store_acknowledged_tickets(acked_tickets).await.unwrap();
+        // Store ack tickets
+        for ack in acked_tickets.iter() {
+            inner_db.set(get_acknowledged_ticket_key(ack).unwrap(), ack).await.unwrap();
+        }
+
+        let mut db = CoreEthereumDb::new(inner_db, Address::random());
 
         let channel_id = generate_channel_id(&(&*ALICE_KEYPAIR).into(), &(&*BOB_KEYPAIR).into());
 

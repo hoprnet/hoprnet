@@ -9,13 +9,15 @@ const POST: Operation = [
     const { channelid } = req.params
 
     try {
-      let channel_id = Hash.deserialize(stringToU8a(channelid))
+      let channelIdHash = Hash.deserialize(stringToU8a(channelid))
+      const tickets = await node.getTickets(channelIdHash)
+      if (tickets.length <= 0) {
+        return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
+      }
 
-      console.log(`about to aggregate tickets`)
-      await node.aggregateTickets(channel_id)
+      await node.aggregateTickets(channelIdHash)
       return res.status(204).send()
     } catch (err) {
-      console.log(`aggregation error`, err)
       return res
         .status(422)
         .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
@@ -43,11 +45,38 @@ POST.apiDoc = {
     '204': {
       description: 'Tickets successfully aggregated'
     },
+    '400': {
+      description: 'Invalid channel id.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.INVALID_CHANNELID
+          }
+        }
+      }
+    },
     '401': {
       $ref: '#/components/responses/Unauthorized'
     },
     '403': {
       $ref: '#/components/responses/Forbidden'
+    },
+    '404': {
+      description:
+        'Tickets were not found for that channel. That means that no messages were sent inside this channel yet.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/RequestStatus'
+          },
+          example: {
+            status: STATUS_CODES.TICKETS_NOT_FOUND
+          }
+        }
+      }
     },
     '422': {
       description: 'Unknown failure.',
