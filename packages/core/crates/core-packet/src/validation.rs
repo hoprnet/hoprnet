@@ -26,7 +26,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 
     // ticket signer MUST be the sender
     ticket
-        .verify(sender, &domain_separator)
+        .verify(sender, domain_separator)
         .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
 
     // ticket amount MUST be greater or equal to minTicketAmount
@@ -152,6 +152,7 @@ mod tests {
                 half_key_challenge: &HalfKeyChallenge,
                 ack_ticket: AcknowledgedTicket,
             ) -> core_ethereum_db::errors::Result<()>;
+            async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<usize>;
             async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_range(
                 &self,
@@ -161,6 +162,13 @@ mod tests {
                 index_end: u64,
             ) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
+            async fn prepare_aggregatable_tickets(
+                &mut self,
+                channel_id: &Hash,
+                epoch: u32,
+                index_start: u64,
+                index_end: u64,
+            ) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn replace_acked_tickets_by_aggregated_ticket(&mut self, aggregated_ticket: AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
             async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;

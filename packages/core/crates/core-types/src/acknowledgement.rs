@@ -82,11 +82,17 @@ impl BinarySerializable for Acknowledgement {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AcknowledgedTicketStatus {
+    #[default]
     Untouched,
-    BeingRedeemed { tx_hash: Hash },
-    BeingAggregated { start: u64, end: u64 },
+    BeingRedeemed {
+        tx_hash: Hash,
+    },
+    BeingAggregated {
+        start: u64,
+        end: u64,
+    },
 }
 
 impl Display for AcknowledgedTicketStatus {
@@ -99,16 +105,8 @@ impl Display for AcknowledgedTicketStatus {
     }
 }
 
-impl Default for AcknowledgedTicketStatus {
-    fn default() -> Self {
-        AcknowledgedTicketStatus::Untouched
-    }
-}
-
 /// Contains acknowledgment information and the respective ticket
-///
-/// FIXME: think about serialization and deserialization
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
@@ -116,6 +114,18 @@ pub struct AcknowledgedTicket {
     pub response: Response,
     pub vrf_params: VrfParameters,
     pub signer: Address,
+}
+
+impl PartialOrd for AcknowledgedTicket {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.ticket.partial_cmp(&other.ticket)
+    }
+}
+
+impl Ord for AcknowledgedTicket {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.ticket.cmp(&other.ticket)
+    }
 }
 
 impl AcknowledgedTicket {
@@ -654,7 +664,7 @@ pub mod wasm {
 
         #[wasm_bindgen(getter)]
         pub fn signer(&self) -> Address {
-            self.w.signer.clone()
+            self.w.signer
         }
 
         #[wasm_bindgen(js_name = "clone")]

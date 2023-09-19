@@ -32,6 +32,7 @@ core-misc = { workspace = true }
 core-network = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }
+core-protocol = { workspace = true }
 core-strategy = { workspace = true }
 core-types = { workspace = true }
 core-ethereum-db = { workspace = true }
@@ -70,6 +71,7 @@ wasm = [
     "core-network/wasm",
     "core-packet/wasm",
     "core-path/wasm",
+    "core-protocol/wasm",
     "core-strategy/wasm",
     "core-types/wasm",
     "core-ethereum-db/wasm",

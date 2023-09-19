@@ -56,6 +56,8 @@ The following sections document the metrics per package:
 | `core_gauge_strategy_last_opened_channels` | gauge       | Number of opened channels in the last strategy tick            |                                 |
 | `core_gauge_strategy_last_closed_channels` | gauge       | Number of closed channels in the last strategy tick            |                                 |
 | `core_gauge_strategy_max_auto_channels`    | gauge       | Maximum number of channels the current strategy can open       |                                 |
+| `core_counter_aggregated_tickets`          | counter     | Number of aggregated tickets                                   |                                 |
+| `core_counter_aggregations`                | counter     | Number of performed ticket aggregations                        |                                 |
 
 ### core-ethereum
 

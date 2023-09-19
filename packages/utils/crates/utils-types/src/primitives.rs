@@ -3,7 +3,7 @@ use getrandom::getrandom;
 use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Div, Mul, Shl, Shr, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -129,11 +129,17 @@ pub enum BalanceType {
 }
 
 /// Represents balance of some coin or token.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: U256,
     balance_type: BalanceType,
+}
+
+impl PartialEq for Balance {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value && self.balance_type == other.balance_type
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -404,7 +410,7 @@ impl U256 {
     /// Multiply with float in the interval [0.0, 1.0]
     pub fn multiply_f64(&self, rhs: f64) -> Result<Self> {
         if rhs < 0.0 || rhs > 1.0 {
-            return Err(GeneralError::InvalidInput);
+            return Err(InvalidInput);
         }
 
         if rhs == 1.0 {
@@ -533,6 +539,12 @@ impl Add for U256 {
         Self {
             value: self.value.add(rhs.value),
         }
+    }
+}
+
+impl AddAssign for U256 {
+    fn add_assign(&mut self, rhs: Self) {
+        self.value.add_assign(&rhs.value);
     }
 }
 
@@ -985,7 +997,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Snapshot {
-        #[wasm_bindgen(js_name = "default")]
+        #[wasm_bindgen(js_name = "make_default")]
         pub fn _default() -> Self {
             Snapshot::default()
         }

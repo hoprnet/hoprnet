@@ -194,6 +194,16 @@ api_redeem_tickets() {
 
 # $1 = node api endpoint
 # $2 = channel id
+api_aggregate_tickets() {
+  local origin=${1:-localhost:3001}
+  local channel_id="${2}"
+
+  log "aggregating tickets in channel ${channel_id}"
+  api_call "${origin}" "/channels/${channel_id}/tickets/aggregate" "POST" "" "" 600
+}
+
+# $1 = node api endpoint
+# $2 = channel id
 # $3 = assertion
 api_get_tickets_in_channel() {
   local node_api="${1}"

@@ -1,5 +1,5 @@
 [package]
-name = "core-p2p"
+name = "core-protocol"
 version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -9,41 +9,48 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = [
-    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom",
-    "libp2p/wasm-bindgen", "dep:libp2p-wasm-ext",
-    "core-network/wasm", "utils-log/wasm", "utils-misc/wasm"
+    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom", "dep:gloo-timers",
+    "utils-log/wasm"
 ]
+prometheus = ["dep:utils-metrics"]
 
 [dependencies]
 # a better separation of tcp + async-std for non wasm case could be designed
-libp2p = { workspace = true, features = ["async-std", "noise", "request-response", "cbor", "macros", "tcp"] }
-libp2p-mplex = { workspace = true }
+async-std = { workspace = true, features = ["attributes", "unstable"] }
+async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
+hex-literal = "0.4"
+lazy_static = "1.4"
 serde = { workspace = true, features = ["derive"]}
-syn = "2.0.27"      # needed for `features=["macros"]` from `libp2p`
-void = "1"          # needed for Behavior implementations from libp2p
+serde_with = { workspace = true }
+thiserror = { workspace = true }
+validator = { workspace = true }
 
 # wasm
-libp2p-wasm-ext = { workspace = true, features = ["tcp"], optional = true }
 getrandom = { version = "0.2.8", features = ["js"], optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.63", optional = true }
-thiserror = { workspace = true }
+libp2p-identity = { workspace = true }
+libp2p = { workspace = true, features = ["noise", "request-response"] }
+gloo-timers = { workspace = true, optional = true}
+
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
-core-network = { workspace = true }
-core-protocol = { workspace = true }
+core-crypto = { workspace = true }
+core-mixer = { workspace = true }
+core-ethereum-db = { workspace = true }
 core-types = { workspace = true }
+utils-db = { workspace = true }
 utils-log = { workspace = true }
-utils-misc = { workspace = true }
+utils-types = { workspace = true }
+utils-metrics = { optional = true, workspace = true }
 
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
 more-asserts = "0.3.1"
 env_logger = "0.10.0"
 wasm-bindgen-test = "0.3.36"
