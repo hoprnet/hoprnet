@@ -1,3 +1,7 @@
+pub mod cli;
+pub mod config;
+pub mod errors;
+
 #[cfg(feature = "wasm")]
 pub mod wasm {
     // Temporarily re-export crates
@@ -30,9 +34,6 @@ pub mod wasm {
 
     #[allow(unused_imports)]
     use core_hopr::wasm::*;
-
-    #[allow(unused_imports)]
-    use hoprd_misc::cli::wasm::*;
 
     #[allow(unused_imports)]
     use hoprd_inbox::inbox::wasm::*;

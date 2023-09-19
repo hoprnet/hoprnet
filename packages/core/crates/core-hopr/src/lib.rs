@@ -13,7 +13,7 @@ use core_mixer::mixer::{Mixer, MixerConfig};
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
-    network::{Network, NetworkEvent},
+    network::{Network, NetworkEvent, NetworkConfig},
     ping::Ping,
 };
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
@@ -135,7 +135,7 @@ pub fn build_components(
     me: libp2p_identity::Keypair,
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-    network_quality_threshold: f64,
+    network_cfg: NetworkConfig,
     hb_cfg: HeartbeatConfig,
     ping_cfg: PingConfig,
     on_acknowledgement: Option<js_sys::Function>,
@@ -157,7 +157,7 @@ pub fn build_components(
 
     let network = Arc::new(RwLock::new(Network::new(
         identity.public().to_peer_id(),
-        network_quality_threshold,
+        network_cfg,
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
     )));
 
@@ -293,6 +293,7 @@ pub mod wasm_impl {
         types::{HalfKeyChallenge, Hash},
     };
     use core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor;
+    use core_network::network::NetworkConfig;
     use core_path::path::Path;
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
@@ -349,7 +350,7 @@ pub mod wasm_impl {
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
             db: Database, // TODO: replace the string with the KeyPair
-            network_quality_threshold: f64,
+            network_cfg: NetworkConfig,
             hb_cfg: HeartbeatConfig,
             ping_cfg: PingConfig,
             on_acknowledgement: Option<js_sys::Function>,
@@ -366,7 +367,7 @@ pub mod wasm_impl {
                 me,
                 me_onchain.clone(),
                 db.as_ref_counted(),
-                network_quality_threshold,
+                network_cfg,
                 hb_cfg,
                 ping_cfg,
                 on_acknowledgement,

@@ -54,10 +54,6 @@ Options:
           List all the options used to run the HOPR node, but quit instead of starting [env: HOPRD_DRY_RUN=]
       --init
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
-      --allowLocalNodeConnections
-          Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS=]
-      --allowPrivateNodeConnections
-          Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=]
       --testAnnounceLocalAddresses
           For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES=]
       --heartbeatInterval <MILLISECONDS>
