@@ -448,10 +448,10 @@ impl HoprdConfig {
             cfg.api.auth = Auth::Token(x);
         };
         if let Some(x) = cli_args.api_host {
-            cfg.api.host.address = if validator::validate_ip_v4(x.as_str()) {
-                HostType::IPv4(x)
-            } else {
-                HostType::Domain(x)
+            if validator::validate_ip_v4(x.as_str()) {
+                cfg.api.host.address = HostType::IPv4(x)
+            } else if is_dns_address(x.as_str()) {
+                cfg.api.host.address = HostType::Domain(x)
             }
         };
         if let Some(x) = cli_args.api_port {
