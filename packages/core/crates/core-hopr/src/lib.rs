@@ -13,7 +13,7 @@ use core_mixer::mixer::{Mixer, MixerConfig};
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
-    network::{Network, NetworkEvent, NetworkConfig},
+    network::{Network, NetworkConfig, NetworkEvent},
     ping::Ping,
 };
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
@@ -21,12 +21,12 @@ use core_p2p::libp2p_identity;
 use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
 use core_protocol::{
     ack::config::AckProtocolConfig,
-    msg::config::MsgProtocolConfig,
     heartbeat::config::HeartbeatProtocolConfig,
+    msg::config::MsgProtocolConfig,
     ticket_aggregation::{
         config::TicketAggregationProtocolConfig,
-        processor::{TicketAggregationActions, TicketAggregationInteraction}
-    }
+        processor::{TicketAggregationActions, TicketAggregationInteraction},
+    },
 };
 use core_types::{channels::Ticket, protocol::TagBloomFilter};
 use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
@@ -40,8 +40,7 @@ use core_ethereum_misc::transaction_queue::{TransactionQueue, TransactionSender}
 
 #[cfg(feature = "wasm")]
 use {
-    core_ethereum_db::db::wasm::Database,
-    core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor,
+    core_ethereum_db::db::wasm::Database, core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor,
     wasm_bindgen::prelude::wasm_bindgen,
 };
 
@@ -157,7 +156,7 @@ pub fn build_components(
     ack_proto_cfg: AckProtocolConfig,
     heartbeat_proto_cfg: HeartbeatProtocolConfig,
     msg_proto_cfg: MsgProtocolConfig,
-    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig
+    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     let identity = me;
 
@@ -261,7 +260,7 @@ pub fn build_components(
                 ack_proto_cfg,
                 heartbeat_proto_cfg,
                 msg_proto_cfg,
-                ticket_aggregation_proto_cfg
+                ticket_aggregation_proto_cfg,
             )
             .map(|_| HoprLoopComponents::Swarm),
         ),
@@ -380,7 +379,7 @@ pub mod wasm_impl {
             ack_proto_cfg: AckProtocolConfig,
             heartbeat_proto_cfg: HeartbeatProtocolConfig,
             msg_proto_cfg: MsgProtocolConfig,
-            ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig
+            ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
@@ -407,7 +406,7 @@ pub mod wasm_impl {
                 ack_proto_cfg,
                 heartbeat_proto_cfg,
                 msg_proto_cfg,
-                ticket_aggregation_proto_cfg
+                ticket_aggregation_proto_cfg,
             );
 
             Self {

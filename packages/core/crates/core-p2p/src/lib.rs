@@ -3,16 +3,18 @@ pub mod errors;
 
 use std::fmt::Debug;
 
-use core_protocol::{constants::{
-    HOPR_MESSAGE_PROTOCOL_V_0_1_0,
-    HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0,
-    HOPR_HEARTBEAT_PROTOCOL_V_0_1_0,
-    HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
-    HOPR_HEARTBEAT_CONNECTION_KEEPALIVE,
-    HOPR_MESSAGE_CONNECTION_KEEPALIVE,
-    HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE,
-    HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE
-}, ack::config::AckProtocolConfig, heartbeat::config::HeartbeatProtocolConfig, msg::config::MsgProtocolConfig, ticket_aggregation::config::TicketAggregationProtocolConfig};
+use core_protocol::{
+    ack::config::AckProtocolConfig,
+    constants::{
+        HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE, HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0,
+        HOPR_HEARTBEAT_CONNECTION_KEEPALIVE, HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_MESSAGE_CONNECTION_KEEPALIVE,
+        HOPR_MESSAGE_PROTOCOL_V_0_1_0, HOPR_TICKET_AGGREGATION_CONNECTION_KEEPALIVE,
+        HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
+    },
+    heartbeat::config::HeartbeatProtocolConfig,
+    msg::config::MsgProtocolConfig,
+    ticket_aggregation::config::TicketAggregationProtocolConfig,
+};
 use core_types::{acknowledgement::AcknowledgedTicket, channels::Ticket};
 pub use libp2p::{
     core as libp2p_core, identity as libp2p_identity, identity, noise as libp2p_noise,
@@ -33,9 +35,8 @@ pub struct Ping(pub ControlMessage);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pong(pub ControlMessage, pub String);
 
-
 /// Network Behavior definition for aggregated HOPR network functionality.
-/// 
+///
 /// Individual network behaviors from the libp2p perspectives are aggregated
 /// under this type in order to create an aggregated network behavior capable
 /// of generating events for all component behaviors.
@@ -57,7 +58,12 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    pub fn new(msg_cfg: MsgProtocolConfig, ack_cfg: AckProtocolConfig, hb_cfg: HeartbeatProtocolConfig, ticket_aggregation_cfg: TicketAggregationProtocolConfig) -> Self {
+    pub fn new(
+        msg_cfg: MsgProtocolConfig,
+        ack_cfg: AckProtocolConfig,
+        hb_cfg: HeartbeatProtocolConfig,
+        ticket_aggregation_cfg: TicketAggregationProtocolConfig,
+    ) -> Self {
         Self {
             heartbeat: libp2p_request_response::cbor::Behaviour::<Ping, Pong>::new(
                 [(
@@ -121,15 +127,14 @@ impl Default for HoprNetworkBehavior {
             MsgProtocolConfig::default(),
             AckProtocolConfig::default(),
             HeartbeatProtocolConfig::default(),
-            TicketAggregationProtocolConfig::default()
-        ) 
+            TicketAggregationProtocolConfig::default(),
+        )
     }
 }
 
-
 /// Aggregated network behavior event inheriting the component behaviors' events.
-/// 
-/// Necessary to allow the libp2p handler to properly distribute the events for 
+///
+/// Necessary to allow the libp2p handler to properly distribute the events for
 /// processing in the business logic loop.
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
@@ -209,11 +214,12 @@ fn build_swarm<T: NetworkBehaviour>(
 /// Build objects comprising the p2p network.
 ///
 /// @return A built `Swarm` object implementing the HoprNetworkBehavior functionality
-pub fn build_p2p_network(me: libp2p_identity::Keypair,     
+pub fn build_p2p_network(
+    me: libp2p_identity::Keypair,
     ack_proto_cfg: AckProtocolConfig,
     heartbeat_proto_cfg: HeartbeatProtocolConfig,
     msg_proto_cfg: MsgProtocolConfig,
-    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig
+    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
 ) -> libp2p_swarm::Swarm<HoprNetworkBehavior> {
     let transport = build_basic_transport()
         .upgrade(upgrade::Version::V1)
@@ -222,7 +228,12 @@ pub fn build_p2p_network(me: libp2p_identity::Keypair,
         .timeout(std::time::Duration::from_secs(60))
         .boxed();
 
-    let behavior = HoprNetworkBehavior::new(msg_proto_cfg, ack_proto_cfg, heartbeat_proto_cfg, ticket_aggregation_proto_cfg);
+    let behavior = HoprNetworkBehavior::new(
+        msg_proto_cfg,
+        ack_proto_cfg,
+        heartbeat_proto_cfg,
+        ticket_aggregation_proto_cfg,
+    );
 
     build_swarm(transport, behavior, PeerId::from(me.public()))
 }

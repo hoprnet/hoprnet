@@ -382,7 +382,7 @@ pub struct HoprdConfig {
     #[validate]
     pub healthcheck: HealthCheck,
     #[validate]
-    pub protocol: Protocol, 
+    pub protocol: Protocol,
     pub network: String,
     #[validate]
     pub chain: Chain,
