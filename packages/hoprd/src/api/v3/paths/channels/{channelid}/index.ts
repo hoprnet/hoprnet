@@ -68,9 +68,9 @@ export async function closeChannel(
     return { success: true, channelStatus, receipt }
   } catch (err) {
     log(`${err}`)
-    const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+    const errString: string = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
 
-    if (errString.match(/channel is already closed/)) {
+    if (errString.includes('channel is already closed')) {
       // @TODO insert receipt
       return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
     } else if (errString.includes('Incoming channel')) {
