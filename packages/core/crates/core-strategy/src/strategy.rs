@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use async_trait::async_trait;
-use core_types::acknowledgement::wasm::AcknowledgedTicket;
-use core_types::channels::ChannelEntry;
+use core_types::acknowledgement::AcknowledgedTicket;
+use core_types::channels::{ChannelEntry};
 use utils_log::error;
 use crate::errors::Result;
 
@@ -13,7 +13,7 @@ pub trait SingularStrategy: Display {
     async fn on_acknowledged_ticket(&self, _ack: &AcknowledgedTicket) -> Result<()> {
         Ok(())
     }
-    async fn on_channel_close(&self, _channel: &ChannelEntry) -> Result<()> {
+    async fn on_channel_state_changed(&self, _channel: &ChannelEntry) -> Result<()> {
         Ok(())
     }
 }
@@ -55,9 +55,9 @@ impl SingularStrategy for MultiStrategy {
         Ok(())
     }
 
-    async fn on_channel_close(&self, channel: &ChannelEntry) -> Result<()> {
+    async fn on_channel_state_changed(&self, channel: &ChannelEntry) -> Result<()> {
         for strat in self.strategies.iter() {
-            if let Err(e) = strat.on_channel_close(channel).await {
+            if let Err(e) = strat.on_channel_state_changed(channel).await {
                 error!("error on_tick in strategy {strat}: {e}")
             }
         }

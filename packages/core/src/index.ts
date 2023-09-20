@@ -39,7 +39,6 @@ import {
   isMultiaddrLocal,
   OffchainKeypair,
   ChainKeypair,
-  StrategyTickResult,
   Database,
   OffchainPublicKey,
   ApplicationData,
@@ -50,7 +49,6 @@ import {
   Health,
   Snapshot,
   CoreApp,
-  get_peers_with_quality,
   HoprTools,
   WasmNetwork,
   WasmPing,
@@ -72,15 +70,6 @@ import HoprCoreEthereum, {
   NetworkRegistryNodeNotAllowedEventName,
   NetworkRegistryNodeAllowedEventName
 } from '@hoprnet/hopr-core-ethereum'
-
-import {
-  type ChannelStrategyInterface,
-  isStrategy,
-  OutgoingChannelStatus,
-  SaneDefaults,
-  Strategy,
-  StrategyFactory
-} from './channel-strategy.js'
 
 import { type ResolvedNetwork, resolveNetwork } from './network.js'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
@@ -112,7 +101,8 @@ const metric_pathLength = create_histogram_with_buckets(
   'Distribution of number of hops of sent messages',
   new Float64Array([0, 1, 2, 3, 4])
 )
-const metric_strategyTicks = create_counter('core_counter_strategy_ticks', 'Number of strategy decisions (ticks)')
+
+/*const metric_strategyTicks = create_counter('core_counter_strategy_ticks', 'Number of strategy decisions (ticks)')
 const metric_strategyLastOpened = create_gauge(
   'core_gauge_strategy_last_opened_channels',
   'Number of opened channels in the last strategy tick'
@@ -125,6 +115,7 @@ const metric_strategyMaxChannels = create_gauge(
   'core_gauge_strategy_max_auto_channels',
   'Maximum number of channels the current strategy can open'
 )
+*/
 
 /// Maximum time to wait for a packet to be pushed to the interaction queue in milliseconds
 const PACKET_QUEUE_TIMEOUT_MILLISECONDS = 15000n
@@ -142,7 +133,6 @@ export class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
   private stopPeriodicCheck: (() => void) | undefined
-  private strategy: ChannelStrategyInterface
   private tools: HoprTools
   private networkPeers: WasmNetwork
   private pinger: WasmPing
@@ -263,10 +253,6 @@ export class Hopr extends EventEmitter {
       this.emit('hopr:message-acknowledged', ackChallenge.to_hex())
     }
 
-    const onAcknowledgedTicket = (ackTicket: AcknowledgedTicket) => {
-      connector.emit('ticket:acknowledged', ackTicket)
-    }
-
     let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
     packetCfg.check_unrealized_balance = this.cfg.chain.check_unrealized_balance
 
@@ -305,7 +291,6 @@ export class Hopr extends EventEmitter {
       this.cfg.heartbeat,
       ping_cfg,
       onAcknowledgement,
-      onAcknowledgedTicket,
       packetCfg,
       onReceivedMessage,
       tagBloomFilter,
@@ -321,7 +306,8 @@ export class Hopr extends EventEmitter {
       this.cfg.protocol.ack,
       this.cfg.protocol.heartbeat,
       this.cfg.protocol.msg,
-      this.cfg.protocol.ticket_aggregation
+      this.cfg.protocol.ticket_aggregation,
+      [this.cfg.strategy]
     )
 
     this.tools = coreApp.tools()
@@ -405,18 +391,6 @@ export class Hopr extends EventEmitter {
     // subscribe so we can process channel close events
     connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
-    let strategy: ChannelStrategyInterface
-    if (isStrategy(this.cfg.strategy.name)) {
-      strategy = StrategyFactory.getStrategy(this.cfg.strategy.name, this)
-      strategy.configure({
-        auto_redeem_tickets: this.cfg.strategy.auto_redeem_tickets,
-        max_channels: this.cfg.strategy.max_auto_channels ?? undefined
-      })
-    } else {
-      strategy = StrategyFactory.getStrategy('passive', this)
-    }
-    this.setChannelStrategy(strategy)
-
     log('announcing done, strategy interval')
     this.startPeriodicStrategyCheck()
 
@@ -460,9 +434,12 @@ export class Hopr extends EventEmitter {
    * @param channel object
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
-    if (channel.status === ChannelStatus.PendingToClose) {
-      await this.strategy.onChannelWillClose(channel)
-    }
+      try {
+        await this.tools.channel_events().send_event(channel)
+      }
+      catch (e) {
+        log(`failed to emit channel closure event`)
+      }
   }
 
   /**
@@ -549,7 +526,7 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  private async strategyOpenChannel(status: OutgoingChannelStatus) {
+  /*private async strategyOpenChannel(status: OutgoingChannelStatus) {
     try {
       const destinationAddress = Address.from_string(status.address)
       const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(Address.from_string(status.address))
@@ -578,7 +555,7 @@ export class Hopr extends EventEmitter {
     } catch (e) {
       error(`strategy could not close channel ${destination}`)
     }
-  }
+  }*/
 
   private async updateChannelMetrics() {
     const selfAddr = this.getEthereumAddress()
@@ -619,7 +596,7 @@ export class Hopr extends EventEmitter {
 
   // On the strategy interval, poll the strategy to see what channel changes
   // need to be made.
-  private async tickChannelStrategy() {
+  /*private async tickChannelStrategy() {
     verbose('strategy tick', this.status, this.strategy.name)
     if (this.status != 'RUNNING') {
       throw new Error('node is not RUNNING')
@@ -679,7 +656,7 @@ export class Hopr extends EventEmitter {
     } catch (e) {
       error(`error when strategy was trying to open or close channels`, e)
     }
-  }
+  }*/
 
   /**
    * Returns the version of hopr-core.
@@ -894,6 +871,7 @@ export class Hopr extends EventEmitter {
     HoprCoreEthereum.getInstance().emit(event)
   }
 
+  // This now only used to update metrics
   public startPeriodicStrategyCheck() {
     const periodicCheck = async function (this: Hopr) {
       log('periodic check. Current status:', this.status)
@@ -905,19 +883,17 @@ export class Hopr extends EventEmitter {
       }, 10000)
       try {
         log('Triggering tick channel strategy')
-        await this.tickChannelStrategy()
         await this.updateChannelMetrics()
       } catch (e) {
         log('error in periodic check', e)
       }
       log('Clearing out logging timeout.')
       timer.clear()
-      log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
     }.bind(this)
 
-    log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
+    log(`Starting periodicCheck interval with 60000ms`)
 
-    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => this.strategy.tickInterval)
+    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => 60000)
   }
 
   /**
@@ -1053,23 +1029,6 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  public setChannelStrategy(strategy: ChannelStrategyInterface): void {
-    log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
-    this.strategy = strategy
-
-    HoprCoreEthereum.getInstance().on('ticket:acknowledged', async (ack: AcknowledgedTicket) => {
-      try {
-        await this.strategy.onAckedTicket(ack)
-      } catch (err) {
-        error(`Strategy error while handling acknowledged ticket`, err)
-      }
-    })
-  }
-
-  public getChannelStrategy(): ChannelStrategyInterface {
-    return this.strategy
-  }
-
   public async getBalance(): Promise<Balance> {
     verbose('Requesting hopr balance for node')
     // we do not keep the node's hopr balance in the db anymore, therefore use
@@ -1201,7 +1160,7 @@ export class Hopr extends EventEmitter {
     }
 
     if (channel.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channel)
+      this.onOwnChannelUpdated(channel)
     }
 
     // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
@@ -1547,15 +1506,9 @@ export class Hopr extends EventEmitter {
 export { PEER_METADATA_PROTOCOL_VERSION } from './constants.js'
 export { createHoprNode } from './main.js'
 export {
-  Strategy,
-  StrategyFactory,
-  StrategyTickResult,
-  isStrategy,
-  SaneDefaults,
   findPath,
   PeerOrigin,
   PeerStatus,
   Health,
-  type ChannelStrategyInterface
 }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'

@@ -7,6 +7,7 @@ use core_network::network::{Network, NetworkExternalActions};
 use crate::config::StrategyConfig;
 use crate::strategy::SingularStrategy;
 
+#[allow(dead_code)]
 pub struct PassiveStrategy<Db, Net>
 where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
     db: Arc<RwLock<Db>>,

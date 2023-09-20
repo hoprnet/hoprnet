@@ -43,7 +43,7 @@ describe('PUT /settings/{setting}', () => {
     expect(res).to.satisfyApiSpec
     expect(res.body).to.deep.equal({ status: STATUS_CODES.INVALID_SETTING_VALUE })
 
-    const res2 = await request(service).put(`/api/v3/settings/${SettingKey.STRATEGY}`).send({ settingValue: 'abcd' })
+    const res2 = await request(service).put(`/api/v3/settings/${SettingKey.INCLUDE_RECIPIENT}`).send({ settingValue: 'abcd' })
     expect(res2.status).to.equal(400)
     expect(res2).to.satisfyApiSpec
     expect(res2.body).to.deep.equal({ status: STATUS_CODES.INVALID_SETTING_VALUE })

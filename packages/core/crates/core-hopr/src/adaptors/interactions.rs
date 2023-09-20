@@ -2,7 +2,6 @@ use futures::channel::mpsc::{channel, unbounded, Sender, UnboundedSender};
 use futures::future::poll_fn;
 
 use core_crypto::types::HalfKeyChallenge;
-use core_types::acknowledgement::AcknowledgedTicket;
 use utils_log::error;
 
 #[cfg(feature = "wasm")]
@@ -39,29 +38,16 @@ pub mod wasm {
     }
 
     /// Helper loop ensuring conversion and enqueueing of events on acknowledgement ticket
-    pub fn spawn_ack_tkt_receiver_loop(
-        on_ack_tkt: Option<js_sys::Function>,
-    ) -> Option<UnboundedSender<AcknowledgedTicket>> {
-        match on_ack_tkt {
-            Some(on_ack_tkt_fn) => {
-                let (tx, mut rx) = unbounded::<AcknowledgedTicket>();
+    /*pub fn spawn_ack_tkt_receiver_loop<F>(
+        on_ack_tkt: F
+    ) -> UnboundedSender<AcknowledgedTicket>
+    where F: Fn(&AcknowledgedTicket) -> Pin<Box<dyn Future<Output = ()>>> {
+        let (tx, mut rx) = unbounded::<AcknowledgedTicket>();
 
-                wasm_bindgen_futures::spawn_local(async move {
-                    while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                        if let Err(e) = on_ack_tkt_fn.call1(
-                            &JsValue::null(),
-                            &core_types::acknowledgement::wasm::AcknowledgedTicket::from(ack).into(),
-                        ) {
-                            error!("failed to call on_ack_ticket closure: {:?}", e.as_string());
-                        }
-                    }
-                });
+        wasm_bindgen_futures::spawn_local();
 
-                Some(tx)
-            }
-            None => None,
-        }
-    }
+        tx
+    }*/
 
     const ON_PACKET_QUEUE_SIZE: usize = 4096;
 
