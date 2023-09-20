@@ -434,12 +434,11 @@ export class Hopr extends EventEmitter {
    * @param channel object
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
-      try {
-        await this.tools.channel_events().send_event(channel)
-      }
-      catch (e) {
-        log(`failed to emit channel closure event`)
-      }
+    try {
+      await this.tools.channel_events().send_event(channel)
+    } catch (e) {
+      log(`failed to emit channel closure event`)
+    }
   }
 
   /**
@@ -1505,10 +1504,5 @@ export class Hopr extends EventEmitter {
 
 export { PEER_METADATA_PROTOCOL_VERSION } from './constants.js'
 export { createHoprNode } from './main.js'
-export {
-  findPath,
-  PeerOrigin,
-  PeerStatus,
-  Health,
-}
+export { findPath, PeerOrigin, PeerStatus, Health }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'

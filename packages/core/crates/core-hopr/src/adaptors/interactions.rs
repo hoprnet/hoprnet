@@ -37,18 +37,6 @@ pub mod wasm {
         }
     }
 
-    /// Helper loop ensuring conversion and enqueueing of events on acknowledgement ticket
-    /*pub fn spawn_ack_tkt_receiver_loop<F>(
-        on_ack_tkt: F
-    ) -> UnboundedSender<AcknowledgedTicket>
-    where F: Fn(&AcknowledgedTicket) -> Pin<Box<dyn Future<Output = ()>>> {
-        let (tx, mut rx) = unbounded::<AcknowledgedTicket>();
-
-        wasm_bindgen_futures::spawn_local();
-
-        tx
-    }*/
-
     const ON_PACKET_QUEUE_SIZE: usize = 4096;
 
     /// Helper loop ensuring conversion and enqueueing of events on receiving the final packet

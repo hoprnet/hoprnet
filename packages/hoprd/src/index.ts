@@ -129,7 +129,7 @@ async function main() {
   let state: State = {
     aliases: new Map(),
     settings: {
-      includeRecipient: false,
+      includeRecipient: false
       //strategy: 'passive',
       //autoRedeemTickets: true,
       //maxAutoChannels: undefined

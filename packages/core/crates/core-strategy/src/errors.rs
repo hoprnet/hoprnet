@@ -1,9 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum StrategyError {
-
-}
+pub enum StrategyError {}
 
 pub type Result<T> = std::result::Result<T, StrategyError>;
 

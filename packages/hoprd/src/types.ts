@@ -1,12 +1,12 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 
 export enum SettingKey {
-//  STRATEGY = 'strategy',
-  INCLUDE_RECIPIENT = 'includeRecipient',
+  //  STRATEGY = 'strategy',
+  INCLUDE_RECIPIENT = 'includeRecipient'
 
-//  MAX_AUTO_CHANNELS = 'maxAutoChannels',
+  //  MAX_AUTO_CHANNELS = 'maxAutoChannels',
 
-//  AUTO_REDEEM_TICKETS = 'autoRedeemTickets'
+  //  AUTO_REDEEM_TICKETS = 'autoRedeemTickets'
 }
 
 /**

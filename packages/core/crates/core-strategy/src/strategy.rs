@@ -1,9 +1,9 @@
-use std::fmt::{Display, Formatter};
+use crate::errors::Result;
 use async_trait::async_trait;
 use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::channels::{ChannelEntry};
+use core_types::channels::ChannelEntry;
+use std::fmt::{Display, Formatter};
 use utils_log::error;
-use crate::errors::Result;
 
 #[async_trait(? Send)]
 pub trait SingularStrategy: Display {
@@ -19,7 +19,7 @@ pub trait SingularStrategy: Display {
 }
 
 pub struct MultiStrategy {
-    strategies: Vec<Box<dyn SingularStrategy >>
+    strategies: Vec<Box<dyn SingularStrategy>>,
 }
 
 impl MultiStrategy {
@@ -36,7 +36,6 @@ impl Display for MultiStrategy {
 
 #[async_trait(? Send)]
 impl SingularStrategy for MultiStrategy {
-
     async fn on_tick(&self) -> Result<()> {
         for strat in self.strategies.iter() {
             if let Err(e) = strat.on_tick().await {
@@ -64,4 +63,3 @@ impl SingularStrategy for MultiStrategy {
         Ok(())
     }
 }
-
