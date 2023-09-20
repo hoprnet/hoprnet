@@ -12,7 +12,7 @@ use core_types::channels::{ChannelEntry, ChannelStatus};
 use core_types::channels::ChannelStatus::{Closed, Open, PendingToClose};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use utils_log::{error, warn};
+use utils_log::{error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
 /// Enumerates all possible outgoing transactions
@@ -136,7 +136,9 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
                                     // Still declare the TX a success
                                 }
                             }
-                            Failure(_) => {}
+                            Failure(_) => {
+                                // TODO: if we know that the transaction failed due to on-chain execution, mark the ticket as losing here!
+                            }
                             _ => panic!("invalid tx result from ticket redeem"),
                         }
                         res
@@ -187,6 +189,8 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
 
             if let Failure(err) = &tx_result {
                 error!("{} failed: {err}", req.0);
+            } else {
+                info!("transaction {} suceeded", req.0);
             }
 
             let _ = req.1.send(tx_result);
@@ -197,7 +201,7 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::transaction_queue::{TransactionExecutor, TransactionResult};
+    use crate::transaction_queue::{TransactionExecutor, TransactionResult, TransactionSender};
     use async_trait::async_trait;
     use core_crypto::types::Hash;
     use core_types::acknowledgement::AcknowledgedTicket;
@@ -210,6 +214,14 @@ pub mod wasm {
     use wasm_bindgen::prelude::wasm_bindgen;
     use wasm_bindgen::JsValue;
     use wasm_bindgen_futures::JsFuture;
+
+    #[wasm_bindgen]
+    impl TransactionSender {
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> TransactionSender {
+            self.clone()
+        }
+    }
 
     #[wasm_bindgen]
     pub struct WasmTxExecutor {
