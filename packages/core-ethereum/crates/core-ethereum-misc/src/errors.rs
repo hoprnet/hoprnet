@@ -24,6 +24,15 @@ pub enum CoreEthereumError {
     #[error("{0}")]
     InvalidState(String),
 
+    #[error("channel to the given destination already exists")]
+    ChannelAlreadyExists,
+
+    #[error("channel does not exist")]
+    ChannelDoesNotExist,
+
+    #[error("channel is already closed")]
+    ChannelAlreadyClosed,
+
     #[error("Invalid response to acknowledgement {0}")]
     InvalidResponseToAcknowledgement(String),
 

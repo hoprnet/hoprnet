@@ -8,7 +8,7 @@ use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
-use core_types::channels::ChannelStatus;
+use core_types::channels::{ChannelEntry, ChannelStatus};
 use core_types::channels::ChannelStatus::{Closed, Open, PendingToClose};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
@@ -25,10 +25,10 @@ pub enum Transaction {
     OpenChannel(Address, Balance),
 
     /// Fund channel with the given ID and amount
-    FundChannel(Hash, Balance),
+    FundChannel(ChannelEntry, Balance),
 
     /// Close channel with the given source and destination
-    CloseChannel(Address, Address),
+    CloseChannel(ChannelEntry),
 
     /// Withdraw given balance to the given address
     Withdraw(Address, Balance),
@@ -39,8 +39,8 @@ impl Display for Transaction {
         match self {
             Transaction::RedeemTicket(ack) => write!(f, "redeem tx of {ack}"),
             Transaction::OpenChannel(dst, amount) => write!(f, "open channel tx to {dst} with {amount}"),
-            Transaction::FundChannel(channel_id, amount) => write!(f, "fund channel tx for {channel_id} with {amount}"),
-            Transaction::CloseChannel(src, dst) => write!(f, "closure tx of channel from {src} to {dst}"),
+            Transaction::FundChannel(channel, amount) => write!(f, "fund channel tx for channel from {} to {} with {amount}", channel.source, channel.destination),
+            Transaction::CloseChannel(channel) => write!(f, "closure tx of channel from {} to {}", channel.source, channel.destination),
             Transaction::Withdraw(dst, amount) => write!(f, "withdraw tx of {amount} to {dst}"),
         }
     }
@@ -146,56 +146,39 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
 
                 Transaction::OpenChannel(address, stake) => self.tx_exec.open_channel(address, stake).await,
 
-                Transaction::FundChannel(channel_id, amount) => {
-                    let maybe_channel = self.db.read().await.get_channel(&channel_id).await.ok().flatten();
-                    if let Some(channel) = maybe_channel {
-                        if channel.status == Open {
-                            self.tx_exec.fund_channel(channel_id, amount).await
-                        } else {
-                            Failure(format!("cannot fund channel {channel_id} that is not opened"))
-                        }
+                Transaction::FundChannel(channel, amount) => {
+                    let channel_id = channel.get_id();
+                    if channel.status == Open {
+                        self.tx_exec.fund_channel(channel_id, amount).await
                     } else {
-                        Failure(format!("cannot obtain channel {channel_id} for funding"))
+                        Failure(format!("cannot fund channel {channel_id} that is not opened"))
                     }
                 }
 
-                Transaction::CloseChannel(source, destination) => {
-                    let maybe_channel = self
-                        .db
-                        .read()
-                        .await
-                        .get_channel_x(&source, &destination)
-                        .await
-                        .ok()
-                        .flatten();
+                Transaction::CloseChannel(channel) => {
+                    let channel_id = channel.get_id();
+                    match channel.status {
+                        Open => self.tx_exec.close_channel_initialize(channel.source, channel.destination).await,
 
-                    if let Some(channel) = maybe_channel {
-                        let channel_id = channel.get_id();
-                        match channel.status {
-                            Open => self.tx_exec.close_channel_initialize(source, destination).await,
-
-                            PendingToClose => {
-                                if channel.closure_time_passed().unwrap_or(false) {
-                                    self.tx_exec.close_channel_finalize(source, destination).await
-                                } else {
-                                    warn!("cannot close channel {channel_id} because closure time has not passed, remaining {} seconds", channel.remaining_closure_time().unwrap_or(u32::MAX as u64));
-                                    TransactionResult::CloseChannel {
-                                        tx_hash: Hash::default(),
-                                        status: PendingToClose,
-                                    }
-                                }
-                            }
-
-                            Closed => {
-                                warn!("channel {channel_id} is already closed");
+                        PendingToClose => {
+                            if channel.closure_time_passed().unwrap_or(false) {
+                                self.tx_exec.close_channel_finalize(channel.source, channel.destination).await
+                            } else {
+                                warn!("cannot close channel {channel_id} because closure time has not passed, remaining {} seconds", channel.remaining_closure_time().unwrap_or(u32::MAX as u64));
                                 TransactionResult::CloseChannel {
                                     tx_hash: Hash::default(),
-                                    status: Closed,
+                                    status: PendingToClose,
                                 }
                             }
                         }
-                    } else {
-                        Failure(format!("cannot find channel {source} -> {destination}"))
+
+                        Closed => {
+                            warn!("channel {channel_id} is already closed");
+                            TransactionResult::CloseChannel {
+                                tx_hash: Hash::default(),
+                                status: Closed,
+                            }
+                        }
                     }
                 }
 
