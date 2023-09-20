@@ -182,7 +182,7 @@ function setup_node() {
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
       --healthCheck \
-      --healthCheckHost "${host}" \
+      --healthCheckHost "0.0.0.0" \
       --healthCheckPort "${healthcheck_port}" \
       ${additional_args} \
       > "${log}" 2>&1 &
