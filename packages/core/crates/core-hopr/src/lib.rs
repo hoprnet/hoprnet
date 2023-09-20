@@ -40,7 +40,7 @@ use core_ethereum_actions::transaction_queue::{TransactionQueue, TransactionSend
 
 #[cfg(feature = "wasm")]
 use {
-    core_ethereum_db::db::wasm::Database, core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor,
+    core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_ethereum_db::db::wasm::Database,
     wasm_bindgen::prelude::wasm_bindgen,
 };
 

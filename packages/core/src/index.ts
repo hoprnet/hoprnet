@@ -1141,8 +1141,8 @@ export class Hopr extends EventEmitter {
     if (!this.isReady) {
       log('openChannel: Node is not ready for on-chain operations')
     }
-    let self_addr = this.getEthereumAddress();
-    let amount = new Balance(amountToFund.toString(10), BalanceType.HOPR);
+    let self_addr = this.getEthereumAddress()
+    let amount = new Balance(amountToFund.toString(10), BalanceType.HOPR)
     let tx_sender = this.tools.get_tx_sender()
     try {
       let res = await open_channel(this.db, counterparty, self_addr, amount, tx_sender)
@@ -1186,7 +1186,7 @@ export class Hopr extends EventEmitter {
     }
 
     try {
-      let self_addr = this.getEthereumAddress();
+      let self_addr = this.getEthereumAddress()
       let tx_sender = this.tools.get_tx_sender()
       let res = await close_channel(this.db, counterparty, self_addr, direction, tx_sender)
       return { receipt: res.tx_hash.to_hex(), status: res.status }

@@ -1,15 +1,15 @@
-use core_ethereum_misc::errors::CoreEthereumError::TransactionSubmissionFailed;
-use core_ethereum_misc::errors::Result;
 use crate::transaction_queue::TransactionResult::{Failure, RedeemTicket};
 use async_lock::RwLock;
 use async_std::channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_misc::errors::CoreEthereumError::TransactionSubmissionFailed;
+use core_ethereum_misc::errors::Result;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
-use core_types::channels::{ChannelEntry, ChannelStatus};
 use core_types::channels::ChannelStatus::{Closed, Open, PendingToClose};
+use core_types::channels::{ChannelEntry, ChannelStatus};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use utils_log::{error, info, warn};
@@ -39,8 +39,16 @@ impl Display for Transaction {
         match self {
             Transaction::RedeemTicket(ack) => write!(f, "redeem tx of {ack}"),
             Transaction::OpenChannel(dst, amount) => write!(f, "open channel tx to {dst} with {amount}"),
-            Transaction::FundChannel(channel, amount) => write!(f, "fund channel tx for channel from {} to {} with {amount}", channel.source, channel.destination),
-            Transaction::CloseChannel(channel) => write!(f, "closure tx of channel from {} to {}", channel.source, channel.destination),
+            Transaction::FundChannel(channel, amount) => write!(
+                f,
+                "fund channel tx for channel from {} to {} with {amount}",
+                channel.source, channel.destination
+            ),
+            Transaction::CloseChannel(channel) => write!(
+                f,
+                "closure tx of channel from {} to {}",
+                channel.source, channel.destination
+            ),
             Transaction::Withdraw(dst, amount) => write!(f, "withdraw tx of {amount} to {dst}"),
         }
     }
@@ -160,11 +168,17 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
                 Transaction::CloseChannel(channel) => {
                     let channel_id = channel.get_id();
                     match channel.status {
-                        Open => self.tx_exec.close_channel_initialize(channel.source, channel.destination).await,
+                        Open => {
+                            self.tx_exec
+                                .close_channel_initialize(channel.source, channel.destination)
+                                .await
+                        }
 
                         PendingToClose => {
                             if channel.closure_time_passed().unwrap_or(false) {
-                                self.tx_exec.close_channel_finalize(channel.source, channel.destination).await
+                                self.tx_exec
+                                    .close_channel_finalize(channel.source, channel.destination)
+                                    .await
                             } else {
                                 warn!("cannot close channel {channel_id} because closure time has not passed, remaining {} seconds", channel.remaining_closure_time().unwrap_or(u32::MAX as u64));
                                 TransactionResult::CloseChannel {
