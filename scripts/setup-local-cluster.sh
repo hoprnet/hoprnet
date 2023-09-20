@@ -119,6 +119,7 @@ function cleanup {
 
   log "Removing cluster env file"
   rm -f "${env_file}"
+  rm -f "${tmp_dir}/cluster.status"
 
   exit $EXIT_CODE
 }
@@ -393,6 +394,7 @@ else
   log "Run: 'source ${env_file}' in your shell to setup environment variables for this cluster (HOPR_NODE_1_ADDR, HOPR_NODE_1_HTTP_URL,... etc.)"
 fi
 
+echo "running" > "${tmp_dir}/cluster.status"
 log "Terminating this script will clean up the running local cluster"
 trap - SIGINT SIGTERM ERR
 wait
