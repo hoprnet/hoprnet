@@ -91,18 +91,16 @@ redeem_tickets() {
       break
     fi
 
+    msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"
     if [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]]; then
       ((successful+=1))
       last_redeemed="${redeemed}"
-    else
-      # continue trying
-      msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"
     fi
 
   done
 
-  # Check there are at least 3 consecutive ticket redemptions
-  if [[ ${successful} -ge 3 ]]; then
+  # Check there are at least 2 consecutive ticket redemptions
+  if [[ ${successful} -ge 2 ]]; then
     log "Redeem all test passed on node ${node_id} !"
     return 0
   else

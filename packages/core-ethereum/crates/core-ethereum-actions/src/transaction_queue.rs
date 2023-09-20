@@ -136,7 +136,12 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         TransactionSender(self.queue_send.clone())
     }
 
-    async fn execute_transaction(db: Arc<RwLock<Db>>, tx_exec: Arc<Box<dyn TransactionExecutor>>, tx: Transaction, tx_finisher: TransactionFinisher) {
+    async fn execute_transaction(
+        db: Arc<RwLock<Db>>,
+        tx_exec: Arc<Box<dyn TransactionExecutor>>,
+        tx: Transaction,
+        tx_finisher: TransactionFinisher,
+    ) {
         let tx_id = tx.to_string();
 
         let tx_result = match tx {
@@ -224,9 +229,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             let db_clone = self.db.clone();
             let tx_exec_clone = self.tx_exec.clone();
 
-            spawn_local(async move {
-                Self::execute_transaction(db_clone, tx_exec_clone, tx, tx_finisher).await
-            });
+            spawn_local(async move { Self::execute_transaction(db_clone, tx_exec_clone, tx, tx_finisher).await });
         }
         warn!("transaction queue has finished");
     }
