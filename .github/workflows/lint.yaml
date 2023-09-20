@@ -11,9 +11,6 @@ on:
     types:
       - synchronize
       - ready_for_review
-    paths-ignore:
-      - 'docs/**/*'
-      - '**/*.md'
 concurrency:
   group: ${{ github.head_ref }}-lint
   cancel-in-progress: true
