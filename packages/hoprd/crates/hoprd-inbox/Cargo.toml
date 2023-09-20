@@ -16,7 +16,7 @@ async-lock = "2.7.0"
 async-trait = "0.1"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 gloo-timers = { workspace = true, optional = true }
-hex = "0.4.3"
+hex = { workspace = true }
 ringbuffer = "0.15.0"
 serde_with = { workspace = true }
 validator = { workspace = true }
@@ -26,9 +26,9 @@ serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
-core-types = { path = "../../../core/crates/core-types", default-features = false }
-utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
-utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
+core-types = { workspace = true, default-features = false }
+utils-log = { workspace = true, default-features = false }
+utils-misc = { workspace = true, default-features = false }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
