@@ -531,7 +531,7 @@ pub mod wasm {
         self_addr: &Address,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
-        super::redeem_all_tickets(db.as_ref_counted().clone(), self_addr, on_chain_tx_sender.clone()).await?;
+        super::redeem_all_tickets(db.as_ref_counted(), self_addr, on_chain_tx_sender.clone()).await?;
         Ok(())
     }
 
@@ -551,7 +551,7 @@ pub mod wasm {
         channel: &ChannelEntry,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
-        super::redeem_tickets_in_channel(db.as_ref_counted().clone(), channel, on_chain_tx_sender.clone()).await?;
+        super::redeem_tickets_in_channel(db.as_ref_counted(), channel, on_chain_tx_sender.clone()).await?;
         Ok(())
     }
 
@@ -562,7 +562,7 @@ pub mod wasm {
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
         let _ = super::redeem_ticket(
-            db.as_ref_counted().clone(),
+            db.as_ref_counted(),
             ack_ticket.into(),
             on_chain_tx_sender.clone(),
         )

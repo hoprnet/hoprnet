@@ -63,10 +63,12 @@ impl Display for ChannelStatus {
     }
 }
 
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelDirection {
-    Incoming,
-    Outgoing,
+    Incoming = 0,
+    Outgoing = 1,
 }
 
 /// Overall description of a channel

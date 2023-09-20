@@ -80,3 +80,83 @@ pub async fn withdraw(tx_sender: TransactionSender, recipient: Address, amount: 
     tx_sender.send(Transaction::Withdraw(recipient, amount)).await
 }
 
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use wasm_bindgen::JsValue;
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use core_crypto::types::Hash;
+    use core_ethereum_db::db::wasm::Database;
+    use core_types::channels::{ChannelDirection, ChannelStatus};
+    use utils_misc::utils::wasm::JsResult;
+    use utils_types::primitives::{Address, Balance};
+    use crate::transaction_queue::{TransactionResult, TransactionSender};
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct OpenChannelResult {
+        pub tx_hash: Hash,
+        pub channel_id: Hash
+    }
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub struct CloseChannelResult {
+        pub tx_hash: Hash,
+        pub status: ChannelStatus
+    }
+
+    #[wasm_bindgen]
+    pub async fn open_channel(
+        db: &Database,
+        destination: &Address,
+        self_addr: &Address,
+        amount: &Balance,
+        on_chain_tx_sender: &TransactionSender,
+    ) -> JsResult<OpenChannelResult> {
+        let awaiter = super::open_channel(db.as_ref_counted(), on_chain_tx_sender.clone(), *destination, *self_addr, *amount).await?;
+        match awaiter.await.map_err(|_| JsValue::from("transaction has been cancelled".to_string()))? {
+            TransactionResult::OpenChannel { tx_hash, channel_id } => Ok(OpenChannelResult { tx_hash, channel_id }),
+            _ => Err(JsValue::from("open channel transaction failed".to_string()))
+        }
+    }
+
+    #[wasm_bindgen]
+    pub async fn fund_channel(
+        db: &Database,
+        channel_id: &Hash,
+        amount: &Balance,
+        on_chain_tx_sender: &TransactionSender,
+    ) -> JsResult<Hash> {
+        let awaiter = super::fund_channel(db.as_ref_counted(), on_chain_tx_sender.clone(), *channel_id, *amount).await?;
+        match awaiter.await.map_err(|_| JsValue::from("transaction has been cancelled".to_string()))? {
+            TransactionResult::FundChannel { tx_hash } => Ok(tx_hash),
+            _ => Err(JsValue::from("fund channel transaction failed".to_string()))
+        }
+    }
+
+    #[wasm_bindgen]
+    pub async fn close_channel(
+        db: &Database,
+        counterparty: &Address,
+        self_addr: &Address,
+        direction: ChannelDirection,
+        on_chain_tx_sender: &TransactionSender,
+    ) -> JsResult<CloseChannelResult> {
+        let awaiter = super::close_channel(db.as_ref_counted(), on_chain_tx_sender.clone(), *counterparty, *self_addr, direction).await?;
+        match awaiter.await.map_err(|_| JsValue::from("transaction has been cancelled".to_string()))? {
+            TransactionResult::CloseChannel { tx_hash, status } => Ok(CloseChannelResult { tx_hash, status }),
+            _ => Err(JsValue::from("close channel transaction failed".to_string()))
+        }
+    }
+
+    #[wasm_bindgen]
+    pub async fn withdraw(
+        recipient: &Address,
+        amount: &Balance,
+        on_chain_tx_sender: &TransactionSender,
+    ) -> JsResult<Hash> {
+        let awaiter = super::withdraw(on_chain_tx_sender.clone(), *recipient, *amount).await?;
+        match awaiter.await.map_err(|_| JsValue::from("transaction has been cancelled".to_string()))? {
+            TransactionResult::Withdraw { tx_hash } => Ok(tx_hash),
+            _ => Err(JsValue::from("withdraw transaction failed".to_string()))
+        }
+    }
+}
