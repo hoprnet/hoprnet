@@ -15,9 +15,6 @@ on:
     types:
       - synchronize
       - ready_for_review
-    paths-ignore:
-      - '.processes/**/*'
-      - 'docs/**/*'
 concurrency:
   group: ${{ github.head_ref }}-test
   cancel-in-progress: true

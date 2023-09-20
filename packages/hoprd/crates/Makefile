@@ -23,7 +23,7 @@ ifneq ($(PACKAGES),)
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) ../lib/
 
-	WASM_EXT_SUFFIX=$$(find ../lib/ -type f -exec grep -oP 'libp2p-wasm-ext-\K\w+' {} \; | uniq); \
+	WASM_EXT_SUFFIX=$$(find ../lib/ -type f -exec grep -oe 'libp2p-wasm-ext-.*' {} \; | uniq); \
 	mkdir -p ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
 	install ../../../vendor/cargo/libp2p-wasm-ext*/src/*.js ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
 	echo "{}" >| ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/package.json
@@ -36,7 +36,7 @@ ifneq ($(PACKAGES),)
 	install hoprd-hoprd/pkg/*.ts ../lib/
 	install hoprd-hoprd/pkg/*.wasm ../lib/
 
-	WASM_EXT_SUFFIX=$$(find ./hoprd-hoprd/pkg/snippets -type d | grep -oP '.+libp2p-wasm-ext-\K[a-f0-9]+$$' | uniq); \
+	WASM_EXT_SUFFIX=$$(find ./hoprd-hoprd/pkg/snippets -type d | grep -oe  '.*libp2p-wasm-ext-.*[0-9]\+$$' | sed 's/.*ext-//' | uniq); \
 	mkdir -p ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
 	install ./hoprd-hoprd/pkg/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/*.js ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
 	echo "{}" >| ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/package.json
