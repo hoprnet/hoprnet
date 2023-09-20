@@ -204,9 +204,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
-  async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+  async withdraw(recipient: string, amount: Balance): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
-    return this.chain.withdraw(currency, recipient, amount, (tx: string) =>
+    let currency: 'NATIVE' | 'HOPR' = amount.balance_type() == BalanceType.Native ? 'NATIVE' : 'HOPR'
+
+    return this.chain.withdraw(currency, recipient, amount.amount().to_string(), (tx: string) =>
       this.setTxHandler(currency === 'NATIVE' ? `withdraw-native-${tx}` : `withdraw-hopr-${tx}`, tx)
     )
   }
@@ -330,7 +332,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     )
   }
 
-  public async openChannel(dest: Address, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {
+  public async openChannel(dest: Address, amount: Balance): Promise<{ channel_id: string; receipt: string }> {
     if (this.chainKeypair.to_address().eq(dest)) {
       throw Error('Cannot open channel to self!')
     }
@@ -349,7 +351,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
     log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
     const receipt = await this.fundChannel(dest, amount)
-    return { channelId: generate_channel_id(this.chainKeypair.to_address(), dest), receipt }
+    return { channel_id: generate_channel_id(this.chainKeypair.to_address(), dest).to_hex(), receipt }
   }
 
   // This operation works on open and closed channels. More assertions must be

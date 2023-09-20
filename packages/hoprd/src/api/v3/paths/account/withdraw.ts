@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import type { Hopr } from '@hoprnet/hopr-core'
-import { Address } from '@hoprnet/hopr-utils'
+import { Address, Balance, BalanceType } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
 /**
@@ -28,8 +28,10 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
     throw Error(STATUS_CODES.NOT_ENOUGH_BALANCE)
   }
 
+  let to_withdraw = new Balance(amount, currencyUpperCase === 'NATIVE' ? BalanceType.Native : BalanceType.HOPR)
+
   // TODO: withdraw hopr broken, its working but only resolves after transaction have been mined.
-  const txHash = await node.withdraw(currencyUpperCase, recipient, amount)
+  const txHash = await node.withdraw(recipient, to_withdraw)
   return txHash
 }
 

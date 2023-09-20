@@ -1,11 +1,12 @@
 import {
-  debug,
-  Hash,
   channel_status_to_string,
-  stringToU8a,
+  ChannelDirection,
   ChannelStatus,
+  debug,
   defer,
-  type DeferType
+  type DeferType,
+  Hash,
+  stringToU8a
 } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
@@ -49,14 +50,14 @@ export async function closeChannel(
   }
 
   // incoming if destination is me, outgoing if source is me
-  let direction
+  let direction: ChannelDirection
   let counterpartyAddress
 
   if (channel.source.to_string() == node.getEthereumAddress().to_string()) {
-    direction = 'outgoing'
+    direction = ChannelDirection.Outgoing
     counterpartyAddress = channel.destination
   } else if (channel.destination.to_string() == node.getEthereumAddress().to_string()) {
-    direction = 'incoming'
+    direction = ChannelDirection.Incoming
     counterpartyAddress = channel.source
   } else {
     return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }

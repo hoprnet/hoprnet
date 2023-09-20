@@ -31,6 +31,10 @@ export {
   ChannelStatus,
   channel_status_to_number,
   channel_status_to_string,
+  close_channel,
+  ChannelDirection,
+  OpenChannelResult,
+  CloseChannelResult,
   CoreEthereumConstants,
   CORE_ETHEREUM_CONSTANTS,
   core_mixer_gather_metrics,
@@ -50,6 +54,7 @@ export {
   derive_mac_key,
   derive_packet_tag,
   EthereumChallenge,
+  fund_channel,
   gather_all_metrics,
   generate_channel_id,
   get_package_version,
@@ -77,6 +82,7 @@ export {
   OffchainKeypair,
   OffchainPublicKey,
   OffchainSignature,
+  open_channel,
   PacketInteractionConfig,
   PassiveStrategy,
   Path,
@@ -114,5 +120,6 @@ export {
   WasmPing,
   WasmIndexerInteractions,
   PingConfig,
-  WasmTxExecutor
+  WasmTxExecutor,
+  withdraw
 } from '../../hoprd/lib/hoprd_hoprd.js'

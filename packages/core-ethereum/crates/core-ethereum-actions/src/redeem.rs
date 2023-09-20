@@ -531,6 +531,7 @@ pub mod wasm {
         self_addr: &Address,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
+        // We do not await the on-chain confirmation
         super::redeem_all_tickets(db.as_ref_counted(), self_addr, on_chain_tx_sender.clone()).await?;
         Ok(())
     }
@@ -541,6 +542,7 @@ pub mod wasm {
         counterparty: &Address,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
+        // We do not await the on-chain confirmation
         super::redeem_tickets_with_counterparty(db.as_ref_counted(), counterparty, on_chain_tx_sender.clone()).await?;
         Ok(())
     }
@@ -551,6 +553,7 @@ pub mod wasm {
         channel: &ChannelEntry,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
+        // We do not await the on-chain confirmation
         super::redeem_tickets_in_channel(db.as_ref_counted(), channel, on_chain_tx_sender.clone()).await?;
         Ok(())
     }
@@ -561,6 +564,7 @@ pub mod wasm {
         ack_ticket: &AcknowledgedTicket,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
+        // We do not await the on-chain confirmation
         let _ = super::redeem_ticket(
             db.as_ref_counted(),
             ack_ticket.into(),
