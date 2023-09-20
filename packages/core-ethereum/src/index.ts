@@ -169,11 +169,6 @@ export default class HoprCoreEthereum extends EventEmitter {
       try {
         await this.chain.waitUntilReady()
 
-        // update token balance
-        //const hoprBalance = await this.chain.getBalance(this.chainKeypair.to_address())
-        //await this.db.set_hopr_balance(hoprBalance)
-        //log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
-
         // indexer starts
         await this.indexer.start(this.chain, this.chain.getGenesisBlock(), this.safeModuleOptions.safeAddress)
 

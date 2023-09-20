@@ -842,43 +842,6 @@ export async function createChainWrapper(
   }
 
   /**
-   * Gets the token balance of a specific account
-   * @param accountAddress account to query for
-   * @param blockNumber block number at which the query performs
-   * @returns a Promise that resolves with the token balance
-   */
-  const getBalanceAtBlock = async (accountAddress: Address, blockNumber: number): Promise<Balance> => {
-    const RETRIES = 3
-    let rawBalance: BigNumber
-    for (let i = 0; i < RETRIES; i++) {
-      try {
-        rawBalance = await token.balanceOf(accountAddress.to_hex(), { blockTag: blockNumber })
-      } catch (err) {
-        if (i + 1 < RETRIES) {
-          await setImmediatePromise()
-          continue
-        }
-
-        log(
-          ` ${
-            token.address
-          } balance for account ${accountAddress.to_hex()} at block ${blockNumber} using the provider, due to error ${err}`
-        )
-        // generic error but here is good enough to handle the case where code hasn't been deployed at the block
-        const isHandledErr = [err?.code, String(err)].includes(errors.CALL_EXCEPTION)
-        if (isHandledErr) {
-          log('Cannot get token balance at block %d, due to call exception: %s', blockNumber, err)
-          return new Balance('0', BalanceType.HOPR)
-        } else {
-          throw Error(`Could not determine on-chain token balance`)
-        }
-      }
-    }
-
-    return new Balance(rawBalance.toString(), BalanceType.HOPR)
-  }
-
-  /**
    * Gets the native balance of a specific account
    * @param accountAddress account to query for
    * @returns a Promise that resolves with the native balance of the account
@@ -901,48 +864,6 @@ export async function createChainWrapper(
     }
 
     return new Balance(rawNativeBalance.toString(), BalanceType.Native)
-  }
-
-  /**
-   * Get the token allowance granted to the HoprChannels contract address by the caller
-   * @param ownerAddress token owner address
-   * @param ownerAddress token owner address
-   */
-  const getTokenAllowanceGrantedToChannelsAt = async (
-    ownerAddress: Address,
-    blockNumber?: number
-  ): Promise<Balance> => {
-    const RETRIES = 3
-    let rawAllowance: BigNumber
-    for (let i = 0; i < RETRIES; i++) {
-      try {
-        rawAllowance = await token.allowance(ownerAddress.to_hex(), channels.address, {
-          blockTag: blockNumber ?? 'latest'
-        })
-      } catch (err) {
-        if (i + 1 < RETRIES) {
-          await setImmediatePromise()
-          continue
-        }
-        log(
-          `Could not determine current on-chain token ${
-            token.address
-          } allowance for owner ${ownerAddress.to_hex()} granted to spender ${
-            channels.address
-          } at block ${blockNumber} using the provider.`
-        )
-        // generic error but here is good enough to handle the case where code hasn't been deployed at the block
-        const isHandledErr = [err?.code, String(err)].includes(errors.CALL_EXCEPTION)
-        if (isHandledErr) {
-          log('Cannot get token allowance at block %d, due to call exception: %s', blockNumber, err)
-          return new Balance('0', BalanceType.HOPR)
-        } else {
-          throw Error(`Could not determine on-chain token allowance`)
-        }
-      }
-    }
-
-    return new Balance(rawAllowance.toString(), BalanceType.HOPR)
   }
 
   /*
@@ -1021,9 +942,7 @@ export async function createChainWrapper(
 
   return {
     getBalance,
-    getBalanceAtBlock,
     getNativeBalance,
-    getTokenAllowanceGrantedToChannelsAt,
     getTransactionsInBlock,
     getTimestamp,
     getNodeManagementModuleTargetInfo,
