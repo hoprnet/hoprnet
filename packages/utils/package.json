@@ -30,8 +30,7 @@
     "@multiformats/multiaddr": "10.3.3",
     "bn.js": "5.2.1",
     "debug": "4.3.4",
-    "ethers": "5.7.2",
-    "multiformats": "9.6.5"
+    "ethers": "5.7.2"
   },
   "devDependencies": {
     "@types/chai": "4.3.5",
