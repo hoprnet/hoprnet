@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::sync::{Arc};
 use async_std::sync::RwLock;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -20,11 +21,11 @@ where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
     }
 }
 
-impl<Db, Net> SingularStrategy for PassiveStrategy<Db, Net>
-where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
-
-    fn name(&self) -> String {
-        "Passive".into()
+impl<Db, Net> Display for PassiveStrategy<Db, Net> where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "passive")
     }
-
 }
+
+impl<Db, Net> SingularStrategy for PassiveStrategy<Db, Net>
+where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions { }

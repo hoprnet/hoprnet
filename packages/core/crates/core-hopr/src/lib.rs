@@ -175,7 +175,7 @@ pub fn build_components(
 
     let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
 
-    let mut strategies = Vec::new();
+    let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
     for cfg in strategies_cfgs {
         match cfg.name.as_str() {
             "passive" => {

@@ -7,9 +7,6 @@ pub mod wasm {
     // Temporarily re-export crates
 
     #[allow(unused_imports)]
-    use core_strategy::passive::wasm::*;
-
-    #[allow(unused_imports)]
     use core_strategy::promiscuous::wasm::*;
 
     #[allow(unused_imports)]

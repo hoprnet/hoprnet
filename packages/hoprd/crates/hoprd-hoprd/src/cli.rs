@@ -213,7 +213,7 @@ pub struct CliArgs {
         help = "Default channel strategy to use after node starts up",
         env = "HOPRD_DEFAULT_STRATEGY",
         value_name = "DEFAULT_STRATEGY",
-        value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME ])
+        value_parser = PossibleValuesParser::new(["promiscuous", "passive" ])
     )]
     pub default_strategy: Option<String>,
 
