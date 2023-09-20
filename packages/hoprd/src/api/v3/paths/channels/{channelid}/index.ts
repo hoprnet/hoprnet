@@ -9,7 +9,7 @@ import {
 } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
-import { ChannelTopologyInfo, formatChannelTopologyInfo } from '../index.js'
+import { formatChannelTopologyInfo } from '../index.js'
 
 import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
