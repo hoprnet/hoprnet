@@ -93,12 +93,12 @@ redeem_tickets() {
 
     if [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]]; then
       ((successful+=1))
+      last_redeemed="${redeemed}"
     else
       # continue trying
       msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"
     fi
 
-    last_redeemed="${redeemed}"
   done
 
   # Check there are at least 3 consecutive ticket redemptions
