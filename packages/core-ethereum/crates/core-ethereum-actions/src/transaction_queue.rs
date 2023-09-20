@@ -136,90 +136,96 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         TransactionSender(self.queue_send.clone())
     }
 
+    async fn execute_transaction(db: Arc<RwLock<Db>>, tx_exec: Arc<Box<dyn TransactionExecutor>>, tx: Transaction, tx_finisher: TransactionFinisher) {
+        let tx_id = tx.to_string();
+
+        let tx_result = match tx {
+            Transaction::RedeemTicket(ack) => match ack.status {
+                BeingRedeemed { .. } => {
+                    let res = tx_exec.redeem_ticket(ack.clone()).await;
+                    match res {
+                        RedeemTicket { .. } => {
+                            if let Err(e) = db.write().await.mark_redeemed(&ack).await {
+                                error!("failed to mark {ack} as redeemed: {e}");
+                                // Still declare the TX a success
+                            }
+                        }
+                        Failure(_) => {
+                            // TODO: if we know that the transaction failed due to on-chain execution, mark the ticket as losing here!
+                        }
+                        _ => panic!("invalid tx result from ticket redeem"),
+                    }
+                    res
+                }
+                _ => Failure(format!("invalid state of {ack}")),
+            },
+
+            Transaction::OpenChannel(address, stake) => tx_exec.open_channel(address, stake).await,
+
+            Transaction::FundChannel(channel, amount) => {
+                let channel_id = channel.get_id();
+                if channel.status == Open {
+                    tx_exec.fund_channel(channel_id, amount).await
+                } else {
+                    Failure(format!("cannot fund channel {channel_id} that is not opened"))
+                }
+            }
+
+            Transaction::CloseChannel(channel) => {
+                let channel_id = channel.get_id();
+                match channel.status {
+                    Open => {
+                        debug!("initiating closure of {channel}");
+                        tx_exec
+                            .close_channel_initialize(channel.source, channel.destination)
+                            .await
+                    }
+
+                    PendingToClose => {
+                        if channel.closure_time_passed().unwrap_or(false) {
+                            debug!("finalizing closure of {channel}");
+                            tx_exec
+                                .close_channel_finalize(channel.source, channel.destination)
+                                .await
+                        } else {
+                            warn!("cannot close channel {channel_id} because closure time has not passed, remaining {} seconds", channel.remaining_closure_time().unwrap_or(u32::MAX as u64));
+                            TransactionResult::CloseChannel {
+                                tx_hash: Hash::default(),
+                                status: PendingToClose,
+                            }
+                        }
+                    }
+
+                    Closed => {
+                        warn!("channel {channel_id} is already closed");
+                        TransactionResult::CloseChannel {
+                            tx_hash: Hash::default(),
+                            status: Closed,
+                        }
+                    }
+                }
+            }
+
+            Transaction::Withdraw(recipient, amount) => tx_exec.withdraw(recipient, amount).await,
+        };
+
+        if let Failure(err) = &tx_result {
+            error!("{tx_id} failed: {err}");
+        } else {
+            info!("transaction {tx_id} succeeded");
+        }
+
+        let _ = tx_finisher.send(tx_result);
+    }
+
     /// Runs the main queue processing loop until the queue is closed.
     pub async fn transaction_loop(self) {
-        while let Ok(req) = self.queue_recv.recv().await {
+        while let Ok((tx, tx_finisher)) = self.queue_recv.recv().await {
             let db_clone = self.db.clone();
             let tx_exec_clone = self.tx_exec.clone();
 
             spawn_local(async move {
-                let tx_result = match req.0.clone() {
-                    Transaction::RedeemTicket(ack) => match ack.status {
-                        BeingRedeemed { .. } => {
-                            let res = tx_exec_clone.redeem_ticket(ack.clone()).await;
-                            match res {
-                                RedeemTicket { .. } => {
-                                    if let Err(e) = db_clone.write().await.mark_redeemed(&ack).await {
-                                        error!("failed to mark {ack} as redeemed: {e}");
-                                        // Still declare the TX a success
-                                    }
-                                }
-                                Failure(_) => {
-                                    // TODO: if we know that the transaction failed due to on-chain execution, mark the ticket as losing here!
-                                }
-                                _ => panic!("invalid tx result from ticket redeem"),
-                            }
-                            res
-                        }
-                        _ => Failure(format!("invalid state of {ack}")),
-                    },
-
-                    Transaction::OpenChannel(address, stake) => tx_exec_clone.open_channel(address, stake).await,
-
-                    Transaction::FundChannel(channel, amount) => {
-                        let channel_id = channel.get_id();
-                        if channel.status == Open {
-                            tx_exec_clone.fund_channel(channel_id, amount).await
-                        } else {
-                            Failure(format!("cannot fund channel {channel_id} that is not opened"))
-                        }
-                    }
-
-                    Transaction::CloseChannel(channel) => {
-                        let channel_id = channel.get_id();
-                        match channel.status {
-                            Open => {
-                                debug!("initiating closure of {channel}");
-                                tx_exec_clone
-                                    .close_channel_initialize(channel.source, channel.destination)
-                                    .await
-                            }
-
-                            PendingToClose => {
-                                if channel.closure_time_passed().unwrap_or(false) {
-                                    debug!("finalizing closure of {channel}");
-                                    tx_exec_clone
-                                        .close_channel_finalize(channel.source, channel.destination)
-                                        .await
-                                } else {
-                                    warn!("cannot close channel {channel_id} because closure time has not passed, remaining {} seconds", channel.remaining_closure_time().unwrap_or(u32::MAX as u64));
-                                    TransactionResult::CloseChannel {
-                                        tx_hash: Hash::default(),
-                                        status: PendingToClose,
-                                    }
-                                }
-                            }
-
-                            Closed => {
-                                warn!("channel {channel_id} is already closed");
-                                TransactionResult::CloseChannel {
-                                    tx_hash: Hash::default(),
-                                    status: Closed,
-                                }
-                            }
-                        }
-                    }
-
-                    Transaction::Withdraw(recipient, amount) => tx_exec_clone.withdraw(recipient, amount).await,
-                };
-
-                if let Failure(err) = &tx_result {
-                    error!("{} failed: {err}", req.0);
-                } else {
-                    info!("transaction {} suceeded", req.0);
-                }
-
-                let _ = req.1.send(tx_result);
+                Self::execute_transaction(db_clone, tx_exec_clone, tx, tx_finisher).await
             });
         }
         warn!("transaction queue has finished");
