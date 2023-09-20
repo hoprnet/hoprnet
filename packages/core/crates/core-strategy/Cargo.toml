@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-trait = "0.1"
 getrandom = { workspace = true }
 js-sys = { workspace = true, optional = true }
 rand = "0.8.5"
@@ -20,6 +21,8 @@ serde-wasm-bindgen = { workspace = true, optional = true }
 simple_moving_average = "0.1.2"
 validator = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true}
+thiserror = "1.0"
 
 core-types = { path = "../core-types", default-features = false }
 utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
@@ -44,5 +47,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "getrandom/js", "core-types/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen", "getrandom/js", "core-types/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

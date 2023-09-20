@@ -1425,6 +1425,7 @@ dependencies = [
 name = "core-strategy"
 version = "0.3.1"
 dependencies = [
+ "async-trait",
  "console_error_panic_hook",
  "core-types",
  "getrandom 0.2.10",
@@ -1433,12 +1434,14 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "simple_moving_average",
+ "thiserror",
  "utils-log",
  "utils-misc",
  "utils-types",
  "validator",
  "vector_assertions",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-opt",
  "wasm-pack",
 ]
