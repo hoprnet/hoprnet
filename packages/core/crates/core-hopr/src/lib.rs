@@ -43,6 +43,9 @@ use {
     core_ethereum_db::db::wasm::Database, core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor,
     wasm_bindgen::prelude::wasm_bindgen,
 };
+use core_strategy::config::StrategyConfig;
+use core_strategy::passive::PassiveStrategy;
+use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -157,11 +160,9 @@ pub fn build_components(
     heartbeat_proto_cfg: HeartbeatProtocolConfig,
     msg_proto_cfg: MsgProtocolConfig,
     ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
+    strategies_cfgs: Vec<StrategyConfig>
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     let identity = me;
-
-    let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
-    let on_ack_tkt_tx = adaptors::interactions::wasm::spawn_ack_tkt_receiver_loop(on_acknowledged_ticket);
 
     let (network_events_tx, network_events_rx) =
         futures::channel::mpsc::channel::<NetworkEvent>(MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
@@ -171,6 +172,25 @@ pub fn build_components(
         network_cfg,
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
     )));
+
+    let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
+
+    let mut strategies = Vec::new();
+    for cfg in strategies_cfgs {
+        match cfg.name.as_str() {
+            "passive" => {
+                strategies.push(Box::new(PassiveStrategy::new(cfg, db.clone(), network.clone(), tx_queue.new_sender())))
+            },
+            _ => error!("unknown strategy {}, skipping", cfg.name)
+        }
+    }
+
+    let multi_strategy = Arc::new(MultiStrategy::new(strategies));
+
+    let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
+
+    // TODO: modify the ack_tkt_receiver to call on_ack_ticket in the multi_strategy object
+    let on_ack_tkt_tx = adaptors::interactions::wasm::spawn_ack_tkt_receiver_loop(on_acknowledged_ticket);
 
     let ack_actions = AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, on_ack_tkt_tx);
 
@@ -204,7 +224,6 @@ pub fn build_components(
     let indexer_updater =
         adaptors::indexer::WasmIndexerInteractions::new(db.clone(), network.clone(), indexer_update_tx);
 
-    let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
     let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
     let hopr_tools = HoprTools::new(
@@ -225,6 +244,7 @@ pub fn build_components(
     let ping_network_clone = network.clone();
     let swarm_network_clone = network.clone();
     let tbf_clone = tbf.clone();
+    let multistrategy_clone = multi_strategy.clone();
 
     let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
         Box::pin(async move {
@@ -266,6 +286,16 @@ pub fn build_components(
         ),
         Box::pin(async move {
             UniversalTimer::new(Duration::from_secs(60))
+                .timer_loop(|| async {
+                    info!("doing strategy tick");
+                    let _ = multistrategy_clone.on_tick().await;
+                    info!("strategy tick done");
+                })
+                .map(|_| HoprLoopComponents::Timer)
+                .await
+        }),
+        Box::pin(async move {
+            UniversalTimer::new(Duration::from_secs(90))
                 .timer_loop(|| async {
                     let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
                     if let Err(_) = save_tbf.call1(
@@ -380,6 +410,7 @@ pub mod wasm_impl {
             heartbeat_proto_cfg: HeartbeatProtocolConfig,
             msg_proto_cfg: MsgProtocolConfig,
             ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
+            multi_strategy_cfgs: JsValue,
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
@@ -407,6 +438,7 @@ pub mod wasm_impl {
                 heartbeat_proto_cfg,
                 msg_proto_cfg,
                 ticket_aggregation_proto_cfg,
+                serde_wasm_bindgen::from_value(multi_strategy_cfgs).expect("strategy cfg cannot be deserialized")
             );
 
             Self {
