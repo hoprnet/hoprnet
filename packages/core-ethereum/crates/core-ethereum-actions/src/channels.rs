@@ -8,7 +8,7 @@ use core_ethereum_misc::errors::CoreEthereumError::{
 use core_ethereum_misc::errors::Result;
 use core_types::channels::{ChannelDirection, ChannelStatus};
 use std::sync::Arc;
-use utils_log::{error, info};
+use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 pub async fn open_channel<Db>(
@@ -21,12 +21,25 @@ pub async fn open_channel<Db>(
 where
     Db: HoprCoreEthereumDbActions,
 {
+    if self_addr == destination {
+        return Err(InvalidArguments("cannot open channel to self".into()));
+    }
+
     if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
         return Err(InvalidArguments("invalid balance or balance type given".into()));
     }
 
+    let allowance = db.read().await.get_staking_safe_allowance().await?;
+    debug!("current staking safe allowance is {allowance}");
+    if allowance.lt(&amount) {
+        return Err(InvalidArguments(format!(
+            "not enough allowance to open a channel with {amount}"
+        )));
+    }
+
     let maybe_channel = db.read().await.get_channel_x(&self_addr, &destination).await?;
     if let Some(channel) = maybe_channel {
+        debug!("already found existing {channel}");
         if channel.status != ChannelStatus::Closed {
             error!("channel to {destination} is already opened or pending to close");
             return Err(ChannelAlreadyExists);
@@ -47,6 +60,14 @@ where
 {
     if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
         return Err(InvalidArguments("invalid balance or balance type given".into()));
+    }
+
+    let allowance = db.read().await.get_staking_safe_allowance().await?;
+    debug!("current staking safe allowance is {allowance}");
+    if allowance.lt(&amount) {
+        return Err(InvalidArguments(format!(
+            "not enough allowance to open a channel with {amount}"
+        )));
     }
 
     let maybe_channel = db.read().await.get_channel(&channel_id).await?;

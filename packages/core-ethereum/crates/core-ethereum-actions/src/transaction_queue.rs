@@ -12,7 +12,7 @@ use core_types::channels::ChannelStatus::{Closed, Open, PendingToClose};
 use core_types::channels::{ChannelEntry, ChannelStatus};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use utils_log::{error, info, warn};
+use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
 /// Enumerates all possible outgoing transactions
@@ -169,6 +169,7 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
                     let channel_id = channel.get_id();
                     match channel.status {
                         Open => {
+                            debug!("initiating closure of {channel}");
                             self.tx_exec
                                 .close_channel_initialize(channel.source, channel.destination)
                                 .await
@@ -176,6 +177,7 @@ impl<Db: HoprCoreEthereumDbActions> TransactionQueue<Db> {
 
                         PendingToClose => {
                             if channel.closure_time_passed().unwrap_or(false) {
+                                debug!("finalizing closure of {channel}");
                                 self.tx_exec
                                     .close_channel_finalize(channel.source, channel.destination)
                                     .await
