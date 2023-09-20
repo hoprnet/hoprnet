@@ -176,7 +176,7 @@ function setup_node() {
       --init \
       --password="${password}" \
       --api \
-      --apiHost "${host}" \
+      --apiHost "0.0.0.0" \
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
@@ -394,6 +394,7 @@ else
   log "Run: 'source ${env_file}' in your shell to setup environment variables for this cluster (HOPR_NODE_1_ADDR, HOPR_NODE_1_HTTP_URL,... etc.)"
 fi
 
+# Needed by the Pluto HealthCheck
 echo "running" > "${tmp_dir}/cluster.status"
 log "Terminating this script will clean up the running local cluster"
 trap - SIGINT SIGTERM ERR
