@@ -17,8 +17,9 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
     throw Error(STATUS_CODES.INVALID_AMOUNT)
   }
 
+  let recipient_addr
   try {
-    Address.from_string(recipient)
+    recipient_addr = Address.from_string(recipient)
   } catch (_err) {
     throw Error(STATUS_CODES.INVALID_ADDRESS)
   }
@@ -31,7 +32,7 @@ export const withdraw = async (node: Hopr, currency: 'native' | 'hopr', recipien
   let to_withdraw = new Balance(amount, currencyUpperCase === 'NATIVE' ? BalanceType.Native : BalanceType.HOPR)
 
   // TODO: withdraw hopr broken, its working but only resolves after transaction have been mined.
-  const txHash = await node.withdraw(recipient, to_withdraw)
+  const txHash = await node.withdraw(recipient_addr, to_withdraw)
   return txHash
 }
 

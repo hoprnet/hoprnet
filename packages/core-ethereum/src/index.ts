@@ -199,11 +199,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
-  async withdraw(recipient: string, amount: Balance): Promise<string> {
+  async withdraw(recipient: Address, amount: Balance): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
     let currency: 'NATIVE' | 'HOPR' = amount.balance_type() == BalanceType.Native ? 'NATIVE' : 'HOPR'
 
-    return this.chain.withdraw(currency, recipient, amount.amount().to_string(), (tx: string) =>
+    return this.chain.withdraw(currency, recipient.to_string(), amount.amount().to_string(), (tx: string) =>
       this.setTxHandler(currency === 'NATIVE' ? `withdraw-native-${tx}` : `withdraw-hopr-${tx}`, tx)
     )
   }

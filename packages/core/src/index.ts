@@ -1369,13 +1369,13 @@ export class Hopr extends EventEmitter {
    * @param amount how many tokens to be transferred
    * @returns
    */
-  public async withdraw(recipient: string, amount: Balance): Promise<string> {
+  public async withdraw(recipient: Address, amount: Balance): Promise<string> {
     if (!this.isReady) {
       log('withdraw: Node is not ready for on-chain operations')
     }
     try {
       let tx_sender = this.tools.get_tx_sender()
-      let result = await withdraw(Address.from_string(recipient), amount, tx_sender)
+      let result = await withdraw(recipient, amount, tx_sender)
       return result.to_hex()
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
