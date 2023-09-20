@@ -42,9 +42,9 @@ impl HeartbeatResponder {
                 ))),
                 _ => Ok(()),
             },
-            Err(_) => Err(P2PError::ProtocolHeartbeat(format!(
-                "The heartbeat mechanism cannot be notified, the receiver was closed"
-            ))),
+            Err(_) => Err(P2PError::ProtocolHeartbeat(
+                "The heartbeat mechanism cannot be notified, the receiver was closed".into(),
+            )),
         }
     }
 
@@ -80,13 +80,13 @@ impl Stream for HeartbeatRequester {
     ) -> std::task::Poll<Option<Self::Item>> {
         let mut this = Pin::new(&mut self);
 
-        return match this.receiver.poll_next(cx) {
+        match this.receiver.poll_next(cx) {
             std::task::Poll::Ready(Some((peer, challenge))) => {
                 std::task::Poll::Ready(Some(HeartbeatChallenge(peer, challenge)))
             }
             std::task::Poll::Ready(None) => std::task::Poll::Ready(None),
             std::task::Poll::Pending => std::task::Poll::Pending,
-        };
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -113,13 +113,13 @@ impl Stream for ManualPingRequester {
     ) -> std::task::Poll<Option<Self::Item>> {
         let mut this = Pin::new(&mut self);
 
-        return match this.receiver.poll_next(cx) {
+        match this.receiver.poll_next(cx) {
             std::task::Poll::Ready(Some((peer, challenge))) => {
                 std::task::Poll::Ready(Some(ManualPingChallenge(peer, challenge)))
             }
             std::task::Poll::Ready(None) => std::task::Poll::Ready(None),
             std::task::Poll::Pending => std::task::Poll::Pending,
-        };
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

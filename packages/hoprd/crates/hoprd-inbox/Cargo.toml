@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-inbox"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Implements Message inbox and filtering functionality on top of HOPR protocol messages"
@@ -17,9 +17,12 @@ async-trait = "0.1"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 gloo-timers = { workspace = true, optional = true }
 hex = "0.4.3"
-ringbuffer = "0.14.2"
+ringbuffer = "0.15.0"
+serde_with = { workspace = true }
+validator = { workspace = true }
 js-sys = { version = "0.3.63", optional = true }
-serde-wasm-bindgen = { version = "0.5", optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 

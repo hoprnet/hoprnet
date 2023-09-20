@@ -13,6 +13,7 @@ use core_crypto::{
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use utils_log::debug;
 use utils_types::{
     errors::{GeneralError::ParseError, Result},
@@ -81,21 +82,31 @@ impl BinarySerializable for Acknowledgement {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AcknowledgedTicketStatus {
+    #[default]
     Untouched,
-    BeingRedeemed { tx_hash: Hash },
-    BeingAggregated { start: u64, end: u64 },
+    BeingRedeemed {
+        tx_hash: Hash,
+    },
+    BeingAggregated {
+        start: u64,
+        end: u64,
+    },
 }
 
-impl Default for AcknowledgedTicketStatus {
-    fn default() -> Self {
-        AcknowledgedTicketStatus::Untouched
+impl Display for AcknowledgedTicketStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AcknowledgedTicketStatus::Untouched => write!(f, "untouched"),
+            AcknowledgedTicketStatus::BeingRedeemed { .. } => write!(f, "being redeemed"),
+            AcknowledgedTicketStatus::BeingAggregated { start, end } => write!(f, "being aggregated ({start}-{end})"),
+        }
     }
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcknowledgedTicket {
     #[serde(default)]
     pub status: AcknowledgedTicketStatus,
@@ -103,6 +114,18 @@ pub struct AcknowledgedTicket {
     pub response: Response,
     pub vrf_params: VrfParameters,
     pub signer: Address,
+}
+
+impl PartialOrd for AcknowledgedTicket {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.ticket.partial_cmp(&other.ticket)
+    }
+}
+
+impl Ord for AcknowledgedTicket {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.ticket.cmp(&other.ticket)
+    }
 }
 
 impl AcknowledgedTicket {
@@ -207,15 +230,9 @@ impl AcknowledgedTicket {
     }
 }
 
-impl std::fmt::Display for AcknowledgedTicket {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AcknowledgedTicket")
-            .field("status", &self.status)
-            .field("ticket", &self.ticket)
-            .field("response", &self.response)
-            .field("vrf_params", &self.vrf_params)
-            .field("signer", &self.signer)
-            .finish()
+impl Display for AcknowledgedTicket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "acknowledged {} in state '{}'", self.ticket, self.status)
     }
 }
 
@@ -620,12 +637,14 @@ pub mod test {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use core_crypto::types::Response;
+    use crate::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
+    use crate::channels::wasm::Ticket;
+    use core_crypto::types::{Hash, Response};
     use utils_types::primitives::Address;
+    use utils_types::traits::ToHex;
     use wasm_bindgen::prelude::*;
 
-    use crate::channels::wasm::Ticket;
-
+    #[derive(Clone)]
     #[wasm_bindgen]
     pub struct AcknowledgedTicket {
         w: super::AcknowledgedTicket,
@@ -645,13 +664,31 @@ pub mod wasm {
 
         #[wasm_bindgen(getter)]
         pub fn signer(&self) -> Address {
-            self.w.signer.clone()
+            self.w.signer
         }
-    }
 
-    impl AcknowledgedTicket {
-        pub fn clone(&self) -> AcknowledgedTicket {
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> AcknowledgedTicket {
             Self { w: self.w.clone() }
+        }
+
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.w.to_string()
+        }
+
+        #[wasm_bindgen]
+        pub fn set_redeem_tx_hash(&mut self, tx_hash_str: &str) {
+            if let Ok(tx_hash) = Hash::from_hex(tx_hash_str) {
+                match self.w.status {
+                    BeingRedeemed { .. } => {
+                        if !tx_hash.eq(&Hash::default()) {
+                            self.w.status = BeingRedeemed { tx_hash }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 

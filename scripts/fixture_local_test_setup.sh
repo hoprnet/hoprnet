@@ -187,6 +187,7 @@ function reuse_pregenerated_identities() {
     native_address="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.native_address")"
 
     log "\tnode ${i}"
+    log "\t\tidentity file: ${tmp_dir}/${node_prefix}_${i}.id"
     log "\t\tpeer id: ${peer_id}"
     log "\t\tnative address: ${native_address}"
   done
@@ -225,7 +226,8 @@ function create_local_safes() {
       hopli create-safe-module \
         --network anvil-localhost \
         --identity-from-path "${id_file}" \
-        --contracts-root "./packages/ethereum/contracts" > "${id_file%.id}.safe.log"
+        --contracts-root "./packages/ethereum/contracts" > "${id_file%.id}.safe.log" \
+        --hopr-amount "20000.0"
 
     # store safe arguments in separate file for later use
     grep -oE "\--safeAddress.*--moduleAddress.*" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
@@ -299,8 +301,6 @@ function setup_node() {
       --disableTicketAutoRedeem \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
-      --allowLocalNodeConnections \
-      --allowPrivateNodeConnections \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
@@ -383,8 +383,8 @@ setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${nod
 # use empty auth token to be able to test this in the security tests
 setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "127.0.0.1" "--announce"
 setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "localhost" "--announce"
-setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "127.0.0.1" "--testNoDirectConnections --announce"
-setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "localhost" "--testNoDirectConnections --announce"
+setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "127.0.0.1" " --announce"
+setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "localhost" " --announce"
 # should not be able to talk to the rest
 setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "127.0.0.1" "--announce --network anvil-localhost2"
 # node n7 will be the only one NOT registered
@@ -404,8 +404,15 @@ wait_for_regex "${node7_log}" "please fund this node"
 
 log "Funding nodes"
 #  --- Fund nodes --- {{{
-make -C "${mydir}/../" fund-local-all \
-  id_password="${password}" id_prefix="${node_prefix}" id_dir="${tmp_dir}"
+env \
+  ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
+  PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  hopli faucet \
+  --network anvil-localhost \
+  --identity-prefix "${node_prefix}" \
+  --identity-directory "${tmp_dir}" \
+  --contracts-root "./packages/ethereum/contracts" \
+  --hopr-amount "0.0"
 # }}}
 
 log "Waiting for port binding"
@@ -433,9 +440,9 @@ wait_for_regex "${node1_log}" "STARTED NODE"
 
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
-  declare node_dir_db="${node_dir}/db/db.sqlite"
+  declare node_dir_db="${node_dir}/db"
   declare node_dir_tbf="${node_dir}/tbf"
-  [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
+  [ -d "${node_dir_db}" ] || { echo "Data directory ${node_dir_db} missing"; exit 1; }
   [ -f "${node_dir_tbf}" ] || { echo "Data file ${node_dir_tbf} missing"; exit 1; }
 done
 # }}}

@@ -13,7 +13,10 @@ use serde::{
     Deserialize, Serialize,
 };
 use serde_repr::*;
-use std::fmt::{Display, Formatter};
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter},
+};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -196,7 +199,7 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 }
 
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Ticket {
     pub channel_id: Hash,
     pub amount: Balance,
@@ -206,6 +209,26 @@ pub struct Ticket {
     pub channel_epoch: u32,
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
+}
+
+impl PartialOrd for Ticket {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Ticket {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.channel_id.cmp(&other.channel_id) {
+            Ordering::Equal => match self.channel_epoch.cmp(&other.channel_epoch) {
+                Ordering::Equal => self.index.cmp(&other.index),
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Less => Ordering::Less,
+            },
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Less => Ordering::Less,
+        }
+    }
 }
 
 // Use compact serialization for ticket as they are used very often
@@ -260,6 +283,16 @@ impl Default for Ticket {
     }
 }
 
+impl Display for Ticket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ticket #{}, epoch {} in channel {}",
+            self.index, self.channel_epoch, self.channel_id
+        )
+    }
+}
+
 impl std::fmt::Debug for Ticket {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Ticket")
@@ -300,7 +333,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(&own_address, counterparty);
 
         let mut ret = Ticket {
             channel_id,
@@ -340,7 +373,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(own_address, counterparty);
 
         let ret = Ticket {
             channel_id,
@@ -353,7 +386,7 @@ impl Ticket {
             signature: Some(signature),
         };
 
-        ret.verify(&own_address, domain_separator)
+        ret.verify(own_address, domain_separator)
             .map_err(|_| CoreTypesError::InvalidInputData("Invalid signature".into()))?;
 
         Ok(ret)
@@ -380,7 +413,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(own_address, counterparty);
 
         Ok(Ticket {
             channel_id,
@@ -406,7 +439,7 @@ impl Ticket {
         win_prob: f64,
         channel_epoch: U256,
     ) -> Result<()> {
-        if own_address.eq(&counterparty) {
+        if own_address.eq(counterparty) {
             return Err(CoreTypesError::InvalidInputData(
                 "Source and destination must be different".into(),
             ));
@@ -538,7 +571,7 @@ impl Ticket {
     ///
     /// Does not support path lengths greater than 255
     pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
-        Ok((self.get_expected_payout() / price_per_packet)
+        (self.get_expected_payout() / price_per_packet)
             .as_u64()
             .try_into() // convert to u8
             .map_err(|_| {
@@ -546,7 +579,7 @@ impl Ticket {
                     "Cannot convert {} to u8",
                     price_per_packet / self.get_expected_payout()
                 ))
-            })?)
+            })
     }
 
     pub fn get_expected_payout(&self) -> U256 {
@@ -972,7 +1005,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         pub fn size() -> u32 {
@@ -1014,8 +1047,8 @@ pub mod wasm {
             })
         }
 
-        #[wasm_bindgen]
-        pub fn default() -> Ticket {
+        #[wasm_bindgen(js_name = "make_default")]
+        pub fn _default() -> Ticket {
             Self {
                 w: super::Ticket::default(),
             }
@@ -1023,12 +1056,12 @@ pub mod wasm {
 
         #[wasm_bindgen(getter)]
         pub fn channel_id(&self) -> Hash {
-            self.w.channel_id.clone()
+            self.w.channel_id
         }
 
         #[wasm_bindgen(getter)]
         pub fn amount(&self) -> Balance {
-            self.w.amount.clone()
+            self.w.amount
         }
 
         #[wasm_bindgen(getter)]
@@ -1061,12 +1094,13 @@ pub mod wasm {
             self.w.signature.clone()
         }
 
-        #[wasm_bindgen]
-        pub fn to_string(&self) -> String {
-            format!("{:?}", self.w)
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.w.to_string()
         }
 
-        pub fn clone(&self) -> Ticket {
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Ticket {
             Self { w: self.w.clone() }
         }
     }

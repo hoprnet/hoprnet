@@ -1,6 +1,6 @@
 [package]
 name = "core-packet"
-version = "0.6.2"
+version = "0.6.3"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -23,7 +23,7 @@ js-sys = { workspace = true, optional = true }
 lazy_static = "1.4"
 libp2p-identity = { workspace = true }
 serde = "1.0"
-serde-wasm-bindgen = { version = "0.5.0", optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 thiserror = "1.0"
 typenum = "1.16"
 wasm-bindgen = { workspace = true, optional = true }

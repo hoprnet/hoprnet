@@ -18,9 +18,10 @@ futures-lite = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
 rand = { version = "0.8.5", features = ["std_rng"] }
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
+serde_with = { workspace = true }
 thiserror = "1.0"
-validator = { version = "0.16.1", features = ["derive"] }
+validator = { workspace = true }
 gloo-timers = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 getrandom = { workspace = true }

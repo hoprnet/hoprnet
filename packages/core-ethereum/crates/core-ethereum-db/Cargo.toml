@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-db"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Selected core modules"
@@ -29,7 +29,7 @@ serde = { version = "1.0", features = ["derive"] }
 stdext = "0.3.1"
 wasm-bindgen = { workspace = true, features = ["serde-serialize"], optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
-serde-wasm-bindgen = { version = "0.5", optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 # wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]

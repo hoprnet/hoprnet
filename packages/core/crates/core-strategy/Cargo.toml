@@ -15,9 +15,10 @@ crate-type = ["cdylib", "rlib"]
 getrandom = { workspace = true }
 js-sys = { workspace = true, optional = true }
 rand = "0.8.5"
-serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = { version = "0.5", optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde-wasm-bindgen = { workspace = true, optional = true }
 simple_moving_average = "0.1.2"
+validator = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 core-types = { path = "../core-types", default-features = false }

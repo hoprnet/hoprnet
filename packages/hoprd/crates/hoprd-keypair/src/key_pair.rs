@@ -15,7 +15,7 @@ use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
 use typenum::Unsigned;
-use utils_log::error;
+use utils_log::{error, info};
 use utils_types::traits::{PeerIdLike, ToHex};
 use uuid::Uuid;
 
@@ -228,9 +228,16 @@ impl HoprKeys {
 
 impl HoprKeys {
     pub fn init(opts: IdentityOptions) -> Result<Self> {
-        let exists = metadata(&opts.id_path).is_ok();
+        let exists = metadata(&opts.id_path).map_or_else(
+            |e| {
+                info!("identity file {} not found: {}", &opts.id_path, e);
+                false
+            },
+            |_v| true,
+        );
 
         if !exists && opts.private_key.is_some() {
+            info!("using provided private key and writing new identity file");
             let keys = if let Some(private_key) = opts.private_key {
                 if private_key.len() != PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH {
                     return Err(KeyPairError::InvalidPrivateKeySize {
@@ -246,15 +253,7 @@ impl HoprKeys {
             } else {
                 HoprKeys::random()
             };
-            keys.write_eth_keystore(
-                &opts.id_path,
-                &opts.password,
-                if let Some(true) = opts.use_weak_crypto {
-                    true
-                } else {
-                    false
-                },
-            )?;
+            keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?;
 
             return Ok(keys);
         }
@@ -262,16 +261,9 @@ impl HoprKeys {
         if exists {
             match HoprKeys::read_eth_keystore(&opts.id_path, &opts.password) {
                 Ok((keys, needs_migration)) => {
+                    info!("migration needed = {}", needs_migration);
                     if needs_migration {
-                        keys.write_eth_keystore(
-                            &opts.id_path,
-                            &opts.password,
-                            if let Some(true) = opts.use_weak_crypto {
-                                true
-                            } else {
-                                false
-                            },
-                        )?
+                        keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?
                     }
                     return Ok(keys);
                 }
@@ -282,16 +274,12 @@ impl HoprKeys {
         }
 
         if opts.initialize {
+            info!(
+                "identity file {} not found, initializing and writing new identity file",
+                &opts.id_path
+            );
             let keys = HoprKeys::random();
-            keys.write_eth_keystore(
-                &opts.id_path,
-                &opts.password,
-                if let Some(true) = opts.use_weak_crypto {
-                    true
-                } else {
-                    false
-                },
-            )?;
+            keys.write_eth_keystore(&opts.id_path, &opts.password, opts.use_weak_crypto.unwrap_or(false))?;
 
             return Ok(keys);
         }

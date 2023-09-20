@@ -10,7 +10,7 @@ use core_crypto::keypairs::Keypair;
 use core_crypto::types::ToChecksum;
 use ethers::{
     types::U256,
-    utils::parse_units, //, types::U256, utils::format_units, ParseUnits
+    utils::parse_units,
 };
 use log::{log, Level};
 use std::{env, str::FromStr};
