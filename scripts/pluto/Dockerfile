@@ -3,14 +3,14 @@ ARG HOPLI_IMAGE=${HOPLI_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docke
 ARG ANVIL_IMAGE=${ANVIL_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-anvil:latest}
 
 # import hopli image to copy in files later
-FROM ${HOPLI_IMAGE} as hopli
+FROM --platform=linux/amd64 ${HOPLI_IMAGE} as hopli
 
 # import hoprd image to copy in files later
-FROM ${HOPRD_IMAGE} as hoprd
+FROM --platform=linux/amd64 ${HOPRD_IMAGE} as hoprd
 
 # the anvil image is our base runtime image since it includes most relevant
 # tools already
-FROM ${ANVIL_IMAGE} as runtime
+FROM --platform=linux/amd64 ${ANVIL_IMAGE} as runtime
 
 LABEL description="Docker image running a HOPR-enabled anvil chain with 5 hoprd nodes using it and being fully interconnected."
 
