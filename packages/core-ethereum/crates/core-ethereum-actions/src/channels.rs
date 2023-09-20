@@ -5,8 +5,8 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::errors::CoreEthereumError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, InvalidArguments, InvalidState};
 use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 use core_ethereum_misc::errors::Result;
-use core_types::channels::{ChannelDirection, ChannelStatus};
-use utils_log::info;
+use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
+use utils_log::{error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 pub async fn open_channel<Db>(db: Arc<RwLock<Db>>, tx_sender: TransactionSender, destination: Address, self_addr: Address, amount: Balance) -> Result<TransactionCompleted>
@@ -15,8 +15,12 @@ where Db: HoprCoreEthereumDbActions {
         return Err(InvalidArguments("invalid balance or balance type given".into()))
     }
 
-    if db.read().await.get_channel_x(&self_addr, &destination).await?.is_some() {
-        return Err(ChannelAlreadyExists)
+    let maybe_channel = db.read().await.get_channel_x(&self_addr, &destination).await?;
+    if let Some(channel) = maybe_channel {
+        if channel.status != ChannelStatus::Closed {
+            error!("channel to {destination} is already opened or pending to close");
+            return Err(ChannelAlreadyExists)
+        }
     }
 
     tx_sender.send(Transaction::OpenChannel(destination, amount)).await

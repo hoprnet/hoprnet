@@ -1148,6 +1148,7 @@ export class Hopr extends EventEmitter {
       let res = await open_channel(this.db, counterparty, self_addr, amount, tx_sender)
       return { channelId: res.channel_id, receipt: res.tx_hash.to_hex() }
     } catch (err) {
+      log('failed to open channel', err)
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
     }
@@ -1170,6 +1171,7 @@ export class Hopr extends EventEmitter {
       let res = await fund_channel(this.db, channelId, newAmount, tx_sender)
       return res.to_hex()
     } catch (err) {
+      log('failed to fund channel', err)
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)
     }
