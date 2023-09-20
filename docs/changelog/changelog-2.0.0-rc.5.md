@@ -11,7 +11,7 @@ Below there is a list with the contents of this release
 - #5503 - `ReceivedAt` field not in `message/pop-all` result
 - #5507 - Update hoprd-inbox to emit timestamp with data
 - #5504 - core: Fix reading of existing identities files
-- #5496 - Pipeline fixes 
+- #5496 - Pipeline fixes
 - #5493 - tests: Fix ping smoke tests
 - #5483 - Migrate ticket redemption to Rust
 
