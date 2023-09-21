@@ -4,7 +4,7 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::errors::CoreEthereumError::{InvalidArguments, InvalidState};
 use core_types::channels::{ChannelDirection, ChannelStatus};
 use std::sync::Arc;
-use utils_log::{debug, error, info };
+use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::errors::CoreEthereumActionsError::{ClosureTimeHasNotElapsed, NotEnoughAllowance};
@@ -109,14 +109,18 @@ where
                 ChannelStatus::Closed => Err(ChannelAlreadyClosed),
                 ChannelStatus::PendingToClose => {
                     info!(
-                            "{channel} - remaining closure time is {:?}",
-                            channel.remaining_closure_time(current_timestamp())
-                        );
+                        "{channel} - remaining closure time is {:?}",
+                        channel.remaining_closure_time(current_timestamp())
+                    );
                     if channel.closure_time_passed(current_timestamp()).unwrap_or(false) {
                         // TODO: emit "channel state change" event
                         tx_sender.send(Transaction::CloseChannel(channel)).await
                     } else {
-                        Err(ClosureTimeHasNotElapsed(channel.remaining_closure_time(current_timestamp()).unwrap_or(u32::MAX as u64)))
+                        Err(ClosureTimeHasNotElapsed(
+                            channel
+                                .remaining_closure_time(current_timestamp())
+                                .unwrap_or(u32::MAX as u64),
+                        ))
                     }
                 }
                 ChannelStatus::Open => {
@@ -720,12 +724,17 @@ mod tests {
             .await
             .unwrap();
 
-
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
 
         assert!(
             matches!(
-                close_channel(db.clone(), tx_queue.new_sender(), bob, self_addr, ChannelDirection::Outgoing)
+                close_channel(
+                    db.clone(),
+                    tx_queue.new_sender(),
+                    bob,
+                    self_addr,
+                    ChannelDirection::Outgoing
+                )
                 .await
                 .err()
                 .unwrap(),
