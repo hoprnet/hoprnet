@@ -22,7 +22,7 @@ add_entry_type() {
     id=${1}
     title=${2}
     labels=${3}
-    if [[ ${labels} == *"feature"* ]]
+    if [[ ${labels} == *"feature"* ]] || [[ ${labels} == *"improvement"* ]]
     then
         section_feature="${section_feature}\n- #${id} - ${title}"
     elif [[ ${labels} == *"bug"* ]]
