@@ -24,32 +24,14 @@ pub enum CoreEthereumError {
     #[error("{0}")]
     InvalidState(String),
 
-    #[error("channel to the given destination already exists")]
-    ChannelAlreadyExists,
-
-    #[error("channel does not exist")]
-    ChannelDoesNotExist,
-
-    #[error("channel is already closed")]
-    ChannelAlreadyClosed,
-
-    #[error("Invalid response to acknowledgement {0}")]
+    #[error("invalid response to acknowledgement {0}")]
     InvalidResponseToAcknowledgement(String),
 
     #[error(transparent)]
     MultiaddrParseError(#[from] MultiaddrError),
 
-    #[error("Ticket is not a win")]
-    NotAWinningTicket,
-
-    #[error("Error while trying to submit ticket")]
+    #[error("error while trying to submit ticket")]
     CouldNotSubmitTicket(String),
-
-    #[error("acknowledged {0} is in a wrong state for the operation")]
-    WrongTicketState(String),
-
-    #[error("on-chain submission of transaction failed: {0}")]
-    TransactionSubmissionFailed(String),
 }
 
 pub type Result<T> = core::result::Result<T, CoreEthereumError>;

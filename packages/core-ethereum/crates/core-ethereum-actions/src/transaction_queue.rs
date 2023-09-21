@@ -1,11 +1,8 @@
-use crate::transaction_queue::TransactionResult::{Failure, RedeemTicket};
 use async_lock::RwLock;
 use async_std::channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::errors::CoreEthereumError::TransactionSubmissionFailed;
-use core_ethereum_misc::errors::Result;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
 use core_types::channels::ChannelStatus::{Closed, Open, PendingToClose};
@@ -14,6 +11,10 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
+
+use crate::errors::CoreEthereumActionsError::TransactionSubmissionFailed;
+use crate::errors::Result;
+use crate::transaction_queue::TransactionResult::{Failure, RedeemTicket};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
@@ -187,6 +188,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                     }
 
                     PendingToClose => {
+                        info!(
+                            "{channel} - remaining closure time is {:?}",
+                            channel.remaining_closure_time()
+                        );
                         if channel.closure_time_passed().unwrap_or(false) {
                             debug!("finalizing closure of {channel}");
                             tx_exec

@@ -1,15 +1,18 @@
-use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 use async_lock::RwLock;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::errors::CoreEthereumError::{
-    ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, InvalidArguments, InvalidState,
-};
-use core_ethereum_misc::errors::Result;
+use core_ethereum_misc::errors::CoreEthereumError::{InvalidArguments, InvalidState};
 use core_types::channels::{ChannelDirection, ChannelStatus};
 use std::sync::Arc;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
+
+use crate::errors::CoreEthereumActionsError::NotEnoughAllowance;
+use crate::errors::{
+    CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
+    Result,
+};
+use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 
 pub async fn open_channel<Db>(
     db: Arc<RwLock<Db>>,
@@ -22,19 +25,17 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     if self_addr == destination {
-        return Err(InvalidArguments("cannot open channel to self".into()));
+        return Err(InvalidArguments("cannot open channel to self".into()).into());
     }
 
     if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
-        return Err(InvalidArguments("invalid balance or balance type given".into()));
+        return Err(InvalidArguments("invalid balance or balance type given".into()).into());
     }
 
     let allowance = db.read().await.get_staking_safe_allowance().await?;
     debug!("current staking safe allowance is {allowance}");
     if allowance.lt(&amount) {
-        return Err(InvalidArguments(format!(
-            "not enough allowance to open a channel with {amount}"
-        )));
+        return Err(NotEnoughAllowance);
     }
 
     let maybe_channel = db.read().await.get_channel_x(&self_addr, &destination).await?;
@@ -59,15 +60,13 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
-        return Err(InvalidArguments("invalid balance or balance type given".into()));
+        return Err(InvalidArguments("invalid balance or balance type given".into()).into());
     }
 
     let allowance = db.read().await.get_staking_safe_allowance().await?;
     debug!("current staking safe allowance is {allowance}");
     if allowance.lt(&amount) {
-        return Err(InvalidArguments(format!(
-            "not enough allowance to open a channel with {amount}"
-        )));
+        return Err(NotEnoughAllowance);
     }
 
     let maybe_channel = db.read().await.get_channel(&channel_id).await?;
@@ -76,7 +75,7 @@ where
             if channel.status == ChannelStatus::Open {
                 tx_sender.send(Transaction::FundChannel(channel, amount)).await
             } else {
-                Err(InvalidState(format!("channel {channel_id} is not opened")))
+                Err(InvalidState(format!("channel {channel_id} is not opened")).into())
             }
         }
         None => Err(ChannelDoesNotExist),
@@ -123,7 +122,7 @@ pub async fn withdraw(
     amount: Balance,
 ) -> Result<TransactionCompleted> {
     if amount.eq(&amount.of_same("0")) {
-        return Err(InvalidArguments("cannot withdraw zero amount".into()));
+        return Err(InvalidArguments("cannot withdraw zero amount".into()).into());
     }
 
     tx_sender.send(Transaction::Withdraw(recipient, amount)).await

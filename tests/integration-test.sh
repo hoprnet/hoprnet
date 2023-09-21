@@ -508,9 +508,10 @@ test_get_all_channels() {
   channels_with_closed=$(api_get_all_channels ${node_api} true)
   channels_with_closed_count=$(echo ${channels_with_closed} | jq '.incoming | length')
 
-  [[ "${channels_count}" -ge "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
+  [[ "${channels_count}" -gt "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
   [[ "${channels_with_closed}" != *"Closed"* ]] && { msg "Channels fetched with includeClosed flag should return channels with closed status: ${channels_with_closed}"; exit 1; }
-  echo "Get all channels successful"
+
+  log "Get all channels successful"
 }
 
 test_get_all_channels "${api1}"

@@ -1,9 +1,7 @@
-use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 use async_lock::RwLock;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::errors::CoreEthereumError::{InvalidArguments, NotAWinningTicket, WrongTicketState};
-use core_ethereum_misc::errors::Result;
+use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use core_types::channels::ChannelEntry;
@@ -12,6 +10,13 @@ use std::sync::Arc;
 use utils_db::errors::DbError;
 use utils_log::{debug, error, info};
 use utils_types::primitives::Address;
+
+use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
+use crate::errors::{
+    CoreEthereumActionsError::{NotAWinningTicket, WrongTicketState},
+    Result,
+};
+use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -60,7 +65,7 @@ where
     if let Some(channel) = ch {
         redeem_tickets_in_channel(db, &channel, onchain_tx_sender).await
     } else {
-        Err(InvalidArguments(format!("cannot find channel with {counterparty}")))
+        Err(ChannelDoesNotExist)
     }
 }
 
@@ -84,7 +89,7 @@ where
         BeingRedeemed { tx_hash: txh } => {
             // If there's already some hash set for this ticket, do not allow unsetting it
             if txh != Hash::default() && tx_hash == Hash::default() {
-                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")));
+                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")).into());
             }
         }
     }
