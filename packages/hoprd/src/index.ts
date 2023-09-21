@@ -129,10 +129,10 @@ async function main() {
   let state: State = {
     aliases: new Map(),
     settings: {
-      includeRecipient: false,
-      strategy: 'passive',
-      autoRedeemTickets: true,
-      maxAutoChannels: undefined
+      includeRecipient: false
+      //strategy: 'passive',
+      //autoRedeemTickets: true,
+      //maxAutoChannels: undefined
     }
   }
 
@@ -212,7 +212,7 @@ async function main() {
     process.exit(0)
   }
 
-  if (cfg.strategy.name) {
+  /*if (cfg.strategy.name) {
     state.settings.strategy = cfg.strategy.name
   }
 
@@ -222,7 +222,7 @@ async function main() {
 
   if (cfg.strategy.max_auto_channels) {
     state.settings.maxAutoChannels = cfg.strategy.max_auto_channels
-  }
+  }*/
 
   try {
     log(`This is HOPRd version ${version}`)

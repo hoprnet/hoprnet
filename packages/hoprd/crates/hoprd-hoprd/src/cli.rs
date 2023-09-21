@@ -6,7 +6,6 @@ use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
 use core_strategy::config::StrategyConfig;
-use core_strategy::{generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy};
 use hex;
 use serde::{Deserialize, Serialize};
 use serde_json;

@@ -20,20 +20,20 @@ rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen = { workspace = true, optional = true }
 simple_moving_average = "0.1.2"
+thiserror = { workspace = true }
 validator = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true}
-thiserror = "1.0"
 
-core-types = { path = "../core-types", default-features = false }
-core-crypto = { path = "../core-crypto", default-features = false }
-core-network = { path = "../core-network", default-features = false }
-core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
-core-ethereum-misc = { path = "../../../core-ethereum/crates/core-ethereum-misc", default-features = false }
-utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
-utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
-utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
-utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
+core-types = { workspace = true, default-features = false }
+core-crypto = { workspace = true, default-features = false }
+core-network = { workspace = true, default-features = false }
+core-ethereum-db = { workspace = true, default-features = false }
+core-ethereum-misc = { workspace = true, default-features = false }
+utils-log = { workspace = true, default-features = false }
+utils-misc = { workspace = true, default-features = false }
+utils-types = { workspace = true, default-features = false }
+utils-db = { workspace = true, default-features = false }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }

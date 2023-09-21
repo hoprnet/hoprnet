@@ -7,6 +7,7 @@ use core_network::network::{Network, NetworkExternalActions};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
+#[allow(dead_code)]
 pub struct PassiveStrategy<Db, Net>
 where
     Db: HoprCoreEthereumDbActions,

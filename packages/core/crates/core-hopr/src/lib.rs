@@ -29,29 +29,49 @@ use core_protocol::{
     },
 };
 use core_types::{channels::Ticket, protocol::TagBloomFilter};
-use futures::{channel::mpsc::Sender, FutureExt, StreamExt};
+use futures::channel::mpsc::{unbounded, UnboundedSender};
+use futures::future::poll_fn;
+use futures::{channel::mpsc::Sender, FutureExt, SinkExt, Stream, StreamExt};
 use libp2p::request_response::{RequestId, ResponseChannel};
 use multiaddr::Multiaddr;
+use std::pin::Pin;
 use std::{sync::Arc, time::Duration};
 use utils_log::{error, info};
 use utils_types::traits::BinarySerializable;
 
 use core_ethereum_misc::transaction_queue::{TransactionQueue, TransactionSender};
 
+use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_network::network::NetworkExternalActions;
+use core_strategy::config::StrategyConfig;
+use core_strategy::passive::PassiveStrategy;
+use core_strategy::strategy::{MultiStrategy, SingularStrategy};
+use core_types::acknowledgement::AcknowledgedTicket;
+use core_types::channels::ChannelEntry;
 #[cfg(feature = "wasm")]
 use {
     core_ethereum_db::db::wasm::Database, core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor,
     wasm_bindgen::prelude::wasm_bindgen,
 };
-use core_strategy::config::StrategyConfig;
-use core_strategy::passive::PassiveStrategy;
-use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
-#[cfg(feature = "wasm")]
-#[wasm_bindgen]
 #[derive(Clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub struct ChannelEventEmitter {
+    tx: UnboundedSender<ChannelEntry>,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+impl ChannelEventEmitter {
+    pub async fn send_event(&self, channel: &ChannelEntry) {
+        let mut sender = self.tx.clone();
+        let _ = sender.send(channel.clone()).await;
+    }
+}
+
+#[derive(Clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct HoprTools {
     ping: adaptors::ping::wasm::WasmPing,
     network: adaptors::network::wasm::WasmNetwork,
@@ -59,6 +79,7 @@ pub struct HoprTools {
     pkt_sender: PacketActions,
     tx_sender: TransactionSender,
     ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+    channel_events: ChannelEventEmitter,
 }
 
 #[cfg(feature = "wasm")]
@@ -71,6 +92,7 @@ impl HoprTools {
         pkt_sender: PacketActions,
         tx_sender: TransactionSender,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+        channel_events: ChannelEventEmitter,
     ) -> Self {
         Self {
             ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
@@ -79,12 +101,12 @@ impl HoprTools {
             pkt_sender,
             ticket_aggregate_actions,
             tx_sender,
+            channel_events,
         }
     }
 }
 
-#[cfg(feature = "wasm")]
-#[wasm_bindgen]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl HoprTools {
     #[wasm_bindgen]
     pub fn ping(&self) -> adaptors::ping::wasm::WasmPing {
@@ -99,6 +121,11 @@ impl HoprTools {
     #[wasm_bindgen]
     pub fn index_updater(&self) -> adaptors::indexer::WasmIndexerInteractions {
         self.indexer.clone()
+    }
+
+    #[wasm_bindgen]
+    pub fn channel_events(&self) -> ChannelEventEmitter {
+        self.channel_events.clone()
     }
 }
 
@@ -133,6 +160,32 @@ impl std::fmt::Display for HoprLoopComponents {
     }
 }
 
+pub fn build_strategies<Db, Net>(
+    cfgs: Vec<StrategyConfig>,
+    db: Arc<RwLock<Db>>,
+    network: Arc<RwLock<Network<Net>>>,
+    tx_sender: TransactionSender,
+) -> MultiStrategy
+where
+    Db: HoprCoreEthereumDbActions + 'static,
+    Net: NetworkExternalActions + 'static,
+{
+    let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
+    for cfg in cfgs {
+        match cfg.name.as_str() {
+            "passive" => strategies.push(Box::new(PassiveStrategy::new(
+                cfg,
+                db.clone(),
+                network.clone(),
+                tx_sender.clone(),
+            ))),
+            _ => error!("unknown strategy {}, skipping", cfg.name),
+        }
+    }
+
+    MultiStrategy::new(strategies)
+}
+
 /// The main core function building all core components
 ///
 /// This method creates a group of utilities that can be used to generate triggers for the core application
@@ -149,7 +202,6 @@ pub fn build_components(
     hb_cfg: HeartbeatConfig,
     ping_cfg: PingConfig,
     on_acknowledgement: Option<js_sys::Function>,
-    on_acknowledged_ticket: Option<js_sys::Function>,
     packet_cfg: PacketInteractionConfig,
     on_final_packet: Option<js_sys::Function>,
     tbf: TagBloomFilter,
@@ -160,7 +212,7 @@ pub fn build_components(
     heartbeat_proto_cfg: HeartbeatProtocolConfig,
     msg_proto_cfg: MsgProtocolConfig,
     ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
-    strategies_cfgs: Vec<StrategyConfig>
+    strategies_cfgs: Vec<StrategyConfig>,
 ) -> (HoprTools, impl std::future::Future<Output = ()>) {
     let identity = me;
 
@@ -175,24 +227,36 @@ pub fn build_components(
 
     let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
 
-    let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
-    for cfg in strategies_cfgs {
-        match cfg.name.as_str() {
-            "passive" => {
-                strategies.push(Box::new(PassiveStrategy::new(cfg, db.clone(), network.clone(), tx_queue.new_sender())))
-            },
-            _ => error!("unknown strategy {}, skipping", cfg.name)
-        }
-    }
-
-    let multi_strategy = Arc::new(MultiStrategy::new(strategies));
+    let multi_strategy = Arc::new(build_strategies(
+        strategies_cfgs,
+        db.clone(),
+        network.clone(),
+        tx_queue.new_sender(),
+    ));
 
     let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
 
-    // TODO: modify the ack_tkt_receiver to call on_ack_ticket in the multi_strategy object
-    let on_ack_tkt_tx = adaptors::interactions::wasm::spawn_ack_tkt_receiver_loop(on_acknowledged_ticket);
+    let (on_ack_tkt_tx, mut rx) = unbounded::<AcknowledgedTicket>();
+    let ms_clone = multi_strategy.clone();
+    let queue = async move {
+        while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
+            let _ = ms_clone.on_acknowledged_ticket(&ack).await;
+        }
+    };
+    wasm_bindgen_futures::spawn_local(queue);
 
-    let ack_actions = AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, on_ack_tkt_tx);
+    // Spawn on_channel_c
+    let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
+    let ms_clone = multi_strategy.clone();
+    let queue = async move {
+        while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
+            let _ = ms_clone.on_channel_state_changed(&channel);
+        }
+    };
+    wasm_bindgen_futures::spawn_local(queue);
+
+    let ack_actions =
+        AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, Some(on_ack_tkt_tx));
 
     let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 
@@ -234,6 +298,9 @@ pub fn build_components(
         packet_actions.writer(),
         tx_queue.new_sender(),
         ticket_aggregation.writer(),
+        ChannelEventEmitter {
+            tx: on_channel_event_tx,
+        },
     );
 
     let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
@@ -399,7 +466,6 @@ pub mod wasm_impl {
             hb_cfg: HeartbeatConfig,
             ping_cfg: PingConfig,
             on_acknowledgement: Option<js_sys::Function>,
-            on_acknowledged_ticket: Option<js_sys::Function>,
             packet_cfg: PacketInteractionConfig,
             on_final_packet: Option<js_sys::Function>,
             tbf: TagBloomFilter,
@@ -421,7 +487,6 @@ pub mod wasm_impl {
                 hb_cfg,
                 ping_cfg,
                 on_acknowledgement,
-                on_acknowledged_ticket,
                 packet_cfg,
                 on_final_packet,
                 tbf,
@@ -438,7 +503,7 @@ pub mod wasm_impl {
                 heartbeat_proto_cfg,
                 msg_proto_cfg,
                 ticket_aggregation_proto_cfg,
-                serde_wasm_bindgen::from_value(multi_strategy_cfgs).expect("strategy cfg cannot be deserialized")
+                serde_wasm_bindgen::from_value(multi_strategy_cfgs).expect("strategy cfg cannot be deserialized"),
             );
 
             Self {
