@@ -53,6 +53,7 @@ use {
     core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_ethereum_db::db::wasm::Database,
     wasm_bindgen::prelude::wasm_bindgen,
 };
+use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -165,6 +166,7 @@ pub fn build_strategies<Db, Net>(
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<Net>>>,
     tx_sender: TransactionSender,
+    ticket_aggregator: BasicTicketAggregationActions<Result<Ticket, String>>,
 ) -> MultiStrategy
 where
     Db: HoprCoreEthereumDbActions + 'static,
@@ -178,6 +180,7 @@ where
                 db.clone(),
                 network.clone(),
                 tx_sender.clone(),
+                ticket_aggregator.clone(),
             ))),
             _ => error!("unknown strategy {}, skipping", cfg.name),
         }
