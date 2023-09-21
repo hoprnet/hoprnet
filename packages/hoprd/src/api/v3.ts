@@ -392,11 +392,7 @@ export class Context {
   public token: Token
   public authResult: AuthResult
 
-  constructor(
-    public node: Hopr,
-    public inbox: MessageInbox,
-    public stateOps: StateOps
-  ) {}
+  constructor(public node: Hopr, public inbox: MessageInbox, public stateOps: StateOps) {}
 }
 
 declare global {

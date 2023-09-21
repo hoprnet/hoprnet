@@ -117,10 +117,7 @@ interface RustStrategyInterface {
   Temporary wrapper class before we migrate rest of the core to use Rust exported types (before we migrate everything to Rust!)
  */
 class RustStrategyWrapper<T extends RustStrategyInterface> extends SaneDefaults implements ChannelStrategyInterface {
-  constructor(
-    private strategy: T,
-    hopr: Hopr
-  ) {
+  constructor(private strategy: T, hopr: Hopr) {
     super(hopr)
   }
 
