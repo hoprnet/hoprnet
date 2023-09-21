@@ -45,7 +45,7 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::NetworkExternalActions;
 use core_strategy::config::StrategyConfig;
 use core_strategy::passive::PassiveStrategy;
-use core_strategy::strategy::{MultiStrategy, SingularStrategy};
+use core_strategy::strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy};
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 #[cfg(feature = "wasm")]
@@ -54,6 +54,7 @@ use {
     wasm_bindgen::prelude::wasm_bindgen,
 };
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
+use core_strategy::aggregating::AggregatingStrategy;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -162,6 +163,7 @@ impl std::fmt::Display for HoprLoopComponents {
 }
 
 pub fn build_strategies<Db, Net>(
+    base_cfg: MultiStrategyConfig,
     cfgs: Vec<StrategyConfig>,
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<Net>>>,
@@ -182,11 +184,14 @@ where
                 tx_sender.clone(),
                 ticket_aggregator.clone(),
             ))),
+            "aggregating" => strategies.push(Box::new(
+                AggregatingStrategy::new(Default::default(), db.clone(), tx_sender.clone(), ticket_aggregator.clone())
+            )),
             _ => error!("unknown strategy {}, skipping", cfg.name),
         }
     }
 
-    MultiStrategy::new(strategies)
+    MultiStrategy::new(strategies, base_cfg)
 }
 
 /// The main core function building all core components
@@ -228,13 +233,17 @@ pub fn build_components(
         adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
     )));
 
+    let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
+
     let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
 
     let multi_strategy = Arc::new(build_strategies(
+        MultiStrategyConfig::default(),
         strategies_cfgs,
         db.clone(),
         network.clone(),
         tx_queue.new_sender(),
+        ticket_aggregation.writer()
     ));
 
     let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
@@ -290,8 +299,6 @@ pub fn build_components(
         futures::channel::mpsc::channel::<IndexerProcessed>(adaptors::indexer::INDEXER_UPDATE_QUEUE_SIZE);
     let indexer_updater =
         adaptors::indexer::WasmIndexerInteractions::new(db.clone(), network.clone(), indexer_update_tx);
-
-    let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
     let hopr_tools = HoprTools::new(
         ping,
