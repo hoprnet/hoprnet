@@ -59,7 +59,7 @@ declare -a jobs
 redeem_tickets() {
   local node_id="${1}"
   local node_api="${2}"
-  local rejected redeemed last_redeemed
+  local rejected redeemed last_redeemed unredeemed
   local successful=0
 
   # First get the initial ticket statistics for reference
@@ -67,7 +67,11 @@ redeem_tickets() {
   log "Node ${node_id} ticket information (before redemption) -- ${result}"
   rejected=$(echo "${result}" | jq -r .rejected)
   redeemed=$(echo "${result}" | jq -r .redeemed)
+  unredeemed=$(echo "${result}" | jq -r .unredeemed)
+
+  [[ ${unredeemed} -eq 0 ]] && { msg "there must be some unredeemed tickets on node ${node_id}"; exit 1; }
   [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
+
   last_redeemed="${redeemed}"
 
   # Trigger a redemption run, but cap it at 20 seconds. We only want to measure
@@ -85,6 +89,7 @@ redeem_tickets() {
 
     rejected=$(echo "${result}" | jq -r .rejected)
     redeemed=$(echo "${result}" | jq -r .redeemed)
+    unredeemed=$(echo "${result}" | jq -r .unredeemed)
 
     if [[ ${rejected} -gt 0 ]]; then
       msg "rejected tickets count on node ${node_id} is ${rejected}"
@@ -99,8 +104,8 @@ redeem_tickets() {
 
   done
 
-  # Check there are at least 2 consecutive ticket redemptions
-  if [[ ${successful} -ge 2 ]]; then
+  # Check there are at least 2 consecutive ticket redemptions or everything has been redeemed
+  if [[ ${successful} -ge 2 || ${unredeemed} -eq 0 ]]; then
     log "Redeem all test passed on node ${node_id} !"
     return 0
   else
