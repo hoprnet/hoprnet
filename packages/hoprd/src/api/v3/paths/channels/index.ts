@@ -288,7 +288,7 @@ export async function openChannel(
 
   const channelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
 
-  const existingChannel = await node.db.get_channel(channelIdHash)
+  const existingChannel = await node.db.get_channel(channelId)
   if (existingChannel?.status == ChannelStatus.Open) {
     return { success: false, reason: STATUS_CODES.CHANNEL_ALREADY_OPEN }
   }
