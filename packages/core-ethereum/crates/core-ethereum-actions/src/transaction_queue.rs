@@ -188,22 +188,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                     }
 
                     PendingToClose => {
-                        info!(
-                            "{channel} - remaining closure time is {:?}",
-                            channel.remaining_closure_time()
-                        );
-                        if channel.closure_time_passed().unwrap_or(false) {
-                            debug!("finalizing closure of {channel}");
-                            tx_exec
-                                .close_channel_finalize(channel.source, channel.destination)
-                                .await
-                        } else {
-                            warn!("cannot close channel {channel_id} because closure time has not passed, remaining {} seconds", channel.remaining_closure_time().unwrap_or(u32::MAX as u64));
-                            TransactionResult::CloseChannel {
-                                tx_hash: Hash::default(),
-                                status: PendingToClose,
-                            }
-                        }
+                        debug!("finalizing closure of {channel}");
+                        tx_exec
+                            .close_channel_finalize(channel.source, channel.destination)
+                            .await
                     }
 
                     Closed => {
@@ -228,7 +216,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         let _ = tx_finisher.send(tx_result);
     }
 
-    /// Runs the main queue processing loop until the queue is closed.
+    /// Consumes self and runs the main queue processing loop until the queue is closed.
     pub async fn transaction_loop(self) {
         while let Ok((tx, tx_finisher)) = self.queue_recv.recv().await {
             let db_clone = self.db.clone();

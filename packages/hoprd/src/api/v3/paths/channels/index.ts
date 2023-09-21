@@ -290,6 +290,7 @@ export async function openChannel(
 
   const existingChannel = await node.db.get_channel(channelId)
   if (existingChannel?.status == ChannelStatus.Open) {
+    log(`channel ${channelId.to_hex()} is already opened`)
     return { success: false, reason: STATUS_CODES.CHANNEL_ALREADY_OPEN }
   }
 

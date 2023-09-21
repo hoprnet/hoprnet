@@ -48,7 +48,7 @@ export async function closeChannel(
   const channelId = channel.get_id()
 
   if (channel.status == ChannelStatus.Closed) {
-    log(`channel ${channelId} is already closed`)
+    log(`channel ${channelId.to_hex()} is already closed`)
     return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
   }
 

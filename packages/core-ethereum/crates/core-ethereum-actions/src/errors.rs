@@ -13,6 +13,9 @@ pub enum CoreEthereumActionsError {
     #[error("channel is already closed")]
     ChannelAlreadyClosed,
 
+    #[error("channel closure time has not elapsed yet, remaining {0}s")]
+    ClosureTimeHasNotElapsed(u64),
+
     #[error("acknowledged {0} is in a wrong state for the operation")]
     WrongTicketState(String),
 
