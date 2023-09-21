@@ -1,20 +1,20 @@
+use core_crypto::types::OffchainPublicKey;
 use core_types::channels::ChannelEntry;
+use core_types::channels::ChannelStatus::{Open, PendingToClose};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use simple_moving_average::{SumTreeSMA, SMA};
-use utils_log::{debug, info, error, warn};
 use std::collections::HashMap;
-use core_types::channels::ChannelStatus::{Open, PendingToClose};
+use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
-use core_crypto::types::OffchainPublicKey;
 
-use std::fmt::{Display, Formatter};
-use std::sync::{Arc};
-use async_trait::async_trait;
 use async_std::sync::RwLock;
+use async_trait::async_trait;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::transaction_queue::TransactionSender;
 use core_network::network::{Network, NetworkExternalActions};
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 use crate::config::StrategyConfig;
 use crate::errors::Result;
@@ -51,13 +51,11 @@ pub struct PromiscuousStrategyConfig {
     // /// Determines if the strategy should automatically redeem tickets.
     // /// Defaults to false
     // pub auto_redeem_tickets: bool,
-
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
     /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
     /// `max_channels` limit.
     /// Defaults to true
     pub enforce_max_channels: bool,
-
     // sma: SimpleMovingAvg,
 }
 
@@ -79,7 +77,10 @@ impl Default for PromiscuousStrategyConfig {
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy<Db, Net>
-where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
+where
+    Db: HoprCoreEthereumDbActions,
+    Net: NetworkExternalActions,
+{
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<Net>>>,
     tx_sender: TransactionSender,
@@ -88,27 +89,58 @@ where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
 }
 
 impl<Db, Net> PromiscuousStrategy<Db, Net>
-where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
-    pub fn new(cfg: StrategyConfig, db: Arc<RwLock<Db>>, network: Arc<RwLock<Network<Net>>>, tx_sender: TransactionSender) -> Self {
-        Self { db, network, tx_sender, config: PromiscuousStrategyConfig {
-            network_quality_threshold: cfg.network_quality_threshold.unwrap_or(PromiscuousStrategyConfig::default().network_quality_threshold),
-            new_channel_stake: cfg.new_channel_stake.unwrap_or(PromiscuousStrategyConfig::default().new_channel_stake),
-            minimum_channel_balance: cfg.minimum_channel_balance.unwrap_or(PromiscuousStrategyConfig::default().minimum_channel_balance),
-            minimum_node_balance: cfg.minimum_node_balance.unwrap_or(PromiscuousStrategyConfig::default().minimum_node_balance),
-            max_channels: cfg.max_auto_channels.map(|m| m as usize),
-            enforce_max_channels: cfg.enforce_max_channels.unwrap_or(PromiscuousStrategyConfig::default().enforce_max_channels),
-        },sma: Arc::new(RwLock::new(SimpleMovingAvg::new())), }
+where
+    Db: HoprCoreEthereumDbActions,
+    Net: NetworkExternalActions,
+{
+    pub fn new(
+        cfg: StrategyConfig,
+        db: Arc<RwLock<Db>>,
+        network: Arc<RwLock<Network<Net>>>,
+        tx_sender: TransactionSender,
+    ) -> Self {
+        Self {
+            db,
+            network,
+            tx_sender,
+            config: PromiscuousStrategyConfig {
+                network_quality_threshold: cfg
+                    .network_quality_threshold
+                    .unwrap_or(PromiscuousStrategyConfig::default().network_quality_threshold),
+                new_channel_stake: cfg
+                    .new_channel_stake
+                    .unwrap_or(PromiscuousStrategyConfig::default().new_channel_stake),
+                minimum_channel_balance: cfg
+                    .minimum_channel_balance
+                    .unwrap_or(PromiscuousStrategyConfig::default().minimum_channel_balance),
+                minimum_node_balance: cfg
+                    .minimum_node_balance
+                    .unwrap_or(PromiscuousStrategyConfig::default().minimum_node_balance),
+                max_channels: cfg.max_auto_channels.map(|m| m as usize),
+                enforce_max_channels: cfg
+                    .enforce_max_channels
+                    .unwrap_or(PromiscuousStrategyConfig::default().enforce_max_channels),
+            },
+            sma: Arc::new(RwLock::new(SimpleMovingAvg::new())),
+        }
     }
 }
 
-impl<Db, Net> Display for PromiscuousStrategy<Db, Net> where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
+impl<Db, Net> Display for PromiscuousStrategy<Db, Net>
+where
+    Db: HoprCoreEthereumDbActions,
+    Net: NetworkExternalActions,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "promiscuous")
     }
 }
 #[async_trait(? Send)]
 impl<Db, Net> SingularStrategy for PromiscuousStrategy<Db, Net>
-where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
+where
+    Db: HoprCoreEthereumDbActions,
+    Net: NetworkExternalActions,
+{
     async fn on_tick(&self) -> Result<()> {
         let balance: Balance = self.db.read().await.get_hopr_balance().await?;
         // addresses: impl Iterator<Item = (Address, f64)>,
@@ -129,7 +161,8 @@ where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
             let packet_key = OffchainPublicKey::from_peerid(&peer)?;
             // get the Ethereum address of the peer
             if let Some(address) = self.db.read().await.get_chain_key(&packet_key).await? {
-                if to_close.contains(&address) || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some() {
+                if to_close.contains(&address) || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some()
+                {
                     // Skip this peer if we already processed it (iterator may have duplicates)
                     debug!("encountered duplicate peer {}", peer);
                     continue;
@@ -164,7 +197,7 @@ where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
                 continue;
             }
         }
-        
+
         self.sma.write().await.add_sample(network_size);
         info!("evaluated qualities of {} peers seen in the network", network_size);
 
@@ -191,7 +224,8 @@ where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
         );
 
         // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_auto_channels = self.config
+        let max_auto_channels = self
+            .config
             .max_channels
             .unwrap_or((self.sma.read().await.get_average() as f64).sqrt().ceil() as usize);
         debug!(
@@ -261,9 +295,13 @@ where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
                 }
 
                 // If we haven't added this peer yet, add it to the list for channel opening
-                if to_open.iter().find(|(open_to_address, _)| open_to_address.eq(&address)).is_none() {
+                if to_open
+                    .iter()
+                    .find(|(open_to_address, _)| open_to_address.eq(&address))
+                    .is_none()
+                {
                     debug!("promoting peer {} for channel opening", address);
-                    to_open.push((address.clone(),self.config.new_channel_stake.clone()));
+                    to_open.push((address.clone(), self.config.new_channel_stake.clone()));
                     remaining_balance = balance.sub(&self.config.new_channel_stake);
                 }
             }
