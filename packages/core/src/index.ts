@@ -25,7 +25,6 @@ import {
   close_channel,
   compareAddressesLocalMode,
   compareAddressesPublicMode,
-  CoreApp,
   create_counter,
   create_gauge,
   create_histogram_with_buckets,
@@ -34,7 +33,6 @@ import {
   debug,
   durations,
   fund_channel,
-  get_peers_with_quality,
   getBackoffRetries,
   getBackoffRetryTimeout,
   HalfKeyChallenge,
@@ -46,8 +44,6 @@ import {
   isMultiaddrLocal,
   MIN_NATIVE_BALANCE,
   OffchainKeypair,
-  ChainKeypair,
-  Database,
   OffchainPublicKey,
   open_channel,
   PacketInteractionConfig,
@@ -62,7 +58,6 @@ import {
   retryWithBackoffThenThrow,
   Snapshot,
   CoreApp,
-  HoprTools,
   Ticket,
   WasmIndexerInteractions,
   WasmNetwork,
@@ -1151,7 +1146,7 @@ export class Hopr extends EventEmitter {
     try {
       let self_addr = this.getEthereumAddress()
       let tx_sender = this.tools.get_tx_sender()
-      let res = await close_channel(this.db, counterparty, self_addr, direction, tx_sender)
+      let res = await close_channel(this.db, counterparty, self_addr, direction, false, tx_sender)
       return { receipt: res.tx_hash.to_hex(), status: res.status }
     } catch (err) {
       log('failed to close channel', err)
