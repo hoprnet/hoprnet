@@ -1,6 +1,6 @@
 [package]
 name = "core-protocol"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -12,7 +12,8 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = [
     "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom", "dep:gloo-timers",
-    "utils-log/wasm"
+    "core-crypto/wasm", "core-ethereum-db/wasm", "core-mixer/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
+    "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-metrics?/wasm",
 ]
 prometheus = ["dep:utils-metrics"]
 
@@ -22,6 +23,7 @@ async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
+hex = { workspace = true }
 hex-literal = "0.4"
 lazy_static = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
@@ -43,8 +45,10 @@ wasm-bindgen-futures = { version = "0.4.36", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 core-crypto = { workspace = true }
-core-mixer = { workspace = true }
 core-ethereum-db = { workspace = true }
+core-mixer = { workspace = true }
+core-packet = { workspace = true }
+core-path = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }
 utils-log = { workspace = true }
@@ -52,8 +56,10 @@ utils-types = { workspace = true }
 utils-metrics = { optional = true, workspace = true }
 
 [dev-dependencies]
-more-asserts = "0.3.1"
 env_logger = "0.10.0"
+hex-literal = "0.4.1"
+more-asserts = "0.3.1"
+serial_test = "2.0"
 wasm-bindgen-test = "0.3.36"
 
 [package.metadata.wasm-pack.profile.dev]

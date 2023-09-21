@@ -9,11 +9,16 @@ use core_p2p::{
     libp2p_swarm::SwarmEvent,
     HoprNetworkBehaviorEvent, Ping, Pong,
 };
-use core_packet::interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction};
 use core_protocol::{
-    ack::config::AckProtocolConfig,
+    ack::{
+        config::AckProtocolConfig,
+        processor::{AckProcessed, AcknowledgementInteraction}, 
+    },
     heartbeat::config::HeartbeatProtocolConfig,
-    msg::config::MsgProtocolConfig,
+    msg::{
+        config::MsgProtocolConfig,
+        processor::{MsgProcessed, PacketInteraction}
+    },
     ticket_aggregation::{
         config::TicketAggregationProtocolConfig,
         processor::{TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed},

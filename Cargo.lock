@@ -1423,7 +1423,7 @@ dependencies = [
 
 [[package]]
 name = "core-protocol"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1431,12 +1431,15 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "core-mixer",
+ "core-packet",
+ "core-path",
  "core-types",
  "env_logger",
  "futures",
  "futures-lite",
  "getrandom 0.2.10",
  "gloo-timers 0.3.0",
+ "hex",
  "hex-literal",
  "js-sys",
  "lazy_static",
@@ -1446,6 +1449,7 @@ dependencies = [
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
+ "serial_test",
  "thiserror",
  "utils-db",
  "utils-log",

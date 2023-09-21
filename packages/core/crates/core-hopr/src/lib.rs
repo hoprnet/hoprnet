@@ -18,11 +18,16 @@ use core_network::{
 };
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_p2p::libp2p_identity;
-use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
 use core_protocol::{
-    ack::config::AckProtocolConfig,
+    ack::{
+        config::AckProtocolConfig,
+        processor::AcknowledgementInteraction, 
+    },
     heartbeat::config::HeartbeatProtocolConfig,
-    msg::config::MsgProtocolConfig,
+    msg::{
+        config::MsgProtocolConfig,
+        processor::{PacketActions, PacketInteraction, PacketInteractionConfig}
+    },
     ticket_aggregation::{
         config::TicketAggregationProtocolConfig,
         processor::{TicketAggregationActions, TicketAggregationInteraction},
