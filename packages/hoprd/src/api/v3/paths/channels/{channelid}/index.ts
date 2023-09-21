@@ -1,11 +1,12 @@
 import {
-  debug,
-  Hash,
   channel_status_to_string,
-  stringToU8a,
+  ChannelDirection,
   ChannelStatus,
+  debug,
   defer,
-  type DeferType
+  type DeferType,
+  Hash,
+  stringToU8a
 } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
@@ -37,8 +38,19 @@ export async function closeChannel(
   const log = debug('hoprd:api:v3:channel-close')
 
   const channelIdHash = Hash.deserialize(stringToU8a(channelIdStr))
+
   const channel = await node.db.get_channel(channelIdHash)
+
+  if (!channel) {
+    return { success: false, reason: STATUS_CODES.CHANNEL_NOT_FOUND }
+  }
+
   const channelId = channel.get_id()
+
+  if (channel.status == ChannelStatus.Closed) {
+    log(`channel ${channelId.to_hex()} is already closed`)
+    return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
+  }
 
   let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {
@@ -49,14 +61,14 @@ export async function closeChannel(
   }
 
   // incoming if destination is me, outgoing if source is me
-  let direction
+  let direction: ChannelDirection
   let counterpartyAddress
 
   if (channel.source.to_string() == node.getEthereumAddress().to_string()) {
-    direction = 'outgoing'
+    direction = ChannelDirection.Outgoing
     counterpartyAddress = channel.destination
   } else if (channel.destination.to_string() == node.getEthereumAddress().to_string()) {
-    direction = 'incoming'
+    direction = ChannelDirection.Incoming
     counterpartyAddress = channel.source
   } else {
     return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }
@@ -66,14 +78,11 @@ export async function closeChannel(
     const { status: channelStatus, receipt } = await node.closeChannel(counterpartyAddress, direction)
     return { success: true, channelStatus, receipt }
   } catch (err) {
-    log(`${err}`)
-    const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+    log(`close channel error: ${err}`)
 
-    if (errString.match(/Channel is already closed/)) {
-      // @TODO insert receipt
+    const errString: string = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+    if (errString.includes('channel is already closed')) {
       return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
-    } else if (errString.includes('Incoming channel')) {
-      return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }
     } else {
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
     }

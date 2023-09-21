@@ -35,6 +35,7 @@ core-path = { workspace = true }
 core-protocol = { workspace = true }
 core-strategy = { workspace = true }
 core-types = { workspace = true }
+core-ethereum-actions = { workspace = true }
 core-ethereum-db = { workspace = true }
 core-ethereum-indexer = { workspace = true }
 core-ethereum-misc = { workspace = true }
