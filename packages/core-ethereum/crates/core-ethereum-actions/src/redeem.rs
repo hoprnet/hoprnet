@@ -1,9 +1,7 @@
-use crate::errors::CoreEthereumError::{InvalidArguments, NotAWinningTicket, WrongTicketState};
-use crate::errors::Result;
-use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 use async_lock::RwLock;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use core_types::channels::ChannelEntry;
@@ -12,6 +10,13 @@ use std::sync::Arc;
 use utils_db::errors::DbError;
 use utils_log::{debug, error, info};
 use utils_types::primitives::Address;
+
+use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
+use crate::errors::{
+    CoreEthereumActionsError::{NotAWinningTicket, WrongTicketState},
+    Result,
+};
+use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -60,7 +65,7 @@ where
     if let Some(channel) = ch {
         redeem_tickets_in_channel(db, &channel, onchain_tx_sender).await
     } else {
-        Err(InvalidArguments(format!("cannot find channel with {counterparty}")))
+        Err(ChannelDoesNotExist)
     }
 }
 
@@ -84,7 +89,7 @@ where
         BeingRedeemed { tx_hash: txh } => {
             // If there's already some hash set for this ticket, do not allow unsetting it
             if txh != Hash::default() && tx_hash == Hash::default() {
-                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")));
+                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")).into());
             }
         }
     }
@@ -196,7 +201,7 @@ mod tests {
     use crate::redeem::{
         redeem_all_tickets, redeem_ticket, redeem_tickets_in_channel, redeem_tickets_with_counterparty,
     };
-    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue};
+    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
     use async_lock::RwLock;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::random::random_bytes;
@@ -322,7 +327,9 @@ mod tests {
             .times(ticket_count)
             .in_sequence(&mut seq)
             .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| Ok(()));
+            .returning(|_| TransactionResult::RedeemTicket {
+                tx_hash: Hash::default(),
+            });
 
         // and then all Charlie's tickets get redeemed
         tx_exec
@@ -330,7 +337,9 @@ mod tests {
             .times(ticket_count)
             .in_sequence(&mut seq)
             .withf(move |t| charlie_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| Ok(()));
+            .returning(|_| TransactionResult::RedeemTicket {
+                tx_hash: Hash::default(),
+            });
 
         // Start the TransactionQueue with the mock TransactionExecutor
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
@@ -400,7 +409,9 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| Ok(()));
+            .returning(|_| TransactionResult::RedeemTicket {
+                tx_hash: Hash::default(),
+            });
 
         // Start the TransactionQueue with the mock TransactionExecutor
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
@@ -482,7 +493,9 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count - 2)
             .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| Ok(()));
+            .returning(|_| TransactionResult::RedeemTicket {
+                tx_hash: Hash::default(),
+            });
 
         // Start the TransactionQueue with the mock TransactionExecutor
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
@@ -531,7 +544,8 @@ pub mod wasm {
         self_addr: &Address,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
-        super::redeem_all_tickets(db.as_ref_counted().clone(), self_addr, on_chain_tx_sender.clone()).await?;
+        // We do not await the on-chain confirmation
+        super::redeem_all_tickets(db.as_ref_counted(), self_addr, on_chain_tx_sender.clone()).await?;
         Ok(())
     }
 
@@ -541,6 +555,7 @@ pub mod wasm {
         counterparty: &Address,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
+        // We do not await the on-chain confirmation
         super::redeem_tickets_with_counterparty(db.as_ref_counted(), counterparty, on_chain_tx_sender.clone()).await?;
         Ok(())
     }
@@ -551,7 +566,8 @@ pub mod wasm {
         channel: &ChannelEntry,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
-        super::redeem_tickets_in_channel(db.as_ref_counted().clone(), channel, on_chain_tx_sender.clone()).await?;
+        // We do not await the on-chain confirmation
+        super::redeem_tickets_in_channel(db.as_ref_counted(), channel, on_chain_tx_sender.clone()).await?;
         Ok(())
     }
 
@@ -561,12 +577,8 @@ pub mod wasm {
         ack_ticket: &AcknowledgedTicket,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
-        let _ = super::redeem_ticket(
-            db.as_ref_counted().clone(),
-            ack_ticket.into(),
-            on_chain_tx_sender.clone(),
-        )
-        .await?;
+        // We do not await the on-chain confirmation
+        let _ = super::redeem_ticket(db.as_ref_counted(), ack_ticket.into(), on_chain_tx_sender.clone()).await?;
         Ok(())
     }
 }

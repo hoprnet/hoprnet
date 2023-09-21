@@ -14,6 +14,7 @@ members = [
     "packages/core/crates/core-p2p",
     "packages/core/crates/core-strategy",
     "packages/core/crates/core-types",
+    "packages/core-ethereum/crates/core-ethereum-actions",
     "packages/core-ethereum/crates/core-ethereum-db",
     "packages/core-ethereum/crates/core-ethereum-indexer",
     "packages/core-ethereum/crates/core-ethereum-misc",
@@ -39,8 +40,10 @@ futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
 getrandom = "0.2.10"
+hex = "0.4.3"
 js-sys = "0.3.64"
 gloo-timers = { version = "0.3.0", features = ["futures"] }
+lazy_static = "1.4.0"
 libp2p-identity = { version = "0.2.3", features = ["peerid", "ed25519"] }
 libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
 libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
@@ -57,6 +60,8 @@ wasm-opt = "0.112.0"
 wasm-bindgen = "0.2.86"
 wasm-bindgen-futures = "0.4.36"
 
+bindings = { path = "packages/ethereum/crates/bindings", default-features = false }
+core-ethereum-actions = { path = "packages/core-ethereum/crates/core-ethereum-actions", default-features = false }
 core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
 core-ethereum-misc = { path = "packages/core-ethereum/crates/core-ethereum-misc", default-features = false }
 core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }
@@ -80,7 +85,6 @@ utils-misc = { path = "packages/utils/crates/utils-misc", default-features = fal
 utils-metrics = { path = "packages/utils/crates/utils-metrics", default-features = false }
 utils-types = { path = "packages/utils/crates/utils-types", default-features = false }
 utils-validation = { path = "packages/utils/crates/utils-validation", default-features = false }
-
 
 [profile.release]
 opt-level = "s"     # optimize for small code size
