@@ -662,6 +662,16 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .collect())
     }
 
+    async fn get_outgoing_channels(&self) -> Result<Vec<ChannelEntry>> {
+        Ok(self
+            .db
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
+            .await?
+            .into_iter()
+            .filter(move |x| x.source.eq(&self.me))
+            .collect())
+    }
+
     async fn get_channels_to(&self, address: &Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db

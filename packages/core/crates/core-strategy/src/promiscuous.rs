@@ -1,24 +1,33 @@
+use core_types::channels::ChannelEntry;
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use simple_moving_average::{SumTreeSMA, SMA};
-use utils_log::{debug, info, warn};
-
+use utils_log::{debug, info, error, warn};
 use std::collections::HashMap;
-
 use core_types::channels::ChannelStatus::{Open, PendingToClose};
 use utils_types::primitives::{Address, Balance, BalanceType};
+use core_crypto::types::OffchainPublicKey;
 
-use crate::generic::{ChannelStrategy, OutgoingChannelStatus, StrategyTickResult};
+use std::fmt::{Display, Formatter};
+use std::sync::{Arc};
+use async_trait::async_trait;
+use async_std::sync::RwLock;
+use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_misc::transaction_queue::TransactionSender;
+use core_network::network::{Network, NetworkExternalActions};
+
+use crate::config::StrategyConfig;
+use crate::errors::Result;
+use crate::strategy::SingularStrategy;
+use utils_types::traits::PeerIdLike;
 
 /// Size of the simple moving average window used to smoothen the number of registered peers.
 pub const SMA_WINDOW_SIZE: usize = 3;
 
 type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
 
-/// Implements promiscuous strategy.
-/// This strategy opens outgoing channels to peers, which have quality above a given threshold.
-/// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
-pub struct PromiscuousStrategy {
+/// Config of promiscuous strategy.
+pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
     /// Defaults to 0.5
     pub network_quality_threshold: f64,
@@ -39,9 +48,9 @@ pub struct PromiscuousStrategy {
     /// Defaults to square-root of the sampled network size.
     pub max_channels: Option<usize>,
 
-    /// Determines if the strategy should automatically redeem tickets.
-    /// Defaults to false
-    pub auto_redeem_tickets: bool,
+    // /// Determines if the strategy should automatically redeem tickets.
+    // /// Defaults to false
+    // pub auto_redeem_tickets: bool,
 
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
     /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
@@ -49,85 +58,123 @@ pub struct PromiscuousStrategy {
     /// Defaults to true
     pub enforce_max_channels: bool,
 
-    sma: SimpleMovingAvg,
+    // sma: SimpleMovingAvg,
 }
 
-impl Default for PromiscuousStrategy {
+impl Default for PromiscuousStrategyConfig {
     fn default() -> Self {
-        PromiscuousStrategy {
+        PromiscuousStrategyConfig {
             network_quality_threshold: 0.5,
             new_channel_stake: Balance::from_str("100000000000000000", BalanceType::HOPR),
             minimum_channel_balance: Balance::from_str("10000000000000000", BalanceType::HOPR),
             minimum_node_balance: Balance::from_str("100000000000000000", BalanceType::HOPR),
             max_channels: None,
-            auto_redeem_tickets: true,
+            // auto_redeem_tickets: true,
             enforce_max_channels: true,
-            sma: SimpleMovingAvg::new(),
+            // sma: SimpleMovingAvg::new(),
         }
     }
 }
 
-impl ChannelStrategy for PromiscuousStrategy {
-    const NAME: &'static str = "promiscuous";
+/// This strategy opens outgoing channels to peers, which have quality above a given threshold.
+/// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
+pub struct PromiscuousStrategy<Db, Net>
+where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
+    db: Arc<RwLock<Db>>,
+    network: Arc<RwLock<Network<Net>>>,
+    tx_sender: TransactionSender,
+    config: PromiscuousStrategyConfig,
+    sma: Arc<RwLock<SimpleMovingAvg>>,
+}
 
-    fn tick(
-        &mut self,
-        balance: Balance,
-        addresses: impl Iterator<Item = (Address, f64)>,
-        outgoing_channels: Vec<OutgoingChannelStatus>,
-    ) -> StrategyTickResult {
-        let mut to_open: Vec<OutgoingChannelStatus> = vec![];
+impl<Db, Net> PromiscuousStrategy<Db, Net>
+where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
+    pub fn new(cfg: StrategyConfig, db: Arc<RwLock<Db>>, network: Arc<RwLock<Network<Net>>>, tx_sender: TransactionSender) -> Self {
+        Self { db, network, tx_sender, config: PromiscuousStrategyConfig {
+            network_quality_threshold: cfg.network_quality_threshold.unwrap_or(PromiscuousStrategyConfig::default().network_quality_threshold),
+            new_channel_stake: cfg.new_channel_stake.unwrap_or(PromiscuousStrategyConfig::default().new_channel_stake),
+            minimum_channel_balance: cfg.minimum_channel_balance.unwrap_or(PromiscuousStrategyConfig::default().minimum_channel_balance),
+            minimum_node_balance: cfg.minimum_node_balance.unwrap_or(PromiscuousStrategyConfig::default().minimum_node_balance),
+            max_channels: cfg.max_auto_channels.map(|m| m as usize),
+            enforce_max_channels: cfg.enforce_max_channels.unwrap_or(PromiscuousStrategyConfig::default().enforce_max_channels),
+        },sma: Arc::new(RwLock::new(SimpleMovingAvg::new())), }
+    }
+}
+
+impl<Db, Net> Display for PromiscuousStrategy<Db, Net> where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "promiscuous")
+    }
+}
+#[async_trait(? Send)]
+impl<Db, Net> SingularStrategy for PromiscuousStrategy<Db, Net>
+where Db: HoprCoreEthereumDbActions, Net: NetworkExternalActions {
+    async fn on_tick(&self) -> Result<()> {
+        let balance: Balance = self.db.read().await.get_hopr_balance().await?;
+        // addresses: impl Iterator<Item = (Address, f64)>,
+        // outgoing_channels: Vec<OutgoingChannelStatus>,
+
         let mut to_close: Vec<Address> = vec![];
+        let mut to_open: Vec<(Address, Balance)> = vec![];
         let mut new_channel_candidates: Vec<(Address, f64)> = vec![];
         let mut network_size: usize = 0;
-
         let mut active_addresses: HashMap<Address, f64> = HashMap::new();
+        let outgoing_channels = self.db.read().await.get_outgoing_channels().await?;
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
         // which peer ids should become candidates for a new channel
         // Also re-open all the channels that have dropped under minimum given balance
-        for (address, quality) in addresses {
-            if to_close.contains(&address) || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some() {
-                // Skip this peer if we already processed it (iterator may have duplicates)
-                debug!("encountered duplicate peer {}", address);
-                continue;
-            }
+        let peers_with_quality = self.network.read().await.all_peers_with_quality();
+        for (peer, quality) in peers_with_quality {
+            let packet_key = OffchainPublicKey::from_peerid(&peer)?;
+            // get the Ethereum address of the peer
+            if let Some(address) = self.db.read().await.get_chain_key(&packet_key).await? {
+                if to_close.contains(&address) || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some() {
+                    // Skip this peer if we already processed it (iterator may have duplicates)
+                    debug!("encountered duplicate peer {}", peer);
+                    continue;
+                }
 
-            // Also get channels we have opened with it
-            let channel_with_peer = outgoing_channels
-                .iter()
-                .find(|c| c.status == Open && c.address.eq(&address));
+                // Also get channels we have opened with it
+                let channel_with_peer = outgoing_channels
+                    .iter()
+                    .find(|c| c.status == Open && c.destination.eq(&address));
 
-            if let Some(channel) = channel_with_peer {
-                if quality <= self.network_quality_threshold {
-                    // Need to close the channel, because quality has dropped
-                    debug!("new channel closure candidate with {} (quality {})", address, quality);
-                    to_close.push(address.clone());
-                } else if channel.stake.lt(&self.minimum_channel_balance) {
-                    // Need to re-open channel, because channel stake has dropped
-                    debug!("new channel closure & re-stake candidate with {}", address);
-                    to_close.push(address.clone());
+                if let Some(channel) = channel_with_peer {
+                    if quality <= self.config.network_quality_threshold {
+                        // Need to close the channel, because quality has dropped
+                        debug!("new channel closure candidate with {} (quality {})", address, quality);
+                        to_close.push(address.clone());
+                    } else if channel.balance.lt(&self.config.minimum_channel_balance) {
+                        // Need to re-open channel, because channel stake has dropped
+                        debug!("new channel closure & re-stake candidate with {}", address);
+                        to_close.push(address.clone());
+                        new_channel_candidates.push((address.clone(), quality));
+                    }
+                } else if quality >= self.config.network_quality_threshold {
+                    // Try to open channel with this peer, because it is high-quality
+                    debug!("new channel opening candidate {} with quality {}", address, quality);
                     new_channel_candidates.push((address.clone(), quality));
                 }
-            } else if quality >= self.network_quality_threshold {
-                // Try to open channel with this peer, because it is high-quality
-                debug!("new channel opening candidate {} with quality {}", address, quality);
-                new_channel_candidates.push((address.clone(), quality));
-            }
 
-            active_addresses.insert(address, quality);
-            network_size += 1;
+                active_addresses.insert(address, quality);
+                network_size += 1;
+            } else {
+                error!("failed to get chain key from a packet key");
+                continue;
+            }
         }
-        self.sma.add_sample(network_size);
+        
+        self.sma.write().await.add_sample(network_size);
         info!("evaluated qualities of {} peers seen in the network", network_size);
 
-        if self.sma.get_num_samples() < self.sma.get_sample_window_size() {
+        if self.sma.read().await.get_num_samples() < self.sma.read().await.get_sample_window_size() {
             info!(
                 "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
-                self.sma.get_num_samples(),
-                self.sma.get_sample_window_size()
+                self.sma.read().await.get_num_samples(),
+                self.sma.read().await.get_sample_window_size()
             );
-            return StrategyTickResult::new(0, vec![], vec![]);
+            return Ok(());
         }
 
         // Also mark for closing all channels which are in PendingToClose state
@@ -136,7 +183,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             .iter()
             .filter(|c| c.status == PendingToClose)
             .for_each(|c| {
-                to_close.push(c.address.clone());
+                to_close.push(c.destination.clone());
             });
         debug!(
             "{} channels are in PendingToClose, so strategy will mark them for closing too",
@@ -144,9 +191,9 @@ impl ChannelStrategy for PromiscuousStrategy {
         );
 
         // We compute the upper bound for channels as a square-root of the perceived network size
-        let max_auto_channels = self
+        let max_auto_channels = self.config
             .max_channels
-            .unwrap_or((self.sma.get_average() as f64).sqrt().ceil() as usize);
+            .unwrap_or((self.sma.read().await.get_average() as f64).sqrt().ceil() as usize);
         debug!(
             "current upper bound for maximum number of auto-channels is {}",
             max_auto_channels
@@ -162,25 +209,25 @@ impl ChannelStrategy for PromiscuousStrategy {
 
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
-        if occupied > max_auto_channels && self.enforce_max_channels {
+        if occupied > max_auto_channels && self.config.enforce_max_channels {
             warn!(
                 "there are {} opened channels, but the strategy allows only {}",
                 occupied, max_auto_channels
             );
 
-            let mut sorted_channels: Vec<OutgoingChannelStatus> = outgoing_channels
+            let mut sorted_channels: Vec<ChannelEntry> = outgoing_channels
                 .iter()
-                .filter(|c| !to_close.contains(&c.address))
+                .filter(|c| !to_close.contains(&c.destination))
                 .cloned()
                 .collect();
 
             // Sort by quality, lowest-quality first
             sorted_channels.sort_unstable_by(|p1, p2| {
                 active_addresses
-                    .get(&p1.address)
-                    .zip(active_addresses.get(&p2.address))
+                    .get(&p1.destination)
+                    .zip(active_addresses.get(&p2.destination))
                     .and_then(|(q1, q2)| q1.partial_cmp(&q2))
-                    .expect(format!("failed to retrieve quality of {} or {}", p1.address, p2.address).as_str())
+                    .expect(format!("failed to retrieve quality of {} or {}", p1.destination, p2.destination).as_str())
             });
 
             // Close the lowest-quality channels (those we did not mark for closing yet)
@@ -188,7 +235,7 @@ impl ChannelStrategy for PromiscuousStrategy {
                 .into_iter()
                 .take(occupied - max_auto_channels)
                 .for_each(|c| {
-                    to_close.push(c.address);
+                    to_close.push(c.destination);
                 });
         }
 
@@ -205,7 +252,7 @@ impl ChannelStrategy for PromiscuousStrategy {
             let mut remaining_balance = balance.clone();
             for address in new_channel_candidates.into_iter().map(|(p, _)| p) {
                 // Stop if we ran out of balance
-                if remaining_balance.lte(&self.minimum_node_balance) {
+                if remaining_balance.lte(&self.config.minimum_node_balance) {
                     warn!(
                         "strategy ran out of allowed node balance - balance is {}",
                         remaining_balance.to_string()
@@ -213,26 +260,24 @@ impl ChannelStrategy for PromiscuousStrategy {
                     break;
                 }
 
-                // If we haven't added this peer id yet, add it to the list for channel opening
-                if to_open.iter().find(|&p| p.address.eq(&address)).is_none() {
+                // If we haven't added this peer yet, add it to the list for channel opening
+                if to_open.iter().find(|(open_to_address, _)| open_to_address.eq(&address)).is_none() {
                     debug!("promoting peer {} for channel opening", address);
-                    to_open.push(OutgoingChannelStatus {
-                        address,
-                        stake: self.new_channel_stake.clone(),
-                        status: Open,
-                    });
-                    remaining_balance = balance.sub(&self.new_channel_stake);
+                    to_open.push((address.clone(),self.config.new_channel_stake.clone()));
+                    remaining_balance = balance.sub(&self.config.new_channel_stake);
                 }
             }
         }
 
         info!(
             "strategy tick #{} result: {} peers for channel opening, {} peer for channel closure",
-            self.sma.get_num_samples(),
+            self.sma.read().await.get_num_samples(),
             to_open.len(),
             to_close.len()
         );
-        StrategyTickResult::new(max_auto_channels, to_open, to_close)
+        Ok(())
+        // TODO: open and close channels
+        // StrategyTickResult::new(max_auto_channels, to_open, to_close)
     }
 }
 
@@ -360,71 +405,71 @@ mod tests {
     }
 }
 
-/// WASM bindings
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::generic::ChannelStrategy;
-    use crate::generic::{wasm::StrategyTickResult, PeerQuality};
-    use crate::strategy_tick;
-    use std::sync::Mutex;
-    use utils_log::error;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Balance;
-    use wasm_bindgen::prelude::*;
+// /// WASM bindings
+// #[cfg(feature = "wasm")]
+// pub mod wasm {
+//     use crate::generic::ChannelStrategy;
+//     use crate::generic::{wasm::StrategyTickResult, PeerQuality};
+//     use crate::strategy_tick;
+//     use std::sync::Mutex;
+//     use utils_log::error;
+//     use utils_misc::utils::wasm::JsResult;
+//     use utils_types::primitives::Balance;
+//     use wasm_bindgen::prelude::*;
 
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct PromiscuousStrategy {
-        pub network_quality_threshold: f64,
-        pub new_channel_stake: Balance,
-        pub minimum_channel_balance: Balance,
-        pub minimum_node_balance: Balance,
-        pub max_channels: Option<usize>,
-        pub auto_redeem_tickets: bool,
-        pub enforce_max_channels: bool,
-        w: Mutex<super::PromiscuousStrategy>,
-    }
+//     #[wasm_bindgen(getter_with_clone)]
+//     pub struct PromiscuousStrategy {
+//         pub network_quality_threshold: f64,
+//         pub new_channel_stake: Balance,
+//         pub minimum_channel_balance: Balance,
+//         pub minimum_node_balance: Balance,
+//         pub max_channels: Option<usize>,
+//         pub auto_redeem_tickets: bool,
+//         pub enforce_max_channels: bool,
+//         w: Mutex<super::PromiscuousStrategy>,
+//     }
 
-    #[wasm_bindgen]
-    impl PromiscuousStrategy {
-        #[wasm_bindgen(constructor)]
-        pub fn _new() -> Self {
-            let s = super::PromiscuousStrategy::default();
-            Self {
-                network_quality_threshold: s.network_quality_threshold,
-                new_channel_stake: s.new_channel_stake,
-                minimum_channel_balance: s.minimum_channel_balance,
-                minimum_node_balance: s.minimum_node_balance,
-                max_channels: s.max_channels,
-                auto_redeem_tickets: s.auto_redeem_tickets,
-                enforce_max_channels: s.enforce_max_channels,
-                w: Mutex::new(s),
-            }
-        }
+//     #[wasm_bindgen]
+//     impl PromiscuousStrategy {
+//         #[wasm_bindgen(constructor)]
+//         pub fn _new() -> Self {
+//             let s = super::PromiscuousStrategy::default();
+//             Self {
+//                 network_quality_threshold: s.network_quality_threshold,
+//                 new_channel_stake: s.new_channel_stake,
+//                 minimum_channel_balance: s.minimum_channel_balance,
+//                 minimum_node_balance: s.minimum_node_balance,
+//                 max_channels: s.max_channels,
+//                 auto_redeem_tickets: s.auto_redeem_tickets,
+//                 enforce_max_channels: s.enforce_max_channels,
+//                 w: Mutex::new(s),
+//             }
+//         }
 
-        #[wasm_bindgen(getter)]
-        pub fn name(&self) -> String {
-            super::PromiscuousStrategy::NAME.into()
-        }
+//         #[wasm_bindgen(getter)]
+//         pub fn name(&self) -> String {
+//             super::PromiscuousStrategy::NAME.into()
+//         }
 
-        pub fn tick(
-            &self,
-            balance: Balance,
-            peers: PeerQuality,
-            outgoing_channels: JsValue,
-        ) -> JsResult<StrategyTickResult> {
-            if let Ok(mut s) = self.w.lock() {
-                s.network_quality_threshold = self.network_quality_threshold;
-                s.new_channel_stake = self.new_channel_stake;
-                s.minimum_channel_balance = self.minimum_channel_balance;
-                s.minimum_node_balance = self.minimum_node_balance;
-                s.max_channels = self.max_channels;
-                s.auto_redeem_tickets = self.auto_redeem_tickets;
-                s.enforce_max_channels = self.enforce_max_channels;
-                strategy_tick!(s, balance, peers, outgoing_channels)
-            } else {
-                error!("could not lock for strategy tick");
-                Err("strategy lock failed".into())
-            }
-        }
-    }
-}
+//         pub fn tick(
+//             &self,
+//             balance: Balance,
+//             peers: PeerQuality,
+//             outgoing_channels: JsValue,
+//         ) -> JsResult<StrategyTickResult> {
+//             if let Ok(mut s) = self.w.lock() {
+//                 s.network_quality_threshold = self.network_quality_threshold;
+//                 s.new_channel_stake = self.new_channel_stake;
+//                 s.minimum_channel_balance = self.minimum_channel_balance;
+//                 s.minimum_node_balance = self.minimum_node_balance;
+//                 s.max_channels = self.max_channels;
+//                 s.auto_redeem_tickets = self.auto_redeem_tickets;
+//                 s.enforce_max_channels = self.enforce_max_channels;
+//                 strategy_tick!(s, balance, peers, outgoing_channels)
+//             } else {
+//                 error!("could not lock for strategy tick");
+//                 Err("strategy lock failed".into())
+//             }
+//         }
+//     }
+// }

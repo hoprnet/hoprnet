@@ -206,6 +206,7 @@ mod tests {
             async fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_channel_x(&self, src: &Address, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn get_channels_from(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_outgoing_channels(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
             async fn get_channels_to(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
             async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
