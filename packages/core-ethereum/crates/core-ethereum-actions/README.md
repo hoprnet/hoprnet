@@ -26,3 +26,17 @@ and if they are, their state is changed to `BeingRedeemed` (while having acquire
 Subsequently, the ticket in such state is transmitted into the `TransactionQueue` so the redemption soon is executed on-chain.
 The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
 confirmation of each ticket redemption.
+
+## `channels`
+
+This submodule adds 4 basic high-level on-chain functions:
+
+- `open_channel`
+- `fund_channel`
+- `close_channel`
+- `withdraw`
+
+All the functions do the necessary validations using the DB and then post the corresponding transaction
+into the `TransactionQueue`.
+The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
+confirmation of the corresponding operation.
