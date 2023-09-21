@@ -22,7 +22,7 @@ wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true, features = ["futures-core-03-stream"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
-real-base = { path = "../../../real/crates/real-base", default-features = false }
+real-base = { workspace = true, default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

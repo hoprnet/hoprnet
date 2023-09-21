@@ -233,6 +233,7 @@ build-docs-api: build
 clean: # Cleanup build directories (lib,build, ...etc.)
 	cargo clean
 	yarn clean
+	find packages -type f -name "*.js" -path "packages/*/src/*" ! -path "packages/*/crates/*" -delete
 	find packages/ethereum/crates/bindings/src -type f -delete
 
 .PHONY: reset
