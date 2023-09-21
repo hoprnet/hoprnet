@@ -1082,7 +1082,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "bindings",
- "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
  "core-ethereum-misc",
@@ -2979,6 +2978,7 @@ version = "0.2.0"
 dependencies = [
  "clap 4.0.32",
  "console_error_panic_hook",
+ "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-indexer",
  "core-ethereum-misc",

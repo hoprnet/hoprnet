@@ -12,11 +12,10 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
-async-trait = "0.1"
+async-std = { workspace = true }
+async-trait = { workspace = true }
 async-lock = { workspace = true }
-console_error_panic_hook = { version = "0.1.7", optional = true }
-futures = "0.3"
+futures = { workspace = true }
 hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
@@ -24,17 +23,17 @@ serde = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen = { workspace = true, optional = true }
 thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
+wasm-bindgen-futures = { workspace = true, features = ["futures-core-03-stream"], optional = true }
 
-core-crypto = { workspace = true, default-features = false }
-core-ethereum-db = { workspace = true, default-features = false }
-core-ethereum-misc = { workspace = true, default-features = false }
-core-types = { workspace = true, default-features = false }
-bindings = { workspace = true, default-features = false }
-utils-db = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
-utils-log = { workspace = true, default-features = false }
-utils-types = { workspace = true, default-features = false }
+core-crypto = { workspace = true }
+core-ethereum-db = { workspace = true }
+core-ethereum-misc = { workspace = true }
+core-types = { workspace = true }
+bindings = { workspace = true }
+utils-db = { workspace = true }
+utils-misc = { workspace = true }
+utils-log = { workspace = true }
+utils-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
@@ -46,8 +45,7 @@ hex-literal = "0.4"
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = ["wasm"]
 wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures",
     "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]
