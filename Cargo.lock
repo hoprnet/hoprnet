@@ -1075,6 +1075,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-ethereum-actions"
+version = "0.1.0"
+dependencies = [
+ "async-lock",
+ "async-std",
+ "async-trait",
+ "bindings",
+ "core-crypto",
+ "core-ethereum-db",
+ "core-ethereum-misc",
+ "core-types",
+ "env_logger",
+ "futures",
+ "hex",
+ "hex-literal",
+ "js-sys",
+ "lazy_static",
+ "mockall",
+ "serde",
+ "serde-wasm-bindgen",
+ "thiserror",
+ "utils-db",
+ "utils-log",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "core-ethereum-db"
 version = "0.4.0"
 dependencies = [
@@ -1133,7 +1163,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1154,6 +1184,8 @@ dependencies = [
  "mockall",
  "multiaddr",
  "semver",
+ "serde",
+ "serde-wasm-bindgen",
  "svm-rs",
  "thiserror",
  "tokio",
@@ -1192,6 +1224,7 @@ dependencies = [
  "async-trait",
  "console_error_panic_hook",
  "core-crypto",
+ "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-misc",
  "core-mixer",
@@ -2952,6 +2985,7 @@ version = "0.2.0"
 dependencies = [
  "clap 4.0.32",
  "console_error_panic_hook",
+ "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-indexer",
  "core-ethereum-misc",

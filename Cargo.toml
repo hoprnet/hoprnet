@@ -14,6 +14,7 @@ members = [
     "packages/core/crates/core-p2p",
     "packages/core/crates/core-strategy",
     "packages/core/crates/core-types",
+    "packages/core-ethereum/crates/core-ethereum-actions",
     "packages/core-ethereum/crates/core-ethereum-db",
     "packages/core-ethereum/crates/core-ethereum-indexer",
     "packages/core-ethereum/crates/core-ethereum-misc",
@@ -60,6 +61,7 @@ wasm-bindgen = "0.2.86"
 wasm-bindgen-futures = "0.4.36"
 
 bindings = { path = "packages/ethereum/crates/bindings", default-features = false }
+core-ethereum-actions = { path = "packages/core-ethereum/crates/core-ethereum-actions", default-features = false }
 core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
 core-ethereum-misc = { path = "packages/core-ethereum/crates/core-ethereum-misc", default-features = false }
 core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }

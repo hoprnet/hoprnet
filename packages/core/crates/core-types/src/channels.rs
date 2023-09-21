@@ -19,12 +19,6 @@ use std::{
 };
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
 
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
-
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
-
 use utils_types::traits::{BinarySerializable, ToHex};
 
 /// Size-optimized encoding of the ticket, used for both,
@@ -61,6 +55,14 @@ impl Display for ChannelStatus {
             ChannelStatus::PendingToClose => write!(f, "PendingToClose"),
         }
     }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub enum ChannelDirection {
+    Incoming = 0,
+    Outgoing = 1,
 }
 
 /// Overall description of a channel
@@ -107,9 +109,10 @@ impl ChannelEntry {
     }
 
     /// Checks if the closure time of this channel has passed.
-    pub fn closure_time_passed(&self) -> Option<bool> {
+    pub fn closure_time_passed(&self, current_timestamp_ms: u64) -> Option<bool> {
+        assert!(current_timestamp_ms > 0, "invalid timestamp");
         // round clock ms to seconds
-        let now_seconds: U256 = U256::from(current_timestamp()) / 1000u64.into();
+        let now_seconds: U256 = U256::from(current_timestamp_ms) / 1000u64.into();
 
         if self.closure_time.eq(&U256::zero()) {
             None
@@ -118,10 +121,11 @@ impl ChannelEntry {
         }
     }
 
-    /// Calculates the remaining channel closure grace period.
-    pub fn remaining_closure_time(&self) -> Option<u64> {
+    /// Calculates the remaining channel closure grace period in seconds.
+    pub fn remaining_closure_time(&self, current_timestamp_ms: u64) -> Option<u64> {
+        assert!(current_timestamp_ms > 0, "invalid timestamp");
         // round clock ms to seconds
-        let now_seconds = U256::from(current_timestamp()) / 1000u64.into();
+        let now_seconds = U256::from(current_timestamp_ms) / 1000u64.into();
 
         if self.closure_time.eq(&U256::zero()) {
             None
@@ -138,17 +142,30 @@ impl ChannelEntry {
     }
 }
 
-impl std::fmt::Display for ChannelEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("ChannelEntry")
-            .field("source", &self.source.to_string())
-            .field("destination", &self.destination.to_string())
-            .field("balance", &format!("{}", self.balance))
-            .field("ticket_index", &self.ticket_index.to_string())
-            .field("status", &self.status.to_string())
-            .field("channel_epoch", &self.channel_epoch.to_string())
-            .field("closure_time", &self.closure_time.to_string())
-            .finish()
+impl ChannelEntry {
+    /// Determines the channel direction given the self address.
+    /// Panics if source nor destination are equal to the given address.
+    pub fn direction(&self, me: &Address) -> ChannelDirection {
+        if self.source.eq(me) {
+            ChannelDirection::Outgoing
+        } else if self.destination.eq(me) {
+            ChannelDirection::Incoming
+        } else {
+            panic!("foreign channel: {self}")
+        }
+    }
+}
+
+impl Display for ChannelEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} channel {}: {} -> {}",
+            self.status,
+            self.get_id(),
+            self.source,
+            self.destination
+        )
     }
 }
 
