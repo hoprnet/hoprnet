@@ -2,7 +2,7 @@ use crate::config::StrategyConfig;
 use crate::strategy::SingularStrategy;
 use async_std::sync::RwLock;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::transaction_queue::TransactionSender;
+use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_network::network::{Network, NetworkExternalActions};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
