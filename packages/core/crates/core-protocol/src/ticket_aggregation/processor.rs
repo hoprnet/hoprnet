@@ -8,7 +8,7 @@ use core_crypto::{
     types::{Hash, OffchainPublicKey},
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_mixer::future_extensions::StreamThenConcurrentExt;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{generate_channel_id, Ticket},

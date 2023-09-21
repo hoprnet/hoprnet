@@ -1284,6 +1284,7 @@ dependencies = [
  "more-asserts",
  "pin-project",
  "rand 0.8.5",
+ "rust-stream-ext-concurrent",
  "utils-log",
  "utils-metrics",
  "utils-misc",
@@ -1379,6 +1380,7 @@ dependencies = [
  "libp2p-identity",
  "mockall",
  "parameterized",
+ "rust-stream-ext-concurrent",
  "serde",
  "serde-wasm-bindgen",
  "serial_test",
@@ -1441,6 +1443,7 @@ dependencies = [
  "libp2p",
  "libp2p-identity",
  "more-asserts",
+ "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
  "thiserror",
@@ -5197,6 +5200,15 @@ dependencies = [
  "netlink-proto",
  "nix",
  "thiserror",
+]
+
+[[package]]
+name = "rust-stream-ext-concurrent"
+version = "1.0.0"
+source = "git+https://github.com/hoprnet/rust-stream-ext-concurrent.git?branch=main#70f9b146aa211f0c3e985a73bf432954fc2c9585"
+dependencies = [
+ "futures",
+ "pin-project",
 ]
 
 [[package]]

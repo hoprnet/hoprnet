@@ -131,7 +131,7 @@ impl Mixer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::future_extensions::StreamThenConcurrentExt;
+    use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
     use futures_lite::stream::StreamExt;
     use more_asserts::*;
 

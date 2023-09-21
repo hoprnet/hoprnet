@@ -1,14 +1,15 @@
+use async_lock::RwLock;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+
 use crate::errors::PacketError::{
     AcknowledgementValidation, ChannelNotFound, InvalidPacketState, MissingDomainSeparator, OutOfFunds,
     PacketConstructionError, PacketDecodingError, PathError, PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use crate::errors::Result;
 use crate::packet::{Packet, PacketState};
-use async_lock::RwLock;
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_mixer::future_extensions::StreamThenConcurrentExt;
 use core_mixer::mixer::{Mixer, MixerConfig};
 use core_path::errors::PathError::PathNotValid;
 use core_path::path::Path;

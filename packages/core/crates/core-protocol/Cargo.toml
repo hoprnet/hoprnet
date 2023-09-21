@@ -24,6 +24,7 @@ futures = { workspace = true }
 futures-lite = { workspace = true }
 hex-literal = "0.4"
 lazy_static = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
 serde_with = { workspace = true }
 thiserror = { workspace = true }
