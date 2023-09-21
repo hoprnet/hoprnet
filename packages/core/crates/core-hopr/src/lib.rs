@@ -43,9 +43,9 @@ use core_ethereum_misc::transaction_queue::{TransactionQueue, TransactionSender}
 
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::NetworkExternalActions;
-use core_strategy::config::StrategyConfig;
 use core_strategy::passive::PassiveStrategy;
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
+use core_strategy::{config::StrategyConfig, promiscuous::PromiscuousStrategy};
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 #[cfg(feature = "wasm")]
@@ -174,6 +174,12 @@ where
     for cfg in cfgs {
         match cfg.name.as_str() {
             "passive" => strategies.push(Box::new(PassiveStrategy::new(
+                cfg,
+                db.clone(),
+                network.clone(),
+                tx_sender.clone(),
+            ))),
+            "promiscuous" => strategies.push(Box::new(PromiscuousStrategy::new(
                 cfg,
                 db.clone(),
                 network.clone(),
