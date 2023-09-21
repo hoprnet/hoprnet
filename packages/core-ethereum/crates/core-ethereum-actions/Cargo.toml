@@ -29,7 +29,7 @@ wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream
 core-crypto = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-misc = { workspace = true, default-features = false }
-core-types = { pworkspace = true, default-features = false }
+core-types = { workspace = true, default-features = false }
 bindings = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-misc = { workspace = true, default-features = false }
