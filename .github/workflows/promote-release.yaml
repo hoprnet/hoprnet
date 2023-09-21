@@ -4,14 +4,14 @@ name: Promote Release
 on:
   workflow_dispatch:
     inputs:
-      release_name:
+      new_release_name:
         type: string
         required: true
-        description: 'Release name (providence| bratislava)'
+        description: 'New release name ( bali | saint-luis )'
       tag_name:
         type: string
         required: true
-        description: 'Git tag name which the release will be rebased (v2.0.0-rc.2)'
+        description: 'Git tag name which the release will be branched (v2.0.0-rc.6)'
 
 concurrency:
   group: promote-release
@@ -53,28 +53,17 @@ jobs:
           fi
 
           # Create new branch or reuse an existing branch
-          if ! git branch -al release/${{ github.event.inputs.release_name }} | grep ${{ github.event.inputs.release_name }};
+          release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
+          if git branch -al release/${release_name} | grep ${release_name};
           then
-            git checkout release/${{ github.event.inputs.release_name }}
-            git rebase ${{ github.event.inputs.tag_name }}
-            git push
-          else
             git checkout ${{ github.event.inputs.tag_name }}
-            git checkout -b release/${{ github.event.inputs.release_name }}
-            git push --set-upstream origin release/${{ github.event.inputs.release_name }}
+            git checkout -b release/${release_name}
+            git push --set-upstream origin release/${release_name}
+          else
+            echo "Branch release/${release_name} already exists"
+            exit 1
           fi
-          
-          # Tag the release
-          git tag --force ${{ github.event.inputs.release_name }}
-          git push --force origin ${{ github.event.inputs.release_name }}
-
-      - name: Tag docker images
-        run: |
-          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-          docker_version_tag=$(jq -r '.version' packages/hoprd/package.json)
-          images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
-          for image in ${images[@]};
-          do
-            echo "Tagging ${image}:${{ github.event.inputs.release_name }}"
-            gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_version_tag} ${docker_registry}/${image}:${{ github.event.inputs.release_name }}
-          done
+          gh variable set BRANCH_RELEASE_RELEASE_NAME --body "${release_name}"
+          gh variable set BRANCH_MASTER_RELEASE_NAME --body "${{ github.event.inputs.new_release_name }}"
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}

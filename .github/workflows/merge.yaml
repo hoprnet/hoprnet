@@ -226,8 +226,20 @@ jobs:
       - name: Tag repository
         id: tag
         run: |
+          # Tag semver
           git tag v${{ steps.setup.outputs.current_version }}
           git push origin v${{ steps.setup.outputs.current_version }}
+
+          # Tag release name
+          if [[ "${base_branch}" == "master" ]]; then
+            release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}
+          elif [[ "${base_branch}" =~ ^"release" ]]; then
+            release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
+          fi
+          git tag --force ${release_name}
+          git push --force origin ${release_name}
+          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
+
 
       - name: Generate Changelog
         id: changelog
@@ -237,6 +249,16 @@ jobs:
           echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Tag docker images with release name
+        run: |
+          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
+          images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
+          for image in ${images[@]};
+          do
+            echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
+            gcloud artifacts docker tags add ${docker_registry}/${image}:${{ steps.setup.outputs.current_version }} ${docker_registry}/${image}:${{ steps.tag.outputs.release_name }}
+          done
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
