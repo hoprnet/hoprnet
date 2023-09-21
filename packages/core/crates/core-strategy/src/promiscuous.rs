@@ -10,8 +10,8 @@ use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_std::sync::RwLock;
 use async_trait::async_trait;
+use core_ethereum_actions::transaction_queue::{Transaction, TransactionSender};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::transaction_queue::TransactionSender;
 use core_network::network::{Network, NetworkExternalActions};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
@@ -140,7 +140,7 @@ where
         // addresses: impl Iterator<Item = (Address, f64)>,
         // outgoing_channels: Vec<OutgoingChannelStatus>,
 
-        let mut to_close: Vec<Address> = vec![];
+        let mut to_close: Vec<ChannelEntry> = vec![];
         let mut to_open: Vec<(Address, Balance)> = vec![];
         let mut new_channel_candidates: Vec<(Address, f64)> = vec![];
         let mut network_size: usize = 0;
@@ -155,7 +155,8 @@ where
             let packet_key = OffchainPublicKey::from_peerid(&peer)?;
             // get the Ethereum address of the peer
             if let Some(address) = self.db.read().await.get_chain_key(&packet_key).await? {
-                if to_close.contains(&address) || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some()
+                if to_close.iter().any(|c| c.destination == address)
+                    || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some()
                 {
                     // Skip this peer if we already processed it (iterator may have duplicates)
                     debug!("encountered duplicate peer {}", peer);
@@ -171,11 +172,11 @@ where
                     if quality <= self.config.network_quality_threshold {
                         // Need to close the channel, because quality has dropped
                         debug!("new channel closure candidate with {} (quality {})", address, quality);
-                        to_close.push(address.clone());
+                        to_close.push(channel.clone());
                     } else if channel.balance.lt(&self.config.minimum_channel_balance) {
                         // Need to re-open channel, because channel stake has dropped
                         debug!("new channel closure & re-stake candidate with {}", address);
-                        to_close.push(address.clone());
+                        to_close.push(channel.clone());
                         new_channel_candidates.push((address.clone(), quality));
                     }
                 } else if quality >= self.config.network_quality_threshold {
@@ -210,7 +211,7 @@ where
             .iter()
             .filter(|c| c.status == PendingToClose)
             .for_each(|c| {
-                to_close.push(c.destination.clone());
+                to_close.push(c.clone());
             });
         debug!(
             "{} channels are in PendingToClose, so strategy will mark them for closing too",
@@ -245,7 +246,7 @@ where
 
             let mut sorted_channels: Vec<ChannelEntry> = outgoing_channels
                 .iter()
-                .filter(|c| !to_close.contains(&c.destination))
+                .filter(|c| !to_close.contains(&c))
                 .cloned()
                 .collect();
 
@@ -263,7 +264,7 @@ where
                 .into_iter()
                 .take(occupied - max_auto_channels)
                 .for_each(|c| {
-                    to_close.push(c.destination);
+                    to_close.push(c);
                 });
         }
 
@@ -307,9 +308,21 @@ where
             to_open.len(),
             to_close.len()
         );
+        // close all the channels
+        futures::future::join_all(to_close.iter().map(|channel_to_close| async {
+            self.tx_sender
+                .send(Transaction::CloseChannel(channel_to_close.clone()))
+                .await
+        }))
+        .await;
+        // open all the channels
+        futures::future::join_all(to_open.iter().map(|channel_to_open| async {
+            self.tx_sender
+                .send(Transaction::OpenChannel(channel_to_open.0, channel_to_open.1))
+                .await
+        }))
+        .await;
         Ok(())
-        // TODO: open and close channels
-        // StrategyTickResult::new(max_auto_channels, to_open, to_close)
     }
 }
 
@@ -317,14 +330,19 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_ethereum_misc::{transaction_queue::{TransactionQueue, TransactionExecutor}, errors::CoreEthereumError};
+    use core_crypto::types::Hash;
+    use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
-    use core_network::{network::{NetworkConfig, NetworkExternalActions, NetworkEvent}, PeerId};
+    use core_network::{
+        network::{NetworkConfig, NetworkEvent, NetworkExternalActions},
+        PeerId,
+    };
     use core_types::acknowledgement::AcknowledgedTicket;
-    use utils_db::{rusty::RustyLevelDbShim, db::DB};
+    use core_types::channels::ChannelStatus;
     use std::str::FromStr;
+    use utils_db::{db::DB, rusty::RustyLevelDbShim};
     struct MockTransactionExecutor;
-    
+
     impl MockTransactionExecutor {
         pub fn new() -> Self {
             Self {}
@@ -333,11 +351,41 @@ mod tests {
 
     #[async_trait(? Send)]
     impl TransactionExecutor for MockTransactionExecutor {
-        async fn redeem_ticket(&self, _ticket: AcknowledgedTicket) -> std::result::Result<(), CoreEthereumError> {
-            Ok(())
+        async fn redeem_ticket(&self, _ticket: AcknowledgedTicket) -> TransactionResult {
+            TransactionResult::RedeemTicket {
+                tx_hash: Hash::default(),
+            }
+        }
+        async fn open_channel(&self, _destination: Address, _balance: Balance) -> TransactionResult {
+            TransactionResult::OpenChannel {
+                tx_hash: Hash::default(),
+                channel_id: Hash::default(),
+            }
+        }
+        async fn fund_channel(&self, _channel_id: Hash, _amount: Balance) -> TransactionResult {
+            TransactionResult::FundChannel {
+                tx_hash: Hash::default(),
+            }
+        }
+        async fn close_channel_initialize(&self, _src: Address, _dst: Address) -> TransactionResult {
+            TransactionResult::CloseChannel {
+                tx_hash: Hash::default(),
+                status: ChannelStatus::PendingToClose,
+            }
+        }
+        async fn close_channel_finalize(&self, _src: Address, _dst: Address) -> TransactionResult {
+            TransactionResult::CloseChannel {
+                tx_hash: Hash::default(),
+                status: ChannelStatus::Closed,
+            }
+        }
+        async fn withdraw(&self, _recipient: Address, _amount: Balance) -> TransactionResult {
+            TransactionResult::Withdraw {
+                tx_hash: Hash::default(),
+            }
         }
     }
-    struct MockNetworkExternalActions {}
+    struct MockNetworkExternalActions;
     impl NetworkExternalActions for MockNetworkExternalActions {
         fn is_public(&self, _: &PeerId) -> bool {
             false
@@ -350,18 +398,20 @@ mod tests {
     async fn test_promiscuous_strategy_config() {
         let alice = Address::from_str("0x5cb1d93aea1fc219a936a708576bf553042993ea").unwrap();
 
-        let db = Arc::new(RwLock::new(
-            CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()),alice,)
-        ));
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            alice,
+        )));
 
-        let network = Arc::new(RwLock::new(
-            Network::new(PeerId::random(), NetworkConfig::default(), MockNetworkExternalActions {})
-        ));
-        let mut tx_exec = MockTransactionExecutor::new();
-        let tx_sender = TransactionQueue::new(db.clone(), Box::new(tx_exec)).new_sender();
+        let network = Arc::new(RwLock::new(Network::new(
+            PeerId::random(),
+            NetworkConfig::default(),
+            MockNetworkExternalActions {},
+        )));
+        let tx_sender = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new())).new_sender();
 
         let strat_cfg = StrategyConfig::default();
-        
+
         let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
         assert_eq!(strat.to_string(), "promiscuous");
     }
@@ -369,7 +419,7 @@ mod tests {
     // #[async_std::test]
     // fn test_promiscuous_strategy_basic() {
     //     let strat_cft = PromiscuousStrategyConfig::default();
-        
+
     //     assert_eq!(strat_cft.name(), "promiscuous");
     //     // let mut strat = PromiscuousStrategy::default();
 

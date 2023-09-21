@@ -22,6 +22,7 @@ serde-wasm-bindgen = { workspace = true, optional = true }
 simple_moving_average = "0.1.2"
 thiserror = { workspace = true }
 validator = { workspace = true }
+futures = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true}
 
@@ -29,7 +30,7 @@ core-types = { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
 core-network = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
-core-ethereum-misc = { workspace = true, default-features = false }
+core-ethereum-actions = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
 utils-misc = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
@@ -53,5 +54,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen", "getrandom/js", "core-types/wasm", "core-crypto/wasm", "core-network/wasm", "core-ethereum-db/wasm",  "core-ethereum-misc/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-db/wasm" ]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen", "getrandom/js", "core-types/wasm", "core-crypto/wasm", "core-network/wasm", "core-ethereum-db/wasm",  "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-db/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
