@@ -6,7 +6,6 @@ set -Eeuo pipefail
 milestone_number=${1}
 include_open=${2:-false}
 
-
 # Decode the entry of a changelog
 jq_decode() {
     echo ${1} | base64 --decode
@@ -33,8 +32,6 @@ add_entry_type() {
         section_other="${section_other}\n- #${id} - ${title}"
     fi
 }
-
-
 
 process_entries() {
     entries=${1}
@@ -70,7 +67,6 @@ build_change_log() {
     echo -e ${change_log_content}
 }
 
-
 # Process Issues
 issues=$(gh issue list --milestone ${milestone_number} --state all --json number,title,labels,state | jq -r 'to_entries[] | .value | @base64')
 process_entries "$issues"
@@ -79,5 +75,3 @@ process_entries "$issues"
 prs=$(gh pr list --state all --json number,title,labels,milestone,state | jq -r --argjson milestone_number ${milestone_number} 'to_entries[] | select(.value.milestone) | select(.value.milestone.number == $milestone_number).value | @base64')
 process_entries "$prs"
 build_change_log
-
-
