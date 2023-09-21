@@ -29,11 +29,11 @@ js-sys = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
 
-core-crypto = { path = "../core-crypto", default-features = false }
-utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
-utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
-utils-metrics = { path = "../../../utils/crates/utils-metrics", default-features = false }
-utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+core-crypto = { workspace = true, default-features = false }
+utils-log = { workspace = true, default-features = false }
+utils-misc = { workspace = true, default-features = false }
+utils-metrics = { workspace = true, default-features = false }
+utils-types = { workspace = true, default-features = false }
 
 [dev-dependencies]
 mockall = "0.11.3"
