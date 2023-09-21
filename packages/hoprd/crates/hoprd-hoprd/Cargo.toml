@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
-hex = "0.4.3"
+hex = { workspace = true }
 proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 serde_yaml = "0.9"

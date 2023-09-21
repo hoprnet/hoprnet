@@ -21,10 +21,10 @@ simple_moving_average = "0.1.2"
 validator = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 
-core-types = { path = "../core-types", default-features = false }
-utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
-utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
-utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+core-types = { workspace = true, default-features = false }
+utils-log = { workspace = true, default-features = false }
+utils-misc = { workspace = true, default-features = false }
+utils-types = { workspace = true, default-features = false }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
