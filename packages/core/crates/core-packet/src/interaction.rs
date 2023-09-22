@@ -554,7 +554,7 @@ where
 
         // Decide whether to create 0-hop or multihop ticket
         let next_ticket = if path.length() == 1 {
-            Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)
+            Ticket::new_zero_hop(&next_peer, &self.cfg.chain_keypair, &domain_separator)?
         } else {
             self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
@@ -737,7 +737,7 @@ where
 
                 // Create next ticket for the packet
                 next_ticket = if ticket_path_pos == 1 {
-                    Ticket::new_zero_hop(&next_hop_addr, &self.cfg.chain_keypair, &domain_separator)
+                    Ticket::new_zero_hop(&next_hop_addr, &self.cfg.chain_keypair, &domain_separator)?
                 } else {
                     self.create_multihop_ticket(next_hop_addr, ticket_path_pos).await?
                 };
