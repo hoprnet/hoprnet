@@ -1,4 +1,4 @@
-name: Lint
+name: Setup Hoprd Workspace
 
 env:
   RUST_BACKTRACE: "1"
@@ -6,19 +6,12 @@ env:
   RUSTC_WRAPPER: "sccache"
 
 on:
-  pull_request:
-    types:
-      - synchronize
-      - ready_for_review
-concurrency:
-  group: ${{ github.head_ref }}-lint
-  cancel-in-progress: true
+  workflow_call:
+
 jobs:
-  lint:
-    name: Linter
+  workspace:
+    name: Setup Hoprd Workspace
     runs-on: ubuntu-2-core
-    timeout-minutes: 30
-    if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -75,18 +68,3 @@ jobs:
 
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
-
-      - name: Run linter
-        run: nix develop -c make lint
-
-  # shellcheck:
-  #   name: Shellcheck
-  #   runs-on: ubuntu-2-core
-  #   timeout-minutes: 15
-  #   if: github.event.pull_request.draft == false
-  #   steps:
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@v3
-
-  #     - name: Check shell scripts (not enforced for now)
-  #       run: shellcheck -a --norc -s bash -x scripts/*.sh

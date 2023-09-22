@@ -32,58 +32,8 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
 
-      - name: Disable sccache (act-only)
-        if: ${{ env.ACT }}
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-
-      - name: Sccache Setup
-        if: ${{ !env.ACT }}
-        uses: mozilla-actions/sccache-action@v0.0.3
-        with:
-          version: "v0.4.0"
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@v20
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@v12
-        if: ${{ !env.ACT }}
-        with:
-          name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-        continue-on-error: true
-
-      - name: get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(pwd)/.yarn/cache" >> $GITHUB_OUTPUT
-
-      - name: restore yarn cache
-        uses: actions/cache@v3
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - name: restore cargo cache
-        uses: actions/cache@v3
-        with:
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            .cargo/.package-cache/
-            .cargo/bin/
-
-      - name: Install dependencies
-        run: nix develop -c make -j deps-ci
+      - name: Setup Hoprd workspace
+        uses: ./.github/workflows/setup-workspace.yaml
 
       - name: Choose template
         id: template

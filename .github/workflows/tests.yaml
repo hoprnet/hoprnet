@@ -4,7 +4,6 @@ env:
   RUST_BACKTRACE: "1"
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
-  HOPR_GITHUB_REF: ${{ github.ref }}
   FOUNDRY_PROFILE: ci
 
 on:
