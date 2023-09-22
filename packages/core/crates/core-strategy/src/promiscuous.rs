@@ -137,7 +137,7 @@ where
     Db: HoprCoreEthereumDbActions,
     Net: NetworkExternalActions,
 {
-    async fn on_tick(&self) -> Result<()> {
+    async fn on_tick(&self) -> Result<(Vec<ChannelEntry>, Vec<(Address, Balance)>)> {
         let mut to_close: Vec<ChannelEntry> = vec![];
         let mut to_open: Vec<(Address, Balance)> = vec![];
         let mut new_channel_candidates: Vec<(Address, f64)> = vec![];
@@ -202,7 +202,7 @@ where
                 self.sma.read().await.get_num_samples(),
                 self.sma.read().await.get_sample_window_size()
             );
-            return Ok(());
+            return Ok((to_close, to_open));
         }
 
         // Also mark for closing all channels which are in PendingToClose state
@@ -339,7 +339,7 @@ where
         }))
         .await;
         debug!("open channels done");
-        Ok(())
+        Ok((to_close, to_open))
     }
 }
 
@@ -491,7 +491,12 @@ mod tests {
             MockNetworkExternalActions {},
         )));
 
-        let tx_sender = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new())).new_sender();
+         // Start the TransactionQueue with the mock TransactionExecutor
+         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+         let tx_sender = tx_queue.new_sender();
+         async_std::task::spawn_local(async move {
+             tx_queue.transaction_loop().await;
+         });
 
         let strat_cfg = StrategyConfig::default();
 
@@ -501,8 +506,8 @@ mod tests {
         let peers: Vec<(PeerId, u32)> = vec![
             (bob_peer_id.clone(), 7),        // - bob: 0.7
             (charlie_peer_id.clone(), 9),    // - charlie: 0.9
-            (eugene_peer_id.clone(), 8),     // - eugene: 0.8
-            (gustave_peer_id.clone(), 10),   // - gustave: 1.0
+            (eugene_peer_id.clone(), 10),     // - eugene: 0.8
+            (gustave_peer_id.clone(), 8),   // - gustave: 1.0
             (address_peer_id_pairs[5].1, 1), // - random_peer: 0.1
             (address_peer_id_pairs[6].1, 3), // - random_peer: 0.3
             (address_peer_id_pairs[7].1, 1), // - random_peer: 0.1
@@ -590,21 +595,12 @@ mod tests {
         strat.sma.write().await.add_sample(peers.len());
         strat.sma.write().await.add_sample(peers.len());
 
-        // get channel counts
-        let outgoing_channels_before_tick = strat.db.read().await.get_outgoing_channels().await.unwrap();
-        debug!(
-            "outgoing_channels_before_tick {:?}",
-            &outgoing_channels_before_tick.iter().map(|channel| channel.to_string())
-        );
+        let (to_close, to_open) = strat.on_tick().await.unwrap();
 
-        strat.on_tick().await.unwrap();
-
-        let outgoing_channels_after_tick = strat.db.read().await.get_outgoing_channels().await.unwrap();
-        debug!(
-            "outgoing_channels_after_tick {:?}",
-            &outgoing_channels_after_tick.iter().map(|channel| channel.to_string())
-        );
-
-        // TODO: assert that there's 1 channel closed (gustave) and 1 opened (eugene).
+        // assert that there's 1 channel closed (gustave) and 1 opened (eugene).
+        assert_eq!(to_close.len(), 1usize);
+        assert_eq!(to_open.len(), 1usize);
+        assert_eq!(to_close[0].destination, gustave_address);
+        assert_eq!(to_open[0].0, eugene_address);
     }
 }

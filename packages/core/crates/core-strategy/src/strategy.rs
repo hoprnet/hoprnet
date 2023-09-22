@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 use serde::{Deserialize, Serialize};
+use utils_types::primitives::{Address, Balance};
 use std::fmt::{Display, Formatter};
 use validator::Validate;
 use utils_log::{error, warn};
@@ -12,8 +13,8 @@ use utils_log::{error, warn};
 #[async_trait(? Send)]
 pub trait SingularStrategy: Display {
     /// Strategy event raised at period intervals (typically each 1 minute).
-    async fn on_tick(&self) -> Result<()> {
-        Ok(())
+    async fn on_tick(&self) -> Result<(Vec<ChannelEntry>, Vec<(Address, Balance)>)> {
+        Ok((vec![], vec![]))
     }
 
     /// Strategy event raised when a new acknowledged ticket is received in a channel
@@ -69,18 +70,26 @@ impl Display for MultiStrategy {
 
 #[async_trait(? Send)]
 impl SingularStrategy for MultiStrategy {
-    async fn on_tick(&self) -> Result<()> {
+    async fn on_tick(&self) -> Result<(Vec<ChannelEntry>, Vec<(Address, Balance)>)> {
+        let mut to_close: Vec<ChannelEntry> = vec![];
+        let mut to_open: Vec<(Address, Balance)> = vec![];
         for strategy in self.strategies.iter() {
-            if let Err(e) = strategy.on_tick().await {
-                error!("error on_tick in strategy {strategy}: {e}");
+            match strategy.on_tick().await {
+                Ok((to_close_from_singular_strategy, to_open_from_singular_strategy)) => {
+                    to_close = [to_close, to_close_from_singular_strategy].concat();
+                    to_open = [to_open, to_open_from_singular_strategy].concat();
+                },
+                Err(e) => {
+                    error!("error on_tick in strategy {strategy}: {e}");
 
-                if !self.cfg.on_fail_continue {
-                    warn!("{self} on_tick chain stopped at {strategy}");
-                    return Err(e);
-                }
+                    if !self.cfg.on_fail_continue {
+                        warn!("{self} on_tick chain stopped at {strategy}");
+                        return Err(e);
+                    }
+                },
             }
         }
-        Ok(())
+        Ok((to_close, to_open))
     }
 
     async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> Result<()> {
@@ -139,7 +148,7 @@ mod tests {
         s2.expect_on_tick()
             .times(1)
             .in_sequence(&mut seq)
-            .returning(|| Ok(()));
+            .returning(|| Ok((vec![], vec![])));
 
         let cfg = MultiStrategyConfig {
             on_fail_continue: true
@@ -163,7 +172,7 @@ mod tests {
         s2.expect_on_tick()
             .never()
             .in_sequence(&mut seq)
-            .returning(|| Ok(()));
+            .returning(|| Ok((vec![], vec![])));
 
         let cfg = MultiStrategyConfig {
             on_fail_continue: false
