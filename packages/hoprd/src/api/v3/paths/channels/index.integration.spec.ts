@@ -118,6 +118,7 @@ describe('POST /channels', () => {
   })
 
   it('should open channel', async () => {
+    node.db.get_channel = sinon.fake.resolves(undefined)
     const res = await request(service).post('/api/v3/channels').send({
       peerAddress: ALICE_ETHEREUM_ADDR.to_string(),
       amount: '1'
@@ -167,12 +168,20 @@ describe('POST /channels', () => {
   })
 
   it('should fail when channel is already open', async () => {
-    node.openChannel = () => {
-      throw Error('Channel is already opened')
-    }
+    const otherChannel = new ChannelEntry(
+      BOB_ETHEREUM_ADDR.clone(),
+      CHARLIE_ETHEREUM_ADDR.clone(),
+      new Balance('3', BalanceType.HOPR),
+      new U256('3'),
+      ChannelStatus.Open,
+      new U256('3'),
+      new U256('3')
+    )
+
+    node.db.get_channel = sinon.fake.resolves(otherChannel)
 
     const res = await request(service).post('/api/v3/channels').send({
-      peerAddress: ALICE_ETHEREUM_ADDR.to_string(),
+      peerAddress: CHARLIE_ETHEREUM_ADDR.to_string(),
       amount: '1'
     })
     expect(res.status).to.equal(409)

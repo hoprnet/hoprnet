@@ -278,6 +278,8 @@ export async function openChannel(
       receipt: string
     }
 > {
+  const log = debug('hoprd:api:v3:channel-open')
+
   const validationResult = await validateOpenChannelParameters(node, counterpartyAddressStr, amountStr)
 
   if (validationResult.valid == false) {
@@ -285,6 +287,12 @@ export async function openChannel(
   }
 
   const channelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
+
+  const existingChannel = await node.db.get_channel(channelId)
+  if (existingChannel?.status == ChannelStatus.Open) {
+    log(`channel ${channelId.to_hex()} is already opened`)
+    return { success: false, reason: STATUS_CODES.CHANNEL_ALREADY_OPEN }
+  }
 
   let openingRequest = openingRequests.get(channelId.to_hex())
 
@@ -299,9 +307,10 @@ export async function openChannel(
     const { channelId, receipt } = await node.openChannel(validationResult.counterparty, validationResult.amount)
     return { success: true, channelId: channelId.to_hex(), receipt }
   } catch (err) {
+    log(`open channel error: ${err}`)
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE
 
-    if (errString.includes('Channel is already opened')) {
+    if (errString.includes('channel is already opened')) {
       return { success: false, reason: STATUS_CODES.CHANNEL_ALREADY_OPEN }
     } else if (errString.includes('not have enough allowance')) {
       return { success: false, reason: STATUS_CODES.NOT_ENOUGH_ALLOWANCE }

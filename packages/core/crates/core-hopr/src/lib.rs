@@ -36,11 +36,11 @@ use std::{sync::Arc, time::Duration};
 use utils_log::{error, info};
 use utils_types::traits::BinarySerializable;
 
-use core_ethereum_misc::transaction_queue::{TransactionQueue, TransactionSender};
+use core_ethereum_actions::transaction_queue::{TransactionQueue, TransactionSender};
 
 #[cfg(feature = "wasm")]
 use {
-    core_ethereum_db::db::wasm::Database, core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor,
+    core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_ethereum_db::db::wasm::Database,
     wasm_bindgen::prelude::wasm_bindgen,
 };
 
@@ -307,7 +307,7 @@ pub mod wasm_impl {
         keypairs::OffchainKeypair,
         types::{HalfKeyChallenge, Hash},
     };
-    use core_ethereum_misc::transaction_queue::wasm::WasmTxExecutor;
+    use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
     use core_network::network::NetworkConfig;
     use core_path::path::Path;
     use core_types::protocol::ApplicationData;

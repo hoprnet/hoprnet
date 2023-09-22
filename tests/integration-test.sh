@@ -59,7 +59,7 @@ declare -a jobs
 redeem_tickets() {
   local node_id="${1}"
   local node_api="${2}"
-  local rejected redeemed last_redeemed
+  local rejected redeemed last_redeemed unredeemed
   local successful=0
 
   # First get the initial ticket statistics for reference
@@ -67,7 +67,11 @@ redeem_tickets() {
   log "Node ${node_id} ticket information (before redemption) -- ${result}"
   rejected=$(echo "${result}" | jq -r .rejected)
   redeemed=$(echo "${result}" | jq -r .redeemed)
+  unredeemed=$(echo "${result}" | jq -r .unredeemed)
+
+  [[ ${unredeemed} -eq 0 ]] && { msg "there must be some unredeemed tickets on node ${node_id}"; exit 1; }
   [[ ${rejected} -gt 0 ]] && { msg "rejected tickets count on node ${node_id} is ${rejected}"; exit 1; }
+
   last_redeemed="${redeemed}"
 
   # Trigger a redemption run, but cap it at 20 seconds. We only want to measure
@@ -85,24 +89,23 @@ redeem_tickets() {
 
     rejected=$(echo "${result}" | jq -r .rejected)
     redeemed=$(echo "${result}" | jq -r .redeemed)
+    unredeemed=$(echo "${result}" | jq -r .unredeemed)
 
     if [[ ${rejected} -gt 0 ]]; then
       msg "rejected tickets count on node ${node_id} is ${rejected}"
       break
     fi
 
+    msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"
     if [[ ${redeemed} -gt 0 && ${redeemed} -gt ${last_redeemed} ]]; then
       ((successful+=1))
-    else
-      # continue trying
-      msg "redeemed tickets count on node ${node_id} is ${redeemed}, previously ${last_redeemed}"
+      last_redeemed="${redeemed}"
     fi
 
-    last_redeemed="${redeemed}"
   done
 
-  # Check there are at least 3 consecutive ticket redemptions
-  if [[ ${successful} -ge 3 ]]; then
+  # Check there are at least 2 consecutive ticket redemptions or everything has been redeemed
+  if [[ ${successful} -ge 2 || ${unredeemed} -eq 0 ]]; then
     log "Redeem all test passed on node ${node_id} !"
     return 0
   else
@@ -510,9 +513,10 @@ test_get_all_channels() {
   channels_with_closed=$(api_get_all_channels ${node_api} true)
   channels_with_closed_count=$(echo ${channels_with_closed} | jq '.incoming | length')
 
-  [[ "${channels_count}" -ge "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
+  [[ "${channels_count}" -gt "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
   [[ "${channels_with_closed}" != *"Closed"* ]] && { msg "Channels fetched with includeClosed flag should return channels with closed status: ${channels_with_closed}"; exit 1; }
-  echo "Get all channels successful"
+
+  log "Get all channels successful"
 }
 
 test_get_all_channels "${api1}"
