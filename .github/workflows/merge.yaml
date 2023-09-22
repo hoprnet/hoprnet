@@ -115,8 +115,8 @@ jobs:
       - name: Deploy on GCP
         run: |
           mkdir -p ~/.ssh/
-          echo "${{ secrets.GCP_SA_ANSIBLE_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
-          echo "${{ secrets.GCP_SA_ANSIBLE_SSH_PUBLIC_KEY }}" > ~/.ssh/google_compute_engine.pub
+          echo "${{ secrets.GCP_SA_DOCKER_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
+          echo "${{ secrets.GCP_SA_DOCKER_SSH_PUBLIC_KEY }}" > ~/.ssh/google_compute_engine.pub
           chmod 400 ~/.ssh/google_compute_engine
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [[ "${base_branch}" == "master" ]]; then
@@ -188,6 +188,7 @@ jobs:
           # git tag v${{ steps.setup.outputs.current_version }}
           # git push origin v${{ steps.setup.outputs.current_version }}
 
+          declare base_branch=${{ github.event.pull_request.base.ref }}
           # Tag release name
           if [[ "${base_branch}" == "master" ]]; then
             release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}
