@@ -315,6 +315,28 @@ pub mod wasm {
         pub value: String,
     }
 
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen]
+        pub type SendTransactionReturnTx;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn hash(this: &SendTransactionReturnTx) -> String;
+    }
+
+    #[wasm_bindgen]
+    extern "C" {
+        // copied from JS, to be removed soon
+        #[wasm_bindgen]
+        pub type SendTransactionReturn;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn code(this: &SendTransactionReturn) -> String;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn tx(this: &SendTransactionReturn) -> Option<SendTransactionReturnTx>;
+    }
+
     impl TryFrom<TypedTransaction> for TransactionPayload {
         type Error = CoreEthereumActionsError;
         fn try_from(value: TypedTransaction) -> Result<Self, Self::Error> {
@@ -361,9 +383,23 @@ pub mod wasm {
             ))
             .await
             {
-                Ok(v) => TransactionResult::TicketRedeemed {
-                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
-                },
+                Ok(v) => {
+                    let result = SendTransactionReturn::from(v.clone());
+
+                    if result.code().eq("SUCCESS") {
+                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
+                            Ok(tx_hash) => TransactionResult::TicketRedeemed { tx_hash },
+                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
+                        };
+                    } else if result.code().eq("DUPLICATE") {
+                        return TransactionResult::Failure(format!("ticket redeem transaction is a duplicate."));
+                    } else {
+                        return TransactionResult::Failure(format!(
+                            "ticket redeem transaction failed with unknown error {:?}",
+                            v
+                        ));
+                    }
+                }
                 Err(e) => TransactionResult::Failure(e),
             }
         }
@@ -387,9 +423,23 @@ pub mod wasm {
             ))
             .await
             {
-                Ok(v) => TransactionResult::ChannelFunded {
-                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
-                },
+                Ok(v) => {
+                    let result = SendTransactionReturn::from(v.clone());
+
+                    if result.code().eq("SUCCESS") {
+                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
+                            Ok(tx_hash) => TransactionResult::ChannelFunded { tx_hash },
+                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
+                        };
+                    } else if result.code().eq("DUPLICATE") {
+                        return TransactionResult::Failure(format!("fund channel transaction is a duplicate."));
+                    } else {
+                        return TransactionResult::Failure(format!(
+                            "fund channel transaction failed with unknown error {:?}",
+                            v
+                        ));
+                    }
+                }
                 Err(e) => TransactionResult::Failure(e),
             }
         }
@@ -413,9 +463,25 @@ pub mod wasm {
             ))
             .await
             {
-                Ok(v) => TransactionResult::ChannelClosureInitiated {
-                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
-                },
+                Ok(v) => {
+                    let result = SendTransactionReturn::from(v.clone());
+
+                    if result.code().eq("SUCCESS") {
+                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
+                            Ok(tx_hash) => TransactionResult::ChannelClosureInitiated { tx_hash },
+                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
+                        };
+                    } else if result.code().eq("DUPLICATE") {
+                        return TransactionResult::Failure(format!(
+                            "initiate channel closure transaction is a duplicate."
+                        ));
+                    } else {
+                        return TransactionResult::Failure(format!(
+                            "initiate channel closure transaction failed with unknown error {:?}",
+                            v
+                        ));
+                    }
+                }
                 Err(e) => TransactionResult::Failure(e),
             }
         }
@@ -439,9 +505,25 @@ pub mod wasm {
             ))
             .await
             {
-                Ok(v) => TransactionResult::ChannelClosed {
-                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
-                },
+                Ok(v) => {
+                    let result = SendTransactionReturn::from(v.clone());
+
+                    if result.code().eq("SUCCESS") {
+                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
+                            Ok(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
+                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
+                        };
+                    } else if result.code().eq("DUPLICATE") {
+                        return TransactionResult::Failure(format!(
+                            "finalize channel close transaction is a duplicate."
+                        ));
+                    } else {
+                        return TransactionResult::Failure(format!(
+                            "finalize channel close transaction failed with unknown error {:?}",
+                            v
+                        ));
+                    }
+                }
                 Err(e) => TransactionResult::Failure(e),
             }
         }
@@ -465,9 +547,25 @@ pub mod wasm {
             ))
             .await
             {
-                Ok(v) => TransactionResult::ChannelClosed {
-                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
-                },
+                Ok(v) => {
+                    let result = SendTransactionReturn::from(v.clone());
+
+                    if result.code().eq("SUCCESS") {
+                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
+                            Ok(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
+                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
+                        };
+                    } else if result.code().eq("DUPLICATE") {
+                        return TransactionResult::Failure(format!(
+                            "close incoming channel transaction is a duplicate."
+                        ));
+                    } else {
+                        return TransactionResult::Failure(format!(
+                            "close incoming channel transaction failed with unknown error {:?}",
+                            v
+                        ));
+                    }
+                }
                 Err(e) => TransactionResult::Failure(e),
             }
         }
@@ -484,13 +582,13 @@ pub mod wasm {
                     });
                     tx.set_to(H160::from(self.hopr_token));
 
-                    event_string = "withdraw_hopr-".into();
+                    event_string = "withdraw-hopr-".into();
                 }
                 BalanceType::Native => {
                     tx.set_to(H160::from(recipient));
                     tx.set_value(U256(primitive_types::U256::from(amount.value()).0));
 
-                    event_string = "withdraw_native-".into();
+                    event_string = "withdraw-native-".into();
                 }
             }
 
@@ -504,9 +602,23 @@ pub mod wasm {
             ))
             .await
             {
-                Ok(v) => TransactionResult::ChannelClosureInitiated {
-                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
-                },
+                Ok(v) => {
+                    let result = SendTransactionReturn::from(v.clone());
+
+                    if result.code().eq("SUCCESS") {
+                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
+                            Ok(tx_hash) => TransactionResult::Withdrawn { tx_hash },
+                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
+                        };
+                    } else if result.code().eq("DUPLICATE") {
+                        return TransactionResult::Failure(format!("withdraw transaction is a duplicate."));
+                    } else {
+                        return TransactionResult::Failure(format!(
+                            "withdraw transaction failed with unknown error {:?}",
+                            v
+                        ));
+                    }
+                }
                 Err(e) => TransactionResult::Failure(e),
             }
         }

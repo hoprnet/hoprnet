@@ -198,7 +198,9 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   public sendTransaction(txPayload: TransactionPayload, eventName: IndexerEventsNames): Promise<SendTransactionReturn> {
-    return this.chain.sendTransaction(true, txPayload, (txHash: string) => this.setTxHandler(`${eventName}${txHash}`, txHash))
+    return this.chain.sendTransaction(true, txPayload, (txHash: string) =>
+      this.setTxHandler(`${eventName}${txHash}`, txHash)
+    )
   }
 
   public setTxHandler(evt: IndexerEventsType, tx: string): DeferType<string> {
