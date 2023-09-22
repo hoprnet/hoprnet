@@ -333,7 +333,7 @@ where
                         Balance::new(0u64.into(), utils_types::primitives::BalanceType::HOPR),
                         0u64.into(),
                         ChannelStatus::Open,
-                        0u64.into(),
+                        1u64.into(),
                         0u64.into(),
                     );
 
@@ -1469,7 +1469,7 @@ pub mod tests {
         let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::Open);
-        assert_eq!(channel.channel_epoch, 0u64.into());
+        assert_eq!(channel.channel_epoch, 1u64.into());
         assert_eq!(channel.ticket_index, 0u64.into());
     }
 
