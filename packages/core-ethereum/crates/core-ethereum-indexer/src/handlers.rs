@@ -1432,6 +1432,7 @@ pub mod tests {
         let closed_channel = db.get_channel(&channel_id).await.unwrap().unwrap();
 
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
+        assert_eq!(closed_channel.ticket_index, 0u64.into());
 
         assert!(closed_channel.balance.value().eq(&U256::zero()));
     }
@@ -1466,6 +1467,58 @@ pub mod tests {
         let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::Open);
+        assert_eq!(channel.channel_epoch, 0u64.into());
+        assert_eq!(channel.ticket_index, 0u64.into());
+    }
+
+    #[async_std::test]
+    async fn on_channel_reopened() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
+
+        db.update_channel_and_snapshot(
+            &channel_id,
+            &ChannelEntry::new(
+                *SELF_CHAIN_ADDRESS,
+                *COUNTERPARTY_CHAIN_ADDRESS,
+                Balance::zero(BalanceType::HOPR),
+                U256::zero(),
+                ChannelStatus::Open,
+                3u64.into(),
+                U256::zero(),
+            ),
+            &Snapshot::default(),
+        )
+        .await
+        .unwrap();
+
+        let channel_opened_log = RawLog {
+            topics: vec![
+                ChannelOpenedFilter::signature(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &channel_opened_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(channel.status, ChannelStatus::Open);
+        assert_eq!(channel.channel_epoch, 4u64.into());
+        assert_eq!(channel.ticket_index, 0u64.into());
     }
 
     #[async_std::test]
