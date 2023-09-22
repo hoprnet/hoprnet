@@ -1469,6 +1469,7 @@ dependencies = [
  "core-types",
  "getrandom 0.2.10",
  "js-sys",
+ "mockall",
  "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen",

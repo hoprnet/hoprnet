@@ -41,7 +41,9 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
+async-std = {version = "1.12", features = ["attributes"] }
 vector_assertions = "0.1.0"
+mockall = "0.11.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

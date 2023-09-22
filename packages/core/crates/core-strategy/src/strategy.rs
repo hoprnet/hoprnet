@@ -8,6 +8,7 @@ use validator::Validate;
 use utils_log::{error, warn};
 
 /// Basic single strategy.
+#[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait SingularStrategy: Display {
     /// Strategy event raised at period intervals (typically each 1 minute).
@@ -114,6 +115,63 @@ impl SingularStrategy for MultiStrategy {
 }
 
 #[cfg(test)]
-mod tests {
+impl Display for MockSingularStrategy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "mock")
+    }
+}
 
+#[cfg(test)]
+mod tests {
+    use mockall::Sequence;
+    use crate::errors::StrategyError::Other;
+    use crate::strategy::{MockSingularStrategy, MultiStrategy, MultiStrategyConfig, SingularStrategy};
+
+    #[async_std::test]
+    async fn test_multi_strategy_logical_or_flow() {
+        let mut seq = Sequence::new();
+
+        let mut s1 = MockSingularStrategy::new();
+        s1.expect_on_tick()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|| Err(Other("error".into())));
+
+        let mut s2 = MockSingularStrategy::new();
+        s2.expect_on_tick()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|| Ok(()));
+
+        let cfg = MultiStrategyConfig {
+            on_fail_continue: true
+        };
+
+        let ms = MultiStrategy::new(vec![Box::new(s1), Box::new(s2)], cfg);
+        ms.on_tick().await.expect("on_tick should not fail");
+    }
+
+    #[async_std::test]
+    async fn test_multi_strategy_logical_and_flow() {
+        let mut seq = Sequence::new();
+
+        let mut s1 = MockSingularStrategy::new();
+        s1.expect_on_tick()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|| Err(Other("error".into())));
+
+        let mut s2 = MockSingularStrategy::new();
+        s2.expect_on_tick()
+            .never()
+            .in_sequence(&mut seq)
+            .returning(|| Ok(()));
+
+        let cfg = MultiStrategyConfig {
+            on_fail_continue: false
+        };
+
+        let ms = MultiStrategy::new(vec![Box::new(s1), Box::new(s2)], cfg);
+        ms.on_tick().await.expect_err("on_tick should fail");
+    }
 }
