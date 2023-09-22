@@ -81,7 +81,7 @@ where
     network: Arc<RwLock<Network<Net>>>,
     tx_sender: TransactionSender,
     config: PromiscuousStrategyConfig,
-    sma: Arc<RwLock<SimpleMovingAvg>>,
+    sma: RwLock<SimpleMovingAvg>,
 }
 
 impl<Db, Net> PromiscuousStrategy<Db, Net>
@@ -117,7 +117,7 @@ where
                     .enforce_max_channels
                     .unwrap_or(PromiscuousStrategyConfig::default().enforce_max_channels),
             },
-            sma: Arc::new(RwLock::new(SimpleMovingAvg::new())),
+            sma: RwLock::new(SimpleMovingAvg::new()),
         }
     }
 }
