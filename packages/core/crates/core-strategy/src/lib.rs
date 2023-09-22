@@ -2,11 +2,12 @@ use std::str::FromStr;
 
 pub mod config;
 pub mod generic;
-pub mod passive;
 pub mod promiscuous;
 
+pub mod passive;
 pub mod errors;
 pub mod strategy;
+pub mod aggregating;
 
 pub enum Strategies {
     Passive,

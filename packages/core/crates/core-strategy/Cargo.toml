@@ -18,6 +18,7 @@ getrandom = { workspace = true }
 js-sys = { workspace = true, optional = true }
 rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
+serde_with = "3.3.0"
 serde-wasm-bindgen = { workspace = true, optional = true }
 simple_moving_average = "0.1.2"
 thiserror = { workspace = true }
@@ -26,15 +27,17 @@ futures = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true}
 
-core-types = { workspace = true, default-features = false }
-core-crypto = { workspace = true, default-features = false }
-core-network = { workspace = true, default-features = false }
-core-ethereum-db = { workspace = true, default-features = false }
-core-ethereum-actions = { workspace = true, default-features = false }
-utils-log = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
-utils-types = { workspace = true, default-features = false }
-utils-db = { workspace = true, default-features = false }
+core-types = { workspace = true }
+core-crypto = { workspace = true }
+core-network = { workspace = true }
+core-protocol = { workspace = true }
+core-ethereum-db = { workspace = true }
+core-ethereum-actions = { workspace = true }
+core-ethereum-misc = { workspace = true }
+utils-db = { workspace = true }
+utils-log = { workspace = true }
+utils-misc = { workspace = true }
+utils-types = { workspace = true }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 #wee_alloc = { version = "0.4.5", optional = true }

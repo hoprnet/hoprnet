@@ -1,11 +1,16 @@
 use thiserror::Error;
-use utils_db::errors::DbError;
+use core_ethereum_actions::errors::CoreEthereumActionsError;
 use utils_types::errors::GeneralError;
+use utils_db::errors::DbError;
 
 #[derive(Debug, Error)]
 pub enum StrategyError {
+
     #[error(transparent)]
     DbError(#[from] DbError),
+
+    #[error(transparent)]
+    ActionsError(#[from] CoreEthereumActionsError)
 
     #[error("lower-level error: {0}")]
     Other(#[from] GeneralError),
