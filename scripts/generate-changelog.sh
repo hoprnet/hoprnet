@@ -43,7 +43,7 @@ process_entries() {
         state=$(echo "${item_decoded}" | jq -r '.state' | tr '[:upper:]' '[:lower:]')
         if [[ "$state" == "open" ]] && [[ $include_open == false ]];
         then
-            echo "Error generating changelog from a milestone with open items"
+            echo "[ERROR] Error generating changelog from a milestone with open items" >>/dev/stderr
             exit 1
         fi
         add_entry_type "${id}" "${title}" "${labels}"
