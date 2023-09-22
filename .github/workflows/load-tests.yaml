@@ -29,4 +29,5 @@ jobs:
         with:
           compose-file: "./k6/docker-compose.yml"
         env:
-          CUSTOM_VARIABLE: "test"
+          ENVIRONMENT_NAME: pluto
+          WORKLOAD_NAME: simple
