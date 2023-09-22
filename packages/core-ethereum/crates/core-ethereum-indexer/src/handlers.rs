@@ -279,8 +279,11 @@ where
                 let maybe_channel = db.get_channel(&channel_closed.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
+                    // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Closed;
                     channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
+                    channel.closure_time = 0u64.into();
+                    channel.ticket_index = 0u64.into();
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel.destination.eq(&self.chain_key) {
@@ -313,7 +316,10 @@ where
                 );
 
                 if let Some(mut channel) = maybe_channel {
+                    // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Open;
+                    channel.ticket_index = 0u64.into();
+                    channel.channel_epoch = channel.channel_epoch + 1u64.into();
 
                     db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
 
