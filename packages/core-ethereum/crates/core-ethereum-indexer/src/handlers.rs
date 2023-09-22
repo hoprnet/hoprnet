@@ -242,6 +242,7 @@ where
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
+                    let old_balance = channel.balance;
                     channel.balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
@@ -250,6 +251,10 @@ where
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
                     }
+
+                    // we need to infer the amount since the actual amount is not part of any event
+                    let amount = old_balance.sub(&channel.balance);
+                    self.cbs.ticket_redeemed(&channel, &amount);
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
