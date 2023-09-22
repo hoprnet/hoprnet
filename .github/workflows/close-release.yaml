@@ -82,6 +82,9 @@ jobs:
             .cargo/.package-cache/
             .cargo/bin/
 
+      - name: Install dependencies
+        run: nix develop -c make -j deps-ci
+
       - name: Choose template
         id: template
         run: |
