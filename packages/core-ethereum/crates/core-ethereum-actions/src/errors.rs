@@ -33,6 +33,12 @@ pub enum CoreEthereumActionsError {
 
     #[error(transparent)]
     OtherError(#[from] CoreEthereumError),
+
+    #[error("{0}")]
+    InvalidArguments(String),
+
+    #[error("{0}")]
+    InvalidState(String),
 }
 
 pub type Result<T> = std::result::Result<T, CoreEthereumActionsError>;

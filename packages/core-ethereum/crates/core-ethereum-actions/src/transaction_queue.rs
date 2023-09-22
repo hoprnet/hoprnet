@@ -3,18 +3,23 @@ use async_std::channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
-use core_types::channels::ChannelStatus::{Closed, Open, PendingToClose};
-use core_types::channels::{ChannelEntry, ChannelStatus};
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use core_types::{
+    acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus::BeingRedeemed},
+    channels::{
+        ChannelDirection, ChannelEntry,
+        ChannelStatus::{Closed, Open, PendingToClose},
+    },
+};
+use std::{
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
 use crate::errors::CoreEthereumActionsError::TransactionSubmissionFailed;
 use crate::errors::Result;
-use crate::transaction_queue::TransactionResult::{Failure, RedeemTicket};
+use crate::transaction_queue::TransactionResult::{Failure, TicketRedeemed};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
@@ -22,7 +27,7 @@ use async_std::task::spawn_local;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
-/// Enumerates all possible outgoing transactions
+/// Enumerates all possible on-chain state change requests
 #[derive(Clone, PartialEq, Debug)]
 pub enum Transaction {
     /// Redeem the given acknowledged ticket
@@ -35,7 +40,7 @@ pub enum Transaction {
     FundChannel(ChannelEntry, Balance),
 
     /// Close channel with the given source and destination
-    CloseChannel(ChannelEntry),
+    CloseChannel(ChannelEntry, ChannelDirection),
 
     /// Withdraw given balance to the given address
     Withdraw(Address, Balance),
@@ -51,9 +56,10 @@ impl Display for Transaction {
                 "fund channel tx for channel from {} to {} with {amount}",
                 channel.source, channel.destination
             ),
-            Transaction::CloseChannel(channel) => write!(
+            Transaction::CloseChannel(channel, direction) => write!(
                 f,
-                "closure tx of channel from {} to {}",
+                "closure tx of {} channel from {} to {}",
+                direction,
                 channel.source, channel.destination
             ),
             Transaction::Withdraw(dst, amount) => write!(f, "withdraw tx of {amount} to {dst}"),
@@ -67,21 +73,21 @@ impl Display for Transaction {
 #[async_trait(? Send)]
 pub trait TransactionExecutor {
     async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
-    async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
-    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> TransactionResult;
-    async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
-    async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
+    async fn fund_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
+    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
+    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
+    async fn close_incoming_channel(&self, src: Address) -> TransactionResult;
     async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
 }
 
 /// Represents a result of an Ethereum transaction after it has been confirmed.
 #[derive(Clone, Debug)]
 pub enum TransactionResult {
-    RedeemTicket { tx_hash: Hash },
-    OpenChannel { tx_hash: Hash, channel_id: Hash },
-    FundChannel { tx_hash: Hash },
-    CloseChannel { tx_hash: Hash, status: ChannelStatus },
-    Withdraw { tx_hash: Hash },
+    TicketRedeemed { tx_hash: Hash },
+    ChannelFunded { tx_hash: Hash },
+    ChannelClosureInitiated { tx_hash: Hash },
+    ChannelClosed { tx_hash: Hash },
+    Withdrawn { tx_hash: Hash },
     Failure(String),
 }
 
@@ -150,7 +156,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
                     match res {
-                        RedeemTicket { .. } => {
+                        TicketRedeemed { .. } => {
                             if let Err(e) = db.write().await.mark_redeemed(&ack).await {
                                 error!("failed to mark {ack} as redeemed: {e}");
                                 // Still declare the TX a success
@@ -166,43 +172,46 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 _ => Failure(format!("invalid state of {ack}")),
             },
 
-            Transaction::OpenChannel(address, stake) => tx_exec.open_channel(address, stake).await,
+            Transaction::OpenChannel(address, stake) => tx_exec.fund_channel(address, stake).await,
 
             Transaction::FundChannel(channel, amount) => {
                 let channel_id = channel.get_id();
                 if channel.status == Open {
-                    tx_exec.fund_channel(channel_id, amount).await
+                    tx_exec.fund_channel(channel.destination, amount).await
                 } else {
                     Failure(format!("cannot fund channel {channel_id} that is not opened"))
                 }
             }
 
-            Transaction::CloseChannel(channel) => {
-                let channel_id = channel.get_id();
-                match channel.status {
+            Transaction::CloseChannel(channel, direction) => match direction {
+                ChannelDirection::Incoming => match channel.status {
+                    Open | PendingToClose => tx_exec.close_incoming_channel(channel.source).await,
+                    Closed => {
+                        warn!("channel {} is already closed", channel.get_id());
+                        TransactionResult::ChannelClosed {
+                            tx_hash: Hash::default(),
+                        }
+                    }
+                },
+                ChannelDirection::Outgoing => match channel.status {
                     Open => {
                         debug!("initiating closure of {channel}");
-                        tx_exec
-                            .close_channel_initialize(channel.source, channel.destination)
-                            .await
+                        tx_exec.initiate_outgoing_channel_closure(channel.destination).await
                     }
 
                     PendingToClose => {
                         debug!("finalizing closure of {channel}");
-                        tx_exec
-                            .close_channel_finalize(channel.source, channel.destination)
-                            .await
+                        tx_exec.finalize_outgoing_channel_closure(channel.destination).await
                     }
 
                     Closed => {
-                        warn!("channel {channel_id} is already closed");
-                        TransactionResult::CloseChannel {
+                        warn!("channel {} is already closed", channel.get_id());
+                        TransactionResult::ChannelClosed {
                             tx_hash: Hash::default(),
-                            status: Closed,
                         }
                     }
-                }
-            }
+                },
+            },
 
             Transaction::Withdraw(recipient, amount) => tx_exec.withdraw(recipient, amount).await,
         };
@@ -230,18 +239,23 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::transaction_queue::{TransactionExecutor, TransactionResult, TransactionSender};
+    use crate::{
+        errors::CoreEthereumActionsError,
+        payload::PayloadGenerator,
+        transaction_queue::{TransactionExecutor, TransactionResult, TransactionSender},
+    };
     use async_trait::async_trait;
-    use core_crypto::types::Hash;
+    use core_crypto::{keypairs::ChainKeypair, types::Hash};
     use core_types::acknowledgement::AcknowledgedTicket;
-    use core_types::channels::ChannelStatus;
-    use js_sys::Promise;
-    use serde::{Deserialize, Serialize};
+    use ethers::types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, NameOrAddress, H160, U256};
+    use hex;
+    use js_sys::{JsString, Promise};
     use utils_misc::utils::wasm::js_value_to_error_msg;
-    use utils_types::primitives::{Address, Balance};
-    use utils_types::traits::ToHex;
-    use wasm_bindgen::prelude::wasm_bindgen;
-    use wasm_bindgen::JsValue;
+    use utils_types::{
+        primitives::{Address, Balance, BalanceType},
+        traits::ToHex,
+    };
+    use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
     use wasm_bindgen_futures::JsFuture;
 
     #[wasm_bindgen]
@@ -254,32 +268,30 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct WasmTxExecutor {
-        redeem_ticket_fn: js_sys::Function,
-        open_channel_fn: js_sys::Function,
-        fund_channel_fn: js_sys::Function,
-        close_channel_init_fn: js_sys::Function,
-        close_channel_finish_fn: js_sys::Function,
-        withdraw_fn: js_sys::Function,
+        send_transaction: js_sys::Function,
+        generator: PayloadGenerator,
+        hopr_channels: Address,
+        hopr_token: Address,
+        // TODO: migrate announce function
+        _hopr_announcements: Address,
     }
 
     #[wasm_bindgen]
     impl WasmTxExecutor {
         #[wasm_bindgen(constructor)]
         pub fn new(
-            redeem_ticket_fn: js_sys::Function,
-            open_channel_fn: js_sys::Function,
-            fund_channel_fn: js_sys::Function,
-            close_channel_init_fn: js_sys::Function,
-            close_channel_finish_fn: js_sys::Function,
-            withdraw_fn: js_sys::Function,
+            send_transaction: js_sys::Function,
+            chain_keypair: &ChainKeypair,
+            hopr_channels: Address,
+            hopr_announcements: Address,
+            hopr_token: Address,
         ) -> Self {
             Self {
-                redeem_ticket_fn,
-                open_channel_fn,
-                fund_channel_fn,
-                close_channel_init_fn,
-                close_channel_finish_fn,
-                withdraw_fn,
+                _hopr_announcements: hopr_announcements,
+                hopr_channels,
+                hopr_token,
+                send_transaction,
+                generator: PayloadGenerator::new(chain_keypair, hopr_channels, hopr_announcements),
             }
         }
     }
@@ -297,99 +309,212 @@ pub mod wasm {
         }
     }
 
-    // TODO: update JS to return this object
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct OpenChannelResult {
-        channel_id: String,
-        receipt: String,
+    #[wasm_bindgen(getter_with_clone)]
+    struct TransactionPayload {
+        pub data: String,
+        pub to: String,
+        pub value: String,
+    }
+
+    impl TryFrom<TypedTransaction> for TransactionPayload {
+        type Error = CoreEthereumActionsError;
+        fn try_from(value: TypedTransaction) -> Result<Self, Self::Error> {
+            Ok(Self {
+                data: match value.data() {
+                    Some(data) => format!("0x{}", hex::encode(data)),
+                    None => {
+                        return Err(CoreEthereumActionsError::InvalidArguments(
+                            "cannot convert data to hex".into(),
+                        ))
+                    }
+                },
+                to: match value.to() {
+                    Some(NameOrAddress::Address(addr)) => format!("0x{}", hex::encode(addr)),
+                    Some(NameOrAddress::Name(_)) => todo!("ens names are not yet supported"),
+                    None => {
+                        return Err(CoreEthereumActionsError::InvalidArguments(
+                            "cannot convert to to hex".into(),
+                        ))
+                    }
+                },
+                value: match value.value() {
+                    Some(x) => x.to_string(),
+                    None => {
+                        return Err(CoreEthereumActionsError::InvalidArguments(
+                            "Invalid transaction value".into(),
+                        ))
+                    }
+                },
+            })
+        }
     }
 
     #[async_trait(? Send)]
     impl TransactionExecutor for WasmTxExecutor {
-        async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult {
-            let wasm_ack: core_types::acknowledgement::wasm::AcknowledgedTicket = ticket.into();
-            match await_js_promise(self.redeem_ticket_fn.call1(&JsValue::null(), &JsValue::from(wasm_ack))).await {
-                Ok(r) => TransactionResult::RedeemTicket {
-                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
+        async fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> TransactionResult {
+            let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+
+            tx.set_data(match self.generator.redeem_ticket(&acked_ticket) {
+                Ok(payload) => payload.into(),
+                Err(e) => return TransactionResult::Failure(e.to_string()),
+            });
+            tx.set_to(H160::from(self.hopr_channels));
+
+            match await_js_promise(self.send_transaction.call2(
+                &JsValue::undefined(),
+                &JsValue::from(match TransactionPayload::try_from(tx) {
+                    Ok(tx) => tx,
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                }),
+                &JsString::from("channel-updated-").into(),
+            ))
+            .await
+            {
+                Ok(v) => TransactionResult::TicketRedeemed {
+                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
                 },
                 Err(e) => TransactionResult::Failure(e),
             }
         }
 
-        async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult {
-            match await_js_promise(self.open_channel_fn.call2(
-                &JsValue::null(),
-                &JsValue::from(destination),
-                &JsValue::from(balance),
+        async fn fund_channel(&self, destination: Address, balance: Balance) -> TransactionResult {
+            let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+
+            tx.set_data(match self.generator.fund_channel(&destination, &balance) {
+                Ok(payload) => payload.into(),
+                Err(e) => return TransactionResult::Failure(e.to_string()),
+            });
+            tx.set_to(H160::from(self.hopr_channels));
+
+            match await_js_promise(self.send_transaction.call2(
+                &JsValue::undefined(),
+                &JsValue::from(match TransactionPayload::try_from(tx) {
+                    Ok(tx) => tx,
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                }),
+                &JsString::from("channel-updated-").into(),
             ))
             .await
-            .and_then(|v| serde_wasm_bindgen::from_value::<OpenChannelResult>(v).map_err(|_| "parse error".to_string()))
             {
-                Ok(v) => TransactionResult::OpenChannel {
-                    tx_hash: Hash::from_hex(&v.receipt).unwrap_or_default(),
-                    channel_id: Hash::from_hex(&v.channel_id).unwrap_or_default(),
+                Ok(v) => TransactionResult::ChannelFunded {
+                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
                 },
                 Err(e) => TransactionResult::Failure(e),
             }
         }
 
-        async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> TransactionResult {
-            match await_js_promise(self.fund_channel_fn.call2(
-                &JsValue::null(),
-                &JsValue::from(channel_id),
-                &JsValue::from(amount),
+        async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult {
+            let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+
+            tx.set_data(match self.generator.initiate_outgoing_channel_closure(&dst) {
+                Ok(payload) => payload.into(),
+                Err(e) => return TransactionResult::Failure(e.to_string()),
+            });
+            tx.set_to(H160::from(self.hopr_channels));
+
+            match await_js_promise(self.send_transaction.call2(
+                &JsValue::undefined(),
+                &JsValue::from(match TransactionPayload::try_from(tx) {
+                    Ok(tx) => tx,
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                }),
+                &JsString::from("channel-updated-").into(),
             ))
             .await
             {
-                Ok(r) => TransactionResult::FundChannel {
-                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
+                Ok(v) => TransactionResult::ChannelClosureInitiated {
+                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
                 },
                 Err(e) => TransactionResult::Failure(e),
             }
         }
 
-        async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult {
-            match await_js_promise(self.close_channel_init_fn.call2(
-                &JsValue::null(),
-                &JsValue::from(src),
-                &JsValue::from(dst),
+        async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult {
+            let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+
+            tx.set_data(match self.generator.finalize_outgoing_channel_closure(&dst) {
+                Ok(payload) => payload.into(),
+                Err(e) => return TransactionResult::Failure(e.to_string()),
+            });
+            tx.set_to(H160::from(self.hopr_channels));
+
+            match await_js_promise(self.send_transaction.call2(
+                &JsValue::undefined(),
+                &JsValue::from(match TransactionPayload::try_from(tx) {
+                    Ok(tx) => tx,
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                }),
+                &JsString::from("channel-updated-").into(),
             ))
             .await
             {
-                Ok(r) => TransactionResult::CloseChannel {
-                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
-                    status: ChannelStatus::PendingToClose,
+                Ok(v) => TransactionResult::ChannelClosed {
+                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
                 },
                 Err(e) => TransactionResult::Failure(e),
             }
         }
 
-        async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult {
-            match await_js_promise(self.close_channel_finish_fn.call2(
-                &JsValue::null(),
-                &JsValue::from(src),
-                &JsValue::from(dst),
+        async fn close_incoming_channel(&self, src: Address) -> TransactionResult {
+            let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+
+            tx.set_data(match self.generator.close_incoming_channel(&src) {
+                Ok(payload) => payload.into(),
+                Err(e) => return TransactionResult::Failure(e.to_string()),
+            });
+            tx.set_to(H160::from(self.hopr_channels));
+
+            match await_js_promise(self.send_transaction.call2(
+                &JsValue::undefined(),
+                &JsValue::from(match TransactionPayload::try_from(tx) {
+                    Ok(tx) => tx,
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                }),
+                &JsString::from("channel-updated-").into(),
             ))
             .await
             {
-                Ok(r) => TransactionResult::CloseChannel {
-                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
-                    status: ChannelStatus::Closed,
+                Ok(v) => TransactionResult::ChannelClosed {
+                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
                 },
                 Err(e) => TransactionResult::Failure(e),
             }
         }
 
         async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult {
-            match await_js_promise(self.withdraw_fn.call2(
-                &JsValue::null(),
-                &JsValue::from(recipient),
-                &JsValue::from(amount),
+            let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+
+            let event_string: String;
+            match amount.balance_type() {
+                BalanceType::HOPR => {
+                    tx.set_data(match self.generator.transfer(&recipient, &amount) {
+                        Ok(payload) => payload.into(),
+                        Err(e) => return TransactionResult::Failure(e.to_string()),
+                    });
+                    tx.set_to(H160::from(self.hopr_token));
+
+                    event_string = "withdraw_hopr-".into();
+                }
+                BalanceType::Native => {
+                    tx.set_to(H160::from(recipient));
+                    tx.set_value(U256(primitive_types::U256::from(amount.value()).0));
+
+                    event_string = "withdraw_native-".into();
+                }
+            }
+
+            match await_js_promise(self.send_transaction.call2(
+                &JsValue::undefined(),
+                &JsValue::from(match TransactionPayload::try_from(tx) {
+                    Ok(tx) => tx,
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                }),
+                &JsString::from(event_string),
             ))
             .await
             {
-                Ok(r) => TransactionResult::Withdraw {
-                    tx_hash: r.as_string().and_then(|s| Hash::from_hex(&s).ok()).unwrap_or_default(),
+                Ok(v) => TransactionResult::ChannelClosureInitiated {
+                    tx_hash: Hash::from_hex(&v.as_string().unwrap_or_default()).unwrap_or_default(),
                 },
                 Err(e) => TransactionResult::Failure(e),
             }

@@ -65,6 +65,15 @@ pub enum ChannelDirection {
     Outgoing = 1,
 }
 
+impl Display for ChannelDirection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChannelDirection::Incoming => write!(f, "incoming"),
+            ChannelDirection::Outgoing => write!(f, "outgoing"),
+        }
+    }
+}
+
 /// Overall description of a channel
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]

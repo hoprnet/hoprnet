@@ -299,13 +299,14 @@ export class Hopr extends EventEmitter {
       error(`no tag bloom filter file found, using empty`)
     }
 
+    let chainConfig = connector.smartContractInfo()
+
     let txExecutor = new WasmTxExecutor(
-      connector.sendTicketRedeemTx.bind(connector),
-      connector.openChannel.bind(connector),
-      connector.fundChannel.bind(connector),
-      connector.initializeClosure.bind(connector),
-      connector.finalizeClosure.bind(connector),
-      connector.withdraw.bind(connector)
+      connector.sendTransaction.bind(connector),
+      this.chainKeypair,
+      Address.from_string(chainConfig.hoprChannelsAddress),
+      Address.from_string(chainConfig.hoprAnnouncementsAddress),
+      Address.from_string(chainConfig.hoprTokenAddress)
     )
 
     log('Constructing the core application and tools')

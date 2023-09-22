@@ -7,12 +7,16 @@ use std::sync::Arc;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
-use crate::errors::CoreEthereumActionsError::{ClosureTimeHasNotElapsed, NotEnoughAllowance};
-use crate::errors::{
-    CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
-    Result,
+use crate::{
+    errors::{
+        CoreEthereumActionsError::{
+            ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
+            NotEnoughAllowance,
+        },
+        Result,
+    },
+    transaction_queue::{Transaction, TransactionCompleted, TransactionSender},
 };
-use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
@@ -114,7 +118,7 @@ where
                     );
                     if channel.closure_time_passed(current_timestamp()).unwrap_or(false) {
                         // TODO: emit "channel state change" event
-                        tx_sender.send(Transaction::CloseChannel(channel)).await
+                        tx_sender.send(Transaction::CloseChannel(channel, direction)).await
                     } else {
                         Err(ClosureTimeHasNotElapsed(
                             channel
@@ -125,7 +129,7 @@ where
                 }
                 ChannelStatus::Open => {
                     // TODO: emit "channel state change" event
-                    tx_sender.send(Transaction::CloseChannel(channel)).await
+                    tx_sender.send(Transaction::CloseChannel(channel, direction)).await
                 }
             }
         }
@@ -147,23 +151,26 @@ pub async fn withdraw(
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::{close_channel, fund_channel, open_channel, withdraw};
-    use crate::errors::CoreEthereumActionsError;
-    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
+    use crate::{
+        channels::{close_channel, fund_channel, open_channel, withdraw},
+        errors::CoreEthereumActionsError,
+        transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult},
+    };
     use async_lock::RwLock;
-    use core_crypto::random::random_bytes;
-    use core_crypto::types::Hash;
-    use core_ethereum_db::db::CoreEthereumDb;
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_crypto::{random::random_bytes, types::Hash};
+    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
     use mockall::Sequence;
-    use std::ops::{Add, Sub};
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
-    use utils_db::db::DB;
-    use utils_db::rusty::RustyLevelDbShim;
-    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
-    use utils_types::traits::BinarySerializable;
+    use std::{
+        ops::{Add, Sub},
+        sync::Arc,
+        time::{Duration, SystemTime, UNIX_EPOCH},
+    };
+    use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    use utils_types::{
+        primitives::{Address, Balance, BalanceType, Snapshot, U256},
+        traits::BinarySerializable,
+    };
 
     #[async_std::test]
     async fn test_open_channel() {
@@ -189,13 +196,10 @@ mod tests {
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
-            .expect_open_channel()
+            .expect_fund_channel()
             .times(1)
             .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::OpenChannel {
-                tx_hash: random_hash,
-                channel_id: random_hash,
-            });
+            .returning(move |_, _| TransactionResult::ChannelFunded { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
         let tx_sender = tx_queue.new_sender();
@@ -210,9 +214,8 @@ mod tests {
             .unwrap();
 
         match tx_res {
-            TransactionResult::OpenChannel { tx_hash, channel_id } => {
+            TransactionResult::ChannelFunded { tx_hash } => {
                 assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-                assert_eq!(random_hash, channel_id, "channel id must be equal");
             }
             _ => panic!("invalid or failed tx result"),
         }
@@ -418,14 +421,12 @@ mod tests {
             .await
             .unwrap();
 
-        let channel_id = channel.get_id();
-
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |id, balance| channel_id.eq(id) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::FundChannel { tx_hash: random_hash });
+            .withf(move |dest, balance| channel.destination.eq(&dest) && stake.eq(balance))
+            .returning(move |_, _| TransactionResult::ChannelFunded { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
         let tx_sender = tx_queue.new_sender();
@@ -440,7 +441,7 @@ mod tests {
             .unwrap();
 
         match tx_res {
-            TransactionResult::FundChannel { tx_hash } => {
+            TransactionResult::ChannelFunded { tx_hash } => {
                 assert_eq!(random_hash, tx_hash, "tx hash must be equal");
             }
             _ => panic!("invalid or failed tx result"),
@@ -605,30 +606,24 @@ mod tests {
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
         tx_exec
-            .expect_close_channel_initialize()
+            .expect_initiate_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |src, dst| match direction {
-                ChannelDirection::Incoming => self_addr.eq(dst) && bob.eq(src),
-                ChannelDirection::Outgoing => self_addr.eq(src) && bob.eq(dst),
+            .withf(move |dst| match direction {
+                ChannelDirection::Incoming => self_addr.eq(dst),
+                ChannelDirection::Outgoing => bob.eq(dst),
             })
-            .returning(move |_, _| TransactionResult::CloseChannel {
-                tx_hash: random_hash,
-                status: ChannelStatus::PendingToClose,
-            });
+            .returning(move |_| TransactionResult::ChannelClosureInitiated { tx_hash: random_hash });
 
         tx_exec
-            .expect_close_channel_finalize()
+            .expect_finalize_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |src, dst| match direction {
-                ChannelDirection::Incoming => self_addr.eq(dst) && bob.eq(src),
-                ChannelDirection::Outgoing => self_addr.eq(src) && bob.eq(dst),
+            .withf(move |dst| match direction {
+                ChannelDirection::Incoming => self_addr.eq(dst),
+                ChannelDirection::Outgoing => bob.eq(dst),
             })
-            .returning(move |_, _| TransactionResult::CloseChannel {
-                tx_hash: random_hash,
-                status: ChannelStatus::Closed,
-            });
+            .returning(move |_| TransactionResult::ChannelClosed { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
         let tx_sender = tx_queue.new_sender();
@@ -643,9 +638,8 @@ mod tests {
             .unwrap();
 
         match tx_res {
-            TransactionResult::CloseChannel { tx_hash, status } => {
+            TransactionResult::ChannelClosureInitiated { tx_hash } => {
                 assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-                assert_eq!(ChannelStatus::PendingToClose, status, "status must be equal");
             }
             _ => panic!("invalid or failed tx result"),
         }
@@ -672,9 +666,8 @@ mod tests {
             .unwrap();
 
         match tx_res {
-            TransactionResult::CloseChannel { tx_hash, status } => {
+            TransactionResult::ChannelClosed { tx_hash } => {
                 assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-                assert_eq!(ChannelStatus::Closed, status, "status must be equal");
             }
             _ => panic!("invalid or failed tx result"),
         }
@@ -841,7 +834,7 @@ mod tests {
             .expect_withdraw()
             .times(1)
             .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::Withdraw { tx_hash: random_hash });
+            .returning(move |_, _| TransactionResult::Withdrawn { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
         let tx_sender = tx_queue.new_sender();
@@ -852,7 +845,7 @@ mod tests {
         let tx_res = withdraw(tx_sender.clone(), bob, stake).await.unwrap().await.unwrap();
 
         match tx_res {
-            TransactionResult::Withdraw { tx_hash } => {
+            TransactionResult::Withdrawn { tx_hash } => {
                 assert_eq!(random_hash, tx_hash, "tx hash must be equal");
             }
             _ => panic!("invalid or failed tx result"),
@@ -890,7 +883,7 @@ pub mod wasm {
     use crate::transaction_queue::{TransactionResult, TransactionSender};
     use core_crypto::types::Hash;
     use core_ethereum_db::db::wasm::Database;
-    use core_types::channels::{ChannelDirection, ChannelStatus};
+    use core_types::channels::{generate_channel_id, ChannelDirection, ChannelStatus};
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::{Address, Balance};
     use wasm_bindgen::prelude::wasm_bindgen;
@@ -924,11 +917,13 @@ pub mod wasm {
             *amount,
         )
         .await?;
+
+        let channel_id = generate_channel_id(self_addr, destination);
         match awaiter
             .await
             .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
         {
-            TransactionResult::OpenChannel { tx_hash, channel_id } => Ok(OpenChannelResult { tx_hash, channel_id }),
+            TransactionResult::ChannelFunded { tx_hash } => Ok(OpenChannelResult { tx_hash, channel_id }),
             _ => Err(JsValue::from("open channel transaction failed".to_string())),
         }
     }
@@ -946,7 +941,7 @@ pub mod wasm {
             .await
             .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
         {
-            TransactionResult::FundChannel { tx_hash } => Ok(tx_hash),
+            TransactionResult::ChannelFunded { tx_hash } => Ok(tx_hash),
             _ => Err(JsValue::from("fund channel transaction failed".to_string())),
         }
     }
@@ -971,7 +966,14 @@ pub mod wasm {
             .await
             .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
         {
-            TransactionResult::CloseChannel { tx_hash, status } => Ok(CloseChannelResult { tx_hash, status }),
+            TransactionResult::ChannelClosureInitiated { tx_hash } => Ok(CloseChannelResult {
+                tx_hash,
+                status: ChannelStatus::PendingToClose,
+            }),
+            TransactionResult::ChannelClosed { tx_hash } => Ok(CloseChannelResult {
+                tx_hash,
+                status: ChannelStatus::Closed,
+            }),
             _ => Err(JsValue::from("close channel transaction failed".to_string())),
         }
     }
@@ -987,7 +989,7 @@ pub mod wasm {
             .await
             .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
         {
-            TransactionResult::Withdraw { tx_hash } => Ok(tx_hash),
+            TransactionResult::Withdrawn { tx_hash } => Ok(tx_hash),
             _ => Err(JsValue::from("withdraw transaction failed".to_string())),
         }
     }

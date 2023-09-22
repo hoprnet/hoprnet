@@ -17,7 +17,7 @@ use bindings::{
     hopr_ticket_price_oracle::{HoprTicketPriceOracleEvents, TicketPriceUpdatedFilter},
     hopr_token::{ApprovalFilter, HoprTokenEvents, TransferFilter},
 };
-use core_crypto::types::{Hash, OffchainSignature};
+use core_crypto::types::OffchainSignature;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     account::{AccountEntry, AccountType},
@@ -161,7 +161,7 @@ where
     {
         match HoprAnnouncementsEvents::decode_log(log)? {
             HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
-                let maybe_account = db.get_account(&address_announcement.node.try_into()?).await?;
+                let maybe_account = db.get_account(&address_announcement.node.into()).await?;
 
                 debug!(
                     "on_announcement_event - multiaddr: {:?} - node: {:?}",
@@ -188,19 +188,19 @@ where
                 }
             }
             HoprAnnouncementsEvents::KeyBindingFilter(key_binding) => {
-                if db.get_account(&key_binding.chain_key.try_into()?).await?.is_some() {
+                if db.get_account(&key_binding.chain_key.into()).await?.is_some() {
                     return Err(CoreEthereumIndexerError::UnsupportedKeyRebinding);
                 }
 
                 match KeyBinding::from_parts(
-                    key_binding.chain_key.try_into()?,
+                    key_binding.chain_key.into(),
                     key_binding.ed_25519_pub_key.try_into()?,
                     OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
                 ) {
                     Ok(binding) => {
                         let updated_account = AccountEntry::new(
                             key_binding.ed_25519_pub_key.try_into()?,
-                            key_binding.chain_key.try_into()?,
+                            key_binding.chain_key.into(),
                             AccountType::NotAnnounced,
                         );
 
@@ -218,7 +218,7 @@ where
                 }
             }
             HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
-                let maybe_account = db.get_account(&revocation.node.try_into()?).await?;
+                let maybe_account = db.get_account(&revocation.node.into()).await?;
 
                 if let Some(mut account) = maybe_account {
                     account.update(AccountType::NotAnnounced);
@@ -237,12 +237,12 @@ where
     {
         match HoprChannelsEvents::decode_log(log)? {
             HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
-                let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&balance_decreased.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
 
-                    db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
+                    db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
                         .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
@@ -253,12 +253,12 @@ where
                 }
             }
             HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
-                let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&balance_increased.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
 
-                    db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
+                    db.update_channel_and_snapshot(&balance_increased.channel_id.into(), &channel, snapshot)
                         .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
@@ -269,7 +269,7 @@ where
                 }
             }
             HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
-                let maybe_channel = db.get_channel(&channel_closed.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&channel_closed.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::Closed;
@@ -280,7 +280,7 @@ where
                         db.delete_acknowledged_tickets_from(channel).await?;
                     }
 
-                    db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
+                    db.update_channel_and_snapshot(&channel_closed.channel_id.into(), &channel, snapshot)
                         .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
@@ -291,8 +291,8 @@ where
                 }
             }
             HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
-                let source: Address = channel_opened.source.0.try_into()?;
-                let destination: Address = channel_opened.destination.0.try_into()?;
+                let source: Address = channel_opened.source.0.into();
+                let destination: Address = channel_opened.destination.0.into();
 
                 let channel_id = generate_channel_id(&source, &destination);
 
@@ -333,12 +333,12 @@ where
                 }
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
-                let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.ticket_index = ticket_redeemed.new_ticket_index.into();
 
-                    db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)
+                    db.update_channel_and_snapshot(&ticket_redeemed.channel_id.into(), &channel, snapshot)
                         .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
@@ -349,13 +349,13 @@ where
                 }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
-                let maybe_channel = db.get_channel(&closure_initiated.channel_id.try_into()?).await?;
+                let maybe_channel = db.get_channel(&closure_initiated.channel_id.into()).await?;
 
                 if let Some(mut channel) = maybe_channel {
                     channel.status = ChannelStatus::PendingToClose;
                     channel.closure_time = closure_initiated.closure_time.into();
 
-                    db.update_channel_and_snapshot(&closure_initiated.channel_id.try_into()?, &channel, snapshot)
+                    db.update_channel_and_snapshot(&closure_initiated.channel_id.into(), &channel, snapshot)
                         .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
@@ -366,12 +366,12 @@ where
                 }
             }
             HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
-                db.set_channels_domain_separator(&Hash::try_from(domain_separator_updated.domain_separator)?, snapshot)
+                db.set_channels_domain_separator(&domain_separator_updated.domain_separator.into(), snapshot)
                     .await?;
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
                 db.set_channels_ledger_domain_separator(
-                    &Hash::try_from(ledger_domain_separator_updated.ledger_domain_separator)?,
+                    &ledger_domain_separator_updated.ledger_domain_separator.into(),
                     snapshot,
                 )
                 .await?;
@@ -386,8 +386,8 @@ where
     {
         match HoprTokenEvents::decode_log(log)? {
             HoprTokenEvents::TransferFilter(transfered) => {
-                let from: Address = transfered.from.0.try_into()?;
-                let to: Address = transfered.to.0.try_into()?;
+                let from: Address = transfered.from.0.into();
+                let to: Address = transfered.to.0.into();
 
                 let value: U256 = u256::from_be_bytes(transfered.value.into()).into();
 
@@ -409,8 +409,8 @@ where
                 }
             }
             HoprTokenEvents::ApprovalFilter(approved) => {
-                let owner: Address = approved.owner.0.try_into()?;
-                let spender: Address = approved.spender.0.try_into()?;
+                let owner: Address = approved.owner.0.into();
+                let spender: Address = approved.spender.0.into();
 
                 let allowance: U256 = u256::from_be_bytes(approved.value.into()).into();
 
@@ -442,27 +442,27 @@ where
     {
         match HoprNetworkRegistryEvents::decode_log(log)? {
             HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
-                let node_address = &deregistered.node_address.0.try_into()?;
+                let node_address = &deregistered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
                 self.cbs.node_not_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
-                let node_address = &deregistered.node_address.0.try_into()?;
+                let node_address = &deregistered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, false, snapshot).await?;
                 self.cbs.node_not_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
-                let node_address = &registered.node_address.0.try_into()?;
+                let node_address = &registered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
                 self.cbs.node_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
-                let node_address = &registered.node_address.0.try_into()?;
+                let node_address = &registered.node_address.0.into();
                 db.set_allowed_to_access_network(node_address, true, snapshot).await?;
                 self.cbs.node_allowed_to_access_network(node_address);
             }
             HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
-                let account: Address = eligibility_updated.staking_account.0.try_into()?;
+                let account: Address = eligibility_updated.staking_account.0.into();
                 db.set_eligible(&account, eligibility_updated.eligibility, snapshot)
                     .await?;
             }
@@ -485,13 +485,13 @@ where
     {
         match HoprNodeSafeRegistryEvents::decode_log(log)? {
             HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
-                if self.chain_key.eq(&registered.node_address.0.try_into()?) {
-                    db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.0.try_into()?), snapshot)
+                if self.chain_key.eq(&registered.node_address.0.into()) {
+                    db.set_mfa_protected_and_update_snapshot(Some(registered.safe_address.0.into()), snapshot)
                         .await?;
                 }
             }
             HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
-                if self.chain_key.eq(&deregistered.node_address.0.try_into()?) {
+                if self.chain_key.eq(&deregistered.node_address.0.into()) {
                     if db.is_mfa_protected().await?.is_some() {
                         db.set_mfa_protected_and_update_snapshot(None, snapshot).await?;
                     } else {
@@ -501,7 +501,7 @@ where
             }
             HoprNodeSafeRegistryEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
                 db.set_node_safe_registry_domain_separator(
-                    &Hash::try_from(domain_separator_updated.domain_separator)?,
+                    &(domain_separator_updated.domain_separator).into(),
                     snapshot,
                 )
                 .await?;

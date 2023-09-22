@@ -327,7 +327,7 @@ mod tests {
             .times(ticket_count)
             .in_sequence(&mut seq)
             .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| TransactionResult::RedeemTicket {
+            .returning(|_| TransactionResult::TicketRedeemed {
                 tx_hash: Hash::default(),
             });
 
@@ -337,7 +337,7 @@ mod tests {
             .times(ticket_count)
             .in_sequence(&mut seq)
             .withf(move |t| charlie_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| TransactionResult::RedeemTicket {
+            .returning(|_| TransactionResult::TicketRedeemed {
                 tx_hash: Hash::default(),
             });
 
@@ -409,7 +409,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count)
             .withf(move |t| bob_tickets.iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| TransactionResult::RedeemTicket {
+            .returning(|_| TransactionResult::TicketRedeemed {
                 tx_hash: Hash::default(),
             });
 
@@ -493,7 +493,7 @@ mod tests {
             .expect_redeem_ticket()
             .times(ticket_count - 2)
             .withf(move |t| tickets_clone[2..].iter().find(|tk| tk.ticket.eq(&t.ticket)).is_some())
-            .returning(|_| TransactionResult::RedeemTicket {
+            .returning(|_| TransactionResult::TicketRedeemed {
                 tx_hash: Hash::default(),
             });
 

@@ -1,6 +1,6 @@
 use ethnum::{u256, AsU256};
 use getrandom::getrandom;
-use primitive_types::H160;
+use primitive_types::{H160, U256 as EthereumU256};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
@@ -82,19 +82,21 @@ impl BinarySerializable for Address {
     }
 }
 
-impl TryFrom<[u8; Address::SIZE]> for Address {
-    type Error = GeneralError;
-
-    fn try_from(value: [u8; Address::SIZE]) -> std::result::Result<Self, Self::Error> {
-        Address::from_bytes(&value)
+impl From<[u8; Address::SIZE]> for Address {
+    fn from(value: [u8; Address::SIZE]) -> Self {
+        Address { addr: value }
     }
 }
 
-impl TryFrom<H160> for Address {
-    type Error = GeneralError;
+impl From<H160> for Address {
+    fn from(value: H160) -> Self {
+        Address { addr: value.0 }
+    }
+}
 
-    fn try_from(value: H160) -> std::result::Result<Self, Self::Error> {
-        Address::try_from(value.0)
+impl From<Address> for H160 {
+    fn from(value: Address) -> Self {
+        H160::from_slice(&value.to_bytes())
     }
 }
 
@@ -618,6 +620,51 @@ impl From<u8> for U256 {
     }
 }
 
+impl From<EthereumU256> for U256 {
+    fn from(value: EthereumU256) -> Self {
+        U256::from(&value)
+    }
+}
+
+impl From<&EthereumU256> for U256 {
+    fn from(value: &EthereumU256) -> Self {
+        let words = value.0;
+
+        let mut hi = [0u8; 16];
+        hi[0..8].copy_from_slice(&words[0].to_be_bytes());
+        hi[8..16].clone_from_slice(&words[1].to_be_bytes());
+
+        let mut lo = [0u8; 16];
+        lo[0..8].copy_from_slice(&words[2].to_be_bytes());
+        lo[8..16].clone_from_slice(&words[3].to_be_bytes());
+
+        Self {
+            value: u256::from_words(u128::from_be_bytes(hi), u128::from_be_bytes(lo)),
+        }
+    }
+}
+
+impl From<U256> for EthereumU256 {
+    fn from(value: U256) -> Self {
+        EthereumU256::from(&value)
+    }
+}
+
+impl From<&U256> for EthereumU256 {
+    fn from(value: &U256) -> Self {
+        let words = [value.value.0[0].to_be_bytes(), value.value.0[1].to_be_bytes()];
+
+        EthereumU256 {
+            0: [
+                u64::from_be_bytes(words[0][0..8].try_into().unwrap()),
+                u64::from_be_bytes(words[0][8..16].try_into().unwrap()),
+                u64::from_be_bytes(words[1][0..8].try_into().unwrap()),
+                u64::from_be_bytes(words[0][8..16].try_into().unwrap()),
+            ],
+        }
+    }
+}
+
 impl AsU256 for U256 {
     fn as_u256(self) -> ethnum::U256 {
         self.value
@@ -681,6 +728,7 @@ mod tests {
     use hex_literal::hex;
     use std::cmp::Ordering;
     use std::str::FromStr;
+    use primitive_types::U256 as EthereumU256;
 
     #[test]
     fn address_tests() {
@@ -798,6 +846,17 @@ mod tests {
         // bad examples
         assert!(U256::one().divide_f64(0.0).is_err());
         assert!(U256::one().divide_f64(1.1).is_err());
+    }
+
+    #[test]
+    fn u256_conversions() {
+        let u256_ethereum = EthereumU256 { 0: [u64::MAX, u64::MAX, u64::MAX, u64::MAX] };
+
+        assert_eq!(U256::from(u256_ethereum), U256::max());
+
+        let u256 = U256::max();
+
+        assert_eq!(EthereumU256::from(u256), EthereumU256::MAX);
     }
 }
 

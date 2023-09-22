@@ -1,5 +1,5 @@
 use crate::errors::{
-    CoreEthereumError::{InvalidArguments, InvalidState},
+    CoreEthereumActionsError::{InvalidArguments, InvalidState},
     Result,
 };
 use bindings::{
@@ -35,7 +35,7 @@ pub enum Operation {
     DelegateCall = 1,
 }
 
-pub struct ChainCalls {
+pub struct PayloadGenerator {
     /// own Ethereum address
     chain_key: Address,
     /// address of HoprChannels smart contract
@@ -46,7 +46,7 @@ pub struct ChainCalls {
     use_safe: bool,
 }
 
-impl ChainCalls {
+impl PayloadGenerator {
     pub fn new(chain_keypair: &ChainKeypair, hopr_channels: Address, hopr_announcements: Address) -> Self {
         Self {
             chain_key: chain_keypair.public().to_address(),
@@ -407,7 +407,7 @@ pub mod tests {
         traits::BinarySerializable,
     };
 
-    use super::ChainCalls;
+    use super::PayloadGenerator;
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
@@ -571,7 +571,7 @@ pub mod tests {
 
         let chain_key = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
 
-        let chain = ChainCalls::new(
+        let chain = PayloadGenerator::new(
             &chain_key,
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
             HoprAddress::random(),
@@ -637,7 +637,7 @@ pub mod tests {
         .await;
 
         let keypair = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
-        let chain = ChainCalls::new(
+        let chain = PayloadGenerator::new(
             &keypair,
             HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
             HoprAddress::random(),
@@ -709,10 +709,7 @@ pub mod tests {
 pub mod wasm {
     use async_lock::RwLock;
     use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
-    use core_types::{
-        acknowledgement::wasm::AcknowledgedTicket,
-        announcement::{AnnouncementData, KeyBinding},
-    };
+    use core_types::announcement::{AnnouncementData, KeyBinding};
     use multiaddr::Multiaddr;
     use std::{str::FromStr, sync::Arc};
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
@@ -721,7 +718,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     pub struct ChainCalls {
-        w: Arc<RwLock<super::ChainCalls>>,
+        w: Arc<RwLock<super::PayloadGenerator>>,
     }
 
     #[wasm_bindgen]
@@ -729,7 +726,7 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(chain_keypair: &ChainKeypair, hopr_channels: Address, hopr_announcements: Address) -> Self {
             Self {
-                w: Arc::new(RwLock::new(super::ChainCalls::new(
+                w: Arc::new(RwLock::new(super::PayloadGenerator::new(
                     chain_keypair,
                     hopr_channels,
                     hopr_announcements,
@@ -808,45 +805,6 @@ pub mod wasm {
                 .read()
                 .await
                 .close_incoming_channel(source)
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_intiate_outgoing_channel_closure_payload(
-            &self,
-            dest: &Address,
-        ) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .initiate_outgoing_channel_closure(dest)
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_finalize_outgoing_channel_closure_payload(
-            &self,
-            dest: &Address,
-        ) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .finalize_outgoing_channel_closure(dest)
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_redeem_ticket_payload(
-            &self,
-            acked_ticket: &AcknowledgedTicket,
-        ) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .redeem_ticket(&acked_ticket.into())
                 .map(|v| js_sys::Uint8Array::from(v.as_slice())))
         }
 

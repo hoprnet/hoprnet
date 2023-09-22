@@ -3,12 +3,10 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 import { ChainWrapper, createChainWrapper, Receipt, type DeploymentExtract } from './ethereum.js'
 import { BigNumber } from 'ethers'
 import {
-  AcknowledgedTicket,
   Balance,
   BalanceType,
   Address,
   cacheNoArgAsyncFunction,
-  generate_channel_id,
   Hash,
   debug,
   ChannelEntry,
@@ -21,10 +19,11 @@ import {
   CORE_ETHEREUM_CONSTANTS,
   Database
 } from '@hoprnet/hopr-utils'
+import { type TransactionPayload } from './transaction-manager.js'
 
 import Indexer from './indexer/index.js'
 import { EventEmitter } from 'events'
-import type { IndexerEventsType } from './indexer/types.js'
+import type { IndexerEventsNames, IndexerEventsType } from './indexer/types.js'
 export {
   BlockEventName,
   BlockProcessedEventName,
@@ -198,13 +197,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
-  async withdraw(recipient: Address, amount: Balance): Promise<string> {
-    // promise of tx hash gets resolved when the tx is mined.
-    let currency: 'NATIVE' | 'HOPR' = amount.balance_type() == BalanceType.Native ? 'NATIVE' : 'HOPR'
-
-    return this.chain.withdraw(currency, recipient.to_string(), amount.amount().to_string(), (tx: string) =>
-      this.setTxHandler(currency === 'NATIVE' ? `withdraw-native-${tx}` : `withdraw-hopr-${tx}`, tx)
-    )
+  public sendTransaction(txPayload: TransactionPayload, eventName: IndexerEventsNames) {
+    this.chain.sendTransaction(true, txPayload, (txHash: string) => this.setTxHandler(`${eventName}${txHash}`, txHash))
   }
 
   public setTxHandler(evt: IndexerEventsType, tx: string): DeferType<string> {
@@ -272,6 +266,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public smartContractInfo(): {
     chain: string
+    hoprAnnouncementsAddress: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
@@ -282,60 +277,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     noticePeriodChannelClosure: number
   } {
     return this.chain.getInfo()
-  }
-
-  public async sendTicketRedeemTx(ackTicket: AcknowledgedTicket): Promise<string> {
-    try {
-      return await this.chain.redeemTicket(ackTicket, (txHash: string) => {
-        return this.setTxHandler(`channel-updated-${txHash}`, txHash)
-      })
-    } catch (err) {
-      log(`ticket redemption error: ${err.toString()}`)
-      throw new Error(`ticket redemption error: ${err.toString()}`)
-    }
-  }
-
-  async initializeClosure(_src: Address, dest: Address): Promise<string> {
-    return this.chain.initiateOutgoingChannelClosure(dest, (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
-    )
-  }
-
-  async finalizeClosure(_src: Address, dest: Address): Promise<string> {
-    return await this.chain.finalizeOutgoingChannelClosure(dest, (txHash: string) =>
-      this.setTxHandler(`channel-updated-${txHash}`, txHash)
-    )
-  }
-
-  async openChannel(dest: Address, amount: Balance): Promise<{ channel_id: string; receipt: string }> {
-    log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
-    const receipt = await this.fundChannel(dest, amount)
-    return { channel_id: generate_channel_id(this.chainKeypair.to_address(), dest).to_hex(), receipt }
-  }
-
-  // This operation works on open and closed channels. More assertions must be
-  // enforced on a higher layer.
-  async fundChannel(dest: Address, amount: Balance): Promise<Receipt> {
-    const myBalance = await this.getSafeBalance()
-
-    if (amount.gt(myBalance)) {
-      throw Error(`Not enough balance (${myBalance.to_string()} < ${amount.to_string()})`)
-    }
-    log(
-      `====> fundChannel: src: ${this.chainKeypair
-        .to_address()
-        .to_string()} dest: ${dest.to_string()} amount: ${amount.to_string()}`
-    )
-
-    const receipt = (
-      await this.chain.fundChannel(
-        dest,
-        amount,
-        (txHash: string) => this.setTxHandler(`channel-updated-${txHash}`, txHash)
-        // we are only interested in fundChannel receipt
-      )
-    )[1]
-    return receipt
   }
 
   public async isSafeAnnouncementAllowed(): Promise<boolean> {
