@@ -85,7 +85,7 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
-      - name: Choose template
+      - name: Generate Changelog
         id: template
         run: |
           current_version=$(jq -r '.version' packages/hoprd/package.json)
@@ -98,33 +98,33 @@ jobs:
             echo "pr_template=pr-close-patch.md" >> $GITHUB_OUTPUT
           fi
           milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${current_version}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-          ./scripts/generate-changelog.sh ${milestone_number} true > docs/changelog/changelog-${current_version}.md
+          ./scripts/generate-changelog.sh ${milestone_number} > docs/changelog/changelog-${current_version}.md
           nix develop -c make fmt-ts
           cat docs/changelog/changelog-${current_version}.md
 
         env:
           GH_TOKEN: ${{ github.token }}
 
-      # - name: Create Pull Request
-      #   uses: peter-evans/create-pull-request@v5
-      #   with:
-      #       token: ${{ secrets.GH_RUNNER_TOKEN }}
-      #       commit-message: "Close release ${{ steps.template.outputs.current_version }}"
-      #       title: "Close release ${{ steps.template.outputs.current_version }}"
-      #       body-path: .github/files/${{ steps.template.outputs.pr_template }}
-      #       branch: bot/close-${{ steps.template.outputs.current_version }}
-      #       delete-branch: true
-      #       labels: release
-      #       assignees: ${{ github.actor }}
-      #       team-reviewers: "@hoprnet/hopr-development"
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+            token: ${{ secrets.GH_RUNNER_TOKEN }}
+            commit-message: "Close release ${{ steps.template.outputs.current_version }}"
+            title: "Close release ${{ steps.template.outputs.current_version }}"
+            body-path: .github/files/${{ steps.template.outputs.pr_template }}
+            branch: bot/close-${{ steps.template.outputs.current_version }}
+            delete-branch: true
+            labels: release
+            assignees: ${{ github.actor }}
+            team-reviewers: "@hoprnet/hopr-development"
 
-      # - name: Enable Auto Merge
-      #   run: |
-      #       git fetch
-      #       git checkout bot/close-${{ steps.template.outputs.current_version }}
-      #       gh pr merge --auto --delete-branch --squash
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+      - name: Enable Auto Merge
+        run: |
+            git fetch
+            git checkout bot/close-${{ steps.template.outputs.current_version }}
+            gh pr merge --auto --delete-branch --squash
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Update next release type
         run: |
