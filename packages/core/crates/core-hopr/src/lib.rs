@@ -58,6 +58,9 @@ use {
     core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_ethereum_db::db::wasm::Database,
     wasm_bindgen::prelude::wasm_bindgen,
 };
+use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
+use core_strategy::aggregating::AggregatingStrategy;
+use core_strategy::auto_redeeming::AutoRedeemingStrategy;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -169,7 +172,7 @@ pub fn build_strategies<Db, Net>(
     base_cfg: MultiStrategyConfig,
     cfgs: Vec<StrategyConfig>,
     db: Arc<RwLock<Db>>,
-    network: Arc<RwLock<Network<Net>>>,
+    _network: Arc<RwLock<Network<Net>>>,
     tx_sender: TransactionSender,
     ticket_aggregator: BasicTicketAggregationActions<Result<Ticket, String>>,
 ) -> MultiStrategy
@@ -178,21 +181,18 @@ where
     Net: NetworkExternalActions + 'static,
 {
     let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
+
     for cfg in cfgs {
         match cfg.name.as_str() {
-            "passive" => strategies.push(Box::new(PassiveStrategy::new(
-                cfg,
-                db.clone(),
-                network.clone(),
-                tx_sender.clone(),
-                ticket_aggregator.clone(),
-            ))),
-            "aggregating" => strategies.push(Box::new(AggregatingStrategy::new(
-                Default::default(),
-                db.clone(),
-                tx_sender.clone(),
-                ticket_aggregator.clone(),
-            ))),
+            "passive" => strategies.push(Box::new(PassiveStrategy::new())),
+            "aggregating" => strategies.push(Box::new(
+                // TODO: propagate the configuration
+                AggregatingStrategy::new(Default::default(), db.clone(), tx_sender.clone(), ticket_aggregator.clone())
+            )),
+            "auto_redeeming" => strategies.push(Box::new(
+                // TODO: propagate the configuration
+                AutoRedeemingStrategy::new(Default::default(), db.clone(), tx_sender.clone())
+            )),
             "promiscuous" => strategies.push(Box::new(PromiscuousStrategy::new(
                 cfg,
                 db.clone(),
@@ -211,7 +211,7 @@ where
 /// This method creates a group of utilities that can be used to generate triggers for the core application
 /// business logic, as well as the main loop that can be triggered to start event processing.
 ///
-/// The loop containing all of the individual core components is running indefinitely, it will not stop or return
+/// The loop containing all the individual core components is running indefinitely, it will not stop or return
 /// until the first unrecoverable error/panic is encountered.
 #[cfg(feature = "wasm")]
 pub fn build_components(
@@ -250,7 +250,7 @@ pub fn build_components(
     let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
 
     let multi_strategy = Arc::new(build_strategies(
-        MultiStrategyConfig::default(),
+        MultiStrategyConfig::default(), // TODO: propagate the global strategy config
         strategies_cfgs,
         db.clone(),
         network.clone(),

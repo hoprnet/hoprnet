@@ -8,6 +8,8 @@ pub mod aggregating;
 pub mod errors;
 pub mod passive;
 pub mod strategy;
+pub mod aggregating;
+pub mod auto_redeeming;
 
 pub enum Strategies {
     Passive,
