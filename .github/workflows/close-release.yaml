@@ -52,26 +52,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-            token: ${{ secrets.GH_RUNNER_TOKEN }}
-            commit-message: "Close release ${{ steps.template.outputs.current_version }}"
-            title: "Close release ${{ steps.template.outputs.current_version }}"
-            body-path: .github/files/${{ steps.template.outputs.pr_template }}
-            branch: bot/close-${{ steps.template.outputs.current_version }}
-            delete-branch: true
-            labels: release
-            assignees: ${{ github.actor }}
-            team-reviewers: "@hoprnet/hopr-development"
+      # - name: Create Pull Request
+      #   uses: peter-evans/create-pull-request@v5
+      #   with:
+      #       token: ${{ secrets.GH_RUNNER_TOKEN }}
+      #       commit-message: "Close release ${{ steps.template.outputs.current_version }}"
+      #       title: "Close release ${{ steps.template.outputs.current_version }}"
+      #       body-path: .github/files/${{ steps.template.outputs.pr_template }}
+      #       branch: bot/close-${{ steps.template.outputs.current_version }}
+      #       delete-branch: true
+      #       labels: release
+      #       assignees: ${{ github.actor }}
+      #       team-reviewers: "@hoprnet/hopr-development"
 
-      - name: Enable Auto Merge
-        run: |
-            git fetch
-            git checkout bot/close-${{ steps.template.outputs.current_version }}
-            gh pr merge --auto --delete-branch --squash
-        env:
-          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+      # - name: Enable Auto Merge
+      #   run: |
+      #       git fetch
+      #       git checkout bot/close-${{ steps.template.outputs.current_version }}
+      #       gh pr merge --auto --delete-branch --squash
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Update next release type
         run: |
