@@ -7,7 +7,7 @@ on:
       next_release_type:
         type: choice
         required: true
-        description: 'Type of next release to create'
+        description: 'Next release type to create'
         options:
           - ReleaseCandidate
           - Patch
@@ -45,7 +45,7 @@ jobs:
             echo "pr_template=pr-close-patch.md" >> $GITHUB_OUTPUT
           fi
           milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${current_version}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-          ./scripts/generate-changelog.sh ${milestone_number} > docs/changelog/changelog-${current_version}.md
+          ./scripts/generate-changelog.sh ${milestone_number} true > docs/changelog/changelog-${current_version}.md
           make fmt-ts
           cat docs/changelog/changelog-${current_version}.md
 
