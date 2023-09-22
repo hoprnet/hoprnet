@@ -59,6 +59,7 @@ jobs:
             gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:2.0.0-rc.5-pr.5496
             gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:2.0.0-rc.5-pr.5496-cache
           done
+        continue-on-error: true
 
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.3
