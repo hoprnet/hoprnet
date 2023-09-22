@@ -1,6 +1,5 @@
 use core_crypto::types::OffchainPublicKey;
-use core_types::channels::ChannelEntry;
-use core_types::channels::ChannelStatus::{Open, PendingToClose};
+use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus::{Open, PendingToClose}};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use simple_moving_average::{SumTreeSMA, SMA};
@@ -10,7 +9,10 @@ use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_std::sync::RwLock;
 use async_trait::async_trait;
-use core_ethereum_actions::transaction_queue::{Transaction, TransactionSender};
+use core_ethereum_actions::{
+    channels::{close_channel, open_channel},
+    transaction_queue::{Transaction, TransactionSender},
+};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use std::fmt::{Display, Formatter};
@@ -307,21 +309,59 @@ where
             to_close.len()
         );
         // close all the channels
-        futures::future::join_all(to_close.iter().map(|channel_to_close| async {
-            self.tx_sender
-                .send(Transaction::CloseChannel(channel_to_close.clone()))
-                .await
-                .unwrap()
-        }))
-        .await;
+        for channel_to_close in to_close {
+            // self.tx_sender
+            //     .send(Transaction::CloseChannel(channel_to_close.clone()))
+            //     .await
+            //     .unwrap();
+            close_channel(
+                self.db.clone(),
+                self.tx_sender.clone(),
+                channel_to_close.destination,
+                Address::default(), // FIXME: replace with self_address
+                ChannelDirection::Outgoing,
+                false,  // TODO: get this value from config
+            )
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        }
+        // futures::future::join_all(to_close.iter().map(|channel_to_close| async {
+        //     self.tx_sender.clone()
+        //         .send(Transaction::CloseChannel(channel_to_close.clone()))
+        //         .await
+        //         .unwrap()
+        //     }))
+        // .await;
+        debug!("close channels done");
+
         // open all the channels
-        futures::future::join_all(to_open.iter().map(|channel_to_open| async {
-            self.tx_sender
-                .send(Transaction::OpenChannel(channel_to_open.0, channel_to_open.1))
-                .await
-                .unwrap()
-        }))
-        .await;
+        for channel_to_open in to_open {
+            // self.tx_sender
+            //     .send(Transaction::OpenChannel(channel_to_open.0, channel_to_open.1))
+            //     .await
+            //     .unwrap();
+            open_channel(
+                self.db.clone(),
+                self.tx_sender.clone(),
+                channel_to_open.0,
+                Address::default(),
+                channel_to_open.1,
+            )
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+        }
+        // futures::future::join_all(to_open.iter().map(|channel_to_open| async {
+        //     self.tx_sender.clone()
+        //         .send(Transaction::OpenChannel(channel_to_open.0, channel_to_open.1))
+        //         .await
+        //         .unwrap()
+        // }))
+        // .await;
+        debug!("open channels done");
         Ok(())
     }
 }
@@ -330,7 +370,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_crypto::{types::Hash, keypairs::{OffchainKeypair, Keypair}};
+    use core_crypto::{
+        keypairs::{Keypair, OffchainKeypair},
+        types::Hash,
+    };
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_network::{
@@ -339,10 +382,10 @@ mod tests {
     };
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::ChannelStatus;
+    use futures::future::join_all;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_misc::time::native::current_timestamp;
-    use futures::future::join_all;
-    use utils_types::primitives::{U256, Snapshot};
+    use utils_types::primitives::{Snapshot, U256};
 
     struct MockTransactionExecutor;
 
@@ -408,37 +451,25 @@ mod tests {
     }
 
     async fn add_peer_and_bump_its_network_quality_many_times<Db, Net>(
-        strategy: &PromiscuousStrategy<Db, Net>, 
-        peer: &PeerId, 
-        steps: u32
+        strategy: &PromiscuousStrategy<Db, Net>,
+        peer: &PeerId,
+        steps: u32,
     ) where
         Db: HoprCoreEthereumDbActions,
         Net: NetworkExternalActions,
     {
-        strategy
-            .network
-            .write()
-            .await
-            .add(peer, PeerOrigin::Initialization);
+        strategy.network.write().await.add(peer, PeerOrigin::Initialization);
 
         assert_eq!(
-            strategy
-                .network
-                .read()
-                .await
-                .get_peer_status(peer)
-                .unwrap()
-                .quality,
+            strategy.network.read().await.get_peer_status(peer).unwrap().quality,
             0f64
         );
-        join_all(
-            (0..steps).map(
-                |_| async {
-                    strategy.network.write().await.update(peer, Ok(current_timestamp()))
-                }
-            )
-        ).await;
-        assert_eq!((strategy.network.read().await.get_peer_status(peer).unwrap().quality / 0.1f64).round() as u32, steps);
+        join_all((0..steps).map(|_| async { strategy.network.write().await.update(peer, Ok(current_timestamp())) }))
+            .await;
+        assert_eq!(
+            (strategy.network.read().await.get_peer_status(peer).unwrap().quality / 0.1f64).round() as u32,
+            steps
+        );
     }
 
     #[async_std::test]
@@ -472,12 +503,6 @@ mod tests {
         let (eugene_address, eugene_peer_id) = address_peer_id_pairs[3];
         let (gustave_address, gustave_peer_id) = address_peer_id_pairs[4];
 
-        println!("alice address {:?} peer {:?}", &alice_address.to_string(), &alice_peer_id);
-        println!("bob address {:?} peer {:?}", &bob_address.to_string(), &bob_peer_id);
-        println!("charlie address {:?} peer {:?}", &charlie_address.to_string(), &charlie_peer_id);
-        println!("eugene address {:?} peer {:?}", &eugene_address.to_string(), &eugene_peer_id);
-        println!("gustave address {:?} peer {:?}", &gustave_address.to_string(), &gustave_peer_id);
-
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
             alice_address,
@@ -497,33 +522,41 @@ mod tests {
 
         // create a network with:
         let peers: Vec<(PeerId, u32)> = vec![
-            (bob_peer_id.clone(), 7),           // - bob: 0.7
-            (charlie_peer_id.clone(), 9),       // - charlie: 0.9
-            (eugene_peer_id.clone(), 8),        // - eugene: 0.8
-            (gustave_peer_id.clone(), 10),      // - gustave: 1.0
-            (address_peer_id_pairs[5].1, 1),      // - random_peer: 0.1
-            (address_peer_id_pairs[6].1, 3),      // - random_peer: 0.3
-            (address_peer_id_pairs[7].1, 1),      // - random_peer: 0.1
-            (address_peer_id_pairs[8].1, 2),      // - random_peer: 0.2
-            (address_peer_id_pairs[9].1, 3),      // - random_peer: 0.3
+            (bob_peer_id.clone(), 7),        // - bob: 0.7
+            (charlie_peer_id.clone(), 9),    // - charlie: 0.9
+            (eugene_peer_id.clone(), 8),     // - eugene: 0.8
+            (gustave_peer_id.clone(), 10),   // - gustave: 1.0
+            (address_peer_id_pairs[5].1, 1), // - random_peer: 0.1
+            (address_peer_id_pairs[6].1, 3), // - random_peer: 0.3
+            (address_peer_id_pairs[7].1, 1), // - random_peer: 0.1
+            (address_peer_id_pairs[8].1, 2), // - random_peer: 0.2
+            (address_peer_id_pairs[9].1, 3), // - random_peer: 0.3
         ];
 
-        join_all(
-            peers.iter().map(|(peer_id, step)| async {
-                add_peer_and_bump_its_network_quality_many_times(&strat, peer_id, *step).await;
-            })
-        ).await;
+        join_all(peers.iter().map(|(peer_id, step)| async {
+            add_peer_and_bump_its_network_quality_many_times(&strat, peer_id, *step).await;
+        }))
+        .await;
 
-        let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR);  // 1 HOPR
+        let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR); // 1 HOPR
         let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
-        // set HOPR balance in DB
+                                                                                    // set HOPR balance in DB
         strat.db.write().await.set_hopr_balance(&balance).await.unwrap();
         // link chain key and packet key
-        join_all(
-            address_peer_id_pairs.iter().map(|pair| async {
-                strat.db.write().await.link_chain_and_packet_keys(&pair.0, &OffchainPublicKey::from_peerid(&pair.1).unwrap(), &Snapshot::default()).await.unwrap();
-            })
-        ).await;
+        join_all(address_peer_id_pairs.iter().map(|pair| async {
+            strat
+                .db
+                .write()
+                .await
+                .link_chain_and_packet_keys(
+                    &pair.0,
+                    &OffchainPublicKey::from_peerid(&pair.1).unwrap(),
+                    &Snapshot::default(),
+                )
+                .await
+                .unwrap();
+        }))
+        .await;
         // add some channels in DB
         let outgoing_channels = vec![
             ChannelEntry::new(
@@ -554,11 +587,27 @@ mod tests {
                 U256::zero(),
             ),
         ];
-        join_all(
-            outgoing_channels.iter().map(|channel| async {
-                strat.db.write().await.update_channel_and_snapshot(&channel.get_id(), channel, &Snapshot::default()).await.unwrap()
-            })
-        ).await;
+        join_all(outgoing_channels.iter().map(|channel| async {
+            strat
+                .db
+                .write()
+                .await
+                .update_channel_and_snapshot(&channel.get_id(), channel, &Snapshot::default())
+                .await
+                .unwrap()
+        }))
+        .await;
+        // set allowance
+        strat
+            .db
+            .write()
+            .await
+            .set_staking_safe_allowance(
+                &balance,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
 
         // Add fake samples to allow the test to run
         strat.sma.write().await.add_sample(peers.len());
@@ -566,70 +615,19 @@ mod tests {
 
         // get channel counts
         let outgoing_channels_before_tick = strat.db.read().await.get_outgoing_channels().await.unwrap();
-        println!("outgoing_channels_before_tick {:?}", &outgoing_channels_before_tick.iter().map(|channel| channel.to_string()));
-        
+        debug!(
+            "outgoing_channels_before_tick {:?}",
+            &outgoing_channels_before_tick.iter().map(|channel| channel.to_string())
+        );
+
         strat.on_tick().await.unwrap();
-        
+
         let outgoing_channels_after_tick = strat.db.read().await.get_outgoing_channels().await.unwrap();
-        println!("outgoing_channels_after_tick {:?}", &outgoing_channels_after_tick.iter().map(|channel| channel.to_string()));
+        debug!(
+            "outgoing_channels_after_tick {:?}",
+            &outgoing_channels_after_tick.iter().map(|channel| channel.to_string())
+        );
 
-
-
-    //     assert_eq!(results.to_close().len(), 2);
-    //     assert_eq!(results.to_open().len(), 3);
-
-    //     assert_vec_eq!(results.to_close(), vec![alice, gustave]);
-    //     assert_vec_eq!(
-    //         results
-    //             .to_open()
-    //             .into_iter()
-    //             .map(|r| r.address)
-    //             .collect::<Vec<Address>>(),
-    //         vec![gustave, eugene, bob]
-    //     );
-
+        // TODO: assert that there's 1 channel closed and 1 opened.
     }
-
-    // #[test]
-    // fn test_promiscuous_strategy_more_channels_than_allowed() {
-    //     let mut strat = PromiscuousStrategy::default();
-    //     let mut peers = HashMap::new();
-    //     let mut outgoing_channels = Vec::new();
-    //     for i in 0..100 {
-    //         let address = Address::random();
-    //         peers.insert(address.clone(), 0.9 - i as f64 * 0.02);
-    //         if outgoing_channels.len() < 20 {
-    //             outgoing_channels.push(OutgoingChannelStatus {
-    //                 address,
-    //                 stake: Balance::from_str("100000000000000000", BalanceType::HOPR),
-    //                 status: Open,
-    //             });
-    //         }
-    //     }
-
-    //     // Add fake samples to allow the test to run
-    //     strat.sma.add_sample(peers.len());
-    //     strat.sma.add_sample(peers.len());
-
-    //     let results = strat.tick(
-    //         Balance::from_str("1000000000000000000", BalanceType::HOPR),
-    //         peers.iter().map(|(&x, q)| (x.clone(), q.clone())),
-    //         outgoing_channels.clone(),
-    //     );
-
-    //     assert_eq!(results.max_auto_channels(), 10);
-    //     assert_eq!(results.to_open().len(), 0);
-    //     assert_eq!(results.to_close().len(), 10);
-
-    //     // Only the last 10 lowest quality channels get closed
-    //     assert_vec_eq!(
-    //         results.to_close(),
-    //         outgoing_channels
-    //             .into_iter()
-    //             .rev()
-    //             .map(|s| s.address)
-    //             .take(10)
-    //             .collect::<Vec<Address>>()
-    //     );
-    // }
 }
