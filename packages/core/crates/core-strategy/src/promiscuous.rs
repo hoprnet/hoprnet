@@ -136,15 +136,13 @@ where
     Net: NetworkExternalActions,
 {
     async fn on_tick(&self) -> Result<()> {
-        let balance: Balance = self.db.read().await.get_hopr_balance().await?;
-        // addresses: impl Iterator<Item = (Address, f64)>,
-        // outgoing_channels: Vec<OutgoingChannelStatus>,
-
         let mut to_close: Vec<ChannelEntry> = vec![];
         let mut to_open: Vec<(Address, Balance)> = vec![];
         let mut new_channel_candidates: Vec<(Address, f64)> = vec![];
         let mut network_size: usize = 0;
         let mut active_addresses: HashMap<Address, f64> = HashMap::new();
+
+        let balance: Balance = self.db.read().await.get_hopr_balance().await?;
         let outgoing_channels = self.db.read().await.get_outgoing_channels().await?;
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
@@ -313,6 +311,7 @@ where
             self.tx_sender
                 .send(Transaction::CloseChannel(channel_to_close.clone()))
                 .await
+                .unwrap()
         }))
         .await;
         // open all the channels
@@ -320,6 +319,7 @@ where
             self.tx_sender
                 .send(Transaction::OpenChannel(channel_to_open.0, channel_to_open.1))
                 .await
+                .unwrap()
         }))
         .await;
         Ok(())
@@ -330,7 +330,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_crypto::types::Hash;
+    use core_crypto::{types::Hash, keypairs::{OffchainKeypair, Keypair}};
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_network::{
@@ -340,7 +340,10 @@ mod tests {
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::ChannelStatus;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
-    // use utils_misc::time::native::current_timestamp;
+    use utils_misc::time::native::current_timestamp;
+    use futures::future::join_all;
+    use utils_types::primitives::{U256, Snapshot};
+
     struct MockTransactionExecutor;
 
     impl MockTransactionExecutor {
@@ -392,15 +395,55 @@ mod tests {
         }
 
         fn emit(&self, _: NetworkEvent) {}
+
+        fn create_timestamp(&self) -> u64 {
+            current_timestamp()
+        }
     }
 
-    fn generate_random_peer() -> (Address, PeerId) {
-        (Address::random(), PeerId::random())
+    fn generate_random_address_and_peer_id_pairs(num: u32) -> Vec<(Address, PeerId)> {
+        (0..num)
+            .map(|_| (Address::random(), OffchainKeypair::random().public().to_peerid()))
+            .collect()
+    }
+
+    async fn add_peer_and_bump_its_network_quality_many_times<Db, Net>(
+        strategy: &PromiscuousStrategy<Db, Net>, 
+        peer: &PeerId, 
+        steps: u32
+    ) where
+        Db: HoprCoreEthereumDbActions,
+        Net: NetworkExternalActions,
+    {
+        strategy
+            .network
+            .write()
+            .await
+            .add(peer, PeerOrigin::Initialization);
+
+        assert_eq!(
+            strategy
+                .network
+                .read()
+                .await
+                .get_peer_status(peer)
+                .unwrap()
+                .quality,
+            0f64
+        );
+        join_all(
+            (0..steps).map(
+                |_| async {
+                    strategy.network.write().await.update(peer, Ok(current_timestamp()))
+                }
+            )
+        ).await;
+        assert_eq!((strategy.network.read().await.get_peer_status(peer).unwrap().quality / 0.1f64).round() as u32, steps);
     }
 
     #[async_std::test]
     async fn test_promiscuous_strategy_config() {
-        let (alice_address, alice_peer_id) = generate_random_peer();
+        let (alice_address, alice_peer_id) = generate_random_address_and_peer_id_pairs(1)[0];
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
@@ -422,9 +465,18 @@ mod tests {
 
     #[async_std::test]
     async fn test_promiscuous_strategy_basic() {
-        let (alice_address, alice_peer_id) = generate_random_peer();
-        let (_, bob_peer_id) = generate_random_peer();
-        // let (charlie_address, charlie_peer_id) = generate_random_peer();
+        let address_peer_id_pairs = generate_random_address_and_peer_id_pairs(10);
+        let (alice_address, alice_peer_id) = address_peer_id_pairs[0];
+        let (bob_address, bob_peer_id) = address_peer_id_pairs[1];
+        let (charlie_address, charlie_peer_id) = address_peer_id_pairs[2];
+        let (eugene_address, eugene_peer_id) = address_peer_id_pairs[3];
+        let (gustave_address, gustave_peer_id) = address_peer_id_pairs[4];
+
+        println!("alice address {:?} peer {:?}", &alice_address.to_string(), &alice_peer_id);
+        println!("bob address {:?} peer {:?}", &bob_address.to_string(), &bob_peer_id);
+        println!("charlie address {:?} peer {:?}", &charlie_address.to_string(), &charlie_peer_id);
+        println!("eugene address {:?} peer {:?}", &eugene_address.to_string(), &eugene_peer_id);
+        println!("gustave address {:?} peer {:?}", &gustave_address.to_string(), &gustave_peer_id);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
@@ -443,83 +495,85 @@ mod tests {
 
         let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
 
-        strat
-            .network
-            .write()
-            .await
-            .add(&bob_peer_id, PeerOrigin::Initialization);
-        assert_eq!(
-            strat
-                .network
-                .read()
-                .await
-                .get_peer_status(&bob_peer_id)
-                .unwrap()
-                .quality,
-            0f64
-        );
-        // strat.network.write().await.update(&bob_peer_id, Ok(current_timestamp()));
-        // assert_eq!(strat.network.read().await.get_peer_status(&bob_peer_id).unwrap().quality, 0.2f64);
-    }
+        // create a network with:
+        let peers: Vec<(PeerId, u32)> = vec![
+            (bob_peer_id.clone(), 7),           // - bob: 0.7
+            (charlie_peer_id.clone(), 9),       // - charlie: 0.9
+            (eugene_peer_id.clone(), 8),        // - eugene: 0.8
+            (gustave_peer_id.clone(), 10),      // - gustave: 1.0
+            (address_peer_id_pairs[5].1, 1),      // - random_peer: 0.1
+            (address_peer_id_pairs[6].1, 3),      // - random_peer: 0.3
+            (address_peer_id_pairs[7].1, 1),      // - random_peer: 0.1
+            (address_peer_id_pairs[8].1, 2),      // - random_peer: 0.2
+            (address_peer_id_pairs[9].1, 3),      // - random_peer: 0.3
+        ];
 
-    // #[async_std::test]
-    // fn test_promiscuous_strategy_basic() {
-    //     let strat_cft = PromiscuousStrategyConfig::default();
+        join_all(
+            peers.iter().map(|(peer_id, step)| async {
+                add_peer_and_bump_its_network_quality_many_times(&strat, peer_id, *step).await;
+            })
+        ).await;
 
-    //     assert_eq!(strat_cft.name(), "promiscuous");
-    //     // let mut strat = PromiscuousStrategy::default();
+        let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR);  // 1 HOPR
+        let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
+        // set HOPR balance in DB
+        strat.db.write().await.set_hopr_balance(&balance).await.unwrap();
+        // link chain key and packet key
+        join_all(
+            address_peer_id_pairs.iter().map(|pair| async {
+                strat.db.write().await.link_chain_and_packet_keys(&pair.0, &OffchainPublicKey::from_peerid(&pair.1).unwrap(), &Snapshot::default()).await.unwrap();
+            })
+        ).await;
+        // add some channels in DB
+        let outgoing_channels = vec![
+            ChannelEntry::new(
+                alice_address.clone(),
+                bob_address.clone(),
+                balance.clone(),
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::zero(),
+                U256::zero(),
+            ),
+            ChannelEntry::new(
+                alice_address.clone(),
+                charlie_address.clone(),
+                balance.clone(),
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::zero(),
+                U256::zero(),
+            ),
+            ChannelEntry::new(
+                alice_address.clone(),
+                gustave_address.clone(),
+                low_balance.clone(),
+                U256::zero(),
+                ChannelStatus::Open,
+                U256::zero(),
+                U256::zero(),
+            ),
+        ];
+        join_all(
+            outgoing_channels.iter().map(|channel| async {
+                strat.db.write().await.update_channel_and_snapshot(&channel.get_id(), channel, &Snapshot::default()).await.unwrap()
+            })
+        ).await;
 
-    //     let alice = Address::from_str("0x5cb1d93aea1fc219a936a708576bf553042993ea").unwrap();
-    //     let bob = Address::from_str("0xcc57a920e27f6eaa78c3ccb7976c0fb1e4b94ea1").unwrap();
-    //     let charlie = Address::from_str("0xf6a2be4680ab2051f2906922c210da0508553ce1").unwrap();
-    //     let eugene = Address::from_str("0x242c983f08f896e1b3a51ec6d646c20bf1b494fc").unwrap();
-    //     let gustave = Address::from_str("0xf6c287af75350dc241255f369368044a02c65160").unwrap();
+        // Add fake samples to allow the test to run
+        strat.sma.write().await.add_sample(peers.len());
+        strat.sma.write().await.add_sample(peers.len());
 
-    //     let peers = HashMap::from([
-    //         (alice.clone(), 0.1),
-    //         (bob.clone(), 0.7),
-    //         (charlie.clone(), 0.9),
-    //         (Address::random(), 0.1),
-    //         (eugene.clone(), 0.8),
-    //         (Address::random(), 0.3),
-    //         (gustave.clone(), 1.0),
-    //         (Address::random(), 0.1),
-    //         (Address::random(), 0.2),
-    //         (Address::random(), 0.3),
-    //     ]);
+        // get channel counts
+        let outgoing_channels_before_tick = strat.db.read().await.get_outgoing_channels().await.unwrap();
+        println!("outgoing_channels_before_tick {:?}", &outgoing_channels_before_tick.iter().map(|channel| channel.to_string()));
+        
+        strat.on_tick().await.unwrap();
+        
+        let outgoing_channels_after_tick = strat.db.read().await.get_outgoing_channels().await.unwrap();
+        println!("outgoing_channels_after_tick {:?}", &outgoing_channels_after_tick.iter().map(|channel| channel.to_string()));
 
-    //     let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR);
-    //     let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR);
 
-    //     let outgoing_channels = vec![
-    //         OutgoingChannelStatus {
-    //             address: alice.clone(),
-    //             stake: balance.clone(),
-    //             status: Open,
-    //         },
-    //         OutgoingChannelStatus {
-    //             address: charlie.clone(),
-    //             stake: balance.clone(),
-    //             status: Open,
-    //         },
-    //         OutgoingChannelStatus {
-    //             address: gustave.clone(),
-    //             stake: low_balance,
-    //             status: Open,
-    //         },
-    //     ];
-
-    //     // Add fake samples to allow the test to run
-    //     strat.sma.add_sample(peers.len());
-    //     strat.sma.add_sample(peers.len());
-
-    //     let results = strat.tick(
-    //         balance,
-    //         peers.iter().map(|(x, q)| (x.clone(), q.clone())),
-    //         outgoing_channels,
-    //     );
-
-    //     assert_eq!(results.max_auto_channels(), 4);
 
     //     assert_eq!(results.to_close().len(), 2);
     //     assert_eq!(results.to_open().len(), 3);
@@ -533,7 +587,8 @@ mod tests {
     //             .collect::<Vec<Address>>(),
     //         vec![gustave, eugene, bob]
     //     );
-    // }
+
+    }
 
     // #[test]
     // fn test_promiscuous_strategy_more_channels_than_allowed() {
