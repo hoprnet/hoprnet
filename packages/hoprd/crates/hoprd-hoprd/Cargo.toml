@@ -73,7 +73,6 @@ wasm = [
     "core-packet/wasm",
     "core-path/wasm",
     "core-protocol/wasm",
-    "core-strategy/wasm",
     "core-types/wasm",
     "core-ethereum-db/wasm",
     "core-ethereum-indexer/wasm",

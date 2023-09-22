@@ -128,6 +128,12 @@ mod tests {
     use crate::strategy::{MockSingularStrategy, MultiStrategy, MultiStrategyConfig, SingularStrategy};
 
     #[async_std::test]
+    async fn test_multi_strategy_name() {
+        let ms = MultiStrategy::new(vec![Box::new(MockSingularStrategy::new()), Box::new(MockSingularStrategy::new())], Default::default());
+        assert_eq!("multi_strategy[mock,mock]", &ms.to_string());
+    }
+
+    #[async_std::test]
     async fn test_multi_strategy_logical_or_flow() {
         let mut seq = Sequence::new();
 

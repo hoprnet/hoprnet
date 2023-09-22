@@ -175,7 +175,7 @@ where
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
     on_chain_tx_sender
-        .send(Transaction::RedeemTicket(ack_ticket.clone()))
+        .send(Transaction::RedeemTicket(ack_ticket))
         .await
 }
 
