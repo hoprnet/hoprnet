@@ -308,7 +308,7 @@ api_get_channel_info() {
   local destination_address="${3}"
   local direction="${4}"
 
-  if [ -Z "${channel_id}" ] || [ "${channel_id}" = "null" ]; then
+  if [ -z "${channel_id}" ] || [ "${channel_id}" = "null" ]; then
     # fetch channel id from API
     channels_info="$(api_get_all_channels "${source_api}" false)"
     channel_id="$(echo "${channels_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
