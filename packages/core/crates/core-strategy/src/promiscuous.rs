@@ -302,18 +302,15 @@ where
             }
         }
 
-        info!(
+        debug!(
             "strategy tick #{} result: {} peers for channel opening, {} peer for channel closure",
             self.sma.read().await.get_num_samples(),
             to_open.len(),
             to_close.len()
         );
+
         // close all the channels
-        for channel_to_close in to_close {
-            // self.tx_sender
-            //     .send(Transaction::CloseChannel(channel_to_close.clone()))
-            //     .await
-            //     .unwrap();
+        futures::future::join_all(to_close.iter().map(|channel_to_close| async {
             close_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
@@ -324,24 +321,12 @@ where
             )
             .await
             .unwrap()
-            .await
-            .unwrap();
-        }
-        // futures::future::join_all(to_close.iter().map(|channel_to_close| async {
-        //     self.tx_sender.clone()
-        //         .send(Transaction::CloseChannel(channel_to_close.clone()))
-        //         .await
-        //         .unwrap()
-        //     }))
-        // .await;
+        }))
+        .await;
         debug!("close channels done");
 
         // open all the channels
-        for channel_to_open in to_open {
-            // self.tx_sender
-            //     .send(Transaction::OpenChannel(channel_to_open.0, channel_to_open.1))
-            //     .await
-            //     .unwrap();
+        futures::future::join_all(to_open.iter().map(|channel_to_open| async {
             open_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
@@ -351,16 +336,8 @@ where
             )
             .await
             .unwrap()
-            .await
-            .unwrap();
-        }
-        // futures::future::join_all(to_open.iter().map(|channel_to_open| async {
-        //     self.tx_sender.clone()
-        //         .send(Transaction::OpenChannel(channel_to_open.0, channel_to_open.1))
-        //         .await
-        //         .unwrap()
-        // }))
-        // .await;
+        }))
+        .await;
         debug!("open channels done");
         Ok(())
     }
@@ -628,6 +605,6 @@ mod tests {
             &outgoing_channels_after_tick.iter().map(|channel| channel.to_string())
         );
 
-        // TODO: assert that there's 1 channel closed and 1 opened.
+        // TODO: assert that there's 1 channel closed (gustave) and 1 opened (eugene).
     }
 }
