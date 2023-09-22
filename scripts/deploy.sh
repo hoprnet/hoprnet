@@ -19,7 +19,7 @@ restart(){
   zone=${1}
   instance=${2}
   echo "Restarting ${instance}"
-  gcloud compute ssh --zone ${zone} ${instance} --command 'sudo service hoprd restart'
+  gcloud compute ssh --ssh-key-expire-after 5m --zone ${zone} ${instance} --command 'sudo service hoprd restart'
 }
 
 # Iterate through all VM instances
