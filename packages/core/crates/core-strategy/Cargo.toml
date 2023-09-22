@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 async-trait = "0.1"
-async-std = "1.12"
+async-std = { version = "1.12.0", features = ["unstable"]}
 getrandom = { workspace = true }
 js-sys = { workspace = true, optional = true }
 rand = "0.8.5"
