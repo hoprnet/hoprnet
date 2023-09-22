@@ -789,26 +789,6 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_fund_channel_payload(&self, dest: &Address, amount: &Balance) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .fund_channel(dest, amount)
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_close_incoming_channel_payload(&self, source: &Address) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .close_incoming_channel(source)
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
-
-        #[wasm_bindgen]
         pub async fn get_register_safe_by_node_payload(&self, safe_addr: &Address) -> JsResult<js_sys::Uint8Array> {
             ok_or_jserr!(self
                 .w

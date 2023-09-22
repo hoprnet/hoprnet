@@ -628,18 +628,11 @@ impl From<EthereumU256> for U256 {
 
 impl From<&EthereumU256> for U256 {
     fn from(value: &EthereumU256) -> Self {
-        let words = value.0;
-
-        let mut hi = [0u8; 16];
-        hi[0..8].copy_from_slice(&words[0].to_be_bytes());
-        hi[8..16].clone_from_slice(&words[1].to_be_bytes());
-
-        let mut lo = [0u8; 16];
-        lo[0..8].copy_from_slice(&words[2].to_be_bytes());
-        lo[8..16].clone_from_slice(&words[3].to_be_bytes());
+        let mut tmp = [0u8; 32];
+        value.to_big_endian(&mut tmp);
 
         Self {
-            value: u256::from_words(u128::from_be_bytes(hi), u128::from_be_bytes(lo)),
+            value: u256::from_be_bytes(tmp),
         }
     }
 }
@@ -652,16 +645,7 @@ impl From<U256> for EthereumU256 {
 
 impl From<&U256> for EthereumU256 {
     fn from(value: &U256) -> Self {
-        let words = [value.value.0[0].to_be_bytes(), value.value.0[1].to_be_bytes()];
-
-        EthereumU256 {
-            0: [
-                u64::from_be_bytes(words[0][0..8].try_into().unwrap()),
-                u64::from_be_bytes(words[0][8..16].try_into().unwrap()),
-                u64::from_be_bytes(words[1][0..8].try_into().unwrap()),
-                u64::from_be_bytes(words[0][8..16].try_into().unwrap()),
-            ],
-        }
+        EthereumU256::from_big_endian(&value.value.to_be_bytes())
     }
 }
 
@@ -726,9 +710,9 @@ impl AuthorizationToken {
 mod tests {
     use super::*;
     use hex_literal::hex;
+    use primitive_types::U256 as EthereumU256;
     use std::cmp::Ordering;
     use std::str::FromStr;
-    use primitive_types::U256 as EthereumU256;
 
     #[test]
     fn address_tests() {
@@ -850,13 +834,20 @@ mod tests {
 
     #[test]
     fn u256_conversions() {
-        let u256_ethereum = EthereumU256 { 0: [u64::MAX, u64::MAX, u64::MAX, u64::MAX] };
+        let u256_ethereum =
+            EthereumU256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap();
 
-        assert_eq!(U256::from(u256_ethereum), U256::max());
+        assert_eq!(
+            U256::from(u256_ethereum),
+            U256::from_hex("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap()
+        );
 
-        let u256 = U256::max();
+        let u256 = U256::from_hex("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap();
 
-        assert_eq!(EthereumU256::from(u256), EthereumU256::MAX);
+        assert_eq!(
+            EthereumU256::from(u256),
+            EthereumU256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap()
+        );
     }
 }
 

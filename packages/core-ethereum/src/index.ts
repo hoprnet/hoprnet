@@ -1,6 +1,6 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { ChainWrapper, createChainWrapper, Receipt, type DeploymentExtract } from './ethereum.js'
+import { ChainWrapper, createChainWrapper, Receipt, type DeploymentExtract, SendTransactionReturn } from './ethereum.js'
 import { BigNumber } from 'ethers'
 import {
   Balance,
@@ -197,8 +197,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
-  public sendTransaction(txPayload: TransactionPayload, eventName: IndexerEventsNames) {
-    this.chain.sendTransaction(true, txPayload, (txHash: string) => this.setTxHandler(`${eventName}${txHash}`, txHash))
+  public sendTransaction(txPayload: TransactionPayload, eventName: IndexerEventsNames): Promise<SendTransactionReturn> {
+    return this.chain.sendTransaction(true, txPayload, (txHash: string) => this.setTxHandler(`${eventName}${txHash}`, txHash))
   }
 
   public setTxHandler(evt: IndexerEventsType, tx: string): DeferType<string> {

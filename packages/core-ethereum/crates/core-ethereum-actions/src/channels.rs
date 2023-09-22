@@ -160,6 +160,8 @@ mod tests {
     use core_crypto::{random::random_bytes, types::Hash};
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
+    use hex_literal::hex;
+    use lazy_static::lazy_static;
     use mockall::Sequence;
     use std::{
         ops::{Add, Sub},
@@ -172,18 +174,21 @@ mod tests {
         traits::BinarySerializable,
     };
 
+    lazy_static! {
+        static ref ALICE: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));
+        static ref BOB: Address = Address::from(hex!("4c8bbd047c2130e702badb23b6b97a88b6562324"));
+    }
+
     #[async_std::test]
     async fn test_open_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
         db.write()
             .await
@@ -198,7 +203,7 @@ mod tests {
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
+            .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
             .returning(move |_, _| TransactionResult::ChannelFunded { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
@@ -207,7 +212,7 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = open_channel(db.clone(), tx_sender.clone(), bob, self_addr, stake)
+        let tx_res = open_channel(db.clone(), tx_sender.clone(), *BOB, *ALICE, stake)
             .await
             .unwrap()
             .await
@@ -224,20 +229,17 @@ mod tests {
     #[async_std::test]
     async fn test_should_not_open_channel_again() {
         let _ = env_logger::builder().is_test(true).try_init();
-
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
 
         let channel = ChannelEntry::new(
-            self_addr,
-            bob,
+            *ALICE,
+            *BOB,
             stake,
             U256::zero(),
             ChannelStatus::Open,
@@ -261,7 +263,7 @@ mod tests {
 
         assert!(
             matches!(
-                open_channel(db.clone(), tx_queue.new_sender(), bob, self_addr, stake)
+                open_channel(db.clone(), tx_queue.new_sender(), *BOB, *ALICE, stake)
                     .await
                     .err()
                     .unwrap(),
@@ -275,12 +277,11 @@ mod tests {
     async fn test_should_not_open_channel_to_self() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
 
@@ -295,7 +296,7 @@ mod tests {
 
         assert!(
             matches!(
-                open_channel(db.clone(), tx_queue.new_sender(), self_addr, self_addr, stake)
+                open_channel(db.clone(), tx_queue.new_sender(), *ALICE, *ALICE, stake)
                     .await
                     .err()
                     .unwrap(),
@@ -565,37 +566,25 @@ mod tests {
         );
     }
 
-    async fn base_test_channel_close(direction: ChannelDirection) {
-        let self_addr = Address::random();
-        let bob = Address::random();
+    #[async_std::test]
+    async fn test_close_channel_outgoing() {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
 
-        let mut channel = match direction {
-            ChannelDirection::Incoming => ChannelEntry::new(
-                bob,
-                self_addr,
-                stake,
-                U256::zero(),
-                ChannelStatus::Open,
-                U256::zero(),
-                U256::zero(),
-            ),
-            ChannelDirection::Outgoing => ChannelEntry::new(
-                self_addr,
-                bob,
-                stake,
-                U256::zero(),
-                ChannelStatus::Open,
-                U256::zero(),
-                U256::zero(),
-            ),
-        };
+        let mut channel = ChannelEntry::new(
+            *ALICE,
+            *BOB,
+            stake,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+            U256::zero(),
+        );
 
         db.write()
             .await
@@ -609,20 +598,14 @@ mod tests {
             .expect_initiate_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| match direction {
-                ChannelDirection::Incoming => self_addr.eq(dst),
-                ChannelDirection::Outgoing => bob.eq(dst),
-            })
+            .withf(move |dst| BOB.eq(dst))
             .returning(move |_| TransactionResult::ChannelClosureInitiated { tx_hash: random_hash });
 
         tx_exec
             .expect_finalize_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| match direction {
-                ChannelDirection::Incoming => self_addr.eq(dst),
-                ChannelDirection::Outgoing => bob.eq(dst),
-            })
+            .withf(move |dst| BOB.eq(dst))
             .returning(move |_| TransactionResult::ChannelClosed { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
@@ -631,7 +614,7 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = close_channel(db.clone(), tx_sender.clone(), bob, self_addr, direction)
+        let tx_res = close_channel(db.clone(), tx_sender.clone(), *BOB, *ALICE, ChannelDirection::Outgoing)
             .await
             .unwrap()
             .await
@@ -659,7 +642,7 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_res = close_channel(db.clone(), tx_sender.clone(), bob, self_addr, direction)
+        let tx_res = close_channel(db.clone(), tx_sender.clone(), *BOB, *ALICE, ChannelDirection::Outgoing)
             .await
             .unwrap()
             .await
@@ -674,31 +657,72 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_close_channel_outgoing() {
-        let _ = env_logger::builder().is_test(true).try_init();
-        base_test_channel_close(ChannelDirection::Outgoing).await
-    }
-
-    #[async_std::test]
     async fn test_close_channel_incoming() {
-        let _ = env_logger::builder().is_test(true).try_init();
-        base_test_channel_close(ChannelDirection::Incoming).await
+        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
+        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            *ALICE,
+        )));
+
+        let channel = ChannelEntry::new(
+            *BOB,
+            *ALICE,
+            stake,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+            U256::zero(),
+        );
+
+        db.write()
+            .await
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        let mut tx_exec = MockTransactionExecutor::new();
+        let mut seq = Sequence::new();
+        tx_exec
+            .expect_close_incoming_channel()
+            .times(1)
+            .in_sequence(&mut seq)
+            .withf(move |dst| BOB.eq(dst))
+            .returning(move |_| TransactionResult::ChannelClosed { tx_hash: random_hash });
+
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn_local(async move {
+            tx_queue.transaction_loop().await;
+        });
+
+        let tx_res = close_channel(db.clone(), tx_sender.clone(), *BOB, *ALICE, ChannelDirection::Incoming)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+
+        match tx_res {
+            TransactionResult::ChannelClosed { tx_hash } => {
+                assert_eq!(random_hash, tx_hash, "tx hash must be equal");
+            }
+            _ => panic!("invalid or failed tx result"),
+        }
     }
 
     #[async_std::test]
     async fn test_should_not_close_when_closure_time_did_not_elapse() {
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
 
         let channel = ChannelEntry::new(
-            self_addr,
-            bob,
+            *ALICE,
+            *BOB,
             stake,
             U256::zero(),
             ChannelStatus::PendingToClose,
@@ -724,8 +748,8 @@ mod tests {
                 close_channel(
                     db.clone(),
                     tx_queue.new_sender(),
-                    bob,
-                    self_addr,
+                    *BOB,
+                    *ALICE,
                     ChannelDirection::Outgoing
                 )
                 .await
@@ -741,12 +765,9 @@ mod tests {
     async fn test_should_not_close_nonexistent_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
 
@@ -755,8 +776,8 @@ mod tests {
                 close_channel(
                     db.clone(),
                     tx_queue.new_sender(),
-                    bob,
-                    self_addr,
+                    *BOB,
+                    *ALICE,
                     ChannelDirection::Outgoing
                 )
                 .await
@@ -772,19 +793,17 @@ mod tests {
     async fn test_should_not_close_closed_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
 
         let channel = ChannelEntry::new(
-            self_addr,
-            bob,
+            *ALICE,
+            *BOB,
             stake,
             U256::zero(),
             ChannelStatus::Closed,
@@ -802,8 +821,8 @@ mod tests {
                 close_channel(
                     db.clone(),
                     tx_queue.new_sender(),
-                    bob,
-                    self_addr,
+                    *BOB,
+                    *ALICE,
                     ChannelDirection::Outgoing
                 )
                 .await
@@ -819,21 +838,19 @@ mod tests {
     async fn test_withdraw() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_withdraw()
             .times(1)
-            .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
+            .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
             .returning(move |_, _| TransactionResult::Withdrawn { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
@@ -842,7 +859,7 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = withdraw(tx_sender.clone(), bob, stake).await.unwrap().await.unwrap();
+        let tx_res = withdraw(tx_sender.clone(), *BOB, stake).await.unwrap().await.unwrap();
 
         match tx_res {
             TransactionResult::Withdrawn { tx_hash } => {
@@ -856,18 +873,15 @@ mod tests {
     async fn test_should_not_withdraw_zero_amount() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let self_addr = Address::random();
-        let bob = Address::random();
-
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            self_addr,
+            *ALICE,
         )));
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
 
         assert!(
             matches!(
-                withdraw(tx_queue.new_sender(), bob, Balance::zero(BalanceType::HOPR))
+                withdraw(tx_queue.new_sender(), *BOB, Balance::zero(BalanceType::HOPR))
                     .await
                     .err()
                     .unwrap(),

@@ -44,8 +44,6 @@ mockall = "0.11.4"
 hex-literal = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-svm-rs = "0.2.23"
-semver = "1.0"
 hex = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]

@@ -59,8 +59,7 @@ impl Display for Transaction {
             Transaction::CloseChannel(channel, direction) => write!(
                 f,
                 "closure tx of {} channel from {} to {}",
-                direction,
-                channel.source, channel.destination
+                direction, channel.source, channel.destination
             ),
             Transaction::Withdraw(dst, amount) => write!(f, "withdraw tx of {amount} to {dst}"),
         }
@@ -322,28 +321,20 @@ pub mod wasm {
             Ok(Self {
                 data: match value.data() {
                     Some(data) => format!("0x{}", hex::encode(data)),
-                    None => {
-                        return Err(CoreEthereumActionsError::InvalidArguments(
-                            "cannot convert data to hex".into(),
-                        ))
-                    }
+                    None => "0x".into(),
                 },
                 to: match value.to() {
                     Some(NameOrAddress::Address(addr)) => format!("0x{}", hex::encode(addr)),
                     Some(NameOrAddress::Name(_)) => todo!("ens names are not yet supported"),
                     None => {
                         return Err(CoreEthereumActionsError::InvalidArguments(
-                            "cannot convert to to hex".into(),
+                            "cannot convert transaction destination (\"to\") to hex".into(),
                         ))
                     }
                 },
                 value: match value.value() {
                     Some(x) => x.to_string(),
-                    None => {
-                        return Err(CoreEthereumActionsError::InvalidArguments(
-                            "Invalid transaction value".into(),
-                        ))
-                    }
+                    None => "".into(),
                 },
             })
         }

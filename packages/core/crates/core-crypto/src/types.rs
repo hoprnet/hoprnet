@@ -502,13 +502,13 @@ impl Hash {
     }
 }
 
-impl From<[u8; 32]> for Hash {
-    fn from(hash: [u8; 32]) -> Self {
+impl From<[u8; Self::SIZE]> for Hash {
+    fn from(hash: [u8; Self::SIZE]) -> Self {
         Hash { hash }
     }
 }
 
-impl From<Hash> for [u8; 32] {
+impl From<Hash> for [u8; Hash::SIZE] {
     fn from(value: Hash) -> Self {
         value.hash
     }

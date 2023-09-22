@@ -11,7 +11,15 @@ export enum IndexerStatus {
 
 // Manual event typing because Node.js EventEmitter is untyped
 
-export type IndexerEventsNames = `announce-` | `token-approved-` | `withdraw-hopr-` | `withdraw-native-` | `channel-updated-` | `on-provider-error-` | `on-new-block-` | `node-safe-registered-`
+export type IndexerEventsNames =
+  | `announce-`
+  | `token-approved-`
+  | `withdraw-hopr-`
+  | `withdraw-native-`
+  | `channel-updated-`
+  | `on-provider-error-`
+  | `on-new-block-`
+  | `node-safe-registered-`
 
 export type IndexerEventsType = `${IndexerEventsNames}${string}`
 
