@@ -5,6 +5,7 @@ use core_network::{
 };
 use core_strategy::generic::PeerQuality;
 use futures::channel::mpsc::Sender;
+use utils_misc::time::native::current_timestamp;
 use std::sync::Arc;
 use utils_log::{error, warn};
 
@@ -28,6 +29,9 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
         if let Err(e) = self.emitter.clone().start_send(event.clone()) {
             error!("Failed to emit a network status: {}: {}", event, e)
         }
+    }
+    fn create_timestamp(&self) -> u64 {
+        current_timestamp()
     }
 }
 

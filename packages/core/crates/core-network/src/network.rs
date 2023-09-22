@@ -135,6 +135,8 @@ pub trait NetworkExternalActions {
     fn is_public(&self, peer: &PeerId) -> bool;
 
     fn emit(&self, event: NetworkEvent);
+
+    fn create_timestamp(&self) -> u64;
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -267,7 +269,7 @@ impl<T: NetworkExternalActions> Network<T> {
     ///
     /// Each PeerId must have an origin specification.
     pub fn add_with_metadata(&mut self, peer: &PeerId, origin: PeerOrigin, metadata: Option<HashMap<String, String>>) {
-        let now = current_timestamp();
+        let now = self.network_actions_api.create_timestamp();
         utils_log::debug!("Registering peer '{}' with origin {}", peer, origin);
 
         // assumes disjoint sets
@@ -348,13 +350,13 @@ impl<T: NetworkExternalActions> Network<T> {
                     self.entries.remove(&entry.id);
                     return;
                 } else if entry.quality < self.cfg.quality_bad_threshold {
-                    self.ignored.insert(entry.id, current_timestamp());
+                    self.ignored.insert(entry.id, self.network_actions_api.create_timestamp());
                 } else if entry.quality < self.cfg.quality_offline_threshold {
                     self.network_actions_api
                         .emit(NetworkEvent::PeerOffline(entry.id.clone()));
                 }
             } else {
-                entry.last_seen = current_timestamp();
+                entry.last_seen = self.network_actions_api.create_timestamp();
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
                 entry.backoff = self.cfg.backoff_min;
                 entry.quality = 1.0_f64.min(entry.quality + self.cfg.quality_step);
@@ -588,6 +590,10 @@ mod tests {
         }
 
         fn emit(&self, _: NetworkEvent) {}
+
+        fn create_timestamp(&self) -> u64 {
+            current_timestamp()
+        }
     }
 
     fn basic_network(my_id: &PeerId) -> Network<DummyNetworkAction> {
@@ -671,7 +677,7 @@ mod tests {
 
         let mut peers = basic_network(&PeerId::random());
 
-        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
 
         assert_eq!(0, peers.length());
         assert!(!peers.has(&peer))
@@ -685,7 +691,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        let ts = current_timestamp();
+        let ts = peers.network_actions_api.create_timestamp();
 
         peers.update(&peer, Ok(ts.clone()));
 
@@ -722,7 +728,7 @@ mod tests {
             assert!(status.metadata().get(&other_metadata_2.0).is_none());
         }
 
-        let ts = current_timestamp();
+        let ts = peers.network_actions_api.create_timestamp();
 
         {
             let proto_version = ("protocol_version".to_string(), "1.2.4".to_string());
@@ -750,8 +756,8 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(current_timestamp()));
-        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
         peers.update(&peer, Err(())); // should drop to ignored
         peers.update(&peer, Err(())); // should drop from network
 
@@ -770,8 +776,8 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(current_timestamp()));
-        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
+        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
         peers.update(&peer, Err(()));
 
         let actual = peers.debug_output();
@@ -789,7 +795,7 @@ mod tests {
         peers.add(&first, PeerOrigin::IncomingConnection);
         peers.add(&second, PeerOrigin::IncomingConnection);
 
-        let ts = current_timestamp();
+        let ts = peers.network_actions_api.create_timestamp();
 
         let mut expected = vec![first, second];
         expected.sort();
@@ -843,7 +849,7 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(1).returning(|_| false);
-
+        mock.expect_create_timestamp().returning(|| current_timestamp());
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
@@ -861,11 +867,12 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(2).returning(move |x| x == &public);
+        mock.expect_create_timestamp().returning(|| current_timestamp());
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
 
         assert_eq!(peers.health(), Health::Orange);
     }
@@ -883,12 +890,12 @@ mod tests {
         mock.expect_emit()
             .with(mockall::predicate::eq(NetworkEvent::CloseConnection(peer.clone())))
             .return_const(());
-
+        mock.expect_create_timestamp().returning(|| current_timestamp());
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
-        peers.update(&peer, Ok(current_timestamp()));
+        peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
         peers.update(&peer, Err(()));
 
         assert!(!peers.has(&public));
@@ -905,12 +912,13 @@ mod tests {
 
         let mut mock = MockNetworkExternalActions::new();
         mock.expect_is_public().times(5).returning(move |x| public.contains(&x));
+        mock.expect_create_timestamp().returning(|| current_timestamp());
         let mut peers = Network::new(me, cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
 
         for _ in 0..3 {
-            peers.update(&peer, Ok(current_timestamp()));
+            peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
         }
 
         assert_eq!(peers.health(), Health::Green);
@@ -927,16 +935,16 @@ mod tests {
         cfg.quality_offline_threshold = 0.3;
 
         let mut mock = MockNetworkExternalActions::new();
-
         mock.expect_is_public().times(8).returning(move |x| public.contains(&x));
+        mock.expect_create_timestamp().returning(|| current_timestamp());
         let mut peers = Network::new(PeerId::random(), cfg, mock);
 
         peers.add(&peer, PeerOrigin::IncomingConnection);
         peers.add(&peer2, PeerOrigin::IncomingConnection);
 
         for _ in 0..3 {
-            peers.update(&peer2, Ok(current_timestamp()));
-            peers.update(&peer, Ok(current_timestamp()));
+            peers.update(&peer2, Ok(peers.network_actions_api.create_timestamp()));
+            peers.update(&peer, Ok(peers.network_actions_api.create_timestamp()));
         }
 
         assert_eq!(peers.health(), Health::Green);
