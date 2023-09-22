@@ -3,8 +3,23 @@ name: Close Release
 
 on:
   workflow_dispatch:
-
-
+    inputs:
+      next_release_type:
+        type: choice
+        required: true
+        description: 'Type of next release to create'
+        options:
+          - ReleaseCandidate
+          - Patch
+          - Minor
+          - Major
+      release_name:
+        type: choice
+        required: true
+        description: 'Name of the release'
+        options:
+          - providence
+          - saint-luis
 concurrency:
   group: close-release
   cancel-in-progress: true
@@ -55,5 +70,12 @@ jobs:
             git fetch
             git checkout bot/close-${{ steps.template.outputs.current_version }}
             gh pr merge --auto --delete-branch --squash
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+      - name: Update next release type
+        run: |
+          gh variable set NEXT_RELEASE_TYPE --body "${{ github.event.inputs.next_release_type }}"
+          gh variable set NEXT_RELEASE_NAME --body "${{ github.event.inputs.release_name }}"
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
