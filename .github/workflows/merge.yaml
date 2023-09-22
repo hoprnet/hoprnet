@@ -169,6 +169,18 @@ jobs:
         with:
           ref: v2.0.0-rc.6
 
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          install_components: beta
+
       - name: Setup variables
         id: setup
         run: |
@@ -199,14 +211,14 @@ jobs:
           git push --force origin ${release_name}
           echo "release_name=${release_name}" >> $GITHUB_OUTPUT
 
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-          ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog.md
-          echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # - name: Generate Changelog
+      #   id: changelog
+      #   run: |
+      #     milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
+      #     ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog.md
+      #     echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
+      #   env:
+      #     GH_TOKEN: ${{ github.token }}
 
       - name: Tag docker images with release name
         run: |
