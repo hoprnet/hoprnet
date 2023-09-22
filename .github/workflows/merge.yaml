@@ -4,7 +4,7 @@ on:
   pull_request:
     types:
       - closed
-      # - synchronize
+      - synchronize
 
 concurrency:
   group: merge
@@ -14,88 +14,88 @@ permissions:
   contents: write
 
 jobs:
-  cleanup-actions:
-    name: Cleanup Actions
-    runs-on: ubuntu-2-core
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
-      - name: Cleanup
-        run: |
-          gh extension install actions/gh-actions-cache
+  # cleanup-actions:
+  #   name: Cleanup Actions
+  #   runs-on: ubuntu-2-core
+  #   steps:
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v3
+  #     - name: Cleanup
+  #       run: |
+  #         gh extension install actions/gh-actions-cache
 
-          REPO=${{ github.repository }}
-          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+  #         REPO=${{ github.repository }}
+  #         BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
 
-          echo "Fetching list of cache key"
-          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
+  #         echo "Fetching list of cache key"
+  #         cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
 
-          ## Setting this to not fail the workflow while deleting cache keys.
-          set +e
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForPR
-          do
-            gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-          done
-          echo "Done"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         ## Setting this to not fail the workflow while deleting cache keys.
+  #         set +e
+  #         echo "Deleting caches..."
+  #         for cacheKey in $cacheKeysForPR
+  #         do
+  #           gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+  #         done
+  #         echo "Done"
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  tag:
-    name: Tag images
-    runs-on: ubuntu-2-core
-    if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+  # tag:
+  #   name: Tag images
+  #   runs-on: ubuntu-2-core
+  #   if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
+  #   steps:
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+  #     - name: Set up Google Cloud Credentials
+  #       id: auth
+  #       uses: google-github-actions/auth@v1
+  #       with:
+  #         token_format: "access_token"
+  #         credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Login Google Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: europe-west3-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.auth.outputs.access_token }}
+  #     - name: Login Google Container Registry
+  #       uses: docker/login-action@v2
+  #       with:
+  #         registry: europe-west3-docker.pkg.dev
+  #         username: oauth2accesstoken
+  #         password: ${{ steps.auth.outputs.access_token }}
 
-      - name: Tag docker images
-        run: |
-          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-          # Set docker PR tag
-          if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
-            docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
-          else
-            docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
-          fi
-          # Set docker stable tag
-          declare base_branch=${{ github.event.pull_request.base.ref }}
-          if [ "${base_branch}" == "master" ]; then
-            docker_stable_tag=latest
-          else
-            docker_stable_tag=${base_branch/release\//}
-          fi
+  #     - name: Tag docker images
+  #       run: |
+  #         docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
+  #         # Set docker PR tag
+  #         if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
+  #           docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
+  #         else
+  #           docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
+  #         fi
+  #         # Set docker stable tag
+  #         declare base_branch=${{ github.event.pull_request.base.ref }}
+  #         if [ "${base_branch}" == "master" ]; then
+  #           docker_stable_tag=latest
+  #         else
+  #           docker_stable_tag=${base_branch/release\//}
+  #         fi
 
-          # Tag images
-          images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
-          for image in ${images[@]}; 
-          do
-            echo "Tagging ${image}:${docker_stable_tag}"
-            gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_stable_tag}
-          done
+  #         # Tag images
+  #         images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
+  #         for image in ${images[@]}; 
+  #         do
+  #           echo "Tagging ${image}:${docker_stable_tag}"
+  #           gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_stable_tag}
+  #         done
 
   deploy_nodes:
     name: Deploy nodes
     runs-on: ubuntu-2-core
-    if: needs.tag.result == 'success'
-    needs:
-      - tag
+    # if: needs.tag.result == 'success'
+    # needs:
+    #   - tag
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -160,12 +160,14 @@ jobs:
   create_release:
     name: Create Release
     runs-on: ubuntu-2-core
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - tag
+    # if: contains(github.event.pull_request.labels.*.name, 'release')
+    # needs:
+    #   - tag
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
+        with:
+          ref: v2.0.0-rc.6
 
       - name: Setup variables
         id: setup
@@ -195,7 +197,6 @@ jobs:
           git push --force origin ${release_name}
           echo "release_name=${release_name}" >> $GITHUB_OUTPUT
 
-
       - name: Generate Changelog
         id: changelog
         run: |
@@ -215,19 +216,19 @@ jobs:
             gcloud artifacts docker tags add ${docker_registry}/${image}:${{ steps.setup.outputs.current_version }} ${docker_registry}/${image}:${{ steps.tag.outputs.release_name }}
           done
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          body_path: docs/changelog/changelog.md
-          prerelease: ${{ steps.setup.outputs.prerelease }}
-          name: HOPR - v${{ steps.setup.outputs.current_version }}
-          tag_name: v${{ steps.setup.outputs.current_version }}
+      # - name: Create Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     body_path: docs/changelog/changelog.md
+      #     prerelease: ${{ steps.setup.outputs.prerelease }}
+      #     name: HOPR - v${{ steps.setup.outputs.current_version }}
+      #     tag_name: v${{ steps.setup.outputs.current_version }}
 
-      - name: Close Milestone
-        run: | 
-          gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
-        env:
-          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+      # - name: Close Milestone
+      #   run: | 
+      #     gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Notify release on Element channel
         run: |
@@ -243,7 +244,7 @@ jobs:
 
   new_release:
     name: Open release
-    if: contains(github.event.pull_request.labels.*.name, 'release')
+    # if: contains(github.event.pull_request.labels.*.name, 'release')
     needs: 
       - create_release
     uses: ./.github/workflows/open-release.yaml

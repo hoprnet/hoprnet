@@ -45,35 +45,35 @@ jobs:
             ./scripts/bump-version.sh ${next_version}
             echo "next_version=${next_version}" >> $GITHUB_OUTPUT
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-            token: ${{ secrets.GH_RUNNER_TOKEN }}
-            commit-message: "Bump to version ${{ steps.bump.outputs.next_version }}"
-            base: ${{ steps.setup.outputs.base_branch }}
-            title: "Open release ${{ steps.bump.outputs.next_version }}"
-            body: "The scope of this PR is to create the contents of the new release ${{ steps.bump.outputs.next_version }}"
-            branch: bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
-            delete-branch: true
-            assignees: ${{ github.actor }}
-            team-reviewers: "@hoprnet/hopr-development"
+      # - name: Create Pull Request
+      #   uses: peter-evans/create-pull-request@v5
+      #   with:
+      #       token: ${{ secrets.GH_RUNNER_TOKEN }}
+      #       commit-message: "Bump to version ${{ steps.bump.outputs.next_version }}"
+      #       base: ${{ steps.setup.outputs.base_branch }}
+      #       title: "Open release ${{ steps.bump.outputs.next_version }}"
+      #       body: "The scope of this PR is to create the contents of the new release ${{ steps.bump.outputs.next_version }}"
+      #       branch: bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+      #       delete-branch: true
+      #       assignees: ${{ github.actor }}
+      #       team-reviewers: "@hoprnet/hopr-development"
 
-      - name: Enable Auto Merge
-        run: |
-            git fetch
-            git checkout bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
-            gh pr merge --auto --delete-branch --squash
-        env:
-          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+      # - name: Enable Auto Merge
+      #   run: |
+      #       git fetch
+      #       git checkout bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+      #       gh pr merge --auto --delete-branch --squash
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
-      - name: Create Milestone
-        run: |
-            milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.bump.outputs.next_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-            if [ -z $milestone_number ]; 
-            then
-              echo '{ "title": "${{ steps.bump.outputs.next_version }}", "state": "open" }' | gh api --method POST repos/${{ github.repository }}/milestones --input -
-            else
-              echo "Milestone ${{ steps.bump.outputs.next_version }} already created"
-            fi
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # - name: Create Milestone
+      #   run: |
+      #       milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.bump.outputs.next_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
+      #       if [ -z $milestone_number ]; 
+      #       then
+      #         echo '{ "title": "${{ steps.bump.outputs.next_version }}", "state": "open" }' | gh api --method POST repos/${{ github.repository }}/milestones --input -
+      #       else
+      #         echo "Milestone ${{ steps.bump.outputs.next_version }} already created"
+      #       fi
+      #   env:
+      #     GH_TOKEN: ${{ github.token }}
