@@ -39,7 +39,7 @@ pub struct PromiscuousStrategyConfig {
     /// A minimum channel token stake. If reached, the channel will be closed and re-opened with `new_channel_stake`.
     /// Defaults to 0.01 HOPR
     pub minimum_channel_balance: Balance,
-
+ 
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
     /// Defaults to 0.01 HOPR
     pub minimum_node_balance: Balance,
@@ -334,13 +334,13 @@ mod tests {
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_network::{
-        network::{NetworkConfig, NetworkEvent, NetworkExternalActions},
+        network::{NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin},
         PeerId,
     };
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::ChannelStatus;
-    use std::str::FromStr;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
+    // use utils_misc::time::native::current_timestamp;
     struct MockTransactionExecutor;
 
     impl MockTransactionExecutor {
@@ -370,13 +370,13 @@ mod tests {
         async fn close_channel_initialize(&self, _src: Address, _dst: Address) -> TransactionResult {
             TransactionResult::CloseChannel {
                 tx_hash: Hash::default(),
-                status: ChannelStatus::PendingToClose,
+                status: ChannelStatus::Open,
             }
         }
         async fn close_channel_finalize(&self, _src: Address, _dst: Address) -> TransactionResult {
             TransactionResult::CloseChannel {
                 tx_hash: Hash::default(),
-                status: ChannelStatus::Closed,
+                status: ChannelStatus::PendingToClose,
             }
         }
         async fn withdraw(&self, _recipient: Address, _amount: Balance) -> TransactionResult {
@@ -394,17 +394,21 @@ mod tests {
         fn emit(&self, _: NetworkEvent) {}
     }
 
+    fn generate_random_peer() -> (Address, PeerId) {
+        (Address::random(), PeerId::random())
+    }
+
     #[async_std::test]
     async fn test_promiscuous_strategy_config() {
-        let alice = Address::from_str("0x5cb1d93aea1fc219a936a708576bf553042993ea").unwrap();
+        let (alice_address, alice_peer_id) = generate_random_peer();
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            alice,
+            alice_address,
         )));
 
         let network = Arc::new(RwLock::new(Network::new(
-            PeerId::random(),
+            alice_peer_id,
             NetworkConfig::default(),
             MockNetworkExternalActions {},
         )));
@@ -414,6 +418,48 @@ mod tests {
 
         let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
         assert_eq!(strat.to_string(), "promiscuous");
+    }
+
+    #[async_std::test]
+    async fn test_promiscuous_strategy_basic() {
+        let (alice_address, alice_peer_id) = generate_random_peer();
+        let (_, bob_peer_id) = generate_random_peer();
+        // let (charlie_address, charlie_peer_id) = generate_random_peer();
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            alice_address,
+        )));
+
+        let network = Arc::new(RwLock::new(Network::new(
+            alice_peer_id,
+            NetworkConfig::default(),
+            MockNetworkExternalActions {},
+        )));
+        
+        let tx_sender = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new())).new_sender();
+        
+        let strat_cfg = StrategyConfig::default();
+        
+        let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
+        
+        // add peers to network
+        //     let peers = HashMap::from([
+            //         (alice.clone(), 0.1),
+            //         (bob.clone(), 0.7),
+            //         (charlie.clone(), 0.9),
+            //         (Address::random(), 0.1),
+            //         (eugene.clone(), 0.8),
+            //         (Address::random(), 0.3),
+            //         (gustave.clone(), 1.0),
+            //         (Address::random(), 0.1),
+            //         (Address::random(), 0.2),
+            //         (Address::random(), 0.3),
+            //     ]);
+        strat.network.write().await.add(&bob_peer_id, PeerOrigin::Initialization);
+        assert_eq!(strat.network.read().await.get_peer_status(&bob_peer_id).unwrap().quality, 0f64);
+        // strat.network.write().await.update(&bob_peer_id, Ok(current_timestamp()));
+        // assert_eq!(strat.network.read().await.get_peer_status(&bob_peer_id).unwrap().quality, 0.2f64);
     }
 
     // #[async_std::test]
