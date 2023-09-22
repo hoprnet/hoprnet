@@ -1,6 +1,6 @@
 # See docs: https://github.com/actions/stale
 
-name: Cleanup
+name: Cleanup PR
 
 
 on:
@@ -12,8 +12,8 @@ on:
         description: 'Pull request number'
 
 jobs:
-  cleanup:
-    name: Clean up cache
+  cleanup-pr:
+    name: Clean up PR cache
     runs-on: ubuntu-2-core
     timeout-minutes: 10
     steps:
