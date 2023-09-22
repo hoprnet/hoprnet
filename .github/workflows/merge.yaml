@@ -183,7 +183,7 @@ jobs:
         id: tag
         run: |
           # Tag semver
-          git tag v${{ steps.setup.outputs.current_version }}
+          # git tag v${{ steps.setup.outputs.current_version }}
           # git push origin v${{ steps.setup.outputs.current_version }}
 
           # Tag release name
