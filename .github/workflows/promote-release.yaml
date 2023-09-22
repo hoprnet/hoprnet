@@ -20,7 +20,7 @@ concurrency:
 jobs:
   promote-release:
     name: Promote Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
 
       - name: Checkout hoprnet repository

@@ -22,7 +22,7 @@ env:
 jobs:
   cleanup-actions:
     name: Cleanup Actions
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -49,7 +49,7 @@ jobs:
 
   tag:
     name: Tag images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
     steps:
       - name: Checkout hoprnet repository
@@ -98,7 +98,7 @@ jobs:
 
   deploy_nodes:
     name: Deploy nodes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     if: needs.tag.result == 'success'
     needs:
       - tag
@@ -176,7 +176,7 @@ jobs:
 # FIXME: Disabled until hoprd nodes can work in Kubernetes
 #  deploy_natted_nodes:
 #    name: Deploy Natted nodes
-#    runs-on: ubuntu-latest
+#    runs-on: ubuntu-2-core
 #    if: needs.tag.result == 'success'
 #    needs:
 #      - tag
@@ -204,7 +204,7 @@ jobs:
 
   create_release:
     name: Create Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
       - tag

@@ -28,7 +28,7 @@ jobs:
 
   open-release:
     name: Open Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - name: Setup environment variables
         id: setup
