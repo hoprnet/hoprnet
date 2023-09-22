@@ -311,7 +311,7 @@ api_open_channel() {
   local amount="${5:-1000000000000000000000}"
   local result balances hopr_balance
 
-  balances=$(api_get_balances ${api1})
+  balances=$(api_get_balances ${source_api})
   hopr_balance=$(echo ${balances} | jq -r .safeHopr)
   log "Safe balance of node ${source_api} before opening new channel: ${hopr_balance} weiHOPR, need ${amount} weiHOPR"
 
