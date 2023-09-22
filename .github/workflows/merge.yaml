@@ -116,6 +116,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh/
           echo "${{ secrets.GCP_SA_ANSIBLE_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
+          echo "${{ secrets.GCP_SA_ANSIBLE_SSH_PUBLIC_KEY }}" > ~/.ssh/google_compute_engine.pub
           chmod 600 ~/.ssh/google_compute_engine
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [[ "${base_branch}" == "master" ]]; then
