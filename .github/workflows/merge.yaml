@@ -112,13 +112,11 @@ jobs:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
 
-      - name: Add GCP Service Account ansible ssh key
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-            ssh-private-key: ${{ secrets.GCP_SA_ANSIBLE_SSH_PRIVATE_KEY }}
-
       - name: Deploy on GCP
         run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.GCP_SA_ANSIBLE_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
+          chmod 600 ~/.ssh/google_compute_engine
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [[ "${base_branch}" == "master" ]]; then
             ./scripts/deploy.sh rotsee
@@ -127,6 +125,7 @@ jobs:
           else
             echo "Skipping deployment"
           fi
+          rm ~/.ssh/google_compute_engine
 
 # FIXME: Disabled until hoprd nodes can work in Kubernetes
 #  deploy_natted_nodes:
