@@ -53,13 +53,11 @@ jobs:
         run: |
           docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
           next_version=$(./scripts/get-next-version.sh Build ${{ github.event.inputs.pr_number }})
-          ./scripts/bump-version.sh ${next_version}
           images=('hopli' 'hoprd' 'hopr-anvil' 'hopr-pluto' 'hopr-toolchain')
           for image in "${images[@]}"; do
-            gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:2.0.0-rc.5-pr.5496
-            gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:2.0.0-rc.5-pr.5496-cache
+            gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version} || true
+            gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version}-cache || true
           done
-        continue-on-error: true
 
       - name: Sccache Setup
         uses: mozilla-actions/sccache-action@v0.0.3
