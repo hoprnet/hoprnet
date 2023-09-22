@@ -5,6 +5,9 @@ use utils_db::errors::DbError;
 #[derive(Debug, Error)]
 pub enum StrategyError {
 
+    #[error("non-specific strategy error: {0}")]
+    Other(String),
+
     #[error(transparent)]
     DbError(#[from] DbError),
 

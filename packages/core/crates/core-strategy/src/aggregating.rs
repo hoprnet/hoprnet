@@ -12,7 +12,7 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use core_types::channels::Ticket;
-use utils_log::{error, info};
+use utils_log::{error, info, debug};
 use crate::strategy::SingularStrategy;
 
 #[cfg(any(not(feature = "wasm"), test))]
@@ -22,13 +22,25 @@ use async_trait::async_trait;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
+/// Configuration object for the `AggregatingStrategy`
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AggregatingStrategyConfig {
+    /// Number of acknowledged tickets in a channel that has to be exceeded to trigger
+    /// the ticket aggregation in that channel.
+    /// Default is 100.
     pub aggregation_threshold: u32,
+
+    /// Maximum time to wait for the ticket aggregation to complete.
+    /// This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
+    /// Default is 1 minute.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub aggregation_timeout: Duration,
-    pub redeem: bool,
+
+    /// Indicates whether to also perform ticket redemption after the ticket aggregation
+    /// in a channel was successful.
+    /// Default is `true`.
+    pub redeem_after_aggregation: bool,
 }
 
 impl Default for AggregatingStrategyConfig {
@@ -36,11 +48,16 @@ impl Default for AggregatingStrategyConfig {
         Self {
             aggregation_threshold: 100,
             aggregation_timeout: Duration::from_secs(60),
-            redeem: true
+            redeem_after_aggregation: true
         }
     }
 }
 
+/// Represents a strategy that starts aggregating tickets in a certain
+/// channel, once the amount of acknowledged tickets in that channel goes
+/// above the given threshold.
+/// Optionally, the strategy can also redeem the aggregated ticket, if the aggregation
+/// was successful.
 pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
     tx_sender: TransactionSender,
@@ -75,30 +92,48 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AggregatingSt
                 .count() as u32;
 
             if acks_in_channel >= self.cfg.aggregation_threshold {
-                info!("channel has {acks_in_channel} acknowledged tickets, strategy will aggregate them");
+                info!("{self} strategy: channel has {acks_in_channel} acknowledged tickets, going to aggregate them");
 
                 let db_clone = self.db.clone();
                 let cfg_clone = self.cfg.clone();
                 let aggregator_clone = self.ticket_aggregator.clone();
                 let tx_sender_clone = self.tx_sender.clone();
+                let strat_name = self.to_string();
 
                 spawn_local(async move {
                     let agg = aggregator_clone.lock().await.aggregate_tickets(&channel_id);
                     match agg {
                         Ok(mut awaiter) => {
-                            if let Err(e) = awaiter.consume_and_wait(cfg_clone.aggregation_timeout).await {
-                                error!("strategy could not aggregate tickets: {e}");
-                            } else if cfg_clone.redeem {
-                                let _ = redeem_tickets_in_channel(db_clone, &channel, tx_sender_clone).await;
+                            match awaiter.consume_and_wait(cfg_clone.aggregation_timeout).await {
+                                Ok(_) => {
+                                    if cfg_clone.redeem_after_aggregation {
+                                        if let Err(e) = redeem_tickets_in_channel(db_clone, &channel, tx_sender_clone).await {
+                                            error!("{strat_name} strategy: failed to send tickets for redemption: {e}");
+                                        } else {
+                                            info!("{strat_name} strategy: successfully aggregated tickets & sent for redeeming in {channel}");
+                                        }
+                                    } else {
+                                        info!("{strat_name} strategy: successfully aggregated tickets in {channel}");
+                                    }
+                                }
+                                Err(e) => error!("{strat_name} strategy: could not aggregate tickets: {e}"),
                             }
                         }
-                        Err(e) => error!("strategy could not aggregate tickets: {e}")
+                        Err(e) => error!("{strat_name} strategy: could initiate ticket aggregation: {e}")
                     }
                 });
+            } else {
+                debug!("{self} strategy: {channel} has {acks_in_channel} < {} ack tickets, not aggregating yet", self.cfg.aggregation_threshold);
             }
             Ok(())
         } else {
+            error!("{self} strategy: encountered {ack} in a non-existing channel!");
             Err(ChannelDoesNotExist.into())
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+
 }
