@@ -315,7 +315,7 @@ where
                 self.db.clone(),
                 self.tx_sender.clone(),
                 channel_to_close.destination,
-                Address::default(), // FIXME: replace with self_address
+                channel_to_close.source,
                 ChannelDirection::Outgoing,
                 false,  // TODO: get this value from config
             )
