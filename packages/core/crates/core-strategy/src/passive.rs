@@ -3,12 +3,11 @@ use crate::strategy::SingularStrategy;
 use async_std::sync::RwLock;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_network::network::{Network, NetworkExternalActions};
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::channels::Ticket;
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 
 #[allow(dead_code)]
 pub struct PassiveStrategy<Db, Net>
@@ -34,7 +33,12 @@ where
         tx_sender: TransactionSender,
         ticket_aggregator: BasicTicketAggregationActions<Result<Ticket, String>>,
     ) -> Self {
-        Self { db, network, tx_sender, ticket_aggregator }
+        Self {
+            db,
+            network,
+            tx_sender,
+            ticket_aggregator,
+        }
     }
 }
 

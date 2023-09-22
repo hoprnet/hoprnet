@@ -39,7 +39,7 @@ pub struct PromiscuousStrategyConfig {
     /// A minimum channel token stake. If reached, the channel will be closed and re-opened with `new_channel_stake`.
     /// Defaults to 0.01 HOPR
     pub minimum_channel_balance: Balance,
- 
+
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
     /// Defaults to 0.01 HOPR
     pub minimum_node_balance: Balance,
@@ -406,7 +406,7 @@ mod tests {
             DB::new(RustyLevelDbShim::new_in_memory()),
             alice_address,
         )));
-
+        // mock it
         let network = Arc::new(RwLock::new(Network::new(
             alice_peer_id,
             NetworkConfig::default(),
@@ -436,28 +436,28 @@ mod tests {
             NetworkConfig::default(),
             MockNetworkExternalActions {},
         )));
-        
+
         let tx_sender = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new())).new_sender();
-        
+
         let strat_cfg = StrategyConfig::default();
-        
+
         let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
-        
-        // add peers to network
-        //     let peers = HashMap::from([
-            //         (alice.clone(), 0.1),
-            //         (bob.clone(), 0.7),
-            //         (charlie.clone(), 0.9),
-            //         (Address::random(), 0.1),
-            //         (eugene.clone(), 0.8),
-            //         (Address::random(), 0.3),
-            //         (gustave.clone(), 1.0),
-            //         (Address::random(), 0.1),
-            //         (Address::random(), 0.2),
-            //         (Address::random(), 0.3),
-            //     ]);
-        strat.network.write().await.add(&bob_peer_id, PeerOrigin::Initialization);
-        assert_eq!(strat.network.read().await.get_peer_status(&bob_peer_id).unwrap().quality, 0f64);
+
+        strat
+            .network
+            .write()
+            .await
+            .add(&bob_peer_id, PeerOrigin::Initialization);
+        assert_eq!(
+            strat
+                .network
+                .read()
+                .await
+                .get_peer_status(&bob_peer_id)
+                .unwrap()
+                .quality,
+            0f64
+        );
         // strat.network.write().await.update(&bob_peer_id, Ok(current_timestamp()));
         // assert_eq!(strat.network.read().await.get_peer_status(&bob_peer_id).unwrap().quality, 0.2f64);
     }

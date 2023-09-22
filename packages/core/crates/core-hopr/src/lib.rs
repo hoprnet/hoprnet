@@ -43,8 +43,14 @@ use core_ethereum_actions::transaction_queue::{TransactionQueue, TransactionSend
 
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::NetworkExternalActions;
-use core_strategy::passive::PassiveStrategy;
-use core_strategy::strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy};
+use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
+use core_strategy::aggregating::AggregatingStrategy;
+use core_strategy::{
+    config::StrategyConfig,
+    passive::PassiveStrategy,
+    promiscuous::PromiscuousStrategy,
+    strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy},
+};
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 #[cfg(feature = "wasm")]
@@ -52,8 +58,6 @@ use {
     core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_ethereum_db::db::wasm::Database,
     wasm_bindgen::prelude::wasm_bindgen,
 };
-use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
-use core_strategy::aggregating::AggregatingStrategy;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -183,9 +187,12 @@ where
                 tx_sender.clone(),
                 ticket_aggregator.clone(),
             ))),
-            "aggregating" => strategies.push(Box::new(
-                AggregatingStrategy::new(Default::default(), db.clone(), tx_sender.clone(), ticket_aggregator.clone())
-            )),
+            "aggregating" => strategies.push(Box::new(AggregatingStrategy::new(
+                Default::default(),
+                db.clone(),
+                tx_sender.clone(),
+                ticket_aggregator.clone(),
+            ))),
             "promiscuous" => strategies.push(Box::new(PromiscuousStrategy::new(
                 cfg,
                 db.clone(),
@@ -248,7 +255,7 @@ pub fn build_components(
         db.clone(),
         network.clone(),
         tx_queue.new_sender(),
-        ticket_aggregation.writer()
+        ticket_aggregation.writer(),
     ));
 
     let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
