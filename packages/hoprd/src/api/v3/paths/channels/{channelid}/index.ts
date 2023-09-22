@@ -194,7 +194,7 @@ const GET: Operation = [
       if (!channel) {
         return res.status(404).send()
       }
-      const response = formatChannelTopologyInfo(node, channel)
+      const response = await formatChannelTopologyInfo(node, channel)
       return res.status(200).send(response)
     } catch (err) {
       log(`${err}`)

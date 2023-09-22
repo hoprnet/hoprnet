@@ -67,7 +67,7 @@ api_call(){
     else
       if [[ ${end_time_ns} -lt ${now} ]]; then
         log "${RED}attempt: ${attempt} - api_call (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
-        exit 1
+        return 1
       else
         log "${YELLOW}attempt: ${attempt} - api_call (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
       fi
@@ -299,6 +299,25 @@ api_close_channel() {
 }
 
 # $1 = source node id
+# $2 = channel id
+# $3 = destination address
+# $4 = direction
+api_get_channel_info() {
+  local source_api="${1}"
+  local channel_id="${2}"
+  local destination_address="${3}"
+  local direction="${4}"
+
+  if [ -Z "${channel_id}" ] || [ "${channel_id}" = "null" ]; then
+    # fetch channel id from API
+    channels_info="$(api_get_all_channels "${source_api}" false)"
+    channel_id="$(echo "${channels_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
+  fi
+
+  api_call "${source_api}" "/channels/${channel_id}" "GET" "" 'channelId' 60 20
+}
+
+# $1 = source node id
 # $2 = destination node id
 # $3 = channel source api endpoint
 # $4 = channel destination native address
@@ -334,11 +353,11 @@ api_validate_balances_gt0() {
 
   if [[ "$eth_balance" = "0" && "${safe_hopr_balance}" != "0" ]]; then
     log "Error: $1 Node has an invalid native balance: $eth_balance"
-    exit 1
+    return 1
   fi
   if [[ "$safe_hopr_balance" = "0" ]]; then
     log "Error: $1 Node Safe has an invalid HOPR balance: $safe_hopr_balance"
-    exit 1
+    return 1
   fi
   log "$1 is funded"
 }
