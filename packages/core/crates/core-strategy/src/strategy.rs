@@ -4,7 +4,6 @@ use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_log::error;
 use validator::Validate;
 use utils_log::{error, warn};
 

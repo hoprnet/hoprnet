@@ -4,7 +4,6 @@ pub mod config;
 pub mod generic;
 pub mod promiscuous;
 
-pub mod aggregating;
 pub mod errors;
 pub mod passive;
 pub mod strategy;
