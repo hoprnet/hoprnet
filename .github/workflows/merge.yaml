@@ -118,6 +118,11 @@ jobs:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           install_components: beta
 
+      - name: Add GCP Service Account ansible ssh key
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+            ssh-private-key: ${{ secrets.GCP_SA_ANSIBLE_SSH_PRIVATE_KEY }}
+
       - name: Deploy on GCP
         run: |
           declare base_branch=${{ github.event.pull_request.base.ref }}
@@ -128,36 +133,6 @@ jobs:
           else
             echo "Skipping deployment"
           fi
-        env:
-          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
-          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
-
-      - name: Add ssh key to deploy to Hetzner
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-            ssh-private-key: ${{ secrets.HETZNER_ROTSEE_SSH_PRIVATE_KEY }}
-
-      - name: Deploy on Hetzner
-        run: |
-          declare base_branch=${{ github.event.pull_request.base.ref }}
-          if [ "${base_branch}" == "master" ]; then
-            hosts=($(echo "${{ vars.HETZNER_ROTSEE_NODES }}" | sed 's/\r//'  | sed 's/\n/ /'))
-          else
-            hosts=""
-          fi
-          echo "Restarting hosts: ${hosts}"
-          for host in ${hosts[@]}; do
-            ssh -o StrictHostKeyChecking=no root@${host} "service hoprd restart"
-          done
-        env:
-          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          IDENTITY_PASSWORD: ${{ secrets.BS_PASSWORD }}
-          API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
 
       - name: Notify Success
         if: ${{ success() }}
