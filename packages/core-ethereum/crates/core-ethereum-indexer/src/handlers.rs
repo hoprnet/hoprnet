@@ -77,6 +77,8 @@ impl From<&wasm::ContractAddresses> for ContractAddresses {
 pub trait IndexerCallbacks {
     fn own_channel_updated(&self, channel_entry: &ChannelEntry);
 
+    fn ticket_redeemed(&self, channel_entry: &ChannelEntry, ticket_amount: &Balance);
+
     fn node_not_allowed_to_access_network(&self, address: &Address);
 
     fn node_allowed_to_access_network(&self, address: &Address);
@@ -1652,7 +1654,7 @@ pub mod wasm {
     use std::str::FromStr;
     use utils_log::error;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
-    use utils_types::primitives::{Address, Snapshot};
+    use utils_types::primitives::{Address, Balance, Snapshot};
     use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_futures;
 
@@ -1663,6 +1665,9 @@ pub mod wasm {
 
         #[wasm_bindgen(method, js_name = "ownChannelUpdated")]
         pub fn js_own_channel_updated(this: &IndexerCallbacks, channel_entry: ChannelEntry);
+
+        #[wasm_bindgen(method, js_name = "ticketRedeemed")]
+        pub fn js_ticket_redeemed(this: &IndexerCallbacks, channel_entry: ChannelEntry, ticket_amount: Balance);
 
         #[wasm_bindgen(method, js_name = "newAnnouncement")]
         pub fn js_new_announcement(this: &IndexerCallbacks, account_entry: AccountEntry);
@@ -1682,6 +1687,10 @@ pub mod wasm {
 
         fn own_channel_updated(&self, channel_entry: &ChannelEntry) {
             self.js_own_channel_updated(*channel_entry)
+        }
+
+        fn ticket_redeemed(&self, channel_entry: &ChannelEntry, ticket_amount: &Balance) {
+            self.js_ticket_redeemed(*channel_entry, *ticket_amount)
         }
 
         fn node_allowed_to_access_network(&self, address: &Address) {
