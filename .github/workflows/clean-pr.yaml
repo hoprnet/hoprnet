@@ -55,6 +55,7 @@ jobs:
           next_version=$(./scripts/get-next-version.sh Build ${{ github.event.inputs.pr_number }})
           images=('hopli' 'hoprd' 'hopr-anvil' 'hopr-pluto' 'hopr-toolchain')
           for image in "${images[@]}"; do
+            echo "Removing tag: $image:${next_version} and $image:${next_version}-cache"
             gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version} || true
             gcloud artifacts docker images delete --quiet --delete-tags --async ${docker_registry}/$image:${next_version}-cache || true
           done
