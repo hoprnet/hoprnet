@@ -396,7 +396,9 @@ test_aggregate_redeem_in_specific_channel() {
 
   channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}")
   channel_id=$(echo "${channel_info}" | jq -r '.channelId')
-  log "Aggregate/Redeem in channel: Opened channel from node ${node_id} to ${second_node_id}: ${channel_id}"
+  channel_info_detail=$(api_get_channel_info "${node_api}" "${channel_id}" "${second_node_addr}" "outgoing")
+  channel_id=$(echo "${channel_info_detail}" | jq -r '.channelId')
+  log "Aggregate/Redeem in channel: Opened channel ${channel_id} from node ${node_id} to ${second_node_id}: ${channel_info_detail}"
 
   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
@@ -444,7 +446,9 @@ test_redeem_in_specific_channel() {
 
   channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}")
   channel_id=$(echo "${channel_info}" | jq -r '.channelId')
-  log "Redeem in channel: Opened channel from node ${node_id} to ${second_node_id}: ${channel_id}"
+  channel_info_detail=$(api_get_channel_info "${node_api}" "${channel_id}" "${second_node_addr}" "outgoing")
+  channel_id=$(echo "${channel_info_detail}" | jq -r '.channelId')
+  log "Redeem in channel: Opened channel ${channel_id} from node ${node_id} to ${second_node_id}: ${channel_info_detail}"
 
   second_peer_id=$(get_hopr_address ${api_token}@${second_node_api})
 
