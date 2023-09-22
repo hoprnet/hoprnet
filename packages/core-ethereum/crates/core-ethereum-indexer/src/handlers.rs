@@ -333,7 +333,7 @@ where
                         Balance::new(0u64.into(), utils_types::primitives::BalanceType::HOPR),
                         0u64.into(),
                         ChannelStatus::Open,
-                        1u64.into(),
+                        0u64.into(),
                         0u64.into(),
                     );
 
@@ -669,6 +669,8 @@ pub mod tests {
         fn new_announcement(&self, _account_entry: &AccountEntry) {}
 
         fn own_channel_updated(&self, _channel_entry: &ChannelEntry) {}
+
+        fn ticket_redeemed(&self, _channel_entry: &ChannelEntry, _ticket_amount: &Balance) {}
 
         fn node_not_allowed_to_access_network(&self, _address: &Address) {}
 
