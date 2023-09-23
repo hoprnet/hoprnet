@@ -44,12 +44,13 @@ use core_ethereum_actions::transaction_queue::{TransactionQueue, TransactionSend
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::NetworkExternalActions;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
-use core_strategy::aggregating::AggregatingStrategy;
 use core_strategy::{
     config::StrategyConfig,
     passive::PassiveStrategy,
     promiscuous::PromiscuousStrategy,
     strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy},
+    aggregating::AggregatingStrategy,
+    auto_redeeming::AutoRedeemingStrategy,
 };
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
@@ -58,9 +59,6 @@ use {
     core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_ethereum_db::db::wasm::Database,
     wasm_bindgen::prelude::wasm_bindgen,
 };
-use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
-use core_strategy::aggregating::AggregatingStrategy;
-use core_strategy::auto_redeeming::AutoRedeemingStrategy;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -172,7 +170,7 @@ pub fn build_strategies<Db, Net>(
     base_cfg: MultiStrategyConfig,
     cfgs: Vec<StrategyConfig>,
     db: Arc<RwLock<Db>>,
-    _network: Arc<RwLock<Network<Net>>>,
+    network: Arc<RwLock<Network<Net>>>,
     tx_sender: TransactionSender,
     ticket_aggregator: BasicTicketAggregationActions<Result<Ticket, String>>,
 ) -> MultiStrategy

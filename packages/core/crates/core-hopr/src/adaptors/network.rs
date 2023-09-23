@@ -5,9 +5,13 @@ use core_network::{
 };
 use core_strategy::generic::PeerQuality;
 use futures::channel::mpsc::Sender;
-use utils_misc::time::native::current_timestamp;
 use std::sync::Arc;
 use utils_log::{error, warn};
+
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_misc::time::native::current_timestamp;
+#[cfg(all(feature = "wasm", not(test)))]
+use utils_misc::time::wasm::current_timestamp;
 
 pub struct ExternalNetworkInteractions {
     emitter: Sender<NetworkEvent>,
