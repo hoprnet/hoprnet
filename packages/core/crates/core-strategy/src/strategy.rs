@@ -2,10 +2,10 @@ use crate::errors::Result;
 use async_trait::async_trait;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
-use std::fmt::{Display, Formatter};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use std::fmt::{Display, Formatter};
 use utils_log::{error, warn};
+use validator::Validate;
 
 /// Basic single strategy.
 #[cfg_attr(test, mockall::automock)]
@@ -36,14 +36,12 @@ pub struct MultiStrategyConfig {
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
     /// Otherwise, it behaves like a logical OR chain of `SingularStrategies`.
     /// Default is `true`.
-    pub on_fail_continue: bool
+    pub on_fail_continue: bool,
 }
 
 impl Default for MultiStrategyConfig {
     fn default() -> Self {
-        Self {
-            on_fail_continue: true
-        }
+        Self { on_fail_continue: true }
     }
 }
 
@@ -53,7 +51,7 @@ impl Default for MultiStrategyConfig {
 /// various logical strategy chains.
 pub struct MultiStrategy {
     strategies: Vec<Box<dyn SingularStrategy>>,
-    cfg: MultiStrategyConfig
+    cfg: MultiStrategyConfig,
 }
 
 impl MultiStrategy {
@@ -65,7 +63,15 @@ impl MultiStrategy {
 
 impl Display for MultiStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "multi_strategy[{}]", self.strategies.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(","))
+        write!(
+            f,
+            "multi_strategy[{}]",
+            self.strategies
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
     }
 }
 
@@ -123,13 +129,19 @@ impl Display for MockSingularStrategy {
 
 #[cfg(test)]
 mod tests {
-    use mockall::Sequence;
     use crate::errors::StrategyError::Other;
     use crate::strategy::{MockSingularStrategy, MultiStrategy, MultiStrategyConfig, SingularStrategy};
+    use mockall::Sequence;
 
     #[async_std::test]
     async fn test_multi_strategy_name() {
-        let ms = MultiStrategy::new(vec![Box::new(MockSingularStrategy::new()), Box::new(MockSingularStrategy::new())], Default::default());
+        let ms = MultiStrategy::new(
+            vec![
+                Box::new(MockSingularStrategy::new()),
+                Box::new(MockSingularStrategy::new()),
+            ],
+            Default::default(),
+        );
         assert_eq!("multi_strategy[mock,mock]", &ms.to_string());
     }
 
@@ -144,14 +156,9 @@ mod tests {
             .returning(|| Err(Other("error".into())));
 
         let mut s2 = MockSingularStrategy::new();
-        s2.expect_on_tick()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Ok(()));
+        s2.expect_on_tick().times(1).in_sequence(&mut seq).returning(|| Ok(()));
 
-        let cfg = MultiStrategyConfig {
-            on_fail_continue: true
-        };
+        let cfg = MultiStrategyConfig { on_fail_continue: true };
 
         let ms = MultiStrategy::new(vec![Box::new(s1), Box::new(s2)], cfg);
         ms.on_tick().await.expect("on_tick should not fail");
@@ -168,13 +175,10 @@ mod tests {
             .returning(|| Err(Other("error".into())));
 
         let mut s2 = MockSingularStrategy::new();
-        s2.expect_on_tick()
-            .never()
-            .in_sequence(&mut seq)
-            .returning(|| Ok(()));
+        s2.expect_on_tick().never().in_sequence(&mut seq).returning(|| Ok(()));
 
         let cfg = MultiStrategyConfig {
-            on_fail_continue: false
+            on_fail_continue: false,
         };
 
         let ms = MultiStrategy::new(vec![Box::new(s1), Box::new(s2)], cfg);

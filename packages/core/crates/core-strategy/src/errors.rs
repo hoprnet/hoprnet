@@ -1,10 +1,9 @@
-use thiserror::Error;
 use core_ethereum_actions::errors::CoreEthereumActionsError;
+use thiserror::Error;
 use utils_db::errors::DbError;
 
 #[derive(Debug, Error)]
 pub enum StrategyError {
-
     #[error("non-specific strategy error: {0}")]
     Other(String),
 
@@ -12,7 +11,7 @@ pub enum StrategyError {
     DbError(#[from] DbError),
 
     #[error(transparent)]
-    ActionsError(#[from] CoreEthereumActionsError)
+    ActionsError(#[from] CoreEthereumActionsError),
 }
 
 pub type Result<T> = std::result::Result<T, StrategyError>;

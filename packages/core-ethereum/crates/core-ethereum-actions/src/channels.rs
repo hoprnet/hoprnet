@@ -7,12 +7,12 @@ use std::sync::Arc;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
-use crate::redeem::redeem_tickets_in_channel;
 use crate::errors::CoreEthereumActionsError::{ClosureTimeHasNotElapsed, NotEnoughAllowance};
 use crate::errors::{
     CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
     Result,
 };
+use crate::redeem::redeem_tickets_in_channel;
 use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -129,7 +129,9 @@ where
                     if redeem_before_close {
                         // TODO: trigger aggregation
                         // Do not await the redemption, just submit it to the queue
-                        let redeemed = redeem_tickets_in_channel(db.clone(), &channel, tx_sender.clone()).await?.len();
+                        let redeemed = redeem_tickets_in_channel(db.clone(), &channel, tx_sender.clone())
+                            .await?
+                            .len();
                         info!("{redeemed} tickets will be redeemed before closing {channel}");
                     }
 
@@ -978,7 +980,7 @@ pub mod wasm {
             *counterparty,
             *self_addr,
             direction,
-            redeem_before_close
+            redeem_before_close,
         )
         .await?;
         match awaiter

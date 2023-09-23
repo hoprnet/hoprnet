@@ -4,11 +4,11 @@ pub mod config;
 pub mod generic;
 pub mod promiscuous;
 
-pub mod passive;
-pub mod errors;
-pub mod strategy;
 pub mod aggregating;
 pub mod auto_redeeming;
+pub mod errors;
+pub mod passive;
+pub mod strategy;
 
 pub enum Strategies {
     Passive,

@@ -174,9 +174,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-    on_chain_tx_sender
-        .send(Transaction::RedeemTicket(ack_ticket))
-        .await
+    on_chain_tx_sender.send(Transaction::RedeemTicket(ack_ticket)).await
 }
 
 /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
