@@ -11,14 +11,14 @@ use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::{
     channels::{close_channel, open_channel},
-    transaction_queue::{Transaction, TransactionSender},
+    transaction_queue::TransactionSender,
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-use crate::config::StrategyConfig;
+use crate::{config::StrategyConfig, decision::StrategyTickDecision};
 use crate::errors::Result;
 use crate::strategy::SingularStrategy;
 use utils_types::traits::PeerIdLike;
@@ -120,29 +120,12 @@ where
             sma: RwLock::new(SimpleMovingAvg::new()),
         }
     }
-}
 
-impl<Db, Net> Display for PromiscuousStrategy<Db, Net>
-where
-    Db: HoprCoreEthereumDbActions,
-    Net: NetworkExternalActions,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "promiscuous")
-    }
-}
-#[async_trait(? Send)]
-impl<Db, Net> SingularStrategy for PromiscuousStrategy<Db, Net>
-where
-    Db: HoprCoreEthereumDbActions,
-    Net: NetworkExternalActions,
-{
-    async fn on_tick(&self) -> Result<(Vec<ChannelEntry>, Vec<(Address, Balance)>)> {
-        let mut to_close: Vec<ChannelEntry> = vec![];
-        let mut to_open: Vec<(Address, Balance)> = vec![];
-        let mut new_channel_candidates: Vec<(Address, f64)> = vec![];
-        let mut network_size: usize = 0;
+    async fn collect_tick_decision(&self) -> Result<StrategyTickDecision> {
+        let mut tick_decision = StrategyTickDecision::new();
+        let mut new_channel_candidates: Vec<(Address, f64)> = Vec::new();
         let mut active_addresses: HashMap<Address, f64> = HashMap::new();
+        let mut network_size: usize = 0;
 
         let balance: Balance = self.db.read().await.get_hopr_balance().await?;
         let outgoing_channels = self.db.read().await.get_outgoing_channels().await?;
@@ -155,7 +138,7 @@ where
             let packet_key = OffchainPublicKey::from_peerid(&peer)?;
             // get the Ethereum address of the peer
             if let Some(address) = self.db.read().await.get_chain_key(&packet_key).await? {
-                if to_close.iter().any(|c| c.destination == address)
+                if tick_decision.will_channel_be_closed(&address)
                     || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some()
                 {
                     // Skip this peer if we already processed it (iterator may have duplicates)
@@ -172,11 +155,11 @@ where
                     if quality <= self.config.network_quality_threshold {
                         // Need to close the channel, because quality has dropped
                         debug!("new channel closure candidate with {} (quality {})", address, quality);
-                        to_close.push(channel.clone());
+                        tick_decision.add_to_close(channel.clone());
                     } else if channel.balance.lt(&self.config.minimum_channel_balance) {
                         // Need to re-open channel, because channel stake has dropped
                         debug!("new channel closure & re-stake candidate with {}", address);
-                        to_close.push(channel.clone());
+                        tick_decision.add_to_close(channel.clone());
                         new_channel_candidates.push((address.clone(), quality));
                     }
                 } else if quality >= self.config.network_quality_threshold {
@@ -202,7 +185,7 @@ where
                 self.sma.read().await.get_num_samples(),
                 self.sma.read().await.get_sample_window_size()
             );
-            return Ok((to_close, to_open));
+            return Ok(tick_decision);
         }
 
         // Also mark for closing all channels which are in PendingToClose state
@@ -211,7 +194,7 @@ where
             .iter()
             .filter(|c| c.status == PendingToClose)
             .for_each(|c| {
-                to_close.push(c.clone());
+                tick_decision.add_to_close(c.clone());
             });
         debug!(
             "{} channels are in PendingToClose, so strategy will mark them for closing too",
@@ -230,8 +213,8 @@ where
 
         // Count all the opened channels
         let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
-        let occupied = if count_opened > to_close.len() {
-            count_opened - to_close.len()
+        let occupied = if count_opened > tick_decision.get_to_close().len() {
+            count_opened - tick_decision.get_to_close().len()
         } else {
             0
         };
@@ -246,7 +229,7 @@ where
 
             let mut sorted_channels: Vec<ChannelEntry> = outgoing_channels
                 .iter()
-                .filter(|c| !to_close.contains(&c))
+                .filter(|c| !tick_decision.will_channel_be_closed(&c.destination))
                 .cloned()
                 .collect();
 
@@ -264,7 +247,7 @@ where
                 .into_iter()
                 .take(occupied - max_auto_channels)
                 .for_each(|c| {
-                    to_close.push(c);
+                    tick_decision.add_to_close(c);
                 });
         }
 
@@ -290,13 +273,10 @@ where
                 }
 
                 // If we haven't added this peer yet, add it to the list for channel opening
-                if to_open
-                    .iter()
-                    .find(|(open_to_address, _)| open_to_address.eq(&address))
-                    .is_none()
+                 if !tick_decision.will_address_be_opened(&address) 
                 {
                     debug!("promoting peer {} for channel opening", address);
-                    to_open.push((address.clone(), self.config.new_channel_stake.clone()));
+                    tick_decision.add_to_open(address.clone(), self.config.new_channel_stake.clone());
                     remaining_balance = balance.sub(&self.config.new_channel_stake);
                 }
             }
@@ -305,12 +285,33 @@ where
         debug!(
             "strategy tick #{} result: {} peers for channel opening, {} peer for channel closure",
             self.sma.read().await.get_num_samples(),
-            to_open.len(),
-            to_close.len()
+            tick_decision.get_to_open().len(),
+            tick_decision.get_to_close().len()
         );
+        Ok(tick_decision)
+    }
+}
+
+impl<Db, Net> Display for PromiscuousStrategy<Db, Net>
+where
+    Db: HoprCoreEthereumDbActions,
+    Net: NetworkExternalActions,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "promiscuous")
+    }
+}
+#[async_trait(? Send)]
+impl<Db, Net> SingularStrategy for PromiscuousStrategy<Db, Net>
+where
+    Db: HoprCoreEthereumDbActions,
+    Net: NetworkExternalActions,
+{
+    async fn on_tick(&self) -> Result<()> {
+        let tick_decision = self.collect_tick_decision().await?;
 
         // close all the channels
-        futures::future::join_all(to_close.iter().map(|channel_to_close| async {
+        futures::future::join_all(tick_decision.get_to_close().iter().map(|channel_to_close| async {
             close_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
@@ -326,7 +327,7 @@ where
         debug!("close channels done");
 
         // open all the channels
-        futures::future::join_all(to_open.iter().map(|channel_to_open| async {
+        futures::future::join_all(tick_decision.get_to_open().iter().map(|channel_to_open| async {
             open_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
@@ -339,7 +340,7 @@ where
         }))
         .await;
         debug!("open channels done");
-        Ok((to_close, to_open))
+        Ok(())
     }
 }
 
@@ -449,35 +450,12 @@ mod tests {
         );
     }
 
-    #[async_std::test]
-    async fn test_promiscuous_strategy_config() {
-        let (alice_address, alice_peer_id) = generate_random_address_and_peer_id_pairs(1)[0];
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
-            alice_address,
-        )));
-        // mock it
-        let network = Arc::new(RwLock::new(Network::new(
-            alice_peer_id,
-            NetworkConfig::default(),
-            MockNetworkExternalActions {},
-        )));
-        let tx_sender = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new())).new_sender();
-
-        let strat_cfg = StrategyConfig::default();
-
-        let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
-        assert_eq!(strat.to_string(), "promiscuous");
-    }
-
-    #[async_std::test]
-    async fn test_promiscuous_strategy_basic() {
+    async fn mock_promiscuous_strategy() -> (PromiscuousStrategy<CoreEthereumDb<RustyLevelDbShim>, MockNetworkExternalActions>, Vec<(Address, PeerId)>) {
         let address_peer_id_pairs = generate_random_address_and_peer_id_pairs(10);
         let (alice_address, alice_peer_id) = address_peer_id_pairs[0];
         let (bob_address, bob_peer_id) = address_peer_id_pairs[1];
         let (charlie_address, charlie_peer_id) = address_peer_id_pairs[2];
-        let (eugene_address, eugene_peer_id) = address_peer_id_pairs[3];
+        let (_eugene_address, eugene_peer_id) = address_peer_id_pairs[3];
         let (gustave_address, gustave_peer_id) = address_peer_id_pairs[4];
 
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
@@ -594,13 +572,33 @@ mod tests {
         // Add fake samples to allow the test to run
         strat.sma.write().await.add_sample(peers.len());
         strat.sma.write().await.add_sample(peers.len());
+        (strat, address_peer_id_pairs)
+    }
 
-        let (to_close, to_open) = strat.on_tick().await.unwrap();
+    #[async_std::test]
+    async fn test_promiscuous_strategy_config() {
+        let (strat, _) = mock_promiscuous_strategy().await;
+        assert_eq!(strat.to_string(), "promiscuous");
+    }
 
-        // assert that there's 1 channel closed (gustave) and 1 opened (eugene).
-        assert_eq!(to_close.len(), 1usize);
-        assert_eq!(to_open.len(), 1usize);
-        assert_eq!(to_close[0].destination, gustave_address);
-        assert_eq!(to_open[0].0, eugene_address);
+    #[async_std::test]
+    async fn test_promiscuous_strategy_tick_decisions() {
+        let (strat, address_peer_pairs) = mock_promiscuous_strategy().await;
+        let tick_decision = strat.collect_tick_decision().await.unwrap();
+
+        // let (to_close, to_open) = strat.on_tick().await.unwrap();
+
+        // assert that there's 1 channel closed (gustave, at index 4) and 1 opened (eugene, at index 3).
+        assert_eq!(tick_decision.get_to_close().len(), 1usize);
+        assert_eq!(tick_decision.get_to_open().len(), 1usize);
+        assert_eq!(tick_decision.get_to_close()[0].destination, address_peer_pairs[4].0);
+        assert_eq!(tick_decision.get_to_open()[0].0, address_peer_pairs[3].0);
+    }
+
+    #[async_std::test]
+    async fn test_promiscuous_strategy_on_tick() {
+        let (strat, _) = mock_promiscuous_strategy().await;
+
+        strat.on_tick().await.unwrap();
     }
 }
