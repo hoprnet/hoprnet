@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 use crate::errors::Result;
 use crate::strategy::SingularStrategy;
-use crate::{config::StrategyConfig, decision::StrategyChannelDecision};
+use crate::{config::StrategyConfig, decision::ChannelDecision, Strategies};
 use utils_types::traits::PeerIdLike;
 
 /// Size of the simple moving average window used to smoothen the number of registered peers.
@@ -124,8 +124,8 @@ where
         }
     }
 
-    async fn collect_tick_decision(&self) -> Result<StrategyChannelDecision> {
-        let mut tick_decision = StrategyChannelDecision::default();
+    async fn collect_tick_decision(&self) -> Result<ChannelDecision> {
+        let mut tick_decision = ChannelDecision::default();
         let mut new_channel_candidates: Vec<(Address, f64)> = Vec::new();
         let mut active_addresses: HashMap<Address, f64> = HashMap::new();
         let mut network_size: usize = 0;
@@ -300,7 +300,7 @@ where
     Net: NetworkExternalActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "promiscuous")
+        write!(f, "{}", Strategies::Promiscuous)
     }
 }
 
@@ -324,9 +324,7 @@ where
                 false, // TODO: get this value from config
             )
             .await {
-                error!("{self} strategy: error while closing {channel_to_close}: {e}");
-            } else {
-                info!("{self} strategy: closed {channel_to_close}")
+                error!("promiscuous strategy: error while closing channel: {e}");
             }
         }))
         .await;
@@ -342,9 +340,9 @@ where
                 channel_to_open.1,
             )
             .await {
-                error!("{self} strategy: error while opening {channel_to_open}: {e}");
+                error!("{self} strategy: error while opening channel to {}: {e}", channel_to_open.0);
             } else {
-                info!("{self} strategy: opened {channel_to_open}")
+                info!("{self} strategy: opened channel to {}", channel_to_open.0)
             }
         }))
         .await;

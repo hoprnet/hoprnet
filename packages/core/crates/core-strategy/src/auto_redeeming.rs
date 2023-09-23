@@ -10,10 +10,23 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use utils_log::info;
 use validator::Validate;
+use crate::Strategies;
 
 /// Configuration object for the `AutoRedeemingStrategy`
-#[derive(Clone, Debug, Default, Serialize, Deserialize, Validate, PartialEq, Eq)]
-pub struct AutoRedeemingStrategyConfig;
+#[derive(Clone, Debug, Serialize, Deserialize, Validate, PartialEq, Eq)]
+pub struct AutoRedeemingStrategyConfig {
+    /// If set, the strategy will redeem only aggregated tickets.
+    /// Defaults to false.
+    redeem_only_aggregated: bool
+}
+
+impl Default for AutoRedeemingStrategyConfig {
+    fn default() -> Self {
+        Self {
+            redeem_only_aggregated: false,
+        }
+    }
+}
 
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
@@ -27,7 +40,7 @@ pub struct AutoRedeemingStrategy<Db: HoprCoreEthereumDbActions> {
 
 impl<Db: HoprCoreEthereumDbActions> Display for AutoRedeemingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "auto_redeeming")
+        write!(f, "{}", Strategies::AutoRedeeming)
     }
 }
 
@@ -40,15 +53,17 @@ impl<Db: HoprCoreEthereumDbActions> AutoRedeemingStrategy<Db> {
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeemingStrategy<Db> {
     async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        info!("{self} strategy: auto-redeeming {ack}");
-        let _ = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
+        if !self.cfg.redeem_only_aggregated || ack.ticket.index_offset > 1 { // Aggregated tickets have always index offset > 1
+            info!("{self} strategy: auto-redeeming {ack}");
+            let _ = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
+        }
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::auto_redeeming::AutoRedeemingStrategy;
+    use crate::auto_redeeming::{AutoRedeemingStrategy, AutoRedeemingStrategyConfig};
     use crate::strategy::SingularStrategy;
     use async_std::sync::RwLock;
     use async_trait::async_trait;
@@ -73,7 +88,7 @@ mod tests {
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
     }
 
-    fn generate_random_ack_ticket() -> AcknowledgedTicket {
+    fn generate_random_ack_ticket(idx_offset: u32) -> AcknowledgedTicket {
         let counterparty = &BOB;
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
@@ -91,7 +106,7 @@ mod tests {
                 BalanceType::HOPR,
             ),
             0_u32.into(),
-            U256::one(),
+            idx_offset.into(),
             1.0f64,
             4u64.into(),
             Challenge::from(cp_sum).to_ethereum_challenge(),
@@ -129,7 +144,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_redeeming_strategy_redeem() {
-        let ack_ticket = generate_random_ack_ticket();
+        let ack_ticket = generate_random_ack_ticket(1);
 
         let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
         inner_db
@@ -167,8 +182,68 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let ars = AutoRedeemingStrategy::new(Default::default(), db.clone(), tx_sender);
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_only_aggregated: false
+        };
+
+        let ars = AutoRedeemingStrategy::new(cfg, db.clone(), tx_sender);
         ars.on_acknowledged_ticket(&ack_ticket).await.unwrap();
+
+        awaiter.await.unwrap();
+    }
+
+    #[async_std::test]
+    async fn test_auto_redeeming_strategy_redeem_agg_only() {
+        let ack_ticket_unagg = generate_random_ack_ticket(1);
+        let ack_ticket_agg = generate_random_ack_ticket(3);
+
+        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        inner_db
+            .set(to_acknowledged_ticket_key(&ack_ticket_unagg), &ack_ticket_unagg)
+            .await
+            .unwrap();
+        inner_db
+            .set(to_acknowledged_ticket_key(&ack_ticket_agg), &ack_ticket_agg)
+            .await
+            .unwrap();
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(inner_db, ALICE.public().to_address())));
+
+        db.write()
+            .await
+            .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
+            .await
+            .unwrap();
+
+        let ack_clone_agg = ack_ticket_agg.clone();
+
+        let (tx, awaiter) = futures::channel::oneshot::channel::<()>();
+        let mut tx_exec = MockTxExec::new();
+        tx_exec
+            .expect_redeem_ticket()
+            .times(1)
+            .withf(move |ack| ack_clone_agg.ticket.eq(&ack.ticket))
+            .return_once(move |_| {
+                tx.send(()).unwrap();
+                TransactionResult::RedeemTicket {
+                    tx_hash: Hash::default(),
+                }
+            });
+
+        // Start the TransactionQueue with the mock TransactionExecutor
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn_local(async move {
+            tx_queue.transaction_loop().await;
+        });
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_only_aggregated: true
+        };
+
+        let ars = AutoRedeemingStrategy::new(cfg, db.clone(), tx_sender);
+        ars.on_acknowledged_ticket(&ack_ticket_unagg).await.unwrap();
+        ars.on_acknowledged_ticket(&ack_ticket_agg).await.unwrap();
 
         awaiter.await.unwrap();
     }

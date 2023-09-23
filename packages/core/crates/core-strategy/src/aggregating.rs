@@ -21,6 +21,7 @@ use async_trait::async_trait;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
+use crate::Strategies;
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
@@ -67,7 +68,7 @@ pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions> {
 
 impl<Db: HoprCoreEthereumDbActions> Display for AggregatingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "aggregating")
+        write!(f, "{}", Strategies::Aggregating)
     }
 }
 
@@ -149,4 +150,6 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AggregatingSt
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+}

@@ -19,6 +19,7 @@ rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
 serde_with = "3.3.0"
 simple_moving_average = "0.1.2"
+strum = { version = "0.25", features = ["derive"] }
 thiserror = { workspace = true }
 validator = { workspace = true }
 futures = { workspace = true }
@@ -38,6 +39,7 @@ utils-db = { workspace = true }
 utils-log = { workspace = true }
 utils-misc = { workspace = true }
 utils-types = { workspace = true }
+log = "0.4.20"
 
 
 [dev-dependencies]

@@ -52,6 +52,7 @@ use core_strategy::{
     promiscuous::PromiscuousStrategy,
     strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy},
 };
+use core_strategy::auto_funding::AutoFundingStrategy;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 
@@ -131,6 +132,10 @@ where
             "auto_redeeming" => strategies.push(Box::new(
                 // TODO: propagate the configuration
                 AutoRedeemingStrategy::new(Default::default(), db.clone(), tx_sender.clone()),
+            )),
+            "auto_funding" => strategies.push(Box::new(
+               // TODO: propagate configuration
+               AutoFundingStrategy::new(Default::default(), db.clone(), tx_sender.clone())
             )),
             "promiscuous" => strategies.push(Box::new(PromiscuousStrategy::new(
                 cfg,

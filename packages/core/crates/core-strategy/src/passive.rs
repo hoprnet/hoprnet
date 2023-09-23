@@ -1,5 +1,6 @@
 use crate::strategy::SingularStrategy;
 use std::fmt::{Display, Formatter};
+use crate::Strategies;
 
 /// This strategy does nothing.
 pub struct PassiveStrategy;
@@ -12,7 +13,7 @@ impl PassiveStrategy {
 
 impl Display for PassiveStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "passive")
+        write!(f, Strategies::Passive)
     }
 }
 

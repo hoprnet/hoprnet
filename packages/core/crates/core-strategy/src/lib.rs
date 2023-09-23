@@ -1,4 +1,6 @@
+use std::fmt::Display;
 use std::str::FromStr;
+use strum::{Display, EnumString};
 
 pub mod config;
 pub mod decision;
@@ -6,25 +8,18 @@ pub mod promiscuous;
 
 pub mod aggregating;
 pub mod auto_redeeming;
+pub mod auto_funding;
 pub mod errors;
 pub mod passive;
 pub mod strategy;
 
+#[derive(Clone, Copy, PartialEq, Eq, Display, EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum Strategies {
     Passive,
-    Generic,
     Promiscuous,
+    Aggregating,
+    AutoRedeeming,
+    AutoFunding,
 }
 
-impl FromStr for Strategies {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "passive" => Ok(Strategies::Passive),
-            "generic" => Ok(Strategies::Generic),
-            "promiscuous" => Ok(Strategies::Promiscuous),
-            _ => Err(format!("No such strategy exists: {}", s)),
-        }
-    }
-}
