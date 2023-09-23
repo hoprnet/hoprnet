@@ -7,7 +7,8 @@ use validator::{Validate, ValidationError};
 
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
-use core_strategy::StrategyConfig;
+use core_strategy::Strategy::AutoRedeeming;
+use core_strategy::{Strategy, StrategyConfig};
 use utils_types::primitives::Address;
 
 #[cfg(not(feature = "wasm"))]
@@ -374,7 +375,6 @@ pub struct HoprdConfig {
     #[validate]
     pub api: Api,
     #[validate]
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip))]
     pub strategy: StrategyConfig,
     #[validate]
     pub heartbeat: HeartbeatConfig,
@@ -512,11 +512,13 @@ impl HoprdConfig {
         // TODO: resolve CLI configuration of strategies
 
         // strategy
-        if let Some(_) = cli_args.default_strategy {
-            cfg.strategy = StrategyConfig::default();
-        };
+        if let Some(x) = cli_args.default_strategy.and_then(|s| Strategy::from_str(&s).ok()) {
+            cfg.strategy.get_strategies().push(x);
+        }
 
-        //cfg.strategy.auto_redeem_tickets = cli_args.auto_redeem_tickets;
+        if cli_args.auto_redeem_tickets {
+            cfg.strategy.get_strategies().push(AutoRedeeming(Default::default()));
+        }
 
         // chain
         cfg.chain.announce = cli_args.announce;
@@ -683,9 +685,9 @@ api:
     address: !IPv4 127.0.0.1
     port: 1233
 strategy:
-  name: passive
-  max_auto_channels: null
-  auto_redeem_tickets: true
+  on_fail_continue: true
+  allow_recursive: true
+  strategies: []
 heartbeat:
   variance: 0
   interval: 0

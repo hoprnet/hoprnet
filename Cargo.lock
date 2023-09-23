@@ -3017,6 +3017,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "serde_yaml",
+ "strum 0.25.0",
  "tempfile",
  "thiserror",
  "utils-log",

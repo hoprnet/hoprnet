@@ -5,10 +5,11 @@ use std::str::FromStr;
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
-use core_strategy::StrategyConfig;
+use core_strategy::Strategy;
 use hex;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use strum::VariantNames;
 use utils_misc::ok_or_str;
 
 #[cfg(not(feature = "wasm"))]
@@ -212,7 +213,7 @@ pub struct CliArgs {
         help = "Default channel strategy to use after node starts up",
         env = "HOPRD_DEFAULT_STRATEGY",
         value_name = "DEFAULT_STRATEGY",
-        value_parser = PossibleValuesParser::new(["promiscuous", "passive" ])
+        value_parser = PossibleValuesParser::new(Strategy::VARIANTS)
     )]
     pub default_strategy: Option<String>,
 

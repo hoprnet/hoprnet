@@ -19,14 +19,21 @@ pub mod promiscuous;
 pub enum Strategy {
     #[strum(serialize = "promiscuous")]
     Promiscuous(PromiscuousStrategyConfig),
+
     #[strum(serialize = "aggregating")]
     Aggregating(AggregatingStrategyConfig),
+
     #[strum(serialize = "auto_redeeming")]
     AutoRedeeming(AutoRedeemingStrategyConfig),
+
     #[strum(serialize = "auto_funding")]
     AutoFunding(AutoFundingStrategyConfig),
+
     #[strum(serialize = "multi")]
     Multi(MultiStrategyConfig),
+
+    #[strum(serialize = "passive")]
+    Passive,
 }
 
 impl Default for Strategy {

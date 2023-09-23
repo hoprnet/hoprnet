@@ -41,16 +41,9 @@ use utils_types::traits::BinarySerializable;
 
 use core_ethereum_actions::transaction_queue::{TransactionQueue, TransactionSender};
 
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_network::network::NetworkExternalActions;
-use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
-use core_strategy::auto_funding::AutoFundingStrategy;
 use core_strategy::{
-    aggregating::AggregatingStrategy,
-    auto_redeeming::AutoRedeemingStrategy,
-    promiscuous::PromiscuousStrategy,
     strategy::{MultiStrategy, SingularStrategy},
-    Strategy, StrategyConfig,
+    StrategyConfig,
 };
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
@@ -102,50 +95,6 @@ impl std::fmt::Display for HoprLoopComponents {
     }
 }
 
-pub fn build_strategies<Db, Net>(
-    cfg: StrategyConfig,
-    db: Arc<RwLock<Db>>,
-    network: Arc<RwLock<Network<Net>>>,
-    tx_sender: TransactionSender,
-    ticket_aggregator: BasicTicketAggregationActions<Result<Ticket, String>>,
-) -> MultiStrategy
-where
-    Db: HoprCoreEthereumDbActions + 'static,
-    Net: NetworkExternalActions + 'static,
-{
-    let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
-
-    for strategy in cfg.substrategies.iter() {
-        match strategy {
-            Strategy::Promiscuous(cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
-                cfg.clone(),
-                db.clone(),
-                network.clone(),
-                tx_sender.clone(),
-            ))),
-            Strategy::Aggregating(cfg) => strategies.push(Box::new(AggregatingStrategy::new(
-                cfg.clone(),
-                db.clone(),
-                tx_sender.clone(),
-                ticket_aggregator.clone(),
-            ))),
-            Strategy::AutoRedeeming(cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
-                cfg.clone(),
-                db.clone(),
-                tx_sender.clone(),
-            ))),
-            Strategy::AutoFunding(cfg) => strategies.push(Box::new(AutoFundingStrategy::new(
-                cfg.clone(),
-                db.clone(),
-                tx_sender.clone(),
-            ))),
-            Strategy::Multi(_) => panic!("embedding multi strategies not supported"),
-        }
-    }
-
-    MultiStrategy::new(strategies, cfg)
-}
-
 #[cfg(feature = "wasm")]
 pub mod wasm_impls {
     use std::str::FromStr;
@@ -159,6 +108,7 @@ pub mod wasm_impls {
     use core_ethereum_db::db::wasm::Database;
     use core_network::network::NetworkConfig;
     use core_path::path::Path;
+    use core_strategy::strategy::MultiStrategyConfig;
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
@@ -290,7 +240,7 @@ pub mod wasm_impls {
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
 
-        let multi_strategy = Arc::new(build_strategies(
+        let multi_strategy = Arc::new(MultiStrategy::new(
             strategy_cfg,
             db.clone(),
             network.clone(),
@@ -485,7 +435,7 @@ pub mod wasm_impls {
             heartbeat_proto_cfg: HeartbeatProtocolConfig,
             msg_proto_cfg: MsgProtocolConfig,
             ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
-            multi_strategy_cfgs: JsValue,
+            multi_strategy_cfg: MultiStrategyConfig,
         ) -> Self {
             let me: libp2p_identity::Keypair = me.into();
             let (tools, run_loop) = build_components(
@@ -512,7 +462,7 @@ pub mod wasm_impls {
                 heartbeat_proto_cfg,
                 msg_proto_cfg,
                 ticket_aggregation_proto_cfg,
-                serde_wasm_bindgen::from_value(multi_strategy_cfgs).expect("strategy cfg cannot be deserialized"),
+                multi_strategy_cfg,
             );
 
             Self {

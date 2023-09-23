@@ -150,4 +150,6 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AggregatingSt
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    // TODO: add tests here!
+}

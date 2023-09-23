@@ -212,18 +212,6 @@ async function main() {
     process.exit(0)
   }
 
-  /*if (cfg.strategy.name) {
-    state.settings.strategy = cfg.strategy.name
-  }
-
-  if (cfg.strategy.auto_redeem_tickets) {
-    state.settings.autoRedeemTickets = cfg.strategy.auto_redeem_tickets
-  }
-
-  if (cfg.strategy.max_auto_channels) {
-    state.settings.maxAutoChannels = cfg.strategy.max_auto_channels
-  }*/
-
   try {
     log(`This is HOPRd version ${version}`)
     metric_version.set([pickVersion(version)], 1.0)

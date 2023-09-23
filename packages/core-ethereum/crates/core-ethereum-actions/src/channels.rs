@@ -7,7 +7,7 @@ use std::sync::Arc;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
-use crate::errors::CoreEthereumActionsError::{ClosureTimeHasNotElapsed, NotEnoughAllowance};
+use crate::errors::CoreEthereumActionsError::{ClosureTimeHasNotElapsed, NotEnoughAllowance, PeerAccessDenied};
 use crate::errors::{
     CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
     Result,
@@ -43,6 +43,12 @@ where
     debug!("current staking safe allowance is {allowance}");
     if allowance.lt(&amount) {
         return Err(NotEnoughAllowance);
+    }
+
+    if db.read().await.is_network_registry_enabled().await?
+        && !db.read().await.is_allowed_to_access_network(&destination).await?
+    {
+        return Err(PeerAccessDenied);
     }
 
     let maybe_channel = db.read().await.get_channel_x(&self_addr, &destination).await?;
@@ -198,6 +204,12 @@ mod tests {
             .await
             .unwrap();
 
+        db.write()
+            .await
+            .set_network_registry(false, &Snapshot::default())
+            .await
+            .unwrap();
+
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_open_channel()
@@ -264,6 +276,12 @@ mod tests {
         db.write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        db.write()
+            .await
+            .set_network_registry(false, &Snapshot::default())
             .await
             .unwrap();
 
