@@ -6,7 +6,7 @@ pub struct PassiveStrategy;
 
 impl PassiveStrategy {
     pub fn new() -> Self {
-        Self { }
+        Self {}
     }
 }
 
@@ -16,4 +16,4 @@ impl Display for PassiveStrategy {
     }
 }
 
-impl SingularStrategy for PassiveStrategy { }
+impl SingularStrategy for PassiveStrategy {}

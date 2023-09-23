@@ -12,20 +12,21 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-async-trait = "0.1"
+async-trait = { workspace = true }
 async-std = { workspace = true, features = ["unstable"]}
 getrandom = { workspace = true }
-js-sys = { workspace = true, optional = true }
 rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
 serde_with = "3.3.0"
-serde-wasm-bindgen = { workspace = true, optional = true }
 simple_moving_average = "0.1.2"
 thiserror = { workspace = true }
 validator = { workspace = true }
 futures = { workspace = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { workspace = true, optional = true}
+js-sys = { workspace = true, optional = true }
+wasm-bindgen = {workspace = true, optional = true}
+wasm-bindgen-futures = {workspace = true, optional = true}
 
 core-types = { workspace = true }
 core-crypto = { workspace = true }
@@ -39,13 +40,16 @@ utils-log = { workspace = true }
 utils-misc = { workspace = true }
 utils-types = { workspace = true }
 
-console_error_panic_hook = { version = "0.1.7", optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
+lazy_static = "1.4"
 vector_assertions = "0.1.0"
 mockall = "0.11.4"
+hex-literal = "0.4.1"
+futures = "0.3.28"
+
+core-crypto = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
@@ -58,6 +62,4 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen", "getrandom/js", "core-types/wasm", "core-crypto/wasm", "core-network/wasm", "core-ethereum-db/wasm",  "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-db/wasm" ]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen" ]

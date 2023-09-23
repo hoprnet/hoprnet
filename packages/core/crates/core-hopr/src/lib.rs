@@ -51,6 +51,7 @@ use core_strategy::{
     strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy},
     aggregating::AggregatingStrategy,
     auto_redeeming::AutoRedeemingStrategy,
+    ticket_aggregation::processor::BasicTicketAggregationActions,
 };
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
@@ -73,65 +74,6 @@ impl ChannelEventEmitter {
     pub async fn send_event(&self, channel: &ChannelEntry) {
         let mut sender = self.tx.clone();
         let _ = sender.send(channel.clone()).await;
-    }
-}
-
-#[derive(Clone)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct HoprTools {
-    ping: adaptors::ping::wasm::WasmPing,
-    network: adaptors::network::wasm::WasmNetwork,
-    indexer: adaptors::indexer::WasmIndexerInteractions,
-    pkt_sender: PacketActions,
-    tx_sender: TransactionSender,
-    ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
-    channel_events: ChannelEventEmitter,
-}
-
-#[cfg(feature = "wasm")]
-impl HoprTools {
-    pub fn new(
-        ping: Ping<adaptors::ping::PingExternalInteractions>,
-        peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
-        change_notifier: Sender<NetworkEvent>,
-        indexer: adaptors::indexer::WasmIndexerInteractions,
-        pkt_sender: PacketActions,
-        tx_sender: TransactionSender,
-        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
-        channel_events: ChannelEventEmitter,
-    ) -> Self {
-        Self {
-            ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
-            network: adaptors::network::wasm::WasmNetwork::new(peers, change_notifier),
-            indexer,
-            pkt_sender,
-            ticket_aggregate_actions,
-            tx_sender,
-            channel_events,
-        }
-    }
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl HoprTools {
-    #[wasm_bindgen]
-    pub fn ping(&self) -> adaptors::ping::wasm::WasmPing {
-        self.ping.clone()
-    }
-
-    #[wasm_bindgen]
-    pub fn network(&self) -> adaptors::network::wasm::WasmNetwork {
-        self.network.clone()
-    }
-
-    #[wasm_bindgen]
-    pub fn index_updater(&self) -> adaptors::indexer::WasmIndexerInteractions {
-        self.indexer.clone()
-    }
-
-    #[wasm_bindgen]
-    pub fn channel_events(&self) -> ChannelEventEmitter {
-        self.channel_events.clone()
     }
 }
 
@@ -185,11 +127,16 @@ where
             "passive" => strategies.push(Box::new(PassiveStrategy::new())),
             "aggregating" => strategies.push(Box::new(
                 // TODO: propagate the configuration
-                AggregatingStrategy::new(Default::default(), db.clone(), tx_sender.clone(), ticket_aggregator.clone())
+                AggregatingStrategy::new(
+                    Default::default(),
+                    db.clone(),
+                    tx_sender.clone(),
+                    ticket_aggregator.clone(),
+                ),
             )),
             "auto_redeeming" => strategies.push(Box::new(
                 // TODO: propagate the configuration
-                AutoRedeemingStrategy::new(Default::default(), db.clone(), tx_sender.clone())
+                AutoRedeemingStrategy::new(Default::default(), db.clone(), tx_sender.clone()),
             )),
             "promiscuous" => strategies.push(Box::new(PromiscuousStrategy::new(
                 cfg,
@@ -204,219 +151,8 @@ where
     MultiStrategy::new(strategies, base_cfg)
 }
 
-/// The main core function building all core components
-///
-/// This method creates a group of utilities that can be used to generate triggers for the core application
-/// business logic, as well as the main loop that can be triggered to start event processing.
-///
-/// The loop containing all the individual core components is running indefinitely, it will not stop or return
-/// until the first unrecoverable error/panic is encountered.
 #[cfg(feature = "wasm")]
-pub fn build_components(
-    me: libp2p_identity::Keypair,
-    me_onchain: ChainKeypair,
-    db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
-    network_cfg: NetworkConfig,
-    hb_cfg: HeartbeatConfig,
-    ping_cfg: PingConfig,
-    on_acknowledgement: Option<js_sys::Function>,
-    packet_cfg: PacketInteractionConfig,
-    on_final_packet: Option<js_sys::Function>,
-    tbf: TagBloomFilter,
-    save_tbf: js_sys::Function,
-    tx_executor: WasmTxExecutor,
-    my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
-    ack_proto_cfg: AckProtocolConfig,
-    heartbeat_proto_cfg: HeartbeatProtocolConfig,
-    msg_proto_cfg: MsgProtocolConfig,
-    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
-    strategies_cfgs: Vec<StrategyConfig>,
-) -> (HoprTools, impl std::future::Future<Output = ()>) {
-    let identity = me;
-
-    let (network_events_tx, network_events_rx) =
-        futures::channel::mpsc::channel::<NetworkEvent>(MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
-
-    let network = Arc::new(RwLock::new(Network::new(
-        identity.public().to_peer_id(),
-        network_cfg,
-        adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
-    )));
-
-    let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
-
-    let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
-
-    let multi_strategy = Arc::new(build_strategies(
-        MultiStrategyConfig::default(), // TODO: propagate the global strategy config
-        strategies_cfgs,
-        db.clone(),
-        network.clone(),
-        tx_queue.new_sender(),
-        ticket_aggregation.writer(),
-    ));
-
-    let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
-
-    let (on_ack_tkt_tx, mut rx) = unbounded::<AcknowledgedTicket>();
-    let ms_clone = multi_strategy.clone();
-    let queue = async move {
-        while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-            let _ = ms_clone.on_acknowledged_ticket(&ack).await;
-        }
-    };
-    wasm_bindgen_futures::spawn_local(queue);
-
-    // Spawn on_channel_c
-    let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
-    let ms_clone = multi_strategy.clone();
-    let queue = async move {
-        while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-            let _ = ms_clone.on_channel_state_changed(&channel);
-        }
-    };
-    wasm_bindgen_futures::spawn_local(queue);
-
-    let ack_actions =
-        AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, Some(on_ack_tkt_tx));
-
-    let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
-
-    let tbf = Arc::new(RwLock::new(tbf));
-
-    let packet_actions = PacketInteraction::new(
-        db.clone(),
-        tbf.clone(),
-        Mixer::new_with_gloo_timers(MixerConfig::default()),
-        ack_actions.writer(),
-        on_final_packet_tx,
-        packet_cfg,
-    );
-
-    let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-    let (pong_tx, pong_rx) =
-        futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
-
-    // manual ping explicitly called by the API
-    let ping = Ping::new(
-        ping_cfg.clone(),
-        ping_tx,
-        pong_rx,
-        adaptors::ping::PingExternalInteractions::new(network.clone()),
-    );
-
-    let (indexer_update_tx, indexer_update_rx) =
-        futures::channel::mpsc::channel::<IndexerProcessed>(adaptors::indexer::INDEXER_UPDATE_QUEUE_SIZE);
-    let indexer_updater =
-        adaptors::indexer::WasmIndexerInteractions::new(db.clone(), network.clone(), indexer_update_tx);
-
-    let hopr_tools = HoprTools::new(
-        ping,
-        network.clone(),
-        network_events_tx,
-        indexer_updater,
-        packet_actions.writer(),
-        tx_queue.new_sender(),
-        ticket_aggregation.writer(),
-        ChannelEventEmitter {
-            tx: on_channel_event_tx,
-        },
-    );
-
-    let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-    let (hb_pong_tx, hb_pong_rx) =
-        futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
-
-    let heartbeat_network_clone = network.clone();
-    let ping_network_clone = network.clone();
-    let swarm_network_clone = network.clone();
-    let tbf_clone = tbf.clone();
-    let multistrategy_clone = multi_strategy.clone();
-
-    let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
-        Box::pin(async move {
-            let hb_pinger = Ping::new(
-                ping_cfg,
-                hb_ping_tx,
-                hb_pong_rx,
-                adaptors::ping::PingExternalInteractions::new(ping_network_clone),
-            );
-            Heartbeat::new(
-                hb_cfg,
-                hb_pinger,
-                adaptors::heartbeat::HeartbeatExternalInteractions::new(heartbeat_network_clone),
-            )
-            .heartbeat_loop()
-            .map(|_| HoprLoopComponents::Heartbeat)
-            .await
-        }),
-        Box::pin(
-            p2p::p2p_loop(
-                identity,
-                swarm_network_clone,
-                network_events_rx,
-                indexer_update_rx,
-                ack_actions,
-                packet_actions,
-                ticket_aggregation,
-                api::HeartbeatRequester::new(hb_ping_rx),
-                api::HeartbeatResponder::new(hb_pong_tx),
-                api::ManualPingRequester::new(ping_rx),
-                api::HeartbeatResponder::new(pong_tx),
-                my_multiaddresses,
-                ack_proto_cfg,
-                heartbeat_proto_cfg,
-                msg_proto_cfg,
-                ticket_aggregation_proto_cfg,
-            )
-            .map(|_| HoprLoopComponents::Swarm),
-        ),
-        Box::pin(async move {
-            UniversalTimer::new(Duration::from_secs(60))
-                .timer_loop(|| async {
-                    info!("doing strategy tick");
-                    let _ = multistrategy_clone.on_tick().await;
-                    info!("strategy tick done");
-                })
-                .map(|_| HoprLoopComponents::Timer)
-                .await
-        }),
-        Box::pin(async move {
-            UniversalTimer::new(Duration::from_secs(90))
-                .timer_loop(|| async {
-                    let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
-                    if let Err(_) = save_tbf.call1(
-                        &wasm_bindgen::JsValue::null(),
-                        js_sys::Uint8Array::from(bloom.to_bytes().as_ref()).as_ref(),
-                    ) {
-                        error!("failed to call save tbf closure");
-                    }
-                    info!("tag bloom filter saved");
-                })
-                .map(|_| HoprLoopComponents::Timer)
-                .await
-        }),
-        Box::pin(async move {
-            tx_queue
-                .transaction_loop()
-                .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
-                .await
-        }),
-    ];
-    let mut futs = helpers::to_futures_unordered(ready_loops);
-
-    let main_loop = async move {
-        while let Some(process) = futs.next().await {
-            error!("CRITICAL: the core system loop unexpectadly stopped: '{}'", process);
-            unreachable!("Futures inside the main loop should never terminate, but run in the background");
-        }
-    };
-
-    (hopr_tools, main_loop)
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm_impl {
+pub mod wasm_impls {
     use std::str::FromStr;
 
     use super::*;
@@ -432,8 +168,58 @@ pub mod wasm_impl {
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
+    #[derive(Clone)]
+    pub struct HoprTools {
+        ping: adaptors::ping::wasm::WasmPing,
+        network: adaptors::network::wasm::WasmNetwork,
+        indexer: adaptors::indexer::WasmIndexerInteractions,
+        pkt_sender: PacketActions,
+        tx_sender: TransactionSender,
+        ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+        channel_events: ChannelEventEmitter,
+    }
+
     impl HoprTools {
-        #[wasm_bindgen]
+        pub fn new(
+            ping: Ping<adaptors::ping::PingExternalInteractions>,
+            peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
+            change_notifier: Sender<NetworkEvent>,
+            indexer: adaptors::indexer::WasmIndexerInteractions,
+            pkt_sender: PacketActions,
+            tx_sender: TransactionSender,
+            ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
+            channel_events: ChannelEventEmitter,
+        ) -> Self {
+            Self {
+                ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
+                network: adaptors::network::wasm::WasmNetwork::new(peers, change_notifier),
+                indexer,
+                pkt_sender,
+                ticket_aggregate_actions,
+                tx_sender,
+                channel_events,
+            }
+        }
+    }
+
+    #[wasm_bindgen]
+    impl HoprTools {
+        pub fn ping(&self) -> adaptors::ping::wasm::WasmPing {
+            self.ping.clone()
+        }
+
+        pub fn network(&self) -> adaptors::network::wasm::WasmNetwork {
+            self.network.clone()
+        }
+
+        pub fn index_updater(&self) -> adaptors::indexer::WasmIndexerInteractions {
+            self.indexer.clone()
+        }
+
+        pub fn channel_events(&self) -> ChannelEventEmitter {
+            self.channel_events.clone()
+        }
+
         pub async fn send_message(
             &self,
             msg: ApplicationData,
@@ -453,7 +239,6 @@ pub mod wasm_impl {
             }
         }
 
-        #[wasm_bindgen]
         pub async fn aggregate_tickets(&mut self, channel_id: &Hash, timeout_in_millis: u64) -> Result<(), JsValue> {
             ok_or_jserr!(
                 ok_or_jserr!(self.ticket_aggregate_actions.aggregate_tickets(channel_id))?
@@ -462,10 +247,219 @@ pub mod wasm_impl {
             )
         }
 
-        #[wasm_bindgen]
         pub fn get_tx_sender(&self) -> TransactionSender {
             self.tx_sender.clone()
         }
+    }
+
+    /// The main core function building all core components
+    ///
+    /// This method creates a group of utilities that can be used to generate triggers for the core application
+    /// business logic, as well as the main loop that can be triggered to start event processing.
+    ///
+    /// The loop containing all the individual core components is running indefinitely, it will not stop or return
+    /// until the first unrecoverable error/panic is encountered.
+    pub fn build_components(
+        me: libp2p_identity::Keypair,
+        me_onchain: ChainKeypair,
+        db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+        network_cfg: NetworkConfig,
+        hb_cfg: HeartbeatConfig,
+        ping_cfg: PingConfig,
+        on_acknowledgement: Option<js_sys::Function>,
+        packet_cfg: PacketInteractionConfig,
+        on_final_packet: Option<js_sys::Function>,
+        tbf: TagBloomFilter,
+        save_tbf: js_sys::Function,
+        tx_executor: WasmTxExecutor,
+        my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
+        ack_proto_cfg: AckProtocolConfig,
+        heartbeat_proto_cfg: HeartbeatProtocolConfig,
+        msg_proto_cfg: MsgProtocolConfig,
+        ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
+        strategies_cfgs: Vec<StrategyConfig>,
+    ) -> (HoprTools, impl std::future::Future<Output = ()>) {
+        let identity = me;
+
+        let (network_events_tx, network_events_rx) =
+            futures::channel::mpsc::channel::<NetworkEvent>(MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
+
+        let network = Arc::new(RwLock::new(Network::new(
+            identity.public().to_peer_id(),
+            network_cfg,
+            adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
+        )));
+
+        let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
+
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
+
+        let multi_strategy = Arc::new(build_strategies(
+            MultiStrategyConfig::default(), // TODO: propagate the global strategy config
+            strategies_cfgs,
+            db.clone(),
+            network.clone(),
+            tx_queue.new_sender(),
+            ticket_aggregation.writer(),
+        ));
+
+        let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
+
+        let (on_ack_tkt_tx, mut rx) = unbounded::<AcknowledgedTicket>();
+        let ms_clone = multi_strategy.clone();
+        let queue = async move {
+            while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
+                let _ = ms_clone.on_acknowledged_ticket(&ack).await;
+            }
+        };
+        wasm_bindgen_futures::spawn_local(queue);
+
+        // Spawn on_channel_c
+        let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
+        let ms_clone = multi_strategy.clone();
+        let queue = async move {
+            while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
+                let _ = ms_clone.on_channel_state_changed(&channel);
+            }
+        };
+        wasm_bindgen_futures::spawn_local(queue);
+
+        let ack_actions =
+            AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, Some(on_ack_tkt_tx));
+
+        let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
+
+        let tbf = Arc::new(RwLock::new(tbf));
+
+        let packet_actions = PacketInteraction::new(
+            db.clone(),
+            tbf.clone(),
+            Mixer::new_with_gloo_timers(MixerConfig::default()),
+            ack_actions.writer(),
+            on_final_packet_tx,
+            packet_cfg,
+        );
+
+        let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
+        let (pong_tx, pong_rx) =
+            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+
+        // manual ping explicitly called by the API
+        let ping = Ping::new(
+            ping_cfg.clone(),
+            ping_tx,
+            pong_rx,
+            adaptors::ping::PingExternalInteractions::new(network.clone()),
+        );
+
+        let (indexer_update_tx, indexer_update_rx) =
+            futures::channel::mpsc::channel::<IndexerProcessed>(adaptors::indexer::INDEXER_UPDATE_QUEUE_SIZE);
+        let indexer_updater =
+            adaptors::indexer::WasmIndexerInteractions::new(db.clone(), network.clone(), indexer_update_tx);
+
+        let hopr_tools = HoprTools::new(
+            ping,
+            network.clone(),
+            network_events_tx,
+            indexer_updater,
+            packet_actions.writer(),
+            tx_queue.new_sender(),
+            ticket_aggregation.writer(),
+            ChannelEventEmitter {
+                tx: on_channel_event_tx,
+            },
+        );
+
+        let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
+        let (hb_pong_tx, hb_pong_rx) =
+            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+
+        let heartbeat_network_clone = network.clone();
+        let ping_network_clone = network.clone();
+        let swarm_network_clone = network.clone();
+        let tbf_clone = tbf.clone();
+        let multistrategy_clone = multi_strategy.clone();
+
+        let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+            Box::pin(async move {
+                let hb_pinger = Ping::new(
+                    ping_cfg,
+                    hb_ping_tx,
+                    hb_pong_rx,
+                    adaptors::ping::PingExternalInteractions::new(ping_network_clone),
+                );
+                Heartbeat::new(
+                    hb_cfg,
+                    hb_pinger,
+                    adaptors::heartbeat::HeartbeatExternalInteractions::new(heartbeat_network_clone),
+                )
+                .heartbeat_loop()
+                .map(|_| HoprLoopComponents::Heartbeat)
+                .await
+            }),
+            Box::pin(
+                p2p::p2p_loop(
+                    identity,
+                    swarm_network_clone,
+                    network_events_rx,
+                    indexer_update_rx,
+                    ack_actions,
+                    packet_actions,
+                    ticket_aggregation,
+                    api::HeartbeatRequester::new(hb_ping_rx),
+                    api::HeartbeatResponder::new(hb_pong_tx),
+                    api::ManualPingRequester::new(ping_rx),
+                    api::HeartbeatResponder::new(pong_tx),
+                    my_multiaddresses,
+                    ack_proto_cfg,
+                    heartbeat_proto_cfg,
+                    msg_proto_cfg,
+                    ticket_aggregation_proto_cfg,
+                )
+                .map(|_| HoprLoopComponents::Swarm),
+            ),
+            Box::pin(async move {
+                UniversalTimer::new(Duration::from_secs(60))
+                    .timer_loop(|| async {
+                        info!("doing strategy tick");
+                        let _ = multistrategy_clone.on_tick().await;
+                        info!("strategy tick done");
+                    })
+                    .map(|_| HoprLoopComponents::Timer)
+                    .await
+            }),
+            Box::pin(async move {
+                UniversalTimer::new(Duration::from_secs(90))
+                    .timer_loop(|| async {
+                        let bloom = tbf_clone.read().await.clone(); // Clone to immediately release the lock
+                        if let Err(_) = save_tbf.call1(
+                            &wasm_bindgen::JsValue::null(),
+                            js_sys::Uint8Array::from(bloom.to_bytes().as_ref()).as_ref(),
+                        ) {
+                            error!("failed to call save tbf closure");
+                        }
+                        info!("tag bloom filter saved");
+                    })
+                    .map(|_| HoprLoopComponents::Timer)
+                    .await
+            }),
+            Box::pin(async move {
+                tx_queue
+                    .transaction_loop()
+                    .map(|_| HoprLoopComponents::OutgoingOnchainTxQueue)
+                    .await
+            }),
+        ];
+        let mut futs = helpers::to_futures_unordered(ready_loops);
+
+        let main_loop = async move {
+            while let Some(process) = futs.next().await {
+                error!("CRITICAL: the core system loop unexpectadly stopped: '{}'", process);
+                unreachable!("Futures inside the main loop should never terminate, but run in the background");
+            }
+        };
+
+        (hopr_tools, main_loop)
     }
 
     #[wasm_bindgen]

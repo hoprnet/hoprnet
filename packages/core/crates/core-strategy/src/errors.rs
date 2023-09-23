@@ -5,7 +5,6 @@ use utils_types::errors::GeneralError;
 
 #[derive(Debug, Error)]
 pub enum StrategyError {
-
     #[error("non-specific strategy error: {0}")]
     Other(String),
 
@@ -13,7 +12,7 @@ pub enum StrategyError {
     DbError(#[from] DbError),
 
     #[error(transparent)]
-    ActionsError(#[from] CoreEthereumActionsError),
+    ActionsError(#[from] CoreEthereumActionsError),,
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),

@@ -1,10 +1,5 @@
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
-use std::time::Duration;
+use crate::strategy::SingularStrategy;
 use async_std::sync::{Mutex, RwLock};
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
-use validator::Validate;
 use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use core_ethereum_actions::redeem::redeem_tickets_in_channel;
 use core_ethereum_actions::transaction_queue::TransactionSender;
@@ -12,8 +7,13 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use core_types::channels::Ticket;
-use utils_log::{error, info, debug};
-use crate::strategy::SingularStrategy;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DurationSeconds};
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+use std::time::Duration;
+use utils_log::{debug, error, info};
+use validator::Validate;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
@@ -48,7 +48,7 @@ impl Default for AggregatingStrategyConfig {
         Self {
             aggregation_threshold: 100,
             aggregation_timeout: Duration::from_secs(60),
-            redeem_after_aggregation: true
+            redeem_after_aggregation: true,
         }
     }
 }
@@ -116,27 +116,29 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AggregatingSt
                 spawn_local(async move {
                     let agg = aggregator_clone.lock().await.aggregate_tickets(&channel_id);
                     match agg {
-                        Ok(mut awaiter) => {
-                            match awaiter.consume_and_wait(cfg_clone.aggregation_timeout).await {
-                                Ok(_) => {
-                                    if cfg_clone.redeem_after_aggregation {
-                                        if let Err(e) = redeem_tickets_in_channel(db_clone, &channel, tx_sender_clone).await {
-                                            error!("{strat_name} strategy: failed to send tickets for redemption: {e}");
-                                        } else {
-                                            info!("{strat_name} strategy: successfully aggregated tickets & sent for redeeming in {channel}");
-                                        }
+                        Ok(mut awaiter) => match awaiter.consume_and_wait(cfg_clone.aggregation_timeout).await {
+                            Ok(_) => {
+                                if cfg_clone.redeem_after_aggregation {
+                                    if let Err(e) = redeem_tickets_in_channel(db_clone, &channel, tx_sender_clone).await
+                                    {
+                                        error!("{strat_name} strategy: failed to send tickets for redemption: {e}");
                                     } else {
-                                        info!("{strat_name} strategy: successfully aggregated tickets in {channel}");
+                                        info!("{strat_name} strategy: successfully aggregated tickets & sent for redeeming in {channel}");
                                     }
+                                } else {
+                                    info!("{strat_name} strategy: successfully aggregated tickets in {channel}");
                                 }
-                                Err(e) => error!("{strat_name} strategy: could not aggregate tickets: {e}"),
                             }
-                        }
-                        Err(e) => error!("{strat_name} strategy: could initiate ticket aggregation: {e}")
+                            Err(e) => error!("{strat_name} strategy: could not aggregate tickets: {e}"),
+                        },
+                        Err(e) => error!("{strat_name} strategy: could initiate ticket aggregation: {e}"),
                     }
                 });
             } else {
-                debug!("{self} strategy: {channel} has {acks_in_channel} < {} ack tickets, not aggregating yet", self.cfg.aggregation_threshold);
+                debug!(
+                    "{self} strategy: {channel} has {acks_in_channel} < {} ack tickets, not aggregating yet",
+                    self.cfg.aggregation_threshold
+                );
             }
             Ok(())
         } else {
@@ -147,6 +149,4 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AggregatingSt
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
