@@ -61,9 +61,9 @@ pub mod wasm {
     use futures::{future::poll_fn, StreamExt};
     use js_sys::JsString;
     use utils_misc::utils::wasm::js_map_to_hash_map;
+    use utils_types::primitives::Address;
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
-    use utils_types::primitives::Address;
 
     /// Object needed only to simplify the iteration over the address and quality pair until
     /// the strategy is migrated into Rust
@@ -83,7 +83,6 @@ pub mod wasm {
             self.peers_with_quality.clone()
         }
     }
-
 
     /// Wrapper object for the `Network` functionality to be callable from outside
     /// the WASM environment.

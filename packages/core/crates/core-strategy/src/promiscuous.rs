@@ -323,7 +323,8 @@ where
                 ChannelDirection::Outgoing,
                 false, // TODO: get this value from config
             )
-            .await {
+            .await
+            {
                 error!("promiscuous strategy: error while closing channel: {e}");
             }
         }))
@@ -339,8 +340,12 @@ where
                 Address::default(),
                 channel_to_open.1,
             )
-            .await {
-                error!("{self} strategy: error while opening channel to {}: {e}", channel_to_open.0);
+            .await
+            {
+                error!(
+                    "{self} strategy: error while opening channel to {}: {e}",
+                    channel_to_open.0
+                );
             } else {
                 info!("{self} strategy: opened channel to {}", channel_to_open.0)
             }

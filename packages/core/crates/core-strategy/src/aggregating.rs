@@ -19,9 +19,9 @@ use validator::Validate;
 use async_std::task::spawn_local;
 use async_trait::async_trait;
 
+use crate::Strategies;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
-use crate::Strategies;
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
@@ -150,6 +150,4 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AggregatingSt
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}

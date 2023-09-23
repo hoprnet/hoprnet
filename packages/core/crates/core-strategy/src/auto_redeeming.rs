@@ -1,4 +1,5 @@
 use crate::strategy::SingularStrategy;
+use crate::Strategies;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::redeem::redeem_ticket;
@@ -10,14 +11,13 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use utils_log::info;
 use validator::Validate;
-use crate::Strategies;
 
 /// Configuration object for the `AutoRedeemingStrategy`
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, PartialEq, Eq)]
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
     /// Defaults to false.
-    redeem_only_aggregated: bool
+    redeem_only_aggregated: bool,
 }
 
 impl Default for AutoRedeemingStrategyConfig {
@@ -53,9 +53,13 @@ impl<Db: HoprCoreEthereumDbActions> AutoRedeemingStrategy<Db> {
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeemingStrategy<Db> {
     async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        if !self.cfg.redeem_only_aggregated || ack.ticket.index_offset > 1 { // Aggregated tickets have always index offset > 1
+        if !self.cfg.redeem_only_aggregated || ack.ticket.index_offset > 1 {
+            // Aggregated tickets have always index offset > 1
             info!("{self} strategy: auto-redeeming {ack}");
-            let _ = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
+            if let Err(e) = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await? {
+                error!("{self} strategy: failed to issue redeem tx: {e}");
+                return Failure(format!("cannot redeem: {e}"));
+            }
         }
         Ok(())
     }
@@ -183,7 +187,7 @@ mod tests {
         });
 
         let cfg = AutoRedeemingStrategyConfig {
-            redeem_only_aggregated: false
+            redeem_only_aggregated: false,
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db.clone(), tx_sender);
@@ -238,7 +242,7 @@ mod tests {
         });
 
         let cfg = AutoRedeemingStrategyConfig {
-            redeem_only_aggregated: true
+            redeem_only_aggregated: true,
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db.clone(), tx_sender);

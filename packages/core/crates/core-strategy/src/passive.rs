@@ -1,6 +1,6 @@
 use crate::strategy::SingularStrategy;
-use std::fmt::{Display, Formatter};
 use crate::Strategies;
+use std::fmt::{Display, Formatter};
 
 /// This strategy does nothing.
 pub struct PassiveStrategy;

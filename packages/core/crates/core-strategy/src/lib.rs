@@ -7,8 +7,8 @@ pub mod decision;
 pub mod promiscuous;
 
 pub mod aggregating;
-pub mod auto_redeeming;
 pub mod auto_funding;
+pub mod auto_redeeming;
 pub mod errors;
 pub mod passive;
 pub mod strategy;
@@ -22,4 +22,3 @@ pub enum Strategies {
     AutoRedeeming,
     AutoFunding,
 }
-
