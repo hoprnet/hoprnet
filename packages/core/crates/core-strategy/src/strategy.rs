@@ -56,7 +56,7 @@ pub struct MultiStrategyConfig {
 
     /// Configuration of individual sub-strategies.
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
-    strategies: Vec<Strategy>, // non-pub due to wasm
+    pub(crate) strategies: Vec<Strategy>, // non-pub due to wasm
 }
 
 impl MultiStrategyConfig {
