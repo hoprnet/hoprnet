@@ -1,5 +1,8 @@
 use core_crypto::types::OffchainPublicKey;
-use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus::{Open, PendingToClose}};
+use core_types::channels::{
+    ChannelDirection, ChannelEntry,
+    ChannelStatus::{Open, PendingToClose},
+};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use simple_moving_average::{SumTreeSMA, SMA};
@@ -18,9 +21,9 @@ use core_network::network::{Network, NetworkExternalActions};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
-use crate::{config::StrategyConfig, decision::StrategyTickDecision};
 use crate::errors::Result;
 use crate::strategy::SingularStrategy;
+use crate::{config::StrategyConfig, decision::StrategyTickDecision};
 use utils_types::traits::PeerIdLike;
 
 /// Size of the simple moving average window used to smoothen the number of registered peers.
@@ -273,8 +276,7 @@ where
                 }
 
                 // If we haven't added this peer yet, add it to the list for channel opening
-                 if !tick_decision.will_address_be_opened(&address) 
-                {
+                if !tick_decision.will_address_be_opened(&address) {
                     debug!("promoting peer {} for channel opening", address);
                     tick_decision.add_to_open(address.clone(), self.config.new_channel_stake.clone());
                     remaining_balance = balance.sub(&self.config.new_channel_stake);
@@ -318,7 +320,7 @@ where
                 channel_to_close.destination,
                 channel_to_close.source,
                 ChannelDirection::Outgoing,
-                false,  // TODO: get this value from config
+                false, // TODO: get this value from config
             )
             .await
             .unwrap()
@@ -450,7 +452,10 @@ mod tests {
         );
     }
 
-    async fn mock_promiscuous_strategy() -> (PromiscuousStrategy<CoreEthereumDb<RustyLevelDbShim>, MockNetworkExternalActions>, Vec<(Address, PeerId)>) {
+    async fn mock_promiscuous_strategy() -> (
+        PromiscuousStrategy<CoreEthereumDb<RustyLevelDbShim>, MockNetworkExternalActions>,
+        Vec<(Address, PeerId)>,
+    ) {
         let address_peer_id_pairs = generate_random_address_and_peer_id_pairs(10);
         let (alice_address, alice_peer_id) = address_peer_id_pairs[0];
         let (bob_address, bob_peer_id) = address_peer_id_pairs[1];
@@ -469,12 +474,12 @@ mod tests {
             MockNetworkExternalActions {},
         )));
 
-         // Start the TransactionQueue with the mock TransactionExecutor
-         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
-         let tx_sender = tx_queue.new_sender();
-         async_std::task::spawn_local(async move {
-             tx_queue.transaction_loop().await;
-         });
+        // Start the TransactionQueue with the mock TransactionExecutor
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn_local(async move {
+            tx_queue.transaction_loop().await;
+        });
 
         let strat_cfg = StrategyConfig::default();
 
@@ -484,8 +489,8 @@ mod tests {
         let peers: Vec<(PeerId, u32)> = vec![
             (bob_peer_id.clone(), 7),        // - bob: 0.7
             (charlie_peer_id.clone(), 9),    // - charlie: 0.9
-            (eugene_peer_id.clone(), 10),     // - eugene: 0.8
-            (gustave_peer_id.clone(), 8),   // - gustave: 1.0
+            (eugene_peer_id.clone(), 10),    // - eugene: 0.8
+            (gustave_peer_id.clone(), 8),    // - gustave: 1.0
             (address_peer_id_pairs[5].1, 1), // - random_peer: 0.1
             (address_peer_id_pairs[6].1, 3), // - random_peer: 0.3
             (address_peer_id_pairs[7].1, 1), // - random_peer: 0.1
@@ -562,10 +567,7 @@ mod tests {
             .db
             .write()
             .await
-            .set_staking_safe_allowance(
-                &balance,
-                &Snapshot::default(),
-            )
+            .set_staking_safe_allowance(&balance, &Snapshot::default())
             .await
             .unwrap();
 

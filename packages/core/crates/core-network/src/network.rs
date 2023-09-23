@@ -14,15 +14,6 @@ use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use utils_log::{info, warn};
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};
 
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
-
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
-
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
-
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq)]
@@ -350,7 +341,8 @@ impl<T: NetworkExternalActions> Network<T> {
                     self.entries.remove(&entry.id);
                     return;
                 } else if entry.quality < self.cfg.quality_bad_threshold {
-                    self.ignored.insert(entry.id, self.network_actions_api.create_timestamp());
+                    self.ignored
+                        .insert(entry.id, self.network_actions_api.create_timestamp());
                 } else if entry.quality < self.cfg.quality_offline_threshold {
                     self.network_actions_api
                         .emit(NetworkEvent::PeerOffline(entry.id.clone()));
@@ -519,6 +511,7 @@ pub mod wasm {
     use js_sys::JsString;
     use std::str::FromStr;
     use utils_misc::utils::wasm::js_map_to_hash_map;
+    use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     pub fn health_to_string(h: Health) -> String {
@@ -580,7 +573,11 @@ pub mod wasm {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::network::{
+        Health, MockNetworkExternalActions, Network, NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin,
+    };
+    use libp2p_identity::PeerId;
+    use utils_misc::time::native::current_timestamp;
 
     struct DummyNetworkAction {}
 

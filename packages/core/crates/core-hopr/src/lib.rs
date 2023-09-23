@@ -13,7 +13,7 @@ use core_mixer::mixer::{Mixer, MixerConfig};
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
-    network::{Network, NetworkConfig, NetworkEvent},
+    network::{Network, NetworkEvent},
     ping::Ping,
 };
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
@@ -45,21 +45,15 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::NetworkExternalActions;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_strategy::{
+    aggregating::AggregatingStrategy,
+    auto_redeeming::AutoRedeemingStrategy,
     config::StrategyConfig,
     passive::PassiveStrategy,
     promiscuous::PromiscuousStrategy,
     strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy},
-    aggregating::AggregatingStrategy,
-    auto_redeeming::AutoRedeemingStrategy,
-    ticket_aggregation::processor::BasicTicketAggregationActions,
 };
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
-#[cfg(feature = "wasm")]
-use {
-    core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_ethereum_db::db::wasm::Database,
-    wasm_bindgen::prelude::wasm_bindgen,
-};
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
@@ -161,6 +155,7 @@ pub mod wasm_impls {
         types::{HalfKeyChallenge, Hash},
     };
     use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
+    use core_ethereum_db::db::wasm::Database;
     use core_network::network::NetworkConfig;
     use core_path::path::Path;
     use core_types::protocol::ApplicationData;

@@ -12,7 +12,7 @@ pub enum StrategyError {
     DbError(#[from] DbError),
 
     #[error(transparent)]
-    ActionsError(#[from] CoreEthereumActionsError),,
+    ActionsError(#[from] CoreEthereumActionsError),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),
