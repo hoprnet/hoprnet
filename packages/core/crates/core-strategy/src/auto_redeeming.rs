@@ -17,7 +17,7 @@ use validator::Validate;
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
     /// Defaults to false.
-    redeem_only_aggregated: bool,
+    pub redeem_only_aggregated: bool,
 }
 
 impl Default for AutoRedeemingStrategyConfig {
@@ -56,10 +56,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeeming
         if !self.cfg.redeem_only_aggregated || ack.ticket.index_offset > 1 {
             // Aggregated tickets have always index offset > 1
             info!("{self} strategy: auto-redeeming {ack}");
-            if let Err(e) = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await? {
-                error!("{self} strategy: failed to issue redeem tx: {e}");
-                return Failure(format!("cannot redeem: {e}"));
-            }
+            let _ = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
         }
         Ok(())
     }

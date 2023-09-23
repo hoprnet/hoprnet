@@ -1,17 +1,20 @@
 use crate::strategy::SingularStrategy;
 use crate::Strategies;
 use async_std::sync::RwLock;
+use async_trait::async_trait;
 use core_ethereum_actions::channels::fund_channel;
-use core_ethereum_actions::transaction_queue::TransactionResult::Failure;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::ChannelEntry;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use utils_log::{error, info};
+use utils_log::info;
 use utils_types::primitives::{Balance, BalanceType};
+use validator::Validate;
 
 /// Configuration for `AutoFundingStrategy`
+#[derive(Clone, Debug, Serialize, Deserialize, Validate, PartialEq, Eq)]
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
     /// Default is 0 HOPR, which never triggers funding.
@@ -46,6 +49,7 @@ impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
     }
 }
 
+#[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db> {
     async fn on_channel_state_changed(&self, channel: &ChannelEntry) -> crate::errors::Result<()> {
         if channel.balance.lt(&self.cfg.min_stake_threshold) {
@@ -54,19 +58,14 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
                 channel.balance, self.cfg.min_stake_threshold
             );
             let to_stake = self.cfg.min_stake_threshold.sub(&channel.balance);
-            if let Err(e) = fund_channel(
+            let _ = fund_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
                 channel.get_id(),
                 to_stake.clone(),
             )
-            .await
-            {
-                error!("{self} strategy: failed to issue staking of {channel} with {to_stake}: {e}");
-                return Failure(format!("cannot fund: {e}"));
-            } else {
-                info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
-            }
+            .await?;
+            info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
         }
 
         Ok(())

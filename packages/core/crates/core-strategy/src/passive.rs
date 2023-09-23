@@ -13,7 +13,7 @@ impl PassiveStrategy {
 
 impl Display for PassiveStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, Strategies::Passive)
+        write!(f, "{}", Strategies::Passive)
     }
 }
 
