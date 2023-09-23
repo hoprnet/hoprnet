@@ -17,14 +17,14 @@ use validator::Validate;
 #[derive(Debug, Clone, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
-    /// Default is 0 HOPR, which never triggers funding.
+    /// Default is 10 HOPR
     pub min_stake_threshold: Balance,
 }
 
 impl Default for AutoFundingStrategyConfig {
     fn default() -> Self {
         Self {
-            min_stake_threshold: Balance::zero(BalanceType::HOPR),
+            min_stake_threshold: Balance::from_str("10000000000000000000", BalanceType::HOPR)
         }
     }
 }

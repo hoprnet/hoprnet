@@ -231,7 +231,7 @@ pub struct CliArgs {
         env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
         help = "Disables automatic redeeming of winning tickets.",
         action = ArgAction::SetFalse,
-        default_value_t = true
+        default_value_t = false
     )]
     pub auto_redeem_tickets: bool,
 
