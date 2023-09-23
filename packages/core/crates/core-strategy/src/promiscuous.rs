@@ -18,12 +18,14 @@ use core_ethereum_actions::{
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+use validator::Validate;
 
 use crate::errors::Result;
 use crate::strategy::SingularStrategy;
-use crate::{config::StrategyConfig, decision::ChannelDecision, Strategies};
+use crate::{decision::ChannelDecision, Strategy};
 use utils_types::traits::PeerIdLike;
 
 /// Size of the simple moving average window used to smoothen the number of registered peers.
@@ -32,6 +34,7 @@ pub const SMA_WINDOW_SIZE: usize = 3;
 type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
 
 /// Config of promiscuous strategy.
+#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
     /// Defaults to 0.5
@@ -93,7 +96,7 @@ where
     Net: NetworkExternalActions,
 {
     pub fn new(
-        cfg: StrategyConfig,
+        config: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
         network: Arc<RwLock<Network<Net>>>,
         tx_sender: TransactionSender,
@@ -102,24 +105,7 @@ where
             db,
             network,
             tx_sender,
-            config: PromiscuousStrategyConfig {
-                network_quality_threshold: cfg
-                    .network_quality_threshold
-                    .unwrap_or(PromiscuousStrategyConfig::default().network_quality_threshold),
-                new_channel_stake: cfg
-                    .new_channel_stake
-                    .unwrap_or(PromiscuousStrategyConfig::default().new_channel_stake),
-                minimum_channel_balance: cfg
-                    .minimum_channel_balance
-                    .unwrap_or(PromiscuousStrategyConfig::default().minimum_channel_balance),
-                minimum_node_balance: cfg
-                    .minimum_node_balance
-                    .unwrap_or(PromiscuousStrategyConfig::default().minimum_node_balance),
-                max_channels: cfg.max_auto_channels.map(|m| m as usize),
-                enforce_max_channels: cfg
-                    .enforce_max_channels
-                    .unwrap_or(PromiscuousStrategyConfig::default().enforce_max_channels),
-            },
+            config,
             sma: RwLock::new(SimpleMovingAvg::new()),
         }
     }
@@ -300,7 +286,7 @@ where
     Net: NetworkExternalActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategies::Promiscuous)
+        write!(f, "{}", Strategy::Promiscuous(Default::default()))
     }
 }
 
@@ -492,7 +478,7 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let strat_cfg = StrategyConfig::default();
+        let strat_cfg = PromiscuousStrategyConfig::default();
 
         let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
 

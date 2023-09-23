@@ -7,7 +7,7 @@ use validator::{Validate, ValidationError};
 
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
-use core_strategy::config::StrategyConfig;
+use core_strategy::StrategyConfig;
 use utils_types::primitives::Address;
 
 #[cfg(not(feature = "wasm"))]
@@ -374,6 +374,7 @@ pub struct HoprdConfig {
     #[validate]
     pub api: Api,
     #[validate]
+    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip))]
     pub strategy: StrategyConfig,
     #[validate]
     pub heartbeat: HeartbeatConfig,
@@ -508,15 +509,14 @@ impl HoprdConfig {
             cfg.identity.private_key = Some(x)
         };
 
+        // TODO: resolve CLI configuration of strategies
+
         // strategy
-        if let Some(x) = cli_args.default_strategy {
-            cfg.strategy.name = x
-        };
-        if let Some(x) = cli_args.max_auto_channels {
-            cfg.strategy.max_auto_channels = Some(x)
+        if let Some(_) = cli_args.default_strategy {
+            cfg.strategy = StrategyConfig::default();
         };
 
-        cfg.strategy.auto_redeem_tickets = cli_args.auto_redeem_tickets;
+        //cfg.strategy.auto_redeem_tickets = cli_args.auto_redeem_tickets;
 
         // chain
         cfg.chain.announce = cli_args.announce;

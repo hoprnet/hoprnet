@@ -19,7 +19,7 @@ use validator::Validate;
 use async_std::task::spawn_local;
 use async_trait::async_trait;
 
-use crate::Strategies;
+use crate::Strategy;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
@@ -68,7 +68,7 @@ pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions> {
 
 impl<Db: HoprCoreEthereumDbActions> Display for AggregatingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategies::Aggregating)
+        write!(f, "{}", Strategy::Aggregating(Default::default()))
     }
 }
 

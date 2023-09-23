@@ -1,5 +1,5 @@
 use crate::strategy::SingularStrategy;
-use crate::Strategies;
+use crate::Strategy;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::channels::fund_channel;
@@ -14,7 +14,7 @@ use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
 /// Configuration for `AutoFundingStrategy`
-#[derive(Clone, Debug, Serialize, Deserialize, Validate, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
     /// Default is 0 HOPR, which never triggers funding.
@@ -45,7 +45,7 @@ impl<Db: HoprCoreEthereumDbActions> AutoFundingStrategy<Db> {
 
 impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategies::AutoFunding)
+        write!(f, "{}", Strategy::AutoFunding(Default::default()))
     }
 }
 

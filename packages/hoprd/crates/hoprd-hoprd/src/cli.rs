@@ -5,7 +5,7 @@ use std::str::FromStr;
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
-use core_strategy::config::StrategyConfig;
+use core_strategy::StrategyConfig;
 use hex;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -230,7 +230,7 @@ pub struct CliArgs {
         env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
         help = "Disables automatic redeeming of winning tickets.",
         action = ArgAction::SetFalse,
-        default_value_t = StrategyConfig::default().auto_redeem_tickets
+        default_value_t = true
     )]
     pub auto_redeem_tickets: bool,
 

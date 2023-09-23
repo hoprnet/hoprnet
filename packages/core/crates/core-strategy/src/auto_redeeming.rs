@@ -1,5 +1,5 @@
 use crate::strategy::SingularStrategy;
-use crate::Strategies;
+use crate::Strategy;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::redeem::redeem_ticket;
@@ -13,7 +13,7 @@ use utils_log::info;
 use validator::Validate;
 
 /// Configuration object for the `AutoRedeemingStrategy`
-#[derive(Clone, Debug, Serialize, Deserialize, Validate, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
     /// Defaults to false.
@@ -40,7 +40,7 @@ pub struct AutoRedeemingStrategy<Db: HoprCoreEthereumDbActions> {
 
 impl<Db: HoprCoreEthereumDbActions> Display for AutoRedeemingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategies::AutoRedeeming)
+        write!(f, "{}", Strategy::AutoRedeeming(Default::default()))
     }
 }
 

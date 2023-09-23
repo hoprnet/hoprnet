@@ -48,10 +48,9 @@ use core_strategy::auto_funding::AutoFundingStrategy;
 use core_strategy::{
     aggregating::AggregatingStrategy,
     auto_redeeming::AutoRedeemingStrategy,
-    config::StrategyConfig,
-    passive::PassiveStrategy,
     promiscuous::PromiscuousStrategy,
-    strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy},
+    strategy::{MultiStrategy, SingularStrategy},
+    Strategy, StrategyConfig,
 };
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
@@ -104,8 +103,7 @@ impl std::fmt::Display for HoprLoopComponents {
 }
 
 pub fn build_strategies<Db, Net>(
-    base_cfg: MultiStrategyConfig,
-    cfgs: Vec<StrategyConfig>,
+    cfg: StrategyConfig,
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<Net>>>,
     tx_sender: TransactionSender,
@@ -117,37 +115,35 @@ where
 {
     let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
 
-    for cfg in cfgs {
-        match cfg.name.as_str() {
-            "passive" => strategies.push(Box::new(PassiveStrategy::new())),
-            "aggregating" => strategies.push(Box::new(
-                // TODO: propagate the configuration
-                AggregatingStrategy::new(
-                    Default::default(),
-                    db.clone(),
-                    tx_sender.clone(),
-                    ticket_aggregator.clone(),
-                ),
-            )),
-            "auto_redeeming" => strategies.push(Box::new(
-                // TODO: propagate the configuration
-                AutoRedeemingStrategy::new(Default::default(), db.clone(), tx_sender.clone()),
-            )),
-            "auto_funding" => strategies.push(Box::new(
-                // TODO: propagate configuration
-                AutoFundingStrategy::new(Default::default(), db.clone(), tx_sender.clone()),
-            )),
-            "promiscuous" => strategies.push(Box::new(PromiscuousStrategy::new(
-                cfg,
+    for strategy in cfg.substrategies.iter() {
+        match strategy {
+            Strategy::Promiscuous(cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
+                cfg.clone(),
                 db.clone(),
                 network.clone(),
                 tx_sender.clone(),
             ))),
-            _ => error!("unknown strategy {}, skipping", cfg.name),
+            Strategy::Aggregating(cfg) => strategies.push(Box::new(AggregatingStrategy::new(
+                cfg.clone(),
+                db.clone(),
+                tx_sender.clone(),
+                ticket_aggregator.clone(),
+            ))),
+            Strategy::AutoRedeeming(cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
+                cfg.clone(),
+                db.clone(),
+                tx_sender.clone(),
+            ))),
+            Strategy::AutoFunding(cfg) => strategies.push(Box::new(AutoFundingStrategy::new(
+                cfg.clone(),
+                db.clone(),
+                tx_sender.clone(),
+            ))),
+            Strategy::Multi(_) => panic!("embedding multi strategies not supported"),
         }
     }
 
-    MultiStrategy::new(strategies, base_cfg)
+    MultiStrategy::new(strategies, cfg)
 }
 
 #[cfg(feature = "wasm")]
@@ -277,7 +273,7 @@ pub mod wasm_impls {
         heartbeat_proto_cfg: HeartbeatProtocolConfig,
         msg_proto_cfg: MsgProtocolConfig,
         ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
-        strategies_cfgs: Vec<StrategyConfig>,
+        strategy_cfg: StrategyConfig,
     ) -> (HoprTools, impl std::future::Future<Output = ()>) {
         let identity = me;
 
@@ -295,8 +291,7 @@ pub mod wasm_impls {
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
 
         let multi_strategy = Arc::new(build_strategies(
-            MultiStrategyConfig::default(), // TODO: propagate the global strategy config
-            strategies_cfgs,
+            strategy_cfg,
             db.clone(),
             network.clone(),
             tx_queue.new_sender(),

@@ -1,22 +1,38 @@
-use strum::{Display, EnumString};
+use crate::aggregating::AggregatingStrategyConfig;
+use crate::auto_funding::AutoFundingStrategyConfig;
+use crate::auto_redeeming::AutoRedeemingStrategyConfig;
+use crate::promiscuous::PromiscuousStrategyConfig;
+use crate::strategy::MultiStrategyConfig;
+use serde::{Deserialize, Serialize};
+use strum::{Display, EnumString, EnumVariantNames};
 
-pub mod config;
-pub mod decision;
-pub mod promiscuous;
+pub mod strategy;
 
 pub mod aggregating;
 pub mod auto_funding;
 pub mod auto_redeeming;
+pub mod decision;
 pub mod errors;
-pub mod passive;
-pub mod strategy;
+pub mod promiscuous;
 
-#[derive(Clone, Copy, PartialEq, Eq, Display, EnumString)]
-#[strum(serialize_all = "snake_case")]
-pub enum Strategies {
-    Passive,
-    Promiscuous,
-    Aggregating,
-    AutoRedeeming,
-    AutoFunding,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, EnumVariantNames)]
+pub enum Strategy {
+    #[strum(serialize = "promiscuous")]
+    Promiscuous(PromiscuousStrategyConfig),
+    #[strum(serialize = "aggregating")]
+    Aggregating(AggregatingStrategyConfig),
+    #[strum(serialize = "auto_redeeming")]
+    AutoRedeeming(AutoRedeemingStrategyConfig),
+    #[strum(serialize = "auto_funding")]
+    AutoFunding(AutoFundingStrategyConfig),
+    #[strum(serialize = "multi")]
+    Multi(MultiStrategyConfig),
 }
+
+impl Default for Strategy {
+    fn default() -> Self {
+        Self::Multi(Default::default())
+    }
+}
+
+pub type StrategyConfig = MultiStrategyConfig;

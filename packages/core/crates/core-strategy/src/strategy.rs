@@ -1,9 +1,10 @@
 use crate::errors::Result;
+use crate::Strategy;
 use async_trait::async_trait;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use utils_log::{error, warn};
 use validator::Validate;
 
@@ -30,18 +31,36 @@ pub trait SingularStrategy: Display {
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
     /// Otherwise, it behaves like a logical OR chain of `SingularStrategies`.
     /// Default is `true`.
     pub on_fail_continue: bool,
+
+    /// Configuration of individual sub-strategies.
+    /// Default is empty, which makes the `MultiStrategy` behave as passive.
+    pub substrategies: Vec<Strategy>,
+}
+
+impl Debug for MultiStrategyConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_list()
+            .entries(self.substrategies.iter().filter(|f| match f {
+                Strategy::Multi(_) => false, // avoid infinite recursion when debugging
+                _ => true,
+            }))
+            .finish()
+    }
 }
 
 impl Default for MultiStrategyConfig {
     fn default() -> Self {
-        Self { on_fail_continue: true }
+        Self {
+            on_fail_continue: true,
+            substrategies: Vec::new(),
+        }
     }
 }
 
@@ -158,7 +177,7 @@ mod tests {
         let mut s2 = MockSingularStrategy::new();
         s2.expect_on_tick().times(1).in_sequence(&mut seq).returning(|| Ok(()));
 
-        let cfg = MultiStrategyConfig { on_fail_continue: true };
+        let cfg = MultiStrategyConfig { on_fail_continue: true, substrategies: Vec::new() };
 
         let ms = MultiStrategy::new(vec![Box::new(s1), Box::new(s2)], cfg);
         ms.on_tick().await.expect("on_tick should not fail");
@@ -179,6 +198,7 @@ mod tests {
 
         let cfg = MultiStrategyConfig {
             on_fail_continue: false,
+            substrategies: Vec::new()
         };
 
         let ms = MultiStrategy::new(vec![Box::new(s1), Box::new(s2)], cfg);
