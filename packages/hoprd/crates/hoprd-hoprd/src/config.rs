@@ -609,11 +609,7 @@ mod tests {
                 password: "".to_owned(),
                 private_key: Some("".to_owned()),
             },
-            strategy: StrategyConfig {
-                name: "passive".to_owned(),
-                max_auto_channels: None,
-                auto_redeem_tickets: true,
-            },
+            strategy: StrategyConfig::default(),
             db: Db {
                 data: "/tmp/db".to_owned(),
                 initialize: false,

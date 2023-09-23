@@ -170,8 +170,14 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all channels from a given address.
     async fn get_channels_from(&self, address: &Address) -> Result<Vec<ChannelEntry>>;
 
+    /// Get all the outgoing channels from current node.
+    async fn get_outgoing_channels(&self) -> Result<Vec<ChannelEntry>>;
+
     /// Get all channels to a given address.
     async fn get_channels_to(&self, address: &Address) -> Result<Vec<ChannelEntry>>;
+
+    /// Get all the incoming channels from current node.
+    async fn get_incoming_channels(&self) -> Result<Vec<ChannelEntry>>;
 
     /// Get the current balance.
     async fn get_hopr_balance(&self) -> Result<Balance>;

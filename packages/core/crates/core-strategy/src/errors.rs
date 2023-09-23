@@ -1,6 +1,7 @@
 use core_ethereum_actions::errors::CoreEthereumActionsError;
 use thiserror::Error;
 use utils_db::errors::DbError;
+use utils_types::errors::GeneralError;
 
 #[derive(Debug, Error)]
 pub enum StrategyError {
@@ -11,7 +12,10 @@ pub enum StrategyError {
     DbError(#[from] DbError),
 
     #[error(transparent)]
-    ActionsError(#[from] CoreEthereumActionsError),
+    ActionsError(#[from] CoreEthereumActionsError),,
+
+    #[error("lower-level error: {0}")]
+    GeneralError(#[from] GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, StrategyError>;

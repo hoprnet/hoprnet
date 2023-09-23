@@ -44,11 +44,15 @@ use core_ethereum_actions::transaction_queue::{TransactionQueue, TransactionSend
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::NetworkExternalActions;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
-use core_strategy::aggregating::AggregatingStrategy;
-use core_strategy::auto_redeeming::AutoRedeemingStrategy;
-use core_strategy::config::StrategyConfig;
-use core_strategy::passive::PassiveStrategy;
-use core_strategy::strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy};
+use core_strategy::{
+    config::StrategyConfig,
+    passive::PassiveStrategy,
+    promiscuous::PromiscuousStrategy,
+    strategy::{MultiStrategy, MultiStrategyConfig, SingularStrategy},
+    aggregating::AggregatingStrategy,
+    auto_redeeming::AutoRedeemingStrategy,
+    ticket_aggregation::processor::BasicTicketAggregationActions,
+};
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
 #[cfg(feature = "wasm")]
@@ -108,7 +112,7 @@ pub fn build_strategies<Db, Net>(
     base_cfg: MultiStrategyConfig,
     cfgs: Vec<StrategyConfig>,
     db: Arc<RwLock<Db>>,
-    _network: Arc<RwLock<Network<Net>>>,
+    network: Arc<RwLock<Network<Net>>>,
     tx_sender: TransactionSender,
     ticket_aggregator: BasicTicketAggregationActions<Result<Ticket, String>>,
 ) -> MultiStrategy
@@ -134,7 +138,12 @@ where
                 // TODO: propagate the configuration
                 AutoRedeemingStrategy::new(Default::default(), db.clone(), tx_sender.clone()),
             )),
-            "promiscuous" => todo!(),
+            "promiscuous" => strategies.push(Box::new(PromiscuousStrategy::new(
+                cfg,
+                db.clone(),
+                network.clone(),
+                tx_sender.clone(),
+            ))),
             _ => error!("unknown strategy {}, skipping", cfg.name),
         }
     }

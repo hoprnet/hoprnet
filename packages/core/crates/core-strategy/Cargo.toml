@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 async-trait = { workspace = true }
-async-std = { workspace = true }
+async-std = { workspace = true, features = ["unstable"]}
 getrandom = { workspace = true }
 rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
@@ -21,13 +21,15 @@ serde_with = "3.3.0"
 simple_moving_average = "0.1.2"
 thiserror = { workspace = true }
 validator = { workspace = true }
-
+futures = { workspace = true }
 serde-wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
 js-sys = { workspace = true, optional = true }
 wasm-bindgen = {workspace = true, optional = true}
 wasm-bindgen-futures = {workspace = true, optional = true}
 
 core-types = { workspace = true }
+core-crypto = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
 core-ethereum-db = { workspace = true }
@@ -40,7 +42,7 @@ utils-types = { workspace = true }
 
 
 [dev-dependencies]
-async-std = { version = "1.12", features = ["attributes"] }
+async-std = { workspace = true, features = ["attributes"] }
 lazy_static = "1.4"
 vector_assertions = "0.1.0"
 mockall = "0.11.4"
@@ -60,4 +62,4 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen" ]
