@@ -5,20 +5,22 @@ use utils_types::primitives::{Address, Balance};
 /// represents which channels should be closed and which should be opened.
 /// Also indicates a number of maximum channels this strategy can open given the current network size.
 /// Note that the number changes as the network size changes.
-pub struct StrategyTickDecision {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StrategyChannelDecision {
     to_close: Vec<ChannelEntry>,
     to_open: Vec<(Address, Balance)>,
 }
 
-impl StrategyTickDecision {
-    /// Constructor for the strategy tick result.
-    pub fn new() -> Self {
-        StrategyTickDecision {
+impl Default for StrategyChannelDecision {
+    fn default() -> Self {
+        Self {
             to_close: Vec::new(),
             to_open: Vec::new(),
         }
     }
+}
 
+impl StrategyChannelDecision {
     pub fn will_channel_be_closed(&self, counter_party: &Address) -> bool {
         self.to_close.iter().any(|c| &c.destination == counter_party)
     }

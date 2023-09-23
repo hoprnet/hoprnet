@@ -2,7 +2,6 @@ use std::str::FromStr;
 
 pub mod config;
 pub mod decision;
-pub mod generic;
 pub mod promiscuous;
 
 pub mod aggregating;

@@ -3,7 +3,6 @@ use core_network::{
     network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerStatus},
     PeerId,
 };
-use core_strategy::generic::PeerQuality;
 use futures::channel::mpsc::Sender;
 use std::sync::Arc;
 use utils_log::{error, warn};
@@ -64,6 +63,27 @@ pub mod wasm {
     use utils_misc::utils::wasm::js_map_to_hash_map;
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
+    use utils_types::primitives::Address;
+
+    /// Object needed only to simplify the iteration over the address and quality pair until
+    /// the strategy is migrated into Rust
+    #[wasm_bindgen]
+    pub struct PeerQuality {
+        peers_with_quality: Vec<(Address, f64)>,
+    }
+
+    impl PeerQuality {
+        pub fn new(peers: Vec<(Address, f64)>) -> Self {
+            Self {
+                peers_with_quality: peers,
+            }
+        }
+
+        pub fn take(&self) -> Vec<(Address, f64)> {
+            self.peers_with_quality.clone()
+        }
+    }
+
 
     /// Wrapper object for the `Network` functionality to be callable from outside
     /// the WASM environment.

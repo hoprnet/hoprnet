@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 use crate::errors::Result;
 use crate::strategy::SingularStrategy;
-use crate::{config::StrategyConfig, decision::StrategyTickDecision};
+use crate::{config::StrategyConfig, decision::StrategyChannelDecision};
 use utils_types::traits::PeerIdLike;
 
 /// Size of the simple moving average window used to smoothen the number of registered peers.
@@ -124,8 +124,8 @@ where
         }
     }
 
-    async fn collect_tick_decision(&self) -> Result<StrategyTickDecision> {
-        let mut tick_decision = StrategyTickDecision::new();
+    async fn collect_tick_decision(&self) -> Result<StrategyChannelDecision> {
+        let mut tick_decision = StrategyChannelDecision::default();
         let mut new_channel_candidates: Vec<(Address, f64)> = Vec::new();
         let mut active_addresses: HashMap<Address, f64> = HashMap::new();
         let mut network_size: usize = 0;
@@ -303,6 +303,7 @@ where
         write!(f, "promiscuous")
     }
 }
+
 #[async_trait(? Send)]
 impl<Db, Net> SingularStrategy for PromiscuousStrategy<Db, Net>
 where
@@ -314,7 +315,7 @@ where
 
         // close all the channels
         futures::future::join_all(tick_decision.get_to_close().iter().map(|channel_to_close| async {
-            close_channel(
+            if let Err(e) = close_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
                 channel_to_close.destination,
@@ -322,26 +323,33 @@ where
                 ChannelDirection::Outgoing,
                 false, // TODO: get this value from config
             )
-            .await
-            .unwrap()
+            .await {
+                error!("{self} strategy: error while closing {channel_to_close}: {e}");
+            } else {
+                info!("{self} strategy: closed {channel_to_close}")
+            }
         }))
         .await;
-        debug!("close channels done");
+        debug!("{self} strategy: close channels done");
 
         // open all the channels
         futures::future::join_all(tick_decision.get_to_open().iter().map(|channel_to_open| async {
-            open_channel(
+            if let Err(e) = open_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
                 channel_to_open.0,
                 Address::default(),
                 channel_to_open.1,
             )
-            .await
-            .unwrap()
+            .await {
+                error!("{self} strategy: error while opening {channel_to_open}: {e}");
+            } else {
+                info!("{self} strategy: opened {channel_to_open}")
+            }
         }))
         .await;
-        debug!("open channels done");
+        debug!("{self} strategy: open channels done");
+
         Ok(())
     }
 }
