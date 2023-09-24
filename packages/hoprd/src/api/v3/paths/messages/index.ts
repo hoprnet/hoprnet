@@ -34,7 +34,6 @@ const POST: Operation = [
     const message = encodeMessage(req.body.body)
     const recipient = peerIdFromString(req.body.peerId)
     const hops = req.body.hops
-
     const tag = req.body.tag
 
     // only set path if given, otherwise a path will be chosen by hopr core
@@ -45,7 +44,6 @@ const POST: Operation = [
 
     try {
       let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops, tag)
-      log(`after sending message`)
       metric_successfulSendApiCalls.increment()
       return res.status(202).json(ackChallenge)
     } catch (err) {
@@ -55,9 +53,15 @@ const POST: Operation = [
       if (RPCH_MESSAGE_REGEXP.test(msg)) {
         log(`RPCh: failed to send message [${msg}]`)
       }
-      return res
-        .status(422)
-        .json({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
+
+      const error = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+      let status = STATUS_CODES.UNKNOWN_FAILURE
+
+      if (error.match(/is out of funds/)) {
+        status = STATUS_CODES.CHANNEL_OUT_OF_FUNDS
+      }
+
+      return res.status(422).send({ status, error })
     }
   }
 ]
