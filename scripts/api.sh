@@ -67,7 +67,7 @@ api_call(){
     else
       if [[ ${end_time_ns} -lt ${now} ]]; then
         log "${RED}attempt: ${attempt} - api_call (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
-        return 1
+        exit 1
       else
         log "${YELLOW}attempt: ${attempt} - api_call (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
       fi
@@ -355,11 +355,11 @@ api_validate_balances_gt0() {
 
   if [[ "$eth_balance" = "0" && "${safe_hopr_balance}" != "0" ]]; then
     log "Error: $1 Node has an invalid native balance: $eth_balance"
-    return 1
+    exit 1
   fi
   if [[ "$safe_hopr_balance" = "0" ]]; then
     log "Error: $1 Node Safe has an invalid HOPR balance: $safe_hopr_balance"
-    return 1
+    exit 1
   fi
   log "$1 is funded"
 }

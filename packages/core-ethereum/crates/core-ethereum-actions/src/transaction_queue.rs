@@ -182,18 +182,11 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 match channel.status {
                     Open => {
                         debug!("initiating closure of {channel}");
-                        tx_exec
-                            .close_channel_initialize(channel.source, channel.destination)
-                            .await
-                    }
-
-                    PendingToClose => {
-                        debug!("finalizing closure of {channel}");
                         let res = tx_exec
-                            .close_channel_finalize(channel.source, channel.destination)
+                            .close_channel_initialize(channel.source, channel.destination)
                             .await;
                         if let TransactionResult::CloseChannel { .. } = res {
-                            debug!("deleting pending balance of {channel} after closure");
+                            debug!("deleting pending balance of {channel} after initiating closure");
                             if let Err(e) = db.write().await.reset_pending_balance_to(&channel.destination).await {
                                 error!(
                                     "failed to reset pending balance to {} in channel {channel}: {e}",
@@ -202,6 +195,13 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                             }
                         }
                         res
+                    }
+
+                    PendingToClose => {
+                        debug!("finalizing closure of {channel}");
+                        tx_exec
+                            .close_channel_finalize(channel.source, channel.destination)
+                            .await
                     }
 
                     Closed => {

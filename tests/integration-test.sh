@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# HOPR interaction tests via HOPRd API v2
+
+# HOPR interaction tests via HOPRd API v3
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
@@ -53,6 +54,18 @@ declare additional_nodes_native_addrs="${ADDITIONAL_NODE_NATIVE_ADDRS:-}"
 declare msg_tag=1234
 
 declare -a jobs
+
+wait_for_jobs() {
+  log "Waiting for ${1}"
+  for j in ${jobs[@]}; do
+    if ! wait -n $j; then
+      log "Waiting for ${1} - FAILED job ${j}"
+      exit 1
+    fi;
+  done;
+  jobs=()
+  log "Waiting for ${1} - DONE"
+}
 
 # $1 = node id
 # $2 = node api endpoint
@@ -110,7 +123,7 @@ redeem_tickets() {
     return 0
   else
     log "Redeem all test FAILED on node ${node_id} !"
-    return 1
+    exit 1
   fi
 }
 
@@ -149,17 +162,16 @@ validate_native_address "${api4}" "${api_token}" & jobs+=( "$!" )
 validate_native_address "${api5}" "${api_token}" & jobs+=( "$!" )
 validate_native_address "${api6}" "${api_token}" & jobs+=( "$!" )
 validate_native_address "${api7}" "${api_token}" & jobs+=( "$!" )
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "ETH addresses exist"
+wait_for_jobs "ETH addresses exist"
 
-api_validate_balances_gt0 "${api_token}@${api1}"
-api_validate_balances_gt0 "${api_token}@${api2}"
-api_validate_balances_gt0 "${api_token}@${api3}"
-api_validate_balances_gt0 "${api_token}@${api4}"
-api_validate_balances_gt0 "${api_token}@${api5}"
-api_validate_balances_gt0 "${api_token}@${api6}"
-api_validate_balances_gt0 "${api_token}@${api7}"
-log "Nodes and Safes are funded"
+api_validate_balances_gt0 "${api_token}@${api1}" & jobs+=( "$!" )
+api_validate_balances_gt0 "${api_token}@${api2}" & jobs+=( "$!" )
+api_validate_balances_gt0 "${api_token}@${api3}" & jobs+=( "$!" )
+api_validate_balances_gt0 "${api_token}@${api4}" & jobs+=( "$!" )
+api_validate_balances_gt0 "${api_token}@${api5}" & jobs+=( "$!" )
+api_validate_balances_gt0 "${api_token}@${api6}" & jobs+=( "$!" )
+api_validate_balances_gt0 "${api_token}@${api7}" & jobs+=( "$!" )
+wait_for_jobs "Nodes and Safes are funded"
 
 declare addr1 addr2 addr3 addr4 addr5 addr6 addr7 result
 addr1="$(get_hopr_address "${api_token}@${api1}")"
@@ -309,10 +321,7 @@ api_open_channel 1 5 "${api1}" "${node_addr5}" & jobs+=( "$!" )
 
 # opening temporary channel just to test get all channels later on
 api_open_channel 1 4 "${api1}" "${node_addr4}" & jobs+=( "$!" )
-
-log "Waiting for nodes to finish open channel (long running)"
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "Waiting DONE"
+wait_for_jobs "nodes to finish open channel (long running)"
 
 for i in `seq 1 100`; do
   log "Node 1 send 1 hop message to self via node 2"
@@ -328,9 +337,7 @@ for i in `seq 1 100`; do
   api_send_message "${api4}" "${msg_tag}" "${addr4}" 'hello, world from self via 5' "${addr5}" & jobs+=( "$!" )
 done
 
-log "Waiting for nodes to finish sending 1 hop messages"
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "Waiting DONE"
+wait_for_jobs "nodes to finish sending 1 hop messages"
 
 sleep 2
 
@@ -363,25 +370,19 @@ for i in `seq 1 100`; do
   log "Node 5 send 1 hop message to node 2 via node 1"
   api_send_message "${api5}" "${msg_tag}" "${addr2}" 'hello, world from 5 via 1' "${addr1}" & jobs+=( "$!" )
 done
-log "Waiting for nodes to finish sending 1-hop messages"
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "Waiting DONE"
+wait_for_jobs "nodes to finish sending 1-hop messages"
 
 for i in `seq 1 100`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
   api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
 done
-log "Waiting for nodes to finish sending 3-hop messages"
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "Waiting DONE"
+wait_for_jobs "nodes to finish sending 3-hop messages"
 
 for i in `seq 1 100`; do
   log "Node 1 send message to node 5"
   api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
 done
-log "Waiting for node 1 to send messages to node 5"
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "Waiting DONE"
+wait_for_jobs "node 1 to send messages to node 5"
 
 # This test ensure the internal pending balance is updated properly. Steps are:
 # - open channel
@@ -391,6 +392,7 @@ log "Waiting DONE"
 # - close channel
 # - open channel
 # - send 2 1-hop messages
+# - redeem tickets
 # - close channel
 test_pending_balance_in_specific_channel() {
   local node_id="${1}"
@@ -400,6 +402,7 @@ test_pending_balance_in_specific_channel() {
   local generated_tickets="2"
 
   peer_id=$(get_hopr_address ${api_token}@${node_api})
+  node_addr=$(get_native_address ${api_token}@${node_api})
   second_node_addr=$(get_native_address ${api_token}@${second_node_api})
 
   # only fund for 2 tickets
@@ -432,29 +435,39 @@ test_pending_balance_in_specific_channel() {
   api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "pendingbalance: hello, world 1 self" "${second_peer_id}" "422"
 
   api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
-  api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
+  sleep 5
+  api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
+
+  # FIXME: The following part can be enabled once incoming channel closure is
+  # implemented.
+  #
+  # need to close the incoming side to not have to wait for the closure timeout
+  # api_close_channel "${second_node_id}" "${node_id}" "${second_node_api}" "${node_addr}" "incoming"
 
   # only fund for 2 tickets
-  channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "200")
+  # channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "200")
 
   # need to wait a little to allow the other side to index the channel open event
-  sleep 10
-  api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
-  for i in `seq 1 ${generated_tickets}`; do
-    log "PendingBalance in channel: Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-    api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "pendingbalance: hello, world 1 self" "${second_peer_id}"
-  done
+  # sleep 10
+  # api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
+  # for i in `seq 1 ${generated_tickets}`; do
+  #   log "PendingBalance in channel: Node ${node_id} send 1 hop message to self via node ${second_node_id}"
+  #   api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "pendingbalance: hello, world 1 self" "${second_peer_id}"
+  # done
 
   # seems like there's slight delay needed for tickets endpoint to return up to date tickets, probably because of blockchain sync delay
-  sleep 5
+  # sleep 5
 
-  ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
-  if [[ "${ticket_amount}" != "${generated_tickets}" ]]; then
-    msg "PendingBalance: Ticket amount ${ticket_amount} is different than expected ${generated_tickets}"
-    exit 1
-  fi
+  # ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
+  # if [[ "${ticket_amount}" != "${generated_tickets}" ]]; then
+  #   msg "PendingBalance: Ticket amount ${ticket_amount} is different than expected ${generated_tickets}"
+  #   exit 1
+  # fi
 
-  api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
+  # api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
+  # sleep 5
+  # api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
+  # api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
   echo "PendingBalance: test passed"
 }
 
@@ -553,9 +566,9 @@ test_redeem_in_specific_channel() {
 }
 
 log "Test aggregating and redeeming in a specific channel"
-test_redeem_in_specific_channel "3" "1" ${api3} ${api1} & jobs+=( "$!" )
-test_aggregate_redeem_in_specific_channel "4" "1" ${api4} ${api1} & jobs+=( "$!" )
-test_pending_balance_in_specific_channel "4" "1" ${api2} ${api1} & jobs+=( "$!" )
+test_redeem_in_specific_channel "3" "1" "${api3}" "${api1}" & jobs+=( "$!" )
+test_aggregate_redeem_in_specific_channel "4" "1" "${api4}" "${api1}" & jobs+=( "$!" )
+test_pending_balance_in_specific_channel "2" "1" "${api2}" "${api1}" & jobs+=( "$!" )
 
 log "Test redeeming all tickets"
 redeem_tickets "2" "${api2}" & jobs+=( "$!" )
@@ -563,9 +576,7 @@ redeem_tickets "3" "${api3}" & jobs+=( "$!" )
 redeem_tickets "4" "${api4}" & jobs+=( "$!" )
 redeem_tickets "5" "${api5}" & jobs+=( "$!" )
 
-log "Waiting for nodes to finish ticket redemption (long running)"
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "Waiting DONE"
+wait_for_jobs "nodes to finish ticket redemption (long running)"
 
 # initiate channel closures, but don't wait because this will trigger ticket
 # redemption as well
@@ -580,9 +591,7 @@ api_close_channel 5 1 "${api5}" "${node_addr1}" "outgoing" & jobs+=( "$!" )
 # completeness
 api_close_channel 1 5 "${api1}" "${node_addr5}" "outgoing" "true" & jobs+=( "$!" )
 
-log "Waiting for nodes to finish handling close channels calls"
-for j in ${jobs[@]}; do wait -n $j; done; jobs=()
-log "Waiting DONE"
+wait_for_jobs "nodes to finish handling close channels calls"
 
 test_get_all_channels() {
   local node_api=${1}

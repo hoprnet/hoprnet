@@ -61,7 +61,7 @@ const POST: Operation = [
         status = STATUS_CODES.CHANNEL_OUT_OF_FUNDS
       }
 
-      res.status(422).send({ status, error })
+      return res.status(422).send({ status, error })
     }
   }
 ]
