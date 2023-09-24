@@ -8,6 +8,7 @@ import {
   ChannelStatus,
   Address,
   ChannelEntry,
+  Balance,
   AccountEntry,
   Snapshot,
   debug,
@@ -132,6 +133,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
         ownChannelUpdated: this.onOwnChannelUpdated.bind(this),
+        ticketRedeemed: this.onTicketRedeemed.bind(this),
         nodeNotAllowedToAccessNetwork: this.onNodeNotAllowedToAccessNetwork.bind(this),
         nodeAllowedToAccessNetwork: this.onNodeAllowedToAccessNetwork.bind(this)
       }
@@ -753,6 +755,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
   onOwnChannelUpdated(channel: ChannelEntry) {
     this.emit('own-channel-updated', channel)
+  }
+
+  onTicketRedeemed(channel: ChannelEntry, ticketAmount: Balance) {
+    this.emit('ticket-redeemed', channel, ticketAmount)
   }
 
   onNodeNotAllowedToAccessNetwork(address: Address) {

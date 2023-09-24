@@ -67,7 +67,7 @@ api_call(){
     else
       if [[ ${end_time_ns} -lt ${now} ]]; then
         log "${RED}attempt: ${attempt} - api_call (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}${NOFORMAT}"
-        return 1
+        exit 1
       else
         log "${YELLOW}attempt: ${attempt} - api_call (${cmd} \"${request_body}\") FAILED, received: ${result} but expected ${assertion}, retrying in ${step_time} seconds${NOFORMAT}"
       fi
@@ -255,17 +255,19 @@ api_get_node_info() {
 # $3 = peer_address peer id
 # $4 = message
 # $5 = OPTIONAL: peers in the message path
+# $6 = OPTIONAL: expected return code
 api_send_message(){
   local source_api="${1}"
   local tag="${2}"
   local peer_address="${3}"
   local msg="${4}"
   local peers="${5}"
+  local expected_code="${6:-202}"
 
   local path=$(echo "${peers}" | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"peerId":"'${peer_address}'","tag":'${tag}'}'
   # Node might need some time once commitment is set on-chain
-  api_call "${source_api}" "/messages" "POST" "${payload}" "202" 90 15 "" true
+  api_call "${source_api}" "/messages" "POST" "${payload}" "${expected_code}" 90 15 "" true
 }
 
 # $1 = source node id
@@ -308,7 +310,7 @@ api_get_channel_info() {
   local destination_address="${3}"
   local direction="${4}"
 
-  if [ -Z "${channel_id}" ] || [ "${channel_id}" = "null" ]; then
+  if [ -z "${channel_id}" ] || [ "${channel_id}" = "null" ]; then
     # fetch channel id from API
     channels_info="$(api_get_all_channels "${source_api}" false)"
     channel_id="$(echo "${channels_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
@@ -353,11 +355,11 @@ api_validate_balances_gt0() {
 
   if [[ "$eth_balance" = "0" && "${safe_hopr_balance}" != "0" ]]; then
     log "Error: $1 Node has an invalid native balance: $eth_balance"
-    return 1
+    exit 1
   fi
   if [[ "$safe_hopr_balance" = "0" ]]; then
     log "Error: $1 Node Safe has an invalid HOPR balance: $safe_hopr_balance"
-    return 1
+    exit 1
   fi
   log "$1 is funded"
 }

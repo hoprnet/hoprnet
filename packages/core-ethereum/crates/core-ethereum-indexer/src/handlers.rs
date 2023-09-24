@@ -77,6 +77,8 @@ impl From<&wasm::ContractAddresses> for ContractAddresses {
 pub trait IndexerCallbacks {
     fn own_channel_updated(&self, channel_entry: &ChannelEntry);
 
+    fn ticket_redeemed(&self, channel_entry: &ChannelEntry, ticket_amount: &Balance);
+
     fn node_not_allowed_to_access_network(&self, address: &Address);
 
     fn node_allowed_to_access_network(&self, address: &Address);
@@ -240,6 +242,7 @@ where
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
+                    let old_balance = channel.balance;
                     channel.balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
@@ -248,6 +251,10 @@ where
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
                     }
+
+                    // we need to infer the amount since the actual amount is not part of any event
+                    let amount = old_balance.sub(&channel.balance);
+                    self.cbs.ticket_redeemed(&channel, &amount);
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -272,8 +279,11 @@ where
                 let maybe_channel = db.get_channel(&channel_closed.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
+                    // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Closed;
                     channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
+                    channel.closure_time = 0u64.into();
+                    channel.ticket_index = 0u64.into();
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel.destination.eq(&self.chain_key) {
@@ -306,7 +316,10 @@ where
                 );
 
                 if let Some(mut channel) = maybe_channel {
+                    // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Open;
+                    channel.ticket_index = 0u64.into();
+                    channel.channel_epoch = channel.channel_epoch + 1u64.into();
 
                     db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
 
@@ -656,6 +669,8 @@ pub mod tests {
         fn new_announcement(&self, _account_entry: &AccountEntry) {}
 
         fn own_channel_updated(&self, _channel_entry: &ChannelEntry) {}
+
+        fn ticket_redeemed(&self, _channel_entry: &ChannelEntry, _ticket_amount: &Balance) {}
 
         fn node_not_allowed_to_access_network(&self, _address: &Address) {}
 
@@ -1419,6 +1434,7 @@ pub mod tests {
         let closed_channel = db.get_channel(&channel_id).await.unwrap().unwrap();
 
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
+        assert_eq!(closed_channel.ticket_index, 0u64.into());
 
         assert!(closed_channel.balance.value().eq(&U256::zero()));
     }
@@ -1453,6 +1469,58 @@ pub mod tests {
         let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::Open);
+        assert_eq!(channel.channel_epoch, 1u64.into());
+        assert_eq!(channel.ticket_index, 0u64.into());
+    }
+
+    #[async_std::test]
+    async fn on_channel_reopened() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
+
+        db.update_channel_and_snapshot(
+            &channel_id,
+            &ChannelEntry::new(
+                *SELF_CHAIN_ADDRESS,
+                *COUNTERPARTY_CHAIN_ADDRESS,
+                Balance::zero(BalanceType::HOPR),
+                U256::zero(),
+                ChannelStatus::Open,
+                3u64.into(),
+                U256::zero(),
+            ),
+            &Snapshot::default(),
+        )
+        .await
+        .unwrap();
+
+        let channel_opened_log = RawLog {
+            topics: vec![
+                ChannelOpenedFilter::signature(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &channel_opened_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(channel.status, ChannelStatus::Open);
+        assert_eq!(channel.channel_epoch, 4u64.into());
+        assert_eq!(channel.ticket_index, 0u64.into());
     }
 
     #[async_std::test]
@@ -1652,7 +1720,7 @@ pub mod wasm {
     use std::str::FromStr;
     use utils_log::error;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
-    use utils_types::primitives::{Address, Snapshot};
+    use utils_types::primitives::{Address, Balance, Snapshot};
     use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_futures;
 
@@ -1663,6 +1731,9 @@ pub mod wasm {
 
         #[wasm_bindgen(method, js_name = "ownChannelUpdated")]
         pub fn js_own_channel_updated(this: &IndexerCallbacks, channel_entry: ChannelEntry);
+
+        #[wasm_bindgen(method, js_name = "ticketRedeemed")]
+        pub fn js_ticket_redeemed(this: &IndexerCallbacks, channel_entry: ChannelEntry, ticket_amount: Balance);
 
         #[wasm_bindgen(method, js_name = "newAnnouncement")]
         pub fn js_new_announcement(this: &IndexerCallbacks, account_entry: AccountEntry);
@@ -1682,6 +1753,10 @@ pub mod wasm {
 
         fn own_channel_updated(&self, channel_entry: &ChannelEntry) {
             self.js_own_channel_updated(*channel_entry)
+        }
+
+        fn ticket_redeemed(&self, channel_entry: &ChannelEntry, ticket_amount: &Balance) {
+            self.js_ticket_redeemed(*channel_entry, *ticket_amount)
         }
 
         fn node_allowed_to_access_network(&self, address: &Address) {
