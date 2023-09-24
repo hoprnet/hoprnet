@@ -429,7 +429,7 @@ test_pending_balance_in_specific_channel() {
   fi
 
   log "PendingBalance in channel: Node ${node_id} trying to send 1 hop message to self via node ${second_node_id}, expected to fail"
-  api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "pendingbalance: hello, world 1 self" "${second_peer_id}"
+  api_send_message "${node_api}" "${msg_tag}" "${peer_id}" "pendingbalance: hello, world 1 self" "${second_peer_id}" "422"
 
   api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
   api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
