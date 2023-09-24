@@ -1,13 +1,13 @@
-use std::time::Duration;
 use crate::aggregating::AggregatingStrategyConfig;
 use crate::auto_funding::AutoFundingStrategyConfig;
 use crate::auto_redeeming::AutoRedeemingStrategyConfig;
 use crate::promiscuous::PromiscuousStrategyConfig;
 use crate::strategy::MultiStrategyConfig;
+use crate::Strategy::{Aggregating, AutoFunding};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use strum::{Display, EnumString, EnumVariantNames};
 use utils_types::primitives::{Balance, BalanceType};
-use crate::Strategy::{Aggregating, AutoFunding};
 
 pub mod strategy;
 
@@ -62,9 +62,9 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             }),
             AutoFunding(AutoFundingStrategyConfig {
                 min_stake_threshold: Balance::from_str("1000000000000000000", BalanceType::HOPR),
-                funding_amount: Balance::from_str("10000000000000000000", BalanceType::HOPR)
-            })
-        ]
+                funding_amount: Balance::from_str("10000000000000000000", BalanceType::HOPR),
+            }),
+        ],
     }
 }
 
@@ -75,4 +75,3 @@ impl Default for Strategy {
 }
 
 pub type StrategyConfig = MultiStrategyConfig;
-

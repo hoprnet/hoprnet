@@ -29,7 +29,7 @@ impl Default for AutoFundingStrategyConfig {
     fn default() -> Self {
         Self {
             min_stake_threshold: Balance::from_str("1000000000000000000", BalanceType::HOPR),
-            funding_amount: Balance::from_str("10000000000000000000", BalanceType::HOPR)
+            funding_amount: Balance::from_str("10000000000000000000", BalanceType::HOPR),
         }
     }
 }
@@ -64,10 +64,7 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
             );
 
             // Re-stake with: Minimum - Current + Funding Amount
-            // TODO: should we only re-stake with funding amount?
-            let to_stake = self.cfg.min_stake_threshold
-                .sub(&channel.balance)
-                .add(&self.cfg.funding_amount);
+            let to_stake = self.cfg.min_stake_threshold.add(&self.cfg.funding_amount);
 
             let _ = fund_channel(
                 self.db.clone(),
@@ -191,7 +188,7 @@ mod tests {
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |id, balance| c2.get_id().eq(id) && stake_limit_c.sub(&c2.balance).add(&fund_amount_c).eq(&balance))
+            .withf(move |id, balance| c2.get_id().eq(id) && c2.balance.add(&fund_amount_c).eq(&balance))
             .return_once(move |id, _| {
                 if id.eq(&c2.get_id()) {
                     tx.send(()).unwrap();
@@ -210,7 +207,7 @@ mod tests {
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,
-            funding_amount: fund_amount
+            funding_amount: fund_amount,
         };
 
         let ars = AutoFundingStrategy::new(cfg, db.clone(), tx_sender);

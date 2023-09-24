@@ -34,7 +34,7 @@ pub struct AggregatingStrategyConfig {
 
     /// Maximum time to wait for the ticket aggregation to complete.
     /// This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
-    /// Default is 1 minute.
+    /// Default is 60 seconds.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub aggregation_timeout: Duration,
 

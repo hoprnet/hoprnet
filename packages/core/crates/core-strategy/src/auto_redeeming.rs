@@ -16,7 +16,7 @@ use validator::Validate;
 #[derive(Debug, Clone, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
-    /// Defaults to false.
+    /// Defaults to true.
     pub redeem_only_aggregated: bool,
 }
 

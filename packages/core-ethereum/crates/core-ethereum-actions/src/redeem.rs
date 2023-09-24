@@ -23,6 +23,8 @@ lazy_static::lazy_static! {
     static ref EMPTY_TX_HASH: Hash = Hash::default();
 }
 
+// TODO: add argument `redeem_only_aggregated` to the functions
+
 /// Redeems all redeemable tickets in all channels.
 pub async fn redeem_all_tickets<Db>(
     db: Arc<RwLock<Db>>,

@@ -404,7 +404,7 @@ impl Default for HoprdConfig {
             db: Db::default(),
             inbox: MessageInboxConfiguration::default(),
             api: Api::default(),
-            strategy: StrategyConfig::default(),
+            strategy: core_strategy::hopr_default_strategies(),
             heartbeat: HeartbeatConfig::default(),
             network_options: NetworkConfig::default(),
             healthcheck: HealthCheck::default(),

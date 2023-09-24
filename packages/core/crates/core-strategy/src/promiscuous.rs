@@ -41,15 +41,11 @@ pub struct PromiscuousStrategyConfig {
     pub network_quality_threshold: f64,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
-    /// Defaults to 0.1 HOPR
+    /// Defaults to 10 HOPR
     pub new_channel_stake: Balance,
 
-    /// A minimum channel token stake. If reached, the channel will be closed and re-opened with `new_channel_stake`.
-    /// Defaults to 0.01 HOPR
-    pub minimum_channel_balance: Balance,
-
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
-    /// Defaults to 0.01 HOPR
+    /// Defaults to 10 HOPR
     pub minimum_node_balance: Balance,
 
     /// Maximum number of opened channels the strategy should maintain.
@@ -67,9 +63,8 @@ impl Default for PromiscuousStrategyConfig {
     fn default() -> Self {
         PromiscuousStrategyConfig {
             network_quality_threshold: 0.5,
-            new_channel_stake: Balance::from_str("100000000000000000", BalanceType::HOPR),
-            minimum_channel_balance: Balance::from_str("10000000000000000", BalanceType::HOPR),
-            minimum_node_balance: Balance::from_str("100000000000000000", BalanceType::HOPR),
+            new_channel_stake: Balance::from_str("10000000000000000000", BalanceType::HOPR),
+            minimum_node_balance: Balance::from_str("10000000000000000000", BalanceType::HOPR),
             max_channels: None,
             enforce_max_channels: true,
         }
@@ -145,11 +140,6 @@ where
                         // Need to close the channel, because quality has dropped
                         debug!("new channel closure candidate with {} (quality {})", address, quality);
                         tick_decision.add_to_close(channel.clone());
-                    } else if channel.balance.lt(&self.config.minimum_channel_balance) {
-                        // Need to re-open channel, because channel stake has dropped
-                        debug!("new channel closure & re-stake candidate with {}", address);
-                        tick_decision.add_to_close(channel.clone());
-                        new_channel_candidates.push((address.clone(), quality));
                     }
                 } else if quality >= self.config.network_quality_threshold {
                     // Try to open channel with this peer, because it is high-quality
