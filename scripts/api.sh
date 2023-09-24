@@ -255,17 +255,19 @@ api_get_node_info() {
 # $3 = peer_address peer id
 # $4 = message
 # $5 = OPTIONAL: peers in the message path
+# $6 = OPTIONAL: expected return code
 api_send_message(){
   local source_api="${1}"
   local tag="${2}"
   local peer_address="${3}"
   local msg="${4}"
   local peers="${5}"
+  local expected_code="${6:-202}"
 
   local path=$(echo "${peers}" | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"peerId":"'${peer_address}'","tag":'${tag}'}'
   # Node might need some time once commitment is set on-chain
-  api_call "${source_api}" "/messages" "POST" "${payload}" "202" 90 15 "" true
+  api_call "${source_api}" "/messages" "POST" "${payload}" "${expected_code}" 90 15 "" true
 }
 
 # $1 = source node id
