@@ -167,8 +167,6 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
-        with:
-          ref: v2.0.0-rc.6
 
       - name: Set up Google Cloud Credentials
         id: auth
@@ -196,10 +194,9 @@ jobs:
       - name: Tag repository
         id: tag
         run: |
-          set -x
           # Tag semver
-          # git tag v${{ steps.setup.outputs.current_version }}
-          # git push origin v${{ steps.setup.outputs.current_version }}
+          git tag v${{ steps.setup.outputs.current_version }}
+          git push origin v${{ steps.setup.outputs.current_version }}
 
           declare base_branch=${{ github.event.pull_request.base.ref }}
           # Tag release name
