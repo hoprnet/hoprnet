@@ -127,7 +127,7 @@ jobs:
           else
             echo "Skipping deployment"
           fi
-          rm ~/.ssh/google_compute_engine
+          rm ~/.ssh/google_compute_engine*
 
 # FIXME: Disabled until hoprd nodes can work in Kubernetes
 #  deploy_natted_nodes:
