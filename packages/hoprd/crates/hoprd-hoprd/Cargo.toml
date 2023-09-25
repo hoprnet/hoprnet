@@ -73,6 +73,7 @@ wasm = [
     "core-network/wasm",
     "core-packet/wasm",
     "core-path/wasm",
+    "core-strategy/wasm",
     "core-protocol/wasm",
     "core-types/wasm",
     "core-ethereum-db/wasm",
