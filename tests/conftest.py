@@ -3,6 +3,9 @@ import subprocess
 
 import pytest
 
+from hopr import HoprdAPI
+
+
 LOCALHOST = "127.0.0.1"
 
 OPEN_CHANNEL_FUNDING_VALUE = '1000000000000000000000'
@@ -134,7 +137,11 @@ def setup_7_nodes(request):
             check=True,
         )
         res.check_returncode()
-        yield NODES
+        nodes = NODES.copy()
+        for key in NODES.keys():
+            port = NODES[key]['api_port']
+            nodes[key]['api'] = HoprdAPI(f"http://localhost:{port}", DEFAULT_API_TOKEN)
+        yield nodes
     except Exception:
         logging.info("Creating a 7 node cluster from source - FAILED")
     finally:

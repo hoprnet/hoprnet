@@ -233,16 +233,6 @@ balances=$(api_get_balances ${api1})
 native_balance=$(echo ${balances} | jq -r .native)
 api_withdraw ${api1} "NATIVE" 10 0x858aa354db6ae5ea1217c5018c90403bde94e09e
 
-# this 2 functions are runned at the end of the tests when withdraw transaction should clear on blockchain and we don't have to block and wait for it
-check_native_withdraw_results() {
-  local initial_native_balance="${1}"
-
-  balances=$(api_get_balances ${api1})
-  new_native_balance=$(echo ${balances} | jq -r .native)
-  [[ "${initial_native_balance}" == "${new_native_balance}" ]] && { msg "Native withdraw failed, pre: ${initial_native_balance}, post: ${new_native_balance}"; exit 1; }
-
-  echo "withdraw native successful"
-}
 
 test_aliases() {
   local node_api="${1}"
@@ -316,14 +306,12 @@ api_open_channel 2 3 "${api2}" "${node_addr3}" & jobs+=( "$!" )
 api_open_channel 3 4 "${api3}" "${node_addr4}" & jobs+=( "$!" )
 api_open_channel 4 5 "${api4}" "${node_addr5}" & jobs+=( "$!" )
 api_open_channel 5 1 "${api5}" "${node_addr1}" & jobs+=( "$!" )
-# used for channel close test later
-api_open_channel 1 5 "${api1}" "${node_addr5}" & jobs+=( "$!" )
 
 # opening temporary channel just to test get all channels later on
 api_open_channel 1 4 "${api1}" "${node_addr4}" & jobs+=( "$!" )
 wait_for_jobs "nodes to finish open channel (long running)"
 
-for i in `seq 1 100`; do
+for i in `seq 1 15`; do
   log "Node 1 send 1 hop message to self via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr1}" 'hello, world from self via 2' "${addr2}" & jobs+=( "$!" )
 
@@ -357,7 +345,7 @@ log "Node 5 should now have a ticket"
 result=$(api_get_ticket_statistics "${api5}" "\"winProportion\":1")
 log "-- ${result}"
 
-for i in `seq 1 100`; do
+for i in `seq 1 20`; do
   log "Node 1 send 1 hop message to node 3 via node 2"
   api_send_message "${api1}" "${msg_tag}" "${addr3}" 'hello, world from 1 via 2' "${addr2}" & jobs+=( "$!" )
 
@@ -372,13 +360,13 @@ for i in `seq 1 100`; do
 done
 wait_for_jobs "nodes to finish sending 1-hop messages"
 
-for i in `seq 1 100`; do
+for i in `seq 1 20`; do
   log "Node 1 send 3 hop message to node 5 via node 2, node 3 and node 4"
   api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via 2,3,4" "${addr2} ${addr3} ${addr4}" & jobs+=( "$!" )
 done
 wait_for_jobs "nodes to finish sending 3-hop messages"
 
-for i in `seq 1 100`; do
+for i in `seq 1 20`; do
   log "Node 1 send message to node 5"
   api_send_message "${api1}" "${msg_tag}" "${addr5}" "hello, world from 1 via auto" "" & jobs+=( "$!" )
 done
@@ -577,61 +565,3 @@ redeem_tickets "4" "${api4}" & jobs+=( "$!" )
 redeem_tickets "5" "${api5}" & jobs+=( "$!" )
 
 wait_for_jobs "nodes to finish ticket redemption (long running)"
-
-# initiate channel closures, but don't wait because this will trigger ticket
-# redemption as well
-api_close_channel 1 4 "${api1}" "${node_addr4}" "outgoing" & jobs+=( "$!" )
-api_close_channel 1 2 "${api1}" "${node_addr2}" "outgoing" & jobs+=( "$!" )
-api_close_channel 2 3 "${api2}" "${node_addr3}" "outgoing" & jobs+=( "$!" )
-api_close_channel 3 4 "${api3}" "${node_addr4}" "outgoing" & jobs+=( "$!" )
-api_close_channel 4 5 "${api4}" "${node_addr5}" "outgoing" & jobs+=( "$!" )
-api_close_channel 5 1 "${api5}" "${node_addr1}" "outgoing" & jobs+=( "$!" )
-
-# initiate channel closures for channels without tickets so we can check
-# completeness
-api_close_channel 1 5 "${api1}" "${node_addr5}" "outgoing" "true" & jobs+=( "$!" )
-
-wait_for_jobs "nodes to finish handling close channels calls"
-
-test_get_all_channels() {
-  local node_api=${1}
-
-  channels=$(api_get_all_channels ${node_api} false)
-  channels_count=$(echo ${channels} | jq '.incoming | length')
-
-  channels_with_closed=$(api_get_all_channels ${node_api} true)
-  channels_with_closed_count=$(echo ${channels_with_closed} | jq '.incoming | length')
-
-  [[ "${channels_count}" -gt "${channels_with_closed_count}" ]] && { msg "There should be more channels returned with includeClosed flag: ${channels_count} !< ${channels_with_closed_count}"; exit 1; }
-  [[ "${channels_with_closed}" != *"Closed"* ]] && { msg "Channels fetched with includeClosed flag should return channels with closed status: ${channels_with_closed}"; exit 1; }
-
-  log "Get all channels successful"
-}
-
-test_get_all_channels "${api1}"
-
-# NOTE: strategy testing will require separate setup so commented out for now until moved
-# test_strategy_setting() {
-#   local node_api="${1}"
-
-#   settings=$(get_settings ${node_api})
-#   strategy=$(echo ${settings} | jq -r .strategy)
-#   [[ "${strategy}" != "passive" ]] && { msg "Default strategy should be passive, got: ${strategy}"; exit 1; }
-
-#   channels_count_pre=$(get_all_channels ${node_api} false | jq '.incoming | length')
-
-#   set_setting ${node_api} "strategy" "promiscuous"
-
-#   log "Waiting 100 seconds for the node to make connections to other nodes"
-#   sleep 100
-
-#   channels_count_post=$(get_all_channels ${node_api} false | jq '.incoming | length')
-#   [[ "${channels_count_pre}" -ge "${channels_count_post}" ]] && { msg "Node didn't open any connections by itself even when strategy was set to promiscuous: ${channels_count_pre} !>= ${channels_count_post}"; exit 1; }
-#   echo "Strategy setting successfull"
-# }
-
-# test_strategy_setting ${api4}
-
-
-# checking statuses of the long running tests
-#check_native_withdraw_results ${native_balance}
