@@ -118,6 +118,7 @@ jobs:
           echo "${{ secrets.GCP_SA_DOCKER_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
           echo "${{ secrets.GCP_SA_DOCKER_SSH_PUBLIC_KEY }}" > ~/.ssh/google_compute_engine.pub
           chmod 400 ~/.ssh/google_compute_engine
+          sleep 6000
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [[ "${base_branch}" == "master" ]]; then
             ./scripts/deploy.sh rotsee
