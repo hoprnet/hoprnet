@@ -176,13 +176,13 @@ function setup_node() {
       --init \
       --password="${password}" \
       --api \
-      --apiHost "0.0.0.0" \
+      --apiHost "${host}" \
       --apiPort "${api_port}" \
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
       --healthCheck \
-      --healthCheckHost "0.0.0.0" \
+      --healthCheckHost "${host}" \
       --healthCheckPort "${healthcheck_port}" \
       ${additional_args} \
       > "${log}" 2>&1 &
