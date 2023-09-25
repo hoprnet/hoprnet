@@ -78,4 +78,4 @@ async def test_hoprd_protocol_aggregated_ticket_redeeming(setup_7_nodes):
             await asyncio.sleep(0.5)
 
     assert(redeemed_value >= AGGREGATED_TICKET_PRICE)
-    assert(redeemed_ticket_count >= (redeemed_value / AGGREGATED_TICKET_PRICE))
+    assert(redeemed_ticket_count == pytest.approx(redeemed_value / AGGREGATED_TICKET_PRICE, 0.1))

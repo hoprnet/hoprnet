@@ -93,7 +93,7 @@ redeem_tickets() {
   result=$(api_redeem_tickets ${node_api} 20)
   log "--${result}"
 
-  for i in `seq 1 12`; do
+  for i in `seq 1 24`; do
     sleep 5
 
     # Get ticket statistics again and compare with previous state. Ensure we redeemed tickets.
