@@ -477,7 +477,7 @@ mod tests {
             (bob_peer_id.clone(), 7),        // - bob: 0.7
             (charlie_peer_id.clone(), 9),    // - charlie: 0.9
             (eugene_peer_id.clone(), 10),    // - eugene: 0.8
-            (gustave_peer_id.clone(), 8),    // - gustave: 1.0
+            (gustave_peer_id.clone(), 2),    // - gustave: 1.0
             (address_peer_id_pairs[5].1, 1), // - random_peer: 0.1
             (address_peer_id_pairs[6].1, 3), // - random_peer: 0.3
             (address_peer_id_pairs[7].1, 1), // - random_peer: 0.1
@@ -490,7 +490,7 @@ mod tests {
         }))
         .await;
 
-        let balance = Balance::from_str("1000000000000000000", BalanceType::HOPR); // 1 HOPR
+        let balance = Balance::from_str("11000000000000000000", BalanceType::HOPR); // 11 HOPR
         let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
                                                                                     // set HOPR balance in DB
         strat.db.write().await.set_hopr_balance(&balance).await.unwrap();
@@ -578,9 +578,18 @@ mod tests {
         // let (to_close, to_open) = strat.on_tick().await.unwrap();
 
         // assert that there's 0 channel closed and 1 opened (eugene, at index 3).
-        assert_eq!(tick_decision.get_to_close().len(), 0usize, "should close no channels");
-        assert_eq!(tick_decision.get_to_open().len(), 1usize, "should open channel");
-        assert_eq!(tick_decision.get_to_open()[0].0, address_peer_pairs[3].0, "should open channel to eugene");
+        assert_eq!(tick_decision.get_to_close().len(), 1usize, "should close 1 channel");
+        assert_eq!(tick_decision.get_to_open().len(), 1usize, "should open 1 channel");
+        assert_eq!(
+            tick_decision.get_to_close()[0].destination,
+            address_peer_pairs[4].0,
+            "should close channel to gustave"
+        );
+        assert_eq!(
+            tick_decision.get_to_open()[0].0,
+            address_peer_pairs[3].0,
+            "should open channel to eugene"
+        );
     }
 
     #[async_std::test]

@@ -120,7 +120,8 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AggregatingSt
                         Ok(mut awaiter) => match awaiter.consume_and_wait(cfg_clone.aggregation_timeout).await {
                             Ok(_) => {
                                 if cfg_clone.redeem_after_aggregation {
-                                    if let Err(e) = redeem_tickets_in_channel(db_clone, &channel, true, tx_sender_clone).await
+                                    if let Err(e) =
+                                        redeem_tickets_in_channel(db_clone, &channel, true, tx_sender_clone).await
                                     {
                                         error!("{strat_name} strategy: failed to send tickets for redemption: {e}");
                                     } else {

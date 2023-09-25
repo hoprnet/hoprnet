@@ -40,11 +40,9 @@ where
         incoming_channels.len()
     );
 
-    let receivers = futures::future::join_all(
-        incoming_channels
-            .iter()
-            .map(|channel| async { redeem_tickets_in_channel(db.clone(), channel, only_aggregated, onchain_tx_sender.clone()).await }),
-    )
+    let receivers = futures::future::join_all(incoming_channels.iter().map(|channel| async {
+        redeem_tickets_in_channel(db.clone(), channel, only_aggregated, onchain_tx_sender.clone()).await
+    }))
     .await
     .into_iter()
     .filter_map(|r| r.ok())
@@ -559,7 +557,13 @@ pub mod wasm {
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
         // We do not await the on-chain confirmation
-        super::redeem_tickets_with_counterparty(db.as_ref_counted(), counterparty, only_aggregated, on_chain_tx_sender.clone()).await?;
+        super::redeem_tickets_with_counterparty(
+            db.as_ref_counted(),
+            counterparty,
+            only_aggregated,
+            on_chain_tx_sender.clone(),
+        )
+        .await?;
         Ok(())
     }
 
@@ -571,7 +575,13 @@ pub mod wasm {
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
         // We do not await the on-chain confirmation
-        super::redeem_tickets_in_channel(db.as_ref_counted(), channel, only_aggregated, on_chain_tx_sender.clone()).await?;
+        super::redeem_tickets_in_channel(
+            db.as_ref_counted(),
+            channel,
+            only_aggregated,
+            on_chain_tx_sender.clone(),
+        )
+        .await?;
         Ok(())
     }
 
