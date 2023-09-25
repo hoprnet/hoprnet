@@ -749,7 +749,6 @@ mod tests {
                     .receive_aggregation_request(bob_packet_key, acked_tickets, ())
                     .unwrap();
             }
-            //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
             _ => panic!("unexpected action happened"),
         };
 
