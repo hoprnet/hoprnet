@@ -117,12 +117,12 @@ strategy:
   on_fail_continue: true
   allow_recursive: true
   strategies:
-    - !promiscuous
+    - !Promiscuous
       max_channels: 50
       new_channel_stake: 20
-    - !auto_funding
+    - !AutoFunding
       funding_amount: 20
-    - !aggregating:
+    - !Aggregating:
       aggregation_threshold: 1000
       redeem_after_aggregation: true
 ```
