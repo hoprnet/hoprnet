@@ -5,6 +5,10 @@ import pytest
 
 LOCALHOST = "127.0.0.1"
 
+OPEN_CHANNEL_FUNDING_VALUE = '1000000000000000000000'
+
+TICKET_AGGREGATION_THRESHOLD = 100
+TICKET_PRICE_PER_HOP = 100
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -19,7 +23,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--stress-tested-api",
         action="store",
-        default=f"http://{LOCALHOST}:{NODES['1']['api_port']}",
+        default=f"http://{LOCALHOST}:{NODES['Alice']['api_port']}",
         help="The API towards which the stress test is performed",
     )
     parser.addoption(
@@ -49,40 +53,47 @@ def cmd_line_args(request):
 DEFAULT_API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 NODES = {
-    "1": {
+    "Alice": {
         "p2p_port": 19091,
         "api_port": 13301,
-        "peer_id": "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7",
+        "peer_id": "12D3KooWKSzQgdszZzipRVGSRwBcC3etYwjSmqqTqcySn97EGWTm",
+        "address": "0x7d1e530e9c82c21b75644a2c23402aa858ae4a69"
     },
-    "2": {
+    "Bob": {
         "p2p_port": 19092,
         "api_port": 13302,
-        "peer_id": "16Uiu2HAmEH1GFK9TdMVusuBdLkEAdqzcYZqegWH9iBRThW6TmuUn",
+        "peer_id": "12D3KooWLWoHJjaS1z9cXn19DE9gPrSbYHkf7CHMbUtLUqbZKDby",
+        "address": "0x1b482420afa04aec1ef0e4a00c18451e84466c75"
     },
-    "3": {
+    "Camilla": {
         "p2p_port": 19093,
         "api_port": 13303,
-        "peer_id": "16Uiu2HAkyMzkTpuMtgGPQCuSnLWJGaWF4pbmCxBQ58Md9TqxSis2",
+        "peer_id": "12D3KooWJ4E4q6wr8nzXyRKnAofQSeoGoRFRRtQJK3jCpLtLNVZj",
+        "address": "0x05b17e37fd43c18741877fca80846ad8c84aa750"
     },
-    "4": {
+    "Dave": {
         "p2p_port": 19094,
         "api_port": 13304,
-        "peer_id": "16Uiu2HAmBDXcqtEp5RjTq6PKiJdfgYPNTkDqjmxBVAmvqoi5PLxk",
+        "peer_id": "12D3KooWA494BRhXs2DpMm5e2DWkPZcot3WpYwB4KBj2udP9xvPC",
+        "address": "0xcc70a22331998454160472f097acb43ca9b1e646"
     },
-    "5": {
+    "Eva": {
         "p2p_port": 19095,
         "api_port": 13305,
-        "peer_id": "16Uiu2HAm7exqjZrqS79AnrxmBBuioRbCdXu8BrwpCMtLKqAnAV1m",
+        "peer_id": "12D3KooWQCHVYhdnLT76rhHoFUu3b4L2aUiY8o1y8erhAwg8evFx",
+        "address": "0xe4bb1970e6c9e5689c5ef68ee2545b4366c49be4"
     },
-    "6": {
+    "Frank": {
         "p2p_port": 19096,
         "api_port": 13306,
-        "peer_id": "16Uiu2HAmUDhBPjFuDXUy1S65uBGAxGmUooH72433jTAkLvk1Cc4Y",
+        "peer_id": "12D3KooWHc2LPyvYGLJbHoQeJUBXBjDRfMY7msobsPoWj8rCAGHr",
+        "address": "0xf90c1eb2557a443c2b27d399afac075fa752cd92"
     },
-    "7": {
+    "George": {
         "p2p_port": 19097,
         "api_port": 13307,
-        "peer_id": "16Uiu2HAmQWRq84LRiA41t4np7HkCTWKsLqF9xg8ct6dNBJzXvALU",
+        "peer_id": "12D3KooWGPUAcSaJhKBmmwP2Bz3PbZyrErosBmCbZKgPPt7XHwqh",
+        "address": "0xe63ececd80c503548516e9e23ebb44d95c4d5ac2"
     },
 }
 
@@ -134,3 +145,4 @@ def setup_7_nodes(request):
             capture_output=True,
             check=True,
         )
+        pass
