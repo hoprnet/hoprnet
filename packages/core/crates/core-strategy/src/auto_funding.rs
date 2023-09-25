@@ -63,8 +63,7 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
                 channel.balance, self.cfg.min_stake_threshold
             );
 
-            // Re-stake with: Minimum - Current + Funding Amount
-            let to_stake = self.cfg.min_stake_threshold.add(&self.cfg.funding_amount);
+            let to_stake = channel.balance.add(&self.cfg.funding_amount);
 
             let _ = fund_channel(
                 self.db.clone(),
@@ -181,7 +180,6 @@ mod tests {
             .await
             .unwrap();
 
-        let stake_limit_c = stake_limit.clone();
         let fund_amount_c = fund_amount.clone();
         let (tx, awaiter) = futures::channel::oneshot::channel::<()>();
         let mut tx_exec = MockTxExec::new();
