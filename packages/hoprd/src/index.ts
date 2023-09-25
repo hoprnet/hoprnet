@@ -130,9 +130,6 @@ async function main() {
     aliases: new Map(),
     settings: {
       includeRecipient: false
-      //strategy: 'passive',
-      //autoRedeemTickets: true,
-      //maxAutoChannels: undefined
     }
   }
 
@@ -193,14 +190,10 @@ async function main() {
     }
   }
 
-  log('before parseCliArguments')
   const argv = parseCliArguments(process.argv.slice(1))
-  log('after parseCliArguments')
   let cfg: HoprdConfig
   try {
-    log('before fetch_configuration')
     cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
-    log('after fetch_configuration')
   } catch (err) {
     console.error(err)
     process.exit(1)
