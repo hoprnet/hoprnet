@@ -14,7 +14,7 @@ use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::{
     channels::{close_channel, open_channel},
-    transaction_queue::{TransactionSender, TransactionCompleted},
+    transaction_queue::{TransactionCompleted, TransactionSender},
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
@@ -333,11 +333,11 @@ where
                 }
                 Err(e) => {
                     error!(
-                    "{self} strategy: error while opening channel to {}: {e}",
-                    channel_to_open.0);
+                        "{self} strategy: error while opening channel to {}: {e}",
+                        channel_to_open.0
+                    );
                 }
             }
-
         }
 
         debug!("{self} strategy: open channels done");

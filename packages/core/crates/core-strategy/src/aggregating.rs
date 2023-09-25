@@ -1,14 +1,21 @@
 use crate::{strategy::SingularStrategy, Strategy};
 use async_std::sync::{Mutex, RwLock};
 use async_trait::async_trait;
-use core_ethereum_actions::{errors::CoreEthereumActionsError::ChannelDoesNotExist,redeem::redeem_tickets_in_channel,transaction_queue::TransactionSender};
+use core_ethereum_actions::{
+    errors::CoreEthereumActionsError::ChannelDoesNotExist, redeem::redeem_tickets_in_channel,
+    transaction_queue::TransactionSender,
+};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::TicketAggregationActions;
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
-use std::{fmt::{Display, Formatter}, sync::Arc, time::Duration};
+use std::{
+    fmt::{Display, Formatter},
+    sync::Arc,
+    time::Duration,
+};
 use utils_log::{debug, error};
 use validator::Validate;
 
@@ -444,14 +451,17 @@ mod tests {
         tx_exec
             .expect_redeem_ticket()
             .times(1)
-            .withf(move |ack| 
-                // signatures will be different, so we can use .eq()
-                ack.ticket.amount.eq(&Balance::new(50000000000000000u128.into(), BalanceType::HOPR)) &&
-                ack.ticket.win_prob() == 1.0f64 &&
-                ack.ticket.challenge.eq(&first_challenge) &&
-                ack.ticket.channel_epoch.eq(&1u32) &&
-                ack.ticket.index.eq(&0u64) &&
-                ack.ticket.index_offset.eq(&4u32)
+            .withf(
+                move |ack| {
+                    ack.ticket
+                        .amount
+                        .eq(&Balance::new(50000000000000000u128.into(), BalanceType::HOPR))
+                        && ack.ticket.win_prob() == 1.0f64
+                        && ack.ticket.challenge.eq(&first_challenge)
+                        && ack.ticket.channel_epoch.eq(&1u32)
+                        && ack.ticket.index.eq(&0u64)
+                        && ack.ticket.index_offset.eq(&4u32)
+                }, // signatures will be different, so we can't use .eq()
             )
             .return_once(move |_| {
                 tx.send(()).unwrap();
