@@ -68,10 +68,10 @@ an `aggregation_threshold`, the strategy will initiate ticket aggregation in tha
 Since ticket aggregation is an interactive process and requires cooperation of the ticket issuer, the aggregation
 will fail if the aggregation takes more than `aggregation_timeout` (in seconds). This does not affect runtime of the
 strategy, since the ticket aggregation and awaiting it is performed on a separate thread.
-If the aggregation is successful, the strategy can be configured to automatically redeem the tickets in the aggregated
+If the aggregation is successful, the strategy can be configured to automatically redeem **all** the aggregated tickets in the
 channel.
 
-Beware of combining the auto redeem feature of the Aggregating Strategy with the Auto Redeem Strategy above.
+Beware of properly combining the auto redeem feature of the Aggregating Strategy with the Auto Redeem Strategy above.
 
 ### Default parameters
 
@@ -124,5 +124,5 @@ strategy:
       funding_amount: 20
     - !aggregating:
       aggregation_threshold: 1000
-      redeem_after_aggregation: false
+      redeem_after_aggregation: true
 ```

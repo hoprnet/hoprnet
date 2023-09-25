@@ -135,7 +135,7 @@ where
                     if redeem_before_close {
                         // TODO: trigger aggregation
                         // Do not await the redemption, just submit it to the queue
-                        let redeemed = redeem_tickets_in_channel(db.clone(), &channel, tx_sender.clone())
+                        let redeemed = redeem_tickets_in_channel(db.clone(), &channel, false, tx_sender.clone())
                             .await?
                             .len();
                         info!("{redeemed} tickets will be redeemed before closing {channel}");

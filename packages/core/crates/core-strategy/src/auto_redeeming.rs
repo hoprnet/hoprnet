@@ -53,8 +53,7 @@ impl<Db: HoprCoreEthereumDbActions> AutoRedeemingStrategy<Db> {
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeemingStrategy<Db> {
     async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        if !self.cfg.redeem_only_aggregated || ack.ticket.index_offset > 1 {
-            // Aggregated tickets have always index offset > 1
+        if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
             info!("{self} strategy: auto-redeeming {ack}");
             let _ = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
         }

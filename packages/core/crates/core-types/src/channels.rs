@@ -629,6 +629,11 @@ impl Ticket {
             .then_some(())
             .ok_or(SignatureVerification)
     }
+
+    pub fn is_aggregated(&self) -> bool {
+        // Aggregated tickets have always an index offset > 1
+        self.index_offset > 1
+    }
 }
 
 impl BinarySerializable for Ticket {

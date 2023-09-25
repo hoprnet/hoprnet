@@ -1120,19 +1120,19 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  public async redeemAllTickets() {
+  public async redeemAllTickets(onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemAllTickets: Node is not ready for on-chain operations')
     }
     try {
       let tx_sender = this.tools.get_tx_sender()
-      await redeem_all_tickets(this.db, this.chainKeypair.to_address(), tx_sender)
+      await redeem_all_tickets(this.db, onlyAggregated, tx_sender)
     } catch (err) {
       log(`error during all tickets redemption: ${err}`)
     }
   }
 
-  public async redeemTicketsInChannel(channelId: Hash) {
+  public async redeemTicketsInChannel(channelId: Hash, onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemTicketsInChannel: Node is not ready for on-chain operations')
     }
@@ -1141,7 +1141,7 @@ export class Hopr extends EventEmitter {
       const channel = await this.db.get_channel(channelId)
       let tx_sender = this.tools.get_tx_sender()
       if (channel?.destination.eq(this.getEthereumAddress())) {
-        await redeem_tickets_in_channel(this.db, channel, tx_sender)
+        await redeem_tickets_in_channel(this.db, channel, onlyAggregated, tx_sender)
       } else {
         log(`cannot redeem tickets in channel ${channelId.to_hex()}`)
       }
@@ -1150,14 +1150,14 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  public async redeemTicketsWithCounterparty(counterparty: Address) {
+  public async redeemTicketsWithCounterparty(counterparty: Address, onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemTicketsWithCounterparty: Node is not ready for on-chain operations')
     }
 
     try {
       let tx_sender = this.tools.get_tx_sender()
-      await redeem_tickets_with_counterparty(this.db, counterparty, tx_sender)
+      await redeem_tickets_with_counterparty(this.db, counterparty, onlyAggregated, tx_sender)
     } catch (err) {
       log(`error during ticket redemption with counterparty ${counterparty.to_hex()}: ${err}`)
     }
