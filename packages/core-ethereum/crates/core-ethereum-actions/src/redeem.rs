@@ -4,11 +4,11 @@ use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
-use core_types::channels::ChannelEntry;
+use core_types::channels::{generate_channel_id, ChannelEntry};
 use std::ops::DerefMut;
 use std::sync::Arc;
 use utils_db::errors::DbError;
-use utils_log::{debug, error, info};
+use utils_log::{debug, error, info, warn};
 use utils_types::primitives::Address;
 
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
@@ -40,14 +40,30 @@ where
         incoming_channels.len()
     );
 
-    let receivers = futures::future::join_all(incoming_channels.iter().map(|channel| async {
-        redeem_tickets_in_channel(db.clone(), channel, only_aggregated, onchain_tx_sender.clone()).await
-    }))
-    .await
-    .into_iter()
-    .filter_map(|r| r.ok())
-    .flatten()
-    .collect();
+    let mut receivers: Vec<TransactionCompleted> = vec![];
+
+    // Must be synchronous because underlying Ethereum transactions are sequential
+    for incoming_channel in incoming_channels {
+        match redeem_tickets_in_channel(
+            db.clone(),
+            &incoming_channel,
+            only_aggregated,
+            onchain_tx_sender.clone(),
+        )
+        .await
+        {
+            Ok(mut successful_txs) => {
+                receivers.append(&mut successful_txs);
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to redeem tickets in channel {} due to {}",
+                    generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
+                    e
+                );
+            }
+        }
+    }
 
     Ok(receivers)
 }
@@ -155,14 +171,22 @@ where
         to_redeem.len()
     );
 
-    let receivers =
-        futures::future::join_all(to_redeem.into_iter().map(|ack_ticket| async {
-            unchecked_ticket_redeem(db.clone(), ack_ticket, onchain_tx_sender.clone()).await
-        }))
-        .await
-        .into_iter()
-        .filter_map(|r| r.ok())
-        .collect();
+    let mut receivers: Vec<TransactionCompleted> = vec![];
+
+    for acked_ticket in to_redeem {
+        let ticket_index = acked_ticket.ticket.index;
+        match unchecked_ticket_redeem(db.clone(), acked_ticket, onchain_tx_sender.clone()).await {
+            Ok(successful_tx) => {
+                receivers.push(successful_tx);
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to submit transaction that redeem ticket with index {} in channel {} due to {}",
+                    ticket_index, channel_id, e
+                );
+            }
+        }
+    }
 
     Ok(receivers)
 }

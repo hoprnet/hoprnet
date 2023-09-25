@@ -14,10 +14,11 @@ use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::{
     channels::{close_channel, open_channel},
-    transaction_queue::TransactionSender,
+    transaction_queue::{TransactionSender, TransactionCompleted},
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
@@ -289,9 +290,12 @@ where
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
 
-        // close all the channels
-        futures::future::join_all(tick_decision.get_to_close().iter().map(|channel_to_close| async {
-            if let Err(e) = close_channel(
+        let mut receivers = futures::stream::FuturesUnordered::<TransactionCompleted>::new();
+
+        // close all the channels, need to be synchronous because Ethereum transactions
+        // are synchronous, especially due nonces
+        for channel_to_close in tick_decision.get_to_close() {
+            match close_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
                 channel_to_close.destination,
@@ -301,15 +305,20 @@ where
             )
             .await
             {
-                error!("promiscuous strategy: error while closing channel: {e}");
+                Ok(successful_tx) => {
+                    receivers.push(successful_tx);
+                }
+                Err(e) => {
+                    error!("promiscuous strategy: error while closing channel: {e}");
+                }
             }
-        }))
-        .await;
+        }
         debug!("{self} strategy: close channels done");
 
-        // open all the channels
-        futures::future::join_all(tick_decision.get_to_open().iter().map(|channel_to_open| async {
-            if let Err(e) = open_channel(
+        // open all the channels, need to be synchronous because Ethereum
+        // transactions are synchronous, especially due to nonces
+        for channel_to_open in tick_decision.get_to_open() {
+            match open_channel(
                 self.db.clone(),
                 self.tx_sender.clone(),
                 channel_to_open.0,
@@ -318,16 +327,24 @@ where
             )
             .await
             {
-                error!(
+                Ok(receiver) => {
+                    info!("{self} strategy: opened channel to {}", channel_to_open.0);
+                    receivers.push(receiver)
+                }
+                Err(e) => {
+                    error!(
                     "{self} strategy: error while opening channel to {}: {e}",
-                    channel_to_open.0
-                );
-            } else {
-                info!("{self} strategy: opened channel to {}", channel_to_open.0)
+                    channel_to_open.0);
+                }
             }
-        }))
-        .await;
+
+        }
+
         debug!("{self} strategy: open channels done");
+
+        while let Some(_) = receivers.next().await {}
+
+        debug!("{self} strategy: channel operations done");
 
         Ok(())
     }
