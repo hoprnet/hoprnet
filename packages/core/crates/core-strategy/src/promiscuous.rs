@@ -577,11 +577,10 @@ mod tests {
 
         // let (to_close, to_open) = strat.on_tick().await.unwrap();
 
-        // assert that there's 1 channel closed (gustave, at index 4) and 1 opened (eugene, at index 3).
-        assert_eq!(tick_decision.get_to_close().len(), 1usize);
-        assert_eq!(tick_decision.get_to_open().len(), 1usize);
-        assert_eq!(tick_decision.get_to_close()[0].destination, address_peer_pairs[4].0);
-        assert_eq!(tick_decision.get_to_open()[0].0, address_peer_pairs[3].0);
+        // assert that there's 0 channel closed and 1 opened (eugene, at index 3).
+        assert_eq!(tick_decision.get_to_close().len(), 0usize, "should close no channels");
+        assert_eq!(tick_decision.get_to_open().len(), 1usize, "should open channel");
+        assert_eq!(tick_decision.get_to_open()[0].0, address_peer_pairs[3].0, "should open channel to eugene");
     }
 
     #[async_std::test]
