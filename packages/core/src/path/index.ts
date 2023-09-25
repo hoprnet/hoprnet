@@ -1,9 +1,11 @@
 import HeapPackage from 'heap-js'
-import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS, PATH_RANDOMNESS, MAX_HOPS } from '../constants.js'
-import { type ChannelEntry, type Address } from '@hoprnet/hopr-utils'
-import { debug, random_float } from '@hoprnet/hopr-utils'
-
 import BN from 'bn.js'
+
+import { debug, random_float, ChannelEntry } from '@hoprnet/hopr-utils'
+
+import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS, PATH_RANDOMNESS, MAX_HOPS } from '../constants.js'
+
+import type { Address } from '@hoprnet/hopr-utils'
 
 const { Heap } = HeapPackage
 
@@ -14,7 +16,12 @@ type ChannelPath = { weight: BN; path: ChannelEntry[] }
 
 const sum = (a: BN, b: BN) => a.add(b)
 const pathFrom = (c: ChannelPath): Path => c.path.map((ce) => ce.destination) // Doesn't include ourself [0]
-const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.eq(c.destination))
+const filterCycles = (c: ChannelEntry, p: ChannelPath): boolean => {
+  if (p) {
+    return !pathFrom(p).find((x) => x.eq(c.destination))
+  }
+  return true
+}
 const debugPath = (p: ChannelPath) =>
   pathFrom(p)
     .map((x) => x.toString())
@@ -26,6 +33,30 @@ const defaultWeight = async (edge: ChannelEntry): Promise<BN> => {
   const r = 1 + random_float() * PATH_RANDOMNESS
   // Log scale, but minimum 1 weight per edge
   return new BN(edge.balance.to_string(), 10).addn(1).muln(r) //log()
+}
+
+// Filter given channels by a set of criteria to get good paths.
+async function filterChannels(
+  channels: ChannelEntry[],
+  destination: Address,
+  currentPath: ChannelPath,
+  deadEnds: Set<string>,
+  networkQualityOf: (p: Address) => Promise<number>
+): Promise<ChannelEntry[]> {
+  return (
+    await Promise.all(
+      channels.map(async (c): Promise<[boolean, ChannelEntry]> => {
+        const valid =
+          !destination.eq(c.destination) &&
+          (await networkQualityOf(c.destination)) > NETWORK_QUALITY_THRESHOLD &&
+          filterCycles(c, currentPath) &&
+          !deadEnds.has(c.destination.to_hex())
+        return [valid, c]
+      })
+    )
+  )
+    .filter(([v, _c]) => v)
+    .map(([_v, c]) => c)
 }
 
 /**
@@ -55,12 +86,19 @@ export async function findPath(
 
   let queue = new Heap<ChannelPath>(comparePath)
   let deadEnds = new Set<string>()
+  let currentPath: ChannelPath = undefined
   let iterations = 0
-  let initialChannels = await getOpenChannelsFromPeer(start)
+  let initialChannels = await filterChannels(
+    await getOpenChannelsFromPeer(start),
+    destination,
+    currentPath,
+    deadEnds,
+    networkQualityOf
+  )
   await Promise.all(initialChannels.map(async (x) => queue.add({ weight: await weight(x), path: [x] })))
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
-    const currentPath: ChannelPath = queue.peek()
+    currentPath = queue.peek()
     const currPathLen = pathFrom(currentPath).length
     if (currPathLen >= hops && currPathLen <= MAX_HOPS) {
       log('Path of correct length found', debugPath(currentPath), ':', currentPath.weight.toString())
@@ -70,18 +108,15 @@ export async function findPath(
     const lastPeer = currentPath.path[currentPath.path.length - 1].destination
     const openChannels = await getOpenChannelsFromPeer(lastPeer)
 
-    const newChannels = []
-
-    for (const openChannel of openChannels) {
-      if (
-        !destination.eq(openChannel.destination) &&
-        (await networkQualityOf(openChannel.destination)) > NETWORK_QUALITY_THRESHOLD &&
-        filterCycles(openChannel, currentPath) &&
-        !deadEnds.has(openChannel.destination.to_hex())
-      ) {
-        newChannels.push(openChannel)
-      }
-    }
+    const newChannels: ChannelEntry[] = []
+    const usefuleOpenChannels: ChannelEntry[] = await filterChannels(
+      openChannels,
+      destination,
+      currentPath,
+      deadEnds,
+      networkQualityOf
+    )
+    usefuleOpenChannels.forEach((c) => newChannels.push(c))
 
     if (newChannels.length == 0) {
       queue.pop()

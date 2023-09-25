@@ -568,7 +568,7 @@ impl Ticket {
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Self {
+    pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Result<Self> {
         Self::new(
             destination,
             &Balance::new(0u32.into(), BalanceType::HOPR),
@@ -580,7 +580,6 @@ impl Ticket {
             private_key,
             domain_separator,
         )
-        .expect("Failed to create zero-hop ticket")
     }
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
@@ -965,7 +964,7 @@ pub mod tests {
 
     #[test]
     pub fn test_zero_hop() {
-        let zero_hop_ticket = Ticket::new_zero_hop(&BOB.public().to_address(), &ALICE, &Hash::default());
+        let zero_hop_ticket = Ticket::new_zero_hop(&BOB.public().to_address(), &ALICE, &Hash::default()).unwrap();
         assert!(zero_hop_ticket
             .verify(&ALICE.public().to_address(), &Hash::default())
             .is_ok());

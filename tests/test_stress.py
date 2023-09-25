@@ -4,7 +4,7 @@ import os
 import pytest
 import random
 
-from hoprd.wrapper import HoprdAPI
+from hopr import HoprdAPI
 
 HTTP_STATUS_CODE_OK = 200
 HTTP_STATUS_CODE_SEND_MESSAGE_OK = 202
@@ -23,19 +23,17 @@ async def test_stress_hoprd_send_message_should_send_sequential_messages_without
 
     # wait for peers to be connected
     for _ in range(60):
-        if (
-            len([i["peerId"] for i in (await alice.peers()).json()["connected"]])
-            >= cmd_line_args["stress_minimum_peer_count"]
-        ):
-            logging.info(f'peers ready {[i["peerId"] for i in (await alice.peers()).json()["connected"]]}')
+        alices_peers = await alice.peers()
+        if len(alices_peers) >= cmd_line_args["stress_minimum_peer_count"]:
+            logging.info(f'peers ready {alices_peers}')
             break
         else:
             await asyncio.sleep(1)
 
-    connected_peers = [i["peerId"] for i in (await alice.peers()).json()["connected"]]
+    connected_peers = await alice.peers()
     assert len(connected_peers) >= cmd_line_args["stress_minimum_peer_count"]
 
-    expected = [HTTP_STATUS_CODE_SEND_MESSAGE_OK] * STRESS_SEQUENTIAL_MESSAGE_COUNT
+    expected = [True] * STRESS_SEQUENTIAL_MESSAGE_COUNT
     actual = [
         (await alice.send_message(random.choice(connected_peers), f"message #{i}", hops)).status_code
         for i in range(STRESS_SEQUENTIAL_MESSAGE_COUNT)
@@ -56,25 +54,22 @@ async def test_stress_hoprd_send_message_should_send_parallel_messages_without_e
 
     # wait for peers to be connected
     for _ in range(60):
-        if (
-            len([i["peerId"] for i in (await alice.peers()).json()["connected"]])
-            >= cmd_line_args["stress_minimum_peer_count"]
-        ):
-            logging.info(f'peers ready {[i["peerId"] for i in (await alice.peers()).json()["connected"]]}')
+        alices_peers = await alice.peers()
+        if len(alices_peers) >= cmd_line_args["stress_minimum_peer_count"]:
+            logging.info(f'peers ready {alices_peers}')
             break
         else:
             await asyncio.sleep(1)
 
-    connected_peers = [i["peerId"] for i in (await alice.peers()).json()["connected"]]
+    connected_peers = await alice.peers()
     assert len(connected_peers) >= cmd_line_args["stress_minimum_peer_count"]
 
-    expected = [HTTP_STATUS_CODE_SEND_MESSAGE_OK] * STRESS_PARALLEL_MESSAGE_COUNT
+    expected = [True] * STRESS_PARALLEL_MESSAGE_COUNT
     actual = await asyncio.gather(
         *[
             alice.send_message(random.choice(connected_peers), f"message #{i}", hops)
             for i in range(STRESS_PARALLEL_MESSAGE_COUNT)
         ]
     )
-    actual = [i.status_code for i in actual]
 
     assert expected == actual
