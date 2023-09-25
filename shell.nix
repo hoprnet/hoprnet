@@ -1,5 +1,4 @@
 { pkgs ? import <nixpkgs> { }
-, pkgs-dev
 , ...
 }:
 let
@@ -25,8 +24,8 @@ let
     ## rust for core development and required utils
     (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
     protobuf # v3.21.12
-    pkgs-dev.wasm-pack # v0.11.1
-    pkgs-dev.binaryen # v113 (includes wasm-opt)
+    pkgs.wasm-pack # v0.12.1
+    pkgs.binaryen # v114 (includes wasm-opt)
     wasm-bindgen-cli # v0.2.83
     pkg-config
 
