@@ -417,6 +417,9 @@ export class Hopr extends EventEmitter {
     // subscribe so we can process channel close events
     connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
+    // subscribe so we can process channel ticket redeemed events
+    connector.indexer.on('ticket-redeemed', this.onTicketRedeemed.bind(this))
+
     let strategy: ChannelStrategyInterface
     if (isStrategy(this.cfg.strategy.name)) {
       strategy = StrategyFactory.getStrategy(this.cfg.strategy.name, this)
@@ -474,6 +477,20 @@ export class Hopr extends EventEmitter {
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
     if (channel.status === ChannelStatus.PendingToClose) {
       await this.strategy.onChannelWillClose(channel)
+    }
+  }
+
+  /*
+   * Callback function used to react to on-chain channel ticket redeem events.
+   * Specifically we resolve the pending balance of the ticket.
+   * @param channel object
+   * @param ticket amount
+   */
+  private async onTicketRedeemed(channel: ChannelEntry, ticketAmount: Balance): Promise<void> {
+    // We are only interested in channels where we are the source, since only
+    // then we track the pending balance.
+    if (channel.source.eq(this.getEthereumAddress())) {
+      await this.db.resolve_pending(channel.destination, ticketAmount)
     }
   }
 
