@@ -26,9 +26,9 @@ use core_protocol::{
 };
 use core_types::{
     acknowledgement::{AcknowledgedTicket, Acknowledgement},
-    channels::Ticket,
+    channels::Ticket, protocol::ApplicationData,
 };
-use futures::{channel::mpsc::Receiver, select, StreamExt};
+use futures::{channel::mpsc::{Receiver, Sender}, select, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::request_response::RequestId;
 use std::collections::{HashMap, HashSet};
@@ -110,6 +110,7 @@ pub(crate) async fn p2p_loop(
     heartbeat_proto_cfg: HeartbeatProtocolConfig,
     msg_proto_cfg: MsgProtocolConfig,
     ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
+    mut on_final_packet: Sender<ApplicationData>,
 ) {
     let mut swarm = core_p2p::build_p2p_network(
         me,
@@ -208,14 +209,28 @@ pub(crate) async fn p2p_loop(
                     }
                 }
                 Inputs::Message(task) => match task {
-                    MsgProcessed::Receive(peer, _octets) => {
-                        debug!("Nothing needs to be done here, as long as the packet interactions emit the received packet from peer: {peer}")
+                    MsgProcessed::Receive(peer, data, ack) => {
+                        debug!("Received packet from peer: {peer}");
+                        if let Err(e) = on_final_packet.try_send(data) {
+                            error!("Failed to store a received message in the inbox: {}", e);
+                        }
+
+                        if let Some(ack) = ack {
+                            if let Err(e) = ack_writer.send_acknowledgement(peer, ack) {
+                                error!("Failed to acknowledge the received final packet: {e}");
+                            }
+                        }
                     },
                     MsgProcessed::Send(peer, octets) => {
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
                     },
-                    MsgProcessed::Forward(peer, octets) => {
+                    MsgProcessed::Forward(peer, octets, previous_peer, ack) => {
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
+                        if let Some(ack) = ack {
+                            if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
+                                error!("failed to acknowledge relayed packet: {e}");
+                            }
+                        }
                     }
                 },
                 Inputs::TicketAggregation(task) => match task {

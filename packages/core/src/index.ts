@@ -246,6 +246,7 @@ export class Hopr extends EventEmitter {
     let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
     packetCfg.check_unrealized_balance = this.cfg.chain.check_unrealized_balance
 
+    // TODO: change to msg: ApplicationData
     const onReceivedMessage = (msg: Uint8Array) => {
       try {
         this.emit('hopr:message', ApplicationData.deserialize(msg))

@@ -219,7 +219,7 @@ pub mod wasm_impls {
         ping_cfg: PingConfig,
         on_acknowledgement: Option<js_sys::Function>,
         packet_cfg: PacketInteractionConfig,
-        on_final_packet: Option<js_sys::Function>,
+        on_final_packet: js_sys::Function,
         tbf: TagBloomFilter,
         save_tbf: js_sys::Function,
         tx_executor: WasmTxExecutor,
@@ -285,8 +285,6 @@ pub mod wasm_impls {
             db.clone(),
             tbf.clone(),
             Mixer::new_with_gloo_timers(MixerConfig::default()),
-            ack_actions.writer(),
-            on_final_packet_tx,
             packet_cfg,
         );
 
@@ -365,6 +363,7 @@ pub mod wasm_impls {
                     heartbeat_proto_cfg,
                     msg_proto_cfg,
                     ticket_aggregation_proto_cfg,
+                    on_final_packet_tx
                 )
                 .map(|_| HoprLoopComponents::Swarm),
             ),
@@ -431,7 +430,7 @@ pub mod wasm_impls {
             ping_cfg: PingConfig,
             on_acknowledgement: Option<js_sys::Function>,
             packet_cfg: PacketInteractionConfig,
-            on_final_packet: Option<js_sys::Function>,
+            on_final_packet: js_sys::Function,
             tbf: TagBloomFilter,
             save_tbf: js_sys::Function,
             tx_executor: WasmTxExecutor,
