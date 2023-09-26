@@ -22,7 +22,6 @@ hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
-rust-stream-ext-concurrent = { workspace = true }
 serde = "1.0"
 serde-wasm-bindgen = { workspace = true, optional = true }
 thiserror = "1.0"

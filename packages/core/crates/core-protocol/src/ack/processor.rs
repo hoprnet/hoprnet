@@ -9,7 +9,7 @@ use core_crypto::keypairs::ChainKeypair;
 use core_crypto::types::{HalfKeyChallenge, OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement};
-use futures::channel::mpsc::{channel, Receiver, Sender, UnboundedSender};
+use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::future::poll_fn;
 use futures::{stream::Stream, StreamExt};
 use libp2p_identity::PeerId;

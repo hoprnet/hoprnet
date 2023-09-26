@@ -1380,7 +1380,6 @@ dependencies = [
  "libp2p-identity",
  "mockall",
  "parameterized",
- "rust-stream-ext-concurrent",
  "serde",
  "serde-wasm-bindgen",
  "serial_test",

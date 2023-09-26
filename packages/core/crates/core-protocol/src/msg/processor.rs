@@ -725,7 +725,7 @@ impl Stream for PacketInteraction {
 
 #[cfg(test)]
 mod tests {
-    use crate::ack::processor::{AckProcessed, AcknowledgementInteraction};
+    use crate::ack::processor::{AckProcessed, AcknowledgementInteraction, Reply};
     use super::{
         DEFAULT_PRICE_PER_PACKET,
         ApplicationData, MsgProcessed, PacketInteraction,
@@ -749,8 +749,7 @@ mod tests {
         protocol::{Tag, TagBloomFilter},
     };
     use futures::{
-        channel::mpsc::{Sender, UnboundedSender},
-        future::{join3, select, Either},
+        future::{select, Either},
         pin_mut, StreamExt,
     };
     use hex_literal::hex;
@@ -928,7 +927,7 @@ mod tests {
         }
 
         // Peer 1: ACK interaction of the packet sender, hookup receiving of acknowledgements and start processing them
-        let ack_interaction_sender =
+        let mut ack_interaction_sender =
             AcknowledgementInteraction::new(core_dbs[0].clone(), &PEERS_CHAIN[0]);
 
         // Peer 2: Recipient of the packet and sender of the acknowledgement
@@ -957,12 +956,18 @@ mod tests {
 
         let finish = async move {
             for i in 1..PENDING_ACKS + 1 {
-                // let ack = done_rx.next().await.expect("failed finalize ack");
-                // debug!("sender has received acknowledgement {i}: {ack}");
-                // assert!(
-                //     sent_challenges.iter().find(|(_, c)| ack.eq(c)).is_some(),
-                //     "received invalid challenge {ack}"
-                // );
+                if let Some(a) = ack_interaction_sender.next().await {
+                    match a {
+                        AckProcessed::Receive(_, Ok(Reply::Sender(ack))) => {
+                            debug!("sender has received acknowledgement {i}: {ack}");
+                            assert!(
+                                sent_challenges.iter().find(|(_, c)| ack.eq(c)).is_some(),
+                                "received invalid challenge {ack}"
+                            );
+                        },
+                        _ => assert!(false, "Should only receive as a Sender"),
+                    }
+                }
             }
         };
         let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
@@ -976,11 +981,7 @@ mod tests {
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
 
-    async fn peer_setup_for(
-        count: usize,
-        ack_tkt_tx: UnboundedSender<AcknowledgedTicket>,
-        ack_tx: UnboundedSender<HalfKeyChallenge>,
-    ) -> Vec<(AcknowledgementInteraction, PacketInteraction)> {
+    async fn peer_setup_for(count: usize) -> Vec<(AcknowledgementInteraction, PacketInteraction)> {
         let peer_count = count;
 
         assert!(peer_count <= PEERS.len());
@@ -1024,12 +1025,6 @@ mod tests {
                 let ack = AcknowledgementInteraction::new(
                     db.clone(),
                     &PEERS_CHAIN[i],
-                    // if i == 0 { Some(ack_tx.clone()) } else { None },
-                    // if i == peer_count - 2 {
-                    //     Some(ack_tkt_tx.clone())
-                    // } else {
-                    //     None
-                    // },
                 );
                 let pkt = PacketInteraction::new(
                     db.clone(),
@@ -1051,8 +1046,11 @@ mod tests {
     async fn emulate_channel_communication(
         pending_packet_count: usize,
         mut components: Vec<(AcknowledgementInteraction, PacketInteraction)>,
-    ) {
+    ) -> (Vec<ApplicationData>, Vec<HalfKeyChallenge>, Vec<AcknowledgedTicket>) {
         let component_length = components.len();
+        let mut received_packets: Vec<ApplicationData> = vec![];
+        let mut received_challenges: Vec<HalfKeyChallenge> = vec![];
+        let mut received_tickets: Vec<AcknowledgedTicket> = vec![];
 
         for _ in 0..pending_packet_count {
             match components[0]
@@ -1076,25 +1074,6 @@ mod tests {
         for i in 1..components.len() {
             for _ in 0..pending_packet_count {
                 match components[i]
-                    .0
-                    .next()
-                    .await
-                    .expect("ACK relayer should send an ack to the previous")
-                {
-                    AckProcessed::Send(peer, ack) => {
-                        assert_eq!(peer, PEERS[i - 1].public().to_peerid());
-                        components[i - 1]
-                            .0
-                            .writer()
-                            .receive_acknowledgement(PEERS[i].public().to_peerid(), ack)
-                            .expect("Send of ack from relayer to sender should succeed")
-                    }
-                    _ => panic!("Should have gotten a send request"),
-                }
-            }
-
-            for _ in 0..pending_packet_count {
-                match components[i]
                     .1
                     .next()
                     .await
@@ -1114,26 +1093,49 @@ mod tests {
                             .receive_packet(data, PEERS[i].public().to_peerid())
                             .expect("Send of ack from relayer to receiver should succeed");
                         assert!(components[i-1].0.writer().receive_acknowledgement(PEERS[i].public().to_peerid(), ack.unwrap()).is_ok());
-
                     }
-                    MsgProcessed::Receive(peer, _packet, ack) => {
-                        
+                    MsgProcessed::Receive(_peer, packet, ack) => {
+                        received_packets.push(packet);
                         assert_eq!(i, component_length - 1, "Only the last peer can be a recipient");
                         assert!(components[i-1].0.writer().receive_acknowledgement(PEERS[i].public().to_peerid(), ack.unwrap()).is_ok());
                     }
                     _ => panic!("Should have gotten a send request or a final packet"),
                 }
-                
+
+                match components[i-1]
+                    .0
+                    .next()
+                    .await
+                    .expect("MSG relayer should forward a msg to the next")
+                {
+                    AckProcessed::Receive(peer, reply) => {
+                        assert_eq!(peer, PEERS[i].public().to_peerid());
+                        assert!(reply.is_ok());
+
+                        match reply.unwrap() {
+                            Reply::Sender(hkc) => {
+                                assert_eq!(i - 1, 0, "Only the sender can receive a half key challenge");
+                                received_challenges.push(hkc);
+                            },
+                            Reply::Relayer(tkt) => {
+                                // choose the last relayer before the receiver
+                                if i - 1 == components.len() - 2 {
+                                    received_tickets.push(tkt)
+                                }
+                            },
+                        }
+                    }
+                    _ => panic!("Should have gotten a send request or a final packet"),
+                }
             }
         }
+
+        (received_packets, received_challenges, received_tickets)
     }
 
     async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usize) {
         assert!(peer_count >= 3, "invalid peer count given");
         assert!(pending_packets >= 1, "at least one packet must be given");
-
-        let (ack_tkt_tx, ack_tkt_rx) = futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
-        let (ack_tx, ack_rx) = futures::channel::mpsc::unbounded::<HalfKeyChallenge>();
 
         const TIMEOUT_SECONDS: u64 = 10;
 
@@ -1144,7 +1146,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let components = peer_setup_for(peer_count, ack_tkt_tx, ack_tx).await;
+        let components = peer_setup_for(peer_count).await;
 
         // Peer 1: start sending out packets
         let packet_path = Path::new_valid(
@@ -1171,43 +1173,29 @@ mod tests {
         pin_mut!(channel, timeout);
 
         let succeeded = match select(channel, timeout).await {
-            Either::Left(_) => true,
+            Either::Left(((pkts, acks, ack_tkts), _)) => {
+                assert_eq!(pkts.len(), pending_packets, "did not receive all packets");
+                assert!(
+                    test_msgs.iter().all(|m| pkts.contains(m)),
+                    "some received packet data does not match"
+                );
+
+                assert_eq!(acks.len(), pending_packets, "did not receive all acknowledgements");
+                assert!(
+                    packet_challenges.iter().all(|c| acks.contains(c)),
+                    "received some unknown acknowledgement"
+                );
+
+                assert_eq!(
+                    ack_tkts.len(),
+                    pending_packets,
+                    "did not receive all acknowledgement tickets"
+                );
+
+                true
+            },
             Either::Right(_) => false,
         };
-
-        // Check that we received all acknowledgements and packets
-        let finish = futures::future::join(
-            ack_rx.collect::<Vec<_>>(),
-            ack_tkt_rx.collect::<Vec<_>>(),
-        );
-        let timeout = async_std::task::sleep(Duration::from_secs(TIMEOUT_SECONDS));
-        pin_mut!(finish, timeout);
-
-        let succeeded = succeeded
-            && match select(finish, timeout).await {
-                Either::Left(((acks, ack_tkts), _)) => {
-                    assert_eq!(acks.len(), pending_packets, "did not receive all acknowledgements");
-                    assert!(
-                        packet_challenges.iter().all(|c| acks.contains(c)),
-                        "received some unknown acknowledgement"
-                    );
-
-                    assert_eq!(
-                        ack_tkts.len(),
-                        pending_packets,
-                        "did not receive all acknowledgement tickets"
-                    );
-
-                    // assert_eq!(pkts.len(), pending_packets, "did not receive all packets");
-                    // assert!(
-                    //     test_msgs.iter().all(|m| pkts.contains(m)),
-                    //     "some received packet data does not match"
-                    // );
-
-                    true
-                }
-                Either::Right(_) => false,
-            };
 
         assert!(succeeded, "test timed out after {TIMEOUT_SECONDS} seconds");
     }
