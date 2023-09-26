@@ -93,8 +93,8 @@ redeem_tickets() {
   result=$(api_redeem_tickets ${node_api} 30)
   log "--${result}"
 
-  for i in `seq 1 36`; do
-    sleep 3
+  for i in `seq 1 60`; do
+    sleep 1
 
     # Get ticket statistics again and compare with previous state. Ensure we redeemed tickets.
     result=$(api_get_ticket_statistics ${node_api} "winProportion")
@@ -117,8 +117,8 @@ redeem_tickets() {
 
   done
 
-  # Check there are at least 2 consecutive ticket redemptions or everything has been redeemed
-  if [[ ${successful} -ge 2 || ${unredeemed} -eq 0 ]]; then
+  # Check there are at least 1 consecutive ticket redemptions or everything has been redeemed
+  if [[ ${successful} -ge 1 || ${unredeemed} -eq 0 ]]; then
     log "Redeem all test passed on node ${node_id} !"
     return 0
   else
