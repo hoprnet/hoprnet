@@ -9,6 +9,50 @@ from conftest import DEFAULT_API_TOKEN, OPEN_CHANNEL_FUNDING_VALUE, TICKET_AGGRE
 
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
 
+@pytest.mark.asyncio
+async def test_hoprd_protocol_aggregated_ticket_redeeming(setup_7_nodes):
+    alice = setup_7_nodes['Alice']
+    bob = setup_7_nodes['Bob']
+    camilla = setup_7_nodes['Camilla']
+
+    alice_api = alice['api']
+    bob_api = bob['api']
+    camilla_api = camilla['api']
+
+    assert(bob['peer_id'] in [x['peer_id'] for x in await alice_api.peers()])
+    assert(camilla['peer_id'] in [x['peer_id'] for x in await bob_api.peers()])
+
+    assert await alice_api.open_channel(bob['address'], OPEN_CHANNEL_FUNDING_VALUE)
+    assert await bob_api.open_channel(camilla['address'], OPEN_CHANNEL_FUNDING_VALUE)
+
+    await asyncio.sleep(3)
+
+    statistics_before = await bob_api.get_tickets_statistics()
+
+    for i in range(TICKET_AGGREGATION_THRESHOLD*2):
+        assert await alice_api.send_message(camilla['peer_id'], f"#{i}", [bob['peer_id']])
+
+    await asyncio.sleep(1)
+
+    for i in range(TICKET_AGGREGATION_THRESHOLD*2):
+        await camilla_api.messages_pop()
+
+    # wait for tickets to be aggregated and redeemed
+    for _ in range(60):
+        statistics_after = await bob_api.get_tickets_statistics()
+        import logging
+        logging.error(f"after => {statistics_after}")
+        redeemed_value = int(statistics_after.redeemed_value) - int(statistics_before.redeemed_value)
+        redeemed_ticket_count = statistics_after.redeemed - statistics_before.redeemed
+
+        if redeemed_value >= AGGREGATED_TICKET_PRICE:
+            break
+        else:
+            await asyncio.sleep(0.5)
+
+    assert(redeemed_value >= AGGREGATED_TICKET_PRICE)
+    assert(redeemed_ticket_count == pytest.approx(redeemed_value / AGGREGATED_TICKET_PRICE, 0.1))
+
 
 def test_hoprd_protocol_bash_integration_tests(setup_7_nodes):
     with open("/tmp/hopr-smoke-test-anvil.cfg") as f:
@@ -43,47 +87,6 @@ async def test_hoprd_should_be_able_to_redeem_all_tickets_at_this_point_UNFINISH
 
 
 @pytest.mark.asyncio
-async def test_hoprd_protocol_aggregated_ticket_redeeming(setup_7_nodes):
-    alice = setup_7_nodes['Alice']
-    bob = setup_7_nodes['Bob']
-    camilla = setup_7_nodes['Camilla']
-
-    alice_api = alice['api']
-    bob_api = bob['api']
-    camilla_api = camilla['api']
-
-    assert(bob['peer_id'] in [x['peer_id'] for x in await alice_api.peers()])
-    assert(camilla['peer_id'] in [x['peer_id'] for x in await bob_api.peers()])
-
-    assert await alice_api.open_channel(bob['address'], OPEN_CHANNEL_FUNDING_VALUE)
-    assert await bob_api.open_channel(camilla['address'], OPEN_CHANNEL_FUNDING_VALUE)
-
-    statistics_before = await bob_api.get_tickets_statistics()
-
-    for i in range(TICKET_AGGREGATION_THRESHOLD):
-        assert await alice_api.send_message(camilla['peer_id'], f"#{i}", [bob['peer_id']])
-
-    await asyncio.sleep(1)
-
-    for i in range(TICKET_AGGREGATION_THRESHOLD):
-        await camilla_api.messages_pop()
-
-    # wait for tickets to be aggregated and redeemed
-    for _ in range(60):
-        statistics_after = await bob_api.get_tickets_statistics()
-        redeemed_value = int(statistics_after.redeemed_value) - int(statistics_before.redeemed_value)
-        redeemed_ticket_count = statistics_after.redeemed - statistics_before.redeemed
-
-        if redeemed_value >= AGGREGATED_TICKET_PRICE:
-            break
-        else:
-            await asyncio.sleep(0.5)
-
-    assert(redeemed_value >= AGGREGATED_TICKET_PRICE)
-    assert(redeemed_ticket_count == pytest.approx(redeemed_value / AGGREGATED_TICKET_PRICE, 0.1))
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize("source,dest",
     [("Alice", "Dave"), ("Alice", "Bob"), ("Bob", "Camilla"), ("Camilla", "Dave"), ("Dave", "Eva"), ("Eva", "Alice")]
 )
@@ -115,6 +118,8 @@ async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(se
     assert len(channel_ids) == 0, "No channel from 'Alice' to 'Eva' should exist at this point"
 
     assert await alice_api.open_channel(eva['address'], OPEN_CHANNEL_FUNDING_VALUE), "Channel should be opened"
+
+    await asyncio.sleep(3)
 
     open_channels = await alice_api.all_channels(include_closed=False)
     channel_ids = [
