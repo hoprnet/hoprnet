@@ -361,6 +361,7 @@ impl From<oneshot::Receiver<()>> for TicketAggregationAwaiter {
 use async_std::task::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
+use libp2p::request_response::{RequestId, ResponseChannel};
 
 impl TicketAggregationAwaiter {
     pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<()> {
@@ -407,6 +408,8 @@ impl TicketAggregationFinalizer {
 pub struct TicketAggregationActions<T, U> {
     pub queue: Sender<TicketAggregationToProcess<T, U>>,
 }
+
+pub type BasicTicketAggregationActions<T> = TicketAggregationActions<ResponseChannel<T>, RequestId>;
 
 impl<T, U> Clone for TicketAggregationActions<T, U> {
     /// Generic type requires handwritten clone function
@@ -746,7 +749,6 @@ mod tests {
                     .receive_aggregation_request(bob_packet_key, acked_tickets, ())
                     .unwrap();
             }
-            //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
             _ => panic!("unexpected action happened"),
         };
 

@@ -1,5 +1,4 @@
 import type { Hopr } from '@hoprnet/hopr-core'
-import { isStrategy, StrategyFactory } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 import { SettingKey, State, StateOps } from '../../../../types.js'
@@ -9,14 +8,14 @@ import { SettingKey, State, StateOps } from '../../../../types.js'
  * Updates HOPRd's state.
  * @returns Setting value or all settings values.
  */
-export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['settings'], value: any) => {
+export const setSetting = (_node: Hopr, stateOps: StateOps, key: keyof State['settings'], value: any) => {
   const state = stateOps.getState()
   if (!Object.values(SettingKey).includes(key)) {
     throw Error(STATUS_CODES.INVALID_SETTING)
   }
 
   switch (key) {
-    case SettingKey.MAX_AUTO_CHANNELS:
+    /*case SettingKey.MAX_AUTO_CHANNELS:
       if (typeof value !== 'number') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
       node.getChannelStrategy().configure({
@@ -24,13 +23,14 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
         auto_redeem_tickets: state.settings[SettingKey.AUTO_REDEEM_TICKETS]
       })
       break
+    */
 
     case SettingKey.INCLUDE_RECIPIENT:
       if (typeof value !== 'boolean') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
       break
 
-    case SettingKey.AUTO_REDEEM_TICKETS:
+    /*case SettingKey.AUTO_REDEEM_TICKETS:
       if (typeof value !== 'boolean') throw Error(STATUS_CODES.INVALID_SETTING_VALUE)
       state.settings[key] = value
       node.getChannelStrategy().configure({
@@ -51,6 +51,8 @@ export const setSetting = (node: Hopr, stateOps: StateOps, key: keyof State['set
       node.setChannelStrategy(strategy)
       state.settings[key] = value as string
       break
+
+     */
   }
 
   stateOps.setState(state)
