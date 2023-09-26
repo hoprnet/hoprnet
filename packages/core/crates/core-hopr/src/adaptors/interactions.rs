@@ -18,23 +18,18 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
 
     /// Helper loop ensuring conversion and enqueueing of events on acknowledgement
-    pub fn spawn_ack_receiver_loop(on_ack: Option<js_sys::Function>) -> Option<UnboundedSender<HalfKeyChallenge>> {
-        match on_ack {
-            Some(on_ack_fn) => {
-                let (tx, mut rx) = unbounded::<HalfKeyChallenge>();
+    pub fn spawn_ack_receiver_loop(on_ack: js_sys::Function) -> UnboundedSender<HalfKeyChallenge> {
+        let (tx, mut rx) = unbounded::<HalfKeyChallenge>();
 
-                wasm_bindgen_futures::spawn_local(async move {
-                    while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                        if let Err(e) = on_ack_fn.call1(&JsValue::null(), &ack.into()) {
-                            error!("failed to call on_ack closure: {:?}", e.as_string());
-                        }
-                    }
-                });
-
-                Some(tx)
+        wasm_bindgen_futures::spawn_local(async move {
+            while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
+                if let Err(e) = on_ack.call1(&JsValue::null(), &ack.into()) {
+                    error!("failed to call on_ack closure: {:?}", e.as_string());
+                }
             }
-            None => None,
-        }
+        });
+
+        tx
     }
 
     const ON_PACKET_QUEUE_SIZE: usize = 4096;

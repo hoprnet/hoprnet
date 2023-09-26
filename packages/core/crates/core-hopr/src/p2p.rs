@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{adaptors::indexer::IndexerProcessed, PeerId};
 use async_lock::RwLock;
+use core_crypto::types::HalfKeyChallenge;
 use core_network::network::{Network, NetworkEvent, PeerOrigin};
 pub use core_p2p::{api, libp2p_identity};
 use core_p2p::{
@@ -12,7 +13,7 @@ use core_p2p::{
 use core_protocol::{
     ack::{
         config::AckProtocolConfig,
-        processor::{AckProcessed, AcknowledgementInteraction}, 
+        processor::{AckProcessed, AcknowledgementInteraction, Reply}, 
     },
     heartbeat::config::HeartbeatProtocolConfig,
     msg::{
@@ -28,7 +29,7 @@ use core_types::{
     acknowledgement::{AcknowledgedTicket, Acknowledgement},
     channels::Ticket, protocol::ApplicationData,
 };
-use futures::{channel::mpsc::{Receiver, Sender}, select, StreamExt};
+use futures::{channel::mpsc::{Receiver, Sender, UnboundedSender}, select, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::request_response::RequestId;
 use std::collections::{HashMap, HashSet};
@@ -111,6 +112,8 @@ pub(crate) async fn p2p_loop(
     msg_proto_cfg: MsgProtocolConfig,
     ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
     mut on_final_packet: Sender<ApplicationData>,
+    on_acknowledgement: UnboundedSender<HalfKeyChallenge>,
+    on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
 ) {
     let mut swarm = core_p2p::build_p2p_network(
         me,
@@ -201,8 +204,22 @@ pub(crate) async fn p2p_loop(
                     },
                 },
                 Inputs::Acknowledgement(task) => match task {
-                    AckProcessed::Receive(peer, _result) => {
-                        debug!("Nothing needs to be done here, as long as the ack interactions emits the received acknowledgement for peer '{peer}'")
+                    AckProcessed::Receive(peer, reply) => {
+                        debug!("Received an acknowledgement from {peer}");
+                        if let Ok(reply) = reply {
+                            match reply {
+                                Reply::Sender(half_key_challenge) => {
+                                    if let Err(e) = on_acknowledgement.unbounded_send(half_key_challenge) {
+                                        error!("failed to emit received acknowledgement: {e}")
+                                    }
+                                },
+                                Reply::Relayer(acknowledged_ticket) => {
+                                    if let Err(e) = on_acknowledged_ticket.unbounded_send(acknowledged_ticket) {
+                                        error!("failed to emit acknowledged ticket: {e}");
+                                    }
+                                }
+                            }
+                        }
                     },
                     AckProcessed::Send(peer, ack) => {
                         let _request_id = swarm.behaviour_mut().ack.send_request(&peer, ack);

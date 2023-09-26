@@ -217,7 +217,7 @@ pub mod wasm_impls {
         network_cfg: NetworkConfig,
         hb_cfg: HeartbeatConfig,
         ping_cfg: PingConfig,
-        on_acknowledgement: Option<js_sys::Function>,
+        on_acknowledgement: js_sys::Function,
         packet_cfg: PacketInteractionConfig,
         on_final_packet: js_sys::Function,
         tbf: TagBloomFilter,
@@ -274,8 +274,7 @@ pub mod wasm_impls {
         };
         wasm_bindgen_futures::spawn_local(queue);
 
-        let ack_actions =
-            AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, Some(on_ack_tkt_tx));
+        let ack_actions = AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair);
 
         let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 
@@ -319,8 +318,7 @@ pub mod wasm_impls {
         );
 
         let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (hb_pong_tx, hb_pong_rx) =
-            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let heartbeat_network_clone = network.clone();
         let ping_network_clone = network.clone();
@@ -363,7 +361,9 @@ pub mod wasm_impls {
                     heartbeat_proto_cfg,
                     msg_proto_cfg,
                     ticket_aggregation_proto_cfg,
-                    on_final_packet_tx
+                    on_final_packet_tx,
+                    on_ack_tx,
+                    on_ack_tkt_tx,
                 )
                 .map(|_| HoprLoopComponents::Swarm),
             ),
@@ -424,11 +424,11 @@ pub mod wasm_impls {
         pub fn new(
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
-            db: Database, // TODO: replace the string with the KeyPair
+            db: Database,
             network_cfg: NetworkConfig,
             hb_cfg: HeartbeatConfig,
             ping_cfg: PingConfig,
-            on_acknowledgement: Option<js_sys::Function>,
+            on_acknowledgement: js_sys::Function,
             packet_cfg: PacketInteractionConfig,
             on_final_packet: js_sys::Function,
             tbf: TagBloomFilter,

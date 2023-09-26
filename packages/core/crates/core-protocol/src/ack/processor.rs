@@ -55,6 +55,12 @@ pub const ACK_RX_QUEUE_SIZE: usize = 2048;
 
 
 #[derive(Debug)]
+pub enum Reply {
+    Sender(HalfKeyChallenge),
+    Relayer(AcknowledgedTicket),
+}
+
+#[derive(Debug)]
 pub enum AckToProcess {
     ToReceive(PeerId, Acknowledgement),
     ToSend(PeerId, Acknowledgement),
@@ -62,7 +68,7 @@ pub enum AckToProcess {
 
 #[derive(Debug)]
 pub enum AckProcessed {
-    Receive(PeerId, Result<()>),
+    Receive(PeerId, Result<Reply>),
     Send(PeerId, Acknowledgement),
 }
 
@@ -70,8 +76,6 @@ pub enum AckProcessed {
 pub struct AcknowledgementProcessor<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
     chain_key: ChainKeypair,
-    pub on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
-    pub on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
 }
 
 impl<Db: HoprCoreEthereumDbActions> Clone for AcknowledgementProcessor<Db> {
@@ -79,8 +83,6 @@ impl<Db: HoprCoreEthereumDbActions> Clone for AcknowledgementProcessor<Db> {
         Self {
             db: self.db.clone(),
             chain_key: self.chain_key.clone(),
-            on_acknowledgement: self.on_acknowledgement.clone(),
-            on_acknowledged_ticket: self.on_acknowledged_ticket.clone(),
         }
     }
 }
@@ -89,18 +91,14 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
     pub fn new(
         db: Arc<RwLock<Db>>,
         chain_key: &ChainKeypair,
-        on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
-        on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
     ) -> Self {
         Self {
             db,
-            on_acknowledgement,
             chain_key: chain_key.clone(),
-            on_acknowledged_ticket,
         }
     }
 
-    pub async fn handle_acknowledgement(&mut self, ack: Acknowledgement) -> Result<()> {
+    pub async fn handle_acknowledgement(&mut self, ack: Acknowledgement) -> Result<Reply> {
         /*
             There are three cases:
             1. There is an unacknowledged ticket and we are
@@ -132,14 +130,11 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
             PendingAcknowledgement::WaitingAsSender => {
                 // No pending ticket, nothing to do.
                 debug!("received acknowledgement as sender: first relayer has processed the packet.");
-                if let Some(emitter) = &mut self.on_acknowledgement {
-                    if let Err(e) = emitter.unbounded_send(ack.ack_challenge()) {
-                        error!("failed to emit received acknowledgement: {e}")
-                    }
-                }
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_SUCCESSFUL_ACKS.increment();
+
+                Ok(Reply::Sender(ack.ack_challenge()))
             }
 
             PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
@@ -188,7 +183,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACKED_TICKETS.increment();
 
-                // Check if ticket it a win
+                // Check if ticket is a win
                 if ack_ticket.is_winning_ticket(&domain_separator) {
                     debug!("{ack_ticket} is a win");
 
@@ -202,14 +197,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     METRIC_LOSING_TICKETS_COUNT.increment();
                 }
 
-                if let Some(emitter) = &mut self.on_acknowledged_ticket {
-                    if let Err(e) = emitter.unbounded_send(ack_ticket) {
-                        error!("failed to emit acknowledged ticket: {e}");
-                    }
-                }
+                Ok(Reply::Relayer(ack_ticket))
             }
         }
-        Ok(())
     }
 }
 
@@ -264,13 +254,11 @@ impl AcknowledgementInteraction {
     pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
         db: Arc<RwLock<Db>>,
         chain_key: &ChainKeypair,
-        on_acknowledgement: Option<UnboundedSender<HalfKeyChallenge>>,
-        on_acknowledged_ticket: Option<UnboundedSender<AcknowledgedTicket>>,
     ) -> Self {
         let (processing_in_tx, processing_in_rx) = channel::<AckToProcess>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
         let (processing_out_tx, processing_out_rx) = channel::<AckProcessed>(ACK_RX_QUEUE_SIZE + ACK_TX_QUEUE_SIZE);
 
-        let processor = AcknowledgementProcessor::new(db, chain_key, on_acknowledgement, on_acknowledged_ticket);
+        let processor = AcknowledgementProcessor::new(db, chain_key);
 
         let processing_stream = processing_in_rx.then_concurrent(move |event| {
             let mut processor = processor.clone();
@@ -283,7 +271,7 @@ impl AcknowledgementInteraction {
                             debug!("validating incoming acknowledgement from {}", peer);
                             if ack.validate(&remote_pk) {
                                 match processor.handle_acknowledgement(ack).await {
-                                    Ok(_) => Some(AckProcessed::Receive(peer, Ok(()))),
+                                    Ok(reply) => Some(AckProcessed::Receive(peer, Ok(reply))),
                                     Err(e) => {
                                         error!(
                                             "Encountered error while handling acknowledgement from peer '{}': {}",
