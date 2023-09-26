@@ -97,12 +97,29 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
             }
         };
 
-        let acks_in_channel = self
+        let ack_tickets_in_db = self
             .db
             .read()
             .await
             .get_acknowledged_tickets(Some(channel.clone()))
-            .await?
+            .await?;
+
+        let being_aggregated_count = ack_tickets_in_db
+            .iter()
+            .filter(|ack| match ack.status {
+                AcknowledgedTicketStatus::BeingAggregated { .. } => true,
+                _ => false,
+            })
+            .count() as u32;
+
+        if being_aggregated_count > 0 {
+            debug!(
+                "{self} strategy: {channel} already has ticket aggregation in progress (size {being_aggregated_count}), not aggregating yet"
+            );
+            return Ok(());
+        }
+
+        let acks_in_channel = ack_tickets_in_db
             .iter()
             .filter(|ack| ack.status == AcknowledgedTicketStatus::Untouched)
             .count() as u32;
@@ -115,13 +132,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
             return Ok(());
         }
 
-        let ticket_aggregation_awaiter = match self
-            .ticket_aggregator
-            .clone()
-            .lock()
-            .await
-            .aggregate_tickets(&channel_id)
-        {
+        let ticket_aggregation_awaiter = match self.ticket_aggregator.lock().await.aggregate_tickets(&channel_id) {
             Ok(mut awaiter) => awaiter.consume_and_wait(self.cfg.aggregation_timeout).await,
             Err(e) => {
                 warn!("{self} could not aggregate tickets due to {e}");
@@ -137,10 +148,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
         if self.cfg.redeem_after_aggregation {
             match redeem_tickets_in_channel(self.db.clone(), &channel, true, self.tx_sender.clone()).await {
                 Ok(tx_result) => {
-                    error!("redeeming tickets");
+                    debug!("redeeming tickets");
                     for result in futures::future::join_all(tx_result).await {
                         if let Err(e) = result {
-                            error!("{self} failed to redeem aggregated ticket {e}")
+                            error!("aggregating strategy: failed to redeem aggregated ticket {e}")
                         }
                     }
                 }
