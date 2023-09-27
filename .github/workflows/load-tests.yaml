@@ -1,0 +1,33 @@
+---
+name: Load Tests
+
+on:
+# Starts at 2:00 AM CET
+  # schedule:
+  #   - cron: '00 2 * * *'
+  workflow_dispatch:
+
+
+concurrency:
+  group: load-tests
+  cancel-in-progress: true
+
+jobs:
+
+  load-tests:
+    name: Load Tests
+    runs-on: ubuntu-2-core
+    steps:
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v3
+        with:
+          repository: hoprnet/hoprd-test
+          ref: main
+
+      - uses: isbang/compose-action@v1.5.1
+        with:
+          compose-file: "./k6/docker-compose.yml"
+        env:
+          ENVIRONMENT_NAME: pluto
+          WORKLOAD_NAME: simple

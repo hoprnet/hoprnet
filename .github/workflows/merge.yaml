@@ -13,16 +13,10 @@ concurrency:
 permissions:
   contents: write
 
-env:
-  MATRIX_ROOM: ${{ secrets.MATRIX_ROOM }}
-  MATRIX_CLUSTER_INFO_ROOM: ${{ secrets.MATRIX_CLUSTER_INFO_ROOM }}
-  MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
-  MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
-
 jobs:
   cleanup-actions:
     name: Cleanup Actions
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
@@ -49,7 +43,7 @@ jobs:
 
   tag:
     name: Tag images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
     steps:
       - name: Checkout hoprnet repository
@@ -98,7 +92,7 @@ jobs:
 
   deploy_nodes:
     name: Deploy nodes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     if: needs.tag.result == 'success'
     needs:
       - tag
@@ -120,6 +114,11 @@ jobs:
 
       - name: Deploy on GCP
         run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.GCP_SA_DOCKER_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
+          echo "${{ secrets.GCP_SA_DOCKER_SSH_PUBLIC_KEY }}" > ~/.ssh/google_compute_engine.pub
+          chmod 400 ~/.ssh/google_compute_engine
+          chmod 644 ~/.ssh/google_compute_engine.pub
           declare base_branch=${{ github.event.pull_request.base.ref }}
           if [[ "${base_branch}" == "master" ]]; then
             ./scripts/deploy.sh rotsee
@@ -128,55 +127,12 @@ jobs:
           else
             echo "Skipping deployment"
           fi
-        env:
-          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          HOPRD_PASSWORD: ${{ secrets.BS_PASSWORD }}
-          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
-
-      - name: Add ssh key to deploy to Hetzner
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-            ssh-private-key: ${{ secrets.HETZNER_ROTSEE_SSH_PRIVATE_KEY }}
-
-      - name: Deploy on Hetzner
-        run: |
-          declare base_branch=${{ github.event.pull_request.base.ref }}
-          if [ "${base_branch}" == "master" ]; then
-            hosts=($(echo "${{ vars.HETZNER_ROTSEE_NODES }}" | sed 's/\r//'  | sed 's/\n/ /'))
-          else
-            hosts=""
-          fi
-          echo "Restarting hosts: ${hosts}"
-          for host in ${hosts[@]}; do
-            ssh -o StrictHostKeyChecking=no root@${host} "service hoprd restart"
-          done
-        env:
-          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
-          IDENTITY_PASSWORD: ${{ secrets.BS_PASSWORD }}
-          API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-          FAUCET_SECRET_API_KEY: ${{ secrets.FAUCET_SECRET_API_KEY }}
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN }}
-
-      - name: Notify Success
-        if: ${{ success() }}
-        run: |
-          ./scripts/notify-matrix-cluster-info.sh
-        env:
-          MATRIX_ROOM: ${{ env.MATRIX_CLUSTER_INFO_ROOM }}
-          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
-
-      - name: Notify Failure
-        if: ${{ failure() }}
-        run: |
-          ./scripts/notify-matrix-github-workflow-failure.sh "${MATRIX_ROOM}" "${{ github.repository }}" \
-            "${{ github.workflow }}" "${{ github.run_id }}"
+          rm ~/.ssh/google_compute_engine*
 
 # FIXME: Disabled until hoprd nodes can work in Kubernetes
 #  deploy_natted_nodes:
 #    name: Deploy Natted nodes
-#    runs-on: ubuntu-latest
+#    runs-on: ubuntu-2-core
 #    if: needs.tag.result == 'success'
 #    needs:
 #      - tag
@@ -204,13 +160,25 @@ jobs:
 
   create_release:
     name: Create Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs:
       - tag
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v3
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          install_components: beta
 
       - name: Setup variables
         id: setup
@@ -226,8 +194,20 @@ jobs:
       - name: Tag repository
         id: tag
         run: |
+          # Tag semver
           git tag v${{ steps.setup.outputs.current_version }}
           git push origin v${{ steps.setup.outputs.current_version }}
+
+          declare base_branch=${{ github.event.pull_request.base.ref }}
+          # Tag release name
+          if [[ "${base_branch}" == "master" ]]; then
+            release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}
+          elif [[ "${base_branch}" =~ ^"release" ]]; then
+            release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
+          fi
+          git tag --force ${release_name}
+          git push --force origin ${release_name}
+          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
 
       - name: Generate Changelog
         id: changelog
@@ -237,6 +217,16 @@ jobs:
           echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Tag docker images with release name
+        run: |
+          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
+          images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
+          for image in ${images[@]};
+          do
+            echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
+            gcloud artifacts docker tags add ${docker_registry}/${image}:${{ steps.setup.outputs.current_version }} ${docker_registry}/${image}:${{ steps.tag.outputs.release_name }}
+          done
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -251,3 +241,25 @@ jobs:
           gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+      - name: Notify release on Element channel
+        run: |
+          messageHeader="<h3>&#9889; New Hoprd Release</h3><br><p>A new hoprd release has been launched. The tag <b>${{ steps.setup.outputs.current_version }}</b> is now available to be downloaded and use it</p>"
+          messageTagNumber="<code>docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${{ steps.setup.outputs.current_version }}</code>"
+          messageTagName="<code>docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${{ steps.tag.outputs.release_name }}</code>"
+          messageChangeLog="<p>Have a look at the <a href='https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }}'>Changelog</a> to see what you are missing</p>"
+          message="${messageHeader}${messageTagNumber}<br>${messageTagName}<br><br>${messageChangeLog}<br>"
+          ./scripts/notify-matrix.sh "${{ secrets.MATRIX_ROOM_RELEASES }}" "${message}"
+        env:
+          MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
+          MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
+
+  new_release:
+    name: Open release
+    if: contains(github.event.pull_request.labels.*.name, 'release')
+    needs: 
+      - create_release
+    uses: ./.github/workflows/open-release.yaml
+    with:
+      release_type: ${{ vars.NEXT_RELEASE_TYPE }}
+      release_name: ${{ vars.NEXT_RELEASE_NAME }}
