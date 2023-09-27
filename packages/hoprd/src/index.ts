@@ -129,10 +129,7 @@ async function main() {
   let state: State = {
     aliases: new Map(),
     settings: {
-      includeRecipient: false,
-      strategy: 'passive',
-      autoRedeemTickets: true,
-      maxAutoChannels: undefined
+      includeRecipient: false
     }
   }
 
@@ -193,14 +190,10 @@ async function main() {
     }
   }
 
-  log('before parseCliArguments')
   const argv = parseCliArguments(process.argv.slice(1))
-  log('after parseCliArguments')
   let cfg: HoprdConfig
   try {
-    log('before fetch_configuration')
     cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
-    log('after fetch_configuration')
   } catch (err) {
     console.error(err)
     process.exit(1)
@@ -210,18 +203,6 @@ async function main() {
 
   if (argv.dry_run) {
     process.exit(0)
-  }
-
-  if (cfg.strategy.name) {
-    state.settings.strategy = cfg.strategy.name
-  }
-
-  if (cfg.strategy.auto_redeem_tickets) {
-    state.settings.autoRedeemTickets = cfg.strategy.auto_redeem_tickets
-  }
-
-  if (cfg.strategy.max_auto_channels) {
-    state.settings.maxAutoChannels = cfg.strategy.max_auto_channels
   }
 
   try {

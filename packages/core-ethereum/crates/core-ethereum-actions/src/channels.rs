@@ -7,11 +7,12 @@ use std::sync::Arc;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
-use crate::errors::CoreEthereumActionsError::{ClosureTimeHasNotElapsed, NotEnoughAllowance};
+use crate::errors::CoreEthereumActionsError::{ClosureTimeHasNotElapsed, NotEnoughAllowance, PeerAccessDenied};
 use crate::errors::{
     CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
     Result,
 };
+use crate::redeem::redeem_tickets_in_channel;
 use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -42,6 +43,12 @@ where
     debug!("current staking safe allowance is {allowance}");
     if allowance.lt(&amount) {
         return Err(NotEnoughAllowance);
+    }
+
+    if db.read().await.is_network_registry_enabled().await?
+        && !db.read().await.is_allowed_to_access_network(&destination).await?
+    {
+        return Err(PeerAccessDenied);
     }
 
     let maybe_channel = db.read().await.get_channel_x(&self_addr, &destination).await?;
@@ -94,6 +101,7 @@ pub async fn close_channel<Db>(
     counterparty: Address,
     self_address: Address,
     direction: ChannelDirection,
+    redeem_before_close: bool,
 ) -> Result<TransactionCompleted>
 where
     Db: HoprCoreEthereumDbActions,
@@ -124,8 +132,17 @@ where
                     }
                 }
                 ChannelStatus::Open => {
-                    // TODO: emit "channel state change" event
+                    if redeem_before_close {
+                        // TODO: trigger aggregation
+                        // Do not await the redemption, just submit it to the queue
+                        let redeemed = redeem_tickets_in_channel(db.clone(), &channel, false, tx_sender.clone())
+                            .await?
+                            .len();
+                        info!("{redeemed} tickets will be redeemed before closing {channel}");
+                    }
+
                     tx_sender.send(Transaction::CloseChannel(channel)).await
+                    // TODO: emit "channel state change" event
                 }
             }
         }
@@ -184,6 +201,12 @@ mod tests {
                 &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
                 &Snapshot::default(),
             )
+            .await
+            .unwrap();
+
+        db.write()
+            .await
+            .set_network_registry(false, &Snapshot::default())
             .await
             .unwrap();
 
@@ -253,6 +276,12 @@ mod tests {
         db.write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        db.write()
+            .await
+            .set_network_registry(false, &Snapshot::default())
             .await
             .unwrap();
 
@@ -636,7 +665,7 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = close_channel(db.clone(), tx_sender.clone(), bob, self_addr, direction)
+        let tx_res = close_channel(db.clone(), tx_sender.clone(), bob, self_addr, direction, false)
             .await
             .unwrap()
             .await
@@ -665,7 +694,7 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_res = close_channel(db.clone(), tx_sender.clone(), bob, self_addr, direction)
+        let tx_res = close_channel(db.clone(), tx_sender.clone(), bob, self_addr, direction, false)
             .await
             .unwrap()
             .await
@@ -733,7 +762,8 @@ mod tests {
                     tx_queue.new_sender(),
                     bob,
                     self_addr,
-                    ChannelDirection::Outgoing
+                    ChannelDirection::Outgoing,
+                    false
                 )
                 .await
                 .err()
@@ -764,7 +794,8 @@ mod tests {
                     tx_queue.new_sender(),
                     bob,
                     self_addr,
-                    ChannelDirection::Outgoing
+                    ChannelDirection::Outgoing,
+                    false
                 )
                 .await
                 .err()
@@ -811,7 +842,8 @@ mod tests {
                     tx_queue.new_sender(),
                     bob,
                     self_addr,
-                    ChannelDirection::Outgoing
+                    ChannelDirection::Outgoing,
+                    false
                 )
                 .await
                 .err()
@@ -957,6 +989,7 @@ pub mod wasm {
         counterparty: &Address,
         self_addr: &Address,
         direction: ChannelDirection,
+        redeem_before_close: bool,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<CloseChannelResult> {
         let awaiter = super::close_channel(
@@ -965,6 +998,7 @@ pub mod wasm {
             *counterparty,
             *self_addr,
             direction,
+            redeem_before_close,
         )
         .await?;
         match awaiter

@@ -29,9 +29,10 @@ pub type EncodedWinProb = [u8; 7];
 
 /// Describes status of a channel
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelStatus {
+    #[default]
     Closed = 0,
     Open = 1,
     PendingToClose = 2,
@@ -627,6 +628,11 @@ impl Ticket {
             .eq(address)
             .then_some(())
             .ok_or(SignatureVerification)
+    }
+
+    pub fn is_aggregated(&self) -> bool {
+        // Aggregated tickets have always an index offset > 1
+        self.index_offset > 1
     }
 }
 

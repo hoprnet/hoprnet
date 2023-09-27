@@ -1217,7 +1217,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "core-hopr"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1456,22 +1456,39 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
- "console_error_panic_hook",
+ "async-std",
+ "async-trait",
+ "core-crypto",
+ "core-ethereum-actions",
+ "core-ethereum-db",
+ "core-ethereum-misc",
+ "core-network",
+ "core-protocol",
  "core-types",
+ "futures",
  "getrandom 0.2.10",
+ "hex-literal",
  "js-sys",
+ "lazy_static",
+ "log",
+ "mockall",
  "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen",
+ "serde_with",
  "simple_moving_average",
+ "strum 0.25.0",
+ "thiserror",
+ "utils-db",
  "utils-log",
  "utils-misc",
  "utils-types",
  "validator",
  "vector_assertions",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -3000,6 +3017,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "serde_yaml",
+ "strum 0.25.0",
  "tempfile",
  "thiserror",
  "utils-log",

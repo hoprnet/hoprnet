@@ -19,6 +19,7 @@ proc-macro-regex = "~1.1.0"
 serde = { workspace = true }
 serde_yaml = "0.9"
 serde_json = "1.0"
+strum = "0.25"
 thiserror = "1.0"
 serde-wasm-bindgen = { workspace = true, optional = true }
 validator = { workspace = true }
@@ -72,8 +73,8 @@ wasm = [
     "core-network/wasm",
     "core-packet/wasm",
     "core-path/wasm",
-    "core-protocol/wasm",
     "core-strategy/wasm",
+    "core-protocol/wasm",
     "core-types/wasm",
     "core-ethereum-db/wasm",
     "core-ethereum-indexer/wasm",

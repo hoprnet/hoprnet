@@ -2,7 +2,7 @@ ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-europe-west3-docker.pkg.dev/hop
 
 # Creates a Docker container that encapsulates a horpd node
 
-FROM ${HOPR_TOOLCHAIN_IMAGE} as build
+FROM --platform=linux/amd64 ${HOPR_TOOLCHAIN_IMAGE} as build
 
 WORKDIR /app/hoprnet
 
@@ -34,7 +34,7 @@ RUN make deps-docker package=hoprd && \
 
 # Debian 11.7
 # https://hub.docker.com/layers/library/debian/11.7-slim/images/sha256-b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3?context=explore
-FROM debian:11.7-slim@sha256:b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3 as runtime
+FROM --platform=linux/amd64 debian:11.7-slim@sha256:b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3 as runtime
 
 WORKDIR /app/hoprnet
 
