@@ -67,7 +67,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
 
       - name: Update vendored cargo dependencies
         run: |

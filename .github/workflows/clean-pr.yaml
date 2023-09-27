@@ -100,7 +100,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
             .foundry/bin/
 
       - name: Clean build

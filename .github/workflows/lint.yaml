@@ -71,7 +71,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
 
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
