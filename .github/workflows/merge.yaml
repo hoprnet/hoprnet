@@ -269,3 +269,5 @@ jobs:
     with:
       release_type: ${{ vars.NEXT_RELEASE_TYPE }}
       release_name: ${{ vars.NEXT_RELEASE_NAME }}
+    secrets:
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
