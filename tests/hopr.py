@@ -1,9 +1,9 @@
 import json
 import logging
 from hoprd_sdk import Configuration, ApiClient
-from hoprd_sdk.models import MessagesBody, ChannelsBody
+from hoprd_sdk.models import MessagesBody, MessagesPopBody, ChannelsBody
 from hoprd_sdk.rest import ApiException
-from hoprd_sdk.api import NodeApi, MessagesApi, AccountApi, ChannelsApi, PeersApi
+from hoprd_sdk.api import NodeApi, MessagesApi, AccountApi, ChannelsApi, PeersApi, TicketsApi
 from urllib3.exceptions import MaxRetryError
 
 
@@ -17,6 +17,8 @@ def getlogger():
 log = getlogger()
 
 
+MESSAGE_TAG = 1234
+
 class HoprdAPI:
     """
     HOPRd API helper to handle exceptions and logging.
@@ -26,7 +28,6 @@ class HoprdAPI:
         self.configuration = Configuration()
         self.configuration.host = f"{url}/api/v3"
         self.configuration.api_key["x-auth-token"] = token
-        print(self.configuration.host)
 
     async def balances(self, type: str or list[str] = "all"):
         """
@@ -354,6 +355,7 @@ class HoprdAPI:
         self,
         params: list or str = "peer_id",
         status: str = "connected",
+        quality: float = 0
     ):
         """
         Returns a list of peers.
@@ -369,7 +371,7 @@ class HoprdAPI:
         try:
             with ApiClient(self.configuration) as client:
                 node_api = NodeApi(client)
-                thread = node_api.node_get_peers(async_req=True)
+                thread = node_api.node_get_peers(quality=quality, async_req=True)
                 response = thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
@@ -400,6 +402,30 @@ class HoprdAPI:
             output_list.append({param: getattr(peer, param) for param in params})
 
         return output_list
+
+    async def get_tickets_statistics(self):
+        """
+        Returns the ticket statistics of the node.
+        :return: statistics: dict
+        """
+        log.debug("Getting tickets/statistics")
+
+        try:
+            with ApiClient(self.configuration) as client:
+                thread = TicketsApi(client).tickets_get_statistics(async_req=True)
+                response = thread.get()
+        except ApiException as e:
+            body = json.loads(e.body.decode())
+            log.error(f"ApiException calling TicketsApi->tickets_get_statistics: {body}")
+            return None
+        except OSError:
+            log.error("OSError calling TicketsApi->tickets_get_statistics")
+            return None
+        except MaxRetryError:
+            log.error("MaxRetryError calling TicketsApi->tickets_get_statistics")
+            return None
+
+        return response
 
     async def get_address(self, address: str):
         """
@@ -432,7 +458,7 @@ class HoprdAPI:
         return getattr(response, address)
 
     async def send_message(
-        self, destination: str, message: str, hops: list[str], tag: int = 0x0320
+        self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG
     ) -> bool:
         """
         Sends a message to the given destination.
@@ -462,3 +488,28 @@ class HoprdAPI:
             return False
 
         return True
+    
+    async def messages_pop(self, tag: int = MESSAGE_TAG) -> bool:
+        """
+        Pop next message from the inbox
+        :param: tag = 0x0320
+        :return: dict
+        """
+        
+        body = MessagesPopBody(tag=tag)
+        try:
+            with ApiClient(self.configuration) as client:
+                message_api = MessagesApi(client)
+                thread = message_api.messages_pop_message(body=body, async_req=True)
+                response = thread.get()
+        except ApiException as e:
+            log.error(f"ApiException calling MessageApi->messages_pop_message: {e}")
+            return None
+        except OSError:
+            log.error("OSError calling MessageApi->messages_pop_message:")
+            return None
+        except MaxRetryError:
+            log.error("MaxRetryError calling MessageApi->messages_pop_message")
+            return None
+
+        return response

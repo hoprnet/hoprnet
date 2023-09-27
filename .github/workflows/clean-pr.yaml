@@ -13,7 +13,7 @@ on:
 
 jobs:
   cleanup-pr:
-    name: Clean up PR cache
+    name: Remove cache
     runs-on: ubuntu-2-core
     timeout-minutes: 10
     steps:

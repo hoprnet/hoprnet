@@ -330,7 +330,7 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: create-local-identity
-create-local-identity: id_dir=`pwd`
+create-local-identity: id_dir=/tmp/
 create-local-identity: id_password=local
 create-local-identity: id_prefix=.identity-local_
 create-local-identity: ## run HOPRd from local repo
