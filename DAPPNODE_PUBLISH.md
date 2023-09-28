@@ -38,6 +38,7 @@ dappnode_bumped_version="${dappnode_minor_version}.${dappnode_patch_bumped_patch
 cat <<< $(jq --arg dappnode_bumped_version ${dappnode_bumped_version} ' . |= .+ { "version": $dappnode_bumped_version}' dappnode_package.json) > dappnode_package.json
 cat <<< $(jq --arg dappnode_bumped_version ${dappnode_bumped_version} ' . |= .+ { "version": $dappnode_bumped_version}' dappnode_package.json) > dappnode_package.json
 yq -i e ".services.node.image |= \"node.hopr.public.dappnode.eth:${dappnode_bumped_version}\"" docker-compose.yml
+yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" docker-compose.yml
 git add dappnode_package.json docker-compose.yml
 git commit -m "Bumping to version ${RELEASE_NUMBER}"
 git push --set-upstream origin update/${RELEASE_NUMBER}
@@ -46,11 +47,12 @@ git push --set-upstream origin update/${RELEASE_NUMBER}
 3. Create a PR from [here](https://github.com/hoprnet/DAppNodePackage-Hopr) the to the point to https://github.com/dappnode/DAppNodePackage-Hopr
 4. Wait until the PR is approved and merged.
 5. Open Metamask and switch to the Dappnode account. Check also that is connected to the Ethereum network (Mainnet).
-6. Turn on your Dappnode
+6. Turn on your Dappnode, and connect to its WiFi
 7. Connect to your Dappnode VPN: `System Preferences` -> `Network` -> `dAppNode Wireguard`
 8. Access to the recently published release https://github.com/dappnode/DAppNodePackage-Hopr/releases, and click the link that takes you to the pre-filled release signing form.
 9. Set the public ethereum address of the Metamask account into the form field named `Developer address`
-10. Click `Connect MetaMask` in the form.
-11. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
-12. Click `Publish release` to publish the signed release (confirm transaction in MM).
-13. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
+10. In the form, click on `Edit Settings` and set the field `IPFS API URLs` with the value `http://ipfs.dappnode:5001/`
+11. Click `Connect MetaMask` in the form.
+12. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
+13. Click `Publish release` to publish the signed release (confirm transaction in MM).
+14. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
