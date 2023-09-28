@@ -1,55 +1,275 @@
+import itertools
 import json
 import os
+import random
 import subprocess
-import pytest
+from contextlib import asynccontextmanager, AsyncExitStack
 
 import asyncio
-from conftest import DEFAULT_API_TOKEN, OPEN_CHANNEL_FUNDING_VALUE, TICKET_AGGREGATION_THRESHOLD, TICKET_PRICE_PER_HOP
+import pytest
+from conftest import (
+    NODES,
+    DEFAULT_API_TOKEN,
+    OPEN_CHANNEL_FUNDING_VALUE,
+    TICKET_AGGREGATION_THRESHOLD,
+    TICKET_PRICE_PER_HOP
+)
 
 
+PARAMETERIZED_SAMPLE_SIZE = 1 if os.getenv('CI', default="false") == "false" else 3
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
+MULTIHOP_MESSAGE_SEND_TIMEOUT = 10.0        #s
+
+def shuffled(coll):
+    random.shuffle(coll)
+    return coll
+
+
+@asynccontextmanager
+async def create_channel(src, dest, funding):
+    channel = await src['api'].open_channel(dest['address'], funding)
+    assert channel is not None
+    try:
+        yield channel
+    finally:
+        assert await src['api'].close_channel(channel)
+
 
 @pytest.mark.asyncio
-async def test_hoprd_protocol_aggregated_ticket_redeeming(setup_7_nodes):
-    alice = setup_7_nodes['Alice']
-    bob = setup_7_nodes['Bob']
-    camilla = setup_7_nodes['Camilla']
+@pytest.mark.parametrize("src,dest",
+    random.sample([(src,dest) for src, dest in itertools.product(
+        list(NODES.keys())[:5], repeat=2) if src != dest], PARAMETERIZED_SAMPLE_SIZE)
+)
+async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src, dest, setup_7_nodes):
+    pinger = setup_7_nodes[src]['api']
+    
+    response = await pinger.ping(setup_7_nodes[dest]['peer_id'])
+    
+    assert response is not None
+    assert int(response.latency) > 0, f"PNon-0 round trip time expected, actual: '{int(response.latency)}'"
 
-    alice_api = alice['api']
-    bob_api = bob['api']
-    camilla_api = camilla['api']
 
-    assert(bob['peer_id'] in [x['peer_id'] for x in await alice_api.peers()])
-    assert(camilla['peer_id'] in [x['peer_id'] for x in await bob_api.peers()])
+@pytest.mark.asyncio
+async def test_hoprd_ping_should_timeout_on_pinging_self(setup_7_nodes):
+    pinger = setup_7_nodes["Alice"]['api']
+    
+    response = await pinger.ping(setup_7_nodes["Alice"]['peer_id'])
+    
+    assert response is None, f"Pinging self should produce timeout, not '{response}'"
 
-    assert await alice_api.open_channel(bob['address'], OPEN_CHANNEL_FUNDING_VALUE)
-    assert await bob_api.open_channel(camilla['address'], OPEN_CHANNEL_FUNDING_VALUE)
 
-    await asyncio.sleep(3)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("node", list(NODES.keys())[:5])
+async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages(node, setup_7_nodes):
+    """
+    log "Node 2 has no unredeemed ticket value"
+    result=$(api_get_ticket_statistics "${api2}" "\"unredeemedValue\":\"0\"")
+    log "-- ${result}"
+    """
+    statistics = await setup_7_nodes[node]['api'].get_tickets_statistics()
+    assert int(statistics.unredeemed_value) == 0
+    assert int(statistics.unredeemed) == 0
 
-    statistics_before = await bob_api.get_tickets_statistics()
 
-    for i in range(TICKET_AGGREGATION_THRESHOLD*2):
-        assert await alice_api.send_message(camilla['peer_id'], f"#{i}", [bob['peer_id']])
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest",
+    random.sample([(src,dest) for src, dest in itertools.product(
+        list(NODES.keys())[:5], repeat=2) if src != dest], PARAMETERIZED_SAMPLE_SIZE)
+)
+async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels(src, dest, setup_7_nodes):
+    message_count = int(TICKET_AGGREGATION_THRESHOLD / 5)
+    
+    packets = [f"0 hop message #{i:04d}" for i in range(message_count)]
+    
+    for packet in packets:
+        assert await setup_7_nodes[src]['api'].send_message(setup_7_nodes[dest]['peer_id'], packet, [])
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(1)
+    
+    async def check_received():
+        received = [(await setup_7_nodes[dest]['api'].messages_pop()).body for i in range(len(packets))]
+        received.sort()
+        assert received == packets
+            
+    await asyncio.wait_for(check_received(), MULTIHOP_MESSAGE_SEND_TIMEOUT)
 
-    for i in range(TICKET_AGGREGATION_THRESHOLD*2):
-        assert await camilla_api.messages_pop() is not None
 
-    # wait for tickets to be aggregated and redeemed
-    for _ in range(60):
-        statistics_after = await bob_api.get_tickets_statistics()
-        redeemed_value = int(statistics_after.redeemed_value) - int(statistics_before.redeemed_value)
-        redeemed_ticket_count = statistics_after.redeemed - statistics_before.redeemed
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest",
+    random.sample([(src,dest) for src, dest in itertools.product(
+        list(NODES.keys())[:5], repeat=2) if src != dest], PARAMETERIZED_SAMPLE_SIZE)
+)
+async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_self_scenario(src, dest, setup_7_nodes):
+    message_count = int(TICKET_AGGREGATION_THRESHOLD / 5)
+    
+    assert(setup_7_nodes[dest]['peer_id'] in [x['peer_id'] for x in await setup_7_nodes[src]['api'].peers()])
+    assert(setup_7_nodes[src]['peer_id'] in [x['peer_id'] for x in await setup_7_nodes[dest]['api'].peers()])
 
-        if redeemed_value >= AGGREGATED_TICKET_PRICE:
-            break
-        else:
-            await asyncio.sleep(0.5)
+    async with create_channel(setup_7_nodes[src],
+                              setup_7_nodes[dest],
+                              funding=str(message_count * TICKET_PRICE_PER_HOP)) as channel:
+        await asyncio.sleep(3)
+        
+        packets = [f"1 hop message to self #{i:04d}" for i in range(message_count)]
+        
+        for packet in packets:
+            assert await setup_7_nodes[src]['api'].send_message(
+                setup_7_nodes[src]['peer_id'], packet, [setup_7_nodes[dest]['peer_id']])
 
-    assert(redeemed_value >= AGGREGATED_TICKET_PRICE)
-    assert(redeemed_ticket_count == pytest.approx(redeemed_value / AGGREGATED_TICKET_PRICE, 0.1))
+        await asyncio.sleep(1)
+        
+        async def check_received():
+            received = [(await setup_7_nodes[src]['api'].messages_pop()).body for i in range(len(packets))]
+            received.sort()
+            assert received == packets
+
+        await asyncio.wait_for(check_received(), MULTIHOP_MESSAGE_SEND_TIMEOUT)
+        
+        statistics = await setup_7_nodes[dest]['api'].get_tickets_statistics()
+        assert (statistics.redeemed + statistics.unredeemed) > 0
+        
+        assert await setup_7_nodes[dest]['api'].channel_redeem_tickets(channel)
+        
+        async def channel_redeemed():
+            while (await setup_7_nodes[dest]['api'].get_tickets_statistics()).unredeemed > 0:
+                await asyncio.sleep(0.5)
+        
+        await asyncio.wait_for(channel_redeemed(), 30.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route",
+    [shuffled(list(NODES.keys()))[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)] +
+    [shuffled(list(NODES.keys()))[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+)
+async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_hop(route, setup_7_nodes):
+    message_count = int(TICKET_AGGREGATION_THRESHOLD / 2)
+    
+    assert all([
+        setup_7_nodes[route[i+1]]['peer_id'] in [x['peer_id'] for x in await setup_7_nodes[route[i]]['api'].peers()]
+        for i in range(len(route) - 1)
+    ])
+    
+    async with AsyncExitStack() as channels:
+        await asyncio.gather(*[
+            channels.enter_async_context(
+                create_channel(setup_7_nodes[route[i]],
+                               setup_7_nodes[route[i+1]],
+                               funding=str(message_count * TICKET_PRICE_PER_HOP))
+                ) for i in range(len(route) - 1)
+        ])
+        
+        await asyncio.sleep(1)
+        
+        packets = [f"hoppity message #{i:04d}" for i in range(message_count)]
+        
+        for packet in packets:
+            assert await setup_7_nodes[route[0]]['api'].send_message(
+                setup_7_nodes[route[-1]]['peer_id'],
+                packet,
+                [setup_7_nodes[x]['peer_id'] for x in route[1:-1]])
+
+        await asyncio.sleep(2)
+        
+        async def check_received():
+            received = [(await setup_7_nodes[route[-1]]['api'].messages_pop()).body for i in range(len(packets))]
+            received.sort()
+            assert received == packets
+
+        await asyncio.wait_for(check_received(), MULTIHOP_MESSAGE_SEND_TIMEOUT)
+        
+        statistics = await setup_7_nodes[route[1]]['api'].get_tickets_statistics()
+        assert (statistics.redeemed + statistics.unredeemed) > 0
+        
+        assert await setup_7_nodes[route[1]]['api'].tickets_redeem()
+        
+        async def all_redeemed():
+            while (await setup_7_nodes[route[1]]['api'].get_tickets_statistics()).unredeemed > 0:
+                await asyncio.sleep(0.5)
+        
+        await asyncio.wait_for(all_redeemed(), 30.0)
+
+
+@pytest.mark.asyncio
+async def test_hoprd_ping_should_not_be_able_to_ping_nodes_in_other_network_UNFINISHED(setup_7_nodes): 
+    """
+    # FIXME: re-enable when network check works
+    # log "Node 1 should not be able to talk to Node 6 (different network id)"
+    # result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
+    # log "-- ${result}"
+
+    # FIXME: re-enable when network check works
+    # log "Node 6 should not be able to talk to Node 1 (different network id)"
+    # result=$(api_ping "${api6}" ${addr1} "TIMEOUT")
+    # log "-- ${result}"
+    """
+    assert True
+    
+    
+@pytest.mark.asyncio
+async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry_UNFINISHED(setup_7_nodes): 
+    """
+    # log "Node 7 should not be able to talk to Node 1 (Node 7 is not in the register)"
+    # result=$(ping "${api7}" ${addr1} "TIMEOUT")
+    # log "-- ${result}"
+
+    # log "Node 1 should not be able to talk to Node 7 (Node 7 is not in the register)"
+    # result=$(ping "${api1}" ${addr7} "TIMEOUT")
+    # log "-- ${result}"
+    """
+    assert True
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route",
+    [shuffled(list(NODES.keys()))[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+)
+async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, setup_7_nodes):
+    ticket_count = TICKET_AGGREGATION_THRESHOLD*2
+
+    assert all([
+        setup_7_nodes[route[i+1]]['peer_id'] in [x['peer_id'] for x in await setup_7_nodes[route[i]]['api'].peers()]
+        for i in range(len(route) - 1)
+    ])
+    
+    async with AsyncExitStack() as channels:
+        await asyncio.gather(*[
+            channels.enter_async_context(
+                create_channel(setup_7_nodes[route[i]],
+                               setup_7_nodes[route[i+1]],
+                               funding=str(ticket_count * TICKET_PRICE_PER_HOP)
+                )) for i in range(len(route) - 1)
+        ])
+
+        await asyncio.sleep(3)
+
+        statistics_before = await setup_7_nodes[route[1]]['api'].get_tickets_statistics()
+
+        for i in range(ticket_count):
+            assert await setup_7_nodes[route[0]]['api'].send_message(
+                setup_7_nodes[route[-1]]['peer_id'],
+                f"#{i}",
+                [setup_7_nodes[route[1]]['peer_id']])
+
+        await asyncio.sleep(1)
+
+        for i in range(ticket_count):
+            await setup_7_nodes[route[-1]]['api'].messages_pop()
+
+        async def aggregate_and_redeem_tickets():
+            while True:
+                statistics_after = await setup_7_nodes[route[1]]['api'].get_tickets_statistics()
+                redeemed_value = int(statistics_after.redeemed_value) - int(statistics_before.redeemed_value)
+                redeemed_ticket_count = statistics_after.redeemed - statistics_before.redeemed
+
+                if redeemed_value >= AGGREGATED_TICKET_PRICE:
+                    break
+                else:
+                    await asyncio.sleep(0.5)
+
+            assert(redeemed_value >= AGGREGATED_TICKET_PRICE)
+            assert(redeemed_ticket_count == pytest.approx(redeemed_value / AGGREGATED_TICKET_PRICE, 0.1))
+        
+        await asyncio.wait_for(aggregate_and_redeem_tickets(), 60.0)
 
 
 def test_hoprd_protocol_bash_integration_tests(setup_7_nodes):
@@ -77,11 +297,6 @@ def test_hoprd_protocol_bash_integration_tests(setup_7_nodes):
         # timeout=2000,
         check=True,
     )
-
-
-@pytest.mark.asyncio
-async def test_hoprd_should_be_able_to_redeem_all_tickets_at_this_point_UNFINISHED(setup_7_nodes):
-    assert True
 
 
 @pytest.mark.asyncio

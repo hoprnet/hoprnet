@@ -97,18 +97,20 @@ class HoprdAPI:
             body = json.loads(e.body.decode())
             if body["status"] == "CHANNEL_ALREADY_OPEN":
                 log.debug("Channel already opened")
+                return None
             else:
                 log.error(
                     f"ApiException calling ChannelsApi->channels_open_channel: {body}"
                 )
+                return None
         except OSError:
             log.error("OSError calling ChannelsApi->channels_open_channel")
-            return False
+            return None
         except MaxRetryError:
             log.error("MaxRetryError calling ChannelsApi->channels_open_channel")
-            return False
+            return None
 
-        return True
+        return response.channel_id
 
     async def close_channel(self, channel_id: str):
         """
@@ -134,6 +136,32 @@ class HoprdAPI:
             return False
         except MaxRetryError:
             log.error("MaxRetryError calling ChannelsApi->channels_close_channel")
+            return False
+
+        return True
+    
+    async def channel_redeem_tickets(self, channel_id: str):
+        """
+        Redeems tickets in a specific channel.
+        :param: channel_id: str
+        :return: bool
+        """
+        try:
+            with ApiClient(self.configuration) as client:
+                channels_api = ChannelsApi(client)
+                thread = channels_api.channels_redeem_tickets(channel_id, async_req=True)
+                thread.get()
+        except ApiException as e:
+            body = json.loads(e.body.decode())
+            log.error(
+                f"ApiException calling ChannelsApi->channels_redeem_tickets: {body}"
+            )
+            return False
+        except OSError:
+            log.error("OSError calling ChannelsApi->channels_redeem_tickets")
+            return False
+        except MaxRetryError:
+            log.error("MaxRetryError calling ChannelsApi->channels_redeem_tickets")
             return False
 
         return True
@@ -219,13 +247,41 @@ class HoprdAPI:
         else:
             return response.outgoing
 
+    async def channel_get_tickets(self, channel_id: str):
+        """
+        Returns all channel tickets.
+        :param: channel_id: str
+        :return: tickets: response
+        """
+        try:
+            with ApiClient(self.configuration) as client:
+                channels_api = ChannelsApi(client)
+                thread = channels_api.channels_get_tickets(
+                    channel_id,
+                    async_req=True,
+                )
+                response = thread.get()
+        except ApiException as e:
+            body = json.loads(e.body.decode())
+            log.error(
+                f"ApiException calling ChannelsApi->channels_get_tickets: {body}"
+            )
+            return None
+        except OSError:
+            log.error("OSError calling ChannelsApi->channels_get_tickets")
+            return None
+        except MaxRetryError:
+            log.error("MaxRetryError calling ChannelsApi->channels_get_tickets")
+            return None
+        else:
+            return response
+        
     async def all_channels(self, include_closed: bool):
         """
         Returns all channels.
         :param: include_closed: bool
         :return: channels: list
         """
-        log.debug(f"Getting all channels (include_closed={include_closed})")
 
         try:
             with ApiClient(self.configuration) as client:
@@ -317,12 +373,11 @@ class HoprdAPI:
 
         return peerid_address_aggbalance_links
 
-    async def ping(self, peer_id: str, metric: str = "latency"):
+    async def ping(self, peer_id: str):
         """
         Pings the given peer_id and returns the measure.
         :param: peer_id: str
-        :param: metric: str = "latency"
-        :return: measure: int
+        :return: measure: str
         """
         log.debug(f"Pinging peer {peer_id}")
 
@@ -334,22 +389,15 @@ class HoprdAPI:
         except ApiException as e:
             body = json.loads(e.body.decode())
             log.error(f"ApiException calling PeersApi->peers_ping_peer: {body}")
-            return 0
+            return None
         except OSError:
             log.error("OSError calling PeersApi->peers_ping_peer")
-            return 0
+            return None
         except MaxRetryError:
             log.error("MaxRetryError calling PeersApi->peers_ping_peer")
-            return 0
+            return None
 
-        if not hasattr(response, metric):
-            log.error(f"No `{metric}` measure from peer {peer_id}")
-            return 0
-
-        measure = int(getattr(response, metric))
-
-        log.debug(f"Measured {measure:3d}({metric}) from peer {peer_id}")
-        return measure
+        return response 
 
     async def peers(
         self,
@@ -513,3 +561,28 @@ class HoprdAPI:
             return None
 
         return response
+    
+    async def tickets_redeem(self):
+        """
+        Redeems all tickets.
+        :param: channel_id: str
+        :return: bool
+        """
+        try:
+            with ApiClient(self.configuration) as client:
+                api = TicketsApi(client)
+                thread = api.tickets_redeem_tickets(async_req=True)
+                thread.get()
+        except ApiException as e:
+            body = json.loads(e.body.decode())
+            log.error(f"ApiException calling TicketsApi->tickets_redeem_tickets: {body}"
+            )
+            return False
+        except OSError:
+            log.error("OSError calling TicketsApi->tickets_redeem_tickets")
+            return False
+        except MaxRetryError:
+            log.error("MaxRetryError calling TicketsApi->tickets_redeem_tickets")
+            return False
+
+        return True
