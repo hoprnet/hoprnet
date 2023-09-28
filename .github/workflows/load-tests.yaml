@@ -25,6 +25,11 @@ jobs:
           repository: hoprnet/hoprd-test
           ref: main
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          driver: kubernetes
+
       - uses: isbang/compose-action@v1.5.1
         with:
           compose-file: "./k6/docker-compose.yaml"
