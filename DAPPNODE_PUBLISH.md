@@ -52,7 +52,7 @@ git push --set-upstream origin update/${RELEASE_NUMBER}
 8. Access to the recently published release https://github.com/dappnode/DAppNodePackage-Hopr/releases, and click the link that takes you to the pre-filled release signing form.
 9. Set the public ethereum address of the Metamask account into the form field named `Developer address`
 10. In the form, click on `Edit Settings` and set the field `IPFS API URLs` with the value `http://ipfs.dappnode:5001/`
-10. Click `Connect MetaMask` in the form.
-11. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
-12. Click `Publish release` to publish the signed release (confirm transaction in MM).
-13. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
+11. Click `Connect MetaMask` in the form.
+12. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
+13. Click `Publish release` to publish the signed release (confirm transaction in MM).
+14. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
