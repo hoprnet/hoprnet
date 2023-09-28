@@ -56,7 +56,7 @@ EXPOSE 18085
 # set default token, but keep it configurable for users
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
-ENV LISTEN_HOST="0.0.0.0"
+ENV HOPRD_HOST="0.0.0.0"
 ENV NODE_OPTIONS="--experimental-wasm-modules"
 HEALTHCHECK --interval=30s --timeout=4s --start-period=4m --retries=10 CMD grep -q running /tmp/cluster.status
-ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p --api-token "${HOPRD_API_TOKEN}" --listen-host "${LISTEN_HOST}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh
+ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p --api-token "${HOPRD_API_TOKEN}" --listen-host "${HOPRD_HOST}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh
