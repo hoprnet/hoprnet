@@ -27,7 +27,7 @@ jobs:
 
       - uses: isbang/compose-action@v1.5.1
         with:
-          compose-file: "./k6/docker-compose.yml"
+          compose-file: "./k6/docker-compose.yaml"
         env:
           ENVIRONMENT_NAME: pluto
           WORKLOAD_NAME: simple
