@@ -119,6 +119,7 @@ function cleanup {
 
   log "Removing cluster env file"
   rm -f "${env_file}"
+  rm -f "${tmp_dir}/cluster.status"
 
   exit $EXIT_CODE
 }
@@ -180,8 +181,6 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
-      --allowLocalNodeConnections \
-      --allowPrivateNodeConnections \
       --healthCheck \
       --healthCheckHost "${host}" \
       --healthCheckPort "${healthcheck_port}" \
@@ -193,8 +192,8 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete || true
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -exec rm {} \; || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id"  -exec rm {} \; || true
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity \
@@ -395,6 +394,8 @@ else
   log "Run: 'source ${env_file}' in your shell to setup environment variables for this cluster (HOPR_NODE_1_ADDR, HOPR_NODE_1_HTTP_URL,... etc.)"
 fi
 
+# Needed by the Pluto HealthCheck
+echo "running" > "${tmp_dir}/cluster.status"
 log "Terminating this script will clean up the running local cluster"
 trap - SIGINT SIGTERM ERR
 wait

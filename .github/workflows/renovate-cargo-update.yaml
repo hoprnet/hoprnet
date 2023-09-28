@@ -1,7 +1,6 @@
 name: Dependencies
 
 env:
-  HOPR_GITHUB_REF: ${{ github.ref }}
   RUST_BACKTRACE: "1"
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -68,7 +67,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
 
       - name: Update vendored cargo dependencies
         run: |
@@ -81,3 +79,4 @@ jobs:
         run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: 'chore(cargo): updated vendored dependencies'
+          HOPR_GITHUB_REF: ${{ github.ref }}

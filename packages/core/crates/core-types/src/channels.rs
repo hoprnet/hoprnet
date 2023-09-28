@@ -13,14 +13,11 @@ use serde::{
     Deserialize, Serialize,
 };
 use serde_repr::*;
-use std::fmt::{Display, Formatter};
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter},
+};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
-
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
-
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
 
 use utils_types::traits::{BinarySerializable, ToHex};
 
@@ -32,9 +29,10 @@ pub type EncodedWinProb = [u8; 7];
 
 /// Describes status of a channel
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelStatus {
+    #[default]
     Closed = 0,
     Open = 1,
     PendingToClose = 2,
@@ -58,6 +56,14 @@ impl Display for ChannelStatus {
             ChannelStatus::PendingToClose => write!(f, "PendingToClose"),
         }
     }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub enum ChannelDirection {
+    Incoming = 0,
+    Outgoing = 1,
 }
 
 /// Overall description of a channel
@@ -104,9 +110,10 @@ impl ChannelEntry {
     }
 
     /// Checks if the closure time of this channel has passed.
-    pub fn closure_time_passed(&self) -> Option<bool> {
+    pub fn closure_time_passed(&self, current_timestamp_ms: u64) -> Option<bool> {
+        assert!(current_timestamp_ms > 0, "invalid timestamp");
         // round clock ms to seconds
-        let now_seconds: U256 = U256::from(current_timestamp()) / 1000u64.into();
+        let now_seconds: U256 = U256::from(current_timestamp_ms) / 1000u64.into();
 
         if self.closure_time.eq(&U256::zero()) {
             None
@@ -115,10 +122,11 @@ impl ChannelEntry {
         }
     }
 
-    /// Calculates the remaining channel closure grace period.
-    pub fn remaining_closure_time(&self) -> Option<u64> {
+    /// Calculates the remaining channel closure grace period in seconds.
+    pub fn remaining_closure_time(&self, current_timestamp_ms: u64) -> Option<u64> {
+        assert!(current_timestamp_ms > 0, "invalid timestamp");
         // round clock ms to seconds
-        let now_seconds = U256::from(current_timestamp()) / 1000u64.into();
+        let now_seconds = U256::from(current_timestamp_ms) / 1000u64.into();
 
         if self.closure_time.eq(&U256::zero()) {
             None
@@ -135,17 +143,30 @@ impl ChannelEntry {
     }
 }
 
-impl std::fmt::Display for ChannelEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("ChannelEntry")
-            .field("source", &self.source.to_string())
-            .field("destination", &self.destination.to_string())
-            .field("balance", &format!("{}", self.balance))
-            .field("ticket_index", &self.ticket_index.to_string())
-            .field("status", &self.status.to_string())
-            .field("channel_epoch", &self.channel_epoch.to_string())
-            .field("closure_time", &self.closure_time.to_string())
-            .finish()
+impl ChannelEntry {
+    /// Determines the channel direction given the self address.
+    /// Panics if source nor destination are equal to the given address.
+    pub fn direction(&self, me: &Address) -> ChannelDirection {
+        if self.source.eq(me) {
+            ChannelDirection::Outgoing
+        } else if self.destination.eq(me) {
+            ChannelDirection::Incoming
+        } else {
+            panic!("foreign channel: {self}")
+        }
+    }
+}
+
+impl Display for ChannelEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} channel {}: {} -> {}",
+            self.status,
+            self.get_id(),
+            self.source,
+            self.destination
+        )
     }
 }
 
@@ -196,7 +217,7 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 }
 
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Ticket {
     pub channel_id: Hash,
     pub amount: Balance,
@@ -206,6 +227,26 @@ pub struct Ticket {
     pub channel_epoch: u32,
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
+}
+
+impl PartialOrd for Ticket {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Ticket {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.channel_id.cmp(&other.channel_id) {
+            Ordering::Equal => match self.channel_epoch.cmp(&other.channel_epoch) {
+                Ordering::Equal => self.index.cmp(&other.index),
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Less => Ordering::Less,
+            },
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Less => Ordering::Less,
+        }
+    }
 }
 
 // Use compact serialization for ticket as they are used very often
@@ -310,7 +351,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(&own_address, counterparty);
 
         let mut ret = Ticket {
             channel_id,
@@ -350,7 +391,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(own_address, counterparty);
 
         let ret = Ticket {
             channel_id,
@@ -363,7 +404,7 @@ impl Ticket {
             signature: Some(signature),
         };
 
-        ret.verify(&own_address, domain_separator)
+        ret.verify(own_address, domain_separator)
             .map_err(|_| CoreTypesError::InvalidInputData("Invalid signature".into()))?;
 
         Ok(ret)
@@ -390,7 +431,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(own_address, counterparty);
 
         Ok(Ticket {
             channel_id,
@@ -416,7 +457,7 @@ impl Ticket {
         win_prob: f64,
         channel_epoch: U256,
     ) -> Result<()> {
-        if own_address.eq(&counterparty) {
+        if own_address.eq(counterparty) {
             return Err(CoreTypesError::InvalidInputData(
                 "Source and destination must be different".into(),
             ));
@@ -528,7 +569,7 @@ impl Ticket {
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Self {
+    pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Result<Self> {
         Self::new(
             destination,
             &Balance::new(0u32.into(), BalanceType::HOPR),
@@ -540,7 +581,6 @@ impl Ticket {
             private_key,
             domain_separator,
         )
-        .expect("Failed to create zero-hop ticket")
     }
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
@@ -548,7 +588,7 @@ impl Ticket {
     ///
     /// Does not support path lengths greater than 255
     pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
-        Ok((self.get_expected_payout() / price_per_packet)
+        (self.get_expected_payout() / price_per_packet)
             .as_u64()
             .try_into() // convert to u8
             .map_err(|_| {
@@ -556,7 +596,7 @@ impl Ticket {
                     "Cannot convert {} to u8",
                     price_per_packet / self.get_expected_payout()
                 ))
-            })?)
+            })
     }
 
     pub fn get_expected_payout(&self) -> U256 {
@@ -588,6 +628,11 @@ impl Ticket {
             .eq(address)
             .then_some(())
             .ok_or(SignatureVerification)
+    }
+
+    pub fn is_aggregated(&self) -> bool {
+        // Aggregated tickets have always an index offset > 1
+        self.index_offset > 1
     }
 }
 
@@ -925,7 +970,7 @@ pub mod tests {
 
     #[test]
     pub fn test_zero_hop() {
-        let zero_hop_ticket = Ticket::new_zero_hop(&BOB.public().to_address(), &ALICE, &Hash::default());
+        let zero_hop_ticket = Ticket::new_zero_hop(&BOB.public().to_address(), &ALICE, &Hash::default()).unwrap();
         assert!(zero_hop_ticket
             .verify(&ALICE.public().to_address(), &Hash::default())
             .is_ok());
@@ -982,7 +1027,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         pub fn size() -> u32 {
@@ -1024,8 +1069,8 @@ pub mod wasm {
             })
         }
 
-        #[wasm_bindgen]
-        pub fn default() -> Ticket {
+        #[wasm_bindgen(js_name = "make_default")]
+        pub fn _default() -> Ticket {
             Self {
                 w: super::Ticket::default(),
             }
@@ -1033,12 +1078,12 @@ pub mod wasm {
 
         #[wasm_bindgen(getter)]
         pub fn channel_id(&self) -> Hash {
-            self.w.channel_id.clone()
+            self.w.channel_id
         }
 
         #[wasm_bindgen(getter)]
         pub fn amount(&self) -> Balance {
-            self.w.amount.clone()
+            self.w.amount
         }
 
         #[wasm_bindgen(getter)]
@@ -1071,12 +1116,13 @@ pub mod wasm {
             self.w.signature.clone()
         }
 
-        #[wasm_bindgen]
-        pub fn to_string(&self) -> String {
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
             self.w.to_string()
         }
 
-        pub fn clone(&self) -> Ticket {
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Ticket {
             Self { w: self.w.clone() }
         }
     }

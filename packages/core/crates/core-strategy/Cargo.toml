@@ -1,6 +1,6 @@
 [package]
 name = "core-strategy"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different (automatic) HOPR payment channel strategies"
 edition = "2021"
@@ -12,24 +12,45 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-trait = { workspace = true }
+async-std = { workspace = true, features = ["unstable"]}
 getrandom = { workspace = true }
-js-sys = { workspace = true, optional = true }
 rand = "0.8.5"
-serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = { version = "0.5", optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_with = "3.3.0"
 simple_moving_average = "0.1.2"
+strum = { version = "0.25", features = ["derive"] }
+thiserror = { workspace = true }
+validator = { workspace = true }
+futures = { workspace = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+wasm-bindgen-futures = {workspace = true, optional = true}
 
-core-types = { path = "../core-types", default-features = false }
-utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
-utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
-utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+core-types = { workspace = true }
+core-crypto = { workspace = true }
+core-network = { workspace = true }
+core-protocol = { workspace = true }
+core-ethereum-db = { workspace = true }
+core-ethereum-actions = { workspace = true }
+core-ethereum-misc = { workspace = true }
+utils-db = { workspace = true }
+utils-log = { workspace = true }
+utils-misc = { workspace = true }
+utils-types = { workspace = true }
+log = "0.4.20"
 
-console_error_panic_hook = { version = "0.1.7", optional = true }
-#wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
+async-std = { workspace = true, features = ["attributes"] }
+lazy_static = "1.4"
 vector_assertions = "0.1.0"
+mockall = "0.11.4"
+hex-literal = "0.4.1"
+futures = "0.3.28"
+
+core-crypto = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
@@ -42,6 +63,4 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "getrandom/js", "core-types/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen" ]

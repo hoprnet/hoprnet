@@ -118,10 +118,10 @@ impl AnnouncementData {
                             key_binding,
                         })
                     } else {
-                        return Err(NonSpecificError(format!(
+                        Err(NonSpecificError(format!(
                             "Received a multiaddr with a PeerId that doesn't match the keybinding, got {} but expected {}",
                             multiaddress, expected
-                        )));
+                        )))
                     }
                 } else {
                     Ok(Self {
@@ -137,7 +137,7 @@ impl AnnouncementData {
             }
         } else {
             debug!("Received empty multiaddr");
-            return Err(InvalidInput);
+            Err(InvalidInput)
         }
     }
 }

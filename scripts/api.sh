@@ -194,6 +194,16 @@ api_redeem_tickets() {
 
 # $1 = node api endpoint
 # $2 = channel id
+api_aggregate_tickets() {
+  local origin=${1:-localhost:3001}
+  local channel_id="${2}"
+
+  log "aggregating tickets in channel ${channel_id}"
+  api_call "${origin}" "/channels/${channel_id}/tickets/aggregate" "POST" "" "" 600
+}
+
+# $1 = node api endpoint
+# $2 = channel id
 # $3 = assertion
 api_get_tickets_in_channel() {
   local node_api="${1}"
@@ -245,17 +255,19 @@ api_get_node_info() {
 # $3 = peer_address peer id
 # $4 = message
 # $5 = OPTIONAL: peers in the message path
+# $6 = OPTIONAL: expected return code
 api_send_message(){
   local source_api="${1}"
   local tag="${2}"
   local peer_address="${3}"
   local msg="${4}"
   local peers="${5}"
+  local expected_code="${6:-202}"
 
   local path=$(echo "${peers}" | tr -d '\n' | jq -R -s 'split(" ")')
   local payload='{"body":"'${msg}'","path":'${path}',"peerId":"'${peer_address}'","tag":'${tag}'}'
   # Node might need some time once commitment is set on-chain
-  api_call "${source_api}" "/messages" "POST" "${payload}" "202" 90 15 "" true
+  api_call "${source_api}" "/messages" "POST" "${payload}" "${expected_code}" 90 15 "" true
 }
 
 # $1 = source node id
@@ -289,6 +301,25 @@ api_close_channel() {
 }
 
 # $1 = source node id
+# $2 = channel id
+# $3 = destination address
+# $4 = direction
+api_get_channel_info() {
+  local source_api="${1}"
+  local channel_id="${2}"
+  local destination_address="${3}"
+  local direction="${4}"
+
+  if [ -z "${channel_id}" ] || [ "${channel_id}" = "null" ]; then
+    # fetch channel id from API
+    channels_info="$(api_get_all_channels "${source_api}" false)"
+    channel_id="$(echo "${channels_info}" | jq  -r ".${direction}| map(select(.peerAddress | contains(\"${destination_address}\")))[0].id")"
+  fi
+
+  api_call "${source_api}" "/channels/${channel_id}" "GET" "" 'channelId' 60 20
+}
+
+# $1 = source node id
 # $2 = destination node id
 # $3 = channel source api endpoint
 # $4 = channel destination native address
@@ -301,7 +332,7 @@ api_open_channel() {
   local amount="${5:-1000000000000000000000}"
   local result balances hopr_balance
 
-  balances=$(api_get_balances ${api1})
+  balances=$(api_get_balances ${source_api})
   hopr_balance=$(echo ${balances} | jq -r .safeHopr)
   log "Safe balance of node ${source_api} before opening new channel: ${hopr_balance} weiHOPR, need ${amount} weiHOPR"
 

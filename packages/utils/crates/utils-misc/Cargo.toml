@@ -16,13 +16,13 @@ futures = "0.3.28"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_bytes = "0.11"
-serde-wasm-bindgen = { version = "0.5.0", optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true, features = ["futures-core-03-stream"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
-real-base = { path = "../../../real/crates/real-base", default-features = false }
+real-base = { workspace = true, default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

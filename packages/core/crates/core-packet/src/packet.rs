@@ -567,7 +567,7 @@ mod tests {
             )
             .unwrap()
         } else {
-            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default())
+            Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default()).unwrap()
         }
     }
 

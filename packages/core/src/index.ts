@@ -10,80 +10,73 @@ import type { PeerId } from '@libp2p/interface-peer-id'
 // @ts-ignore untyped library
 import retimer from 'retimer'
 
-import { compareAddressesLocalMode, compareAddressesPublicMode } from '@hoprnet/hopr-connect'
-
 import {
+  AccountEntry,
+  AcknowledgedTicket,
+  Address,
   app_version,
+  ApplicationData,
+  Balance,
+  BalanceType,
+  ChainKeypair,
+  ChannelDirection,
+  ChannelEntry,
+  ChannelStatus,
+  close_channel,
+  compareAddressesLocalMode,
+  compareAddressesPublicMode,
   create_counter,
   create_gauge,
   create_histogram_with_buckets,
   create_multi_gauge,
+  Database,
   debug,
   durations,
+  fund_channel,
   getBackoffRetries,
   getBackoffRetryTimeout,
-  isErrorOutOfFunds,
-  MIN_NATIVE_BALANCE,
-  retimer as intervalTimer,
-  retryWithBackoffThenThrow,
-  Address,
-  AccountEntry,
-  AcknowledgedTicket,
-  ChannelStatus,
-  ChannelEntry,
-  Ticket,
-  Hash,
   HalfKeyChallenge,
-  Balance,
-  BalanceType,
+  Hash,
+  Health,
+  HoprdConfig,
+  HoprTools,
+  isErrorOutOfFunds,
   isMultiaddrLocal,
+  MIN_NATIVE_BALANCE,
   OffchainKeypair,
-  ChainKeypair,
-  StrategyTickResult,
-  Database,
   OffchainPublicKey,
-  ApplicationData,
+  open_channel,
   PacketInteractionConfig,
   Path,
   PeerOrigin,
   PeerStatus,
-  Health,
-  Snapshot,
-  HeartbeatConfig,
-  CoreApp,
-  get_peers_with_quality,
-  HoprTools,
-  WasmNetwork,
-  WasmPing,
-  WasmIndexerInteractions,
   PingConfig,
   redeem_all_tickets,
   redeem_tickets_in_channel,
+  redeem_tickets_with_counterparty,
+  retimer as intervalTimer,
+  retryWithBackoffThenThrow,
+  Snapshot,
+  CoreApp,
+  Ticket,
+  WasmIndexerInteractions,
+  WasmNetwork,
+  WasmPing,
   WasmTxExecutor,
-  redeem_tickets_with_counterparty
+  withdraw
 } from '@hoprnet/hopr-utils'
 
-import { INTERMEDIATE_HOPS, MAX_HOPS, PACKET_SIZE, VERSION, MAX_PARALLEL_PINGS } from './constants.js'
+import { INTERMEDIATE_HOPS, MAX_HOPS, MAX_PARALLEL_PINGS, PACKET_SIZE, VERSION } from './constants.js'
 
 import { findPath } from './path/index.js'
 
 import HoprCoreEthereum, {
   type Indexer,
-  NetworkRegistryNodeNotAllowedEventName,
-  NetworkRegistryNodeAllowedEventName
+  NetworkRegistryNodeAllowedEventName,
+  NetworkRegistryNodeNotAllowedEventName
 } from '@hoprnet/hopr-core-ethereum'
 
-import {
-  type ChannelStrategyInterface,
-  isStrategy,
-  OutgoingChannelStatus,
-  SaneDefaults,
-  Strategy,
-  StrategyFactory
-} from './channel-strategy.js'
-
-import type { ResolvedNetwork } from './network.js'
-import type { EventEmitter as Libp2pEmitter } from '@libp2p/interfaces/events'
+import { type ResolvedNetwork, resolveNetwork } from './network.js'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
 import { peerIdFromString } from '@libp2p/peer-id'
 
@@ -113,94 +106,15 @@ const metric_pathLength = create_histogram_with_buckets(
   'Distribution of number of hops of sent messages',
   new Float64Array([0, 1, 2, 3, 4])
 )
-const metric_strategyTicks = create_counter('core_counter_strategy_ticks', 'Number of strategy decisions (ticks)')
-const metric_strategyLastOpened = create_gauge(
-  'core_gauge_strategy_last_opened_channels',
-  'Number of opened channels in the last strategy tick'
-)
-const metric_strategyLastClosed = create_gauge(
-  'core_gauge_strategy_last_closed_channels',
-  'Number of closed channels in the last strategy tick'
-)
-const metric_strategyMaxChannels = create_gauge(
-  'core_gauge_strategy_max_auto_channels',
-  'Maximum number of channels the current strategy can open'
-)
 
 /// Maximum time to wait for a packet to be pushed to the interaction queue in milliseconds
 const PACKET_QUEUE_TIMEOUT_MILLISECONDS = 15000n
 
-interface NetOptions {
-  ip?: string
-  dns?: string
-  port: number
-}
+const TICKET_AGGREGATION_TIMEOUT_MILLISECONDS = 10000n
 
 type PeerStoreAddress = {
   id: PeerId
   multiaddrs: Multiaddr[]
-}
-
-export type HoprOptions = {
-  network: ResolvedNetwork
-  announce: boolean
-  dataPath: string
-  createDbIfNotExist: boolean
-  forceCreateDB: boolean
-  allowLocalConnections: boolean
-  allowPrivateConnections: boolean
-  password: string
-  connector?: HoprCoreEthereum
-  strategy?: {
-    name: Strategy
-    settings?: any
-  }
-  hosts: NetOptions[]
-  heartbeatInterval?: number
-  heartbeatThreshold?: number
-  heartbeatVariance?: number
-  networkQualityThreshold?: number
-  onChainConfirmations?: number
-  checkUnrealizedBalance?: boolean
-  maxParallelConnections?: number
-  // disable NAT relay functionality
-  noRelay?: boolean
-  testing?: {
-    // when true, assume that the node is running in an isolated network and does
-    // not need any connection to nodes outside of the subnet
-    // default: false
-    announceLocalAddresses?: boolean
-    // when true, assume a testnet with multiple nodes running on the same machine
-    // or in the same private IPv4 network
-    // default: false
-    preferLocalAddresses?: boolean
-    // when true, intentionally fail on direct connections
-    // to test NAT behavior
-    // default: false
-    noDirectConnections?: boolean
-    // local-mode STUN, used for unit testing and e2e testing
-    // default: false
-    localModeStun?: boolean
-    // when true, even if a direct WebRTC connection is possible,
-    // don't do the upgrade to it to test bidirectional NAT
-    // default: false
-    noWebRTCUpgrade?: boolean
-    // Use mocked libp2p instance instead of real one
-    useMockedLibp2p?: boolean
-    // When using mocked libp2p instance, use existing mocked
-    // DHT to simulate decentralized networks
-    mockedDHT?: Map<string, string[]>
-    // When using mocked libp2p instances
-    mockedNetwork?: Libp2pEmitter<any>
-  }
-  safeModule: {
-    // Base URL to interact with safe transaction service
-    safeTransactionServiceProvider?: string
-    // Address of node's safe proxy instance
-    safeAddress?: Address
-    // Address of node's safe-module proxy instance
-    moduleAddress?: Address
-  }
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -209,7 +123,6 @@ export class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
   private stopPeriodicCheck: (() => void) | undefined
-  private strategy: ChannelStrategyInterface
   private tools: HoprTools
   private networkPeers: WasmNetwork
   private pinger: WasmPing
@@ -238,13 +151,13 @@ export class Hopr extends EventEmitter {
     private chainKeypair: ChainKeypair,
     private packetKeypair: OffchainKeypair,
     public db: Database,
-    private options: HoprOptions
+    private cfg: HoprdConfig
   ) {
     super()
 
-    this.network = options.network
-    log(`using network: ${this.network.id}`)
-    this.indexer = HoprCoreEthereum.getInstance().indexer // TODO temporary
+    this.network = resolveNetwork(cfg.network, cfg.chain.provider)
+    log(`Using network: ${this.network.id}`)
+    this.indexer = HoprCoreEthereum.getInstance().indexer
     this.id = peerIdFromString(packetKeypair.to_peerid_str())
   }
 
@@ -296,7 +209,7 @@ export class Hopr extends EventEmitter {
     verbose('Waiting for indexer to find connected nodes.')
 
     // Add us as public node if announced
-    if (!this.options.announce) {
+    if (!this.cfg.chain.announce) {
       throw new Error('Announce option should be turned ON in Providence, only public nodes are supported')
     }
 
@@ -319,12 +232,6 @@ export class Hopr extends EventEmitter {
     const pushToRecentlyAnnouncedNodes = (peer: PeerStoreAddress) => recentlyAnnouncedNodes.push(peer)
     connector.indexer.on('peer', pushToRecentlyAnnouncedNodes)
 
-    let heartbeat_cfg = new HeartbeatConfig(
-      this.options?.heartbeatVariance,
-      this.options?.heartbeatInterval,
-      BigInt(this.options?.heartbeatThreshold)
-    )
-
     let ping_cfg = new PingConfig(
       MAX_PARALLEL_PINGS,
       BigInt(2000) // in millis
@@ -336,12 +243,8 @@ export class Hopr extends EventEmitter {
       this.emit('hopr:message-acknowledged', ackChallenge.to_hex())
     }
 
-    const onAcknowledgedTicket = (ackTicket: AcknowledgedTicket) => {
-      connector.emit('ticket:acknowledged', ackTicket)
-    }
-
     let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
-    packetCfg.check_unrealized_balance = this.options.checkUnrealizedBalance ?? true
+    packetCfg.check_unrealized_balance = this.cfg.chain.check_unrealized_balance
 
     const onReceivedMessage = (msg: Uint8Array) => {
       try {
@@ -352,9 +255,13 @@ export class Hopr extends EventEmitter {
     }
 
     log('Linking chain and packet keys')
-    this.db.link_chain_and_packet_keys(this.chainKeypair.to_address(), this.packetKeypair.public(), Snapshot._default())
+    this.db.link_chain_and_packet_keys(
+      this.chainKeypair.to_address(),
+      this.packetKeypair.public(),
+      Snapshot.make_default()
+    )
 
-    const tbfPath = path.join(this.options.dataPath, 'tbf')
+    const tbfPath = path.join(this.cfg.db.data, 'tbf')
     let tagBloomFilter = new TagBloomFilter()
     try {
       let tbfData = new Uint8Array(fs.readFileSync(tbfPath))
@@ -363,17 +270,24 @@ export class Hopr extends EventEmitter {
       error(`no tag bloom filter file found, using empty`)
     }
 
-    let txExecutor = new WasmTxExecutor(connector.sendTicketRedeemTx.bind(connector))
+    let txExecutor = new WasmTxExecutor(
+      connector.sendTicketRedeemTx.bind(connector),
+      connector.openChannel.bind(connector),
+      connector.fundChannel.bind(connector),
+      connector.initializeClosure.bind(connector),
+      connector.finalizeClosure.bind(connector),
+      connector.withdraw.bind(connector)
+    )
 
     log('Constructing the core application and tools')
     let coreApp = new CoreApp(
       new OffchainKeypair(this.packetKeypair.secret()),
+      this.chainKeypair,
       this.db.clone(),
-      this.options.networkQualityThreshold,
-      heartbeat_cfg,
+      this.cfg.network_options,
+      this.cfg.heartbeat,
       ping_cfg,
       onAcknowledgement,
-      onAcknowledgedTicket,
       packetCfg,
       onReceivedMessage,
       tagBloomFilter,
@@ -385,7 +299,12 @@ export class Hopr extends EventEmitter {
         }
       },
       txExecutor,
-      this.getLocalMultiaddresses().map((x) => x.toString())
+      this.getLocalMultiaddresses().map((x) => x.toString()),
+      this.cfg.protocol.ack,
+      this.cfg.protocol.heartbeat,
+      this.cfg.protocol.msg,
+      this.cfg.protocol.ticket_aggregation,
+      this.cfg.strategy
     )
 
     this.tools = coreApp.tools()
@@ -435,7 +354,7 @@ export class Hopr extends EventEmitter {
     if (await connector.isNodeSafeNotRegistered()) {
       log('No NodeSafeRegistry entry yet, proceeding with direct announcement')
       try {
-        await this.announce(this.options.announce)
+        await this.announce(this.cfg.chain.announce)
         this.hasAnnounced = true
       } catch (err) {
         console.error('Could not announce directly self on-chain: ', err)
@@ -443,7 +362,7 @@ export class Hopr extends EventEmitter {
     } else {
       log('NodeSafeRegistry entry already present, proceeding with Safe-Module announcement')
       try {
-        await this.announce(this.options.announce, true)
+        await this.announce(this.cfg.chain.announce, true)
         this.hasAnnounced = true
       } catch (err) {
         console.error('Could not announce through Safe-Module self on-chain: ', err)
@@ -469,15 +388,8 @@ export class Hopr extends EventEmitter {
     // subscribe so we can process channel close events
     connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
-    let strategy: ChannelStrategyInterface
-    if (this.options.strategy) {
-      strategy = StrategyFactory.getStrategy(this.options.strategy.name, this)
-      strategy.configure(this.options.strategy.settings)
-    } else {
-      strategy = StrategyFactory.getStrategy('passive', this)
-    }
-
-    this.setChannelStrategy(strategy)
+    // subscribe so we can process channel ticket redeemed events
+    connector.indexer.on('ticket-redeemed', this.onTicketRedeemed.bind(this))
 
     log('announcing done, strategy interval')
     this.startPeriodicStrategyCheck()
@@ -505,14 +417,12 @@ export class Hopr extends EventEmitter {
     let mas: Multiaddr[] = []
 
     // at this point the values were parsed and validated already
-    for (const host of this.options.hosts) {
-      if (host.ip) {
-        mas.push(multiaddr(`/ip4/${host.ip}/tcp/${host.port}`))
-      } else if (host.dns) {
-        mas.push(multiaddr(`/dns4/${host.dns}/tcp/${host.port}`))
-      } else {
-        log('Error: Unhandled host type in multiaddress conversion')
-      }
+    if (this.cfg.host.is_ipv4()) {
+      mas.push(multiaddr(`/ip4/${this.cfg.host.address()}/tcp/${this.cfg.host.port}`))
+    } else if (this.cfg.host.is_domain()) {
+      mas.push(multiaddr(`/dns4/${this.cfg.host.address()}/tcp/${this.cfg.host.port}`))
+    } else {
+      new Error('Unknown format specified for host')
     }
 
     return mas
@@ -524,8 +434,24 @@ export class Hopr extends EventEmitter {
    * @param channel object
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
-    if (channel.status === ChannelStatus.PendingToClose) {
-      await this.strategy.onChannelWillClose(channel)
+    try {
+      await this.tools.channel_events().send_event(channel)
+    } catch (e) {
+      log(`failed to emit channel closure event`)
+    }
+  }
+
+  /*
+   * Callback function used to react to on-chain channel ticket redeem events.
+   * Specifically we resolve the pending balance of the ticket.
+   * @param channel object
+   * @param ticket amount
+   */
+  private async onTicketRedeemed(channel: ChannelEntry, ticketAmount: Balance): Promise<void> {
+    // We are only interested in channels where we are the source, since only
+    // then we track the pending balance.
+    if (channel.source.eq(this.getEthereumAddress())) {
+      await this.db.resolve_pending(channel.destination, ticketAmount)
     }
   }
 
@@ -613,37 +539,6 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  private async strategyOpenChannel(status: OutgoingChannelStatus) {
-    try {
-      const destinationAddress = Address.from_string(status.address)
-      const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(Address.from_string(status.address))
-      const stake = new BN(status.stake_str)
-
-      const pId = peerIdFromString(pk.to_peerid_str())
-      if (await this.isAllowedAccessToNetwork(pId)) {
-        await this.networkPeers.register(pId.toString(), PeerOrigin.StrategyNewChannel)
-
-        const hash = await this.openChannel(destinationAddress, stake)
-        verbose('- opened channel', status.address, hash)
-        this.emit('hopr:channel:opened', status)
-      } else {
-        error(`Protocol error: strategy wants to open channel to non-registered peer ${status.address}`)
-      }
-    } catch (e) {
-      error(`strategy could not open channel to ${status.address}`, e)
-    }
-  }
-
-  private async strategyCloseChannel(destination: string) {
-    try {
-      await this.closeChannel(Address.from_string(destination), 'outgoing')
-      verbose(`closed channel to ${destination.toString()}`)
-      this.emit('hopr:channel:closed', destination)
-    } catch (e) {
-      error(`strategy could not close channel ${destination}`)
-    }
-  }
-
   private async updateChannelMetrics() {
     const selfAddr = this.getEthereumAddress()
 
@@ -678,70 +573,6 @@ export class Hopr extends EventEmitter {
       metric_outChannelCount.set(outgoingChannels)
     } catch (e) {
       error(`error: failed to update channel metrics`, e)
-    }
-  }
-
-  // On the strategy interval, poll the strategy to see what channel changes
-  // need to be made.
-  private async tickChannelStrategy() {
-    verbose('strategy tick', this.status, this.strategy.name)
-    if (this.status != 'RUNNING') {
-      throw new Error('node is not RUNNING')
-    }
-
-    let tickResult: StrategyTickResult
-    try {
-      // Retrieve all outgoing channels
-      const outgoingChannels = await this.getChannelsFrom(this.getEthereumAddress())
-      verbose(`strategy tracks ${outgoingChannels.length} outgoing channels`)
-
-      // Check if all peer ids are still registered
-      await Promise.all(
-        outgoingChannels.map(async (channel) => {
-          const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(
-            Address.from_string(channel.destination.to_string())
-          )
-
-          if (await this.isAllowedAccessToNetwork(peerIdFromString(pk.to_peerid_str()))) {
-            await this.networkPeers.register(pk.to_peerid_str(), PeerOrigin.StrategyExistingChannel)
-          } else {
-            error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.to_hex()}`)
-          }
-        })
-      )
-
-      // Perform the strategy tick
-      tickResult = this.strategy.tick(
-        new BN((await this.getBalance()).to_string()),
-        await get_peers_with_quality(this.networkPeers, this.db),
-        outgoingChannels.map((c) => {
-          return {
-            address: c.destination.to_string(),
-            stake_str: c.balance.to_string(),
-            status: c.status
-          }
-        })
-      )
-      metric_strategyTicks.increment()
-      metric_strategyMaxChannels.set(tickResult.max_auto_channels)
-    } catch (e) {
-      error(`failed to do a strategy tick`, e)
-      throw new Error('error while performing strategy tick')
-    }
-
-    let allClosedChannels = tickResult.to_close()
-    verbose(`strategy wants to close ${allClosedChannels.length} channels`)
-    metric_strategyLastClosed.set(allClosedChannels.length)
-
-    let allOpenedChannels: OutgoingChannelStatus[] = tickResult.to_open()
-    verbose(`strategy wants to open ${allOpenedChannels.length} new channels`)
-    metric_strategyLastOpened.set(allOpenedChannels.length)
-
-    try {
-      await Promise.all(allClosedChannels.map(this.strategyCloseChannel.bind(this)))
-      await Promise.all(allOpenedChannels.map(this.strategyOpenChannel.bind(this)))
-    } catch (e) {
-      error(`error when strategy was trying to open or close channels`, e)
     }
   }
 
@@ -794,9 +625,7 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
   }
 
   /**
@@ -809,9 +638,30 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
+  }
+
+  /**
+   * Attempts to all tickets in the given channel.
+   * @param channelId id of the channel
+   */
+  public async aggregateTickets(channelId: Hash) {
+    const channel = await this.db.get_channel(channelId)
+
+    // make additional assertions
+    if (!channel) {
+      throw new Error('Cannot aggregate tickets in non-existing channel')
+    }
+    if (!(channel.status in [ChannelStatus.Open, ChannelStatus.PendingToClose])) {
+      throw new Error('Cannot aggregate tickets in channel when not in status OPEN or PENDING_TO_CLOSE')
+    }
+
+    let ticketCount = await this.db.get_acknowledged_tickets_count()
+    if (ticketCount < 1) {
+      throw new Error('No tickets found in channel')
+    }
+
+    await this.tools.aggregate_tickets(channelId, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
   }
 
   /**
@@ -939,6 +789,7 @@ export class Hopr extends EventEmitter {
     HoprCoreEthereum.getInstance().emit(event)
   }
 
+  // This now only used to update metrics
   public startPeriodicStrategyCheck() {
     const periodicCheck = async function (this: Hopr) {
       log('periodic check. Current status:', this.status)
@@ -946,23 +797,20 @@ export class Hopr extends EventEmitter {
         return
       }
       const timer = retimer(() => {
-        log('strategy tick took longer than 10 secs')
+        log('tick took longer than 10 secs')
       }, 10000)
       try {
-        log('Triggering tick channel strategy')
-        await this.tickChannelStrategy()
+        log('Triggering tick')
         await this.updateChannelMetrics()
       } catch (e) {
         log('error in periodic check', e)
       }
       log('Clearing out logging timeout.')
       timer.clear()
-      log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
     }.bind(this)
 
-    log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
-
-    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => this.strategy.tickInterval)
+    log(`Starting periodicCheck interval with 60000ms`)
+    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => 60000)
   }
 
   /**
@@ -976,9 +824,7 @@ export class Hopr extends EventEmitter {
       multiaddr(mas)
     )
 
-    return addrs.sort(
-      this.options.testing?.preferLocalAddresses ? compareAddressesLocalMode : compareAddressesPublicMode
-    )
+    return addrs.sort(this.cfg.test.prefer_local_addresses ? compareAddressesLocalMode : compareAddressesPublicMode)
   }
 
   /*
@@ -1017,9 +863,9 @@ export class Hopr extends EventEmitter {
     if (announceRoutableAddress) {
       let multiaddrs = this.getLocalMultiaddresses()
 
-      if (this.options.testing?.announceLocalAddresses) {
+      if (this.cfg.test.announce_local_addresses) {
         multiaddrs = multiaddrs.filter((ma) => isMultiaddrLocal(ma))
-      } else if (this.options.testing?.preferLocalAddresses) {
+      } else if (this.cfg.test.prefer_local_addresses) {
         // If we need local addresses, sort them first according to their class
         multiaddrs.sort(compareAddressesLocalMode)
       } else {
@@ -1100,23 +946,6 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  public setChannelStrategy(strategy: ChannelStrategyInterface): void {
-    log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
-    this.strategy = strategy
-
-    HoprCoreEthereum.getInstance().on('ticket:acknowledged', async (ack: AcknowledgedTicket) => {
-      try {
-        await this.strategy.onAckedTicket(ack)
-      } catch (err) {
-        error(`Strategy error while handling acknowledged ticket`, err)
-      }
-    })
-  }
-
-  public getChannelStrategy(): ChannelStrategyInterface {
-    return this.strategy
-  }
-
   public async getBalance(): Promise<Balance> {
     verbose('Requesting hopr balance for node')
     // we do not keep the node's hopr balance in the db anymore, therefore use
@@ -1176,13 +1005,14 @@ export class Hopr extends EventEmitter {
     if (!this.isReady) {
       log('openChannel: Node is not ready for on-chain operations')
     }
-
+    let self_addr = this.getEthereumAddress()
+    let amount = new Balance(amountToFund.toString(10), BalanceType.HOPR)
+    let tx_sender = this.tools.get_tx_sender()
     try {
-      return HoprCoreEthereum.getInstance().openChannel(
-        counterparty,
-        new Balance(amountToFund.toString(10), BalanceType.HOPR)
-      )
+      let res = await open_channel(this.db, counterparty, self_addr, amount, tx_sender)
+      return { channelId: res.channel_id, receipt: res.tx_hash.to_hex() }
     } catch (err) {
+      log('failed to open channel', err)
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to openChannel: ${err}`)
     }
@@ -1199,21 +1029,13 @@ export class Hopr extends EventEmitter {
       log('fundChannel: Node is not ready for on-chain operations')
     }
 
-    const connector = HoprCoreEthereum.getInstance()
-    const channel = await this.db.get_channel(channelId)
-
-    // make additional assertions
-    if (!channel) {
-      throw new Error('Cannot fund non-existing channel')
-    }
-    if (channel.status !== ChannelStatus.Open) {
-      throw new Error('Cannot fund channel when not in status OPEN')
-    }
-
     try {
-      const counterparty = channel.destination
-      return connector.fundChannel(counterparty, new Balance(amount.toString(10), BalanceType.HOPR))
+      let newAmount = new Balance(amount.toString(10), BalanceType.HOPR)
+      let tx_sender = this.tools.get_tx_sender()
+      let res = await fund_channel(this.db, channelId, newAmount, tx_sender)
+      return res.to_hex()
     } catch (err) {
+      log('failed to fund channel', err)
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to fundChannel: ${err}`)
     }
@@ -1221,74 +1043,22 @@ export class Hopr extends EventEmitter {
 
   public async closeChannel(
     counterparty: Address,
-    direction: 'incoming' | 'outgoing'
+    direction: ChannelDirection
   ): Promise<{ receipt: string; status: ChannelStatus }> {
     if (!this.isReady) {
       log('closeChannel: Node is not ready for on-chain operations')
     }
 
-    const connector = HoprCoreEthereum.getInstance()
-    const channel = ChannelEntry.deserialize(
-      (direction === 'outgoing'
-        ? await this.db.get_channel_x(this.getEthereumAddress(), counterparty)
-        : await this.db.get_channel_x(counterparty, this.getEthereumAddress())
-      ).serialize()
-    )
-
-    if (channel === undefined) {
-      log(`The requested channel for counterparty ${counterparty.toString()} does not exist`)
-      throw new Error('Requested channel does not exist')
-    }
-
-    log(`asking to close channel: ${channel.to_string()}`)
-
-    // TODO: should we wait for confirmation?
-    if (channel.status === ChannelStatus.Closed) {
-      throw new Error('Channel is already closed')
-    }
-
-    if (channel.status === ChannelStatus.Open) {
-      await this.strategy.onChannelWillClose(channel)
-    }
-
-    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (direction === 'incoming') {
-      log(
-        `Incoming channel: ignoring closing channel ${channel
-          .get_id()
-          .to_hex()} because current HoprChannels contract does not support closing incoming channels.`
-      )
-      throw new Error('Incoming channel: Closing incoming channels currently is not supported.')
-    }
-
-    let txHash: string
     try {
-      if (channel.status === ChannelStatus.Open) {
-        log('initiating closure of channel', channel.get_id().to_hex())
-        txHash = await connector.initializeClosure(channel.source, channel.destination)
-      } else {
-        // verify that we passed the closure waiting period to prevent failing
-        // on-chain transactions
-
-        if (channel.closure_time_passed()) {
-          txHash = await connector.finalizeClosure(channel.source, channel.destination)
-        } else {
-          log(
-            `ignoring finalizing closure of channel ${channel
-              .get_id()
-              .to_hex()} because closure window is still active. Need to wait ${channel
-              .remaining_closure_time()
-              .toString(10)} seconds.`
-          )
-        }
-      }
+      let self_addr = this.getEthereumAddress()
+      let tx_sender = this.tools.get_tx_sender()
+      let res = await close_channel(this.db, counterparty, self_addr, direction, false, tx_sender)
+      return { receipt: res.tx_hash.to_hex(), status: res.status }
     } catch (err) {
       log('failed to close channel', err)
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to closeChannel: ${err}`)
     }
-
-    return { receipt: txHash, status: channel.status }
   }
 
   public async getAllTickets(): Promise<Ticket[]> {
@@ -1350,26 +1120,28 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  public async redeemAllTickets() {
+  public async redeemAllTickets(onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemAllTickets: Node is not ready for on-chain operations')
     }
     try {
-      await redeem_all_tickets(this.db, this.chainKeypair.to_address(), this.tools.get_tx_sender())
+      let tx_sender = this.tools.get_tx_sender()
+      await redeem_all_tickets(this.db, onlyAggregated, tx_sender)
     } catch (err) {
       log(`error during all tickets redemption: ${err}`)
     }
   }
 
-  public async redeemTicketsInChannel(channelId: Hash) {
+  public async redeemTicketsInChannel(channelId: Hash, onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemTicketsInChannel: Node is not ready for on-chain operations')
     }
     try {
       log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
       const channel = await this.db.get_channel(channelId)
+      let tx_sender = this.tools.get_tx_sender()
       if (channel?.destination.eq(this.getEthereumAddress())) {
-        await redeem_tickets_in_channel(this.db, channel, this.tools.get_tx_sender())
+        await redeem_tickets_in_channel(this.db, channel, onlyAggregated, tx_sender)
       } else {
         log(`cannot redeem tickets in channel ${channelId.to_hex()}`)
       }
@@ -1378,13 +1150,14 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  public async redeemTicketsWithCounterparty(counterparty: Address) {
+  public async redeemTicketsWithCounterparty(counterparty: Address, onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemTicketsWithCounterparty: Node is not ready for on-chain operations')
     }
 
     try {
-      await redeem_tickets_with_counterparty(this.db, counterparty, this.tools.get_tx_sender())
+      let tx_sender = this.tools.get_tx_sender()
+      await redeem_tickets_with_counterparty(this.db, counterparty, onlyAggregated, tx_sender)
     } catch (err) {
       log(`error during ticket redemption with counterparty ${counterparty.to_hex()}: ${err}`)
     }
@@ -1450,7 +1223,7 @@ export class Hopr extends EventEmitter {
   }
 
   public getEthereumAddress(): Address {
-    return this.chainKeypair.public().to_address()
+    return this.chainKeypair.public().to_address().clone()
   }
 
   /**
@@ -1460,19 +1233,18 @@ export class Hopr extends EventEmitter {
    * @param amount how many tokens to be transferred
    * @returns
    */
-  public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+  public async withdraw(recipient: Address, amount: Balance): Promise<string> {
     if (!this.isReady) {
       log('withdraw: Node is not ready for on-chain operations')
     }
-    let result: string
     try {
-      result = await HoprCoreEthereum.getInstance().withdraw(currency, recipient, amount)
+      let tx_sender = this.tools.get_tx_sender()
+      let result = await withdraw(recipient, amount, tx_sender)
+      return result.to_hex()
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
       throw new Error(`Failed to withdraw: ${err}`)
     }
-
-    return result
   }
 
   public async peerIdToChainKey(id: PeerId): Promise<Address> {
@@ -1593,17 +1365,5 @@ export class Hopr extends EventEmitter {
 
 export { PEER_METADATA_PROTOCOL_VERSION } from './constants.js'
 export { createHoprNode } from './main.js'
-export {
-  Strategy,
-  StrategyFactory,
-  StrategyTickResult,
-  isStrategy,
-  SaneDefaults,
-  findPath,
-  PeerOrigin,
-  PeerStatus,
-  Health,
-  type ChannelStrategyInterface
-}
+export { findPath, PeerOrigin, PeerStatus, Health }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
-export { sampleOptions } from './index.mock.js'

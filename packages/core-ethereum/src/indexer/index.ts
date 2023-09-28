@@ -6,10 +6,9 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import {
   defer,
   ChannelStatus,
-  Balance,
-  BalanceType,
   Address,
   ChannelEntry,
+  Balance,
   AccountEntry,
   Snapshot,
   debug,
@@ -134,6 +133,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
         ownChannelUpdated: this.onOwnChannelUpdated.bind(this),
+        ticketRedeemed: this.onTicketRedeemed.bind(this),
         nodeNotAllowedToAccessNetwork: this.onNodeNotAllowedToAccessNetwork.bind(this),
         nodeAllowedToAccessNetwork: this.onNodeAllowedToAccessNetwork.bind(this)
       }
@@ -163,24 +163,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
     // no need to query before HoprChannels or HoprNetworkRegistry existed
     fromBlock = Math.max(fromBlock, this.genesisBlock)
-
-    // update the base valuse of balance and allowance of token for safe
-    if (!this.lastSnapshot) {
-      // update safe's HOPR token balance
-      log(`get safe ${this.safeAddress.to_string()} HOPR balance at block ${fromBlock}`)
-      const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
-      await this.db.set_hopr_balance(Balance.deserialize(hoprBalance.serialize_value(), BalanceType.HOPR))
-      log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
-
-      // update safe's HORP token allowance granted to Channels contract
-      log(`get safe ${this.safeAddress.to_string()} HOPR allowance at block ${fromBlock}`)
-      const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
-      await this.db.set_staking_safe_allowance(
-        Balance.deserialize(safeAllowance.serialize_value(), BalanceType.HOPR),
-        new Snapshot(new U256('0'), new U256('0'), new U256('0')) // dummy snapshot
-      )
-      log(`set safe allowance to ${safeAllowance.to_formatted_string()}`)
-    }
 
     log('Starting to index from block %d, sync progress 0%%', fromBlock)
 
@@ -773,6 +755,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
   onOwnChannelUpdated(channel: ChannelEntry) {
     this.emit('own-channel-updated', channel)
+  }
+
+  onTicketRedeemed(channel: ChannelEntry, ticketAmount: Balance) {
+    this.emit('ticket-redeemed', channel, ticketAmount)
   }
 
   onNodeNotAllowedToAccessNetwork(address: Address) {

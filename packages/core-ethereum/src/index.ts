@@ -8,7 +8,6 @@ import {
   BalanceType,
   Address,
   cacheNoArgAsyncFunction,
-  ChannelStatus,
   generate_channel_id,
   Hash,
   debug,
@@ -169,11 +168,6 @@ export default class HoprCoreEthereum extends EventEmitter {
       try {
         await this.chain.waitUntilReady()
 
-        // update token balance
-        //const hoprBalance = await this.chain.getBalance(this.chainKeypair.to_address())
-        //await this.db.set_hopr_balance(hoprBalance)
-        //log(`set own HOPR balance to ${hoprBalance.to_formatted_string()}`)
-
         // indexer starts
         await this.indexer.start(this.chain, this.chain.getGenesisBlock(), this.safeModuleOptions.safeAddress)
 
@@ -204,9 +198,11 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
-  async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+  async withdraw(recipient: Address, amount: Balance): Promise<string> {
     // promise of tx hash gets resolved when the tx is mined.
-    return this.chain.withdraw(currency, recipient, amount, (tx: string) =>
+    let currency: 'NATIVE' | 'HOPR' = amount.balance_type() == BalanceType.Native ? 'NATIVE' : 'HOPR'
+
+    return this.chain.withdraw(currency, recipient.to_string(), amount.amount().to_string(), (tx: string) =>
       this.setTxHandler(currency === 'NATIVE' ? `withdraw-native-${tx}` : `withdraw-hopr-${tx}`, tx)
     )
   }
@@ -299,66 +295,29 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  async initializeClosure(src: Address, dest: Address): Promise<string> {
-    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (!this.chainKeypair.to_address().eq(src)) {
-      throw Error('Initialize incoming channel closure currently is not supported.')
-    }
-
-    const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
-
-    if (c.status !== ChannelStatus.Open) {
-      throw Error('Channel status is not OPEN or WAITING FOR COMMITMENT')
-    }
+  async initializeClosure(_src: Address, dest: Address): Promise<string> {
     return this.chain.initiateOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 
-  public async finalizeClosure(src: Address, dest: Address): Promise<string> {
-    // TODO: should remove this blocker when https://github.com/hoprnet/hoprnet/issues/4194 gets addressed
-    if (!this.chainKeypair.to_address().eq(src)) {
-      throw Error('Finalizing incoming channel closure currently is not supported.')
-    }
-    const c = ChannelEntry.deserialize((await this.db.get_channel_x(src, dest)).serialize())
-
-    if (c.status !== ChannelStatus.PendingToClose) {
-      throw Error('Channel status is not PENDING_TO_CLOSE')
-    }
+  async finalizeClosure(_src: Address, dest: Address): Promise<string> {
     return await this.chain.finalizeOutgoingChannelClosure(dest, (txHash: string) =>
       this.setTxHandler(`channel-updated-${txHash}`, txHash)
     )
   }
 
-  public async openChannel(dest: Address, amount: Balance): Promise<{ channelId: Hash; receipt: Receipt }> {
-    if (this.chainKeypair.to_address().eq(dest)) {
-      throw Error('Cannot open channel to self!')
-    }
-
-    // channel may not exist, we can still open it
-    let c: ChannelEntry
-    try {
-      c = await this.db.get_channel_to(dest)
-    } catch {
-      log(`failed to retrieve channel information`)
-    }
-
-    if (c && c.status !== ChannelStatus.Closed) {
-      throw Error('Channel is already opened')
-    }
-
+  async openChannel(dest: Address, amount: Balance): Promise<{ channel_id: string; receipt: string }> {
     log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
     const receipt = await this.fundChannel(dest, amount)
-    return { channelId: generate_channel_id(this.chainKeypair.to_address(), dest), receipt }
+    return { channel_id: generate_channel_id(this.chainKeypair.to_address(), dest).to_hex(), receipt }
   }
 
   // This operation works on open and closed channels. More assertions must be
   // enforced on a higher layer.
-  public async fundChannel(dest: Address, amount: Balance): Promise<Receipt> {
+  async fundChannel(dest: Address, amount: Balance): Promise<Receipt> {
     const myBalance = await this.getSafeBalance()
-    if (amount.lte(Balance.zero(BalanceType.HOPR))) {
-      throw Error('Amount must be more than 0')
-    }
+
     if (amount.gt(myBalance)) {
       throw Error(`Not enough balance (${myBalance.to_string()} < ${amount.to_string()})`)
     }
@@ -368,11 +327,6 @@ export default class HoprCoreEthereum extends EventEmitter {
         .to_string()} dest: ${dest.to_string()} amount: ${amount.to_string()}`
     )
 
-    // allowance must be larger or equal to the amount
-    const allowance = await this.db.get_staking_safe_allowance()
-    if (allowance.lt(amount)) {
-      throw Error(`Not enough allowance (${allowance.to_string()} < ${amount.to_string()})`)
-    }
     const receipt = (
       await this.chain.fundChannel(
         dest,

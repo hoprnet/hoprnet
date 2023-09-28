@@ -4,7 +4,7 @@ ARG HOPR_TOOLCHAIN_IMAGE=${HOPR_TOOLCHAIN_IMAGE:-europe-west3-docker.pkg.dev/hop
 # https://hub.docker.com/layers/library/debian/11.7-slim/images/sha256-b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3?context=explore
 ARG DEBIAN_IMAGE=${DEBIAN_IMAGE:-debian:11.7-slim@sha256:b74f58783fdb8f58107f1d0b3d8e7721e11feeacd9c4c8faa159a14bb0fc6bb3}
 
-FROM ${HOPR_TOOLCHAIN_IMAGE} as builder
+FROM --platform=linux/amd64 ${HOPR_TOOLCHAIN_IMAGE} as builder
 
 WORKDIR /app/hoprnet
 
@@ -27,7 +27,7 @@ RUN OPENSSL_LIB_DIR=/usr/lib/$(uname -m)-linux-gnu RUSTFLAGS="-C target-feature=
 RUN rm -rf target/release && \
     mv target/$(uname -m)-unknown-linux-musl/release target/
 
-FROM ${DEBIAN_IMAGE} as runtime
+FROM --platform=linux/amd64 ${DEBIAN_IMAGE} as runtime
 
 LABEL name="hopli" \
     maintainer="tech@hoprnet.org" \

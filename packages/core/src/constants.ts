@@ -23,4 +23,4 @@ export const ACKNOWLEDGEMENT_TIMEOUT = 2000
 
 export const PEER_METADATA_PROTOCOL_VERSION = 'protocol_version'
 
-export const DB_VERSION_TAG = 'indexer_4'
+export const DB_VERSION_TAG = 'main_2'

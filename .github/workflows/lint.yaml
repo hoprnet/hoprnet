@@ -1,7 +1,6 @@
 name: Lint
 
 env:
-  HOPR_GITHUB_REF: ${{ github.ref }}
   RUST_BACKTRACE: "1"
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -11,9 +10,6 @@ on:
     types:
       - synchronize
       - ready_for_review
-    paths-ignore:
-      - 'docs/**/*'
-      - '**/*.md'
 concurrency:
   group: ${{ github.head_ref }}-lint
   cancel-in-progress: true
@@ -75,7 +71,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
 
       - name: Install dependencies
         run: nix develop -c make -j deps-ci

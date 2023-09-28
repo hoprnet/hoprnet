@@ -26,7 +26,7 @@ pub async fn validate_unacknowledged_ticket<T: HoprCoreEthereumDbActions>(
 
     // ticket signer MUST be the sender
     ticket
-        .verify(sender, &domain_separator)
+        .verify(sender, domain_separator)
         .map_err(|e| TicketValidation(format!("ticket signer does not match the sender: {e}")))?;
 
     // ticket amount MUST be greater or equal to minTicketAmount
@@ -152,6 +152,7 @@ mod tests {
                 half_key_challenge: &HalfKeyChallenge,
                 ack_ticket: AcknowledgedTicket,
             ) -> core_ethereum_db::errors::Result<()>;
+            async fn get_acknowledged_tickets_count(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<usize>;
             async fn get_acknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn get_acknowledged_tickets_range(
                 &self,
@@ -161,10 +162,18 @@ mod tests {
                 index_end: u64,
             ) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
+            async fn prepare_aggregatable_tickets(
+                &mut self,
+                channel_id: &Hash,
+                epoch: u32,
+                index_start: u64,
+                index_end: u64,
+            ) -> core_ethereum_db::errors::Result<Vec<AcknowledgedTicket>>;
             async fn replace_acked_tickets_by_aggregated_ticket(&mut self, aggregated_ticket: AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_unacknowledged_tickets(&self, filter: Option<ChannelEntry>) -> core_ethereum_db::errors::Result<Vec<UnacknowledgedTicket>>;
             async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_balance_to(&self, counterparty: &Address) -> core_ethereum_db::errors::Result<Balance>;
+            async fn reset_pending_balance_to(&mut self, counterparty: &Address) -> core_ethereum_db::errors::Result<()>;
             async fn get_channel_to(&self, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn get_channel_from(&self, src: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn update_channel_and_snapshot(
@@ -191,14 +200,16 @@ mod tests {
             async fn get_neglected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_pending_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_losing_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
-            async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
+            async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
             async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn mark_losing_acked_ticket(&mut self, ticket: &AcknowledgedTicket) -> core_ethereum_db::errors::Result<()>;
             async fn get_rejected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_rejected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_channel_x(&self, src: &Address, dest: &Address) -> core_ethereum_db::errors::Result<Option<ChannelEntry>>;
             async fn get_channels_from(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_outgoing_channels(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
             async fn get_channels_to(&self, address: &Address) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
+            async fn get_incoming_channels(&self) -> core_ethereum_db::errors::Result<Vec<ChannelEntry>>;
             async fn get_public_node_accounts(&self) -> core_ethereum_db::errors::Result<Vec<AccountEntry>>;
             async fn get_hopr_balance(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn set_hopr_balance(&mut self, balance: &Balance) -> core_ethereum_db::errors::Result<()>;

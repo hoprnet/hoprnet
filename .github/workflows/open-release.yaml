@@ -2,23 +2,17 @@
 name: Open Release
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       release_type:
-        type: choice
         required: true
-        description: 'Type of Release to create'
-        options:
-          - ReleaseCandidate
-          - Patch
-          - Minor
-          - Major
+        type: string
       release_name:
-        type: choice
         required: true
-        description: 'Name of the release'
-        options:
-          - providence
+        type: string
+    secrets:
+      GH_RUNNER_TOKEN:
+        required: true
 
 concurrency:
   group: open-release
@@ -28,14 +22,14 @@ jobs:
 
   open-release:
     name: Open Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-2-core
     steps:
       - name: Setup environment variables
         id: setup
         run: |
-            if [ "${{ github.event.inputs.release_type }}" == "Patch" ] 
+            if [ "${{ inputs.release_type }}" == "Patch" ] 
             then
-                base_branch="release/${{ github.event.inputs.release_name }}"
+                base_branch="release/${{ inputs.release_name }}"
             else
                 base_branch="master"
             fi
@@ -49,7 +43,7 @@ jobs:
       - name: Bump Version
         id: bump
         run: |
-            next_version=$(./scripts/get-next-version.sh ${{ github.event.inputs.release_type }})
+            next_version=$(./scripts/get-next-version.sh ${{ inputs.release_type }})
             ./scripts/bump-version.sh ${next_version}
             echo "next_version=${next_version}" >> $GITHUB_OUTPUT
 
@@ -61,7 +55,7 @@ jobs:
             base: ${{ steps.setup.outputs.base_branch }}
             title: "Open release ${{ steps.bump.outputs.next_version }}"
             body: "The scope of this PR is to create the contents of the new release ${{ steps.bump.outputs.next_version }}"
-            branch: bot/open-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+            branch: bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
             delete-branch: true
             assignees: ${{ github.actor }}
             team-reviewers: "@hoprnet/hopr-development"
@@ -69,7 +63,7 @@ jobs:
       - name: Enable Auto Merge
         run: |
             git fetch
-            git checkout bot/open-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+            git checkout bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
             gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}

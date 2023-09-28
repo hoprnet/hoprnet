@@ -817,6 +817,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "time 0.1.45",
  "wasm-bindgen",
  "winapi",
@@ -1074,6 +1075,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-ethereum-actions"
+version = "0.1.0"
+dependencies = [
+ "async-lock",
+ "async-std",
+ "async-trait",
+ "bindings",
+ "core-crypto",
+ "core-ethereum-db",
+ "core-ethereum-misc",
+ "core-types",
+ "env_logger",
+ "futures",
+ "hex",
+ "hex-literal",
+ "js-sys",
+ "lazy_static",
+ "mockall",
+ "serde",
+ "serde-wasm-bindgen",
+ "thiserror",
+ "utils-db",
+ "utils-log",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "core-ethereum-db"
 version = "0.4.0"
 dependencies = [
@@ -1132,7 +1163,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-misc"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1153,6 +1184,8 @@ dependencies = [
  "mockall",
  "multiaddr",
  "semver",
+ "serde",
+ "serde-wasm-bindgen",
  "svm-rs",
  "thiserror",
  "tokio",
@@ -1184,13 +1217,14 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "core-hopr"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "async-lock",
  "async-std",
  "async-trait",
  "console_error_panic_hook",
  "core-crypto",
+ "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-misc",
  "core-mixer",
@@ -1198,12 +1232,14 @@ dependencies = [
  "core-p2p",
  "core-packet",
  "core-path",
+ "core-protocol",
  "core-strategy",
  "core-types",
  "futures",
  "futures-concurrency",
  "gloo-timers 0.3.0",
  "js-sys",
+ "libp2p",
  "multiaddr",
  "serde-wasm-bindgen",
  "thiserror",
@@ -1276,6 +1312,7 @@ dependencies = [
  "multiaddr",
  "rand 0.8.5",
  "serde",
+ "serde_with",
  "thiserror",
  "utils-log",
  "utils-metrics",
@@ -1293,6 +1330,7 @@ dependencies = [
  "async-std",
  "console_error_panic_hook",
  "core-network",
+ "core-protocol",
  "core-types",
  "env_logger",
  "futures",
@@ -1382,22 +1420,75 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-strategy"
-version = "0.3.1"
+name = "core-protocol"
+version = "0.2.0"
 dependencies = [
+ "async-lock",
+ "async-std",
  "console_error_panic_hook",
+ "core-crypto",
+ "core-ethereum-db",
+ "core-mixer",
  "core-types",
+ "env_logger",
+ "futures",
+ "futures-lite",
  "getrandom 0.2.10",
+ "gloo-timers 0.3.0",
+ "hex-literal",
  "js-sys",
+ "lazy_static",
+ "libp2p",
+ "libp2p-identity",
+ "more-asserts",
+ "serde",
+ "serde_with",
+ "thiserror",
+ "utils-db",
+ "utils-log",
+ "utils-metrics",
+ "utils-types",
+ "validator",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+]
+
+[[package]]
+name = "core-strategy"
+version = "0.4.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "core-crypto",
+ "core-ethereum-actions",
+ "core-ethereum-db",
+ "core-ethereum-misc",
+ "core-network",
+ "core-protocol",
+ "core-types",
+ "futures",
+ "getrandom 0.2.10",
+ "hex-literal",
+ "js-sys",
+ "lazy_static",
+ "log",
+ "mockall",
  "rand 0.8.5",
  "serde",
  "serde-wasm-bindgen",
+ "serde_with",
  "simple_moving_average",
+ "strum 0.25.0",
+ "thiserror",
+ "utils-db",
  "utils-log",
  "utils-misc",
  "utils-types",
+ "validator",
  "vector_assertions",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -1640,6 +1731,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0209d94da627ab5605dcccf08bb18afa5009cfbef48d8a8b7d7bdbc79be25c5e"
+dependencies = [
+ "darling_core",
+ "darling_macro",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "177e3443818124b357d8e76f53be906d60937f0d3a90773a664fa63fa253e621"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 2.0.29",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "836a9bbc7ad63342d6d6e7b815ccab164bc77a2d95d84bc3117a8c0d5c98e2d5"
+dependencies = [
+ "darling_core",
+ "quote",
+ "syn 2.0.29",
+]
+
+[[package]]
 name = "dashmap"
 version = "5.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1707,6 +1833,9 @@ name = "deranged"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7684a49fb1af197853ef7b2ee694bc1f5b4179556f1e5710e1760c5db6f5e929"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "derive_more"
@@ -2862,9 +2991,11 @@ dependencies = [
 
 [[package]]
 name = "hoprd-hoprd"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "clap 4.0.32",
  "console_error_panic_hook",
+ "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-indexer",
  "core-ethereum-misc",
@@ -2873,15 +3004,28 @@ dependencies = [
  "core-network",
  "core-packet",
  "core-path",
+ "core-protocol",
  "core-strategy",
  "core-types",
+ "hex",
  "hoprd-inbox",
  "hoprd-keypair",
- "hoprd-misc",
  "js-sys",
+ "proc-macro-regex",
+ "real-base",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "serde_yaml",
+ "strum 0.25.0",
+ "tempfile",
+ "thiserror",
  "utils-log",
  "utils-metrics",
  "utils-misc",
+ "utils-types",
+ "utils-validation",
+ "validator",
  "wasm-bindgen",
  "wasm-opt",
  "wasm-pack",
@@ -2889,7 +3033,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-inbox"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -2900,10 +3044,13 @@ dependencies = [
  "hex",
  "js-sys",
  "ringbuffer",
+ "serde",
  "serde-wasm-bindgen",
+ "serde_with",
  "tempfile",
  "utils-log",
  "utils-misc",
+ "validator",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-opt",
@@ -2933,35 +3080,6 @@ dependencies = [
  "utils-misc",
  "utils-types",
  "uuid 1.4.1",
- "wasm-bindgen",
- "wasm-opt",
- "wasm-pack",
-]
-
-[[package]]
-name = "hoprd-misc"
-version = "0.2.1"
-dependencies = [
- "clap 4.0.32",
- "console_error_panic_hook",
- "core-ethereum-misc",
- "core-misc",
- "core-network",
- "core-strategy",
- "hex",
- "js-sys",
- "proc-macro-regex",
- "real-base",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "serde_yaml",
- "tempfile",
- "thiserror",
- "utils-log",
- "utils-misc",
- "utils-types",
- "validator",
  "wasm-bindgen",
  "wasm-opt",
  "wasm-pack",
@@ -3096,6 +3214,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ident_case"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
 name = "idna"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3203,6 +3327,7 @@ checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
  "hashbrown 0.12.3",
+ "serde",
 ]
 
 [[package]]
@@ -3213,6 +3338,7 @@ checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.0",
+ "serde",
 ]
 
 [[package]]
@@ -5023,9 +5149,9 @@ dependencies = [
 
 [[package]]
 name = "ringbuffer"
-version = "0.14.2"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eba9638e96ac5a324654f8d47fb71c5e21abef0f072740ed9c1d4b0801faa37"
+checksum = "3df6368f71f205ff9c33c076d170dd56ebf68e8161c733c0caa07a7a5509ed53"
 
 [[package]]
 name = "ripemd"
@@ -5185,8 +5311,9 @@ checksum = "7ffc183a10b4478d04cbbbfc96d0873219d962dd5accaff2ffbd4ceb7df837f4"
 
 [[package]]
 name = "rusty-leveldb"
-version = "2.0.0"
-source = "git+https://github.com/hoprnet/leveldb-rs?branch=feature/no-fs#5fe91287ba37de730b921101a264d7abc35f95dc"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3453f8c92d48f99810f59095444eda0622ae8485ac899ad97a574fd7cb9aa9c4"
 dependencies = [
  "crc",
  "integer-encoding",
@@ -5350,9 +5477,9 @@ dependencies = [
 
 [[package]]
 name = "serde-wasm-bindgen"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
+checksum = "30c9933e5689bd420dc6c87b7a1835701810cbc10cd86a26e4da45b73e6b1d78"
 dependencies = [
  "js-sys",
  "serde",
@@ -5429,6 +5556,35 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_with"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ca3b16a3d82c4088f343b7480a93550b3eabe1a358569c2dfe38bbcead07237"
+dependencies = [
+ "base64 0.21.2",
+ "chrono",
+ "hex",
+ "indexmap 1.9.3",
+ "indexmap 2.0.0",
+ "serde",
+ "serde_json",
+ "serde_with_macros",
+ "time 0.3.25",
+]
+
+[[package]]
+name = "serde_with_macros"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e6be15c453eb305019bfa438b1593c731f36a289a7853f7707ee29e870b3b3c"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.29",
 ]
 
 [[package]]
@@ -6349,7 +6505,7 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utils-db"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-lock",
  "async-std",
@@ -6440,6 +6596,20 @@ dependencies = [
  "utils-log",
  "utils-misc",
  "wasm-bindgen",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
+name = "utils-validation"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "proc-macro-regex",
+ "real-base",
+ "serde",
+ "serde_json",
+ "utils-types",
  "wasm-opt",
  "wasm-pack",
 ]
