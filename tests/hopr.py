@@ -1,7 +1,7 @@
 import json
 import logging
 from hoprd_sdk import Configuration, ApiClient
-from hoprd_sdk.models import MessagesBody, MessagesPopBody, ChannelsBody
+from hoprd_sdk.models import MessagesBody, MessagesPopBody, ChannelsBody, ChannelidFundBody
 from hoprd_sdk.rest import ApiException
 from hoprd_sdk.api import NodeApi, MessagesApi, AccountApi, ChannelsApi, PeersApi, TicketsApi
 from urllib3.exceptions import MaxRetryError
@@ -48,8 +48,6 @@ class HoprdAPI:
                     + "`safeNative` or `safeHopr`"
                 )
                 return None
-
-        log.debug("Getting own balance")
 
         try:
             with ApiClient(self.configuration) as client:
@@ -111,6 +109,35 @@ class HoprdAPI:
             return None
 
         return response.channel_id
+    
+    async def channels_fund_channel(self, channel_id: str, amount: str):
+        """
+        Funds a given channel.
+        :param: channel_id: str
+        :param: amount: str
+        :return: bool
+        """
+        try:
+            with ApiClient(self.configuration) as client:
+                api = ChannelsApi(client)
+                thread = api.channels_fund_channel(
+                    channel_id, body=ChannelidFundBody(amount=amount), async_req=True
+                )
+                thread.get()
+        except ApiException as e:
+            body = json.loads(e.body.decode())
+            log.error(
+                f"ApiException calling ChannelsApi->channels_fund_channel: {body}"
+            )
+            return False
+        except OSError:
+            log.error("OSError calling ChannelsApi->channels_fund_channel")
+            return False
+        except MaxRetryError:
+            log.error("MaxRetryError calling ChannelsApi->channels_fund_channel")
+            return False
+
+        return True
 
     async def close_channel(self, channel_id: str):
         """

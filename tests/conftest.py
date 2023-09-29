@@ -1,10 +1,16 @@
 import logging
+import os
+import random
 import subprocess
 
 import pytest
+import pytest_asyncio
 
 from hopr import HoprdAPI
 
+random_data = os.urandom(8)
+SEED = int.from_bytes(random_data, byteorder="big")
+random.seed(SEED)
 
 LOCALHOST = "127.0.0.1"
 
@@ -126,10 +132,11 @@ def check_socket(address, port):
 
 
 @pytest.fixture(scope="module")
-def setup_7_nodes(request):
+def swarm7(request):
     log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}-setup.log"
     try:
         logging.info("Creating a 7 node cluster from source")
+        logging.info(f"Using the random seed: {SEED}")
         res = subprocess.run(
             f"./scripts/fixture_local_test_setup.sh --skip-cleanup 2>&1 | tee {log_file_path}",
             shell=True,
