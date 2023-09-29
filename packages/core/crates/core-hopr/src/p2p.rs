@@ -13,12 +13,12 @@ use core_p2p::{
 use core_protocol::{
     ack::{
         config::AckProtocolConfig,
-        processor::{AckProcessed, AcknowledgementInteraction, Reply}, 
+        processor::{AckProcessed, AcknowledgementInteraction, Reply},
     },
     heartbeat::config::HeartbeatProtocolConfig,
     msg::{
         config::MsgProtocolConfig,
-        processor::{MsgProcessed, PacketInteraction}
+        processor::{MsgProcessed, PacketInteraction},
     },
     ticket_aggregation::{
         config::TicketAggregationProtocolConfig,
@@ -27,9 +27,13 @@ use core_protocol::{
 };
 use core_types::{
     acknowledgement::{AcknowledgedTicket, Acknowledgement},
-    channels::Ticket, protocol::ApplicationData,
+    channels::Ticket,
+    protocol::ApplicationData,
 };
-use futures::{channel::mpsc::{Receiver, Sender, UnboundedSender}, select, StreamExt};
+use futures::{
+    channel::mpsc::{Receiver, Sender, UnboundedSender},
+    select, StreamExt,
+};
 use futures_concurrency::stream::Merge;
 use libp2p::request_response::RequestId;
 use std::collections::{HashMap, HashSet};

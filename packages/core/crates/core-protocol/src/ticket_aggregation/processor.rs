@@ -8,7 +8,6 @@ use core_crypto::{
     types::{Hash, OffchainPublicKey},
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{generate_channel_id, Ticket},
@@ -23,6 +22,7 @@ use futures::{
 };
 use futures_lite::stream::{Stream, StreamExt};
 use libp2p_identity::PeerId;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
 use utils_log::{debug, error, info, warn};
 use utils_types::{

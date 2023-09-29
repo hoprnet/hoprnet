@@ -131,9 +131,9 @@ impl Mixer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
     use futures_lite::stream::StreamExt;
     use more_asserts::*;
+    use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
     type Packet = Box<[u8]>;
 

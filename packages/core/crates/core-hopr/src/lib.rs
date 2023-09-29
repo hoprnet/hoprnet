@@ -19,14 +19,11 @@ use core_network::{
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_p2p::libp2p_identity;
 use core_protocol::{
-    ack::{
-        config::AckProtocolConfig,
-        processor::AcknowledgementInteraction, 
-    },
+    ack::{config::AckProtocolConfig, processor::AcknowledgementInteraction},
     heartbeat::config::HeartbeatProtocolConfig,
     msg::{
         config::MsgProtocolConfig,
-        processor::{PacketActions, PacketInteraction, PacketInteractionConfig}
+        processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
     },
     ticket_aggregation::{
         config::TicketAggregationProtocolConfig,
@@ -318,7 +315,8 @@ pub mod wasm_impls {
         );
 
         let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
-        let (hb_pong_tx, hb_pong_rx) = futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
+        let (hb_pong_tx, hb_pong_rx) =
+            futures::channel::mpsc::unbounded::<(PeerId, std::result::Result<(ControlMessage, String), ()>)>();
 
         let heartbeat_network_clone = network.clone();
         let ping_network_clone = network.clone();
