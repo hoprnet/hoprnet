@@ -16,7 +16,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false && ! contains(github.event.sender.login, 'hopr-bot') }}
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Convert to draft
         run: |
