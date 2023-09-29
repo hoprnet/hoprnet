@@ -55,7 +55,7 @@
     "swagger-ui-express": "4.6.3",
     "trace-unhandled": "2.0.1",
     "uuid": "^9.0.0",
-    "ws": "8.13.0"
+    "ws": "8.14.2"
   },
   "devDependencies": {
     "@types/chai": "4.3.5",
