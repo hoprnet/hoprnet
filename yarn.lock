@@ -1008,12 +1008,12 @@ __metadata:
   linkType: hard
 
 "@types/swagger-ui-express@npm:^4.1.3":
-  version: 4.1.3
-  resolution: "@types/swagger-ui-express@npm:4.1.3"
+  version: 4.1.4
+  resolution: "@types/swagger-ui-express@npm:4.1.4"
   dependencies:
     "@types/express": "*"
     "@types/serve-static": "*"
-  checksum: 1c990fa8c158f699c5443245383daef2c4b47efce715c105e67f9b88447cf23663774393fdeea7d5a6e97a83d6959b09129f19c4abca64abdb7db74517162295
+  checksum: b3fd981bf95514da2fa113f56d4f04a32ebcc208ec51ba49e1350c52c90fb7bd3d6651f889b1c12d0264f3ddd745e6fca29664c55882b3fb8740452c2c7ffbca
   languageName: node
   linkType: hard
 
