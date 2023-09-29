@@ -477,7 +477,7 @@ __metadata:
     "@types/mocha": 10.0.2
     bn.js: 5.2.1
     debug: 4.3.4
-    heap-js: 2.2.0
+    heap-js: 2.3.0
     mocha: 10.2.0
     retimer: 3.0.0
     typedoc: 0.24.8
@@ -2910,10 +2910,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"heap-js@npm:2.2.0":
-  version: 2.2.0
-  resolution: "heap-js@npm:2.2.0"
-  checksum: be89ec49ceac0c55a1cdbbe47b8fad76b43d98468b72e7fb3302f048a796ca8c8e683d59ffe564cc0b5ad31b68770a31bf2f315e3739bd7165ea34d7562a4b6b
+"heap-js@npm:2.3.0":
+  version: 2.3.0
+  resolution: "heap-js@npm:2.3.0"
+  checksum: 04ba26c68ab6f5f8ef8726b806648bd433a5db1eba95510b09ddb46c4c915da944078582f2c136b6aafaf1b07e69a1d9fad5b8e24143aba00b6fd403876a1b46
   languageName: node
   linkType: hard
 

@@ -38,7 +38,7 @@
     "@multiformats/multiaddr": "10.3.3",
     "bn.js": "5.2.1",
     "debug": "4.3.4",
-    "heap-js": "2.2.0",
+    "heap-js": "2.3.0",
     "retimer": "3.0.0"
   },
   "devDependencies": {
