@@ -22,7 +22,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
@@ -92,7 +92,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Google Cloud Credentials
         id: auth
