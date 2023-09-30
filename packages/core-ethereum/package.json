@@ -33,7 +33,7 @@
     "async-mutex": "0.4.0",
     "bn.js": "5.2.1",
     "debug": "4.3.4",
-    "ethers": "5.7.2",
+    "ethers": "6.7.1",
     "retimer": "3.0.0"
   },
   "devDependencies": {
