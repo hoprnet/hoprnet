@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/node": "18",
-    "prettier": "2.8.8",
+    "prettier": "3.0.3",
     "solhint-community": "3.6.1",
     "ts-node": "10.9.1",
     "typescript": "5.2.2"
