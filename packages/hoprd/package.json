@@ -35,7 +35,7 @@
     "@hoprnet/hopr-real": "workspace:packages/real",
     "@hoprnet/hopr-utils": "workspace:packages/utils",
     "@libp2p/interface-peer-id": "1.0.5",
-    "@libp2p/peer-id": "1.1.16",
+    "@libp2p/peer-id": "3.0.2",
     "@multiformats/multiaddr": "10.3.3",
     "@types/chai-as-promised": "7.1.5",
     "@types/debug": "4.1.9",
