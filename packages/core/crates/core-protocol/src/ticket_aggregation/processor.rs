@@ -8,7 +8,6 @@ use core_crypto::{
     types::{Hash, OffchainPublicKey},
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_mixer::future_extensions::StreamThenConcurrentExt;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
     channels::{generate_channel_id, Ticket},
@@ -23,6 +22,7 @@ use futures::{
 };
 use futures_lite::stream::{Stream, StreamExt};
 use libp2p_identity::PeerId;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
 use utils_log::{debug, error, info, warn};
 use utils_types::{
@@ -68,7 +68,7 @@ pub enum TicketAggregationToProcess<T, U> {
 /// Emitted by the processor background pipeline once processed
 #[derive(Debug)]
 pub enum TicketAggregationProcessed<T, U> {
-    Receive(PeerId, U),
+    Receive(PeerId, AcknowledgedTicket, U),
     Reply(PeerId, std::result::Result<Ticket, String>, T),
     Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer),
 }
@@ -204,7 +204,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         .map_err(|e| e.into())
     }
 
-    pub async fn handle_aggregated_ticket(&self, aggregated_ticket: Ticket) -> Result<()> {
+    pub async fn handle_aggregated_ticket(&self, aggregated_ticket: Ticket) -> Result<AcknowledgedTicket> {
         let channel_id = aggregated_ticket.channel_id;
         debug!("received aggregated {aggregated_ticket}");
 
@@ -302,10 +302,10 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         self.db
             .write()
             .await
-            .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket)
+            .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
             .await?;
 
-        Ok(())
+        Ok(acked_aggregated_ticket)
     }
 
     pub async fn prepare_aggregatable_tickets(&self, channel_id: &Hash) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
@@ -507,12 +507,15 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                     }
                     TicketAggregationToProcess::ToReceive(_destination, aggregated_ticket, request) => {
                         match aggregated_ticket {
-                            Ok(ticket) => {
-                                if let Err(e) = processor.handle_aggregated_ticket(ticket.clone()).await {
-                                    debug!("Error while handling aggregated ticket {}", e)
+                            Ok(ticket) => match processor.handle_aggregated_ticket(ticket.clone()).await {
+                                Ok(acked_ticket) => {
+                                    Some(TicketAggregationProcessed::Receive(_destination, acked_ticket, request))
                                 }
-                                Some(TicketAggregationProcessed::Receive(_destination, request))
-                            }
+                                Err(e) => {
+                                    debug!("Error while handling aggregated ticket {}", e);
+                                    None
+                                }
+                            },
                             Err(e) => {
                                 debug!("Counterparty refused to aggregrate tickets. {}", e);
                                 None
@@ -678,7 +681,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn ticket_aggregation() {
+    async fn test_ticket_aggregation() {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let mut inner_dbs = (0..2)
@@ -761,7 +764,9 @@ mod tests {
         };
 
         match bob.next().await {
-            Some(TicketAggregationProcessed::Receive(_destination, ())) => finalizer.take().unwrap().finalize(),
+            Some(TicketAggregationProcessed::Receive(_destination, _acked_tkt, ())) => {
+                finalizer.take().unwrap().finalize()
+            }
             _ => panic!("unexpected action happened"),
         }
 
