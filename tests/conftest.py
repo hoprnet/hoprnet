@@ -147,7 +147,7 @@ def setup_7_nodes(request):
     finally:
         logging.info("Tearing down the 7 node cluster from source")
         subprocess.run(
-            "./scripts/fixture_local_test_setup.sh --just-cleanup 2>&1 | tee {log_file_path}",
+            f"./scripts/fixture_local_test_setup.sh --just-cleanup 2>&1 | tee --append {log_file_path}",
             shell=True,
             capture_output=True,
             check=False,
