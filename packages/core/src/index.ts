@@ -1098,6 +1098,8 @@ export class Hopr extends EventEmitter {
 
   public async getTicketStatistics() {
     const acked_tickets = await this.db.get_acknowledged_tickets()
+
+    log(`acked tickets`, acked_tickets)
     const pending = await this.db.get_pending_tickets_count()
     const losing = await this.db.get_losing_tickets_count()
 
@@ -1107,15 +1109,15 @@ export class Hopr extends EventEmitter {
     }
 
     return {
-      pending: pending.toString(),
-      losing: losing.toString(),
-      winProportion: (acked_tickets.len() / (acked_tickets.len() + losing) || 0).toString(),
-      unredeemed: acked_tickets.len().toString(),
+      pending,
+      losing,
+      winProportion: acked_tickets.len() / (acked_tickets.len() + losing),
+      unredeemed: acked_tickets.len(),
       unredeemedValue: totalValue.clone(),
-      redeemed: (await this.db.get_redeemed_tickets_count()).toString(),
+      redeemed: (await this.db.get_redeemed_tickets_count()),
       redeemedValue: await this.db.get_redeemed_tickets_value(),
-      neglected: (await this.db.get_neglected_tickets_count()).toString(),
-      rejected: (await this.db.get_rejected_tickets_count()).toString(),
+      neglected: (await this.db.get_neglected_tickets_count()),
+      rejected: (await this.db.get_rejected_tickets_count()),
       rejectedValue: await this.db.get_rejected_tickets_value()
     }
   }
