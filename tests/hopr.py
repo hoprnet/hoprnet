@@ -19,6 +19,7 @@ log = getlogger()
 
 MESSAGE_TAG = 1234
 
+
 class HoprdAPI:
     """
     HOPRd API helper to handle exceptions and logging.
@@ -43,10 +44,7 @@ class HoprdAPI:
 
         for t in type:
             if t not in all_types:
-                log.error(
-                    f"Type `{type}` not supported. Use `all`, `hopr`, `native`, "
-                    + "`safeNative` or `safeHopr`"
-                )
+                log.error(f"Type `{type}` not supported. Use `all`, `hopr`, `native`, " + "`safeNative` or `safeHopr`")
                 return None
 
         try:
@@ -87,19 +85,14 @@ class HoprdAPI:
                 channels_api = ChannelsApi(client)
                 thread = channels_api.channels_open_channel(body=body, async_req=True)
                 response = thread.get()
-                log.debug(
-                    "Response after trying to open a channel to "
-                    + f"{peer_address} {response}"
-                )
+                log.debug("Response after trying to open a channel to " + f"{peer_address} {response}")
         except ApiException as e:
             body = json.loads(e.body.decode())
             if body["status"] == "CHANNEL_ALREADY_OPEN":
                 log.debug("Channel already opened")
                 return None
             else:
-                log.error(
-                    f"ApiException calling ChannelsApi->channels_open_channel: {body}"
-                )
+                log.error(f"ApiException calling ChannelsApi->channels_open_channel: {body}")
                 return None
         except OSError:
             log.error("OSError calling ChannelsApi->channels_open_channel")
@@ -109,7 +102,7 @@ class HoprdAPI:
             return None
 
         return response.channel_id
-    
+
     async def channels_fund_channel(self, channel_id: str, amount: str):
         """
         Funds a given channel.
@@ -120,15 +113,11 @@ class HoprdAPI:
         try:
             with ApiClient(self.configuration) as client:
                 api = ChannelsApi(client)
-                thread = api.channels_fund_channel(
-                    channel_id, body=ChannelidFundBody(amount=amount), async_req=True
-                )
+                thread = api.channels_fund_channel(channel_id, body=ChannelidFundBody(amount=amount), async_req=True)
                 thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(
-                f"ApiException calling ChannelsApi->channels_fund_channel: {body}"
-            )
+            log.error(f"ApiException calling ChannelsApi->channels_fund_channel: {body}")
             return False
         except OSError:
             log.error("OSError calling ChannelsApi->channels_fund_channel")
@@ -154,9 +143,7 @@ class HoprdAPI:
                 thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(
-                f"ApiException calling ChannelsApi->channels_close_channel: {body}"
-            )
+            log.error(f"ApiException calling ChannelsApi->channels_close_channel: {body}")
             return False
         except OSError:
             log.error("OSError calling ChannelsApi->channels_close_channel")
@@ -166,7 +153,7 @@ class HoprdAPI:
             return False
 
         return True
-    
+
     async def channel_redeem_tickets(self, channel_id: str):
         """
         Redeems tickets in a specific channel.
@@ -180,9 +167,7 @@ class HoprdAPI:
                 thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(
-                f"ApiException calling ChannelsApi->channels_redeem_tickets: {body}"
-            )
+            log.error(f"ApiException calling ChannelsApi->channels_redeem_tickets: {body}")
             return False
         except OSError:
             log.error("OSError calling ChannelsApi->channels_redeem_tickets")
@@ -209,9 +194,7 @@ class HoprdAPI:
                 response = thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(
-                f"ApiException calling ChannelsApi->channels_get_channels: {body}"
-            )
+            log.error(f"ApiException calling ChannelsApi->channels_get_channels: {body}")
             return []
         except OSError:
             log.error("OSError calling ChannelsApi->channels_get_channels")
@@ -249,9 +232,7 @@ class HoprdAPI:
                 response = thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(
-                f"ApiException calling ChannelsApi->channels_get_channels: {body}"
-            )
+            log.error(f"ApiException calling ChannelsApi->channels_get_channels: {body}")
             return []
         except OSError as e:
             body = json.loads(e.body.decode())
@@ -274,6 +255,34 @@ class HoprdAPI:
         else:
             return response.outgoing
 
+    async def get_channel(self, channel_id: str):
+        """
+        Returns the channel object.
+        :param: channel_id: str
+        :return: channel: response
+        """
+        try:
+            with ApiClient(self.configuration) as client:
+                channels_api = ChannelsApi(client)
+                thread = channels_api.channels_get_channel(
+                    channel_id,
+                    async_req=True,
+                )
+                response = thread.get()
+        except ApiException as e:
+            body = json.loads(e.body.decode())
+            log.error(f"ApiException calling ChannelsApi->channels_get_channel: {body}")
+            return None
+        except OSError:
+            log.error("OSError calling ChannelsApi->channels_get_channel")
+            return None
+        except MaxRetryError:
+            log.error("MaxRetryError calling ChannelsApi->channels_get_channel")
+            return None
+        else:
+            print(response)
+            return response
+
     async def channel_get_tickets(self, channel_id: str):
         """
         Returns all channel tickets.
@@ -290,9 +299,7 @@ class HoprdAPI:
                 response = thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(
-                f"ApiException calling ChannelsApi->channels_get_tickets: {body}"
-            )
+            log.error(f"ApiException calling ChannelsApi->channels_get_tickets: {body}")
             return None
         except OSError:
             log.error("OSError calling ChannelsApi->channels_get_tickets")
@@ -302,7 +309,7 @@ class HoprdAPI:
             return None
         else:
             return response
-        
+
     async def all_channels(self, include_closed: bool):
         """
         Returns all channels.
@@ -321,9 +328,7 @@ class HoprdAPI:
                 response = thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(
-                f"ApiException calling ChannelsApi->channels_get_channels: {body}"
-            )
+            log.error(f"ApiException calling ChannelsApi->channels_get_channels: {body}")
             return []
         except OSError:
             log.error("OSError calling ChannelsApi->channels_get_channels")
@@ -349,9 +354,7 @@ class HoprdAPI:
                 response = thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(
-                f"ApiException calling ChannelsApi->channels_get_channels: {body}"
-            )
+            log.error(f"ApiException calling ChannelsApi->channels_get_channels: {body}")
             return None
         except OSError:
             log.error("OSError calling ChannelsApi->channels_get_channels")
@@ -366,12 +369,8 @@ class HoprdAPI:
 
         peerid_address_aggbalance_links = {}
         for item in response.all:
-            if not hasattr(item, "source_peer_id") or not hasattr(
-                item, "source_address"
-            ):
-                log.error(
-                    "Response does not contain `source_peerid` or `source_address`"
-                )
+            if not hasattr(item, "source_peer_id") or not hasattr(item, "source_address"):
+                log.error("Response does not contain `source_peerid` or `source_address`")
                 continue
 
             if not hasattr(item, "status"):
@@ -394,9 +393,7 @@ class HoprdAPI:
                 }
 
             else:
-                peerid_address_aggbalance_links[source_peer_id][
-                    "channels_balance"
-                ] += balance
+                peerid_address_aggbalance_links[source_peer_id]["channels_balance"] += balance
 
         return peerid_address_aggbalance_links
 
@@ -424,14 +421,9 @@ class HoprdAPI:
             log.error("MaxRetryError calling PeersApi->peers_ping_peer")
             return None
 
-        return response 
+        return response
 
-    async def peers(
-        self,
-        params: list or str = "peer_id",
-        status: str = "connected",
-        quality: float = 0
-    ):
+    async def peers(self, params: list or str = "peer_id", status: str = "connected", quality: float = 0):
         """
         Returns a list of peers.
         :param: param: list or str = "peer_id"
@@ -532,9 +524,7 @@ class HoprdAPI:
 
         return getattr(response, address)
 
-    async def send_message(
-        self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG
-    ) -> bool:
+    async def send_message(self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG) -> bool:
         """
         Sends a message to the given destination.
         :param: destination: str
@@ -563,14 +553,14 @@ class HoprdAPI:
             return False
 
         return True
-    
+
     async def messages_pop(self, tag: int = MESSAGE_TAG) -> bool:
         """
         Pop next message from the inbox
         :param: tag = 0x0320
         :return: dict
         """
-        
+
         body = MessagesPopBody(tag=tag)
         try:
             with ApiClient(self.configuration) as client:
@@ -588,7 +578,7 @@ class HoprdAPI:
             return None
 
         return response
-    
+
     async def tickets_redeem(self):
         """
         Redeems all tickets.
@@ -602,8 +592,7 @@ class HoprdAPI:
                 thread.get()
         except ApiException as e:
             body = json.loads(e.body.decode())
-            log.error(f"ApiException calling TicketsApi->tickets_redeem_tickets: {body}"
-            )
+            log.error(f"ApiException calling TicketsApi->tickets_redeem_tickets: {body}")
             return False
         except OSError:
             log.error("OSError calling TicketsApi->tickets_redeem_tickets")

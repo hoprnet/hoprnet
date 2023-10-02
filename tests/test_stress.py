@@ -25,7 +25,7 @@ async def test_stress_hoprd_send_message_should_send_sequential_messages_without
     for _ in range(60):
         alices_peers = await alice.peers()
         if len(alices_peers) >= cmd_line_args["stress_minimum_peer_count"]:
-            logging.info(f'peers ready {alices_peers}')
+            logging.info(f"peers ready {alices_peers}")
             break
         else:
             await asyncio.sleep(1)
@@ -56,7 +56,7 @@ async def test_stress_hoprd_send_message_should_send_parallel_messages_without_e
     for _ in range(60):
         alices_peers = await alice.peers()
         if len(alices_peers) >= cmd_line_args["stress_minimum_peer_count"]:
-            logging.info(f'peers ready {alices_peers}')
+            logging.info(f"peers ready {alices_peers}")
             break
         else:
             await asyncio.sleep(1)

@@ -69,13 +69,13 @@ declare tmp_dir="$(find_tmp_dir)"
 
 declare node_prefix="hopr-smoke-test-node"
 
-declare node1_dir="${tmp_dir}/${node_prefix}_0"
-declare node2_dir="${tmp_dir}/${node_prefix}_1"
-declare node3_dir="${tmp_dir}/${node_prefix}_2"
-declare node4_dir="${tmp_dir}/${node_prefix}_3"
-declare node5_dir="${tmp_dir}/${node_prefix}_4"
-declare node6_dir="${tmp_dir}/${node_prefix}_5"
-declare node7_dir="${tmp_dir}/${node_prefix}_6"
+declare node1_dir="${tmp_dir}/${node_prefix}_1"
+declare node2_dir="${tmp_dir}/${node_prefix}_2"
+declare node3_dir="${tmp_dir}/${node_prefix}_3"
+declare node4_dir="${tmp_dir}/${node_prefix}_4"
+declare node5_dir="${tmp_dir}/${node_prefix}_5"
+declare node6_dir="${tmp_dir}/${node_prefix}_6"
+declare node7_dir="${tmp_dir}/${node_prefix}_7"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -179,7 +179,8 @@ function reuse_pregenerated_identities() {
 
   log "ADDRESSES INFORMATION"
   for i in ${!ready_id_files[@]}; do
-    cp "${ready_id_files[$i]}" "${tmp_dir}/${node_prefix}_${i}.id"
+    local node_nr=$(( i + 1 ))
+    cp "${ready_id_files[$i]}" "${tmp_dir}/${node_prefix}_${node_nr}.id"
 
     local peer_id native_address id_file
     id_file="$(basename ${ready_id_files[$i]})"
@@ -187,7 +188,7 @@ function reuse_pregenerated_identities() {
     native_address="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.native_address")"
 
     log "\tnode ${i}"
-    log "\t\tidentity file: ${tmp_dir}/${node_prefix}_${i}.id"
+    log "\t\tidentity file: ${tmp_dir}/${node_prefix}_${node_nr}.id"
     log "\t\tpeer id: ${peer_id}"
     log "\t\tnative address: ${native_address}"
   done
