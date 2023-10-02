@@ -1111,13 +1111,13 @@ export class Hopr extends EventEmitter {
     return {
       pending,
       losing,
-      winProportion: acked_tickets.len() / (acked_tickets.len() + losing),
+      winProportion: acked_tickets.len() / (acked_tickets.len() + losing) || 0,
       unredeemed: acked_tickets.len(),
       unredeemedValue: totalValue.clone(),
-      redeemed: (await this.db.get_redeemed_tickets_count()),
+      redeemed: await this.db.get_redeemed_tickets_count(),
       redeemedValue: await this.db.get_redeemed_tickets_value(),
-      neglected: (await this.db.get_neglected_tickets_count()),
-      rejected: (await this.db.get_rejected_tickets_count()),
+      neglected: await this.db.get_neglected_tickets_count(),
+      rejected: await this.db.get_rejected_tickets_count(),
       rejectedValue: await this.db.get_rejected_tickets_value()
     }
   }
