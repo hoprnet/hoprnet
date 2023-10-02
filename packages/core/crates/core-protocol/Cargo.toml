@@ -13,7 +13,7 @@ default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = [
     "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom", "dep:gloo-timers",
     "core-crypto/wasm", "core-ethereum-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
-    "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-metrics?/wasm",
+    "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-types/wasm", "utils-metrics?/wasm",
 ]
 prometheus = ["dep:utils-metrics"]
 
@@ -54,6 +54,7 @@ utils-db = { workspace = true }
 utils-log = { workspace = true }
 utils-types = { workspace = true }
 utils-metrics = { optional = true, workspace = true }
+utils-misc = { optional = true, workspace = true }
 
 [dev-dependencies]
 env_logger = "0.10.0"

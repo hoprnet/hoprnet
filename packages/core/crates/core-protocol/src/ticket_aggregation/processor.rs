@@ -507,17 +507,15 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                     }
                     TicketAggregationToProcess::ToReceive(_destination, aggregated_ticket, request) => {
                         match aggregated_ticket {
-                            Ok(ticket) => {
-                                match processor.handle_aggregated_ticket(ticket.clone()).await {
-                                    Ok(acked_ticket) => {
-                                        Some(TicketAggregationProcessed::Receive(_destination, acked_ticket, request))
-                                    },
-                                    Err(e) => {
-                                        debug!("Error while handling aggregated ticket {}", e);
-                                        None
-                                    }
+                            Ok(ticket) => match processor.handle_aggregated_ticket(ticket.clone()).await {
+                                Ok(acked_ticket) => {
+                                    Some(TicketAggregationProcessed::Receive(_destination, acked_ticket, request))
                                 }
-                            }
+                                Err(e) => {
+                                    debug!("Error while handling aggregated ticket {}", e);
+                                    None
+                                }
+                            },
                             Err(e) => {
                                 debug!("Counterparty refused to aggregrate tickets. {}", e);
                                 None
@@ -766,7 +764,9 @@ mod tests {
         };
 
         match bob.next().await {
-            Some(TicketAggregationProcessed::Receive(_destination, _acked_tkt, ())) => finalizer.take().unwrap().finalize(),
+            Some(TicketAggregationProcessed::Receive(_destination, _acked_tkt, ())) => {
+                finalizer.take().unwrap().finalize()
+            }
             _ => panic!("unexpected action happened"),
         }
 

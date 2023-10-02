@@ -1427,6 +1427,7 @@ dependencies = [
  "utils-db",
  "utils-log",
  "utils-metrics",
+ "utils-misc",
  "utils-types",
  "validator",
  "wasm-bindgen",

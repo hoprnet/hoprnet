@@ -32,7 +32,7 @@ async def test_hoprd_protocol_aggregated_ticket_redeeming(setup_7_nodes):
     for i in range(TICKET_AGGREGATION_THRESHOLD*2):
         assert await alice_api.send_message(camilla['peer_id'], f"#{i}", [bob['peer_id']])
 
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
 
     for i in range(TICKET_AGGREGATION_THRESHOLD*2):
         assert await camilla_api.messages_pop() is not None

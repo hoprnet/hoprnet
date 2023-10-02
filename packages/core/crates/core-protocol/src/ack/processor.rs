@@ -183,15 +183,17 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_WINNING_TICKETS_COUNT.increment();
+
+                    Ok(Reply::RelayerWinning(ack_ticket))
                 } else {
                     warn!("encountered losing {ack_ticket}");
                     self.db.write().await.mark_losing_acked_ticket(&ack_ticket).await?;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_LOSING_TICKETS_COUNT.increment();
-                }
 
-                Ok(Reply::RelayerWinning(ack_ticket))
+                    Ok(Reply::RelayerLosing)
+                }
             }
         }
     }
