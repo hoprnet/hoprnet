@@ -1144,11 +1144,14 @@ mod tests {
                                 assert_eq!(i - 1, 0, "Only the sender can receive a half key challenge");
                                 received_challenges.push(hkc);
                             }
-                            Reply::Relayer(tkt) => {
+                            Reply::RelayerWinning(tkt) => {
                                 // choose the last relayer before the receiver
                                 if i - 1 == components.len() - 2 {
                                     received_tickets.push(tkt)
                                 }
+                            },
+                            Reply::RelayerLosing => {
+                                assert!(false);
                             }
                         }
                     }

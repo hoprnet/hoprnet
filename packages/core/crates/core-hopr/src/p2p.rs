@@ -217,11 +217,12 @@ pub(crate) async fn p2p_loop(
                                         error!("failed to emit received acknowledgement: {e}")
                                     }
                                 },
-                                Reply::Relayer(acknowledged_ticket) => {
+                                Reply::RelayerWinning(acknowledged_ticket) => {
                                     if let Err(e) = on_acknowledged_ticket.unbounded_send(acknowledged_ticket) {
                                         error!("failed to emit acknowledged ticket: {e}");
                                     }
                                 }
+                                Reply::RelayerLosing => {}
                             }
                         }
                     },

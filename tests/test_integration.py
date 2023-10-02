@@ -35,7 +35,7 @@ async def test_hoprd_protocol_aggregated_ticket_redeeming(setup_7_nodes):
     await asyncio.sleep(1)
 
     for i in range(TICKET_AGGREGATION_THRESHOLD*2):
-        await camilla_api.messages_pop()
+        assert await camilla_api.messages_pop() is not None
 
     # wait for tickets to be aggregated and redeemed
     for _ in range(60):

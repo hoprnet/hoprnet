@@ -53,7 +53,8 @@ pub const ACK_RX_QUEUE_SIZE: usize = 2048;
 #[derive(Debug)]
 pub enum Reply {
     Sender(HalfKeyChallenge),
-    Relayer(AcknowledgedTicket),
+    RelayerWinning(AcknowledgedTicket),
+    RelayerLosing,
 }
 
 #[derive(Debug)]
@@ -190,7 +191,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     METRIC_LOSING_TICKETS_COUNT.increment();
                 }
 
-                Ok(Reply::Relayer(ack_ticket))
+                Ok(Reply::RelayerWinning(ack_ticket))
             }
         }
     }
