@@ -72,7 +72,13 @@ def test_hoprd_protocol_bash_integration_tests(setup_7_nodes):
 
     log_file_path = f"/tmp/hopr-smoke-{__name__}.log"
     subprocess.run(
-        ['bash', '-o', 'pipefail', '-c', f"./tests/integration-test.sh {nodes_api_as_str} 2>&1 | tee --append {log_file_path}"],
+        [
+            'bash', 
+            '-o', 
+            'pipefail', 
+            '-c', 
+            f"./tests/integration-test.sh {nodes_api_as_str} 2>&1 | tee --append {log_file_path}"
+        ],
         shell=False,
         capture_output=True,
         env=env_vars,
