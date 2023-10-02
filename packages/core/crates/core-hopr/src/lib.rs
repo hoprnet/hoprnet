@@ -9,7 +9,6 @@ use crate::{adaptors::indexer::IndexerProcessed, p2p::api, timer::UniversalTimer
 use async_lock::RwLock;
 use core_crypto::keypairs::ChainKeypair;
 use core_ethereum_db::db::CoreEthereumDb;
-use core_mixer::mixer::{Mixer, MixerConfig};
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
@@ -276,12 +275,7 @@ pub mod wasm_impls {
 
         let tbf = Arc::new(RwLock::new(tbf));
 
-        let packet_actions = PacketInteraction::new(
-            db.clone(),
-            tbf.clone(),
-            Mixer::new_with_gloo_timers(MixerConfig::default()),
-            packet_cfg,
-        );
+        let packet_actions = PacketInteraction::new(db.clone(), tbf.clone(), packet_cfg);
 
         let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
         let (pong_tx, pong_rx) =

@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = [
     "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom", "dep:gloo-timers",
-    "core-crypto/wasm", "core-ethereum-db/wasm", "core-mixer/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
+    "core-crypto/wasm", "core-ethereum-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-metrics?/wasm",
 ]
 prometheus = ["dep:utils-metrics"]
@@ -26,6 +26,7 @@ futures-lite = { workspace = true }
 hex = { workspace = true }
 hex-literal = "0.4"
 lazy_static = { workspace = true }
+rand = "0.8.5"
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"]}
 serde_with = { workspace = true }
@@ -33,7 +34,7 @@ thiserror = { workspace = true }
 validator = { workspace = true }
 
 # wasm
-getrandom = { version = "0.2.8", features = ["js"], optional = true }
+getrandom = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.63", optional = true }
 libp2p-identity = { workspace = true }
@@ -46,7 +47,6 @@ wasm-bindgen-futures = { version = "0.4.36", optional = true }
 
 core-crypto = { workspace = true }
 core-ethereum-db = { workspace = true }
-core-mixer = { workspace = true }
 core-packet = { workspace = true }
 core-path = { workspace = true }
 core-types = { workspace = true }

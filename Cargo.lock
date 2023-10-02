@@ -1227,7 +1227,6 @@ dependencies = [
  "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-misc",
- "core-mixer",
  "core-network",
  "core-p2p",
  "core-packet",
@@ -1266,30 +1265,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-opt",
  "wasm-pack",
-]
-
-[[package]]
-name = "core-mixer"
-version = "0.3.0"
-dependencies = [
- "async-std",
- "console_error_panic_hook",
- "env_logger",
- "futures",
- "futures-lite",
- "getrandom 0.2.10",
- "gloo-timers 0.3.0",
- "js-sys",
- "lazy_static",
- "more-asserts",
- "pin-project",
- "rand 0.8.5",
- "rust-stream-ext-concurrent",
- "utils-log",
- "utils-metrics",
- "utils-misc",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -1365,7 +1340,6 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "core-ethereum-misc",
- "core-mixer",
  "core-path",
  "core-types",
  "env_logger",
@@ -1429,7 +1403,6 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
- "core-mixer",
  "core-packet",
  "core-path",
  "core-types",
@@ -1445,6 +1418,7 @@ dependencies = [
  "libp2p",
  "libp2p-identity",
  "more-asserts",
+ "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",

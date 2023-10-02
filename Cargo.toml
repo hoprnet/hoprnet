@@ -6,7 +6,6 @@ members = [
     "packages/core/crates/core-crypto",
     "packages/core/crates/core-hopr",
     "packages/core/crates/core-misc",
-    "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",
     "packages/core/crates/core-path",
     "packages/core/crates/core-packet",
@@ -69,7 +68,6 @@ core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-in
 core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
 core-hopr = { path = "packages/core/crates/core-hopr", default-features = false }
 core-misc = { path = "packages/core/crates/core-misc", default-features = false }
-core-mixer = { path = "packages/core/crates/core-mixer", default-features = false }
 core-network = { path = "packages/core/crates/core-network", default-features = false }
 core-packet = { path = "packages/core/crates/core-packet", default-features = false }
 core-path = { path = "packages/core/crates/core-path", default-features = false }

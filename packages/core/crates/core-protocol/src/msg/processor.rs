@@ -12,7 +12,6 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_mixer::mixer::{Mixer, MixerConfig};
 use core_packet::errors::PacketError::{
     ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError,
     PathPositionMismatch, Retry, TagReplay, TransportError,
@@ -29,17 +28,20 @@ use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
+use crate::msg::mixer::MixerConfig;
+
 #[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
+use async_std::task::{sleep, spawn_local};
 
 #[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
+use {gloo_timers::future::sleep, wasm_bindgen_futures::spawn_local};
 
 use core_packet::validation::validate_unacknowledged_ticket;
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::SimpleCounter;
+use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
+    // packet processing
     static ref METRIC_FWD_MESSAGE_COUNT: SimpleCounter =
         SimpleCounter::new("core_counter_forwarded_messages", "Number of forwarded messages").unwrap();
     static ref METRIC_RECV_MESSAGE_COUNT: SimpleCounter =
@@ -48,6 +50,14 @@ lazy_static::lazy_static! {
         SimpleCounter::new("core_counter_created_tickets", "Number of created tickets").unwrap();
     static ref METRIC_PACKETS_COUNT: SimpleCounter =
         SimpleCounter::new("core_counter_packets", "Number of created packets").unwrap();
+    // mixer
+    static ref METRIC_QUEUE_SIZE: SimpleGauge =
+        SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
+    static ref METRIC_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
+        "core_gauge_mixer_average_packet_delay",
+        "Average mixer packet delay averaged over a packet window"
+    )
+    .unwrap();
 }
 
 lazy_static::lazy_static! {
@@ -427,11 +437,6 @@ impl From<futures::channel::oneshot::Receiver<HalfKeyChallenge>> for PacketSendA
     }
 }
 
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep;
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-
 impl PacketSendAwaiter {
     pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<HalfKeyChallenge> {
         match self.rx.take() {
@@ -540,12 +545,12 @@ impl PacketInteraction {
     pub fn new<Db: HoprCoreEthereumDbActions + 'static>(
         db: Arc<RwLock<Db>>,
         tbf: Arc<RwLock<TagBloomFilter>>,
-        mixer: Mixer,
         cfg: PacketInteractionConfig,
     ) -> Self {
         let (to_process_tx, to_process_rx) = channel::<MsgToProcess>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
         let (processed_tx, processed_rx) = channel::<MsgProcessed>(PACKET_RX_QUEUE_SIZE + PACKET_TX_QUEUE_SIZE);
 
+        let mixer_cfg = cfg.mixer.clone();
         let pkt_keypair = cfg.packet_keypair.clone();
         let pkt_keypair_2 = pkt_keypair.clone();
         let processor = PacketProcessor::new(db, cfg);
@@ -695,9 +700,32 @@ impl PacketInteraction {
             })
             // introduce random timeout to mix packets asynchrounously
             .then_concurrent(move |event| async move {
+                let mixer_cfg = mixer_cfg;
+
                 match event {
                     Ok(processed) => match processed {
-                        MsgProcessed::Send(_, _) | MsgProcessed::Forward(_, _, _, _) => Ok(mixer.mix(processed).await),
+                        MsgProcessed::Send(_, _) | MsgProcessed::Forward(_, _, _, _) => {
+                            let random_delay = mixer_cfg.random_delay();
+                            debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_QUEUE_SIZE.increment(1.0f64);
+
+                            sleep(random_delay).await;
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_QUEUE_SIZE.decrement(1.0f64);
+
+                                let weight = 1.0f64 / mixer_cfg.metric_delay_window as f64;
+                                METRIC_AVERAGE_DELAY.set(
+                                    (weight * random_delay.as_millis() as f64)
+                                        + ((1.0f64 - weight) * METRIC_AVERAGE_DELAY.get()),
+                                );
+                            }
+
+                            Ok(processed)
+                        }
                         MsgProcessed::Receive(_, _, _) => Ok(processed),
                     },
                     Err(e) => Err(e),
@@ -754,7 +782,10 @@ impl Stream for PacketInteraction {
 #[cfg(test)]
 mod tests {
     use super::{ApplicationData, MsgProcessed, PacketInteraction, PacketInteractionConfig, DEFAULT_PRICE_PER_PACKET};
-    use crate::ack::processor::{AckProcessed, AcknowledgementInteraction, Reply};
+    use crate::{
+        ack::processor::{AckProcessed, AcknowledgementInteraction, Reply},
+        msg::mixer::MixerConfig,
+    };
     use async_std::sync::RwLock;
     use core_crypto::{
         derivation::derive_ack_key_share,
@@ -764,7 +795,6 @@ mod tests {
         types::{HalfKeyChallenge, Hash},
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-    use core_mixer::mixer::{Mixer, MixerConfig};
     use core_packet::por::ProofOfRelayValues;
     use core_path::path::Path;
     use core_types::{
@@ -1048,7 +1078,6 @@ mod tests {
                 let pkt = PacketInteraction::new(
                     db.clone(),
                     Arc::new(RwLock::new(TagBloomFilter::default())),
-                    Mixer::new(MixerConfig::default()),
                     PacketInteractionConfig {
                         check_unrealized_balance: true,
                         packet_keypair: PEERS[i].clone(),
@@ -1149,7 +1178,7 @@ mod tests {
                                 if i - 1 == components.len() - 2 {
                                     received_tickets.push(tkt)
                                 }
-                            },
+                            }
                             Reply::RelayerLosing => {
                                 assert!(false);
                             }

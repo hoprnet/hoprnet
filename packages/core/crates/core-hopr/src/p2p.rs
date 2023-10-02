@@ -271,7 +271,7 @@ pub(crate) async fn p2p_loop(
                         // if let Err(e) = on_acknowledged_ticket.unbounded_send(acked_ticket) {
                         //     error!("failed to emit acknowledged aggregated ticket: {e}");
                         // }
-                        
+
                         match active_aggregation_requests.remove(&request) {
                             Some(finalizer) => finalizer.finalize(),
                             None => {
