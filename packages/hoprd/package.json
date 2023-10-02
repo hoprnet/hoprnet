@@ -52,7 +52,7 @@
     "rewiremock": "3.14.5",
     "rlp": "3.0.0",
     "semver": "7.5.4",
-    "swagger-ui-express": "4.6.3",
+    "swagger-ui-express": "5.0.0",
     "trace-unhandled": "2.0.1",
     "uuid": "^9.0.0",
     "ws": "8.14.2"
