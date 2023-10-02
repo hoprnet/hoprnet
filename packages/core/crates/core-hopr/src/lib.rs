@@ -252,24 +252,23 @@ pub mod wasm_impls {
 
         let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
 
+        // on acknowledged ticket notifier
         let (on_ack_tkt_tx, mut rx) = unbounded::<AcknowledgedTicket>();
         let ms_clone = multi_strategy.clone();
-        let queue = async move {
+        wasm_bindgen_futures::spawn_local(async move {
             while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
                 let _ = ms_clone.on_acknowledged_ticket(&ack).await;
             }
-        };
-        wasm_bindgen_futures::spawn_local(queue);
+        });
 
-        // Spawn on_channel_c
+        // on channel state change notifier
         let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
         let ms_clone = multi_strategy.clone();
-        let queue = async move {
+        wasm_bindgen_futures::spawn_local(async move {
             while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
                 let _ = ms_clone.on_channel_state_changed(&channel);
             }
-        };
-        wasm_bindgen_futures::spawn_local(queue);
+        });
 
         let ack_actions = AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair);
 

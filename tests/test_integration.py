@@ -40,8 +40,6 @@ async def test_hoprd_protocol_aggregated_ticket_redeeming(setup_7_nodes):
     # wait for tickets to be aggregated and redeemed
     for _ in range(60):
         statistics_after = await bob_api.get_tickets_statistics()
-        import logging
-        logging.error(f"after => {statistics_after}")
         redeemed_value = int(statistics_after.redeemed_value) - int(statistics_before.redeemed_value)
         redeemed_ticket_count = statistics_after.redeemed - statistics_before.redeemed
 
