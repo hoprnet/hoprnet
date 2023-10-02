@@ -68,9 +68,19 @@ async def check_outgoing_channel_closed(src, channel: str):
             await asyncio.sleep(0.2)
 
 
-async def check_received_packets(receiver, expected_packets):
-    received = [(await receiver['api'].messages_pop()).body for i in range(len(expected_packets))]
-    received.sort()
+async def check_received_packets(receiver, expected_packets, sort=True):
+    received = []
+    
+    while len(received) != len(expected_packets):
+        packet = await receiver['api'].messages_pop()
+        if packet is not None:
+            received.append(packet.body)
+        else:
+            asyncio.sleep(0.2)
+    
+    if sort:
+        received.sort()
+        
     assert received == expected_packets
 
 
