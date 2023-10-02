@@ -1,8 +1,8 @@
 [package]
 name = "core-strategy"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Contains implementations of different (automatic) HOPR payment channel strategies"
+description = "Contains implementations of different HOPR strategies"
 edition = "2021"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"

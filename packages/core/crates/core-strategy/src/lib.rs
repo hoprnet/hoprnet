@@ -17,7 +17,9 @@ pub mod auto_redeeming;
 pub mod decision;
 pub mod errors;
 pub mod promiscuous;
+pub mod filtering;
 
+/// Enumerates all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, EnumVariantNames)]
 pub enum Strategy {
     #[strum(serialize = "promiscuous")]
@@ -58,7 +60,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             Aggregating(AggregatingStrategyConfig {
                 aggregation_threshold: 100,
                 aggregation_timeout: Duration::from_secs(60),
-                redeem_after_aggregation: true,
+                aggregate_on_channel_close: true,
             }),
             AutoFunding(AutoFundingStrategyConfig {
                 min_stake_threshold: Balance::from_str("1000000000000000000", BalanceType::HOPR),

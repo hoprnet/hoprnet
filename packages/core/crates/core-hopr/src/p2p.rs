@@ -267,10 +267,9 @@ pub(crate) async fn p2p_loop(
                         }
                     },
                     TicketAggregationProcessed::Receive(_peer, acked_ticket, request) => {
-                        // TODO: uncomment once strategies need to get the value
-                        // if let Err(e) = on_acknowledged_ticket.unbounded_send(acked_ticket) {
-                        //     error!("failed to emit acknowledged aggregated ticket: {e}");
-                        // }
+                        if let Err(e) = on_acknowledged_ticket.unbounded_send(acked_ticket) {
+                             error!("Ticket aggregation: failed to emit acknowledged aggregated ticket: {e}");
+                        }
 
                         match active_aggregation_requests.remove(&request) {
                             Some(finalizer) => finalizer.finalize(),
