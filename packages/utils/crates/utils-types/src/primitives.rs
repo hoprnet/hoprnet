@@ -3,6 +3,7 @@ use getrandom::getrandom;
 use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
 use std::str::FromStr;
 use regex::Regex;
@@ -536,6 +537,12 @@ impl U256 {
 impl Display for U256 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+impl Sum for U256 {
+    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
+        Self { value: iter.map(|u| u.value).sum() }
     }
 }
 

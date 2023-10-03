@@ -8,7 +8,7 @@ use crate::auto_funding::AutoFundingStrategyConfig;
 use crate::auto_redeeming::AutoRedeemingStrategyConfig;
 use crate::promiscuous::PromiscuousStrategyConfig;
 use crate::strategy::MultiStrategyConfig;
-use crate::Strategy::{Aggregating, AutoFunding};
+use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming};
 
 pub mod strategy;
 
@@ -45,9 +45,10 @@ pub enum Strategy {
 ///
 /// Aggregation strategy:
 ///  - aggregate every 100 tickets on all channels
-///  - redeem the newly aggregated ticket right away
+///  - or when unredeemed value in the channel is more than 90% of channel's current balance
+///  - aggregate unredeemed tickets when channel transitions to `PendingToClose`
 /// Auto-redeem Strategy
-/// - disabled (because it would redeem single tickets)
+/// - redeem only aggregated tickets
 /// Auto-funding Strategy
 /// - funding amount: 10 HOPR
 /// - lower limit: 1 HOPR
@@ -57,15 +58,18 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
         on_fail_continue: true,
         allow_recursive: false,
         strategies: vec![
+            AutoFunding(AutoFundingStrategyConfig {
+                min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
+                funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
+            }),
             Aggregating(AggregatingStrategyConfig {
                 aggregation_threshold: Some(100),
                 unrealized_balance_ratio: Some(0.9),
                 aggregation_timeout: Duration::from_secs(60),
                 aggregate_on_channel_close: true,
             }),
-            AutoFunding(AutoFundingStrategyConfig {
-                min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
-                funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
+            AutoRedeeming(AutoRedeemingStrategyConfig {
+                redeem_only_aggregated: true
             }),
         ],
     }

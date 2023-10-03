@@ -24,7 +24,7 @@ use async_std::task::spawn_local;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 use core_path::channel_graph::ChannelChange;
-use utils_types::primitives::{Balance, BalanceType};
+use utils_types::primitives::Balance;
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
@@ -132,6 +132,8 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U
 
         let mut can_aggregate = false;
 
+        // TODO: should check this criteria on Open -> PendingToClose transition ?
+
         // Check the aggregation threshold
         if let Some(agg_threshold) = self.cfg.aggregation_threshold {
             if count_ack_tickets_in_channel >= agg_threshold {
@@ -148,25 +150,22 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U
             }
         }
         if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
-            let unrealized_balance = ack_tickets_in_db
+            let unredeemed_value = Balance::new(ack_tickets_in_db
                 .iter()
-                .fold(Some(channel.balance), |result, t| {
-                    result
-                        .and_then(|b| b.value().value().checked_sub(*t.ticket.amount.value().value()))
-                        .map(|u| Balance::new(u.into(), channel.balance.balance_type()))
-                })
-                .unwrap_or(Balance::zero(BalanceType::HOPR));
+                .map(|t| *t.ticket.amount.value())
+                .sum(), channel.balance.balance_type());
 
             let diminished_balance = channel.balance.div_f64(unrealized_threshold as f64);
 
-            if unrealized_balance.gte(&diminished_balance) {
+            // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
+            if unredeemed_value.gte(&diminished_balance) {
                 info!(
-                    "{self} strategy: {channel} has unrealized balance {unrealized_balance} >= {diminished_balance}",
+                    "{self} strategy: {channel} has unrealized balance {unredeemed_value} >= {diminished_balance}",
                 );
                 can_aggregate = true;
             } else {
                 debug!(
-                    "{self} strategy: {channel} has unrealized balance {unrealized_balance} < {diminished_balance}, not aggregating yet",
+                    "{self} strategy: {channel} has unrealized balance {unredeemed_value} < {diminished_balance}, not aggregating yet",
                 );
             }
         }
@@ -223,8 +222,8 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
         }
 
         match change {
-            ChannelChange::Status { new, .. } => {
-                if new == ChannelStatus::PendingToClose {
+            ChannelChange::Status { old, new } => {
+                if old == ChannelStatus::Open && new == ChannelStatus::PendingToClose {
                     self.perform_ticket_aggregation(*channel).await
                 } else {
                     debug!("{self} strategy: ignoring channel {channel} state change that's not in PendingToClose");
