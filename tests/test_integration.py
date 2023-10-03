@@ -30,16 +30,12 @@ def shuffled(coll):
 async def create_channel(src, dest, funding: int):
     channel = await src["api"].open_channel(dest["address"], str(funding))
     assert channel is not None
-    await asyncio.wait_for(check_channel_opened(src, dest), 10.0)
+    await asyncio.wait_for(check_channel_status(src, dest, status="Open"), 10.0)
     try:
         yield channel
     finally:
         assert await src["api"].close_channel(channel)
-        await asyncio.wait_for(check_outgoing_channel_pending_to_be_closed(src, channel), 10.0)
-        # wait for closure time to pass
-        await asyncio.sleep(15)
-        assert await src["api"].close_channel(channel)
-        await asyncio.wait_for(check_outgoing_channel_closed(src, channel), 10.0)
+        await asyncio.wait_for(check_channel_status(src, dest, status="Closed"), 30.0)
 
 
 async def get_channel(src, dest, include_closed=False):
@@ -53,19 +49,11 @@ async def get_channel(src, dest, include_closed=False):
     return channels[0] if len(channels) > 0 else None
 
 
-async def check_channel_opened(src, dest):
+async def check_channel_status(src, dest, status):
+    assert status in ["Open", "PendingToClose", "Closed"]
     while True:
         channel = await get_channel(src, dest, include_closed=False)
-        if channel is not None and channel.status == "Open":
-            break
-        else:
-            await asyncio.sleep(0.2)
-
-
-async def check_outgoing_channel_pending_to_be_closed(src, channel_id: str):
-    while True:
-        channel = await src["api"].channels_get_channel(channel_id)
-        if channel is not None and channel.status == "PendingToClose":
+        if channel is not None and channel.status == status:
             break
         else:
             await asyncio.sleep(0.2)
@@ -73,7 +61,7 @@ async def check_outgoing_channel_pending_to_be_closed(src, channel_id: str):
 
 async def check_outgoing_channel_closed(src, channel_id: str):
     while True:
-        channel = await src["api"].channels_get_channel(channel_id)
+        channel = await src["api"].get_channel(channel_id)
         if channel is not None and channel.status == "Closed":
             break
         else:
@@ -193,14 +181,15 @@ async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages
 async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels(src, dest, swarm7):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 5)
 
-    packets = [f"0 hop message #{i:04d}" for i in range(message_count)]
+    packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
 
     for packet in packets:
         assert await swarm7[src]["api"].send_message(swarm7[dest]["peer_id"], packet, [])
 
     await asyncio.sleep(1)
 
-    await asyncio.wait_for(check_received_packets(swarm7[dest], packets), MULTIHOP_MESSAGE_SEND_TIMEOUT)
+    packets.sort()
+    await asyncio.wait_for(check_received_packets(swarm7[dest], packets, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT)
 
 
 @pytest.mark.asyncio
@@ -238,14 +227,13 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 5)
 
     async with create_channel(swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP) as channel:
-        packets = [f"1 hop message to self #{i:04d}" for i in range(message_count)]
+        packets = [f"1 hop message to self #{i:08d}" for i in range(message_count)]
 
         for packet in packets:
             assert await swarm7[src]["api"].send_message(swarm7[src]["peer_id"], packet, [swarm7[dest]["peer_id"]])
 
-        await asyncio.sleep(1)
-
-        await asyncio.wait_for(check_received_packets(swarm7[src], packets), MULTIHOP_MESSAGE_SEND_TIMEOUT)
+        packets.sort()
+        await asyncio.wait_for(check_received_packets(swarm7[src], packets, sort=True), 30.0)
 
         statistics = await swarm7[dest]["api"].get_tickets_statistics()
         assert (statistics.redeemed + statistics.unredeemed) > 0
@@ -274,25 +262,20 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_ho
             ]
         )
 
-        packets = [f"hoppity message #{i:04d}" for i in range(message_count)]
+        packets = [f"hoppity message #{i:08d}" for i in range(message_count)]
 
         for packet in packets:
             assert await swarm7[route[0]]["api"].send_message(
                 swarm7[route[-1]]["peer_id"], packet, [swarm7[x]["peer_id"] for x in route[1:-1]]
             )
 
-        await asyncio.sleep(1)
-
-        await asyncio.wait_for(check_received_packets(swarm7[route[-1]], packets), MULTIHOP_MESSAGE_SEND_TIMEOUT)
+        packets.sort()
+        await asyncio.wait_for(check_received_packets(swarm7[route[-1]], packets, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT)
 
         statistics = await swarm7[route[1]]["api"].get_tickets_statistics()
         assert (statistics.redeemed + statistics.unredeemed) > 0
 
         assert await swarm7[route[1]]["api"].tickets_redeem()
-
-        async def all_redeemed():
-            while (await swarm7[route[1]]["api"].get_tickets_statistics()).unredeemed > 0:
-                await asyncio.sleep(0.5)
 
         await asyncio.wait_for(check_all_tickets_redeemed(swarm7[route[1]]), 30.0)
 
@@ -301,11 +284,6 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_ho
 @pytest.mark.parametrize("route", [shuffled(list(NODES.keys()))[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_tickets(route, swarm7):
     ticket_count = TICKET_AGGREGATION_THRESHOLD / 10
-
-    # assert all([
-    #     swarm7[route[i+1]]['peer_id'] in [x['peer_id'] for x in await swarm7[route[i]]['api'].peers()]
-    #     for i in range(len(route) - 1)
-    # ])
 
     async with AsyncExitStack() as channels:
         channel_ids = await asyncio.gather(
@@ -317,23 +295,22 @@ async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_ticke
             ]
         )
 
-        for i in range(ticket_count):
+        packets = [f"#{i:08d}" for i in range(ticket_count)]
+
+        for packet in packets:
             assert await swarm7[route[0]]["api"].send_message(
-                swarm7[route[-1]]["peer_id"], f"#{i}", [swarm7[route[1]]["peer_id"]]
+                swarm7[route[-1]]["peer_id"], packet, [swarm7[route[1]]["peer_id"]]
             )
 
-        await asyncio.sleep(1)
-
-        for i in range(ticket_count):
-            await swarm7[route[-1]]["api"].messages_pop()
-
+        packets.sort()
+        await asyncio.wait_for(check_received_packets(swarm7[route[-1]], packets, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT)
+        
         statistics = await swarm7[route[1]]["api"].get_tickets_statistics()
-
         assert statistics.unredeemed > 0
 
         assert await swarm7[-2]["api"].close_channel(channel_ids[-2])
 
-        await asyncio.wait_for(check_outgoing_channel_closed(swarm7[-2], channel_ids[-2]), 30.0)
+        await asyncio.wait_for(check_channel_status(swarm7[-2], swarm7[-1], status="PendingToClose"), 30.0)
 
 
 @pytest.mark.asyncio
@@ -351,11 +328,6 @@ async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(sr
 async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, swarm7):
     ticket_count = TICKET_AGGREGATION_THRESHOLD * 2
 
-    # assert all([
-    #     swarm7[route[i+1]]['peer_id'] in [x['peer_id'] for x in await swarm7[route[i]]['api'].peers()]
-    #     for i in range(len(route) - 1)
-    # ])
-
     async with AsyncExitStack() as channels:
         await asyncio.gather(
             *[
@@ -366,19 +338,17 @@ async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, 
             ]
         )
 
-        await asyncio.sleep(3)
-
         statistics_before = await swarm7[route[1]]["api"].get_tickets_statistics()
+        
+        packets = [f"#{i:08d}" for i in range(ticket_count)]
 
-        for i in range(ticket_count):
+        for packet in packets:
             assert await swarm7[route[0]]["api"].send_message(
-                swarm7[route[-1]]["peer_id"], f"#{i}", [swarm7[route[1]]["peer_id"]]
+                swarm7[route[-1]]["peer_id"], packet, [swarm7[route[1]]["peer_id"]]
             )
 
-        await asyncio.sleep(1)
-
-        for i in range(ticket_count):
-            await swarm7[route[-1]]["api"].messages_pop()
+        packets.sort()
+        await asyncio.wait_for(check_received_packets(swarm7[route[-1]], packets, sort=True), 30.0)
 
         async def aggregate_and_redeem_tickets():
             while True:
