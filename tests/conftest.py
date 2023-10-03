@@ -133,10 +133,11 @@ def check_socket(address, port):
 
 @pytest.fixture(scope="module")
 def swarm7(request):
+    logging.info(f"Using the random seed: {SEED}")
+
     log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}-setup.log"
     try:
-        logging.info("Creating a 7 node cluster from source")
-        logging.info(f"Using the random seed: {SEED}")
+        logging.debug("Creating a 7 node cluster from bash")
         res = subprocess.run(
             f"./scripts/fixture_local_test_setup.sh --skip-cleanup 2>&1 | tee {log_file_path}",
             shell=True,
@@ -150,9 +151,9 @@ def swarm7(request):
             nodes[key]["api"] = HoprdAPI(f"http://localhost:{port}", DEFAULT_API_TOKEN)
         yield nodes
     except Exception:
-        logging.info("Creating a 7 node cluster from source - FAILED")
+        logging.error("Creating a 7 node cluster from bash - FAILED")
     finally:
-        logging.info("Tearing down the 7 node cluster from source")
+        logging.debug("Tearing down the 7 node cluster from bash")
         subprocess.run(
             f"./scripts/fixture_local_test_setup.sh --just-cleanup 2>&1 | tee {log_file_path}",
             shell=True,
