@@ -462,7 +462,7 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_validation_ok_if_ticket_idx_smaller_than_channel_idx_unredeemed() {
         let mut db_ticket = create_valid_ticket();
-        db_ticket.amount = Balance::from_str("100", BalanceType::HOPR);
+        db_ticket.amount = Balance::new_from_str("100", BalanceType::HOPR);
         db_ticket.index = 2u32.into();
         db_ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
 
@@ -471,7 +471,7 @@ mod tests {
 
         let ticket = create_valid_ticket();
         let mut channel = create_channel_entry();
-        channel.balance = Balance::from_str("200", BalanceType::HOPR);
+        channel.balance = Balance::new_from_str("200", BalanceType::HOPR);
 
         let ret = validate_unacknowledged_ticket(
             &db,

@@ -17,6 +17,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use utils_log::{error, warn};
 use validator::Validate;
+use core_path::channel_graph::ChannelChange;
+use crate::errors::StrategyError::Filtered;
 
 /// Basic single strategy.
 #[cfg_attr(test, mockall::automock)]
@@ -27,13 +29,13 @@ pub trait SingularStrategy: Display {
         Ok(())
     }
 
-    /// Strategy event raised when a new acknowledged ticket is received in a channel
+    /// Strategy event raised when a new **winning** acknowledged ticket is received in a channel
     async fn on_acknowledged_ticket(&self, _ack: &AcknowledgedTicket) -> Result<()> {
         Ok(())
     }
 
     /// Strategy event raised whenever the Indexer registers a change in the channel status
-    async fn on_channel_state_changed(&self, _channel: &ChannelEntry) -> Result<()> {
+    async fn on_channel_state_changed(&self, _channel: &ChannelEntry, _change: ChannelChange) -> Result<()> {
         Ok(())
     }
 }
@@ -181,7 +183,10 @@ impl SingularStrategy for MultiStrategy {
     async fn on_tick(&self) -> Result<()> {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_tick().await {
-                error!("error on_tick in strategy {strategy}: {e}");
+                match e {
+                    Filtered => {}
+                    _ => error!("error on_tick in strategy {strategy}: {e}")
+                }
 
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_tick chain stopped at {strategy}");
@@ -195,7 +200,10 @@ impl SingularStrategy for MultiStrategy {
     async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> Result<()> {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_acknowledged_ticket(ack).await {
-                error!("error on_acknowledged_ticket in strategy {strategy}: {e}");
+                match e {
+                    Filtered => {}
+                    _ => error!("error on_acknowledged_ticket in strategy {strategy}: {e}")
+                }
 
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_acknowledged_ticket chain stopped at {strategy}");
@@ -206,10 +214,13 @@ impl SingularStrategy for MultiStrategy {
         Ok(())
     }
 
-    async fn on_channel_state_changed(&self, channel: &ChannelEntry) -> Result<()> {
+    async fn on_channel_state_changed(&self, channel: &ChannelEntry, change: ChannelChange) -> Result<()> {
         for strategy in self.strategies.iter() {
-            if let Err(e) = strategy.on_channel_state_changed(channel).await {
-                error!("error on_channel_state_changed in strategy {strategy}: {e}");
+            if let Err(e) = strategy.on_channel_state_changed(channel, change).await {
+                match e {
+                    Filtered => {}
+                    _ => error!("error on_channel_state_changed in strategy {strategy}: {e}")
+                }
 
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_channel_state_changed chain stopped at {strategy}");

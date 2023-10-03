@@ -9,27 +9,32 @@ use core_types::channels::{ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+use serde_with::{serde_as, DisplayFromStr};
 use utils_log::info;
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
+use core_path::channel_graph::ChannelChange;
 
 /// Configuration for `AutoFundingStrategy`
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
     /// Default is 1 HOPR
+    #[serde_as(as = "DisplayFromStr")]
     pub min_stake_threshold: Balance,
 
     /// Funding amount.
     /// Defaults to 10 HOPR.
+    #[serde_as(as = "DisplayFromStr")]
     pub funding_amount: Balance,
 }
 
 impl Default for AutoFundingStrategyConfig {
     fn default() -> Self {
         Self {
-            min_stake_threshold: Balance::from_str("1000000000000000000", BalanceType::HOPR),
-            funding_amount: Balance::from_str("10000000000000000000", BalanceType::HOPR),
+            min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
+            funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
         }
     }
 }
@@ -56,23 +61,28 @@ impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db> {
-    async fn on_channel_state_changed(&self, channel: &ChannelEntry) -> crate::errors::Result<()> {
-        if channel.balance.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
-            info!(
-                "{self} strategy: stake on {channel} is below treshhold {} < {}",
-                channel.balance, self.cfg.min_stake_threshold
-            );
+    async fn on_channel_state_changed(&self, channel: &ChannelEntry, change: ChannelChange) -> crate::errors::Result<()> {
+        match change {
+            ChannelChange::CurrentBalance { new, .. } => {
+                if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
+                    info!(
+                            "{self} strategy: stake on {channel} is below threshold {} < {}",
+                            channel.balance, self.cfg.min_stake_threshold
+                    );
 
-            let to_stake = channel.balance.add(&self.cfg.funding_amount);
+                    let to_stake = channel.balance.add(&self.cfg.funding_amount);
 
-            let _ = fund_channel(
-                self.db.clone(),
-                self.tx_sender.clone(),
-                channel.get_id(),
-                to_stake.clone(),
-            )
-            .await?;
-            info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
+                    let _ = fund_channel(
+                        self.db.clone(),
+                        self.tx_sender.clone(),
+                        channel.get_id(),
+                        to_stake.clone(),
+                    )
+                        .await?;
+                    info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
+                }
+            }
+            _ => {}
         }
 
         Ok(())
@@ -93,6 +103,7 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use mockall::mock;
     use std::sync::Arc;
+    use core_path::channel_graph::ChannelChange::CurrentBalance;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot};
@@ -209,9 +220,9 @@ mod tests {
         };
 
         let ars = AutoFundingStrategy::new(cfg, db.clone(), tx_sender);
-        ars.on_channel_state_changed(&c1).await.unwrap();
-        ars.on_channel_state_changed(&c2).await.unwrap();
-        ars.on_channel_state_changed(&c3).await.unwrap();
+        ars.on_channel_state_changed(&c1, CurrentBalance { old: Balance::zero(BalanceType::HOPR), new: c1.balance }).await.unwrap();
+        ars.on_channel_state_changed(&c2, CurrentBalance { old: Balance::zero(BalanceType::HOPR), new: c2.balance }).await.unwrap();
+        ars.on_channel_state_changed(&c3, CurrentBalance { old: Balance::zero(BalanceType::HOPR), new: c3.balance }).await.unwrap();
 
         awaiter.await.unwrap();
     }

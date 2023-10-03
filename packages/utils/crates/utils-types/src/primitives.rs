@@ -4,12 +4,14 @@ use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
+use std::str::FromStr;
+use regex::Regex;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
@@ -128,6 +130,27 @@ pub enum BalanceType {
     HOPR,
 }
 
+impl Display for BalanceType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Native => write!(f, "Native"),
+            Self::HOPR => write!(f, "HOPR")
+        }
+    }
+}
+
+impl FromStr for BalanceType {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "NATIVE" => Ok(Self::Native),
+            "HOPR" => Ok(Self::HOPR),
+            _ => Err(ParseError)
+        }
+    }
+}
+
 /// Represents balance of some coin or token.
 #[derive(Clone, Copy, Debug, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -146,7 +169,7 @@ impl PartialEq for Balance {
 impl Balance {
     /// Creates new balance of the given type from the base 10 integer string
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
+    pub fn new_from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
             value: U256 {
                 value: u256::from_str_radix(value, 10).unwrap_or_else(|_| panic!("invalid number {}", value)),
@@ -170,7 +193,7 @@ impl Balance {
 
     /// Creates balance of the given value with the same symbol
     pub fn of_same(&self, value: &str) -> Self {
-        Self::from_str(value, self.balance_type)
+        Self::new_from_str(value, self.balance_type)
     }
 
     /// Serializes just the value of the balance (not the symbol)
@@ -263,6 +286,14 @@ impl Balance {
         }
     }
 
+    /// Divides the balance by a float in inverval (0,1]
+    pub fn div_f64(&self, divisor: f64) -> Self {
+        Self {
+            value: self.value().divide_f64(divisor).expect("divisor must be in (0,1]"),
+            balance_type: self.balance_type
+        }
+    }
+
     pub fn amount(&self) -> U256 {
         self.value
     }
@@ -271,6 +302,21 @@ impl Balance {
 impl Display for Balance {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {:?}", self.value(), self.balance_type)
+    }
+}
+
+impl FromStr for Balance {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let regex = Regex::new(r"^\s*(\d+)\s*([A-z]+)\s*$").unwrap();
+        let cap = regex.captures(s).ok_or(ParseError)?;
+
+        if cap.len() == 3 {
+            Ok(Self::new_from_str(&cap[1], BalanceType::from_str(&cap[2])?))
+        } else {
+            Err(ParseError)
+        }
     }
 }
 
@@ -703,11 +749,15 @@ mod tests {
 
     #[test]
     fn balance_test_serialize() {
-        let b_1 = Balance::from_str("10", BalanceType::HOPR);
+        let b_1 = Balance::new_from_str("10", BalanceType::HOPR);
         assert_eq!("10 HOPR".to_string(), b_1.to_string(), "to_string failed");
 
         let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
         assert_eq!(b_1, b_2, "deserialized balance does not match");
+
+        assert_eq!(b_1, Balance::from_str(&b_1.to_string()).expect("must parse balance 1"), "string representations must match 1");
+        assert_eq!(b_1, Balance::from_str("10HOPR").expect("must parse balance 2"), "string representations must match 2");
+        assert_eq!(b_1, Balance::from_str(" 10   hOpR").expect("must parse balance 3"), "string representations must match 3");
     }
 
     #[test]

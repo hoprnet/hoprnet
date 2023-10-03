@@ -22,6 +22,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
 
 use crate::errors::Result;
@@ -35,22 +36,27 @@ pub const SMA_WINDOW_SIZE: usize = 3;
 type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
 
 /// Config of promiscuous strategy.
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
     /// Defaults to 0.5
+    #[validate(range(min = 0_f32, max = 1.0_f32))]
     pub network_quality_threshold: f64,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
     /// Defaults to 10 HOPR
+    #[serde_as(as = "DisplayFromStr")]
     pub new_channel_stake: Balance,
 
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
     /// Defaults to 10 HOPR
+    #[serde_as(as = "DisplayFromStr")]
     pub minimum_node_balance: Balance,
 
     /// Maximum number of opened channels the strategy should maintain.
     /// Defaults to square-root of the sampled network size.
+    #[validate(range(min = 1))]
     pub max_channels: Option<usize>,
 
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
@@ -64,8 +70,8 @@ impl Default for PromiscuousStrategyConfig {
     fn default() -> Self {
         PromiscuousStrategyConfig {
             network_quality_threshold: 0.5,
-            new_channel_stake: Balance::from_str("10000000000000000000", BalanceType::HOPR),
-            minimum_node_balance: Balance::from_str("10000000000000000000", BalanceType::HOPR),
+            new_channel_stake: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
+            minimum_node_balance: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             max_channels: None,
             enforce_max_channels: true,
         }
@@ -507,8 +513,8 @@ mod tests {
         }))
         .await;
 
-        let balance = Balance::from_str("11000000000000000000", BalanceType::HOPR); // 11 HOPR
-        let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
+        let balance = Balance::new_from_str("11000000000000000000", BalanceType::HOPR); // 11 HOPR
+        let low_balance = Balance::new_from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
                                                                                     // set HOPR balance in DB
         strat.db.write().await.set_hopr_balance(&balance).await.unwrap();
         // link chain key and packet key

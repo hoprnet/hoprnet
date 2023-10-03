@@ -1,6 +1,6 @@
 pub mod errors;
-pub mod finder;
 pub mod path;
+pub mod channel_graph;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

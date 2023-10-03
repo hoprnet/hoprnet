@@ -51,6 +51,7 @@ use core_types::channels::ChannelEntry;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
+/// This is used by the indexer to emit events when a change on channel entry is detected.
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct ChannelEventEmitter {
@@ -113,6 +114,8 @@ pub mod wasm_impls {
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
+    use core_crypto::keypairs::Keypair;
+    use core_path::channel_graph::ChannelGraph;
 
     #[wasm_bindgen]
     #[derive(Clone)]
@@ -237,6 +240,8 @@ pub mod wasm_impls {
             adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
         )));
 
+        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
+
         let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
@@ -263,9 +268,15 @@ pub mod wasm_impls {
         // on channel state change notifier
         let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
         let ms_clone = multi_strategy.clone();
+        let cg_clone = channel_graph.clone();
         wasm_bindgen_futures::spawn_local(async move {
             while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                let _ = ms_clone.on_channel_state_changed(&channel);
+                let change = cg_clone.write().await.update_channel(channel);
+                if let Some(change_set) = change {
+                    for channel_change in change_set {
+                        let _ = ms_clone.on_channel_state_changed(&channel, channel_change).await;
+                    }
+                }
             }
         });
 
@@ -394,7 +405,7 @@ pub mod wasm_impls {
 
         let main_loop = async move {
             while let Some(process) = futs.next().await {
-                error!("CRITICAL: the core system loop unexpectadly stopped: '{}'", process);
+                error!("CRITICAL: the core system loop unexpectedly stopped: '{}'", process);
                 unreachable!("Futures inside the main loop should never terminate, but run in the background");
             }
         };

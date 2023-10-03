@@ -1,21 +1,6 @@
 use core_types::channels::ChannelEntry;
 use utils_types::primitives::{Address, Balance};
 
-
-pub enum ChannelCriteria {
-    UnrealizedBalanceRatio(CriteriaRelation, f64),
-    AcknowledgedTicketCount(CriteriaRelation, usize),
-}
-
-pub enum CriteriaRelation {
-
-}
-
-pub enum CriteriaValues {
-
-}
-
-
 /// A decision made by a strategy on each tick,
 /// represents which channels should be closed and which should be opened.
 /// Also indicates a number of maximum channels this strategy can open given the current network size.
