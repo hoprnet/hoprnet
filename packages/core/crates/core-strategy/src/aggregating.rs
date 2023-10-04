@@ -50,8 +50,9 @@ pub struct AggregatingStrategyConfig {
     pub aggregation_timeout: Duration,
 
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
-    /// to the `PendingToClose` state, if the `aggregation_threshold` or `unrealized_balance_ratio`
-    /// thresholds are met on that channel.
+    /// to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
+    /// or `unrealized_balance_ratio` thresholds are met on that channel.
+    /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
     /// Default is true.
     pub aggregate_on_channel_close: bool,
 }

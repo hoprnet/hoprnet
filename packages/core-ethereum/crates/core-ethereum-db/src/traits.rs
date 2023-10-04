@@ -148,6 +148,9 @@ pub trait HoprCoreEthereumDbActions {
     /// Get the total number of neglected tickets.
     async fn get_neglected_tickets_count(&self) -> Result<usize>;
 
+    /// Get the total value of neglected tickets.
+    async fn get_neglected_tickets_value(&self) -> Result<Balance>;
+
     /// Get the total number of pending tickets.
     async fn get_pending_tickets_count(&self) -> Result<usize>;
 

@@ -55,7 +55,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeeming
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
             info!("{self} strategy: auto-redeeming {ack}");
             let rx = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
-            std::mem::drop(rx); // The Receiver is not intentionally awaited here
+            std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
         }
         Ok(())
     }

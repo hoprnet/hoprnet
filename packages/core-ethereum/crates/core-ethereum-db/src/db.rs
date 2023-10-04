@@ -145,8 +145,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 )),
             });
 
-        let count_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;
-        let value_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
+        let count_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
+        let value_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;
 
         let mut count = self.get_rejected_tickets_count().await?;
         let mut balance = self.get_rejected_tickets_value().await?;
@@ -479,16 +479,25 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     async fn delete_acknowledged_tickets_from(&mut self, channel: ChannelEntry) -> Result<()> {
         let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel)).await?;
 
-        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
-        let neglected_ticket_count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
+        let count_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
+        let value_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;
+
+        let neglected_ticket_count = self.db.get_or_none::<usize>(count_key.clone()).await?.unwrap_or(0);
+        let mut neglected_ticket_value = self
+            .db
+            .get_or_none::<Balance>(count_key.clone())
+            .await?
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let mut batch_ops = utils_db::db::Batch::default();
         for acked_ticket in acknowledged_tickets.iter() {
             batch_ops.del(get_acknowledged_ticket_key(&acked_ticket)?);
+            neglected_ticket_value = neglected_ticket_value.add(&acked_ticket.ticket.amount);
         }
 
         if !acknowledged_tickets.is_empty() {
-            batch_ops.put(key, neglected_ticket_count + acknowledged_tickets.len())
+            batch_ops.put(count_key, neglected_ticket_count + acknowledged_tickets.len());
+            batch_ops.put(value_key, neglected_ticket_value);
         }
 
         self.db.batch(batch_ops, true).await
@@ -580,9 +589,19 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn get_neglected_tickets_count(&self) -> Result<usize> {
-        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
+        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
 
         Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
+    }
+
+    async fn get_neglected_tickets_value(&self) -> Result<Balance> {
+        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;
+
+        Ok(self
+            .db
+            .get_or_none::<Balance>(key)
+            .await?
+            .unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
     async fn get_pending_tickets_count(&self) -> Result<usize> {
@@ -1397,6 +1416,15 @@ pub mod wasm {
             //check_lock_read! {
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_neglected_tickets_count().await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_neglected_tickets_value(&self) -> Result<Balance, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_neglected_tickets_value().await)
             //}
         }
 

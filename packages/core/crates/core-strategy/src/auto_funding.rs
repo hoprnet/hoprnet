@@ -76,7 +76,7 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
                 let to_stake = channel.balance.add(&self.cfg.funding_amount);
 
                 let rx = fund_channel(self.db.clone(), self.tx_sender.clone(), channel.get_id(), to_stake).await?;
-                std::mem::drop(rx); // The Receiver is not intentionally awaited here
+                std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
                 info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
             }
         }

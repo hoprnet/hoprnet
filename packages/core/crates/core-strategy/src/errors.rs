@@ -8,9 +8,6 @@ pub enum StrategyError {
     #[error("non-specific strategy error: {0}")]
     Other(String),
 
-    #[error("the event has been filtered out based on criteria")]
-    Filtered,
-
     #[error(transparent)]
     DbError(#[from] DbError),
 

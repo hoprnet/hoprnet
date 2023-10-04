@@ -14,6 +14,7 @@ export const getTicketsStatistics = async (node: Hopr) => {
     losingTickets: stats.losing,
     winProportion: stats.winProportion,
     neglected: stats.neglected,
+    neglectedValue: stats.neglectedValue,
     rejected: stats.rejected,
     rejectedValue: stats.rejectedValue.to_string()
   }
@@ -74,6 +75,7 @@ GET.apiDoc = {
                 description:
                   'Number of tickets that were not redeemed in time before channel was closed. Those cannot be redeemed anymore.'
               },
+              neglectedValue: { type: 'string', description: 'Total value of all neglected tickets in Hopr tokens.' },
               rejected: {
                 type: 'number',
                 description:

@@ -2,7 +2,6 @@ use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;
 use crate::auto_redeeming::AutoRedeemingStrategy;
 use crate::errors::Result;
-use crate::errors::StrategyError::Filtered;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 use async_std::sync::RwLock;
@@ -184,11 +183,6 @@ impl SingularStrategy for MultiStrategy {
     async fn on_tick(&self) -> Result<()> {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_tick().await {
-                match e {
-                    Filtered => {}
-                    _ => error!("error on_tick in strategy {strategy}: {e}"),
-                }
-
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_tick chain stopped at {strategy}");
                     return Err(e);
@@ -201,11 +195,6 @@ impl SingularStrategy for MultiStrategy {
     async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> Result<()> {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_acknowledged_ticket(ack).await {
-                match e {
-                    Filtered => {}
-                    _ => error!("error on_acknowledged_ticket in strategy {strategy}: {e}"),
-                }
-
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_acknowledged_ticket chain stopped at {strategy}");
                     return Err(e);
@@ -218,11 +207,6 @@ impl SingularStrategy for MultiStrategy {
     async fn on_channel_state_changed(&self, channel: &ChannelEntry, change: ChannelChange) -> Result<()> {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_channel_state_changed(channel, change).await {
-                match e {
-                    Filtered => {}
-                    _ => error!("error on_channel_state_changed in strategy {strategy}: {e}"),
-                }
-
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_channel_state_changed chain stopped at {strategy}");
                     return Err(e);

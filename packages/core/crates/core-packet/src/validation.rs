@@ -199,6 +199,7 @@ mod tests {
             async fn get_redeemed_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_redeemed_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_neglected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
+            async fn get_neglected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_pending_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_losing_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
