@@ -153,7 +153,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let mut batch_ops = Batch::default();
 
-        // All invalid tickets will be marked as rejected
+        // All invalid tickets will be marked as neglected
         for (amount, maybe_key) in ack_tickets.chain(unack_tickets) {
             batch_ops.del(maybe_key?);
             balance = balance.add(&amount);

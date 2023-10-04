@@ -151,9 +151,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                    AcknowledgementValidation(format!(
+                    return AcknowledgementValidation(format!(
                         "acknowledgement received for channel that does not exist or has a newer epoch"
-                    ))
+                    ));
                 }
 
                 let domain_separator = self
