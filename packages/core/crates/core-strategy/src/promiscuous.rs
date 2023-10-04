@@ -19,9 +19,9 @@ use core_ethereum_actions::{
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
 
 use crate::errors::Result;
@@ -513,7 +513,7 @@ mod tests {
 
         let balance = Balance::new_from_str("11000000000000000000", BalanceType::HOPR); // 11 HOPR
         let low_balance = Balance::new_from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
-                                                                                    // set HOPR balance in DB
+                                                                                        // set HOPR balance in DB
         strat.db.write().await.set_hopr_balance(&balance).await.unwrap();
         // link chain key and packet key
         join_all(address_peer_id_pairs.iter().map(|pair| async {

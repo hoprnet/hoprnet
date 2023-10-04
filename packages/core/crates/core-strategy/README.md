@@ -73,13 +73,15 @@ strategy, since the ticket aggregation and awaiting it is performed on a separat
 This strategy listens for two distinct channel events and triggers the interactive aggregation based on different criteria:
 
 ### 1) New winning acknowledged ticket event
+
 This strategy listens to newly added acknowledged winning tickets and once the amount of tickets in a certain channel reaches
 an `aggregation_threshold`, the strategy will initiate ticket aggregation in that channel.
-The strategy can independently also check if the unrealized balance (current balance *minus* unredeemed tickets value) in a certain channel
+The strategy can independently also check if the unrealized balance (current balance _minus_ unredeemed tickets value) in a certain channel
 has not gone over `unrelalized_balance_ratio` percent of the current balance in that channel. If that happens, the strategy will also initiate
-ticket aggregation. 
+ticket aggregation.
 
 ### 2) Channel transition from `Open` to `PendingToClose` event
+
 If the `aggregate_on_channel_close` flag is set, the aggregation will be triggered once a channel transitions from `Open` to `PendingToClose` state.
 This behavior does not have any additional criteria, unlike in the previous event.
 

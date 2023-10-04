@@ -102,20 +102,17 @@ pub mod wasm_impls {
     use std::str::FromStr;
 
     use super::*;
-    use core_crypto::{
-        keypairs::OffchainKeypair,
-        types::{HalfKeyChallenge, Hash},
-    };
+    use core_crypto::keypairs::Keypair;
+    use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
     use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
     use core_ethereum_db::db::wasm::Database;
     use core_network::network::NetworkConfig;
+    use core_path::channel_graph::ChannelGraph;
     use core_path::path::Path;
     use core_strategy::strategy::MultiStrategyConfig;
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
-    use core_crypto::keypairs::Keypair;
-    use core_path::channel_graph::ChannelGraph;
 
     #[wasm_bindgen]
     #[derive(Clone)]
@@ -189,7 +186,11 @@ pub mod wasm_impls {
             }
         }
 
-        pub async fn aggregate_tickets(&mut self, channel: &ChannelEntry, timeout_in_millis: u64) -> Result<(), JsValue> {
+        pub async fn aggregate_tickets(
+            &mut self,
+            channel: &ChannelEntry,
+            timeout_in_millis: u64,
+        ) -> Result<(), JsValue> {
             ok_or_jserr!(
                 ok_or_jserr!(self.ticket_aggregate_actions.aggregate_tickets(channel))?
                     .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))

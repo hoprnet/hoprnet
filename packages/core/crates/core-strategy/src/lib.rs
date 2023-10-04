@@ -69,7 +69,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
                 aggregate_on_channel_close: true,
             }),
             AutoRedeeming(AutoRedeemingStrategyConfig {
-                redeem_only_aggregated: true
+                redeem_only_aggregated: true,
             }),
         ],
     }

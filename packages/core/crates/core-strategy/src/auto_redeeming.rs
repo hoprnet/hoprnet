@@ -59,7 +59,6 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeeming
         }
         Ok(())
     }
-
 }
 
 #[cfg(test)]

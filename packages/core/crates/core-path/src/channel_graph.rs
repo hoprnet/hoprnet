@@ -1,13 +1,13 @@
-use std::fmt::{Display, Formatter};
-use petgraph::graphmap::DiGraphMap;
+use crate::channel_graph::ChannelChange::{CurrentBalance, Status};
+use crate::errors::Result;
+use crate::path::Path;
 use core_types::channels::{ChannelEntry, ChannelStatus};
 use core_types::protocol::INTERMEDIATE_HOPS;
+use petgraph::graphmap::DiGraphMap;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use utils_log::info;
 use utils_types::primitives::{Address, Balance};
-use crate::channel_graph::ChannelChange::{CurrentBalance, Status};
-use crate::path::Path;
-use crate::errors::Result;
 
 /// Implements a HOPR payment channel graph cached in-memory.
 /// This structure is useful for tracking channel state changes and
@@ -19,7 +19,7 @@ use crate::errors::Result;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
-    graph: DiGraphMap<Address, ChannelEntry>
+    graph: DiGraphMap<Address, ChannelEntry>,
 }
 
 /// Enumerates changes on a channel entry update
@@ -29,7 +29,7 @@ pub enum ChannelChange {
     Status { old: ChannelStatus, new: ChannelStatus },
 
     /// Channel balance has changed
-    CurrentBalance { old: Balance, new: Balance }
+    CurrentBalance { old: Balance, new: Balance },
 }
 
 impl Display for ChannelChange {
@@ -52,7 +52,10 @@ impl ChannelGraph {
 
     /// Creates a new instance with the given self `Address`.
     pub fn new(me: Address) -> Self {
-        Self { me, graph: DiGraphMap::default() }
+        Self {
+            me,
+            graph: DiGraphMap::default(),
+        }
     }
 
     /// Inserts or updates the given channel in the channel graph.
@@ -63,11 +66,17 @@ impl ChannelGraph {
             let mut ret = Vec::new();
 
             if old_value.status != channel.status {
-                ret.push(Status { old: old_value.status, new: channel.status });
+                ret.push(Status {
+                    old: old_value.status,
+                    new: channel.status,
+                });
             }
 
             if old_value.balance != channel.balance {
-                ret.push(CurrentBalance { old: old_value.balance, new: channel.balance })
+                ret.push(CurrentBalance {
+                    old: old_value.balance,
+                    new: channel.balance,
+                })
             }
 
             info!("updated {channel}: {} changes", ret.len());

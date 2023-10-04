@@ -3,10 +3,7 @@ use crate::errors::{
     Result,
 };
 use async_lock::RwLock;
-use core_crypto::{
-    keypairs::ChainKeypair,
-    types::OffchainPublicKey,
-};
+use core_crypto::{keypairs::ChainKeypair, types::OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
@@ -308,8 +305,10 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         Ok(acked_aggregated_ticket)
     }
 
-    pub async fn prepare_aggregatable_tickets(&self, channel: &ChannelEntry) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
-
+    pub async fn prepare_aggregatable_tickets(
+        &self,
+        channel: &ChannelEntry,
+    ) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
         // get aggregatable tickets and them as being aggregated
         let tickets_to_aggregate = self
             .db
@@ -353,10 +352,10 @@ impl From<oneshot::Receiver<()>> for TicketAggregationAwaiter {
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
+use core_types::channels::ChannelEntry;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
 use libp2p::request_response::{RequestId, ResponseChannel};
-use core_types::channels::ChannelEntry;
 
 impl TicketAggregationAwaiter {
     pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<()> {
@@ -728,11 +727,7 @@ mod tests {
         dbs[1]
             .write()
             .await
-            .update_channel_and_snapshot(
-                &channel_id_alice_bob,
-                &channel_alice_bob,
-                &Snapshot::default(),
-            )
+            .update_channel_and_snapshot(&channel_id_alice_bob, &channel_alice_bob, &Snapshot::default())
             .await
             .unwrap();
 

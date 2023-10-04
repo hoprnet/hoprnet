@@ -5,15 +5,15 @@ use async_trait::async_trait;
 use core_ethereum_actions::channels::fund_channel;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_path::channel_graph::ChannelChange;
 use core_types::channels::{ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use serde_with::{serde_as, DisplayFromStr};
 use utils_log::info;
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
-use core_path::channel_graph::ChannelChange;
 
 /// Configuration for `AutoFundingStrategy`
 #[serde_as]
@@ -61,25 +61,24 @@ impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db> {
-    async fn on_channel_state_changed(&self, channel: &ChannelEntry, change: ChannelChange) -> crate::errors::Result<()> {
-        if let ChannelChange::CurrentBalance { new, .. }  = change {
-                if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
-                    info!(
-                            "{self} strategy: stake on {channel} is below threshold {} < {}",
-                            channel.balance, self.cfg.min_stake_threshold
-                    );
+    async fn on_channel_state_changed(
+        &self,
+        channel: &ChannelEntry,
+        change: ChannelChange,
+    ) -> crate::errors::Result<()> {
+        if let ChannelChange::CurrentBalance { new, .. } = change {
+            if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
+                info!(
+                    "{self} strategy: stake on {channel} is below threshold {} < {}",
+                    channel.balance, self.cfg.min_stake_threshold
+                );
 
-                    let to_stake = channel.balance.add(&self.cfg.funding_amount);
+                let to_stake = channel.balance.add(&self.cfg.funding_amount);
 
-                    let rx = fund_channel(
-                        self.db.clone(),
-                        self.tx_sender.clone(),
-                        channel.get_id(),
-                        to_stake,
-                    ).await?;
-                    std::mem::drop(rx); // The Receiver is not intentionally awaited here
-                    info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
-                }
+                let rx = fund_channel(self.db.clone(), self.tx_sender.clone(), channel.get_id(), to_stake).await?;
+                std::mem::drop(rx); // The Receiver is not intentionally awaited here
+                info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
+            }
         }
 
         Ok(())
@@ -96,11 +95,11 @@ mod tests {
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_path::channel_graph::ChannelChange::CurrentBalance;
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use mockall::mock;
     use std::sync::Arc;
-    use core_path::channel_graph::ChannelChange::CurrentBalance;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot};
@@ -217,9 +216,33 @@ mod tests {
         };
 
         let ars = AutoFundingStrategy::new(cfg, db.clone(), tx_sender);
-        ars.on_channel_state_changed(&c1, CurrentBalance { old: Balance::zero(BalanceType::HOPR), new: c1.balance }).await.unwrap();
-        ars.on_channel_state_changed(&c2, CurrentBalance { old: Balance::zero(BalanceType::HOPR), new: c2.balance }).await.unwrap();
-        ars.on_channel_state_changed(&c3, CurrentBalance { old: Balance::zero(BalanceType::HOPR), new: c3.balance }).await.unwrap();
+        ars.on_channel_state_changed(
+            &c1,
+            CurrentBalance {
+                old: Balance::zero(BalanceType::HOPR),
+                new: c1.balance,
+            },
+        )
+        .await
+        .unwrap();
+        ars.on_channel_state_changed(
+            &c2,
+            CurrentBalance {
+                old: Balance::zero(BalanceType::HOPR),
+                new: c2.balance,
+            },
+        )
+        .await
+        .unwrap();
+        ars.on_channel_state_changed(
+            &c3,
+            CurrentBalance {
+                old: Balance::zero(BalanceType::HOPR),
+                new: c3.balance,
+            },
+        )
+        .await
+        .unwrap();
 
         awaiter.await.unwrap();
     }

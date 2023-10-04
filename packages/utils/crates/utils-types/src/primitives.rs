@@ -1,12 +1,12 @@
 use ethnum::{u256, AsU256};
 use getrandom::getrandom;
 use primitive_types::H160;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
 use std::str::FromStr;
-use regex::Regex;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
@@ -135,7 +135,7 @@ impl Display for BalanceType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Native => write!(f, "Native"),
-            Self::HOPR => write!(f, "HOPR")
+            Self::HOPR => write!(f, "HOPR"),
         }
     }
 }
@@ -147,7 +147,7 @@ impl FromStr for BalanceType {
         match s.to_uppercase().as_str() {
             "NATIVE" => Ok(Self::Native),
             "HOPR" => Ok(Self::HOPR),
-            _ => Err(ParseError)
+            _ => Err(ParseError),
         }
     }
 }
@@ -291,7 +291,7 @@ impl Balance {
     pub fn div_f64(&self, divisor: f64) -> Self {
         Self {
             value: self.value().divide_f64(divisor).expect("divisor must be in (0,1]"),
-            balance_type: self.balance_type
+            balance_type: self.balance_type,
         }
     }
 
@@ -541,8 +541,10 @@ impl Display for U256 {
 }
 
 impl Sum for U256 {
-    fn sum<I: Iterator<Item=Self>>(iter: I) -> Self {
-        Self { value: iter.map(|u| u.value).sum() }
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        Self {
+            value: iter.map(|u| u.value).sum(),
+        }
     }
 }
 
@@ -762,9 +764,21 @@ mod tests {
         let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
         assert_eq!(b_1, b_2, "deserialized balance does not match");
 
-        assert_eq!(b_1, Balance::from_str(&b_1.to_string()).expect("must parse balance 1"), "string representations must match 1");
-        assert_eq!(b_1, Balance::from_str("10HOPR").expect("must parse balance 2"), "string representations must match 2");
-        assert_eq!(b_1, Balance::from_str(" 10   hOpR").expect("must parse balance 3"), "string representations must match 3");
+        assert_eq!(
+            b_1,
+            Balance::from_str(&b_1.to_string()).expect("must parse balance 1"),
+            "string representations must match 1"
+        );
+        assert_eq!(
+            b_1,
+            Balance::from_str("10HOPR").expect("must parse balance 2"),
+            "string representations must match 2"
+        );
+        assert_eq!(
+            b_1,
+            Balance::from_str(" 10   hOpR").expect("must parse balance 3"),
+            "string representations must match 3"
+        );
     }
 
     #[test]

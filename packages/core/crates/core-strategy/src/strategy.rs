@@ -2,6 +2,7 @@ use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;
 use crate::auto_redeeming::AutoRedeemingStrategy;
 use crate::errors::Result;
+use crate::errors::StrategyError::Filtered;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 use async_std::sync::RwLock;
@@ -9,6 +10,7 @@ use async_trait::async_trait;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
+use core_path::channel_graph::ChannelChange;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::{ChannelEntry, Ticket};
@@ -17,8 +19,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use utils_log::{error, warn};
 use validator::Validate;
-use core_path::channel_graph::ChannelChange;
-use crate::errors::StrategyError::Filtered;
 
 /// Basic single strategy.
 #[cfg_attr(test, mockall::automock)]
@@ -186,7 +186,7 @@ impl SingularStrategy for MultiStrategy {
             if let Err(e) = strategy.on_tick().await {
                 match e {
                     Filtered => {}
-                    _ => error!("error on_tick in strategy {strategy}: {e}")
+                    _ => error!("error on_tick in strategy {strategy}: {e}"),
                 }
 
                 if !self.cfg.on_fail_continue {
@@ -203,7 +203,7 @@ impl SingularStrategy for MultiStrategy {
             if let Err(e) = strategy.on_acknowledged_ticket(ack).await {
                 match e {
                     Filtered => {}
-                    _ => error!("error on_acknowledged_ticket in strategy {strategy}: {e}")
+                    _ => error!("error on_acknowledged_ticket in strategy {strategy}: {e}"),
                 }
 
                 if !self.cfg.on_fail_continue {
@@ -220,7 +220,7 @@ impl SingularStrategy for MultiStrategy {
             if let Err(e) = strategy.on_channel_state_changed(channel, change).await {
                 match e {
                     Filtered => {}
-                    _ => error!("error on_channel_state_changed in strategy {strategy}: {e}")
+                    _ => error!("error on_channel_state_changed in strategy {strategy}: {e}"),
                 }
 
                 if !self.cfg.on_fail_continue {
