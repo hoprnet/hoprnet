@@ -769,46 +769,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.emit('network-registry-node-allowed', address)
   }
 
-  /**
-   * TODO: event update
-   */
-  // private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
-  //   if (Address.from_string(event.args.source).eq(this.address)) {
-  //     // the node used to lock outstandingTicketBalance
-  //     // rebuild part of the Ticket
-  //     const partialTicket: Partial<Ticket> = {
-  //       counterparty: Address.from_string(event.args.destination),
-  //       amount: new Balance(event.args.amount.toString(), BalanceType.HOPR)
-  //     }
-  //     const outstandingBalance = Balance.deserialize(
-  //       (
-  //         await this.db.get_pending_balance_to(Address.deserialize(partialTicket.counterparty.serialize()))
-  //       ).serialize_value(),
-  //       BalanceType.HOPR
-  //     )
-
-  //     assert(lastSnapshot !== undefined)
-  //     try {
-  //       // Negative case:
-  //       // It falls into this case when db of sender gets erased while having tickets pending.
-  //       // TODO: handle this may allow sender to send arbitrary amount of tickets through open
-  //       // channels with positive balance, before the counterparty initiates closure.
-  //       const balance = outstandingBalance.lte(Balance.zero(BalanceType.HOPR))
-  //         ? Balance.zero(BalanceType.HOPR)
-  //         : outstandingBalance
-  //       await this.db.resolve_pending(
-  //         Address.deserialize(partialTicket.counterparty.serialize()),
-  //         Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
-  //         Snapshot.deserialize(lastSnapshot.serialize())
-  //       )
-  //       metric_ticketsRedeemed.increment()
-  //     } catch (error) {
-  //       log(`error in onTicketRedeemed ${error}`)
-  //       throw new Error(`error in onTicketRedeemed ${error}`)
-  //     }
-  //   }
-  // }
-
   private indexEvent(indexerEvent: IndexerEventsType) {
     log(`Indexer indexEvent ${indexerEvent}`)
     this.emit(indexerEvent)

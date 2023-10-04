@@ -18,6 +18,8 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>>;
 
+    async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> Result<()>;
+
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 
     async fn get_pending_acknowledgement(

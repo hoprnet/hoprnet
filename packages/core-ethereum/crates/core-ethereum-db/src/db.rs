@@ -105,6 +105,66 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(acked_tickets)
     }
 
+    async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> Result<()> {
+        // Get all ack tickets in the given channel with channel epoch less than the one on the channel
+        let ack_tickets = self
+            .db
+            .get_more::<AcknowledgedTicket>(
+                Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
+                ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
+                &|ack: &AcknowledgedTicket| {
+                    channel.get_id() == ack.ticket.channel_id
+                        && channel.channel_epoch.as_u32() > ack.ticket.channel_epoch
+                },
+            )
+            .await?
+            .into_iter()
+            .map(|ack| (ack.ticket.amount, get_acknowledged_ticket_key(&ack)));
+
+        // Get all unack tickets in the given channel with channel epoch less than the one on the channel
+        let unack_tickets = self
+            .db
+            .get_more::<PendingAcknowledgement>(
+                Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
+                HalfKeyChallenge::SIZE as u32,
+                &move |v: &PendingAcknowledgement| match v {
+                    PendingAcknowledgement::WaitingAsSender => false,
+                    PendingAcknowledgement::WaitingAsRelayer(unack) => {
+                        channel.get_id() == unack.ticket.channel_id
+                            && channel.channel_epoch.as_u32() > unack.ticket.channel_epoch
+                    }
+                },
+            )
+            .await?
+            .into_iter()
+            .filter_map(|pa| match pa {
+                PendingAcknowledgement::WaitingAsSender => None,
+                PendingAcknowledgement::WaitingAsRelayer(unack) => Some((
+                    unack.ticket.amount,
+                    utils_db::db::Key::new_with_prefix(&unack.own_key.to_challenge(), PENDING_ACKNOWLEDGEMENTS_PREFIX),
+                )),
+            });
+
+        let count_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;
+        let value_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
+
+        let mut count = self.get_rejected_tickets_count().await?;
+        let mut balance = self.get_rejected_tickets_value().await?;
+
+        let mut batch_ops = Batch::default();
+
+        // All invalid tickets will be marked as rejected
+        for (amount, maybe_key) in ack_tickets.chain(unack_tickets) {
+            batch_ops.del(maybe_key?);
+            balance = balance.add(&amount);
+            count += 1;
+        }
+
+        batch_ops.put(count_key, balance);
+        batch_ops.put(value_key, count);
+        self.db.batch(batch_ops, true).await
+    }
+
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()> {
         let count = self.get_rejected_tickets_count().await?;
         let count_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;

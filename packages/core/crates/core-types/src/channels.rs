@@ -77,6 +77,7 @@ pub struct ChannelEntry {
     pub status: ChannelStatus,
     pub channel_epoch: U256,
     pub closure_time: U256,
+    id: Hash,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -100,13 +101,14 @@ impl ChannelEntry {
             status,
             channel_epoch,
             closure_time,
+            id: generate_channel_id(&source, &destination),
         }
     }
 
     /// Generates the channel ID using the source and destination address
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn get_id(&self) -> Hash {
-        generate_channel_id(&self.source, &self.destination)
+        self.id
     }
 
     /// Checks if the closure time of this channel has passed.
@@ -184,7 +186,7 @@ impl BinarySerializable for ChannelEntry {
                 .ok_or(utils_types::errors::GeneralError::ParseError)?;
             let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            Ok(Self {
+            Ok(Self::new(
                 source,
                 destination,
                 balance,
@@ -192,7 +194,7 @@ impl BinarySerializable for ChannelEntry {
                 status,
                 channel_epoch,
                 closure_time,
-            })
+            ))
         } else {
             Err(utils_types::errors::GeneralError::ParseError)
         }

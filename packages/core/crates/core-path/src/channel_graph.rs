@@ -1,4 +1,4 @@
-use crate::channel_graph::ChannelChange::{CurrentBalance, Status};
+use crate::channel_graph::ChannelChange::{CurrentBalance, Epoch, Status};
 use crate::errors::Result;
 use crate::path::Path;
 use core_types::channels::{ChannelEntry, ChannelStatus};
@@ -30,6 +30,9 @@ pub enum ChannelChange {
 
     /// Channel balance has changed
     CurrentBalance { old: Balance, new: Balance },
+
+    /// Channel epoch has changed
+    Epoch { old: u64, new: u64 },
 }
 
 impl Display for ChannelChange {
@@ -41,6 +44,10 @@ impl Display for ChannelChange {
 
             CurrentBalance { old, new } => {
                 write!(f, "Balance: {old} -> {new}")
+            }
+
+            Epoch { old, new } => {
+                write!(f, "Epoch: {old} -> {new}")
             }
         }
     }
@@ -76,7 +83,14 @@ impl ChannelGraph {
                 ret.push(CurrentBalance {
                     old: old_value.balance,
                     new: channel.balance,
-                })
+                });
+            }
+
+            if old_value.channel_epoch != channel.channel_epoch {
+                ret.push(Epoch {
+                    old: old_value.channel_epoch.as_u64(),
+                    new: channel.channel_epoch.as_u64(),
+                });
             }
 
             info!("updated {channel}: {} changes", ret.len());

@@ -106,8 +106,9 @@ pub mod wasm_impls {
     use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
     use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
     use core_ethereum_db::db::wasm::Database;
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_network::network::NetworkConfig;
-    use core_path::channel_graph::ChannelGraph;
+    use core_path::channel_graph::{ChannelChange, ChannelGraph};
     use core_path::path::Path;
     use core_strategy::strategy::MultiStrategyConfig;
     use core_types::protocol::ApplicationData;
@@ -270,12 +271,19 @@ pub mod wasm_impls {
         let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
         let ms_clone = multi_strategy.clone();
         let cg_clone = channel_graph.clone();
+        let db_clone = db.clone();
         wasm_bindgen_futures::spawn_local(async move {
             while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
                 let change = cg_clone.write().await.update_channel(channel);
                 if let Some(change_set) = change {
                     for channel_change in change_set {
                         let _ = ms_clone.on_channel_state_changed(&channel, channel_change).await;
+
+                        // Cleanup invalid tickets from the DB if epoch has changed
+                        // TODO: this should be moved somewhere else once event broadcasts are implemented
+                        if let ChannelChange::Epoch { .. } = channel_change {
+                            let _ = db_clone.write().await.cleanup_invalid_channel_tickets(&channel).await;
+                        }
                     }
                 }
             }

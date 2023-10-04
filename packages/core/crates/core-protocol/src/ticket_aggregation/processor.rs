@@ -714,15 +714,15 @@ mod tests {
 
         let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
 
-        let channel_alice_bob = ChannelEntry {
-            source: alice_addr,
-            destination: bob_addr,
-            balance: Balance::new(1u64.into(), BalanceType::HOPR),
-            ticket_index: 1u64.into(),
-            status: ChannelStatus::Open,
-            channel_epoch: 1u32.into(),
-            closure_time: 0u64.into(),
-        };
+        let channel_alice_bob = ChannelEntry::new(
+            alice_addr,
+            bob_addr,
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            1u64.into(),
+            ChannelStatus::Open,
+            1u32.into(),
+            0u64.into(),
+        );
 
         dbs[1]
             .write()
