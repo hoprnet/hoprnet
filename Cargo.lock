@@ -1227,7 +1227,6 @@ dependencies = [
  "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-misc",
- "core-mixer",
  "core-network",
  "core-p2p",
  "core-packet",
@@ -1266,29 +1265,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-opt",
  "wasm-pack",
-]
-
-[[package]]
-name = "core-mixer"
-version = "0.3.0"
-dependencies = [
- "async-std",
- "console_error_panic_hook",
- "env_logger",
- "futures",
- "futures-lite",
- "getrandom 0.2.10",
- "gloo-timers 0.3.0",
- "js-sys",
- "lazy_static",
- "more-asserts",
- "pin-project",
- "rand 0.8.5",
- "utils-log",
- "utils-metrics",
- "utils-misc",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -1364,7 +1340,6 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "core-ethereum-misc",
- "core-mixer",
  "core-path",
  "core-types",
  "env_logger",
@@ -1421,32 +1396,38 @@ dependencies = [
 
 [[package]]
 name = "core-protocol"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-lock",
  "async-std",
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
- "core-mixer",
+ "core-packet",
+ "core-path",
  "core-types",
  "env_logger",
  "futures",
  "futures-lite",
  "getrandom 0.2.10",
  "gloo-timers 0.3.0",
+ "hex",
  "hex-literal",
  "js-sys",
  "lazy_static",
  "libp2p",
  "libp2p-identity",
  "more-asserts",
+ "rand 0.8.5",
+ "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
+ "serial_test",
  "thiserror",
  "utils-db",
  "utils-log",
  "utils-metrics",
+ "utils-misc",
  "utils-types",
  "validator",
  "wasm-bindgen",
@@ -5197,6 +5178,15 @@ dependencies = [
  "netlink-proto",
  "nix",
  "thiserror",
+]
+
+[[package]]
+name = "rust-stream-ext-concurrent"
+version = "1.0.0"
+source = "git+https://github.com/hoprnet/rust-stream-ext-concurrent.git?branch=main#70f9b146aa211f0c3e985a73bf432954fc2c9585"
+dependencies = [
+ "futures",
+ "pin-project",
 ]
 
 [[package]]

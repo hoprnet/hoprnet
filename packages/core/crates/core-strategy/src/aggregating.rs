@@ -398,7 +398,7 @@ mod tests {
                 };
 
                 match bob.next().await {
-                    Some(TicketAggregationProcessed::Receive(_destination, ())) => (),
+                    Some(TicketAggregationProcessed::Receive(_destination, _ticket, ())) => (),
                     _ => panic!("unexpected action happened"),
                 };
 
@@ -542,7 +542,7 @@ mod tests {
                 };
 
                 match bob.next().await {
-                    Some(TicketAggregationProcessed::Receive(_destination, ())) => (),
+                    Some(TicketAggregationProcessed::Receive(_destination, _ticket, ())) => (),
                     _ => panic!("unexpected action happened"),
                 };
 

@@ -153,9 +153,9 @@ mod tests {
 
     #[async_std::test]
     async fn reorder_items() {
-        let item_1 = 10u64; // 3rd in the output
-        let item_2 = 5u64; // 1st in the output
-        let item_3 = 7u64; // 2nd in the output
+        let item_1 = 10u64;     // 3rd in the output
+        let item_2 = 5u64;      // 1st in the output
+        let item_3 = 7u64;      // 2nd in the output
 
         let stream = futures::stream::iter(vec![item_1, item_2, item_3]).then_concurrent(|x| async move {
             async_std::task::sleep(std::time::Duration::from_millis(x)).await;

@@ -32,6 +32,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@babel/runtime@npm:^7.23.1":
+  version: 7.23.1
+  resolution: "@babel/runtime@npm:7.23.1"
+  dependencies:
+    regenerator-runtime: ^0.14.0
+  checksum: 0cd0d43e6e7dc7f9152fda8c8312b08321cda2f56ef53d6c22ebdd773abdc6f5d0a69008de90aa41908d00e2c1facb24715ff121274e689305c858355ff02c70
+  languageName: node
+  linkType: hard
+
 "@cspotcode/source-map-support@npm:^0.8.0":
   version: 0.8.1
   resolution: "@cspotcode/source-map-support@npm:0.8.1"
@@ -458,7 +467,7 @@ __metadata:
     debug: 4.3.4
     ethers: 5.7.2
     mocha: 10.2.0
-    retimer: 3.0.0
+    retimer: 4.0.0
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
     typescript: 5.2.2
@@ -479,7 +488,7 @@ __metadata:
     debug: 4.3.4
     heap-js: 2.3.0
     mocha: 10.2.0
-    retimer: 3.0.0
+    retimer: 4.0.0
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
     typescript: 5.2.2
@@ -558,7 +567,7 @@ __metadata:
     semver: 7.5.4
     sinon: 16.0.0
     supertest: ^6.2.2
-    swagger-ui-express: 4.6.3
+    swagger-ui-express: 5.0.0
     trace-unhandled: 2.0.1
     ts-node: ^10.9.1
     typedoc: 0.24.8
@@ -981,11 +990,11 @@ __metadata:
   linkType: hard
 
 "@types/supertest@npm:^2.0.11":
-  version: 2.0.13
-  resolution: "@types/supertest@npm:2.0.13"
+  version: 2.0.14
+  resolution: "@types/supertest@npm:2.0.14"
   dependencies:
     "@types/superagent": "*"
-  checksum: fe66be8e16626f254dc9d9691706942689f47a84edf7d3baaeadd6d4d576dbf915ee70cebdd7034015e83fa91fcd2dcff1cd0252514e4c510619817a183b5b4f
+  checksum: 9f6850a22b8f0fd4c26a6dfd9b64771a66476b1a4f841a3b84a9da843ce69463efbf37594fe107297dd14a225d199b802464d48d70e9413238c637903d392137
   languageName: node
   linkType: hard
 
@@ -2462,6 +2471,16 @@ __metadata:
   version: 2.1.1
   resolution: "fast-safe-stringify@npm:2.1.1"
   checksum: a851cbddc451745662f8f00ddb622d6766f9bd97642dabfd9a405fb0d646d69fc0b9a1243cbf67f5f18a39f40f6fa821737651ff1bceeba06c9992ca2dc5bd3d
+  languageName: node
+  linkType: hard
+
+"fast-unique-numbers@npm:^8.0.9":
+  version: 8.0.9
+  resolution: "fast-unique-numbers@npm:8.0.9"
+  dependencies:
+    "@babel/runtime": ^7.23.1
+    tslib: ^2.6.2
+  checksum: 922e306faf3c82eeed5ecf6b583e58af23b276c54d36ef4b1e105521eca38ba381956f70675bd8cf62b9af43871f1321c7cc1d306a1e1a9722adae0c25993d83
   languageName: node
   linkType: hard
 
@@ -4518,6 +4537,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"regenerator-runtime@npm:^0.14.0":
+  version: 0.14.0
+  resolution: "regenerator-runtime@npm:0.14.0"
+  checksum: 1c977ad82a82a4412e4f639d65d22be376d3ebdd30da2c003eeafdaaacd03fc00c2320f18120007ee700900979284fc78a9f00da7fb593f6e6eeebc673fba9a3
+  languageName: node
+  linkType: hard
+
 "require-directory@npm:^2.1.1":
   version: 2.1.1
   resolution: "require-directory@npm:2.1.1"
@@ -4539,10 +4565,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"retimer@npm:3.0.0":
-  version: 3.0.0
-  resolution: "retimer@npm:3.0.0"
-  checksum: f88309196e9d4f2d4be0c76eafc27a9f102c74b40b391ce730785b052c345d7bd59c3e4411a4c422f89f19a42b97b28034639e2f06c63133a06ec8958e9e7516
+"retimer@npm:4.0.0":
+  version: 4.0.0
+  resolution: "retimer@npm:4.0.0"
+  dependencies:
+    worker-timers: ^7.0.75
+  checksum: ca653e2ffb5b4633b42ce4383e53bfb332490487a8933e3c822d9b7aec13f443065c719dc2b772a9201ed6c95772104c32c70e2c0410620f5bc9e21b0a150f0f
   languageName: node
   linkType: hard
 
@@ -5070,21 +5098,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"swagger-ui-dist@npm:>=4.11.0":
-  version: 5.3.1
-  resolution: "swagger-ui-dist@npm:5.3.1"
-  checksum: babf26f3a40a932db22248a620dbb0c5c68721c4165b173537a949c6ec3df3a89982db484651e1f5fe31f3cdb1037eeef13fb6b746efbb72902d7410291070c8
+"swagger-ui-dist@npm:>=5.0.0":
+  version: 5.9.0
+  resolution: "swagger-ui-dist@npm:5.9.0"
+  checksum: 722f5d81adf0c0a940559952f48f7cd20a3f2a53aee8771c896eee8e3bed6f78c2f231960a7c30a4dca390d1205c0b2909d84062978013bb60febc478b9fc3d9
   languageName: node
   linkType: hard
 
-"swagger-ui-express@npm:4.6.3":
-  version: 4.6.3
-  resolution: "swagger-ui-express@npm:4.6.3"
+"swagger-ui-express@npm:5.0.0":
+  version: 5.0.0
+  resolution: "swagger-ui-express@npm:5.0.0"
   dependencies:
-    swagger-ui-dist: ">=4.11.0"
+    swagger-ui-dist: ">=5.0.0"
   peerDependencies:
     express: ">=4.0.0 || >=5.0.0-beta"
-  checksum: bd0e02d2572685fcd82701b29f27ba6a27bc72de2b1553e84f884d008a0bf85a3711c9e236bb658130d702892866744d1a8a30b52b887e4f8224635c57afc63d
+  checksum: 565b89717315577785edc6d2f4df8ce83207baa2b714264170ffa677522d2103c184091e146b7cce7baf254e96116c5bb2cb1ab907dc1152fdead3090690983b
   languageName: node
   linkType: hard
 
@@ -5221,6 +5249,13 @@ __metadata:
   version: 2.6.1
   resolution: "tslib@npm:2.6.1"
   checksum: b0d176d176487905b66ae4d5856647df50e37beea7571c53b8d10ba9222c074b81f1410fb91da13debaf2cbc970663609068bdebafa844ea9d69b146527c38fe
+  languageName: node
+  linkType: hard
+
+"tslib@npm:^2.6.2":
+  version: 2.6.2
+  resolution: "tslib@npm:2.6.2"
+  checksum: 329ea56123005922f39642318e3d1f0f8265d1e7fcb92c633e0809521da75eeaca28d2cf96d7248229deb40e5c19adf408259f4b9640afd20d13aecc1430f3ad
   languageName: node
   linkType: hard
 
@@ -5512,6 +5547,40 @@ __metadata:
   version: 1.0.0
   resolution: "wordwrap@npm:1.0.0"
   checksum: 2a44b2788165d0a3de71fd517d4880a8e20ea3a82c080ce46e294f0b68b69a2e49cff5f99c600e275c698a90d12c5ea32aff06c311f0db2eb3f1201f3e7b2a04
+  languageName: node
+  linkType: hard
+
+"worker-timers-broker@npm:^6.0.96":
+  version: 6.0.96
+  resolution: "worker-timers-broker@npm:6.0.96"
+  dependencies:
+    "@babel/runtime": ^7.23.1
+    fast-unique-numbers: ^8.0.9
+    tslib: ^2.6.2
+    worker-timers-worker: ^7.0.60
+  checksum: 4475d1f3718d6626df754011f6c080e1017e5c50abf228d4e7e152f9c0bd2b63548007abdd073e7b059680104a6281fcdebac18739d23933fe893ba7906c734d
+  languageName: node
+  linkType: hard
+
+"worker-timers-worker@npm:^7.0.60":
+  version: 7.0.60
+  resolution: "worker-timers-worker@npm:7.0.60"
+  dependencies:
+    "@babel/runtime": ^7.23.1
+    tslib: ^2.6.2
+  checksum: 727a520c175e9065645c5cc5cb0e2ee9330a8c45c7fb96989bba03b31203a00a70eb14bf55c4c46ed5890250b2c4be27babe25cbaff69b786a80dd54e28e1461
+  languageName: node
+  linkType: hard
+
+"worker-timers@npm:^7.0.75":
+  version: 7.0.76
+  resolution: "worker-timers@npm:7.0.76"
+  dependencies:
+    "@babel/runtime": ^7.23.1
+    tslib: ^2.6.2
+    worker-timers-broker: ^6.0.96
+    worker-timers-worker: ^7.0.60
+  checksum: f84c25e304a78a2d1f279e390a7742b485203b07cd6315ee708f739a40ff551a9a28524b23e040e71c8c22927e82bb9d123555447e64f343471daeb9eb32ef93
   languageName: node
   linkType: hard
 

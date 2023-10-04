@@ -9,7 +9,6 @@ use crate::{adaptors::indexer::IndexerProcessed, p2p::api, timer::UniversalTimer
 use async_lock::RwLock;
 use core_crypto::keypairs::ChainKeypair;
 use core_ethereum_db::db::CoreEthereumDb;
-use core_mixer::mixer::{Mixer, MixerConfig};
 use core_network::{
     heartbeat::Heartbeat,
     messaging::ControlMessage,
@@ -18,11 +17,13 @@ use core_network::{
 };
 use core_network::{heartbeat::HeartbeatConfig, ping::PingConfig, PeerId};
 use core_p2p::libp2p_identity;
-use core_packet::interaction::{AcknowledgementInteraction, PacketActions, PacketInteraction, PacketInteractionConfig};
 use core_protocol::{
-    ack::config::AckProtocolConfig,
+    ack::{config::AckProtocolConfig, processor::AcknowledgementInteraction},
     heartbeat::config::HeartbeatProtocolConfig,
-    msg::config::MsgProtocolConfig,
+    msg::{
+        config::MsgProtocolConfig,
+        processor::{PacketActions, PacketInteraction, PacketInteractionConfig},
+    },
     ticket_aggregation::{
         config::TicketAggregationProtocolConfig,
         processor::{TicketAggregationActions, TicketAggregationInteraction},
@@ -212,9 +213,9 @@ pub mod wasm_impls {
         network_cfg: NetworkConfig,
         hb_cfg: HeartbeatConfig,
         ping_cfg: PingConfig,
-        on_acknowledgement: Option<js_sys::Function>,
+        on_acknowledgement: js_sys::Function,
         packet_cfg: PacketInteractionConfig,
-        on_final_packet: Option<js_sys::Function>,
+        on_final_packet: js_sys::Function,
         tbf: TagBloomFilter,
         save_tbf: js_sys::Function,
         tx_executor: WasmTxExecutor,
@@ -250,40 +251,31 @@ pub mod wasm_impls {
 
         let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
 
+        // on acknowledged ticket notifier
         let (on_ack_tkt_tx, mut rx) = unbounded::<AcknowledgedTicket>();
         let ms_clone = multi_strategy.clone();
-        let queue = async move {
+        wasm_bindgen_futures::spawn_local(async move {
             while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
                 let _ = ms_clone.on_acknowledged_ticket(&ack).await;
             }
-        };
-        wasm_bindgen_futures::spawn_local(queue);
+        });
 
-        // Spawn on_channel_c
+        // on channel state change notifier
         let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
         let ms_clone = multi_strategy.clone();
-        let queue = async move {
+        wasm_bindgen_futures::spawn_local(async move {
             while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
                 let _ = ms_clone.on_channel_state_changed(&channel);
             }
-        };
-        wasm_bindgen_futures::spawn_local(queue);
+        });
 
-        let ack_actions =
-            AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair, on_ack_tx, Some(on_ack_tkt_tx));
+        let ack_actions = AcknowledgementInteraction::new(db.clone(), &packet_cfg.chain_keypair);
 
         let on_final_packet_tx = adaptors::interactions::wasm::spawn_on_final_packet_loop(on_final_packet);
 
         let tbf = Arc::new(RwLock::new(tbf));
 
-        let packet_actions = PacketInteraction::new(
-            db.clone(),
-            tbf.clone(),
-            Mixer::new_with_gloo_timers(MixerConfig::default()),
-            ack_actions.writer(),
-            on_final_packet_tx,
-            packet_cfg,
-        );
+        let packet_actions = PacketInteraction::new(db.clone(), tbf.clone(), packet_cfg);
 
         let (ping_tx, ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
         let (pong_tx, pong_rx) =
@@ -360,6 +352,9 @@ pub mod wasm_impls {
                     heartbeat_proto_cfg,
                     msg_proto_cfg,
                     ticket_aggregation_proto_cfg,
+                    on_final_packet_tx,
+                    on_ack_tx,
+                    on_ack_tkt_tx,
                 )
                 .map(|_| HoprLoopComponents::Swarm),
             ),
@@ -420,13 +415,13 @@ pub mod wasm_impls {
         pub fn new(
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
-            db: Database, // TODO: replace the string with the KeyPair
+            db: Database,
             network_cfg: NetworkConfig,
             hb_cfg: HeartbeatConfig,
             ping_cfg: PingConfig,
-            on_acknowledgement: Option<js_sys::Function>,
+            on_acknowledgement: js_sys::Function,
             packet_cfg: PacketInteractionConfig,
-            on_final_packet: Option<js_sys::Function>,
+            on_final_packet: js_sys::Function,
             tbf: TagBloomFilter,
             save_tbf: js_sys::Function,
             tx_executor: WasmTxExecutor,
