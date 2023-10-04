@@ -1,8 +1,8 @@
 import logging
 from hoprd_sdk import Configuration, ApiClient
-from hoprd_sdk.models import MessagesBody, MessagesPopBody, ChannelsBody, ChannelidFundBody
+from hoprd_sdk.models import AliasesBody, MessagesBody, MessagesPopBody, ChannelsBody, ChannelidFundBody
 from hoprd_sdk.rest import ApiException
-from hoprd_sdk.api import NodeApi, MessagesApi, AccountApi, ChannelsApi, PeersApi, TicketsApi
+from hoprd_sdk.api import AliasesApi, NodeApi, MessagesApi, AccountApi, ChannelsApi, PeersApi, TicketsApi
 from urllib3.exceptions import MaxRetryError
 
 
@@ -39,18 +39,53 @@ class HoprdAPI:
                 log.debug(
                     f"Calling {api_callback.__qualname__} with kwargs: {kwargs}, args: {args}, response: {response}"
                 )
-                return response
+                return (True, response)
         except ApiException as e:
-            log.debug(
+            log.info(
                 f"ApiException calling {api_callback.__qualname__} with kwargs: {kwargs}, args: {args}, error is: {e}"
             )
-            return None
+            return (False, None)
         except OSError:
             log.error(f"OSError calling {api_callback.__qualname__} with kwargs: {kwargs}, args: {args}:")
-            return None
+            return (False, None)
         except MaxRetryError:
             log.error(f"MaxRetryError calling {api_callback.__qualname__} with kwargs: {kwargs}, args: {args}")
-            return None
+            return (False, None)
+
+    async def aliases_get_aliases(self):
+        """
+        DO NOT USE - this is useless, returns a pair {'alice': None, 'bob': None} that never gets set!
+
+        Returns the aliases recognized by the node.
+        :return: aliases: dict
+        """
+        _, response = self.__call_api(AliasesApi, "aliases_get_aliases")
+        return response
+
+    async def aliases_get_alias(self, alias: str):
+        """
+        Returns the peer id recognized by the node.
+        :return: peer_id: str
+        """
+        status, response = self.__call_api(AliasesApi, "aliases_get_alias", alias)
+        return response.peer_id if status else None
+
+    async def aliases_set_alias(self, alias: str, peer_id: str):
+        """
+        Returns the aliases recognized by the node.
+        :return: bool
+        """
+        body = AliasesBody(peer_id, alias)
+        status, response = self.__call_api(AliasesApi, "aliases_set_alias", body=body)
+        return status
+
+    async def aliases_remove_alias(self, alias: str):
+        """
+        Returns the aliases recognized by the node.
+        :return: bool
+        """
+        status, _ = self.__call_api(AliasesApi, "aliases_remove_alias", alias)
+        return status
 
     async def balances(self, type: str or list[str] = "all"):
         """
@@ -61,8 +96,8 @@ class HoprdAPI:
         all_types = ["hopr", "native", "safe_native", "safe_hopr"]
         assert type in all_types
 
-        response = self.__call_api(AccountApi, "account_get_balances")
-        if response is not None:
+        status, response = self.__call_api(AccountApi, "account_get_balances")
+        if status:
             return int(getattr(response, type))
         else:
             return response
@@ -76,8 +111,8 @@ class HoprdAPI:
         """
         body = ChannelsBody(peer_address, amount)
 
-        response = self.__call_api(ChannelsApi, "channels_open_channel", body=body)
-        return response.channel_id if response is not None else None
+        status, response = self.__call_api(ChannelsApi, "channels_open_channel", body=body)
+        return response.channel_id if status else None
 
     async def channels_fund_channel(self, channel_id: str, amount: str):
         """
@@ -87,7 +122,8 @@ class HoprdAPI:
         :return: bool
         """
         body = ChannelidFundBody(amount=amount)
-        return self.__call_api(ChannelsApi, "channels_fund_channel", channel_id, body=body) is not None
+        status, _ = self.__call_api(ChannelsApi, "channels_fund_channel", channel_id, body=body)
+        return status
 
     async def close_channel(self, channel_id: str):
         """
@@ -95,7 +131,8 @@ class HoprdAPI:
         :param: channel_id: str
         :return: bool
         """
-        return self.__call_api(ChannelsApi, "channels_close_channel", channel_id) is not None
+        status, _ = self.__call_api(ChannelsApi, "channels_close_channel", channel_id)
+        return status
 
     async def channel_redeem_tickets(self, channel_id: str):
         """
@@ -103,8 +140,8 @@ class HoprdAPI:
         :param: channel_id: str
         :return: bool
         """
-        self.__call_api(ChannelsApi, "channels_redeem_tickets", channel_id)
-        return True  # even the success returns None
+        status, _ = self.__call_api(ChannelsApi, "channels_redeem_tickets", channel_id)
+        return status
 
     async def incoming_channels(self, only_id: bool = False):
         """
@@ -112,10 +149,10 @@ class HoprdAPI:
         :return: channels: list
         """
 
-        response = self.__call_api(
+        status, response = self.__call_api(
             ChannelsApi, "channels_get_channels", full_topology="false", including_closed="false"
         )
-        if response is not None:
+        if status:
             if not hasattr(response, "incoming"):
                 log.warning("Response does not contain `incoming`")
                 return []
@@ -136,8 +173,8 @@ class HoprdAPI:
         Returns all open outgoing channels.
         :return: channels: list
         """
-        response = self.__call_api(ChannelsApi, "channels_get_channels")
-        if response is not None:
+        status, response = self.__call_api(ChannelsApi, "channels_get_channels")
+        if status:
             if not hasattr(response, "outgoing"):
                 log.warning("Response does not contain `outgoing`")
                 return []
@@ -159,7 +196,17 @@ class HoprdAPI:
         :param: channel_id: str
         :return: channel: response
         """
-        return self.__call_api(ChannelsApi, "channels_get_channel", channel_id)
+        _, response = self.__call_api(ChannelsApi, "channels_get_channel", channel_id)
+        return response
+
+    async def channels_aggregate_tickets(self, channel_id: str):
+        """
+        Aggregate channel tickets.
+        :param: channel_id: str
+        :return: bool
+        """
+        status, _ = self.__call_api(ChannelsApi, "channels_aggregate_tickets", channel_id)
+        return status
 
     async def channel_get_tickets(self, channel_id: str):
         """
@@ -167,7 +214,8 @@ class HoprdAPI:
         :param: channel_id: str
         :return: tickets: response
         """
-        return self.__call_api(ChannelsApi, "channels_get_tickets", channel_id)
+        status, response = self.__call_api(ChannelsApi, "channels_get_tickets", channel_id)
+        return response if status else []
 
     async def all_channels(self, include_closed: bool):
         """
@@ -175,10 +223,10 @@ class HoprdAPI:
         :param: include_closed: bool
         :return: channels: list
         """
-        response = self.__call_api(
+        status, response = self.__call_api(
             ChannelsApi, "channels_get_channels", full_topology="true", including_closed=include_closed
         )
-        return response if response is not None else []
+        return response if status else []
 
     async def ping(self, peer_id: str):
         """
@@ -186,9 +234,10 @@ class HoprdAPI:
         :param: peer_id: str
         :return: response: dict
         """
-        return self.__call_api(PeersApi, "peers_ping_peer", peer_id)
+        _, response = self.__call_api(PeersApi, "peers_ping_peer", peer_id)
+        return response
 
-    async def peers(self, params: list or str = "peer_id", status: str = "connected", quality: float = 0):
+    async def peers(self, params: list or str = "peer_id", status: str = "connected"):
         """
         Returns a list of peers.
         :param: param: list or str = "peer_id"
@@ -196,8 +245,8 @@ class HoprdAPI:
         :param: quality: int = 0..1
         :return: peers: list
         """
-        response = self.__call_api(NodeApi, "node_get_peers")
-        if response is not None:
+        is_ok, response = self.__call_api(NodeApi, "node_get_peers")
+        if is_ok:
             if not hasattr(response, status):
                 log.error(f"No `{status}` returned from the API")
                 return []
@@ -225,7 +274,8 @@ class HoprdAPI:
         Returns the ticket statistics of the node.
         :return: statistics: dict
         """
-        return self.__call_api(TicketsApi, "tickets_get_statistics")
+        _, response = self.__call_api(TicketsApi, "tickets_get_statistics")
+        return response
 
     async def get_address(self, address: str):
         """
@@ -233,8 +283,8 @@ class HoprdAPI:
         :param: address: str = "hopr" | "native"
         :return: address: str | undefined
         """
-        response = self.__call_api(AccountApi, "account_get_address", address)
-        if response is not None:
+        status, response = self.__call_api(AccountApi, "account_get_address", address)
+        if status:
             if not hasattr(response, address):
                 log.error(f"No {address} returned from the API")
                 return None
@@ -253,7 +303,8 @@ class HoprdAPI:
         :return: bool
         """
         body = MessagesBody(tag, message, destination, path=hops)
-        return self.__call_api(MessagesApi, "messages_send_message", body=body) is not None
+        status, _ = self.__call_api(MessagesApi, "messages_send_message", body=body)
+        return status
 
     async def messages_pop(self, tag: int = MESSAGE_TAG) -> bool:
         """
@@ -263,12 +314,13 @@ class HoprdAPI:
         """
 
         body = MessagesPopBody(tag=tag)
-        return self.__call_api(MessagesApi, "messages_pop_message", body=body)
+        _, response = self.__call_api(MessagesApi, "messages_pop_message", body=body)
+        return response
 
     async def tickets_redeem(self):
         """
         Redeems all tickets.
         :return: bool
         """
-        self.__call_api(TicketsApi, "tickets_redeem_tickets")
-        return True  # returns None even on success
+        status, _ = self.__call_api(TicketsApi, "tickets_redeem_tickets")
+        return status
