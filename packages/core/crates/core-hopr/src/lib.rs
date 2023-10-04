@@ -189,9 +189,9 @@ pub mod wasm_impls {
             }
         }
 
-        pub async fn aggregate_tickets(&mut self, channel_id: &Hash, timeout_in_millis: u64) -> Result<(), JsValue> {
+        pub async fn aggregate_tickets(&mut self, channel: &ChannelEntry, timeout_in_millis: u64) -> Result<(), JsValue> {
             ok_or_jserr!(
-                ok_or_jserr!(self.ticket_aggregate_actions.aggregate_tickets(channel_id))?
+                ok_or_jserr!(self.ticket_aggregate_actions.aggregate_tickets(channel))?
                     .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
                     .await
             )

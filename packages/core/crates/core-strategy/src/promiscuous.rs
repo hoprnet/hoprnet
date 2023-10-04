@@ -14,11 +14,10 @@ use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::{
     channels::{close_channel, open_channel},
-    transaction_queue::{TransactionCompleted, TransactionSender},
+    transaction_queue::TransactionSender,
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
@@ -130,7 +129,7 @@ where
             // get the Ethereum address of the peer
             if let Some(address) = self.db.read().await.get_chain_key(&packet_key).await? {
                 if tick_decision.will_channel_be_closed(&address)
-                    || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some()
+                    || new_channel_candidates.iter().any(|(p, _)| p.eq(&address))
                 {
                     // Skip this peer if we already processed it (iterator may have duplicates)
                     debug!("encountered duplicate peer {}", peer);
@@ -146,12 +145,12 @@ where
                     if quality <= self.config.network_quality_threshold {
                         // Need to close the channel, because quality has dropped
                         debug!("new channel closure candidate with {} (quality {})", address, quality);
-                        tick_decision.add_to_close(channel.clone());
+                        tick_decision.add_to_close(*channel);
                     }
                 } else if quality >= self.config.network_quality_threshold {
                     // Try to open channel with this peer, because it is high-quality
                     debug!("new channel opening candidate {} with quality {}", address, quality);
-                    new_channel_candidates.push((address.clone(), quality));
+                    new_channel_candidates.push((address, quality));
                 }
 
                 active_addresses.insert(address, quality);
@@ -180,7 +179,7 @@ where
             .iter()
             .filter(|c| c.status == PendingToClose)
             .for_each(|c| {
-                tick_decision.add_to_close(c.clone());
+                tick_decision.add_to_close(*c);
             });
         debug!(
             "{} channels are in PendingToClose, so strategy will mark them for closing too",
@@ -224,7 +223,7 @@ where
                 active_addresses
                     .get(&p1.destination)
                     .zip(active_addresses.get(&p2.destination))
-                    .and_then(|(q1, q2)| q1.partial_cmp(&q2))
+                    .and_then(|(q1, q2)| q1.partial_cmp(q2))
                     .expect(format!("failed to retrieve quality of {} or {}", p1.destination, p2.destination).as_str())
             });
 
@@ -247,7 +246,7 @@ where
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
             // Go through the new candidates for opening channels allow them to open based on our available node balance
-            let mut remaining_balance = balance.clone();
+            let mut remaining_balance = balance;
             for address in new_channel_candidates.into_iter().map(|(p, _)| p) {
                 // Stop if we ran out of balance
                 if remaining_balance.lte(&self.config.minimum_node_balance) {
@@ -261,7 +260,7 @@ where
                 // If we haven't added this peer yet, add it to the list for channel opening
                 if !tick_decision.will_address_be_opened(&address) {
                     debug!("promoting peer {} for channel opening", address);
-                    tick_decision.add_to_open(address.clone(), self.config.new_channel_stake.clone());
+                    tick_decision.add_to_open(address, self.config.new_channel_stake);
                     remaining_balance = balance.sub(&self.config.new_channel_stake);
                 }
             }
@@ -296,8 +295,6 @@ where
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
 
-        let mut receivers = futures::stream::FuturesUnordered::<TransactionCompleted>::new();
-
         // close all the channels, need to be synchronous because Ethereum transactions
         // are synchronous, especially due nonces
         for channel_to_close in tick_decision.get_to_close() {
@@ -311,11 +308,12 @@ where
             )
             .await
             {
-                Ok(successful_tx) => {
-                    receivers.push(successful_tx);
+                Ok(_) => {
+                    // Intentionally do not await result of the channel transaction
+                    info!("{self} strategy: issued channel closing tx: {}", channel_to_close);
                 }
                 Err(e) => {
-                    error!("promiscuous strategy: error while closing channel: {e}");
+                    error!("{self} strategy: error while closing channel: {e}");
                 }
             }
         }
@@ -333,13 +331,13 @@ where
             )
             .await
             {
-                Ok(receiver) => {
-                    info!("{self} strategy: opened channel to {}", channel_to_open.0);
-                    receivers.push(receiver)
+                Ok(_) => {
+                    // Intentionally do not await result of the channel transaction
+                    info!("{self} strategy: issued channel opening tx: {}", channel_to_open.0);
                 }
                 Err(e) => {
                     error!(
-                        "{self} strategy: error while opening channel to {}: {e}",
+                        "{self} strategy: error while issuing channel opening to {}: {e}",
                         channel_to_open.0
                     );
                 }
@@ -348,7 +346,7 @@ where
 
         debug!("{self} strategy: open channels done");
 
-        while let Some(_) = receivers.next().await {}
+        //while let Some(_) = receivers.next().await {}
 
         debug!("{self} strategy: channel operations done");
 

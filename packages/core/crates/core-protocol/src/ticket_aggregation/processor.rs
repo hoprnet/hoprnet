@@ -5,7 +5,7 @@ use crate::errors::{
 use async_lock::RwLock;
 use core_crypto::{
     keypairs::ChainKeypair,
-    types::{Hash, OffchainPublicKey},
+    types::OffchainPublicKey,
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
@@ -62,7 +62,7 @@ pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
     ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
-    ToSend(Hash, TicketAggregationFinalizer),
+    ToSend(ChannelEntry, TicketAggregationFinalizer),
 }
 
 /// Emitted by the processor background pipeline once processed
@@ -308,24 +308,18 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         Ok(acked_aggregated_ticket)
     }
 
-    pub async fn prepare_aggregatable_tickets(&self, channel_id: &Hash) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
-        let channel = self.db.read().await.get_channel(channel_id).await?.ok_or_else(|| {
-            ProtocolTicketAggregation(format!(
-                "Cannot aggregate tickets in channel {} because indexer has no record for that particular channel",
-                channel_id
-            ))
-        })?;
+    pub async fn prepare_aggregatable_tickets(&self, channel: &ChannelEntry) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
 
         // get aggregatable tickets and them as being aggregated
         let tickets_to_aggregate = self
             .db
             .write()
             .await
-            .prepare_aggregatable_tickets(channel_id, channel.channel_epoch.as_u32(), 0u64, u64::MAX)
+            .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
             .await?;
 
         if tickets_to_aggregate.is_empty() {
-            debug!("No tickets to aggregate in {channel_id}, dropping request");
+            debug!("No tickets to aggregate in {channel}, dropping request");
             return Err(ProtocolTicketAggregation("No tickets to aggregate".into()));
         }
 
@@ -362,6 +356,7 @@ use async_std::task::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
 use libp2p::request_response::{RequestId, ResponseChannel};
+use core_types::channels::ChannelEntry;
 
 impl TicketAggregationAwaiter {
     pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<()> {
@@ -442,11 +437,11 @@ impl<T, U> TicketAggregationActions<T, U> {
     }
 
     /// Pushes a new collection of tickets into the processing.
-    pub fn aggregate_tickets(&mut self, channel_id: &Hash) -> Result<TicketAggregationAwaiter> {
+    pub fn aggregate_tickets(&mut self, channel: &ChannelEntry) -> Result<TicketAggregationAwaiter> {
         let (tx, rx) = oneshot::channel::<()>();
 
         self.process(TicketAggregationToProcess::ToSend(
-            *channel_id,
+            *channel,
             TicketAggregationFinalizer::new(tx),
         ))?;
 
@@ -522,8 +517,8 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                             }
                         }
                     }
-                    TicketAggregationToProcess::ToSend(channel_id, finalizer) => {
-                        match processor.prepare_aggregatable_tickets(&channel_id).await {
+                    TicketAggregationToProcess::ToSend(channel, finalizer) => {
+                        match processor.prepare_aggregatable_tickets(&channel).await {
                             Ok((source, tickets)) => Some(TicketAggregationProcessed::Send(source, tickets, finalizer)),
                             Err(_) => None,
                         }
@@ -720,20 +715,22 @@ mod tests {
 
         let channel_id_alice_bob = generate_channel_id(&(&PEERS_CHAIN[0]).into(), &(&PEERS_CHAIN[1]).into());
 
+        let channel_alice_bob = ChannelEntry {
+            source: alice_addr,
+            destination: bob_addr,
+            balance: Balance::new(1u64.into(), BalanceType::HOPR),
+            ticket_index: 1u64.into(),
+            status: ChannelStatus::Open,
+            channel_epoch: 1u32.into(),
+            closure_time: 0u64.into(),
+        };
+
         dbs[1]
             .write()
             .await
             .update_channel_and_snapshot(
                 &channel_id_alice_bob,
-                &ChannelEntry {
-                    source: alice_addr,
-                    destination: bob_addr,
-                    balance: Balance::new(1u64.into(), BalanceType::HOPR),
-                    ticket_index: 1u64.into(),
-                    status: ChannelStatus::Open,
-                    channel_epoch: 1u32.into(),
-                    closure_time: 0u64.into(),
-                },
+                &channel_alice_bob,
                 &Snapshot::default(),
             )
             .await
@@ -742,7 +739,7 @@ mod tests {
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
 
-        let mut awaiter = bob.writer().aggregate_tickets(&channel_id_alice_bob).unwrap();
+        let mut awaiter = bob.writer().aggregate_tickets(&channel_alice_bob).unwrap();
         let mut finalizer = None;
         match bob.next().await {
             Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {

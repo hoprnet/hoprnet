@@ -62,8 +62,7 @@ impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db> {
     async fn on_channel_state_changed(&self, channel: &ChannelEntry, change: ChannelChange) -> crate::errors::Result<()> {
-        match change {
-            ChannelChange::CurrentBalance { new, .. } => {
+        if let ChannelChange::CurrentBalance { new, .. }  = change {
                 if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
                     info!(
                             "{self} strategy: stake on {channel} is below threshold {} < {}",
@@ -72,17 +71,15 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
 
                     let to_stake = channel.balance.add(&self.cfg.funding_amount);
 
-                    let _ = fund_channel(
+                    let rx = fund_channel(
                         self.db.clone(),
                         self.tx_sender.clone(),
                         channel.get_id(),
-                        to_stake.clone(),
-                    )
-                        .await?;
+                        to_stake,
+                    ).await?;
+                    std::mem::drop(rx); // The Receiver is not intentionally awaited here
                     info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
                 }
-            }
-            _ => {}
         }
 
         Ok(())

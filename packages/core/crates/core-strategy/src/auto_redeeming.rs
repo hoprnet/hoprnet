@@ -23,7 +23,7 @@ pub struct AutoRedeemingStrategyConfig {
 impl Default for AutoRedeemingStrategyConfig {
     fn default() -> Self {
         Self {
-            redeem_only_aggregated: false,
+            redeem_only_aggregated: true,
         }
     }
 }
@@ -34,7 +34,6 @@ impl Default for AutoRedeemingStrategyConfig {
 pub struct AutoRedeemingStrategy<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
     tx_sender: TransactionSender,
-    #[allow(dead_code)]
     cfg: AutoRedeemingStrategyConfig,
 }
 
@@ -55,7 +54,8 @@ impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeeming
     async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
             info!("{self} strategy: auto-redeeming {ack}");
-            let _ = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
+            let rx = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
+            std::mem::drop(rx); // The Receiver is not intentionally awaited here
         }
         Ok(())
     }

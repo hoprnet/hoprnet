@@ -63,18 +63,29 @@ It can be configured to automatically redeem all tickets or only aggregated tick
 
 ## Aggregating Strategy
 
+This strategy automates ticket aggregation on different channel/ticket events.
+Note that the aggregating strategy can be combined with the Auto Redeem Strategy above.
+
+Ticket aggregation is an interactive process and requires cooperation of the ticket issuer, the aggregation
+will fail if the aggregation takes more than `aggregation_timeout` (in seconds). This does not affect runtime of the
+strategy, since the ticket aggregation and awaiting it is performed on a separate thread.
+
+This strategy listens for two distinct channel events and triggers the interactive aggregation based on different criteria:
+
+### 1) New winning acknowledged ticket event
 This strategy listens to newly added acknowledged winning tickets and once the amount of tickets in a certain channel reaches
 an `aggregation_threshold`, the strategy will initiate ticket aggregation in that channel.
 The strategy can independently also check if the unrealized balance (current balance *minus* unredeemed tickets value) in a certain channel
 has not gone over `unrelalized_balance_ratio` percent of the current balance in that channel. If that happens, the strategy will also initiate
 ticket aggregation. 
-If the `aggregate_on_channel_close` flag is set, the aggregation will also happen once a channel transitions from `Open` to `PendingToClose` state,
-but only if the above conditions are met.
-Since ticket aggregation is an interactive process and requires cooperation of the ticket issuer, the aggregation
-will fail if the aggregation takes more than `aggregation_timeout` (in seconds). This does not affect runtime of the
-strategy, since the ticket aggregation and awaiting it is performed on a separate thread.
 
-Beware of properly combining the auto redeem feature of the Aggregating Strategy with the Auto Redeem Strategy above.
+### 2) Channel transition from `Open` to `PendingToClose` event
+If the `aggregate_on_channel_close` flag is set, the aggregation will be triggered once a channel transitions from `Open` to `PendingToClose` state.
+This behavior does not have any additional criteria, unlike in the previous event.
+
+The aggregation on channel closure slightly differs in what happens on failure behaviour.
+If the aggregation on channel closure fails, the unaggregated tickets in that channel are automatically send for redeeming.
+When this strategy is triggered from the
 
 ### Default parameters
 

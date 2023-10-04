@@ -23,8 +23,10 @@ use async_std::task::spawn_local;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
+use core_ethereum_actions::redeem::redeem_tickets_in_channel;
+use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_path::channel_graph::ChannelChange;
-use utils_types::primitives::Balance;
+use utils_types::primitives::{Balance, BalanceType};
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
@@ -75,6 +77,7 @@ impl Default for AggregatingStrategyConfig {
 /// was successful.
 pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions, T, U> {
     db: Arc<RwLock<Db>>,
+    tx_sender: TransactionSender,
     ticket_aggregator: Arc<Mutex<TicketAggregationActions<T, U>>>,
     cfg: AggregatingStrategyConfig,
 }
@@ -89,72 +92,112 @@ impl<Db: HoprCoreEthereumDbActions, T, U> AggregatingStrategy<Db, T, U> {
     pub fn new(
         cfg: AggregatingStrategyConfig,
         db: Arc<RwLock<Db>>,
+        tx_sender: TransactionSender,
         ticket_aggregator: TicketAggregationActions<T, U>,
     ) -> Self {
         Self {
             cfg,
             db,
+            tx_sender,
             ticket_aggregator: Arc::new(Mutex::new(ticket_aggregator)),
         }
     }
 }
 
 impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U> {
-    async fn perform_ticket_aggregation(&self, channel: ChannelEntry) -> crate::errors::Result<()> {
-        let channel_id = channel.get_id();
+    async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
+        debug!("{self} strategy: starting aggregation in {channel}");
+        match self.ticket_aggregator.lock().await.aggregate_tickets(&channel) {
+            Ok(mut awaiter) => {
+                // Spawn waiting for the aggregation as a separate task
+                let agg_timeout = self.cfg.aggregation_timeout;
+                let tx_sender_clone = self.tx_sender.clone();
+                let db_clone = self.db.clone();
+                let strategy_id = self.to_string();
+
+                spawn_local(async move {
+                    match awaiter.consume_and_wait(agg_timeout).await {
+                        Ok(_) => {
+                            // The TicketAggregationActions will raise the on_acknowledged_ticket event,
+                            // so the AutoRedeem strategy can take care of redeeming if needed
+                            info!("{strategy_id} strategy: has completed ticket aggregation");
+                        }
+                        Err(e) => {
+                            warn!("{strategy_id} strategy: could not aggregate tickets: {e}");
+                            if redeem_if_failed {
+                                info!("{strategy_id} strategy: initiating redemption of all tickets in {channel} after aggregation failure");
+
+                                if let Err(e) = redeem_tickets_in_channel(db_clone, &channel, false, tx_sender_clone).await {
+                                    error!("{strategy_id} strategy: failed to issue redeeming of all tickets in {channel}: {e}");
+                                }
+
+                                // We do not need to await the redemption completion of all the tickets
+                            }
+                        }
+                    }
+                });
+
+                Ok(())
+            },
+            Err(e) => {
+                warn!("{self} strategy: could not initiate aggregate tickets due to {e}");
+                Err(crate::errors::StrategyError::Other("ticket aggregation failed".into()))
+            }
+        }
+    }
+}
+
+#[async_trait(? Send)]
+impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for AggregatingStrategy<Db, T, U> {
+    async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
+        let channel_id = ack.ticket.channel_id;
+
+        let channel = match self.db.read().await.get_channel(&channel_id).await? {
+            Some(channel) => channel,
+            None => {
+                error!("{self} strategy: encountered {ack} in a non-existing channel!");
+                return Err(ChannelDoesNotExist.into());
+            }
+        };
 
         let ack_tickets_in_db = self
             .db
             .read()
             .await
-            .get_acknowledged_tickets(Some(channel.clone()))
+            .get_acknowledged_tickets(Some(channel))
             .await?;
 
-        let being_aggregated_count = ack_tickets_in_db
-            .iter()
-            .filter(|ack| match ack.status {
-                AcknowledgedTicketStatus::BeingAggregated { .. } => true,
-                _ => false,
-            })
-            .count() as u32;
+        let mut aggregatable_tickets = 0;
+        let mut unredeemed_value = Balance::zero(BalanceType::HOPR);
 
-        if being_aggregated_count > 0 {
-            debug!(
-                "{self} strategy: {channel} already has ticket aggregation in progress (size {being_aggregated_count}), not aggregating yet"
-            );
-            return Ok(());
+        for ticket in ack_tickets_in_db.iter() {
+            match ticket.status {
+                AcknowledgedTicketStatus::Untouched => {
+                    aggregatable_tickets += 1;
+                    unredeemed_value = unredeemed_value.add(&ticket.ticket.amount);
+                }
+                AcknowledgedTicketStatus::BeingAggregated { .. } => {
+                    debug!(
+                        "{self} strategy: {channel} already has ticket aggregation in progress, not aggregating yet"
+                    );
+                    return Ok(());
+                }
+                AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
+            }
         }
-
-        let count_ack_tickets_in_channel = ack_tickets_in_db
-            .iter()
-            .filter(|ack| ack.status == AcknowledgedTicketStatus::Untouched)
-            .count() as u32;
 
         let mut can_aggregate = false;
 
-        // TODO: should check this criteria on Open -> PendingToClose transition ?
-
         // Check the aggregation threshold
         if let Some(agg_threshold) = self.cfg.aggregation_threshold {
-            if count_ack_tickets_in_channel >= agg_threshold {
-                info!(
-                    "{self} strategy: {channel} has {count_ack_tickets_in_channel} >= {} ack tickets",
-                    agg_threshold
-                );
+            if aggregatable_tickets >= agg_threshold {
+                info!("{self} strategy: {channel} has {aggregatable_tickets} >= {agg_threshold} ack tickets");
                 can_aggregate = true;
             } else {
-                debug!(
-                    "{self} strategy: {channel} has {count_ack_tickets_in_channel} < {} ack tickets, not aggregating yet",
-                    agg_threshold
-                );
+                debug!("{self} strategy: {channel} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet");
             }
         }
         if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
-            let unredeemed_value = Balance::new(ack_tickets_in_db
-                .iter()
-                .map(|t| *t.ticket.amount.value())
-                .sum(), channel.balance.balance_type());
-
             let diminished_balance = channel.balance.div_f64(unrealized_threshold as f64);
 
             // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
@@ -172,48 +215,11 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U
 
         // Proceed with aggregation
         if can_aggregate {
-            debug!("{self} strategy: starting aggregation in {channel_id}");
-            match self.ticket_aggregator.lock().await.aggregate_tickets(&channel_id) {
-                Ok(mut awaiter) => {
-                    let agg_timeout = self.cfg.aggregation_timeout;
-                    // Spawn waiting for the aggregation as a separate task
-                    spawn_local(async move {
-                        match awaiter.consume_and_wait(agg_timeout).await {
-                            Ok(_) => {
-                                // The TicketAggregationActions will raise the on_acknowledged_ticket event
-                                info!("strategy has completed ticket aggregation");
-                            }
-                            Err(e) => {
-                                warn!("strategy could not aggregate tickets: {e}")
-                            }
-                        }
-                    });
-                },
-                Err(e) => {
-                    warn!("{self} strategy: could not initiate aggregate tickets due to {e}");
-                    return Err(crate::errors::StrategyError::Other("ticket aggregation failed".into()));
-                }
-            };
+            self.start_aggregation(channel, false).await
+        } else {
+            debug!("{self} strategy: channel {channel_id} has not met the criteria for aggregation");
+            Ok(())
         }
-
-        Ok(())
-    }
-}
-
-#[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for AggregatingStrategy<Db, T, U> {
-    async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        let channel_id = ack.ticket.channel_id;
-
-        let channel = match self.db.read().await.get_channel(&channel_id).await? {
-            Some(channel) => channel,
-            None => {
-                error!("{self} strategy: encountered {ack} in a non-existing channel!");
-                return Err(ChannelDoesNotExist.into());
-            }
-        };
-
-        self.perform_ticket_aggregation(channel).await
     }
 
     async fn on_channel_state_changed(&self, channel: &ChannelEntry, change: ChannelChange) -> crate::errors::Result<()> {
@@ -221,16 +227,42 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
             return Ok(())
         }
 
-        match change {
-            ChannelChange::Status { old, new } => {
-                if old == ChannelStatus::Open && new == ChannelStatus::PendingToClose {
-                    self.perform_ticket_aggregation(*channel).await
-                } else {
-                    debug!("{self} strategy: ignoring channel {channel} state change that's not in PendingToClose");
-                    Ok(())
-                }
+        if let ChannelChange::Status { old, new } = change {
+            if old != ChannelStatus::Open || new != ChannelStatus::PendingToClose {
+                debug!("{self} strategy: ignoring channel {channel} state change that's not in PendingToClose");
+                return Ok(())
             }
-            _ => Ok(())
+        }
+
+        let ack_tickets_in_db = self
+            .db
+            .read()
+            .await
+            .get_acknowledged_tickets(Some(*channel))
+            .await?;
+
+        let mut aggregatable_tickets = 0;
+
+        for ticket in ack_tickets_in_db.iter() {
+            match ticket.status {
+                AcknowledgedTicketStatus::Untouched => {
+                    aggregatable_tickets += 1;
+                }
+                AcknowledgedTicketStatus::BeingAggregated { .. } => {
+                    debug!(
+                        "{self} strategy: {channel} already has ticket aggregation in progress, not aggregating yet"
+                    );
+                    return Ok(());
+                }
+                AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
+            }
+        }
+
+        if aggregatable_tickets > 0 {
+            self.start_aggregation(*channel, true).await
+        } else {
+            debug!("{self} strategy: closing {channel} has no tickets to aggregate");
+            Ok(())
         }
     }
 }
@@ -245,7 +277,7 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionResult};
+    use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_protocol::ticket_aggregation::processor::{TicketAggregationInteraction, TicketAggregationProcessed};
     use core_types::{
@@ -411,10 +443,17 @@ mod tests {
             .await
             .unwrap();
 
+        let tx_exec = MockTxExec::new();
+        let tx_queue = TransactionQueue::new(dbs[1].clone(), Box::new(tx_exec));
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn_local(async move {
+            tx_queue.transaction_loop().await;
+        });
+
         let mut alice = TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
         let mut bob = TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), bob.writer());
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob.writer());
 
         let threshold_ticket = acked_tickets.last().unwrap();
 
@@ -523,10 +562,17 @@ mod tests {
             .await
             .unwrap();
 
+        let tx_exec = MockTxExec::new();
+        let tx_queue = TransactionQueue::new(dbs[1].clone(), Box::new(tx_exec));
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn_local(async move {
+            tx_queue.transaction_loop().await;
+        });
+
         let mut alice = TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
         let mut bob = TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
 
-        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), bob.writer());
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob.writer());
 
         let (tx, awaiter) = futures::channel::oneshot::channel::<()>();
 
