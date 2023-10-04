@@ -1098,7 +1098,6 @@ export class Hopr extends EventEmitter {
 
   public async getTicketStatistics() {
     const acked_tickets = await this.db.get_acknowledged_tickets()
-
     const pending = await this.db.get_pending_tickets_count()
     const losing = await this.db.get_losing_tickets_count()
 
