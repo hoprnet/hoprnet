@@ -46,13 +46,6 @@ impl Address {
         ret.into_boxed_slice()
     }
 
-    // impl std::string::ToString {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
-    pub fn _to_string(&self) -> String {
-        self.to_hex()
-    }
-    // }
-
     /// Creates a random Ethereum address, mostly used for testing
     pub fn random() -> Self {
         let mut addr = [0u8; Self::SIZE];
@@ -821,6 +814,11 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8]) -> JsResult<Address> {
             ok_or_jserr!(Address::from_bytes(data))
+        }
+
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.to_string()
         }
 
         #[wasm_bindgen(js_name = "to_hex")]

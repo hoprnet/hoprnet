@@ -447,13 +447,11 @@ mod tests {
             .await
             .unwrap();
 
-        let channel_id = channel.get_id();
-
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |id, balance| channel_id.eq(id) && stake.eq(balance))
+            .withf(move |dst, balance| channel.destination.eq(dst) && stake.eq(balance))
             .returning(move |_, _| TransactionResult::FundChannel { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
