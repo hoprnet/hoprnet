@@ -12,7 +12,7 @@ use core_network::network::{Network, NetworkExternalActions};
 use core_path::channel_graph::ChannelChange;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::channels::{ChannelEntry, Ticket};
+use core_types::channels::{ChannelDirection, ChannelEntry, Ticket};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -33,8 +33,13 @@ pub trait SingularStrategy: Display {
         Ok(())
     }
 
-    /// Strategy event raised whenever the Indexer registers a change on a channel
-    async fn on_channel_changed(&self, _channel: &ChannelEntry, _change: ChannelChange) -> Result<()> {
+    /// Strategy event raised whenever the Indexer registers a change on node's own channel
+    async fn on_own_channel_changed(
+        &self,
+        _channel: &ChannelEntry,
+        _direction: ChannelDirection,
+        _change: ChannelChange,
+    ) -> Result<()> {
         Ok(())
     }
 }
@@ -63,7 +68,11 @@ pub struct MultiStrategyConfig {
 impl MultiStrategyConfig {
     pub fn new(on_fail_continue: bool, allow_recursive: bool, strategies: Vec<Strategy>) -> Self {
         // This constructor can be removed once `strategies` field is made `pub`
-        Self { on_fail_continue, allow_recursive, strategies }
+        Self {
+            on_fail_continue,
+            allow_recursive,
+            strategies,
+        }
     }
 
     pub fn get_strategies(&mut self) -> &mut Vec<Strategy> {
@@ -196,9 +205,14 @@ impl SingularStrategy for MultiStrategy {
         Ok(())
     }
 
-    async fn on_channel_changed(&self, channel: &ChannelEntry, change: ChannelChange) -> Result<()> {
+    async fn on_own_channel_changed(
+        &self,
+        channel: &ChannelEntry,
+        direction: ChannelDirection,
+        change: ChannelChange,
+    ) -> Result<()> {
         for strategy in self.strategies.iter() {
-            if let Err(e) = strategy.on_channel_changed(channel, change).await {
+            if let Err(e) = strategy.on_own_channel_changed(channel, direction, change).await {
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_channel_state_changed chain stopped at {strategy}");
                     return Err(e);

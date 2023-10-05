@@ -287,9 +287,9 @@ where
 }
 
 impl<Db, Net> Display for PromiscuousStrategy<Db, Net>
-    where
-        Db: HoprCoreEthereumDbActions,
-        Net: NetworkExternalActions,
+where
+    Db: HoprCoreEthereumDbActions,
+    Net: NetworkExternalActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Promiscuous(self.cfg))

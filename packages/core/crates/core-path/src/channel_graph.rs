@@ -14,7 +14,7 @@ use utils_types::primitives::{Address, Balance};
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 struct WeightedChannel {
     channel: ChannelEntry,
-    weight: f64
+    weight: f64,
 }
 
 /// Implements a HOPR payment channel graph cached in-memory.
@@ -73,12 +73,23 @@ impl ChannelGraph {
         }
     }
 
+    /// Checks if the channel is incoming to or outgoing from this node
+    pub fn is_own_channel(&self, channel: &ChannelEntry) -> bool {
+        channel.destination == self.me || channel.source == self.me
+    }
+
+    /// Convenience method to get this node's own address
+    pub fn my_address(&self) -> Address {
+        self.me
+    }
+
     /// Inserts or updates the given channel in the channel graph.
     /// Returns a set of changes if the channel was already present in the graphs or
     /// None if the channel was not previously present in the channel graph.
     pub fn update_channel(&mut self, channel: ChannelEntry) -> Option<Vec<ChannelChange>> {
         let weighted = WeightedChannel {
-            channel, weight: 1_f64 // TODO: compute weight properly
+            channel,
+            weight: 1_f64, // TODO: compute weight properly
         };
 
         if let Some(old_w_value) = self.graph.add_edge(channel.source, channel.destination, weighted) {

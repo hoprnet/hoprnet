@@ -5,15 +5,15 @@ use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::TicketAggregationActions;
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use core_types::channels::{ChannelEntry, ChannelStatus};
+use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
+use std::fmt::Debug;
 use std::{
     fmt::{Display, Formatter},
     sync::Arc,
     time::Duration,
 };
-use std::fmt::Debug;
 use utils_log::{debug, error, info, warn};
 use validator::Validate;
 
@@ -23,6 +23,7 @@ use async_std::task::spawn_local;
 use core_ethereum_actions::redeem::redeem_tickets_in_channel;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_path::channel_graph::ChannelChange;
+use core_types::channels::ChannelDirection::Incoming;
 use utils_types::primitives::{Balance, BalanceType};
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
@@ -81,8 +82,10 @@ pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions, T, U> {
     cfg: AggregatingStrategyConfig,
 }
 
-impl<Db,T,U> Debug for AggregatingStrategy<Db,T,U>
-where Db: HoprCoreEthereumDbActions {
+impl<Db, T, U> Debug for AggregatingStrategy<Db, T, U>
+where
+    Db: HoprCoreEthereumDbActions,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Aggregating(self.cfg))
     }
@@ -223,12 +226,13 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
         }
     }
 
-    async fn on_channel_changed(
+    async fn on_own_channel_changed(
         &self,
         channel: &ChannelEntry,
+        direction: ChannelDirection,
         change: ChannelChange,
     ) -> crate::errors::Result<()> {
-        if !self.cfg.aggregate_on_channel_close {
+        if !self.cfg.aggregate_on_channel_close || direction != Incoming {
             return Ok(());
         }
 
@@ -237,31 +241,33 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
                 debug!("{self} strategy: ignoring channel {channel} state change that's not in PendingToClose");
                 return Ok(());
             }
-        }
 
-        let ack_tickets_in_db = self.db.read().await.get_acknowledged_tickets(Some(*channel)).await?;
+            let ack_tickets_in_db = self.db.read().await.get_acknowledged_tickets(Some(*channel)).await?;
 
-        let mut aggregatable_tickets = 0;
+            let mut aggregatable_tickets = 0;
 
-        for ticket in ack_tickets_in_db.iter() {
-            match ticket.status {
-                AcknowledgedTicketStatus::Untouched => {
-                    aggregatable_tickets += 1;
-                }
-                AcknowledgedTicketStatus::BeingAggregated { .. } => {
-                    debug!(
+            for ticket in ack_tickets_in_db.iter() {
+                match ticket.status {
+                    AcknowledgedTicketStatus::Untouched => {
+                        aggregatable_tickets += 1;
+                    }
+                    AcknowledgedTicketStatus::BeingAggregated { .. } => {
+                        debug!(
                         "{self} strategy: {channel} already has ticket aggregation in progress, not aggregating yet"
                     );
-                    return Ok(());
+                        return Ok(());
+                    }
+                    AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
                 }
-                AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
             }
-        }
 
-        if aggregatable_tickets > 0 {
-            self.start_aggregation(*channel, true).await
+            if aggregatable_tickets > 0 {
+                self.start_aggregation(*channel, true).await
+            } else {
+                debug!("{self} strategy: closing {channel} has no tickets to aggregate");
+                Ok(())
+            }
         } else {
-            debug!("{self} strategy: closing {channel} has no tickets to aggregate");
             Ok(())
         }
     }
@@ -280,6 +286,7 @@ mod tests {
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_path::channel_graph::ChannelChange;
     use core_protocol::ticket_aggregation::processor::{TicketAggregationInteraction, TicketAggregationProcessed};
+    use core_types::channels::ChannelDirection::Incoming;
     use core_types::channels::ChannelStatus;
     use core_types::{
         acknowledgement::AcknowledgedTicket,
@@ -618,8 +625,9 @@ mod tests {
             .unwrap();
 
         aggregation_strategy
-            .on_channel_changed(
+            .on_own_channel_changed(
                 &channel,
+                Incoming,
                 ChannelChange::Status {
                     old: ChannelStatus::Open,
                     new: ChannelStatus::PendingToClose,

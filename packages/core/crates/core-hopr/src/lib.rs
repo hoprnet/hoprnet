@@ -273,17 +273,25 @@ pub mod wasm_impls {
         let ms_clone = multi_strategy.clone();
         let cg_clone = channel_graph.clone();
         let db_clone = db.clone();
+        let my_addr = me_onchain.public().to_address();
         wasm_bindgen_futures::spawn_local(async move {
             while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
+                let maybe_direction = channel.direction(&my_addr);
                 let change = cg_clone.write().await.update_channel(channel);
-                if let Some(change_set) = change {
-                    for channel_change in change_set {
-                        let _ = ms_clone.on_channel_changed(&channel, channel_change).await;
 
-                        // Cleanup invalid tickets from the DB if epoch has changed
-                        // TODO: this should be moved somewhere else once event broadcasts are implemented
-                        if let ChannelChange::Epoch { .. } = channel_change {
-                            let _ = db_clone.write().await.cleanup_invalid_channel_tickets(&channel).await;
+                // Check if this is our own channel
+                if let Some(own_channel_direction) = maybe_direction {
+                    if let Some(change_set) = change {
+                        for channel_change in change_set {
+                            let _ = ms_clone
+                                .on_own_channel_changed(&channel, own_channel_direction, channel_change)
+                                .await;
+
+                            // Cleanup invalid tickets from the DB if epoch has changed
+                            // TODO: this should be moved somewhere else once event broadcasts are implemented
+                            if let ChannelChange::Epoch { .. } = channel_change {
+                                let _ = db_clone.write().await.cleanup_invalid_channel_tickets(&channel).await;
+                            }
                         }
                     }
                 }

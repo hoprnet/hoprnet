@@ -6,7 +6,8 @@ use core_ethereum_actions::channels::fund_channel;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_path::channel_graph::ChannelChange;
-use core_types::channels::{ChannelEntry, ChannelStatus};
+use core_types::channels::ChannelDirection::Outgoing;
+use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
@@ -67,11 +68,17 @@ impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db> {
-    async fn on_channel_changed(
+    async fn on_own_channel_changed(
         &self,
         channel: &ChannelEntry,
+        direction: ChannelDirection,
         change: ChannelChange,
     ) -> crate::errors::Result<()> {
+        // Can only auto-fund outgoing channels
+        if direction != Outgoing {
+            return Ok(());
+        }
+
         if let ChannelChange::CurrentBalance { new, .. } = change {
             if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
                 info!(
@@ -103,6 +110,7 @@ mod tests {
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_path::channel_graph::ChannelChange::CurrentBalance;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use core_types::channels::ChannelDirection::Outgoing;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use mockall::mock;
     use std::sync::Arc;
@@ -222,8 +230,9 @@ mod tests {
         };
 
         let ars = AutoFundingStrategy::new(cfg, db.clone(), tx_sender);
-        ars.on_channel_changed(
+        ars.on_own_channel_changed(
             &c1,
+            Outgoing,
             CurrentBalance {
                 old: Balance::zero(BalanceType::HOPR),
                 new: c1.balance,
@@ -231,8 +240,9 @@ mod tests {
         )
         .await
         .unwrap();
-        ars.on_channel_changed(
+        ars.on_own_channel_changed(
             &c2,
+            Outgoing,
             CurrentBalance {
                 old: Balance::zero(BalanceType::HOPR),
                 new: c2.balance,
@@ -240,8 +250,9 @@ mod tests {
         )
         .await
         .unwrap();
-        ars.on_channel_changed(
+        ars.on_own_channel_changed(
             &c3,
+            Outgoing,
             CurrentBalance {
                 old: Balance::zero(BalanceType::HOPR),
                 new: c3.balance,

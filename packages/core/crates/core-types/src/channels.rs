@@ -58,12 +58,25 @@ impl Display for ChannelStatus {
     }
 }
 
+/// Describes a direction of node's own channel.
+/// The direction of a channel that is not own is undefined.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelDirection {
+    /// The other party is initiator of the channel.
     Incoming = 0,
+    /// Our own node is the initiator of the channel.
     Outgoing = 1,
+}
+
+impl Display for ChannelDirection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChannelDirection::Incoming => write!(f, "incoming"),
+            ChannelDirection::Outgoing => write!(f, "outgoing"),
+        }
+    }
 }
 
 /// Overall description of a channel
@@ -147,14 +160,14 @@ impl ChannelEntry {
 
 impl ChannelEntry {
     /// Determines the channel direction given the self address.
-    /// Panics if source nor destination are equal to the given address.
-    pub fn direction(&self, me: &Address) -> ChannelDirection {
+    /// Returns `None` if neither source nor destination is equal to `me`.
+    pub fn direction(&self, me: &Address) -> Option<ChannelDirection> {
         if self.source.eq(me) {
-            ChannelDirection::Outgoing
+            Some(ChannelDirection::Outgoing)
         } else if self.destination.eq(me) {
-            ChannelDirection::Incoming
+            Some(ChannelDirection::Incoming)
         } else {
-            panic!("foreign channel: {self}")
+            None
         }
     }
 }
