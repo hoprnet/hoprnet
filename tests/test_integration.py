@@ -242,7 +242,6 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-@pytest.mark.skip(reason="Failing due to a bug in the application")
 async def test_hoprd_channel_should_register_fund_increase_using_funding_endpoint(src, dest, swarm7):
     hopr_amount = "1"
 
