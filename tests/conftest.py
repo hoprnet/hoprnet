@@ -12,7 +12,6 @@ SEED = int.from_bytes(random_data, byteorder="big")
 random.seed(SEED)
 
 LOCALHOST = "127.0.0.1"
-
 OPEN_CHANNEL_FUNDING_VALUE = "1000000000000000000000"
 
 TICKET_AGGREGATION_THRESHOLD = 100

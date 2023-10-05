@@ -246,27 +246,19 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-@pytest.mark.skip(reason="Failing due to a bug in the application")
 async def test_hoprd_channel_should_register_fund_increase_using_funding_endpoint(src, dest, swarm7):
-    hopr_amount = "1"
+    hopr_amount = OPEN_CHANNEL_FUNDING_VALUE
 
     async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
         balance_before = await swarm7[src]["api"].balances()
 
         assert await swarm7[src]["api"].channels_fund_channel(channel, hopr_amount)
 
-        async def check_balance_changed():
-            while True:
-                balance = await swarm7[src]["api"].balances()
-                if balance["safe_hopr"] > balance_before["safe_hopr"]:
-                    break
-                else:
-                    await asyncio.sleep(CHECK_RETRY_INTERVAL)
+        balance_after = await swarm7[src]["api"].balances()
 
-        await asyncio.wait_for(check_balance_changed(), 10.0)
-
-        balance = await swarm7[src]["api"].balances()
-        assert balance["safe_hopr"] - balance_before["safe_hopr"] == 1
+        assert int(balance_before.safe_hopr) - int(balance_after.safe_hopr) == int(hopr_amount)
+        assert int(balance_before.safe_hopr_allowance) - int(balance_after.safe_hopr_allowance) == int(hopr_amount)
+        assert int(balance_after.native) < int(balance_before.native)
 
 
 @pytest.mark.asyncio

@@ -87,20 +87,17 @@ class HoprdAPI:
         status, _ = self.__call_api(AliasesApi, "aliases_remove_alias", alias)
         return status
 
-    async def balances(self, type: str or list[str] = "all"):
+    async def balances(self):
         """
         Returns the balance of the node.
         :param: type: str =  "all" | "hopr" | "native" | "safe_native" | "safe_hopr"
         :return: balances: dict | int
         """
-        all_types = ["hopr", "native", "safe_native", "safe_hopr"]
-        assert type in all_types
-
         status, response = self.__call_api(AccountApi, "account_get_balances")
         if status:
-            return int(getattr(response, type))
-        else:
             return response
+        else:
+            return None
 
     async def open_channel(self, peer_address: str, amount: str):
         """
