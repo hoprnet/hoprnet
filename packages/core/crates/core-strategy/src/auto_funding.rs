@@ -9,7 +9,7 @@ use core_path::channel_graph::ChannelChange;
 use core_types::channels::{ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use utils_log::info;
 use utils_types::primitives::{Balance, BalanceType};
@@ -17,7 +17,7 @@ use validator::Validate;
 
 /// Configuration for `AutoFundingStrategy`
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
     /// Default is 1 HOPR
@@ -53,15 +53,21 @@ impl<Db: HoprCoreEthereumDbActions> AutoFundingStrategy<Db> {
     }
 }
 
+impl<Db: HoprCoreEthereumDbActions> Debug for AutoFundingStrategy<Db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", Strategy::AutoFunding(self.cfg))
+    }
+}
+
 impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::AutoFunding(Default::default()))
+        write!(f, "{}", Strategy::AutoFunding(self.cfg))
     }
 }
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db> {
-    async fn on_channel_state_changed(
+    async fn on_channel_changed(
         &self,
         channel: &ChannelEntry,
         change: ChannelChange,
@@ -216,7 +222,7 @@ mod tests {
         };
 
         let ars = AutoFundingStrategy::new(cfg, db.clone(), tx_sender);
-        ars.on_channel_state_changed(
+        ars.on_channel_changed(
             &c1,
             CurrentBalance {
                 old: Balance::zero(BalanceType::HOPR),
@@ -225,7 +231,7 @@ mod tests {
         )
         .await
         .unwrap();
-        ars.on_channel_state_changed(
+        ars.on_channel_changed(
             &c2,
             CurrentBalance {
                 old: Balance::zero(BalanceType::HOPR),
@@ -234,7 +240,7 @@ mod tests {
         )
         .await
         .unwrap();
-        ars.on_channel_state_changed(
+        ars.on_channel_changed(
             &c3,
             CurrentBalance {
                 old: Balance::zero(BalanceType::HOPR),

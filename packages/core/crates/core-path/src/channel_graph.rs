@@ -9,6 +9,14 @@ use std::fmt::{Display, Formatter};
 use utils_log::info;
 use utils_types::primitives::{Address, Balance};
 
+/// Internal structure that adds additional data to a `ChannelEntry` that
+/// can be used to compute edge weights.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+struct WeightedChannel {
+    channel: ChannelEntry,
+    weight: f64
+}
+
 /// Implements a HOPR payment channel graph cached in-memory.
 /// This structure is useful for tracking channel state changes and
 /// packet path finding.
@@ -19,10 +27,10 @@ use utils_types::primitives::{Address, Balance};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
-    graph: DiGraphMap<Address, ChannelEntry>,
+    graph: DiGraphMap<Address, WeightedChannel>,
 }
 
-/// Enumerates changes on a channel entry update
+/// Enumerates possible changes on a channel entry update
 #[derive(Clone, Copy, Debug)]
 pub enum ChannelChange {
     /// Channel status has changed
@@ -32,7 +40,7 @@ pub enum ChannelChange {
     CurrentBalance { old: Balance, new: Balance },
 
     /// Channel epoch has changed
-    Epoch { old: u64, new: u64 },
+    Epoch { old: u32, new: u32 },
 }
 
 impl Display for ChannelChange {
@@ -69,27 +77,32 @@ impl ChannelGraph {
     /// Returns a set of changes if the channel was already present in the graphs or
     /// None if the channel was not previously present in the channel graph.
     pub fn update_channel(&mut self, channel: ChannelEntry) -> Option<Vec<ChannelChange>> {
-        if let Some(old_value) = self.graph.add_edge(channel.source, channel.destination, channel) {
-            let mut ret = Vec::new();
+        let weighted = WeightedChannel {
+            channel, weight: 1_f64 // TODO: compute weight properly
+        };
 
-            if old_value.status != channel.status {
+        if let Some(old_w_value) = self.graph.add_edge(channel.source, channel.destination, weighted) {
+            let mut ret = Vec::new();
+            let old_channel = old_w_value.channel;
+
+            if old_channel.status != channel.status {
                 ret.push(Status {
-                    old: old_value.status,
+                    old: old_channel.status,
                     new: channel.status,
                 });
             }
 
-            if old_value.balance != channel.balance {
+            if old_channel.balance != channel.balance {
                 ret.push(CurrentBalance {
-                    old: old_value.balance,
+                    old: old_channel.balance,
                     new: channel.balance,
                 });
             }
 
-            if old_value.channel_epoch != channel.channel_epoch {
+            if old_channel.channel_epoch != channel.channel_epoch {
                 ret.push(Epoch {
-                    old: old_value.channel_epoch.as_u64(),
-                    new: channel.channel_epoch.as_u64(),
+                    old: old_channel.channel_epoch.as_u32(),
+                    new: channel.channel_epoch.as_u32(),
                 });
             }
 

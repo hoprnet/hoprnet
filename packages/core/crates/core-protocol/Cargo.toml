@@ -1,6 +1,6 @@
 [package]
 name = "core-protocol"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"

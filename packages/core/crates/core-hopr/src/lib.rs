@@ -255,6 +255,7 @@ pub mod wasm_impls {
             tx_queue.new_sender(),
             ticket_aggregation.writer(),
         ));
+        info!("initialized strategies: {multi_strategy:?}");
 
         let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
 
@@ -263,7 +264,7 @@ pub mod wasm_impls {
         let ms_clone = multi_strategy.clone();
         wasm_bindgen_futures::spawn_local(async move {
             while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                let _ = ms_clone.on_acknowledged_ticket(&ack).await;
+                let _ = ms_clone.on_acknowledged_winning_ticket(&ack).await;
             }
         });
 
@@ -277,7 +278,7 @@ pub mod wasm_impls {
                 let change = cg_clone.write().await.update_channel(channel);
                 if let Some(change_set) = change {
                     for channel_change in change_set {
-                        let _ = ms_clone.on_channel_state_changed(&channel, channel_change).await;
+                        let _ = ms_clone.on_channel_changed(&channel, channel_change).await;
 
                         // Cleanup invalid tickets from the DB if epoch has changed
                         // TODO: this should be moved somewhere else once event broadcasts are implemented

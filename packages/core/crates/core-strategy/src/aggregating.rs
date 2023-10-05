@@ -13,6 +13,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use std::fmt::Debug;
 use utils_log::{debug, error, info, warn};
 use validator::Validate;
 
@@ -28,7 +29,7 @@ use wasm_bindgen_futures::spawn_local;
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct AggregatingStrategyConfig {
     /// Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
     /// in that channel when exceeded.
@@ -80,9 +81,16 @@ pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions, T, U> {
     cfg: AggregatingStrategyConfig,
 }
 
+impl<Db,T,U> Debug for AggregatingStrategy<Db,T,U>
+where Db: HoprCoreEthereumDbActions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", Strategy::Aggregating(self.cfg))
+    }
+}
+
 impl<Db: HoprCoreEthereumDbActions, T, U> Display for AggregatingStrategy<Db, T, U> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::Aggregating(Default::default()))
+        write!(f, "{}", Strategy::Aggregating(self.cfg))
     }
 }
 
@@ -149,7 +157,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for AggregatingStrategy<Db, T, U> {
-    async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
+    async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;
 
         let channel = match self.db.read().await.get_channel(&channel_id).await? {
@@ -215,7 +223,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
         }
     }
 
-    async fn on_channel_state_changed(
+    async fn on_channel_changed(
         &self,
         channel: &ChannelEntry,
         change: ChannelChange,
@@ -485,7 +493,7 @@ mod tests {
         });
 
         aggregation_strategy
-            .on_acknowledged_ticket(&threshold_ticket)
+            .on_acknowledged_winning_ticket(&threshold_ticket)
             .await
             .expect("strategy call should succeed");
 
@@ -610,7 +618,7 @@ mod tests {
             .unwrap();
 
         aggregation_strategy
-            .on_channel_state_changed(
+            .on_channel_changed(
                 &channel,
                 ChannelChange::Status {
                     old: ChannelStatus::Open,

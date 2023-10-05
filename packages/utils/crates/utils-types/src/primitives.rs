@@ -3,7 +3,7 @@ use getrandom::getrandom;
 use primitive_types::H160;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
 use std::str::FromStr;
@@ -153,17 +153,11 @@ impl FromStr for BalanceType {
 }
 
 /// Represents balance of some coin or token.
-#[derive(Clone, Copy, Debug, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: U256,
     balance_type: BalanceType,
-}
-
-impl PartialEq for Balance {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value && self.balance_type == other.balance_type
-    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -297,6 +291,19 @@ impl Balance {
 
     pub fn amount(&self) -> U256 {
         self.value
+    }
+}
+
+impl PartialEq for Balance {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value && self.balance_type == other.balance_type
+    }
+}
+
+impl Debug for Balance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Intentionally same as Display
+        write!(f, "{} {:?}", self.value(), self.balance_type)
     }
 }
 
