@@ -116,7 +116,7 @@ mod tests {
         impl TransactionExecutor for TxExec {
             async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
             async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> TransactionResult;
+            async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult;
             async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
             async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
             async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
@@ -199,9 +199,9 @@ mod tests {
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |id, balance| c2.get_id().eq(id) && c2.balance.add(&fund_amount_c).eq(&balance))
-            .return_once(move |id, _| {
-                if id.eq(&c2.get_id()) {
+            .withf(move |dst, balance| c2.destination.eq(dst) && c2.balance.add(&fund_amount_c).eq(&balance))
+            .return_once(move |dst, _| {
+                if dst.eq(&c2.destination) {
                     tx.send(()).unwrap();
                 }
                 TransactionResult::FundChannel {

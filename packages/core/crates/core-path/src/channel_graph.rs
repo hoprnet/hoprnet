@@ -6,7 +6,7 @@ use core_types::protocol::INTERMEDIATE_HOPS;
 use petgraph::graphmap::DiGraphMap;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use utils_log::info;
+use utils_log::{debug, info};
 use utils_types::primitives::{Address, Balance};
 
 /// Internal structure that adds additional data to a `ChannelEntry` that
@@ -105,6 +105,7 @@ impl ChannelGraph {
                     new: channel.channel_epoch.as_u32(),
                 });
             }
+            debug!("channel update changes: {:?}", ret);
 
             info!("updated {channel}: {} changes", ret.len());
             Some(ret)

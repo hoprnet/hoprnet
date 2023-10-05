@@ -141,7 +141,7 @@ mod tests {
         impl TransactionExecutor for TxExec {
             async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
             async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> TransactionResult;
+            async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult;
             async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
             async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
             async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
