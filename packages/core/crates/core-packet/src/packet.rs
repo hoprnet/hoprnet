@@ -289,7 +289,7 @@ impl Display for PacketState {
 /// Represents a HOPR packet.
 /// Packet also defines the conversion between peer ids, off-chain public keys and group elements from Sphinx suite.
 pub struct Packet {
-    packet: MetaPacket<CurrentSphinxSuite>,
+    packet: Box<[u8]>,
     pub ticket: Ticket,
     state: PacketState,
 }
@@ -322,7 +322,7 @@ impl Packet {
         ticket.sign(chain_keypair, domain_separator);
 
         Ok(Self {
-            packet: MetaPacket::new(
+            packet: Box::from(MetaPacket::<CurrentSphinxSuite>::new(
                 shared_keys,
                 msg,
                 &public_keys_path,
@@ -330,7 +330,7 @@ impl Packet {
                 POR_SECRET_LENGTH,
                 &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
                 None,
-            ),
+            ).to_bytes()),
             ticket,
             state: Outgoing {
                 next_hop: OffchainPublicKey::from_peerid(&path.hops()[0])?,
@@ -347,7 +347,7 @@ impl Packet {
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
             let header_len = header_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-            let mp = MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet, header_len)?;
+            let mp: MetaPacket<core_crypto::ec_groups::X25519Suite> = MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet, header_len)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 RelayedPacket {
@@ -364,7 +364,7 @@ impl Packet {
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self {
-                        packet,
+                        packet: Box::from(packet.to_bytes()),
                         ticket,
                         state: Forwarded {
                             packet_tag,
@@ -389,7 +389,7 @@ impl Packet {
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self {
-                        packet: mp,
+                        packet: Box::from(mp.to_bytes()),
                         ticket,
                         state: Final {
                             packet_tag,
@@ -434,7 +434,7 @@ impl Packet {
 impl Packet {
     pub fn to_bytes(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(Self::SIZE);
-        ret.extend_from_slice(self.packet.to_bytes());
+        ret.extend_from_slice(self.packet.as_ref());
         ret.extend_from_slice(&self.ticket.to_bytes());
         ret.into_boxed_slice()
     }
