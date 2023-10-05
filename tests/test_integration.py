@@ -148,7 +148,7 @@ def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
             "-o",
             "pipefail",
             "-c",
-            f"./tests/test_after_fixture_ready.sh {nodes_api_as_str} 2>&1 | tee {log_file_path}",
+            f"./tests/test_after_fixture_ready.sh {nodes_api_as_str} 2>&1 | tee --append {log_file_path}",
         ],
         shell=False,
         capture_output=True,
