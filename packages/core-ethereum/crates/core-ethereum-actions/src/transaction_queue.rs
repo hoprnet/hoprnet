@@ -68,7 +68,7 @@ impl Display for Transaction {
 pub trait TransactionExecutor {
     async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
     async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
-    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> TransactionResult;
+    async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult;
     async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
     async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
     async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
@@ -169,11 +169,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             Transaction::OpenChannel(address, stake) => tx_exec.open_channel(address, stake).await,
 
             Transaction::FundChannel(channel, amount) => {
-                let channel_id = channel.get_id();
                 if channel.status == Open {
-                    tx_exec.fund_channel(channel_id, amount).await
+                    tx_exec.fund_channel(channel.destination, amount).await
                 } else {
-                    Failure(format!("cannot fund channel {channel_id} that is not opened"))
+                    Failure(format!("cannot fund {channel} because it is not opened"))
                 }
             }
 
@@ -307,7 +306,6 @@ pub mod wasm {
         }
     }
 
-    // TODO: update JS to return this object
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct OpenChannelResult {
         channel_id: String,
@@ -343,10 +341,10 @@ pub mod wasm {
             }
         }
 
-        async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> TransactionResult {
+        async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult {
             match await_js_promise(self.fund_channel_fn.call2(
                 &JsValue::null(),
-                &JsValue::from(channel_id),
+                &JsValue::from(destination),
                 &JsValue::from(amount),
             ))
             .await
