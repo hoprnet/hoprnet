@@ -1400,6 +1400,7 @@ version = "0.2.1"
 dependencies = [
  "async-lock",
  "async-std",
+ "async-trait",
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
@@ -1418,6 +1419,7 @@ dependencies = [
  "libp2p",
  "libp2p-identity",
  "more-asserts",
+ "parameterized",
  "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",

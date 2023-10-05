@@ -237,21 +237,17 @@ pub(crate) async fn p2p_loop(
                             error!("Failed to store a received message in the inbox: {}", e);
                         }
 
-                        if let Some(ack) = ack {
-                            if let Err(e) = ack_writer.send_acknowledgement(peer, ack) {
-                                error!("Failed to acknowledge the received final packet: {e}");
-                            }
+                        if let Err(e) = ack_writer.send_acknowledgement(peer, ack) {
+                            error!("Failed to acknowledge the received final packet: {e}");
                         }
                     },
                     MsgProcessed::Send(peer, octets) => {
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
                     },
                     MsgProcessed::Forward(peer, octets, previous_peer, ack) => {
-                        let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
-                        if let Some(ack) = ack {
-                            if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
-                                error!("failed to acknowledge relayed packet: {e}");
-                            }
+                    let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
+                        if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
+                            error!("failed to acknowledge relayed packet: {e}");
                         }
                     }
                 },
@@ -264,7 +260,7 @@ pub(crate) async fn p2p_loop(
                     TicketAggregationProcessed::Reply(peer, ticket, response) => {
                         if let Err(_) = swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket) {
                             error!("Ticket aggregation: Failed send reply to {}", peer);
-                        }
+                        } 
                     },
                     TicketAggregationProcessed::Receive(_peer, _acked_ticket, request) => {
                         // TODO: uncomment once strategies need to get the value
