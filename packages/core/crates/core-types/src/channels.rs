@@ -130,8 +130,8 @@ impl ChannelEntry {
 
         if self.closure_time.eq(&U256::zero()) {
             None
-        } else if now_seconds >= self.closure_time {
-            Some((now_seconds - self.closure_time).as_u64())
+        } else if self.closure_time > now_seconds {
+            Some((self.closure_time - now_seconds).as_u64())
         } else {
             Some(0u64)
         }
@@ -161,11 +161,12 @@ impl Display for ChannelEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} channel {}: {} -> {}",
+            "{} channel {} ({}): {} -> {}",
             self.status,
             self.get_id(),
+            self.closure_time,
             self.source,
-            self.destination
+            self.destination,
         )
     }
 }
