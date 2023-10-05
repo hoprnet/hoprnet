@@ -392,7 +392,7 @@ mod tests {
                 channel_id: Hash::default(),
             }
         }
-        async fn fund_channel(&self, _channel_id: Hash, _amount: Balance) -> TransactionResult {
+        async fn fund_channel(&self, _destination: Address, _amount: Balance) -> TransactionResult {
             TransactionResult::FundChannel {
                 tx_hash: Hash::default(),
             }

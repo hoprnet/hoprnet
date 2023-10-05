@@ -451,7 +451,7 @@ mod tests {
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |id, balance| channel.destination.eq(id) && stake.eq(balance))
+            .withf(move |dst, balance| channel.destination.eq(dst) && stake.eq(balance))
             .returning(move |_, _| TransactionResult::FundChannel { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));

@@ -91,7 +91,7 @@ impl TryFrom<H160> for Address {
     }
 }
 
-impl FromStr for Address {
+impl std::str::FromStr for Address {
     type Err = GeneralError;
 
     fn from_str(value: &str) -> Result<Address> {
