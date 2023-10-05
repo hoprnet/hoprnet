@@ -1,24 +1,6 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::time::Duration;
 
 use rand::Rng;
-
-use utils_log::debug;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use {lazy_static::lazy_static, utils_metrics::metrics::SimpleGauge};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static! {
-    static ref METRIC_QUEUE_SIZE: SimpleGauge =
-        SimpleGauge::new("core_gauge_mixer_queue_size", "Current mixer queue size").unwrap();
-    static ref METRIC_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
-        "core_gauge_mixer_average_packet_delay",
-        "Average mixer packet delay averaged over a packet window"
-    )
-    .unwrap();
-}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -41,7 +23,7 @@ impl Default for MixerConfig {
 impl MixerConfig {
     /// Get a random delay duration from the specified minimum and maximum delay available
     /// inside the configuration.
-    fn random_delay(&self) -> Duration {
+    pub fn random_delay(&self) -> Duration {
         let mut rng = rand::thread_rng();
         let random_delay = rng.gen_range(self.min_delay.as_millis()..self.max_delay.as_millis()) as u64;
 
@@ -70,70 +52,12 @@ impl MixerConfig {
     }
 }
 
-type SleepFn = fn(Duration) -> Box<dyn Future<Output = ()>>;
-
-/// Mixer implementation using Async instead of a real queue to provide the packet mixing functionality
-#[derive(Copy, Clone)]
-pub struct Mixer {
-    pub cfg: MixerConfig,
-    sleep: SleepFn,
-}
-
-impl Mixer {
-    /// Creates new mixer with standard sleep function.
-    /// This constructor is not suitable for WASM context and will panic.
-    pub fn new(cfg: MixerConfig) -> Self {
-        Self {
-            sleep: |d| Box::new(async_std::task::sleep(d)),
-            cfg,
-        }
-    }
-
-    /// Creates new Mixer with gloo-timers for sleep method.
-    /// This constructor is suitable for WASM context.
-    #[cfg(feature = "wasm")]
-    pub fn new_with_gloo_timers(cfg: MixerConfig) -> Self {
-        Self {
-            sleep: |d| Box::new(gloo_timers::future::sleep(d)),
-            cfg,
-        }
-    }
-
-    /// Async mixing operation on the packet.
-    ///
-    /// # Arguments
-    /// * data: Data ontent to be time mixed
-    ///
-    /// # Returns
-    /// The same data as ingested on input postponed by a random delay
-    pub async fn mix<T>(&self, data: T) -> T {
-        let random_delay = self.cfg.random_delay();
-        debug!("Mixer created a random packet delay of {}ms", random_delay.as_millis());
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_QUEUE_SIZE.increment(1.0f64);
-
-        Pin::from((self.sleep)(random_delay)).await;
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-            let weight = 1.0f64 / self.cfg.metric_delay_window as f64;
-            METRIC_AVERAGE_DELAY
-                .set((weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_AVERAGE_DELAY.get()));
-        }
-
-        data
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::future_extensions::StreamThenConcurrentExt;
     use futures_lite::stream::StreamExt;
     use more_asserts::*;
+    use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
     type Packet = Box<[u8]>;
 

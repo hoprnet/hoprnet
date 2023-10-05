@@ -346,6 +346,15 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
+    // Delete the pending balance for the particular counterparty. This is a no-op for incoming
+    // channels since no pending balance will accumulate.
+    async fn reset_pending_balance_to(&mut self, counterparty: &Address) -> Result<()> {
+        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
+
+        let _ = self.db.remove::<Balance>(key).await?;
+        Ok(())
+    }
+
     async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>> {
         let key = utils_db::db::Key::new_with_prefix(chain_key, CHAIN_KEY_PREFIX)?;
         self.db.get_or_none(key).await
@@ -528,7 +537,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
     }
 
-    async fn resolve_pending(&mut self, address: &Address, balance: &Balance, snapshot: &Snapshot) -> Result<()> {
+    async fn resolve_pending(&mut self, address: &Address, balance: &Balance) -> Result<()> {
         let key = utils_db::db::Key::new_with_prefix(address, PENDING_TICKETS_COUNT)?;
         let current_balance = self
             .db
@@ -536,15 +545,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-        let mut batch_ops = utils_db::db::Batch::default();
-        // TODO: NOTE: was there a bug in the original implementation in TS? val.sub(val)?
-        batch_ops.put(key.clone(), current_balance.sub(balance));
-        batch_ops.put(
-            utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            snapshot,
-        );
-
-        self.db.batch(batch_ops, true).await
+        self.db.set(key.clone(), &current_balance.sub(balance)).await?;
+        Ok(())
     }
 
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
@@ -662,6 +664,16 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .collect())
     }
 
+    async fn get_outgoing_channels(&self) -> Result<Vec<ChannelEntry>> {
+        Ok(self
+            .db
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
+            .await?
+            .into_iter()
+            .filter(move |x| x.source.eq(&self.me))
+            .collect())
+    }
+
     async fn get_channels_to(&self, address: &Address) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .db
@@ -669,6 +681,16 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .await?
             .into_iter()
             .filter(move |x| x.destination.eq(address))
+            .collect())
+    }
+
+    async fn get_incoming_channels(&self) -> Result<Vec<ChannelEntry>> {
+        Ok(self
+            .db
+            .get_more::<ChannelEntry>(Box::from(CHANNEL_PREFIX.as_bytes()), Hash::SIZE as u32, &|_| true)
+            .await?
+            .into_iter()
+            .filter(move |x| x.destination.eq(&self.me))
             .collect())
     }
 
@@ -1387,16 +1409,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn resolve_pending(
-            &self,
-            address: &Address,
-            balance: &Balance,
-            snapshot: &Snapshot,
-        ) -> Result<(), JsValue> {
+        pub async fn resolve_pending(&self, address: &Address, balance: &Balance) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.resolve_pending(address, balance, snapshot).await)
+            utils_misc::ok_or_jserr!(db.resolve_pending(address, balance).await)
             //}
         }
 

@@ -1,7 +1,6 @@
 name: Lint
 
 env:
-  HOPR_GITHUB_REF: ${{ github.ref }}
   RUST_BACKTRACE: "1"
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -22,7 +21,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
@@ -37,7 +36,7 @@ jobs:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v23
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -72,7 +71,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
 
       - name: Install dependencies
         run: nix develop -c make -j deps-ci

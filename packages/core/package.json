@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "2.0.0-rc.7",
+  "version": "2.0.0-rc.8",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -38,11 +38,11 @@
     "@multiformats/multiaddr": "10.3.3",
     "bn.js": "5.2.1",
     "debug": "4.3.4",
-    "heap-js": "2.2.0",
-    "retimer": "3.0.0"
+    "heap-js": "2.3.0",
+    "retimer": "4.0.0"
   },
   "devDependencies": {
-    "@types/mocha": "10.0.1",
+    "@types/mocha": "10.0.2",
     "mocha": "10.2.0",
     "typedoc": "0.24.8",
     "typedoc-plugin-markdown": "3.15.4",

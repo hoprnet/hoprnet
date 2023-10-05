@@ -16,6 +16,9 @@ pub enum CoreEthereumActionsError {
     #[error("channel closure time has not elapsed yet, remaining {0}s")]
     ClosureTimeHasNotElapsed(u64),
 
+    #[error("network registry does not allow accessing this peer")]
+    PeerAccessDenied,
+
     #[error("acknowledged {0} is in a wrong state for the operation")]
     WrongTicketState(String),
 

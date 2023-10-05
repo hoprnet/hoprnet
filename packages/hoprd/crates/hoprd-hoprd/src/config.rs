@@ -7,7 +7,8 @@ use validator::{Validate, ValidationError};
 
 use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
-use core_strategy::config::StrategyConfig;
+use core_strategy::Strategy::AutoRedeeming;
+use core_strategy::{Strategy, StrategyConfig};
 use utils_types::primitives::Address;
 
 #[cfg(not(feature = "wasm"))]
@@ -403,7 +404,7 @@ impl Default for HoprdConfig {
             db: Db::default(),
             inbox: MessageInboxConfiguration::default(),
             api: Api::default(),
-            strategy: StrategyConfig::default(),
+            strategy: core_strategy::hopr_default_strategies(),
             heartbeat: HeartbeatConfig::default(),
             network_options: NetworkConfig::default(),
             healthcheck: HealthCheck::default(),
@@ -508,15 +509,16 @@ impl HoprdConfig {
             cfg.identity.private_key = Some(x)
         };
 
-        // strategy
-        if let Some(x) = cli_args.default_strategy {
-            cfg.strategy.name = x
-        };
-        if let Some(x) = cli_args.max_auto_channels {
-            cfg.strategy.max_auto_channels = Some(x)
-        };
+        // TODO: resolve CLI configuration of strategies
 
-        cfg.strategy.auto_redeem_tickets = cli_args.auto_redeem_tickets;
+        // strategy
+        if let Some(x) = cli_args.default_strategy.and_then(|s| Strategy::from_str(&s).ok()) {
+            cfg.strategy.get_strategies().push(x);
+        }
+
+        if cli_args.auto_redeem_tickets {
+            cfg.strategy.get_strategies().push(AutoRedeeming(Default::default()));
+        }
 
         // chain
         cfg.chain.announce = cli_args.announce;
@@ -609,11 +611,7 @@ mod tests {
                 password: "".to_owned(),
                 private_key: Some("".to_owned()),
             },
-            strategy: StrategyConfig {
-                name: "passive".to_owned(),
-                max_auto_channels: None,
-                auto_redeem_tickets: true,
-            },
+            strategy: StrategyConfig::default(),
             db: Db {
                 data: "/tmp/db".to_owned(),
                 initialize: false,
@@ -687,9 +685,9 @@ api:
     address: !IPv4 127.0.0.1
     port: 1233
 strategy:
-  name: passive
-  max_auto_channels: null
-  auto_redeem_tickets: true
+  on_fail_continue: true
+  allow_recursive: true
+  strategies: []
 heartbeat:
   variance: 0
   interval: 0

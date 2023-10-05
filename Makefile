@@ -330,7 +330,7 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: create-local-identity
-create-local-identity: id_dir=`pwd`
+create-local-identity: id_dir=/tmp/
 create-local-identity: id_password=local
 create-local-identity: id_prefix=.identity-local_
 create-local-identity: ## run HOPRd from local repo
@@ -589,10 +589,10 @@ endif
 
 .PHONY: generate-python-sdk
 generate-python-sdk: ## generate Python SDK via Swagger Codegen
-generate-python-sdk: build-docs-api
+generate-python-sdk: build-docs-api			# not using the official swagger-codegen-cli as it does not offer a multiplatform image
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
-	docker run --rm -v $$(pwd):/local swaggerapi/swagger-codegen-cli-v3 generate -l python \
+	docker run --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
 		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
 		-c /local/scripts/python-sdk-config.json
 

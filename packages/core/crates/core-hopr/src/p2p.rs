@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{adaptors::indexer::IndexerProcessed, PeerId};
 use async_lock::RwLock;
+use core_crypto::types::HalfKeyChallenge;
 use core_network::network::{Network, NetworkEvent, PeerOrigin};
 pub use core_p2p::{api, libp2p_identity};
 use core_p2p::{
@@ -9,11 +10,16 @@ use core_p2p::{
     libp2p_swarm::SwarmEvent,
     HoprNetworkBehaviorEvent, Ping, Pong,
 };
-use core_packet::interaction::{AckProcessed, AcknowledgementInteraction, MsgProcessed, PacketInteraction};
 use core_protocol::{
-    ack::config::AckProtocolConfig,
+    ack::{
+        config::AckProtocolConfig,
+        processor::{AckProcessed, AcknowledgementInteraction, Reply},
+    },
     heartbeat::config::HeartbeatProtocolConfig,
-    msg::config::MsgProtocolConfig,
+    msg::{
+        config::MsgProtocolConfig,
+        processor::{MsgProcessed, PacketInteraction},
+    },
     ticket_aggregation::{
         config::TicketAggregationProtocolConfig,
         processor::{TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed},
@@ -22,8 +28,12 @@ use core_protocol::{
 use core_types::{
     acknowledgement::{AcknowledgedTicket, Acknowledgement},
     channels::Ticket,
+    protocol::ApplicationData,
 };
-use futures::{channel::mpsc::Receiver, select, StreamExt};
+use futures::{
+    channel::mpsc::{Receiver, Sender, UnboundedSender},
+    select, StreamExt,
+};
 use futures_concurrency::stream::Merge;
 use libp2p::request_response::RequestId;
 use std::collections::{HashMap, HashSet};
@@ -105,6 +115,9 @@ pub(crate) async fn p2p_loop(
     heartbeat_proto_cfg: HeartbeatProtocolConfig,
     msg_proto_cfg: MsgProtocolConfig,
     ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
+    mut on_final_packet: Sender<ApplicationData>,
+    on_acknowledgement: UnboundedSender<HalfKeyChallenge>,
+    on_acknowledged_ticket: UnboundedSender<AcknowledgedTicket>,
 ) {
     let mut swarm = core_p2p::build_p2p_network(
         me,
@@ -195,22 +208,51 @@ pub(crate) async fn p2p_loop(
                     },
                 },
                 Inputs::Acknowledgement(task) => match task {
-                    AckProcessed::Receive(peer, _result) => {
-                        debug!("Nothing needs to be done here, as long as the ack interactions emits the received acknowledgement for peer '{peer}'")
+                    AckProcessed::Receive(peer, reply) => {
+                        debug!("Received an acknowledgement from {peer}");
+                        if let Ok(reply) = reply {
+                            match reply {
+                                Reply::Sender(half_key_challenge) => {
+                                    if let Err(e) = on_acknowledgement.unbounded_send(half_key_challenge) {
+                                        error!("failed to emit received acknowledgement: {e}")
+                                    }
+                                },
+                                Reply::RelayerWinning(acknowledged_ticket) => {
+                                    if let Err(e) = on_acknowledged_ticket.unbounded_send(acknowledged_ticket) {
+                                        error!("failed to emit acknowledged ticket: {e}");
+                                    }
+                                }
+                                Reply::RelayerLosing => {}
+                            }
+                        }
                     },
                     AckProcessed::Send(peer, ack) => {
                         let _request_id = swarm.behaviour_mut().ack.send_request(&peer, ack);
                     }
                 }
                 Inputs::Message(task) => match task {
-                    MsgProcessed::Receive(peer, _octets) => {
-                        debug!("Nothing needs to be done here, as long as the packet interactions emit the received packet from peer: {peer}")
+                    MsgProcessed::Receive(peer, data, ack) => {
+                        debug!("Received packet from peer: {peer}");
+                        if let Err(e) = on_final_packet.try_send(data) {
+                            error!("Failed to store a received message in the inbox: {}", e);
+                        }
+
+                        if let Some(ack) = ack {
+                            if let Err(e) = ack_writer.send_acknowledgement(peer, ack) {
+                                error!("Failed to acknowledge the received final packet: {e}");
+                            }
+                        }
                     },
                     MsgProcessed::Send(peer, octets) => {
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
                     },
-                    MsgProcessed::Forward(peer, octets) => {
+                    MsgProcessed::Forward(peer, octets, previous_peer, ack) => {
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
+                        if let Some(ack) = ack {
+                            if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
+                                error!("failed to acknowledge relayed packet: {e}");
+                            }
+                        }
                     }
                 },
                 Inputs::TicketAggregation(task) => match task {
@@ -224,7 +266,12 @@ pub(crate) async fn p2p_loop(
                             error!("Ticket aggregation: Failed send reply to {}", peer);
                         }
                     },
-                    TicketAggregationProcessed::Receive(_peer, request) => {
+                    TicketAggregationProcessed::Receive(_peer, acked_ticket, request) => {
+                        // TODO: uncomment once strategies need to get the value
+                        // if let Err(e) = on_acknowledged_ticket.unbounded_send(acked_ticket) {
+                        //     error!("failed to emit acknowledged aggregated ticket: {e}");
+                        // }
+
                         match active_aggregation_requests.remove(&request) {
                             Some(finalizer) => finalizer.finalize(),
                             None => {

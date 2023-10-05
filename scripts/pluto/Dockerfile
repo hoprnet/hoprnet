@@ -3,14 +3,14 @@ ARG HOPLI_IMAGE=${HOPLI_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docke
 ARG ANVIL_IMAGE=${ANVIL_IMAGE:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-anvil:latest}
 
 # import hopli image to copy in files later
-FROM ${HOPLI_IMAGE} as hopli
+FROM --platform=linux/amd64 ${HOPLI_IMAGE} as hopli
 
 # import hoprd image to copy in files later
-FROM ${HOPRD_IMAGE} as hoprd
+FROM --platform=linux/amd64 ${HOPRD_IMAGE} as hoprd
 
 # the anvil image is our base runtime image since it includes most relevant
 # tools already
-FROM ${ANVIL_IMAGE} as runtime
+FROM --platform=linux/amd64 ${ANVIL_IMAGE} as runtime
 
 LABEL description="Docker image running a HOPR-enabled anvil chain with 5 hoprd nodes using it and being fully interconnected."
 
@@ -56,5 +56,7 @@ EXPOSE 18085
 # set default token, but keep it configurable for users
 ARG HOPRD_API_TOKEN
 ENV HOPRD_API_TOKEN=${HOPRD_API_TOKEN:-%th1s-IS-a-S3CR3T-ap1-PUSHING-b1ts-TO-you%}
+ENV HOPRD_HOST="0.0.0.0"
 ENV NODE_OPTIONS="--experimental-wasm-modules"
-ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p -t "${HOPRD_API_TOKEN}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh
+HEALTHCHECK --interval=30s --timeout=4s --start-period=4m --retries=10 CMD grep -q running /tmp/cluster.status
+ENTRYPOINT /app/hoprnet/scripts/setup-local-cluster.sh -p --api-token "${HOPRD_API_TOKEN}" --listen-host "${HOPRD_HOST}" -i /app/hoprnet/scripts/topologies/full_interconnected_cluster.sh

@@ -76,6 +76,9 @@ pub trait HoprCoreEthereumDbActions {
     /// Get pending balance to a counter party's address.
     async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
 
+    /// Reset pending balance to a counter party's address.
+    async fn reset_pending_balance_to(&mut self, counterparty: &Address) -> Result<()>;
+
     async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>>;
 
     async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<Address>>;
@@ -150,7 +153,7 @@ pub trait HoprCoreEthereumDbActions {
     async fn get_losing_tickets_count(&self) -> Result<usize>;
 
     /// Resolve pending tickets.
-    async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance, snapshot: &Snapshot) -> Result<()>;
+    async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance) -> Result<()>;
 
     /// Mark the ticket as redeemed.
     async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
@@ -170,8 +173,14 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all channels from a given address.
     async fn get_channels_from(&self, address: &Address) -> Result<Vec<ChannelEntry>>;
 
+    /// Get all the outgoing channels from current node.
+    async fn get_outgoing_channels(&self) -> Result<Vec<ChannelEntry>>;
+
     /// Get all channels to a given address.
     async fn get_channels_to(&self, address: &Address) -> Result<Vec<ChannelEntry>>;
+
+    /// Get all the incoming channels from current node.
+    async fn get_incoming_channels(&self) -> Result<Vec<ChannelEntry>>;
 
     /// Get the current balance.
     async fn get_hopr_balance(&self) -> Result<Balance>;

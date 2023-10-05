@@ -1,6 +1,6 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
 import type { Multiaddr } from '@multiformats/multiaddr'
-import type { Address, ChannelEntry } from '@hoprnet/hopr-utils'
+import type { Address, ChannelEntry, Balance } from '@hoprnet/hopr-utils'
 
 export enum IndexerStatus {
   STARTING = 'starting',
@@ -33,6 +33,7 @@ export const NetworkRegistryNodeAllowedEventName = 'network-registry-node-allowe
 export const NetworkRegistryNodeNotAllowedEventName = 'network-registry-node-not-allowed'
 
 export const ChannelUpdateEventNames = 'own-channel-updated'
+export const TicketRedeemedEventNames = 'ticket-redeemed'
 
 type BlockEventNameType = 'block'
 type BlockProcessedEventNameType = 'block-processed'
@@ -42,8 +43,8 @@ type NetworkRegistryEligibilityChangedEventNameType = 'network-registry-eligibil
 type NetworkRegistryStatusChangedEventNameType = 'network-registry-status-changed'
 type NetworkRegistryNodeAllowedEventNameType = 'network-registry-node-allowed'
 type NetworkRegistryNodeNotAllowedEventNameType = 'network-registry-node-not-allowed'
-
 type ChannelUpdateEventNamesType = 'own-channel-updated'
+type TicketRedeemedEventNamesType = 'ticket-redeemed'
 
 type IndexerEventNames =
   | BlockEventNameType
@@ -51,6 +52,7 @@ type IndexerEventNames =
   | StatusEventNameType
   | PeerEventNameType
   | ChannelUpdateEventNamesType
+  | TicketRedeemedEventNamesType
   | IndexerEventsType
   | NetworkRegistryEligibilityChangedEventNameType
   | NetworkRegistryStatusChangedEventNameType
@@ -62,6 +64,7 @@ type BlockProcessedListener = (block: number) => void
 type StatusListener = (status: IndexerStatus) => void
 type PeerListener = (peerData: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }) => void
 type ChannelUpdateListener = (channel: ChannelEntry) => void
+type TicketRedeemedListener = (channel: ChannelEntry, ticketAmount: Balance) => void
 type IndexerEventsListener = (txHash: string) => void
 type NetworkRegistryEligibilityChangedListener = (account: Address, allowed: boolean) => void
 type NetworkRegistryStatusChangedListener = (isEnabled: boolean) => void
@@ -75,6 +78,7 @@ export interface IndexerEventEmitter {
   addListener(event: StatusEventNameType, listener: StatusListener): this
   addListener(event: PeerEventNameType, listener: PeerListener): this
   addListener(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  addListener(event: TicketRedeemedEventNamesType, listener: TicketRedeemedListener): this
   addListener(event: IndexerEventsType, listener: IndexerEventsListener): this
   addListener(
     event: NetworkRegistryEligibilityChangedEventNameType,
@@ -90,6 +94,7 @@ export interface IndexerEventEmitter {
   emit(event: StatusEventNameType, status: IndexerStatus): boolean
   emit(event: PeerEventNameType, peerData: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }): boolean
   emit(event: ChannelUpdateEventNamesType, channel: ChannelEntry): boolean
+  emit(event: TicketRedeemedEventNamesType, channel: ChannelEntry, ticketAmount: Balance): boolean
   emit(event: IndexerEventsType, txHash: string): boolean
   emit(event: NetworkRegistryEligibilityChangedEventNameType, account: Address, allowed: boolean): boolean
   emit(event: NetworkRegistryStatusChangedEventNameType, isEnabled: boolean): boolean
@@ -102,6 +107,7 @@ export interface IndexerEventEmitter {
   on(event: StatusEventNameType, listener: StatusListener): this
   on(event: PeerEventNameType, listener: PeerListener): this
   on(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  on(event: TicketRedeemedEventNamesType, listener: TicketRedeemedListener): this
   on(event: IndexerEventsType, listener: IndexerEventsListener): this
   on(event: NetworkRegistryEligibilityChangedEventNameType, listener: NetworkRegistryEligibilityChangedListener): this
   on(event: NetworkRegistryStatusChangedEventNameType, listener: NetworkRegistryStatusChangedListener): this
@@ -114,6 +120,7 @@ export interface IndexerEventEmitter {
   once(event: StatusEventNameType, listener: StatusListener): this
   once(event: PeerEventNameType, listener: PeerListener): this
   once(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  once(event: TicketRedeemedEventNamesType, listener: TicketRedeemedListener): this
   once(event: IndexerEventsType, listener: IndexerEventsListener): this
   once(event: NetworkRegistryEligibilityChangedEventNameType, listener: NetworkRegistryEligibilityChangedListener): this
   once(event: NetworkRegistryStatusChangedEventNameType, listener: NetworkRegistryStatusChangedListener): this
@@ -126,6 +133,7 @@ export interface IndexerEventEmitter {
   prependListener(event: StatusEventNameType, listener: StatusListener): this
   prependListener(event: PeerEventNameType, listener: PeerListener): this
   prependListener(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  prependListener(event: TicketRedeemedEventNamesType, listener: TicketRedeemedListener): this
   prependListener(event: IndexerEventsType, listener: IndexerEventsListener): this
   prependListener(
     event: NetworkRegistryEligibilityChangedEventNameType,
@@ -147,6 +155,7 @@ export interface IndexerEventEmitter {
   prependOnceListener(event: StatusEventNameType, listener: StatusListener): this
   prependOnceListener(event: PeerEventNameType, listener: PeerListener): this
   prependOnceListener(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  prependOnceListener(event: TicketRedeemedEventNamesType, listener: TicketRedeemedListener): this
   prependOnceListener(event: IndexerEventsType, listener: IndexerEventsListener): this
   prependOnceListener(
     event: NetworkRegistryEligibilityChangedEventNameType,
@@ -171,6 +180,7 @@ export interface IndexerEventEmitter {
   removeListener(event: StatusEventNameType, listener: StatusListener): this
   removeListener(event: PeerEventNameType, listener: PeerListener): this
   removeListener(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  removeListener(event: TicketRedeemedEventNamesType, listener: TicketRedeemedListener): this
   removeListener(event: IndexerEventsType, listener: IndexerEventsListener): this
   removeListener(
     event: NetworkRegistryEligibilityChangedEventNameType,
@@ -189,6 +199,7 @@ export interface IndexerEventEmitter {
   off(event: StatusEventNameType, listener: StatusListener): this
   off(event: PeerEventNameType, listener: PeerListener): this
   off(event: ChannelUpdateEventNamesType, listener: ChannelUpdateListener): this
+  off(event: TicketRedeemedEventNamesType, listener: TicketRedeemedListener): this
   off(event: IndexerEventsType, listener: IndexerEventsListener): this
   off(event: NetworkRegistryEligibilityChangedEventNameType, listener: NetworkRegistryEligibilityChangedListener): this
   off(event: NetworkRegistryStatusChangedEventNameType, listener: NetworkRegistryStatusChangedListener): this

@@ -23,7 +23,7 @@ jobs:
           python-version: 3.11
 
       - name: Checkout hoprnet
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get version
         run: |
@@ -32,7 +32,7 @@ jobs:
           echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
 
       - name: Checkout gitops
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: hoprnet/gitops
           path: "./gitops"
@@ -77,7 +77,7 @@ jobs:
           python-version: 3.11
 
       - name: Checkout hoprnet
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get version
         run: |
@@ -86,7 +86,7 @@ jobs:
           echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
 
       - name: Checkout gitops
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: hoprnet/gitops
           path: "./gitops"
