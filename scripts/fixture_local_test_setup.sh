@@ -288,7 +288,6 @@ function setup_node() {
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
     node packages/hoprd/lib/main.cjs \
       --data="${dir}" \
