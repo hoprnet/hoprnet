@@ -86,11 +86,18 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
                     channel.balance, self.cfg.min_stake_threshold
                 );
 
-                let to_stake = channel.balance.add(&self.cfg.funding_amount);
-
-                let rx = fund_channel(self.db.clone(), self.tx_sender.clone(), channel.get_id(), to_stake).await?;
+                let rx = fund_channel(
+                    self.db.clone(),
+                    self.tx_sender.clone(),
+                    channel.get_id(),
+                    self.cfg.funding_amount,
+                )
+                .await?;
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
-                info!("{self} strategy: issued re-staking of {channel} with {to_stake}");
+                info!(
+                    "{self} strategy: issued re-staking of {channel} with {}",
+                    self.cfg.funding_amount
+                );
             }
         }
 
@@ -207,7 +214,7 @@ mod tests {
         tx_exec
             .expect_fund_channel()
             .times(1)
-            .withf(move |dst, balance| c2.destination.eq(dst) && c2.balance.add(&fund_amount_c).eq(&balance))
+            .withf(move |dst, balance| c2.destination.eq(dst) && fund_amount_c.eq(&balance))
             .return_once(move |dst, _| {
                 if dst.eq(&c2.destination) {
                     tx.send(()).unwrap();

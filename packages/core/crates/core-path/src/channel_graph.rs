@@ -1,4 +1,4 @@
-use crate::channel_graph::ChannelChange::{CurrentBalance, Epoch, Status};
+use crate::channel_graph::ChannelChange::{CurrentBalance, Epoch, Status, TicketIndex};
 use crate::errors::Result;
 use crate::path::Path;
 use core_types::channels::{ChannelEntry, ChannelStatus};
@@ -41,6 +41,9 @@ pub enum ChannelChange {
 
     /// Channel epoch has changed
     Epoch { old: u32, new: u32 },
+
+    /// Ticket index has changed
+    TicketIndex { old: u64, new: u64 },
 }
 
 impl Display for ChannelChange {
@@ -56,6 +59,10 @@ impl Display for ChannelChange {
 
             Epoch { old, new } => {
                 write!(f, "Epoch: {old} -> {new}")
+            }
+
+            TicketIndex { old, new } => {
+                write!(f, "TicketIndex: {old} -> {new}")
             }
         }
     }
@@ -116,7 +123,18 @@ impl ChannelGraph {
                     new: channel.channel_epoch.as_u32(),
                 });
             }
-            debug!("channel update changes: {:?}", ret);
+
+            if old_channel.ticket_index != channel.ticket_index {
+                ret.push(TicketIndex {
+                    old: old_channel.ticket_index.as_u64(),
+                    new: channel.ticket_index.as_u64(),
+                })
+            }
+            debug!(
+                "{channel} (own = {}) update changes: {:?}",
+                self.is_own_channel(&channel),
+                ret
+            );
 
             info!("updated {channel}: {} changes", ret.len());
             Some(ret)

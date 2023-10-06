@@ -204,7 +204,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
             }
         }
         if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
-            let diminished_balance = channel.balance.div_f64(unrealized_threshold as f64);
+            let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64);
 
             // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
             if unredeemed_value.gte(&diminished_balance) {
@@ -282,17 +282,22 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, Response},
     };
-    use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
+    use core_ethereum_actions::transaction_queue::{
+        TransactionExecutor, TransactionQueue, TransactionResult, TransactionSender,
+    };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_path::channel_graph::ChannelChange;
-    use core_protocol::ticket_aggregation::processor::{TicketAggregationInteraction, TicketAggregationProcessed};
+    use core_protocol::ticket_aggregation::processor::{
+        TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
+    };
     use core_types::channels::ChannelDirection::Incoming;
     use core_types::channels::ChannelStatus;
     use core_types::{
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelEntry, Ticket},
     };
-    use futures::StreamExt;
+    use futures::channel::oneshot::Receiver;
+    use futures::{FutureExt, StreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use mockall::mock;
@@ -336,7 +341,7 @@ mod tests {
     }
 
     fn mock_acknowledged_ticket(signer: &ChainKeypair, destination: &ChainKeypair, index: u64) -> AcknowledgedTicket {
-        let price_per_packet: U256 = 10000000000000000u128.into();
+        let price_per_packet: U256 = 20_u32.into();
         let ticket_win_prob = 1.0f64;
 
         let channel_id = generate_channel_id(&signer.into(), &destination.into());
@@ -379,6 +384,19 @@ mod tests {
         utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
     }
 
+    async fn populate_db_with_ack_tickets(db: &mut DB<RustyLevelDbShim>, amount: usize) -> Vec<AcknowledgedTicket> {
+        let mut acked_tickets = Vec::new();
+        for i in 0..amount {
+            let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64);
+            db.set(to_acknowledged_ticket_key(&acked_ticket), &acked_ticket)
+                .await
+                .unwrap();
+
+            acked_tickets.push(acked_ticket);
+        }
+        acked_tickets
+    }
+
     async fn init_dbs(inner_dbs: Vec<DB<RustyLevelDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
         let mut dbs = Vec::new();
         for (i, inner_db) in inner_dbs.into_iter().enumerate() {
@@ -403,69 +421,17 @@ mod tests {
         dbs
     }
 
-    #[async_std::test]
-    async fn test_strategy_aggregation_on_ack() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        // db_0: Alice (channel source)
-        // db_1: Bob (channel destination)
-        let mut inner_dbs = (0..2)
-            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
-            .collect::<Vec<_>>();
-
-        let mut acked_tickets = Vec::new();
-        for i in 0..5 {
-            let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i);
-            inner_dbs[1]
-                .set(to_acknowledged_ticket_key(&acked_ticket), &acked_ticket)
-                .await
-                .unwrap();
-
-            acked_tickets.push(acked_ticket);
-        }
-
-        let cfg = super::AggregatingStrategyConfig {
-            aggregation_threshold: Some(5),
-            unrealized_balance_ratio: None,
-            aggregation_timeout: std::time::Duration::from_secs(5),
-            aggregate_on_channel_close: false,
-        };
-
-        let dbs = init_dbs(inner_dbs).await;
-
-        let channel = ChannelEntry::new(
-            (&PEERS_CHAIN[0]).into(),
-            (&PEERS_CHAIN[1]).into(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            6u64.into(),
-            core_types::channels::ChannelStatus::Open,
-            1u32.into(),
-            0u64.into(),
-        );
-
-        dbs[1]
-            .write()
-            .await
-            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
-            .await
-            .unwrap();
-
-        let tx_exec = MockTxExec::new();
-        let tx_queue = TransactionQueue::new(dbs[1].clone(), Box::new(tx_exec));
-        let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn_local(async move {
-            tx_queue.transaction_loop().await;
-        });
-
-        let mut alice = TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
-        let mut bob = TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
-
-        let aggregation_strategy =
-            super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob.writer());
-
-        let threshold_ticket = acked_tickets.last().unwrap();
+    fn spawn_aggregation_interaction<Db: HoprCoreEthereumDbActions + 'static>(
+        db_alice: Arc<RwLock<Db>>,
+        db_bob: Arc<RwLock<Db>>,
+        key_alice: &ChainKeypair,
+        key_bob: &ChainKeypair,
+    ) -> (TicketAggregationActions<(), ()>, Receiver<()>) {
+        let mut alice = TicketAggregationInteraction::<(), ()>::new(db_alice, key_alice);
+        let mut bob = TicketAggregationInteraction::<(), ()>::new(db_bob, key_bob);
 
         let (tx, awaiter) = futures::channel::oneshot::channel::<()>();
+        let bob_aggregator = bob.writer();
 
         async_std::task::spawn_local(async move {
             let mut finalizer = None;
@@ -498,6 +464,138 @@ mod tests {
             finalizer.unwrap().finalize();
             let _ = tx.send(());
         });
+
+        return (bob_aggregator, awaiter);
+    }
+
+    fn spawn_tx_queue<Db: HoprCoreEthereumDbActions + 'static>(
+        db: Arc<RwLock<Db>>,
+        tx_exec: MockTxExec,
+    ) -> TransactionSender {
+        let tx_queue = TransactionQueue::new(db, Box::new(tx_exec));
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn_local(async move {
+            tx_queue.transaction_loop().await;
+        });
+
+        tx_sender
+    }
+
+    #[async_std::test]
+    async fn test_strategy_aggregation_on_ack() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        // db_0: Alice (channel source)
+        // db_1: Bob (channel destination)
+        let mut inner_dbs = (0..2)
+            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
+            .collect::<Vec<_>>();
+
+        let acked_tickets = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
+
+        let dbs = init_dbs(inner_dbs).await;
+
+        let channel = ChannelEntry::new(
+            (&PEERS_CHAIN[0]).into(),
+            (&PEERS_CHAIN[1]).into(),
+            Balance::new(1u64.into(), BalanceType::HOPR),
+            6u64.into(),
+            ChannelStatus::Open,
+            1u32.into(),
+            0u64.into(),
+        );
+
+        dbs[1]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        let tx_sender = spawn_tx_queue(dbs[1].clone(), MockTxExec::new());
+        let (bob_aggregator, awaiter) =
+            spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+
+        let cfg = super::AggregatingStrategyConfig {
+            aggregation_threshold: Some(5),
+            unrealized_balance_ratio: None,
+            aggregation_timeout: std::time::Duration::from_secs(5),
+            aggregate_on_channel_close: false,
+        };
+
+        let aggregation_strategy =
+            super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob_aggregator);
+
+        let threshold_ticket = acked_tickets.last().unwrap();
+        aggregation_strategy
+            .on_acknowledged_winning_ticket(&threshold_ticket)
+            .await
+            .expect("strategy call should succeed");
+
+        // Wait until aggregation has finished
+        let f1 = pin!(awaiter);
+        let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)).fuse());
+        let _ = futures::future::select(f1, f2).await;
+
+        assert_eq!(
+            dbs[1]
+                .read()
+                .await
+                .get_acknowledged_tickets_range(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
+                .await
+                .unwrap()
+                .len(),
+            1,
+            "there should be a single aggregated ticket"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_strategy_aggregation_on_ack_when_unrealized_balance_exceeded() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        // db_0: Alice (channel source)
+        // db_1: Bob (channel destination)
+        let mut inner_dbs = (0..2)
+            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
+            .collect::<Vec<_>>();
+
+        let acked_tickets = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
+
+        let dbs = init_dbs(inner_dbs).await;
+
+        let channel = ChannelEntry::new(
+            (&PEERS_CHAIN[0]).into(),
+            (&PEERS_CHAIN[1]).into(),
+            Balance::new(100u64.into(), BalanceType::HOPR),
+            6u64.into(),
+            ChannelStatus::Open,
+            1u32.into(),
+            0u64.into(),
+        );
+
+        dbs[1]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        let tx_sender = spawn_tx_queue(dbs[1].clone(), MockTxExec::new());
+        let (bob_aggregator, awaiter) =
+            spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+
+        let cfg = super::AggregatingStrategyConfig {
+            aggregation_threshold: None,
+            unrealized_balance_ratio: Some(0.75),
+            aggregation_timeout: Duration::from_secs(5),
+            aggregate_on_channel_close: false,
+        };
+
+        let aggregation_strategy =
+            super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob_aggregator);
+
+        let threshold_ticket = acked_tickets.last().unwrap();
 
         aggregation_strategy
             .on_acknowledged_winning_ticket(&threshold_ticket)
@@ -532,21 +630,12 @@ mod tests {
             .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
             .collect::<Vec<_>>();
 
-        let mut acked_tickets = Vec::new();
-        for i in 0..5 {
-            let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i);
-            inner_dbs[1]
-                .set(to_acknowledged_ticket_key(&acked_ticket), &acked_ticket)
-                .await
-                .unwrap();
-
-            acked_tickets.push(acked_ticket);
-        }
+        populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 
         let cfg = super::AggregatingStrategyConfig {
-            aggregation_threshold: Some(5),
+            aggregation_threshold: None,
             unrealized_balance_ratio: None,
-            aggregation_timeout: std::time::Duration::from_secs(5),
+            aggregation_timeout: Duration::from_secs(5),
             aggregate_on_channel_close: true,
         };
 
@@ -557,7 +646,7 @@ mod tests {
             (&PEERS_CHAIN[1]).into(),
             Balance::new(1u64.into(), BalanceType::HOPR),
             6u64.into(),
-            core_types::channels::ChannelStatus::Open,
+            ChannelStatus::Open,
             1u32.into(),
             0u64.into(),
         );
@@ -569,52 +658,12 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_exec = MockTxExec::new();
-        let tx_queue = TransactionQueue::new(dbs[1].clone(), Box::new(tx_exec));
-        let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn_local(async move {
-            tx_queue.transaction_loop().await;
-        });
-
-        let mut alice = TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
-        let mut bob = TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
+        let tx_sender = spawn_tx_queue(dbs[1].clone(), MockTxExec::new());
+        let (bob_aggregator, awaiter) =
+            spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
         let aggregation_strategy =
-            super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob.writer());
-
-        let (tx, awaiter) = futures::channel::oneshot::channel::<()>();
-
-        async_std::task::spawn_local(async move {
-            let mut finalizer = None;
-
-            match bob.next().await {
-                Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {
-                    let _ = finalizer.insert(request_finalizer);
-                    alice
-                        .writer()
-                        .receive_aggregation_request(PEERS[1].public().to_peerid(), acked_tickets, ())
-                        .unwrap();
-                }
-                //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
-                _ => panic!("unexpected action happened"),
-            };
-
-            match alice.next().await {
-                Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ())) => bob
-                    .writer()
-                    .receive_ticket(PEERS[0].public().to_peerid(), aggregated_ticket, ())
-                    .unwrap(),
-                _ => panic!("unexpected action happened"),
-            };
-
-            match bob.next().await {
-                Some(TicketAggregationProcessed::Receive(_destination, _ticket, ())) => (),
-                _ => panic!("unexpected action happened"),
-            };
-
-            finalizer.unwrap().finalize();
-            let _ = tx.send(());
-        });
+            super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob_aggregator);
 
         channel.status = ChannelStatus::PendingToClose;
         dbs[1]

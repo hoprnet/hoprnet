@@ -282,6 +282,17 @@ impl Balance {
         }
     }
 
+    /// Multiplies the balance by a float in inverval (0,1]
+    pub fn mul_f64(&self, coefficient: f64) -> Self {
+        Self {
+            value: self
+                .value()
+                .multiply_f64(coefficient)
+                .expect("coefficient must be in (0,1]"),
+            balance_type: self.balance_type,
+        }
+    }
+
     pub fn amount(&self) -> U256 {
         self.value
     }
