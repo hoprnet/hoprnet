@@ -16,6 +16,7 @@ async-std = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
+gloo-timers = { workspace = true, optional = true }
 hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
@@ -46,6 +47,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures",
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
     "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
