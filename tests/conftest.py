@@ -12,7 +12,6 @@ SEED = int.from_bytes(random_data, byteorder="big")
 random.seed(SEED)
 
 LOCALHOST = "127.0.0.1"
-
 OPEN_CHANNEL_FUNDING_VALUE = "1000000000000000000000"
 
 TICKET_AGGREGATION_THRESHOLD = 100
@@ -155,7 +154,7 @@ def swarm7(request):
     finally:
         logging.debug("Tearing down the 7 node cluster from bash")
         subprocess.run(
-            f"./scripts/fixture_local_test_setup.sh --just-cleanup 2>&1 | tee {log_file_path}",
+            f"./scripts/fixture_local_test_setup.sh --just-cleanup 2>&1 | tee --append {log_file_path}",
             shell=True,
             capture_output=True,
             check=False,

@@ -174,11 +174,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             Transaction::OpenChannel(address, stake) => tx_exec.fund_channel(address, stake).await,
 
             Transaction::FundChannel(channel, amount) => {
-                let channel_id = channel.get_id();
                 if channel.status == Open {
                     tx_exec.fund_channel(channel.destination, amount).await
                 } else {
-                    Failure(format!("cannot fund channel {channel_id} that is not opened"))
+                    Failure(format!("cannot fund {channel} because it is not opened"))
                 }
             }
 
