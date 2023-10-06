@@ -21,6 +21,6 @@ export function snapshotComparator(snapA: IndexerSnapshot, snapB: IndexerSnapsho
  * if blockNumber is considered confirmed.
  * @returns boolean
  */
-export function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number, maxConfirmations: number): boolean {
-  return blockNumber + maxConfirmations <= onChainBlockNumber
+export function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number, confirmations: number): boolean {
+  return blockNumber + confirmations <= onChainBlockNumber
 }

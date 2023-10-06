@@ -65,7 +65,8 @@ export async function createHoprNode(
       maxFeePerGas: network.chain.max_fee_per_gas,
       maxPriorityFeePerGas: network.chain.max_priority_fee_per_gas,
       chain: network.chain.id,
-      provider: network.chain.default_provider
+      provider: network.chain.default_provider,
+      confirmations: network.confirmations
     },
     {
       safeTransactionServiceProvider: cfg.safe_module.safe_transaction_service_provider,

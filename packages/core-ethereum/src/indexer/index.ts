@@ -99,7 +99,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   constructor(
     private address: Address,
     private db: Database,
-    private maxConfirmations: number,
+    private confirmations: number,
     private blockRange: number
   ) {
     super()
@@ -158,8 +158,8 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     let fromBlock = latestSavedBlock
-    if (fromBlock - this.maxConfirmations > 0) {
-      fromBlock = fromBlock - this.maxConfirmations
+    if (fromBlock - this.confirmations > 0) {
+      fromBlock = fromBlock - this.confirmations
     }
     // no need to query before HoprChannels or HoprNetworkRegistry existed
     fromBlock = Math.max(fromBlock, this.genesisBlock)
@@ -473,13 +473,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
     this.blockProcessingLock = defer<void>()
 
-    const currentBlock = blockNumber - this.maxConfirmations
+    const currentBlock = blockNumber - this.confirmations
 
     if (currentBlock < 0) {
       return
     }
 
-    log('Indexer got new block %d, handling block %d', blockNumber, blockNumber - this.maxConfirmations)
+    log('Indexer got new block %d, handling block %d', blockNumber, blockNumber - this.confirmations)
     this.emit('block', blockNumber)
 
     // update latest block
@@ -498,12 +498,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         let nativeTxHashes: string[] | undefined
         try {
           // This new block marks a previous block
-          // (blockNumber - this.maxConfirmations) is final.
+          // (blockNumber - this.confirmations) is final.
           // Confirm native token transactions in that previous block.
           nativeTxHashes = await this.chain.getTransactionsInBlock(currentBlock)
         } catch (err) {
           log(
-            `error: failed to retrieve information about block ${currentBlock} with finality ${this.maxConfirmations}`,
+            `error: failed to retrieve information about block ${currentBlock} with finality ${this.confirmations}`,
             err
           )
         }
@@ -540,12 +540,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       for (let i = 0; i < RETRIES; i++) {
         log(
-          `fetchEvents at currentBlock ${currentBlock} startupBlock ${this.startupBlock} maxConfirmations ${
-            this.maxConfirmations
-          }. ${currentBlock > this.startupBlock + this.maxConfirmations}`
+          `fetchEvents at currentBlock ${currentBlock} startupBlock ${this.startupBlock} confirmations ${
+            this.confirmations
+          }. ${currentBlock > this.startupBlock + this.confirmations}`
         )
         if (currentBlock > this.startupBlock) {
-          // between starting block "Latest on-chain block" and finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - maxConfirmations, "Latest on-chain block"]
+          // between starting block "Latest on-chain block" and finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - confirmations, "Latest on-chain block"]
           res = await this.getEvents(currentBlock, currentBlock, true)
         } else {
           res = await this.getEvents(currentBlock, currentBlock, false)
@@ -683,24 +683,24 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       blockNumber,
       this.unconfirmedEvents.size(),
       this.unconfirmedEvents.size() > 0
-        ? isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
+        ? isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.confirmations)
         : null,
       this.unconfirmedEvents.size() > 0 ? this.unconfirmedEvents.peek().blockNumber : 0,
-      this.maxConfirmations
+      this.confirmations
     )
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
       this.unconfirmedEvents.size() > 0 &&
-      isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
+      isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.confirmations)
     ) {
       const event = this.unconfirmedEvents.shift()
       log(
-        'Processing event at blockNumber=%s maxConfirmations=%s',
+        'Processing event at blockNumber=%s confirmations=%s',
         // @TODO: fix type clash
         blockNumber,
-        this.maxConfirmations
+        this.confirmations
       )
 
       // if we find a previous snapshot, compare event's snapshot with last processed
