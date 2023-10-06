@@ -354,15 +354,6 @@ pub struct CliArgs {
     pub heartbeat_variance: Option<u64>,
 
     #[arg(
-        long = "onChainConfirmations",
-        help = "Number of confirmations required for on-chain transactions",
-        value_name = "CONFIRMATIONS",
-        value_parser = clap::value_parser ! (u32),
-        env = "HOPRD_ON_CHAIN_CONFIRMATIONS",
-    )]
-    pub on_chain_confirmations: Option<u32>,
-
-    #[arg(
         long = "networkQualityThreshold",
         help = "Minimum quality of a peer connection to be considered usable",
         value_name = "THRESHOLD",

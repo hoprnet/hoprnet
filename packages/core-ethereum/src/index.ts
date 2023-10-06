@@ -39,7 +39,7 @@ const log = debug('hopr-core-ethereum')
 
 export type ChainOptions = {
   provider: string
-  maxConfirmations?: number
+  confirmations: number
   chainId: number
   maxFeePerGas: string
   maxPriorityFeePerGas: string
@@ -79,7 +79,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     this.indexer = new Indexer(
       this.chainKeypair.public().to_address(),
       this.db,
-      this.options.maxConfirmations ?? constants.DEFAULT_CONFIRMATIONS,
+      this.options.confirmations,
       constants.INDEXER_BLOCK_RANGE
     )
   }
