@@ -71,7 +71,7 @@
     "chai": "4.3.7",
     "chai-openapi-response-validator": "^0.14.2",
     "mocha": "10.2.0",
-    "sinon": "16.0.0",
+    "sinon": "16.1.0",
     "supertest": "^6.2.2",
     "ts-node": "^10.9.1",
     "typedoc": "0.24.8",
