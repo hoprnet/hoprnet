@@ -40,7 +40,7 @@ impl Default for AutoFundingStrategyConfig {
     }
 }
 
-/// The `AutoFundingStrategys` automatically funds channel that
+/// The `AutoFundingStrategy` automatically funds channel that
 /// dropped it's staked balance below the configured threshold.
 pub struct AutoFundingStrategy<Db: HoprCoreEthereumDbActions> {
     tx_sender: TransactionSender,

@@ -14,7 +14,7 @@ export const getTicketsStatistics = async (node: Hopr) => {
     losingTickets: stats.losing,
     winProportion: stats.winProportion,
     neglected: stats.neglected,
-    neglectedValue: stats.neglectedValue,
+    neglectedValue: stats.neglectedValue.to_string(),
     rejected: stats.rejected,
     rejectedValue: stats.rejectedValue.to_string()
   }

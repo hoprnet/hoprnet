@@ -296,6 +296,23 @@ impl Balance {
     pub fn amount(&self) -> U256 {
         self.value
     }
+
+    pub fn to_formatted_string(&self) -> String {
+        let mut val = self.value.to_string();
+
+        if val.len() > Self::SCALE {
+            let (l,r) = val.split_at(val.len() - Self::SCALE + 1);
+            format!("{l}.{} {}",&r[..r.len()-(val.len()-Self::SCALE)], self.balance_type)
+        } else if val.len() < Self::SCALE {
+            for _ in 0..(Self::SCALE - val.len() - 1) {
+                val = "0".to_owned() + &val;
+            }
+            format!("0.{val} {}", self.balance_type)
+        } else {
+            let (l, r) = val.split_at(1);
+            format!("{l}.{r} {}", self.balance_type)
+        }
+    }
 }
 
 impl PartialEq for Balance {
@@ -335,6 +352,9 @@ impl FromStr for Balance {
 impl Balance {
     /// Size of the balance value is equal to U256 size (32 bytes)
     pub const SIZE: usize = U256::SIZE;
+
+    /// Number of digits in the base unit
+    pub const SCALE: usize = 18;
 
     pub fn new(value: U256, balance_type: BalanceType) -> Self {
         Balance { value, balance_type }
@@ -832,6 +852,24 @@ mod tests {
     }
 
     #[test]
+    fn balance_test_formatted_string() {
+        let mut base = "123".to_string();
+        for _ in 0..Balance::SCALE-3 {
+            base += "0";
+        }
+
+        let b1 = Balance::new_from_str(&base, BalanceType::HOPR);
+        let b2 = b1.imul(100);
+        let b3 = Balance::new_from_str(&base[..Balance::SCALE-3], BalanceType::HOPR);
+        let b4 = Balance::new_from_str(&base[..Balance::SCALE-1], BalanceType::HOPR);
+
+        assert_eq!("1.23000000000000000 HOPR", b1.to_formatted_string());
+        assert_eq!("123.000000000000000 HOPR", b2.to_formatted_string());
+        assert_eq!("0.00123000000000000 HOPR", b3.to_formatted_string());
+        assert_eq!("0.12300000000000000 HOPR", b4.to_formatted_string());
+    }
+
+    #[test]
     fn eth_challenge_tests() {
         let e_1 = EthereumChallenge::default();
         let e_2 = EthereumChallenge::from_bytes(&e_1.to_bytes()).unwrap();
@@ -941,11 +979,6 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8], balance_type: BalanceType) -> JsResult<Balance> {
             ok_or_jserr!(Balance::deserialize(data, balance_type))
-        }
-
-        #[wasm_bindgen]
-        pub fn to_formatted_string(&self) -> String {
-            self.to_string()
         }
 
         #[wasm_bindgen(js_name = "eq")]
