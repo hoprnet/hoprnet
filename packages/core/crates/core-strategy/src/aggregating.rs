@@ -36,6 +36,7 @@ pub struct AggregatingStrategyConfig {
     /// in that channel when exceeded.
     /// This condition is independent of `unrealized_balance_ratio`.
     /// Default is 100.
+    #[validate(range(min = 2))]
     pub aggregation_threshold: Option<u32>,
 
     /// Percentage of unrealized balance in a channel (relative to , that triggers the ticket aggregation
@@ -207,12 +208,13 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
             let diminished_balance = channel.balance.mul_f64(unrealized_threshold as f64);
 
             // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
-            if unredeemed_value.gte(&diminished_balance) {
-                info!("{self} strategy: {channel} has unrealized balance {unredeemed_value} >= {diminished_balance}",);
+            // and there are at least two tickets
+            if unredeemed_value.gte(&diminished_balance) && aggregatable_tickets > 1 {
+                info!("{self} strategy: {channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets",);
                 can_aggregate = true;
             } else {
                 debug!(
-                    "{self} strategy: {channel} has unrealized balance {unredeemed_value} < {diminished_balance}, not aggregating yet",
+                    "{self} strategy: {channel} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet",
                 );
             }
         }
