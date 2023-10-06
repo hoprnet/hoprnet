@@ -9,10 +9,7 @@ use core_crypto::{
 };
 use core_types::protocol::{INTERMEDIATE_HOPS, PAYLOAD_SIZE};
 use typenum::Unsigned;
-use utils_types::{
-    errors::GeneralError::ParseError,
-    traits::BinarySerializable,
-};
+use utils_types::{errors::GeneralError::ParseError, traits::BinarySerializable};
 
 use crate::{
     errors::Result,
@@ -242,12 +239,9 @@ impl<S: SphinxSuite> BinarySerializable for MetaPacket<S> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::packet::{
-        add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, PADDING_TAG,
-    };
+    use crate::packet::{add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, PADDING_TAG};
     use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
     use core_crypto::{
         ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite},
@@ -256,7 +250,6 @@ mod tests {
     };
     use core_types::protocol::INTERMEDIATE_HOPS;
     use parameterized::parameterized;
-
 
     #[test]
     fn test_padding() {

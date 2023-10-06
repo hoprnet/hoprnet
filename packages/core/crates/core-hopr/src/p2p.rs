@@ -260,7 +260,7 @@ pub(crate) async fn p2p_loop(
                     TicketAggregationProcessed::Reply(peer, ticket, response) => {
                         if let Err(_) = swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket) {
                             error!("Ticket aggregation: Failed send reply to {}", peer);
-                        } 
+                        }
                     },
                     TicketAggregationProcessed::Receive(_peer, _acked_ticket, request) => {
                         // TODO: uncomment once strategies need to get the value

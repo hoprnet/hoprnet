@@ -1,10 +1,9 @@
 use core_path::path::Path;
 use libp2p_identity::PeerId;
 
-use core_crypto::{derivation::PacketTag, types::HalfKeyChallenge, keypairs::OffchainKeypair};
+use core_crypto::{derivation::PacketTag, keypairs::OffchainKeypair, types::HalfKeyChallenge};
 use core_packet::errors::Result;
 use core_types::acknowledgement::Acknowledgement;
-
 
 pub enum TransportPacket {
     /// Packet is intended for us
@@ -12,7 +11,7 @@ pub enum TransportPacket {
         packet_tag: PacketTag,
         previous_hop: PeerId,
         plain_text: Box<[u8]>,
-        ack: Acknowledgement
+        ack: Acknowledgement,
     },
     /// Packet must be forwarded
     Forwarded {
@@ -20,7 +19,7 @@ pub enum TransportPacket {
         previous_hop: PeerId,
         next_hop: PeerId,
         data: Box<[u8]>,
-        ack: Acknowledgement
+        ack: Acknowledgement,
     },
     /// Packet that is being sent out by us
     Outgoing {
@@ -36,5 +35,10 @@ pub trait PacketConstructing {
 
     async fn into_outgoing(&self, data: Self::Input, path: &Path) -> Result<TransportPacket>;
 
-    async fn from_incoming(&self, data: Box<[u8]>, node_keypair: &OffchainKeypair, sender: &PeerId) -> Result<TransportPacket>;
+    async fn from_incoming(
+        &self,
+        data: Box<[u8]>,
+        node_keypair: &OffchainKeypair,
+        sender: &PeerId,
+    ) -> Result<TransportPacket>;
 }

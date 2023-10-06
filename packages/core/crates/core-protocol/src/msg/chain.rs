@@ -1,14 +1,3 @@
-use core_packet::{
-    errors::{
-        PacketError::PacketDecodingError,
-        Result
-    },
-    packet::{
-        PACKET_LENGTH,
-        CurrentSphinxSuite, MetaPacket, ForwardedMetaPacket,
-    },
-    por::{ProofOfRelayValues, ProofOfRelayString, pre_verify, POR_SECRET_LENGTH}
-};
 use core_crypto::{
     derivation::{derive_ack_key_share, PacketTag},
     keypairs::{ChainKeypair, OffchainKeypair},
@@ -16,13 +5,17 @@ use core_crypto::{
     shared_keys::SphinxSuite,
     types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
 };
+use core_packet::{
+    errors::{PacketError::PacketDecodingError, Result},
+    packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
+    por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
+};
 use core_path::path::Path;
-use core_types::protocol::INTERMEDIATE_HOPS;
 use core_types::channels::Ticket;
+use core_types::protocol::INTERMEDIATE_HOPS;
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
-
 
 /// Indicates the packet type.
 #[derive(Debug, Clone)]
@@ -96,7 +89,8 @@ impl ChainPacketComponents {
         ticket.sign(chain_keypair, domain_separator);
 
         Ok(Self::Outgoing {
-                packet: Box::from(MetaPacket::<CurrentSphinxSuite>::new(
+            packet: Box::from(
+                MetaPacket::<CurrentSphinxSuite>::new(
                     shared_keys,
                     msg,
                     &public_keys_path,
@@ -104,12 +98,13 @@ impl ChainPacketComponents {
                     POR_SECRET_LENGTH,
                     &por_strings.iter().map(Box::as_ref).collect::<Vec<_>>(),
                     None,
-                ).to_bytes()),
-                ticket,
-                next_hop: OffchainPublicKey::from_peerid(&path.hops()[0])?,
-                ack_challenge: por_values.ack_challenge,
-            },
-        )
+                )
+                .to_bytes(),
+            ),
+            ticket,
+            next_hop: OffchainPublicKey::from_peerid(&path.hops()[0])?,
+            ack_challenge: por_values.ack_challenge,
+        })
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the
@@ -119,7 +114,8 @@ impl ChainPacketComponents {
             let (pre_packet, pre_ticket) = data.split_at(PACKET_LENGTH);
             let previous_hop = OffchainPublicKey::from_peerid(sender)?;
 
-            let mp: MetaPacket<core_crypto::ec_groups::X25519Suite> = MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
+            let mp: MetaPacket<core_crypto::ec_groups::X25519Suite> =
+                MetaPacket::<CurrentSphinxSuite>::from_bytes(pre_packet)?;
 
             match mp.forward(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
                 ForwardedMetaPacket::RelayedPacket {
@@ -136,18 +132,17 @@ impl ChainPacketComponents {
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self::Forwarded {
-                            packet: Box::from(packet.to_bytes()),
-                            ticket,
-                            packet_tag,
-                            ack_key,
-                            previous_hop,
-                            path_pos,
-                            own_key: verification_output.own_key,
-                            next_hop: next_node,
-                            next_challenge: verification_output.next_ticket_challenge,
-                            ack_challenge: verification_output.ack_challenge,
-                        },
-                    )
+                        packet: Box::from(packet.to_bytes()),
+                        ticket,
+                        packet_tag,
+                        ack_key,
+                        previous_hop,
+                        path_pos,
+                        own_key: verification_output.own_key,
+                        next_hop: next_node,
+                        next_challenge: verification_output.next_ticket_challenge,
+                        ack_challenge: verification_output.ack_challenge,
+                    })
                 }
                 ForwardedMetaPacket::FinalPacket {
                     packet_tag,
@@ -159,14 +154,13 @@ impl ChainPacketComponents {
 
                     let ticket = Ticket::from_bytes(pre_ticket)?;
                     Ok(Self::Final {
-                            packet: Box::from(mp.to_bytes()),
-                            ticket,
-                            packet_tag,
-                            ack_key,
-                            previous_hop,
-                            plain_text,
-                        },
-                    )
+                        packet: Box::from(mp.to_bytes()),
+                        ticket,
+                        packet_tag,
+                        ack_key,
+                        previous_hop,
+                        plain_text,
+                    })
                 }
             }
         } else {
@@ -175,8 +169,7 @@ impl ChainPacketComponents {
     }
 }
 
-
-#[allow(dead_code)]     // used in tests
+#[allow(dead_code)] // used in tests
 pub fn forward(
     packet: ChainPacketComponents,
     chain_keypair: &ChainKeypair,
@@ -184,23 +177,39 @@ pub fn forward(
     domain_separator: &Hash,
 ) -> ChainPacketComponents {
     match packet {
-        ChainPacketComponents::Forwarded { next_challenge, packet, ack_challenge, packet_tag, ack_key, previous_hop, own_key, next_hop, path_pos, ..  } => {
+        ChainPacketComponents::Forwarded {
+            next_challenge,
+            packet,
+            ack_challenge,
+            packet_tag,
+            ack_key,
+            previous_hop,
+            own_key,
+            next_hop,
+            path_pos,
+            ..
+        } => {
             next_ticket.challenge = next_challenge.to_ethereum_challenge();
             next_ticket.sign(chain_keypair, domain_separator);
-            ChainPacketComponents::Forwarded { 
+            ChainPacketComponents::Forwarded {
                 packet: packet,
                 ticket: next_ticket,
                 ack_challenge,
                 packet_tag,
-                ack_key, previous_hop, own_key, next_hop, next_challenge, path_pos }
+                ack_key,
+                previous_hop,
+                own_key,
+                next_hop,
+                next_challenge,
+                path_pos,
+            }
         }
         _ => packet,
     }
 }
 
-
 impl ChainPacketComponents {
-    #[allow(dead_code)]     // used in tests
+    #[allow(dead_code)] // used in tests
     pub fn to_bytes(&self) -> Box<[u8]> {
         let (packet, ticket) = match self {
             Self::Final { packet, ticket, .. } => (packet, ticket),
@@ -214,7 +223,6 @@ impl ChainPacketComponents {
         ret.into_boxed_slice()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -273,8 +281,9 @@ mod tests {
 
         let test_message = b"some testing message";
         let path = Path::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
-        let mut packet = ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())
-            .expect("failed to construct packet");
+        let mut packet =
+            ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())
+                .expect("failed to construct packet");
 
         match &packet {
             ChainPacketComponents::Outgoing { .. } => {}

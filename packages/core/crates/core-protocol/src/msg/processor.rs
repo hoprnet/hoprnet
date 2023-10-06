@@ -10,12 +10,12 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 use core_crypto::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::{HalfKeyChallenge, OffchainPublicKey}
+    types::{HalfKeyChallenge, OffchainPublicKey},
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{
-    ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError,
-    PathPositionMismatch, Retry, TagReplay, TransportError, self,
+    self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError,
+    PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use core_packet::errors::Result;
 use core_path::errors::PathError::PathNotValid;
@@ -28,10 +28,7 @@ use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
-use crate::msg::{
-    chain::ChainPacketComponents,
-    mixer::MixerConfig
-};
+use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
@@ -43,7 +40,7 @@ use core_packet::validation::validate_unacknowledged_ticket;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
 
-use super::packet::{TransportPacket, PacketConstructing};
+use super::packet::{PacketConstructing, TransportPacket};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     // packet processing
@@ -69,7 +66,6 @@ lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
     static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 }
-
 
 // /// Represents a payload (packet or acknowledgement) at the transport level.
 // #[derive(Debug, Clone)]
@@ -163,64 +159,106 @@ where
             self.create_multihop_ticket(next_peer, path.length() as u8).await?
         };
 
-        match ChainPacketComponents::into_outgoing(&data.to_bytes(), &path, &self.cfg.chain_keypair, next_ticket, &domain_separator) {
-            Ok(p) => {
-                match p {
-                    ChainPacketComponents::Final {..} | ChainPacketComponents::Forwarded { .. } => Err(PacketError::LogicError("Must contain an outgoing packet type".into())),
-                    ChainPacketComponents::Outgoing { packet, ticket, next_hop, ack_challenge } => {
-                        self.db
-                            .write()
-                            .await
-                            .store_pending_acknowledgment(ack_challenge, PendingAcknowledgement::WaitingAsSender)
-                            .await?;
-                        
-                        let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
-                        payload.extend_from_slice(packet.as_ref());
-                        payload.extend_from_slice(&ticket.to_bytes());
+        match ChainPacketComponents::into_outgoing(
+            &data.to_bytes(),
+            &path,
+            &self.cfg.chain_keypair,
+            next_ticket,
+            &domain_separator,
+        ) {
+            Ok(p) => match p {
+                ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
+                    Err(PacketError::LogicError("Must contain an outgoing packet type".into()))
+                }
+                ChainPacketComponents::Outgoing {
+                    packet,
+                    ticket,
+                    next_hop,
+                    ack_challenge,
+                } => {
+                    self.db
+                        .write()
+                        .await
+                        .store_pending_acknowledgment(ack_challenge, PendingAcknowledgement::WaitingAsSender)
+                        .await?;
 
-                        Ok(TransportPacket::Outgoing { next_hop: next_hop.to_peerid(), ack_challenge: ack_challenge.clone(), data: payload.into_boxed_slice() })
-                    },
+                    let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                    payload.extend_from_slice(packet.as_ref());
+                    payload.extend_from_slice(&ticket.to_bytes());
+
+                    Ok(TransportPacket::Outgoing {
+                        next_hop: next_hop.to_peerid(),
+                        ack_challenge: ack_challenge.clone(),
+                        data: payload.into_boxed_slice(),
+                    })
                 }
             },
             Err(e) => Err(e),
         }
     }
 
-    async fn from_incoming(&self, data: Box<[u8]>, pkt_keypair: &OffchainKeypair, sender: &PeerId) -> Result<TransportPacket> {
+    async fn from_incoming(
+        &self,
+        data: Box<[u8]>,
+        pkt_keypair: &OffchainKeypair,
+        sender: &PeerId,
+    ) -> Result<TransportPacket> {
         let components = ChainPacketComponents::from_incoming(&data, pkt_keypair, sender)?;
 
         match components {
-            ChainPacketComponents::Final { packet_tag, ack_key, previous_hop, plain_text, .. } => {
+            ChainPacketComponents::Final {
+                packet_tag,
+                ack_key,
+                previous_hop,
+                plain_text,
+                ..
+            } => {
                 let ack = Acknowledgement::new(ack_key, pkt_keypair);
 
-                Ok(TransportPacket::Final { packet_tag, previous_hop: previous_hop.to_peerid(), plain_text, ack })
-            },
-            ChainPacketComponents::Forwarded { packet, ticket, ack_challenge, packet_tag, ack_key, previous_hop, own_key, next_hop, next_challenge, path_pos } => {
-                let domain_separator = self
-                    .db
-                    .read()
-                    .await
-                    .get_channels_domain_separator()
-                    .await?
-                    .ok_or_else(|| {
-                        debug!("Missing domain separator");
-                        MissingDomainSeparator
-                    })?;
-        
+                Ok(TransportPacket::Final {
+                    packet_tag,
+                    previous_hop: previous_hop.to_peerid(),
+                    plain_text,
+                    ack,
+                })
+            }
+            ChainPacketComponents::Forwarded {
+                packet,
+                ticket,
+                ack_challenge,
+                packet_tag,
+                ack_key,
+                previous_hop,
+                own_key,
+                next_hop,
+                next_challenge,
+                path_pos,
+            } => {
+                let domain_separator =
+                    self.db
+                        .read()
+                        .await
+                        .get_channels_domain_separator()
+                        .await?
+                        .ok_or_else(|| {
+                            debug!("Missing domain separator");
+                            MissingDomainSeparator
+                        })?;
+
                 let previous_peer = previous_hop.to_peerid();
                 let next_peer = next_hop.to_peerid();
-        
+
                 // START: channel = get_channel_from_to(packet_key, packet_key)
-                let previous_hop_addr = self
-                    .db
-                    .read()
-                    .await
-                    .get_chain_key(&previous_hop)
-                    .await?
-                    .ok_or(PacketDecodingError(format!(
-                        "failed to find channel key for packet key {previous_peer} on previous hop"
-                    )))?;
-        
+                let previous_hop_addr =
+                    self.db
+                        .read()
+                        .await
+                        .get_chain_key(&previous_hop)
+                        .await?
+                        .ok_or(PacketDecodingError(format!(
+                            "failed to find channel key for packet key {previous_peer} on previous hop"
+                        )))?;
+
                 let next_hop_addr = self
                     .db
                     .read()
@@ -230,7 +268,7 @@ where
                     .ok_or(PacketDecodingError(format!(
                         "failed to find channel key for packet key {next_peer} on next hop",
                     )))?;
-        
+
                 // Find the corresponding channel
                 debug!("looking for channel with {previous_hop_addr} ({previous_peer})");
                 let channel = self
@@ -241,7 +279,7 @@ where
                     .await?
                     .ok_or(ChannelNotFound(previous_hop.to_string()))?;
                 // END: channel = get_channel_from_to(packet_key, packet_key)
-        
+
                 // Validate the ticket first
                 let price_per_packet = self
                     .db
@@ -263,9 +301,9 @@ where
                         );
                         *DEFAULT_PRICE_PER_PACKET
                     });
-        
+
                 debug!("price per packet is {price_per_packet}");
-        
+
                 if let Err(e) = validate_unacknowledged_ticket::<Db>(
                     &*self.db.read().await,
                     &ticket,
@@ -282,13 +320,13 @@ where
                     self.db.write().await.mark_rejected(&ticket).await?;
                     return Err(e);
                 }
-        
+
                 {
                     debug!("storing pending acknowledgement for channel {}", channel.get_id());
                     let mut g = self.db.write().await;
                     g.set_current_ticket_index(&channel.get_id().hash(), ticket.index.into())
                         .await?;
-        
+
                     // Store the unacknowledged ticket
                     g.store_pending_acknowledgment(
                         ack_challenge,
@@ -314,7 +352,7 @@ where
                 } else {
                     self.create_multihop_ticket(next_hop_addr, ticket_path_pos).await?
                 };
-        
+
                 // forward packet
                 ticket.challenge = next_challenge.to_ethereum_challenge();
                 ticket.sign(&self.cfg.chain_keypair, &domain_separator);
@@ -324,17 +362,18 @@ where
                 let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
                 payload.extend_from_slice(packet.as_ref());
                 payload.extend_from_slice(&ticket.to_bytes());
-                
 
                 Ok(TransportPacket::Forwarded {
                     packet_tag,
                     previous_hop: previous_peer,
                     next_hop: next_peer,
                     data: payload.into_boxed_slice(),
-                    ack
+                    ack,
                 })
-            },
-            ChainPacketComponents::Outgoing { .. } => { Err(PacketError::LogicError("Cannot receive an outgoing packet".into())) }
+            }
+            ChainPacketComponents::Outgoing { .. } => {
+                Err(PacketError::LogicError("Cannot receive an outgoing packet".into()))
+            }
         }
     }
 }
@@ -635,7 +674,7 @@ impl PacketInteraction {
                             // There is a 0.1% chance that the positive result is not a replay
                             // because a Bloom filter is used
                             if tbf.write().await.check_and_set(tag) {
-                                return (Err(TagReplay), finalizer)
+                                return (Err(TagReplay), finalizer);
                             }
                         }
                     };
@@ -644,56 +683,52 @@ impl PacketInteraction {
                 }
             })
             // process packet operation
-            .then_concurrent(move |(packet, finalizer)| {
-                async move {
-                    match packet {
-                        Err(e) => Err(e),
-                        Ok(packet) => {
-                            match packet {
-                                TransportPacket::Outgoing {
-                                    next_hop,
-                                    ack_challenge,
-                                    data,
-                                } => {
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_PACKETS_COUNT.increment();
+            .then_concurrent(move |(packet, finalizer)| async move {
+                match packet {
+                    Err(e) => Err(e),
+                    Ok(packet) => match packet {
+                        TransportPacket::Outgoing {
+                            next_hop,
+                            ack_challenge,
+                            data,
+                        } => {
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_PACKETS_COUNT.increment();
 
-                                    if let Some(finalizer) = finalizer {
-                                        finalizer.finalize(ack_challenge.clone());
-                                    }
-                                    return Ok(MsgProcessed::Send(next_hop, data));
-                                }
-
-                                TransportPacket::Final {
-                                    previous_hop,
-                                    plain_text,
-                                    ack,
-                                    ..
-                                } => match ApplicationData::from_bytes(plain_text.as_ref()) {
-                                    Ok(app_data) => {
-                                        #[cfg(all(feature = "prometheus", not(test)))]
-                                        METRIC_RECV_MESSAGE_COUNT.increment();
-
-                                        return Ok(MsgProcessed::Receive(previous_hop, app_data, ack));
-                                    }
-                                    Err(e) => return Err(e.into()),
-                                },
-
-                                TransportPacket::Forwarded {
-                                    previous_hop,
-                                    next_hop,
-                                    data,
-                                    ack,
-                                    ..
-                                } => {
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_FWD_MESSAGE_COUNT.increment();
-        
-                                    Ok(MsgProcessed::Forward(next_hop, data, previous_hop, ack))
-                                }
+                            if let Some(finalizer) = finalizer {
+                                finalizer.finalize(ack_challenge.clone());
                             }
+                            return Ok(MsgProcessed::Send(next_hop, data));
                         }
-                    }
+
+                        TransportPacket::Final {
+                            previous_hop,
+                            plain_text,
+                            ack,
+                            ..
+                        } => match ApplicationData::from_bytes(plain_text.as_ref()) {
+                            Ok(app_data) => {
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                METRIC_RECV_MESSAGE_COUNT.increment();
+
+                                return Ok(MsgProcessed::Receive(previous_hop, app_data, ack));
+                            }
+                            Err(e) => return Err(e.into()),
+                        },
+
+                        TransportPacket::Forwarded {
+                            previous_hop,
+                            next_hop,
+                            data,
+                            ack,
+                            ..
+                        } => {
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_FWD_MESSAGE_COUNT.increment();
+
+                            Ok(MsgProcessed::Forward(next_hop, data, previous_hop, ack))
+                        }
+                    },
                 }
             })
             // introduce random timeout to mix packets asynchrounously
