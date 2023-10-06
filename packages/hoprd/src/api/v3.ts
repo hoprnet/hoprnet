@@ -275,8 +275,11 @@ export async function setupRestApi(
     }
   }
 
-  service.use(urlPath, ((err, _req, res, _next) => {
-    res.status(err.status).json(err)
+  service.use(urlPath, ((err, _req, res, next) => {
+    if (res.headersSent) {
+      return next(err)
+    }
+    res.status(500).json(err)
   }) as express.ErrorRequestHandler)
 
   return apiInstance
