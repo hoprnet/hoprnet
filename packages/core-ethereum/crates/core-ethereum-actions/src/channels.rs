@@ -11,7 +11,7 @@ use crate::{
     errors::{
         CoreEthereumActionsError::{
             ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
-            NotEnoughAllowance, PeerAccessDenied
+            NotEnoughAllowance, PeerAccessDenied,
         },
         Result,
     },
@@ -643,11 +643,18 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = close_channel(db.clone(), tx_sender.clone(), *BOB, *ALICE, ChannelDirection::Outgoing, false)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+        let tx_res = close_channel(
+            db.clone(),
+            tx_sender.clone(),
+            *BOB,
+            *ALICE,
+            ChannelDirection::Outgoing,
+            false,
+        )
+        .await
+        .unwrap()
+        .await
+        .unwrap();
 
         match tx_res {
             TransactionResult::ChannelClosureInitiated { tx_hash } => {
@@ -671,11 +678,18 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_res = close_channel(db.clone(), tx_sender.clone(), *BOB, *ALICE, ChannelDirection::Outgoing, false)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+        let tx_res = close_channel(
+            db.clone(),
+            tx_sender.clone(),
+            *BOB,
+            *ALICE,
+            ChannelDirection::Outgoing,
+            false,
+        )
+        .await
+        .unwrap()
+        .await
+        .unwrap();
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {
@@ -726,11 +740,18 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = close_channel(db.clone(), tx_sender.clone(), *BOB, *ALICE, ChannelDirection::Incoming, false)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+        let tx_res = close_channel(
+            db.clone(),
+            tx_sender.clone(),
+            *BOB,
+            *ALICE,
+            ChannelDirection::Incoming,
+            false,
+        )
+        .await
+        .unwrap()
+        .await
+        .unwrap();
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {

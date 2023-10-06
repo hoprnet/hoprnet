@@ -195,9 +195,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 ChannelDirection::Outgoing => match channel.status {
                     Open => {
                         debug!("initiating closure of {channel}");
-                        let res = tx_exec
-                            .initiate_outgoing_channel_closure(channel.source)
-                            .await;
+                        let res = tx_exec.initiate_outgoing_channel_closure(channel.source).await;
                         if let TransactionResult::ChannelClosureInitiated { .. } = res {
                             debug!("deleting pending balance of {channel} after initiating closure");
                             if let Err(e) = db.write().await.reset_pending_balance_to(&channel.destination).await {
@@ -298,6 +296,7 @@ pub mod wasm {
             hopr_token: Address,
         ) -> Self {
             Self {
+                // TODO: migrate announce function
                 _hopr_announcements: hopr_announcements,
                 hopr_channels,
                 hopr_token,
@@ -322,8 +321,11 @@ pub mod wasm {
 
     #[wasm_bindgen(getter_with_clone)]
     struct TransactionPayload {
+        #[allow(unused)]
         pub data: String,
+        #[allow(unused)]
         pub to: String,
+        #[allow(unused)]
         pub value: String,
     }
 
@@ -351,6 +353,7 @@ pub mod wasm {
 
     impl TryFrom<TypedTransaction> for TransactionPayload {
         type Error = CoreEthereumActionsError;
+
         fn try_from(value: TypedTransaction) -> Result<Self, Self::Error> {
             Ok(Self {
                 data: match value.data() {
