@@ -5,7 +5,6 @@ use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
 use core_strategy::Strategy::AutoRedeeming;
 use core_strategy::{Strategy, StrategyConfig};
@@ -221,7 +220,6 @@ pub struct Chain {
     pub announce: bool,
     pub provider: Option<String>,
     pub check_unrealized_balance: bool,
-    pub on_chain_confirmations: u32,
 }
 
 impl Default for Chain {
@@ -230,7 +228,6 @@ impl Default for Chain {
             announce: false,
             provider: None,
             check_unrealized_balance: true,
-            on_chain_confirmations: DEFAULT_CONFIRMATIONS,
         }
     }
 }
@@ -527,9 +524,6 @@ impl HoprdConfig {
             cfg.chain.provider = Some(x)
         };
         cfg.chain.check_unrealized_balance = cli_args.check_unrealized_balance;
-        if let Some(x) = cli_args.on_chain_confirmations {
-            cfg.chain.on_chain_confirmations = x
-        };
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {
@@ -647,7 +641,6 @@ mod tests {
                 announce: false,
                 provider: None,
                 check_unrealized_balance: true,
-                on_chain_confirmations: 0,
             },
             safe_module: SafeModule {
                 safe_transaction_service_provider: None,
@@ -720,7 +713,6 @@ chain:
   announce: false
   provider: null
   check_unrealized_balance: true
-  on_chain_confirmations: 0
 safe_module:
   safe_transaction_service_provider: null
   safe_address: null
