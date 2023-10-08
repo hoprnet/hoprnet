@@ -1,24 +1,112 @@
+use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
 use core_crypto::types::OffchainPublicKey;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::ChannelStatus;
+use core_types::protocol::PeerAddressResolver;
+use futures::future::FutureExt;
+use futures::stream::FuturesOrdered;
+use futures::TryStreamExt;
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use utils_log::warn;
 use utils_types::primitives::Address;
 use utils_types::traits::{PeerIdLike, ToHex};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChannelPath {
+    pub(crate) hops: Vec<Address>,
+}
+
+impl ChannelPath {
+    pub fn new(hops: Vec<Address>, allow_loops: bool, graph: &ChannelGraph) -> Result<Self> {
+        if hops.is_empty() {
+            return Err(PathNotValid);
+        }
+
+        let mut ticket_receiver;
+        let mut ticket_issuer = graph.my_address();
+
+        // Ignore the last hop in the check, because channels are not required for direct messages
+        for hop in hops.iter().take(hops.len() - 1) {
+            ticket_receiver = *hop;
+
+            // Check for loops
+            if ticket_issuer == ticket_receiver {
+                if !allow_loops {
+                    return Err(LoopsNotAllowed(ticket_receiver.to_hex()));
+                }
+                warn!("duplicated adjacent path entries")
+            }
+
+            // Check if the channel is opened
+            let channel = graph
+                .get_channel(ticket_issuer, ticket_receiver)
+                .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
+
+            if channel.status != ChannelStatus::Open {
+                return Err(ChannelNotOpened(ticket_issuer.to_hex(), ticket_receiver.to_hex()));
+            }
+
+            ticket_issuer = ticket_receiver;
+        }
+
+        Ok(Self { hops })
+    }
+
+    pub fn new_valid(hops: Vec<Address>) -> Self {
+        assert!(!hops.is_empty(), "must not be empty");
+        Self { hops }
+    }
+
+    pub async fn to_path<R: PeerAddressResolver>(&self, resolver: &R) -> Result<Path> {
+        let hops = self
+            .hops
+            .iter()
+            .map(|addr| {
+                resolver.resolve_packet_key(addr).map(move |opt| {
+                    opt.map(|k| k.to_peerid())
+                        .ok_or(InvalidPeer(format!("could not resolve off-chain key for {addr}")))
+                })
+            })
+            .collect::<FuturesOrdered<_>>()
+            .try_collect::<Vec<_>>()
+            .await?;
+
+        Ok(Path::new_valid(hops))
+    }
+
+    /// Individual hops in the path.
+    pub fn hops(&self) -> &[Address] {
+        &self.hops
+    }
+
+    pub fn last_hop(&self) -> &Address {
+        self.hops.last().unwrap()
+    }
+}
+
+impl Display for ChannelPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "[ {} ] ({} hops)",
+            self.hops.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("->"),
+            self.hops.len()
+        )
+    }
+}
+
 /// Represents a path for a packet.
 /// The type internally carries an information if the path has been already validated or not (since path validation
 /// is potentially an expensive operation).
 /// Path validation process checks if all the channels on the path exist and are in an `Open` state.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Path {
     hops: Vec<PeerId>,
-    valid: bool,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -27,20 +115,13 @@ impl Path {
     pub fn length(&self) -> u32 {
         self.hops.len() as u32
     }
-
-    /// Determines with the path is valid.
-    pub fn valid(&self) -> bool {
-        !self.hops.is_empty() && self.valid
-    }
 }
 
 impl Path {
     /// Creates an already pre-validated path.
-    pub fn new_valid(validated_path: Vec<PeerId>) -> Self {
-        Self {
-            hops: validated_path,
-            valid: true,
-        }
+    pub fn new_valid(hops: Vec<PeerId>) -> Self {
+        assert!(!hops.is_empty(), "must not be empty");
+        Self { hops }
     }
 
     /// Creates a new path by validating the list of peer ids using the channel database
@@ -89,6 +170,24 @@ impl Path {
         Ok(Self::new_valid(path))
     }
 
+    pub async fn to_channel_path<R: PeerAddressResolver>(&self, resolver: &R) -> Result<ChannelPath> {
+        let hops = self
+            .hops
+            .iter()
+            .map(|peer| async move {
+                let key = OffchainPublicKey::from_peerid(peer)?;
+                resolver
+                    .resolve_chain_key(&key)
+                    .await
+                    .ok_or(InvalidPeer(format!("could not resolve on-chain key for {peer}")))
+            })
+            .collect::<FuturesOrdered<_>>()
+            .try_collect::<Vec<_>>()
+            .await?;
+
+        Ok(ChannelPath::new_valid(hops))
+    }
+
     /// Individual hops in the path.
     pub fn hops(&self) -> &[PeerId] {
         &self.hops
@@ -102,15 +201,11 @@ where
     type Error = PathError;
 
     fn try_from(value: &Path) -> std::result::Result<Self, Self::Error> {
-        if value.valid() {
-            value
-                .hops()
-                .iter()
-                .map(|p| T::from_peerid(p).map_err(|_| InvalidPeer(p.to_string())))
-                .collect()
-        } else {
-            Err(PathNotValid)
-        }
+        value
+            .hops()
+            .iter()
+            .map(|p| T::from_peerid(p).map_err(|_| InvalidPeer(p.to_string())))
+            .collect()
     }
 }
 
@@ -118,8 +213,7 @@ impl Display for Path {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{} ] ({} hops)",
-            if self.valid { "[ " } else { "[ !! " },
+            "[ {} ] ({} hops)",
             self.hops.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("->"),
             self.length()
         )

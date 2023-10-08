@@ -13,12 +13,11 @@ use core_crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 use core_crypto::types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{
-    ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError,
+    ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError,
     PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use core_packet::errors::Result;
 use core_packet::packet::{Packet, PacketState};
-use core_path::errors::PathError::PathNotValid;
 use core_path::path::Path;
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
@@ -465,11 +464,6 @@ pub struct PacketActions {
 impl PacketActions {
     /// Pushes a new packet from this node into processing.
     pub fn send_packet(&mut self, msg: ApplicationData, path: Path) -> Result<PacketSendAwaiter> {
-        // Check if the path is valid
-        if !path.valid() {
-            return Err(PathError(PathNotValid));
-        }
-
         let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
 
         self.process(MsgToProcess::ToSend(msg.to_bytes(), path, PacketSendFinalizer::new(tx)))

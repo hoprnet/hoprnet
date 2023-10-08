@@ -301,8 +301,12 @@ impl Balance {
         let mut val = self.value.to_string();
 
         if val.len() > Self::SCALE {
-            let (l,r) = val.split_at(val.len() - Self::SCALE + 1);
-            format!("{l}.{} {}",&r[..r.len()-(val.len()-Self::SCALE)], self.balance_type)
+            let (l, r) = val.split_at(val.len() - Self::SCALE + 1);
+            format!(
+                "{l}.{} {}",
+                &r[..r.len() - (val.len() - Self::SCALE)],
+                self.balance_type
+            )
         } else if val.len() < Self::SCALE {
             for _ in 0..(Self::SCALE - val.len() - 1) {
                 val = "0".to_owned() + &val;
@@ -854,14 +858,14 @@ mod tests {
     #[test]
     fn balance_test_formatted_string() {
         let mut base = "123".to_string();
-        for _ in 0..Balance::SCALE-3 {
+        for _ in 0..Balance::SCALE - 3 {
             base += "0";
         }
 
         let b1 = Balance::new_from_str(&base, BalanceType::HOPR);
         let b2 = b1.imul(100);
-        let b3 = Balance::new_from_str(&base[..Balance::SCALE-3], BalanceType::HOPR);
-        let b4 = Balance::new_from_str(&base[..Balance::SCALE-1], BalanceType::HOPR);
+        let b3 = Balance::new_from_str(&base[..Balance::SCALE - 3], BalanceType::HOPR);
+        let b4 = Balance::new_from_str(&base[..Balance::SCALE - 1], BalanceType::HOPR);
 
         assert_eq!("1.23000000000000000 HOPR", b1.to_formatted_string());
         assert_eq!("123.000000000000000 HOPR", b2.to_formatted_string());

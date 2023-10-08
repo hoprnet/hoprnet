@@ -12,21 +12,23 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-core-ethereum-db = { workspace = true, default-features = false }
-core-crypto = { workspace = true, default-features = false }
-core-types = { workspace = true, default-features = false }
+futures = { workspace = true }
 hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 petgraph = {version = "0.6.4", features = ["serde-1"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
+
+core-ethereum-db = { workspace = true, default-features = false }
+core-crypto = { workspace = true, default-features = false }
+core-types = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-misc = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 

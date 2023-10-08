@@ -1378,6 +1378,7 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "core-types",
+ "futures",
  "hex",
  "hex-literal",
  "js-sys",
@@ -1482,6 +1483,7 @@ dependencies = [
 name = "core-types"
 version = "0.4.1"
 dependencies = [
+ "async-trait",
  "bincode",
  "bindings",
  "bloomfilter",
