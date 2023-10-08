@@ -3,6 +3,7 @@ use getrandom::getrandom;
 use primitive_types::H160;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
@@ -300,21 +301,25 @@ impl Balance {
     pub fn to_formatted_string(&self) -> String {
         let mut val = self.value.to_string();
 
-        if val.len() > Self::SCALE {
-            let (l, r) = val.split_at(val.len() - Self::SCALE + 1);
-            format!(
-                "{l}.{} {}",
-                &r[..r.len() - (val.len() - Self::SCALE)],
-                self.balance_type
-            )
-        } else if val.len() < Self::SCALE {
-            for _ in 0..(Self::SCALE - val.len() - 1) {
-                val = "0".to_owned() + &val;
+        match val.len().cmp(&Self::SCALE) {
+            Ordering::Greater => {
+                let (l, r) = val.split_at(val.len() - Self::SCALE + 1);
+                format!(
+                    "{l}.{} {}",
+                    &r[..r.len() - (val.len() - Self::SCALE)],
+                    self.balance_type
+                )
             }
-            format!("0.{val} {}", self.balance_type)
-        } else {
-            let (l, r) = val.split_at(1);
-            format!("{l}.{r} {}", self.balance_type)
+            Ordering::Less => {
+                for _ in 0..(Self::SCALE - val.len() - 1) {
+                    val = "0".to_owned() + &val;
+                }
+                format!("0.{val} {}", self.balance_type)
+            }
+            Ordering::Equal => {
+                let (l, r) = val.split_at(1);
+                format!("{l}.{r} {}", self.balance_type)
+            }
         }
     }
 }
@@ -491,7 +496,7 @@ impl U256 {
 
     /// Multiply with float in the interval [0.0, 1.0]
     pub fn multiply_f64(&self, rhs: f64) -> Result<Self> {
-        if rhs < 0.0 || rhs > 1.0 {
+        if !(0.0..=1.0).contains(&rhs) {
             return Err(InvalidInput);
         }
 

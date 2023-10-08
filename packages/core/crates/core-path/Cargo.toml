@@ -1,9 +1,9 @@
 [package]
 name = "core-path"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Contains mixnet path construction and path finding logic"
+description = "Contains mixnet path construction and path selection logic"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"

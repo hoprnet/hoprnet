@@ -15,12 +15,15 @@ use utils_log::warn;
 use utils_types::primitives::Address;
 use utils_types::traits::{PeerIdLike, ToHex};
 
+/// Represents a path in the `ChannelGraph`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelPath {
     pub(crate) hops: Vec<Address>,
 }
 
 impl ChannelPath {
+    /// Creates a new path by validating the list of peer ids using the channel graph.
+    /// The given path does not contain the sender node, which assume to be this node.
     pub fn new(hops: Vec<Address>, allow_loops: bool, graph: &ChannelGraph) -> Result<Self> {
         if hops.is_empty() {
             return Err(PathNotValid);
@@ -100,9 +103,7 @@ impl Display for ChannelPath {
 }
 
 /// Represents a path for a packet.
-/// The type internally carries an information if the path has been already validated or not (since path validation
-/// is potentially an expensive operation).
-/// Path validation process checks if all the channels on the path exist and are in an `Open` state.
+/// The path must be always valid
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path {
@@ -250,7 +251,6 @@ mod tests {
         let path = Path::new_valid(peer_ids.clone());
         assert_eq!(HOPS, path.length());
         assert_eq!(&peer_ids, path.hops());
-        assert!(path.valid());
     }
 
     fn create_dummy_channel(source: Address, destination: Address, status: ChannelStatus) -> ChannelEntry {

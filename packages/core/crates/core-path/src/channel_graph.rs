@@ -1,179 +1,37 @@
 use crate::channel_graph::ChannelChange::{CurrentBalance, Epoch, Status, TicketIndex};
-use crate::errors::PathError::MissingChannel;
-use crate::errors::{PathError, Result};
-use crate::path::ChannelPath;
-use core_crypto::random::random_float;
+use crate::errors::Result;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelEntry, ChannelStatus};
-use core_types::protocol::INTERMEDIATE_HOPS;
 use petgraph::graphmap::DiGraphMap;
-use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::Add;
 use utils_log::{debug, info};
-use utils_types::primitives::{Address, Balance, U256};
-
-pub const DEFAULT_INITIAL_QUALITY: f64 = 0.0_f64;
+use utils_types::primitives::{Address, Balance};
 
 /// Structure that adds additional data to a `ChannelEntry`, which
-/// can be used to compute edge weights.
+/// can be used to compute edge weights and traverse the `ChannelGraph`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct WeightedChannel {
-    channel: ChannelEntry,
-    quality: Option<f64>,
-}
-
-const PATH_RANDOMNESS: f64 = 0.1;
-
-type EdgeWeight = U256;
-
-impl WeightedChannel {
-    /// Calculates edge weight based on the channel information
-    pub fn calculate_weight(&self) -> EdgeWeight {
-        let r = random_float() * PATH_RANDOMNESS;
-        let base = self.channel.balance.value().addn(1);
-        // (stake + 1) * (1 + r)
-        base.add(base.multiply_f64(r).unwrap())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct WeightedChannelPath(Vec<Address>, EdgeWeight);
-
-impl PartialOrd for WeightedChannelPath {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.1.partial_cmp(&other.1)
-    }
-}
-
-impl Ord for WeightedChannelPath {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
-    }
-}
-
-/// Trait for implementing custom path selection algorithm from the channel graph.
-pub trait PathSelector {
-    /// Select path of maximum `max_hops` from `source` to `destination` in the given channel graph.
-    /// Fails if no such path can be found.
-    fn select_path(
-        &self,
-        graph: &DiGraphMap<Address, WeightedChannel>,
-        source: Address,
-        destination: Address,
-        max_hops: usize,
-    ) -> Result<ChannelPath>;
-}
-
-/// Simple path selector using depth-first search of the channel graph.
-#[derive(Clone, Debug)]
-pub struct DFSPathSelector {
-    /// Maximum number of iterations before a path selection fails
-    /// Default is 100
-    pub max_iterations: usize,
-    /// Peer quality threshold for a channel to be taken into account.
-    /// Default is 0.5
-    pub quality_threshold: f64,
-}
-
-impl Default for DFSPathSelector {
-    fn default() -> Self {
-        Self {
-            max_iterations: 100,
-            quality_threshold: 0.5_f64,
-        }
-    }
-}
-
-impl DFSPathSelector {
-    fn filter_channel(
-        &self,
-        channel: &WeightedChannel,
-        destination: &Address,
-        current: &Vec<Address>,
-        dead_ends: &HashSet<Address>,
-    ) -> bool {
-        !destination.eq(&channel.channel.destination) &&               // last hop does not need channel
-        channel.quality.unwrap_or(0_f64) > self.quality_threshold &&  // quality threshold
-        !current.contains(&channel.channel.destination) &&     // must not be in the path already (no loops allowed)
-        !dead_ends.contains(&channel.channel.destination) // must not be in the dead end list
-    }
-}
-
-impl PathSelector for DFSPathSelector {
-    fn select_path(
-        &self,
-        graph: &DiGraphMap<Address, WeightedChannel>,
-        source: Address,
-        destination: Address,
-        max_hops: usize,
-    ) -> Result<ChannelPath> {
-        let mut queue = BinaryHeap::new();
-        let mut dead_ends = HashSet::new();
-
-        graph
-            .edges_directed(source, Direction::Outgoing)
-            .filter_map(|channel| {
-                let w = channel.weight();
-                self.filter_channel(w, &destination, &vec![], &dead_ends)
-                    .then(|| WeightedChannelPath(vec![w.channel.destination], w.calculate_weight()))
-            })
-            .for_each(|wcp| queue.push(wcp));
-
-        let mut iters = 0;
-        while !queue.is_empty() && iters < self.max_iterations {
-            let current_path = queue.peek().unwrap();
-            let current_path_len = current_path.0.len();
-
-            if current_path_len >= max_hops && current_path_len <= INTERMEDIATE_HOPS {
-                return Ok(ChannelPath::new_valid(queue.pop().unwrap().0));
-            }
-
-            let last_peer = *current_path.0.last().unwrap();
-            let new_channels = graph
-                .edges_directed(last_peer, Direction::Outgoing)
-                .filter(|channel| self.filter_channel(channel.weight(), &destination, &current_path.0, &dead_ends))
-                .collect::<Vec<_>>();
-
-            if !new_channels.is_empty() {
-                let current_path_clone = current_path.clone();
-                for new_channel in new_channels {
-                    let mut next_path_variant = current_path_clone.clone();
-                    next_path_variant.0.push(new_channel.weight().channel.destination);
-                    next_path_variant.1 += new_channel.weight().calculate_weight();
-                    queue.push(next_path_variant);
-                }
-            } else {
-                queue.pop();
-                dead_ends.insert(last_peer);
-            }
-
-            iters += 1;
-        }
-
-        Err(PathError::PathNotFound(
-            max_hops,
-            source.to_string(),
-            destination.to_string(),
-        ))
-    }
+pub struct ChannelEdge {
+    /// Underlying channel
+    pub channel: ChannelEntry,
+    /// Network quality of this channel at the transport level (if any).
+    /// This value is currently present only for *own channels*.
+    pub quality: Option<f64>,
 }
 
 /// Implements a HOPR payment channel graph cached in-memory.
 /// This structure is useful for tracking channel state changes and
 /// packet path finding.
 /// The structure is updated only from the Indexer and therefore contains only
-/// the channels that were *seen* on-chain.
-/// Using this structure is generally faster than querying the DB and therefore
+/// the channels that were *seen* on-chain. The network qualities are also
+/// added to the graph on the fly.
+/// Using this structure is much faster than querying the DB and therefore
 /// is preferred for per-packet path-finding computations.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
-    graph: DiGraphMap<Address, WeightedChannel>,
-    path_selector: Box<dyn PathSelector>,
+    graph: DiGraphMap<Address, ChannelEdge>,
 }
 
 /// Enumerates possible changes on a channel entry update
@@ -219,11 +77,10 @@ impl ChannelGraph {
     pub const INTERMEDIATE_HOPS: usize = 3;
 
     /// Creates a new instance with the given self `Address`.
-    pub fn new(me: Address, path_selector: Box<dyn PathSelector>) -> Self {
+    pub fn new(me: Address) -> Self {
         Self {
             me,
             graph: DiGraphMap::default(),
-            path_selector,
         }
     }
 
@@ -241,6 +98,11 @@ impl ChannelGraph {
     /// Returns `None` if no such edge exists in the graph.
     pub fn get_channel(&self, src: Address, dst: Address) -> Option<&ChannelEntry> {
         self.graph.edge_weight(src, dst).map(|w| &w.channel)
+    }
+
+    /// Gets all channels going from (outgoing) the given `Address`
+    pub fn channels_from(&self, src: Address) -> impl Iterator<Item = (Address, Address, &ChannelEdge)> {
+        self.graph.edges_directed(src, Direction::Outgoing)
     }
 
     /// Inserts or updates the given channel in the channel graph.
@@ -290,7 +152,7 @@ impl ChannelGraph {
 
             Some(ret)
         } else {
-            let weighted = WeightedChannel { channel, quality: None };
+            let weighted = ChannelEdge { channel, quality: None };
 
             self.graph.add_edge(channel.source, channel.destination, weighted);
             info!("new {channel}");
@@ -299,8 +161,9 @@ impl ChannelGraph {
         }
     }
 
-    pub fn update_channel_quality(&mut self, src: Address, dst: Address, quality: f64) {
-        if let Some(channel) = self.graph.edge_weight_mut(src, dst) {
+    /// Updates the quality value of network connection between `source` and `destination`
+    pub fn update_channel_quality(&mut self, source: Address, destination: Address, quality: f64) {
+        if let Some(channel) = self.graph.edge_weight_mut(source, destination) {
             channel.quality = Some(quality);
         }
     }
@@ -317,34 +180,5 @@ impl ChannelGraph {
     /// Checks whether the given channel is in the graph already.
     pub fn contains_channel(&self, channel: &ChannelEntry) -> bool {
         self.graph.contains_edge(channel.source, channel.destination)
-    }
-
-    /// Calculates the total weight of the given outgoing channel path
-    pub fn path_weight(&self, path: ChannelPath) -> Result<EdgeWeight> {
-        let mut initial_addr = self.me;
-        let mut weight = EdgeWeight::zero();
-
-        for hop in path.hops() {
-            let w = self
-                .graph
-                .edge_weight(initial_addr, *hop)
-                .ok_or(MissingChannel(initial_addr.to_string(), hop.to_string()))?;
-            weight = weight.add(w.calculate_weight());
-            initial_addr = *hop;
-        }
-
-        Ok(weight)
-    }
-
-    /// Constructs a new valid packet `Path` from self and the given destination.
-    /// This method uses `INTERMEDIATE_HOPS` as the maximum number of hops.
-    pub fn find_auto_path(&self, destination: Address) -> Result<ChannelPath> {
-        self.find_path(self.me, destination, INTERMEDIATE_HOPS)
-    }
-
-    /// Constructs a new valid packet `Path` from the given source and destination.
-    pub fn find_path(&self, source: Address, destination: Address, max_hops: usize) -> Result<ChannelPath> {
-        self.path_selector
-            .select_path(&self.graph, source, destination, max_hops)
     }
 }

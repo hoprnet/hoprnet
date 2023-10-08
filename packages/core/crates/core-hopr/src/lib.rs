@@ -108,7 +108,7 @@ pub mod wasm_impls {
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_network::network::NetworkConfig;
-    use core_path::channel_graph::{ChannelChange, ChannelGraph, DFSPathSelector};
+    use core_path::channel_graph::{ChannelChange, ChannelGraph};
     use core_path::path::Path;
     use core_strategy::strategy::MultiStrategyConfig;
     use core_types::protocol::ApplicationData;
@@ -242,10 +242,7 @@ pub mod wasm_impls {
             adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
         )));
 
-        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(
-            me_onchain.public().to_address(),
-            Box::new(DFSPathSelector::default()),
-        )));
+        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
         let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
