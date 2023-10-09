@@ -401,8 +401,9 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-@pytest.mark.skip(reason="Failing due to a bug in the application")
+@pytest.mark.parametrize(
+    "src,dest", [(random.choice(default_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+)
 async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_request(src, dest, swarm7):
     message_count = 2
 
@@ -415,25 +416,26 @@ async def test_hoprd_should_aggregate_and_redeem_tickets_in_channel_on_api_reque
         packets.sort()
         await asyncio.wait_for(check_received_packets(swarm7[src], packets, sort=True), 30.0)
 
-        statistics = await swarm7[dest]["api"].get_tickets_statistics()
-        assert int(statistics.unredeemed) == message_count
+        await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
-        async def channel_aggregate_and_redeem_tickets(api, channel):
+        assert len(await swarm7[dest]["api"].channel_get_tickets(channel)) == 2
+
+        async def channel_aggregate_tickets(api, target_channel):
             while True:
-                if await api.channels_aggregate_tickets(channel):
+                if await api.channels_aggregate_tickets(target_channel):
                     break
                 else:
                     await asyncio.sleep(0.5)
 
-        await asyncio.wait_for(channel_aggregate_and_redeem_tickets(swarm7[dest]["api"], channel), 20.0)
+        await asyncio.wait_for(channel_aggregate_tickets(swarm7[dest]["api"], channel), 20.0)
+
+        assert len(await swarm7[dest]["api"].channel_get_tickets(channel)) == 1
+
+        assert await swarm7[dest]["api"].channel_redeem_tickets(channel)
 
         await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 120.0)
 
-        assert await swarm7[dest]["api"].channel_get_tickets(channel) == []
-
-        statistics = await swarm7[dest]["api"].get_tickets_statistics()
-        assert int(statistics.redeemed_value) == message_count * TICKET_PRICE_PER_HOP
-        assert int(statistics.redeemed) == 1
+        assert len(await swarm7[dest]["api"].channel_get_tickets(channel)) == 0
 
 
 @pytest.mark.asyncio
