@@ -106,7 +106,7 @@ async def check_all_tickets_redeemed(src):
 
 
 async def check_unredeemed_tickets_value(src, value):
-    while int((await src["api"].get_tickets_statistics()).unredeemed_value) >= value:
+    while int((await src["api"].get_tickets_statistics()).unredeemed_value) < value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
