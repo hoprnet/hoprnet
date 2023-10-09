@@ -209,12 +209,16 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
 
             // Trigger aggregation if unrealized balance greater or equal to X percent of the current balance
             // and there are at least two tickets
-            if unredeemed_value.gte(&diminished_balance) && aggregatable_tickets > 1 {
-                info!("{self} strategy: {channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets",);
-                can_aggregate = true;
+            if unredeemed_value.gte(&diminished_balance) {
+                if aggregatable_tickets > 1 {
+                    info!("{self} strategy: {channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
+                    can_aggregate = true;
+                } else {
+                    debug!("{self} strategy: {channel} has unrealized balance {unredeemed_value} >= {diminished_balance} but in just {aggregatable_tickets} tickets, not aggregating yet");
+                }
             } else {
                 debug!(
-                    "{self} strategy: {channel} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet",
+                    "{self} strategy: {channel} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet"
                 );
             }
         }
@@ -263,10 +267,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
                 }
             }
 
-            if aggregatable_tickets > 0 {
+            if aggregatable_tickets > 1 {
                 self.start_aggregation(*channel, true).await
             } else {
-                debug!("{self} strategy: closing {channel} has no tickets to aggregate");
+                debug!("{self} strategy: closing {channel} does not have more than 1 tickets to aggregate");
                 Ok(())
             }
         } else {

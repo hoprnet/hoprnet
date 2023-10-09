@@ -15,7 +15,6 @@ from conftest import (
     TICKET_PRICE_PER_HOP,
 )
 
-
 PARAMETERIZED_SAMPLE_SIZE = 1  # if os.getenv("CI", default="false") == "false" else 3
 AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
 MULTIHOP_MESSAGE_SEND_TIMEOUT = 30.0
@@ -103,6 +102,11 @@ async def check_received_packets(receiver, expected_packets, sort=True):
 
 async def check_all_tickets_redeemed(src):
     while (await src["api"].get_tickets_statistics()).unredeemed > 0:
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
+async def check_unredeemed_tickets_value(src, value):
+    while (await src["api"].get_tickets_statistics()).unredeemed_value >= value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
@@ -366,8 +370,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
         # this message has no funding in the channel, so it should fail
         assert await swarm7[src]["api"].send_message(swarm7[src]["peer_id"], packet, [swarm7[dest]["peer_id"]]) is False
 
-        statistics = await swarm7[dest]["api"].get_tickets_statistics()
-        assert int(statistics.unredeemed) == message_count
+        await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
         assert await swarm7[dest]["api"].tickets_redeem()
 
@@ -375,11 +378,12 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(default_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+@pytest.mark.parametrize("src,dest",
+                         [(random.choice(default_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)])
 async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_self_scenario(src, dest, swarm7):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
 
-    async with create_channel(swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP):
+    async with create_channel(swarm7[src], swarm7[dest], funding=(message_count + 10) * TICKET_PRICE_PER_HOP):
         packets = [f"1 hop message to self: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
 
         for packet in packets:
@@ -388,8 +392,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
         packets.sort()
         await asyncio.wait_for(check_received_packets(swarm7[src], packets, sort=True), 30.0)
 
-        statistics = await swarm7[dest]["api"].get_tickets_statistics()
-        assert (statistics.redeemed + statistics.unredeemed) > 0
+        await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
         assert await swarm7[dest]["api"].tickets_redeem()
 
