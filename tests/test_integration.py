@@ -372,6 +372,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
+        await asyncio.sleep(10)  # wait for aggregation to finish
         assert await swarm7[dest]["api"].tickets_redeem()
 
         await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 120.0)
@@ -466,9 +467,9 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_general_n_ho
             check_received_packets(swarm7[route[-1]], packets, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT
         )
 
-        statistics = await swarm7[route[1]]["api"].get_tickets_statistics()
-        assert (statistics.redeemed + statistics.unredeemed) > 0
+        await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[route[1]], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
+        await asyncio.sleep(10)  # wait for aggregation to finish before redeeming
         assert await swarm7[route[1]]["api"].tickets_redeem()
 
         await asyncio.wait_for(check_all_tickets_redeemed(swarm7[route[1]]), 120.0)
@@ -501,8 +502,7 @@ async def test_hoprd_should_be_able_to_close_open_channels_with_unredeemed_ticke
             check_received_packets(swarm7[route[-1]], packets, sort=True), MULTIHOP_MESSAGE_SEND_TIMEOUT
         )
 
-        statistics = await swarm7[route[1]]["api"].get_tickets_statistics()
-        assert statistics.unredeemed > 0
+        await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[route[1]], ticket_count * TICKET_PRICE_PER_HOP), 30.0)
 
         # NOTE: will be closed on context manager exit
 
