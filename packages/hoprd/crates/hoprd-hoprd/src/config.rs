@@ -358,34 +358,130 @@ pub struct Protocol {
     pub ticket_aggregation: core_protocol::ticket_aggregation::config::TicketAggregationProtocolConfig,
 }
 
+/// The main configuration object of the entire node.
+/// 
+/// The configuration is composed of individual configuration of corresponding 
+/// component configuration objects.
+/// 
+/// An always up-to-date config YAML example can be found in [`EXAMPLE_YAML`].
+/// 
+/// The default configuration as it would appear from the configuration YAML file.
+/// ```yaml
+/// ---
+/// 
+/// host:
+///   address: !IPv4 127.0.0.1
+///   port: 47462
+/// identity:
+///   file: identity
+///   password: ''
+///   private_key: ''
+/// db:
+///   data: /tmp/db
+///   initialize: false
+///   force_initialize: false
+/// inbox:
+///   capacity: 512
+///   max_age: 900
+///   excluded_tags:
+///   - 0
+/// api:
+///   enable: true
+///   auth: !Token sdjkghsfg
+/// host:
+///   address: !IPv4 127.0.0.1
+///   port: 1233
+/// strategy:
+///   on_fail_continue: true
+///   allow_recursive: true
+///   strategies: []
+/// heartbeat:
+///   variance: 0
+///   interval: 0
+///   threshold: 0
+/// network_options:
+///   min_delay: 1
+///   max_delay: 300
+///   quality_bad_threshold: 0.2
+///   quality_offline_threshold: 0.0
+///   quality_step: 0.1
+///   ignore_timeframe: 600
+///   backoff_exponent: 1.5
+///   backoff_min: 2.0
+///   backoff_max: 300.0
+/// healthcheck:
+///   enable: false
+///   host: 127.0.0.1
+///   port: 0
+/// protocol:
+///   ack:
+///     timeout: 15
+///   heartbeat:
+///     timeout: 15
+///   msg:
+///     timeout: 15
+///   ticket_aggregation:
+///     timeout: 15
+/// network: testing
+/// chain:
+///   announce: false
+///   provider: null
+///   check_unrealized_balance: true
+/// safe_module:
+///   safe_transaction_service_provider: null
+///   safe_address: null
+///   module_address: null
+/// test:
+///   announce_local_addresses: false
+///   prefer_local_addresses: false
+///   use_weak_crypto: false
+/// ```
+/// 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
+    /// Configuration related to host specifics
     #[validate]
     pub host: Host,
+    /// Configuration regarding the identity of the node
     #[validate]
     pub identity: Identity,
+    /// Configuration of the underlying database engine
     #[validate]
     pub db: Db,
+    /// Configuration of the message inbox
     #[validate]
     inbox: MessageInboxConfiguration,
+    /// Configuration relevant for the API of the node
     #[validate]
     pub api: Api,
+    /// Configuration of underlying node behavior in the form strategies
+    /// 
+    /// Strategies represent automatically executable behavior performed by 
+    /// the node given pre-configured triggers.
     #[validate]
     pub strategy: StrategyConfig,
+    /// Configuration of the protocol heartbeat mechanism
     #[validate]
     pub heartbeat: HeartbeatConfig,
+    /// Configuration of network properties
     #[validate]
     pub network_options: NetworkConfig,
+    /// Configuration of the health check mechanism
     #[validate]
     pub healthcheck: HealthCheck,
+    /// Configuration specific to protocol execution on the p2p layer
     #[validate]
     pub protocol: Protocol,
+    /// Network name
     pub network: String,
+    /// Blockchain specific configuration
     #[validate]
     pub chain: Chain,
+    /// Configuration of the `Safe` mechanism
     #[validate]
     pub safe_module: SafeModule,
+    /// Configuration for enabling test specific behavior
     #[validate]
     pub test: Testing,
 }
@@ -420,6 +516,7 @@ use real_base::file::native::read_to_string;
 #[cfg(all(feature = "wasm", not(test)))]
 use real_base::file::wasm::read_to_string;
 use utils_log::debug;
+
 
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
@@ -587,6 +684,75 @@ pub mod wasm {
     }
 }
 
+/// Used in the testing and documentation
+pub const EXAMPLE_YAML: &'static str = r#"host:
+  address: !IPv4 127.0.0.1
+  port: 47462
+identity:
+  file: identity
+  password: ''
+  private_key: ''
+db:
+  data: /tmp/db
+  initialize: false
+  force_initialize: false
+inbox:
+  capacity: 512
+  max_age: 900
+  excluded_tags:
+  - 0
+api:
+  enable: false
+  auth: None
+  host:
+    address: !IPv4 127.0.0.1
+    port: 1233
+strategy:
+  on_fail_continue: true
+  allow_recursive: true
+  strategies: []
+heartbeat:
+  variance: 0
+  interval: 0
+  threshold: 0
+network_options:
+  min_delay: 1
+  max_delay: 300
+  quality_bad_threshold: 0.2
+  quality_offline_threshold: 0.0
+  quality_step: 0.1
+  ignore_timeframe: 600
+  backoff_exponent: 1.5
+  backoff_min: 2.0
+  backoff_max: 300.0
+healthcheck:
+  enable: false
+  host: 127.0.0.1
+  port: 0
+protocol:
+  ack:
+    timeout: 15
+  heartbeat:
+    timeout: 15
+  msg:
+    timeout: 15
+  ticket_aggregation:
+    timeout: 15
+network: testing
+chain:
+  announce: false
+  provider: null
+  check_unrealized_balance: true
+safe_module:
+  safe_transaction_service_provider: null
+  safe_address: null
+  module_address: null
+test:
+  announce_local_addresses: false
+  prefer_local_addresses: false
+  use_weak_crypto: false
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -654,74 +820,6 @@ mod tests {
             },
         }
     }
-
-    const EXAMPLE_YAML: &'static str = r#"host:
-  address: !IPv4 127.0.0.1
-  port: 47462
-identity:
-  file: identity
-  password: ''
-  private_key: ''
-db:
-  data: /tmp/db
-  initialize: false
-  force_initialize: false
-inbox:
-  capacity: 512
-  max_age: 900
-  excluded_tags:
-  - 0
-api:
-  enable: false
-  auth: None
-  host:
-    address: !IPv4 127.0.0.1
-    port: 1233
-strategy:
-  on_fail_continue: true
-  allow_recursive: true
-  strategies: []
-heartbeat:
-  variance: 0
-  interval: 0
-  threshold: 0
-network_options:
-  min_delay: 1
-  max_delay: 300
-  quality_bad_threshold: 0.2
-  quality_offline_threshold: 0.0
-  quality_step: 0.1
-  ignore_timeframe: 600
-  backoff_exponent: 1.5
-  backoff_min: 2.0
-  backoff_max: 300.0
-healthcheck:
-  enable: false
-  host: 127.0.0.1
-  port: 0
-protocol:
-  ack:
-    timeout: 15
-  heartbeat:
-    timeout: 15
-  msg:
-    timeout: 15
-  ticket_aggregation:
-    timeout: 15
-network: testing
-chain:
-  announce: false
-  provider: null
-  check_unrealized_balance: true
-safe_module:
-  safe_transaction_service_provider: null
-  safe_address: null
-  module_address: null
-test:
-  announce_local_addresses: false
-  prefer_local_addresses: false
-  use_weak_crypto: false
-"#;
 
     #[test]
     fn test_config_should_be_serializable_into_string() -> Result<(), Box<dyn std::error::Error>> {
