@@ -84,11 +84,11 @@ async def check_outgoing_channel_closed(src, channel_id: str):
             await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_received_packets(receiver, expected_packets, sort=True):
+async def check_received_packets(receiver, expected_packets, tag=None, sort=True):
     received = []
 
     while len(received) != len(expected_packets):
-        packet = await receiver["api"].messages_pop()
+        packet = await receiver["api"].messages_pop(tag)
         if packet is not None:
             received.append(packet.body)
         else:
@@ -100,14 +100,18 @@ async def check_received_packets(receiver, expected_packets, sort=True):
     assert received == expected_packets
 
 
-async def check_all_tickets_redeemed(src):
-    while int((await src["api"].get_tickets_statistics()).unredeemed) > 0:
-        await asyncio.sleep(CHECK_RETRY_INTERVAL)
-
-
 async def check_unredeemed_tickets_value(src, value):
     while balance_str_to_int((await src["api"].get_tickets_statistics()).unredeemed_value) < value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
+async def check_all_tickets_redeemed(src, channel_id=None):
+    if channel_id is not None:
+        while len(await src["api"].channel_get_tickets(channel_id)) > 0:
+            await asyncio.sleep(CHECK_RETRY_INTERVAL)
+    else:
+        while (await src["api"].get_tickets_statistics()).unredeemed > 0:
+            await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
 def random_distinct_pairs_from(values: list, count: int):
@@ -390,22 +394,46 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
     "src,dest", [(random.choice(default_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_self_scenario(src, dest, swarm7):
-    message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
+    # send 90% of messages before ticket aggregation would kick in
+    message_count = int(TICKET_AGGREGATION_THRESHOLD / 10 * 9)
 
-    async with create_channel(swarm7[src], swarm7[dest], funding=(message_count + 10) * TICKET_PRICE_PER_HOP):
-        packets = [f"1 hop message to self: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
+    async with create_channel(swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP) as channel_id:
+        packets = [
+            f"1 hop message to self: {src} - {dest} - {src} #{i:08d} of #{message_count:08d}"
+            for i in range(message_count)
+        ]
+
+        # ensure ticket stats are what we expect before starting
+        statistics_before = await swarm7[dest]["api"].get_tickets_statistics()
+        tickets_before = await swarm7[dest]["api"].channel_get_tickets(channel_id)
+        assert len(tickets_before) == 0
+        assert statistics_before.redeemed == 0
 
         for packet in packets:
-            assert await swarm7[src]["api"].send_message(swarm7[src]["peer_id"], packet, [swarm7[dest]["peer_id"]])
+            assert await swarm7[src]["api"].send_message(
+                swarm7[src]["peer_id"], packet, [swarm7[dest]["peer_id"]], 1234
+            )
 
         packets.sort()
-        await asyncio.wait_for(check_received_packets(swarm7[src], packets, sort=True), 30.0)
+        await asyncio.wait_for(check_received_packets(swarm7[src], packets, 1234, sort=True), 60.0)
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
-        assert await swarm7[dest]["api"].tickets_redeem()
+        # ensure ticket stats are updated after messages are sent
+        statistics_after = await swarm7[dest]["api"].get_tickets_statistics()
+        tickets_after = await swarm7[dest]["api"].channel_get_tickets(channel_id)
+        assert statistics_after.redeemed == statistics_before.redeemed
+        assert (statistics_after.unredeemed - statistics_before.unredeemed) == len(packets)
+        assert len(tickets_after) == len(packets)
 
-        await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 120.0)
+        assert await swarm7[dest]["api"].channel_redeem_tickets(channel_id)
+
+        await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest], channel_id), 120.0)
+
+        # ensure ticket stats are updated after redemption
+        statistics_after_redemption = await swarm7[dest]["api"].get_tickets_statistics()
+        assert (statistics_after_redemption.redeemed - statistics_after.redeemed) == len(packets)
+        assert statistics_after_redemption.unredeemed == 0
 
 
 @pytest.mark.asyncio
