@@ -125,7 +125,9 @@ async def test_hoprd_swarm_connectivity(swarm7):
 
     await asyncio.gather(
         *[
-            asyncio.wait_for(check_all_connected(swarm7[k], [swarm7[v]["peer_id"] for v in default_nodes() if v != k]), 30.0)
+            asyncio.wait_for(
+                check_all_connected(swarm7[k], [swarm7[v]["peer_id"] for v in default_nodes() if v != k]), 30.0
+            )
             for k in default_nodes()
         ]
     )
@@ -250,8 +252,8 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest",
-    [(passive_node(), random.choice(default_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+@pytest.mark.parametrize(
+    "src,dest", [(passive_node(), random.choice(default_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(src, dest, swarm7):
     hopr_amount = OPEN_CHANNEL_FUNDING_VALUE
@@ -269,8 +271,8 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest",
-    [(random.choice(default_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+@pytest.mark.parametrize(
+    "src,dest", [(random.choice(default_nodes()), passive_node()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(src, dest, swarm7):
     message_count = 2
@@ -302,8 +304,8 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest",
-    [(passive_node(), random.choice(default_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+@pytest.mark.parametrize(
+    "src,dest", [(passive_node(), random.choice(default_nodes())) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
 )
 async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_funding(src, dest, swarm7):
     """

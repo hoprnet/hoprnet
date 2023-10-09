@@ -140,10 +140,10 @@ def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
     log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}-setup.log"
-    
+
     for f in ["node_5.cfg.yaml"]:
         shutil.copyfile(f"./tests/{f}", f"{FIXTURE_FILES_DIR}/{FIXTURE_FILES_PREFIX}-{f}")
-    
+
     try:
         logging.debug("Creating a 7 node cluster from bash")
         res = subprocess.run(

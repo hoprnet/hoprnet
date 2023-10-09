@@ -1,24 +1,23 @@
 ---
-
 host:
   address: !IPv4 127.0.0.1
   port: 19091
 identity:
-  file: "/tmp/local_5.id"
-  password: ""
+  file: '/tmp/local_5.id'
+  password: ''
   private_key:
 db:
-  data: "/tmp/local_5"
+  data: '/tmp/local_5'
   initialize: true
   force_initialize: false
 inbox:
   capacity: 512
   max_age: 900
   excluded_tags:
-  - 0
+    - 0
 api:
   enable: true
-  auth: !Token "^^LOCAL-testing-123^^"
+  auth: !Token '^^LOCAL-testing-123^^'
   host:
     address: !IPv4 127.0.0.1
     port: 13301
