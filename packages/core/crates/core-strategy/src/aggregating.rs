@@ -268,6 +268,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
             }
 
             if aggregatable_tickets > 1 {
+                debug!("{self} strategy: {channel} has {aggregatable_tickets} aggregatable tickets");
                 self.start_aggregation(*channel, true).await
             } else {
                 debug!("{self} strategy: closing {channel} does not have more than 1 tickets to aggregate");
