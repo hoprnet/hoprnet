@@ -1,7 +1,6 @@
 use core_crypto::{
     derivation::{derive_ack_key_share, PacketTag},
     keypairs::{ChainKeypair, OffchainKeypair},
-    routing::header_length,
     shared_keys::SphinxSuite,
     types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey},
 };
