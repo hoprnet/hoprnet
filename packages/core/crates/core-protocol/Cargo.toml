@@ -19,6 +19,7 @@ prometheus = ["dep:utils-metrics"]
 
 [dependencies]
 # a better separation of tcp + async-std for non wasm case could be designed
+async-trait = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
@@ -60,6 +61,7 @@ utils-misc = { optional = true, workspace = true }
 env_logger = "0.10.0"
 hex-literal = "0.4.1"
 more-asserts = "0.3.1"
+parameterized = "1.0"
 serial_test = "2.0"
 wasm-bindgen-test = "0.3.36"
 
