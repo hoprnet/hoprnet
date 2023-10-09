@@ -80,7 +80,7 @@ impl Display for KeyBinding {
 }
 
 /// Structure containing data used for on-chain announcement.
-/// That is the decapsulated multiaddress (with the /p2p/<peer id> suffix removed) and
+/// That is the decapsulated multiaddress (with the /p2p/{peer_id} suffix removed) and
 /// optional `KeyBinding` (announcement can be done with key bindings or without)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]

@@ -294,7 +294,7 @@ impl HoprKeys {
 
     /// Reads a keystore file using custom FS operations
     ///
-    /// Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
+    /// Highly inspired by `<https://github.com/roynalnaruto/eth-keystore-rs>`
     pub fn read_eth_keystore(path: &str, password: &str) -> Result<(Self, bool)> {
         let json_string = read_to_string(path)?;
         let keystore: EthKeystore = from_json_string(&json_string)?;
@@ -385,7 +385,7 @@ impl HoprKeys {
 
     /// Writes a keystore file using custom FS operation and custom entropy source
     ///
-    /// Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
+    /// Highly inspired by `<https://github.com/roynalnaruto/eth-keystore-rs>`
     pub fn write_eth_keystore(&self, path: &str, password: &str, use_weak_crypto: bool) -> Result<()> {
         // Generate a random salt.
         let salt: [u8; HOPR_KEY_SIZE] = random_bytes();
