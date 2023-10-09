@@ -177,7 +177,7 @@ pub enum ForwardedHeader {
         /// Transformed header
         header: Box<[u8]>,
         /// Authentication tag
-        mac: Box<[u8]>,
+        mac: [u8; SimpleMac::SIZE],
         /// Position of the relay in the path
         path_pos: u8,
         /// Public key of the next node
@@ -237,9 +237,15 @@ pub fn forward_header<S: SphinxSuite>(
 
         // Try to deserialize the public key to validate it
         let next_node: Box<[u8]> = (&header[0..pub_key_size]).into();
-        let path_pos: u8 = header[pub_key_size]; // Path position is the secret key index
-        let mac: Box<[u8]> =
-            (&header[pub_key_size + PATH_POSITION_LEN..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE]).into();
+
+        // Path position is the secret key index
+        let path_pos: u8 = header[pub_key_size];
+
+        // Authentication tag
+        let mac: [u8; SimpleMac::SIZE] = (&header
+            [pub_key_size + PATH_POSITION_LEN..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE])
+            .try_into()
+            .unwrap();
 
         let additional_info: Box<[u8]> = (&header[pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE
             ..pub_key_size + PATH_POSITION_LEN + SimpleMac::SIZE + additional_data_relayer_len])
