@@ -9,9 +9,10 @@ use async_trait::async_trait;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
+use core_path::channel_graph::ChannelChange;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::channels::{ChannelEntry, Ticket};
+use core_types::channels::{ChannelDirection, ChannelEntry, Ticket};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -27,13 +28,18 @@ pub trait SingularStrategy: Display {
         Ok(())
     }
 
-    /// Strategy event raised when a new acknowledged ticket is received in a channel
-    async fn on_acknowledged_ticket(&self, _ack: &AcknowledgedTicket) -> Result<()> {
+    /// Strategy event raised when a new **winning** acknowledged ticket is received in a channel
+    async fn on_acknowledged_winning_ticket(&self, _ack: &AcknowledgedTicket) -> Result<()> {
         Ok(())
     }
 
-    /// Strategy event raised whenever the Indexer registers a change in the channel status
-    async fn on_channel_state_changed(&self, _channel: &ChannelEntry) -> Result<()> {
+    /// Strategy event raised whenever the Indexer registers a change on node's own channel
+    async fn on_own_channel_changed(
+        &self,
+        _channel: &ChannelEntry,
+        _direction: ChannelDirection,
+        _change: ChannelChange,
+    ) -> Result<()> {
         Ok(())
     }
 }
@@ -42,7 +48,7 @@ pub trait SingularStrategy: Display {
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-#[derive(Clone, PartialEq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
 pub struct MultiStrategyConfig {
     /// Determines if the strategy should continue executing the next strategy if the current one failed.
     /// If set to `true`, the strategy behaves like a logical AND chain of `SingularStrategies`
@@ -60,19 +66,17 @@ pub struct MultiStrategyConfig {
 }
 
 impl MultiStrategyConfig {
+    pub fn new(on_fail_continue: bool, allow_recursive: bool, strategies: Vec<Strategy>) -> Self {
+        // This constructor can be removed once `strategies` field is made `pub`
+        Self {
+            on_fail_continue,
+            allow_recursive,
+            strategies,
+        }
+    }
+
     pub fn get_strategies(&mut self) -> &mut Vec<Strategy> {
         &mut self.strategies
-    }
-}
-
-impl Debug for MultiStrategyConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_list()
-            .entries(self.strategies.iter().filter(|f| match f {
-                Strategy::Multi(_) => false, // avoid infinite recursion when debugging
-                _ => true,
-            }))
-            .finish()
     }
 }
 
@@ -163,17 +167,15 @@ impl MultiStrategy {
     }
 }
 
+impl Debug for MultiStrategy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", Strategy::Multi(self.cfg.clone()))
+    }
+}
+
 impl Display for MultiStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "multi_strategy[{}]",
-            self.strategies
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>()
-                .join(",")
-        )
+        write!(f, "{}", Strategy::Multi(self.cfg.clone()))
     }
 }
 
@@ -182,8 +184,6 @@ impl SingularStrategy for MultiStrategy {
     async fn on_tick(&self) -> Result<()> {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_tick().await {
-                error!("error on_tick in strategy {strategy}: {e}");
-
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_tick chain stopped at {strategy}");
                     return Err(e);
@@ -193,11 +193,9 @@ impl SingularStrategy for MultiStrategy {
         Ok(())
     }
 
-    async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> Result<()> {
+    async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> Result<()> {
         for strategy in self.strategies.iter() {
-            if let Err(e) = strategy.on_acknowledged_ticket(ack).await {
-                error!("error on_acknowledged_ticket in strategy {strategy}: {e}");
-
+            if let Err(e) = strategy.on_acknowledged_winning_ticket(ack).await {
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_acknowledged_ticket chain stopped at {strategy}");
                     return Err(e);
@@ -207,11 +205,14 @@ impl SingularStrategy for MultiStrategy {
         Ok(())
     }
 
-    async fn on_channel_state_changed(&self, channel: &ChannelEntry) -> Result<()> {
+    async fn on_own_channel_changed(
+        &self,
+        channel: &ChannelEntry,
+        direction: ChannelDirection,
+        change: ChannelChange,
+    ) -> Result<()> {
         for strategy in self.strategies.iter() {
-            if let Err(e) = strategy.on_channel_state_changed(channel).await {
-                error!("error on_channel_state_changed in strategy {strategy}: {e}");
-
+            if let Err(e) = strategy.on_own_channel_changed(channel, direction, change).await {
                 if !self.cfg.on_fail_continue {
                     warn!("{self} on_channel_state_changed chain stopped at {strategy}");
                     return Err(e);
@@ -234,18 +235,6 @@ mod tests {
     use crate::errors::StrategyError::Other;
     use crate::strategy::{MockSingularStrategy, MultiStrategy, MultiStrategyConfig, SingularStrategy};
     use mockall::Sequence;
-
-    #[async_std::test]
-    async fn test_multi_strategy_name() {
-        let ms = MultiStrategy {
-            strategies: vec![
-                Box::new(MockSingularStrategy::new()),
-                Box::new(MockSingularStrategy::new()),
-            ],
-            cfg: Default::default(),
-        };
-        assert_eq!("multi_strategy[mock,mock]", &ms.to_string());
-    }
 
     #[async_std::test]
     async fn test_multi_strategy_logical_or_flow() {

@@ -142,19 +142,19 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     ))
                 })?;
 
-                self.db
-                    .read()
-                    .await
-                    .get_channel_from(&unacknowledged.signer)
-                    .await
-                    .map_err(|e| {
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_RECEIVED_FAILED_ACKS.increment();
+                let from_channel = self.db.read().await.get_channel_from(&unacknowledged.signer).await?;
 
-                        AcknowledgementValidation(format!(
-                            "acknowledgement received for channel that does not exist, {e}"
-                        ))
-                    })?;
+                // Check that the channel with the ticket signer exists and the epoch on the ticket is correct
+                if from_channel.is_none()
+                    || from_channel.is_some_and(|c| c.channel_epoch.as_u32() != unacknowledged.ticket.channel_epoch)
+                {
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_RECEIVED_FAILED_ACKS.increment();
+
+                    return Err(AcknowledgementValidation(format!(
+                        "acknowledgement received for channel that does not exist or has a newer epoch"
+                    )));
+                }
 
                 let domain_separator = self
                     .db

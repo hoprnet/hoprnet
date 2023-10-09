@@ -5,19 +5,10 @@ use utils_types::primitives::{Address, Balance};
 /// represents which channels should be closed and which should be opened.
 /// Also indicates a number of maximum channels this strategy can open given the current network size.
 /// Note that the number changes as the network size changes.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct ChannelDecision {
     to_close: Vec<ChannelEntry>,
     to_open: Vec<(Address, Balance)>,
-}
-
-impl Default for ChannelDecision {
-    fn default() -> Self {
-        Self {
-            to_close: Vec::new(),
-            to_open: Vec::new(),
-        }
-    }
 }
 
 impl ChannelDecision {

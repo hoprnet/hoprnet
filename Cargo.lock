@@ -1088,6 +1088,7 @@ dependencies = [
  "core-types",
  "env_logger",
  "futures",
+ "gloo-timers 0.3.0",
  "hex",
  "hex-literal",
  "js-sys",
@@ -1370,7 +1371,7 @@ dependencies = [
 
 [[package]]
 name = "core-path"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-std",
  "console_error_panic_hook",
@@ -1381,6 +1382,8 @@ dependencies = [
  "hex-literal",
  "js-sys",
  "libp2p-identity",
+ "petgraph",
+ "serde",
  "tempfile",
  "thiserror",
  "utils-db",
@@ -1439,7 +1442,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1448,14 +1451,15 @@ dependencies = [
  "core-ethereum-db",
  "core-ethereum-misc",
  "core-network",
+ "core-path",
  "core-protocol",
  "core-types",
+ "env_logger",
  "futures",
  "getrandom 0.2.10",
  "hex-literal",
  "js-sys",
  "lazy_static",
- "log",
  "mockall",
  "rand 0.8.5",
  "serde",
@@ -4433,12 +4437,14 @@ checksum = "9b2a4787296e9989611394c33f193f676704af1686e70b8f8033ab5ba9a35a94"
 
 [[package]]
 name = "petgraph"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dd7d28ee937e54fe3080c91faa1c3a46c06de6252988a7f4592ba2310ef22a4"
+checksum = "e1d3afd2628e69da2be385eb6f2fd57c8ac7977ceeff6dc166ff1657b0e386a9"
 dependencies = [
  "fixedbitset",
- "indexmap 1.9.3",
+ "indexmap 2.0.0",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -6571,7 +6577,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.6"
+version = "0.2.8"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
@@ -6583,6 +6589,7 @@ dependencies = [
  "js-sys",
  "libp2p-identity",
  "primitive-types",
+ "regex",
  "serde",
  "thiserror",
  "utils-log",

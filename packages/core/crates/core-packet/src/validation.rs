@@ -137,6 +137,7 @@ mod tests {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
             async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
+            async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> core_ethereum_db::errors::Result<()>;
             async fn mark_rejected(&mut self, ticket: &Ticket) -> core_ethereum_db::errors::Result<()>;
             async fn get_pending_acknowledgement(
                 &self,
@@ -185,7 +186,7 @@ mod tests {
             async fn get_packet_key(&self, chain_key: &Address) -> core_ethereum_db::errors::Result<Option<OffchainPublicKey>>;
             async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> core_ethereum_db::errors::Result<Option<Address>>;
             async fn link_chain_and_packet_keys(&mut self, chain_key: &Address, packet_key: &OffchainPublicKey, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
-            async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
+            async fn mark_acknowledged_tickets_neglected(&mut self, source: ChannelEntry) -> core_ethereum_db::errors::Result<()>;
             async fn get_latest_block_number(&self) -> core_ethereum_db::errors::Result<u32>;
             async fn update_latest_block_number(&mut self, number: u32) -> core_ethereum_db::errors::Result<()>;
             async fn get_latest_confirmed_snapshot(&self) -> core_ethereum_db::errors::Result<Option<Snapshot>>;
@@ -198,6 +199,7 @@ mod tests {
             async fn get_redeemed_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_redeemed_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_neglected_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
+            async fn get_neglected_tickets_value(&self) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_pending_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn get_losing_tickets_count(&self) -> core_ethereum_db::errors::Result<usize>;
             async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance) -> core_ethereum_db::errors::Result<()>;
@@ -462,7 +464,7 @@ mod tests {
     #[async_std::test]
     async fn test_ticket_validation_ok_if_ticket_idx_smaller_than_channel_idx_unredeemed() {
         let mut db_ticket = create_valid_ticket();
-        db_ticket.amount = Balance::from_str("100", BalanceType::HOPR);
+        db_ticket.amount = Balance::new_from_str("100", BalanceType::HOPR);
         db_ticket.index = 2u32.into();
         db_ticket.sign(&SENDER_PRIV_KEY, &Hash::default());
 
@@ -471,7 +473,7 @@ mod tests {
 
         let ticket = create_valid_ticket();
         let mut channel = create_channel_entry();
-        channel.balance = Balance::from_str("200", BalanceType::HOPR);
+        channel.balance = Balance::new_from_str("200", BalanceType::HOPR);
 
         let ret = validate_unacknowledged_ticket(
             &db,

@@ -56,7 +56,7 @@ impl KeyBinding {
         chain_key: Address,
         packet_key: OffchainPublicKey,
         signature: OffchainSignature,
-    ) -> Result<Self, GeneralError> {
+    ) -> crate::errors::Result<Self> {
         let to_verify = Self::prepare_for_signing(&chain_key, &packet_key);
         signature
             .verify_message(&to_verify, &packet_key)
@@ -65,7 +65,7 @@ impl KeyBinding {
                 packet_key,
                 signature,
             })
-            .ok_or(GeneralError::Other(CryptoError::SignatureVerification.into()))
+            .ok_or(CryptoError::SignatureVerification.into())
     }
 }
 
