@@ -359,16 +359,16 @@ pub struct Protocol {
 }
 
 /// The main configuration object of the entire node.
-/// 
-/// The configuration is composed of individual configuration of corresponding 
+///
+/// The configuration is composed of individual configuration of corresponding
 /// component configuration objects.
-/// 
+///
 /// An always up-to-date config YAML example can be found in [`EXAMPLE_YAML`].
-/// 
+///
 /// The default configuration as it would appear from the configuration YAML file.
 /// ```yaml
 /// ---
-/// 
+///
 /// host:
 ///   address: !IPv4 127.0.0.1
 ///   port: 47462
@@ -436,7 +436,7 @@ pub struct Protocol {
 ///   prefer_local_addresses: false
 ///   use_weak_crypto: false
 /// ```
-/// 
+///
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
@@ -456,8 +456,8 @@ pub struct HoprdConfig {
     #[validate]
     pub api: Api,
     /// Configuration of underlying node behavior in the form strategies
-    /// 
-    /// Strategies represent automatically executable behavior performed by 
+    ///
+    /// Strategies represent automatically executable behavior performed by
     /// the node given pre-configured triggers.
     #[validate]
     pub strategy: StrategyConfig,
@@ -516,7 +516,6 @@ use real_base::file::native::read_to_string;
 #[cfg(all(feature = "wasm", not(test)))]
 use real_base::file::wasm::read_to_string;
 use utils_log::debug;
-
 
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
