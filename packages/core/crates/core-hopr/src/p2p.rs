@@ -237,10 +237,8 @@ pub(crate) async fn p2p_loop(
                             error!("Failed to store a received message in the inbox: {}", e);
                         }
 
-                        if let Some(ack) = ack {
-                            if let Err(e) = ack_writer.send_acknowledgement(peer, ack) {
-                                error!("Failed to acknowledge the received final packet: {e}");
-                            }
+                        if let Err(e) = ack_writer.send_acknowledgement(peer, ack) {
+                            error!("Failed to acknowledge the received final packet: {e}");
                         }
                     },
                     MsgProcessed::Send(peer, octets) => {
@@ -248,10 +246,8 @@ pub(crate) async fn p2p_loop(
                     },
                     MsgProcessed::Forward(peer, octets, previous_peer, ack) => {
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
-                        if let Some(ack) = ack {
-                            if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
-                                error!("failed to acknowledge relayed packet: {e}");
-                            }
+                        if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
+                            error!("failed to acknowledge relayed packet: {e}");
                         }
                     }
                 },
