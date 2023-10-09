@@ -1,6 +1,7 @@
 import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
+import { debug } from '@hoprnet/hopr-utils'
 
 export const getTicketsStatistics = async (node: Hopr) => {
   const stats = await node.getTicketStatistics()
@@ -22,13 +23,15 @@ export const getTicketsStatistics = async (node: Hopr) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
+    const log = debug('hoprd:api:v3:get-statistics')
     const { node }: { node: Hopr } = req.context
 
     try {
-      console.log(`about to get ticket statistics`)
+      log(`about to get ticket statistics`)
       const tickets = await getTicketsStatistics(node)
       return res.status(200).send(tickets)
     } catch (err) {
+      log(`failed to get ticket statistics: ${err}`)
       return res
         .status(422)
         .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })

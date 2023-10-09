@@ -160,8 +160,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             count += 1;
         }
 
-        batch_ops.put(count_key, balance);
-        batch_ops.put(value_key, count);
+        batch_ops.put(count_key, count);
+        batch_ops.put(value_key, balance);
         self.db.batch(batch_ops, true).await
     }
 
