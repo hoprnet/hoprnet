@@ -5,7 +5,7 @@ use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::TicketAggregationActions;
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
+use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::Debug;
@@ -22,7 +22,6 @@ use async_std::task::spawn_local;
 
 use core_ethereum_actions::redeem::redeem_tickets_in_channel;
 use core_ethereum_actions::transaction_queue::TransactionSender;
-use core_path::channel_graph::ChannelChange;
 use core_types::channels::ChannelDirection::Incoming;
 use utils_types::primitives::{Balance, BalanceType};
 #[cfg(all(feature = "wasm", not(test)))]
@@ -238,7 +237,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for Aggrega
             return Ok(());
         }
 
-        if let ChannelChange::Status { old, new } = change {
+        if let ChannelChange::Status { left: old, right: new } = change {
             if old != ChannelStatus::Open || new != ChannelStatus::PendingToClose {
                 debug!("{self} strategy: ignoring channel {channel} state change that's not in PendingToClose");
                 return Ok(());
@@ -288,12 +287,11 @@ mod tests {
         TransactionExecutor, TransactionQueue, TransactionResult, TransactionSender,
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
-    use core_path::channel_graph::ChannelChange;
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
     };
     use core_types::channels::ChannelDirection::Incoming;
-    use core_types::channels::ChannelStatus;
+    use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::{
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelEntry, Ticket},
@@ -680,8 +678,8 @@ mod tests {
                 &channel,
                 Incoming,
                 ChannelChange::Status {
-                    old: ChannelStatus::Open,
-                    new: ChannelStatus::PendingToClose,
+                    left: ChannelStatus::Open,
+                    right: ChannelStatus::PendingToClose,
                 },
             )
             .await

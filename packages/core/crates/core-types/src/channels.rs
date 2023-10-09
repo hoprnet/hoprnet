@@ -246,6 +246,84 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
     Hash::create(&[&source.to_bytes(), &destination.to_bytes()])
 }
 
+/// Enumerates possible changes on a channel entry update
+#[derive(Clone, Copy, Debug)]
+pub enum ChannelChange {
+    /// Channel status has changed
+    Status { left: ChannelStatus, right: ChannelStatus },
+
+    /// Channel balance has changed
+    CurrentBalance { left: Balance, right: Balance },
+
+    /// Channel epoch has changed
+    Epoch { left: u32, right: u32 },
+
+    /// Ticket index has changed
+    TicketIndex { left: u64, right: u64 },
+}
+
+impl Display for ChannelChange {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChannelChange::Status { left, right } => {
+                write!(f, "Status: {left} -> {right}")
+            }
+
+            ChannelChange::CurrentBalance { left, right } => {
+                write!(f, "Balance: {left} -> {right}")
+            }
+
+            ChannelChange::Epoch { left, right } => {
+                write!(f, "Epoch: {left} -> {right}")
+            }
+
+            ChannelChange::TicketIndex { left, right } => {
+                write!(f, "TicketIndex: {left} -> {right}")
+            }
+        }
+    }
+}
+
+impl ChannelChange {
+    /// Compares the two given channels and returns a vector of `ChannelChange`s
+    /// Note that only some fields are tracked for changes, and therefore an empty vector returned
+    /// does not imply the two `ChannelEntry` instances are equal.
+    pub fn diff_channels(left: &ChannelEntry, right: &ChannelEntry) -> Vec<Self> {
+        let mut ret = Vec::with_capacity(4);
+        if left.status != right.status {
+            ret.push(ChannelChange::Status {
+                left: left.status,
+                right: right.status,
+            });
+        }
+
+        if left.balance != right.balance {
+            ret.push(ChannelChange::CurrentBalance {
+                left: left.balance,
+                right: right.balance,
+            });
+        }
+
+        if left.channel_epoch != right.channel_epoch {
+            ret.push(ChannelChange::Epoch {
+                left: left.channel_epoch.as_u32(),
+                right: right.channel_epoch.as_u32(),
+            });
+        }
+
+        if left.ticket_index != right.ticket_index {
+            ret.push(ChannelChange::TicketIndex {
+                left: left.ticket_index.as_u64(),
+                right: right.ticket_index.as_u64(),
+            })
+        }
+
+        //debug!("{channel} update changes: {:?}",ret);
+
+        ret
+    }
+}
+
 /// Contains the overall description of a ticket with a signature
 #[derive(Clone, Eq, PartialEq)]
 pub struct Ticket {

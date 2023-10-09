@@ -1,13 +1,13 @@
-use crate::channel_graph::ChannelChange::{CurrentBalance, Epoch, Status, TicketIndex};
 use crate::errors::Result;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_types::channels::{ChannelEntry, ChannelStatus};
+use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
 use petgraph::graphmap::DiGraphMap;
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display, Formatter};
-use utils_log::{debug, info};
-use utils_types::primitives::{Address, Balance};
+use std::fmt::Debug;
+use petgraph::visit::EdgeRef;
+use utils_log::info;
+use utils_types::primitives::Address;
 
 /// Structure that adds additional data to a `ChannelEntry`, which
 /// can be used to compute edge weights and traverse the `ChannelGraph`.
@@ -28,48 +28,12 @@ pub struct ChannelEdge {
 /// added to the graph on the fly.
 /// Using this structure is much faster than querying the DB and therefore
 /// is preferred for per-packet path-finding computations.
+/// Per default, the graph does not track channels in `Closed` state, and therefore
+/// cannot detect channel re-openings.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
     graph: DiGraphMap<Address, ChannelEdge>,
-}
-
-/// Enumerates possible changes on a channel entry update
-#[derive(Clone, Copy, Debug)]
-pub enum ChannelChange {
-    /// Channel status has changed
-    Status { old: ChannelStatus, new: ChannelStatus },
-
-    /// Channel balance has changed
-    CurrentBalance { old: Balance, new: Balance },
-
-    /// Channel epoch has changed
-    Epoch { old: u32, new: u32 },
-
-    /// Ticket index has changed
-    TicketIndex { old: u64, new: u64 },
-}
-
-impl Display for ChannelChange {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Status { old, new } => {
-                write!(f, "Status: {old} -> {new}")
-            }
-
-            CurrentBalance { old, new } => {
-                write!(f, "Balance: {old} -> {new}")
-            }
-
-            Epoch { old, new } => {
-                write!(f, "Epoch: {old} -> {new}")
-            }
-
-            TicketIndex { old, new } => {
-                write!(f, "TicketIndex: {old} -> {new}")
-            }
-        }
-    }
 }
 
 impl ChannelGraph {
@@ -94,66 +58,45 @@ impl ChannelGraph {
         self.me
     }
 
-    /// Looks up the channel given the source and destination.
-    /// Returns `None` if no such edge exists in the graph.
-    pub fn get_channel(&self, src: Address, dst: Address) -> Option<&ChannelEntry> {
-        self.graph.edge_weight(src, dst).map(|w| &w.channel)
+    /// Looks up an `Open` channel given the source and destination.
+    /// Returns `None` if no such edge exists in the graph or if it is not `Open`.
+    pub fn get_channel(&self, source: Address, destination: Address) -> Option<&ChannelEntry> {
+        self.graph.edge_weight(source, destination)
+            .map(|w| &w.channel)
+            .filter(|c| c.status == ChannelStatus::Open)
     }
 
-    /// Gets all channels going from (outgoing) the given `Address`
-    pub fn channels_from(&self, src: Address) -> impl Iterator<Item = (Address, Address, &ChannelEdge)> {
-        self.graph.edges_directed(src, Direction::Outgoing)
+    /// Gets all `Open` outgoing channels going from the given `Address`
+    pub fn open_channels_from(&self, source: Address) -> impl Iterator<Item = (Address, Address, &ChannelEdge)> {
+        self.graph.edges_directed(source, Direction::Outgoing)
+            .filter(|c| c.weight().channel.status == ChannelStatus::Open)
     }
 
     /// Inserts or updates the given channel in the channel graph.
     /// Returns a set of changes if the channel was already present in the graphs or
     /// None if the channel was not previously present in the channel graph.
     pub fn update_channel(&mut self, channel: ChannelEntry) -> Option<Vec<ChannelChange>> {
-        if let Some(old_w_value) = self.graph.edge_weight_mut(channel.source, channel.destination) {
-            let old_channel = old_w_value.channel;
-            old_w_value.channel = channel;
+        // Remove the edge if we do not allow Closed channels
+        if channel.status == ChannelStatus::Closed {
+            let ret = if let Some(old_value) = self.graph.remove_edge(channel.source, channel.destination) {
+                Some(ChannelChange::diff_channels(&old_value.channel, &channel))
+            } else {
+                None
+            };
 
-            let mut ret = Vec::new();
+            info!("removed {channel}");
+            return ret;
+        }
 
-            if old_channel.status != channel.status {
-                ret.push(Status {
-                    old: old_channel.status,
-                    new: channel.status,
-                });
-            }
+        if let Some(old_value) = self.graph.edge_weight_mut(channel.source, channel.destination) {
+            let old_channel = old_value.channel;
+            old_value.channel = channel;
 
-            if old_channel.balance != channel.balance {
-                ret.push(CurrentBalance {
-                    old: old_channel.balance,
-                    new: channel.balance,
-                });
-            }
-
-            if old_channel.channel_epoch != channel.channel_epoch {
-                ret.push(Epoch {
-                    old: old_channel.channel_epoch.as_u32(),
-                    new: channel.channel_epoch.as_u32(),
-                });
-            }
-
-            if old_channel.ticket_index != channel.ticket_index {
-                ret.push(TicketIndex {
-                    old: old_channel.ticket_index.as_u64(),
-                    new: channel.ticket_index.as_u64(),
-                })
-            }
-            debug!(
-                "{channel} (own = {}) update changes: {:?}",
-                self.is_own_channel(&channel),
-                ret
-            );
-
+            let ret = ChannelChange::diff_channels(&old_channel, &channel);
             info!("updated {channel}: {} changes", ret.len());
-
             Some(ret)
         } else {
             let weighted = ChannelEdge { channel, quality: None };
-
             self.graph.add_edge(channel.source, channel.destination, weighted);
             info!("new {channel}");
 
@@ -181,4 +124,9 @@ impl ChannelGraph {
     pub fn contains_channel(&self, channel: &ChannelEntry) -> bool {
         self.graph.contains_edge(channel.source, channel.destination)
     }
+}
+
+#[cfg(test)]
+mod tests {
+
 }

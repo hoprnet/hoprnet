@@ -114,6 +114,7 @@ pub mod wasm_impls {
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
+    use core_types::channels::ChannelStatus;
 
     #[wasm_bindgen]
     #[derive(Clone)]

@@ -106,7 +106,7 @@ impl PathSelector for DfsPathSelector {
         let mut dead_ends = HashSet::new();
 
         graph
-            .channels_from(source)
+            .open_channels_from(source)
             .filter_map(|channel| {
                 let w = channel.weight();
                 self.filter_channel(w, &destination, &[], &dead_ends)
@@ -125,7 +125,7 @@ impl PathSelector for DfsPathSelector {
 
             let last_peer = *current_path.0.last().unwrap();
             let new_channels = graph
-                .channels_from(last_peer)
+                .open_channels_from(last_peer)
                 .filter(|channel| self.filter_channel(channel.weight(), &destination, &current_path.0, &dead_ends))
                 .collect::<Vec<_>>();
 
@@ -151,4 +151,9 @@ impl PathSelector for DfsPathSelector {
             destination.to_string(),
         ))
     }
+}
+
+#[cfg(test)]
+mod tests {
+
 }

@@ -9,10 +9,9 @@ use async_trait::async_trait;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
-use core_path::channel_graph::ChannelChange;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::channels::{ChannelDirection, ChannelEntry, Ticket};
+use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, Ticket};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
@@ -33,7 +32,7 @@ pub trait SingularStrategy: Display {
         Ok(())
     }
 
-    /// Strategy event raised whenever the Indexer registers a change on node's own channel
+    /// Strategy event raised whenever the Indexer registers a change on node's own channel.
     async fn on_own_channel_changed(
         &self,
         _channel: &ChannelEntry,
