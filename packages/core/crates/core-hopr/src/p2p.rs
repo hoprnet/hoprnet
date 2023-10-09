@@ -245,7 +245,7 @@ pub(crate) async fn p2p_loop(
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
                     },
                     MsgProcessed::Forward(peer, octets, previous_peer, ack) => {
-                    let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
+                        let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
                         if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
                             error!("failed to acknowledge relayed packet: {e}");
                         }

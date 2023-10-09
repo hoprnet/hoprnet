@@ -67,22 +67,6 @@ lazy_static::lazy_static! {
     static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 }
 
-// /// Represents a payload (packet or acknowledgement) at the transport level.
-// #[derive(Debug, Clone)]
-// pub(crate) struct Payload {
-//     pub(crate) remote_peer: PeerId,
-//     pub(crate) data: Box<[u8]>,
-// }
-
-// impl Display for Payload {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         f.debug_struct("Payload")
-//             .field("remote_peer", &self.remote_peer)
-//             .field("data", &hex::encode(&self.data))
-//             .finish()
-//     }
-// }
-
 // Default sizes of the packet queues
 const PACKET_TX_QUEUE_SIZE: usize = 2048;
 const PACKET_RX_QUEUE_SIZE: usize = 2048;
