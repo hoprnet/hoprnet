@@ -629,16 +629,21 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        debug!("marking {} as redeemed", acked_ticket);
+        // TODO: for debugging purposes this operation has been un-batched
+        // Note that if any of the un-batched operations fail, the stats of redeemed
+        // tickets will be in an inconsistent state.
+        // Once the underlying issue is resolved, it should be batched again.
 
-        let mut ops = Batch::default();
-
-        let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
-        let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
-        ops.put(key, count + 1);
+        debug!("start marking {acked_ticket} as redeemed");
 
         let key = get_acknowledged_ticket_key(&acked_ticket)?;
-        ops.del(key);
+        self.db.remove::<AcknowledgedTicket>(key).await?;
+        debug!("removed {acked_ticket} from the DB");
+
+        let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
+        let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0) + 1;
+        self.db.set(key, &count).await?;
+        debug!("updated redeemed tickets count to {count}");
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
         let balance = self
@@ -648,7 +653,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
-        ops.put(key, new_redeemed_balance);
+        self.db.set(key, &new_redeemed_balance).await?;
+        debug!("updated redeemed tickets value to {new_redeemed_balance}");
 
         if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
             if c.source == self.me {
@@ -665,15 +671,18 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 .unwrap_or(Balance::zero(BalanceType::HOPR));
 
             let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
-            ops.put(key, new_pending_balance);
+            self.db.set(key, &new_pending_balance).await?;
+            debug!("updated pending balance with {counterparty} to: {new_pending_balance}");
+
+            Ok(())
         } else {
             error!(
-                "could not update redeemed tickets count: unable to find channel with id {}",
+                "could not update pending balance: unable to find channel with id {}",
                 acked_ticket.ticket.channel_id
-            )
-        }
+            );
 
-        self.db.batch(ops, true).await
+            Err(DbError::GenericError(format!("channel {} not found", acked_ticket.ticket.channel_id)))
+        }
     }
 
     async fn mark_losing_acked_ticket(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
@@ -706,7 +715,9 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             error!(
                 "could not update losing tickets count: unable to find channel with id {}",
                 acked_ticket.ticket.channel_id
-            )
+            );
+
+            return Err(DbError::GenericError(format!("channel {} not found", acked_ticket.ticket.channel_id)));
         }
 
         self.db.batch(ops, true).await
