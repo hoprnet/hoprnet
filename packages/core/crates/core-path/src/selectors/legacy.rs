@@ -161,9 +161,10 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use lazy_static::lazy_static;
     use utils_types::primitives::{Address, Balance, U256};
+    use std::str::FromStr;
 
     lazy_static! {
-        static ref ADDRESSES: &[Address] = [
+        static ref ADDRESSES: [Address; 6] = [
             Address::from_str("0xafe8c178cf70d966be0a798e666ce2782c7b2288").unwrap(),
             Address::from_str("0x1223d5786d9e6799b3297da1ad55605b91e2c882").unwrap(),
             Address::from_str("0x0e3e60ddced1e33c9647a71f4fc2cf4ed33e4a9d").unwrap(),
