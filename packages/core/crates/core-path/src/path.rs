@@ -1,3 +1,5 @@
+use std::collections::hash_map::RandomState;
+use std::collections::HashSet;
 use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
@@ -15,7 +17,10 @@ use utils_log::warn;
 use utils_types::primitives::Address;
 use utils_types::traits::{PeerIdLike, ToHex};
 
-/// Represents a path in the `ChannelGraph`
+/// Represents a path in the `ChannelGraph`.
+/// The path is never allowed to be empty and is always constructed from
+/// hops that must be known to have open channels (at the time of construction).
+/// The path may or may not contain simple loops (same adjacent nodes).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelPath {
     pub(crate) hops: Vec<Address>,
@@ -86,8 +91,27 @@ impl ChannelPath {
         &self.hops
     }
 
+    /// Gets the last hop
     pub fn last_hop(&self) -> &Address {
         self.hops.last().unwrap()
+    }
+
+    /// Checks if the path contains simple hops between the same addresses.
+    pub fn has_simple_loops(&self) -> bool {
+        let last_addr = self.hops[0];
+        for addr in self.hops.iter().skip(1) {
+            if last_addr.eq(addr) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Checks if all the hops in this path are to distinct addresses.
+    /// Returns `true` if there are duplicate Addresses on this path.
+    pub fn is_cyclic(&self) -> bool {
+        let set = HashSet::<&Address, RandomState>::from_iter(self.hops.iter());
+        set.len() != self.hops.len()
     }
 }
 
@@ -123,70 +147,6 @@ impl Path {
     pub fn new_valid(hops: Vec<PeerId>) -> Self {
         assert!(!hops.is_empty(), "must not be empty");
         Self { hops }
-    }
-
-    /// Creates a new path by validating the list of peer ids using the channel database
-    /// The given path does not contain the sender node, which is given by `self_addr`
-    pub async fn new<T: HoprCoreEthereumDbActions>(
-        path: Vec<PeerId>,
-        self_addr: &Address,
-        allow_loops: bool,
-        db: &T, // TODO: refactor this so it uses the ChannelGraph instead of DB
-    ) -> Result<Self> {
-        if path.is_empty() {
-            return Err(PathNotValid);
-        }
-
-        let mut ticket_receiver;
-        let mut ticket_issuer = *self_addr;
-
-        // Ignore the last hop in the check, because channels are not required for direct messages
-        for hop in path.iter().take(path.len() - 1) {
-            ticket_receiver = db
-                .get_chain_key(&OffchainPublicKey::from_peerid(hop)?)
-                .await?
-                .ok_or(InvalidPeer(format!("could not find channel key for {hop}")))?;
-
-            // Check for loops
-            if ticket_issuer == ticket_receiver {
-                if !allow_loops {
-                    return Err(LoopsNotAllowed(ticket_receiver.to_hex()));
-                }
-                warn!("duplicated adjacent path entries")
-            }
-
-            // Check if the channel is opened
-            let channel = db
-                .get_channel_x(&ticket_issuer, &ticket_receiver)
-                .await?
-                .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
-
-            if channel.status != ChannelStatus::Open {
-                return Err(ChannelNotOpened(ticket_issuer.to_hex(), ticket_receiver.to_hex()));
-            }
-
-            ticket_issuer = ticket_receiver;
-        }
-
-        Ok(Self::new_valid(path))
-    }
-
-    pub async fn to_channel_path<R: PeerAddressResolver>(&self, resolver: &R) -> Result<ChannelPath> {
-        let hops = self
-            .hops
-            .iter()
-            .map(|peer| async move {
-                let key = OffchainPublicKey::from_peerid(peer)?;
-                resolver
-                    .resolve_chain_key(&key)
-                    .await
-                    .ok_or(InvalidPeer(format!("could not resolve on-chain key for {peer}")))
-            })
-            .collect::<FuturesOrdered<_>>()
-            .try_collect::<Vec<_>>()
-            .await?;
-
-        Ok(ChannelPath::new_valid(hops))
     }
 
     /// Individual hops in the path.
