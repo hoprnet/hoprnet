@@ -18,8 +18,6 @@ use core_packet::errors::PacketError::{
     PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use core_packet::errors::Result;
-use core_packet::packet::{Packet, PacketState};
-use core_path::errors::PathError::PathNotValid;
 use core_path::path::Path;
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;

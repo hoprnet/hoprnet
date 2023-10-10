@@ -114,7 +114,6 @@ mod tests {
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_path::channel_graph::ChannelChange::CurrentBalance;
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::ChannelDirection::Outgoing;
     use core_types::channels::{ChannelEntry, ChannelStatus};
