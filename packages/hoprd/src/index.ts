@@ -108,23 +108,26 @@ function parseCliArguments(args: string[]) {
   return argv
 }
 
-// async function addUnhandledPromiseRejectionHandler() {
-//   if (process.env.NODE_ENV !== 'production') {
-//     console.log(
-//       `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
-//     )
-//     const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
+// TODO: Possibly not needed anymore since this used to catch unhandled promise rejections from hopr-connect and js-libp2p
+/*
+async function addUnhandledPromiseRejectionHandler() {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `Loading extended logger that enhances debugging of unhandled promise rejections. Disabled on production environments`
+    )
+    const { register: registerUnhandled, setLogger } = await import('trace-unhandled')
 
-//     registerUnhandled()
-//     setLogger((msg) => {
-//       console.error(msg)
-//     })
-//   }
+    registerUnhandled()
+    setLogger((msg) => {
+      console.error(msg)
+    })
+  }
 
-//   // Filter specific known promise rejection that cannot be handled for
-//   // one reason or the other
-//   setupPromiseRejectionFilter()
-// }
+  // Filter specific known promise rejection that cannot be handled for
+  // one reason or the other
+  setupPromiseRejectionFilter()
+}
+*/
 
 async function main() {
   // Starting with Node.js 15, undhandled promise rejections terminate the

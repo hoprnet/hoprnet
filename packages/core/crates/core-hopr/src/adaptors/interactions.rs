@@ -14,7 +14,6 @@ pub mod wasm {
     use futures::Stream;
     use utils_log::debug;
     use wasm_bindgen::prelude::*;
-    use utils_types::traits::BinarySerializable;
 
     /// Helper loop ensuring conversion and enqueueing of events on acknowledgement
     pub fn spawn_ack_receiver_loop(on_ack: js_sys::Function) -> UnboundedSender<HalfKeyChallenge> {
