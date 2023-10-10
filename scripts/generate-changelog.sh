@@ -72,6 +72,6 @@ issues=$(gh issue list --milestone ${milestone_number} --state all --json number
 process_entries "$issues"
 
 # Process PR
-prs=$(gh pr list --state all --json number,title,labels,milestone,state | jq -r --argjson milestone_number ${milestone_number} 'to_entries[] | select(.value.milestone) | select(.value.milestone.number == $milestone_number).value | @base64')
+prs=$(gh pr list --state all --limit 200 --json number,title,labels,milestone,state | jq -r --argjson milestone_number ${milestone_number} 'to_entries[] | select(.value.milestone) | select(.value.milestone.number == $milestone_number).value | @base64')
 process_entries "$prs"
 build_change_log
