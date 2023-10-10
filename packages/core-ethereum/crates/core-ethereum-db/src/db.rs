@@ -160,8 +160,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             count += 1;
         }
 
-        batch_ops.put(count_key, balance);
-        batch_ops.put(value_key, count);
+        batch_ops.put(count_key, count);
+        batch_ops.put(value_key, balance);
         self.db.batch(batch_ops, true).await
     }
 
@@ -476,7 +476,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     // core-ethereum only part
-    async fn delete_acknowledged_tickets_from(&mut self, channel: ChannelEntry) -> Result<()> {
+    async fn mark_acknowledged_tickets_neglected(&mut self, channel: ChannelEntry) -> Result<()> {
         let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel)).await?;
 
         let count_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
@@ -1295,11 +1295,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn delete_acknowledged_tickets_from(&self, source: ChannelEntry) -> Result<(), JsValue> {
+        pub async fn mark_acknowledged_tickets_neglected(&self, source: ChannelEntry) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.delete_acknowledged_tickets_from(source).await)
+            utils_misc::ok_or_jserr!(db.mark_acknowledged_tickets_neglected(source).await)
             //}
         }
 

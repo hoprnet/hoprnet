@@ -111,6 +111,7 @@ pub mod wasm_impls {
     use core_path::channel_graph::{ChannelChange, ChannelGraph};
     use core_path::path::Path;
     use core_strategy::strategy::MultiStrategyConfig;
+    use core_types::channels::ChannelStatus;
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
@@ -294,6 +295,18 @@ pub mod wasm_impls {
                                 let _ = db_clone.write().await.cleanup_invalid_channel_tickets(&channel).await;
                             }
                         }
+                    } else if channel.status == ChannelStatus::Open {
+                        // Emit Opening event if the channel did not exist before in the graph
+                        let _ = ms_clone
+                            .on_own_channel_changed(
+                                &channel,
+                                own_channel_direction,
+                                ChannelChange::Status {
+                                    old: ChannelStatus::Closed,
+                                    new: ChannelStatus::Open,
+                                },
+                            )
+                            .await;
                     }
                 }
             }

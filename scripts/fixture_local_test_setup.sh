@@ -20,18 +20,18 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-s|--skip-cleanup] [-c|--just-cleanup]"
+  msg "Usage: $0 [-h|--help] [-s|--setup] [-t|--teardown]"
   msg
-  msg "The cleanup process can be skipped by using '--skip-cleanup'."
-  msg "The cleanup process can be triggered by using '--just-cleanup'."
+  msg "The cleanup process can be skipped by using '--setup'."
+  msg "The cleanup process can be triggered by using '--teardown'."
   msg
 }
 
 # verify and set parameters
 declare wait_delay=2
 declare wait_max_wait=1000
-declare skip_cleanup="false"
-declare just_cleanup="false"
+declare setup="false"
+declare teardown="false"
 declare default_api_token="e2e-API-token^^"
 
 while (( "$#" )); do
@@ -41,12 +41,12 @@ while (( "$#" )); do
       usage
       exit 0
       ;;
-    -s|--skip-cleanup)
-      skip_cleanup="true"
+    -s|--setup)
+      setup="true"
       shift
       ;;
-    -c|--just-cleanup)
-      just_cleanup="true"
+    -t|--teardown)
+      teardown="true"
       shift
       ;;
     -*|--*=)
@@ -152,12 +152,12 @@ function cleanup {
   fi
 }
 
-if [ "${just_cleanup}" == "1" ] || [ "${just_cleanup}" == "true" ]; then
+if [ "${teardown}" == "1" ] || [ "${teardown}" == "true" ]; then
   cleanup
   exit $?
 fi
 
-if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+if [ "${setup}" != "1" ] && [ "${setup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
@@ -276,6 +276,12 @@ function setup_node() {
   log "safe args ${safe_args}"
   # read safe args and append to additional_args TODO:
   additional_args="${additional_args} ${safe_args}"
+
+  # add explicit yaml config, if it exists
+  CFG=$(echo -e "${log}" | sed 's/\(.*\).log/\1.cfg.yaml/')
+  if [[ -f "$CFG" ]]; then
+      additional_args="${additional_args} --configurationFilePath=${CFG}"
+  fi
 
   log "Additional args: \"${additional_args}\""
 

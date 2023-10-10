@@ -99,7 +99,7 @@ pub(crate) fn generate_key_iv(secret: &SecretKey, info: &[u8], key: &mut [u8], i
 
 /// Sample a random secp256k1 field element that can represent a valid secp256k1 point.
 /// The implementation uses `hash_to_field` function as defined in
-/// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field
+/// `<https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field>`
 /// The `secret` must be at least `SecretKey::LENGTH` long.
 /// The `tag` parameter will be used as an additional Domain Separation Tag.
 pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> Result<HalfKey> {

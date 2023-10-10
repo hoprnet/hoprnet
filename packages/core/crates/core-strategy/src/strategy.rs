@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
+use core_path::channel_graph::ChannelChange;
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, Ticket};

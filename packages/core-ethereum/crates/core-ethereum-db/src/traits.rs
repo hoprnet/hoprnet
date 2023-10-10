@@ -107,7 +107,7 @@ pub trait HoprCoreEthereumDbActions {
 
     // core-ethereum only part
     /// Delete acknowledged tickets belonging to a channel
-    async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> Result<()>;
+    async fn mark_acknowledged_tickets_neglected(&mut self, source: ChannelEntry) -> Result<()>;
 
     /// Get the value of the lastest block number.
     async fn get_latest_block_number(&self) -> Result<u32>;
