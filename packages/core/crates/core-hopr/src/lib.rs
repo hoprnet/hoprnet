@@ -111,7 +111,7 @@ pub mod wasm_impls {
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::Path;
     use core_strategy::strategy::MultiStrategyConfig;
-    use core_types::channels::{ChannelStatus, ChannelChange};
+    use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;

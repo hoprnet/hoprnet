@@ -536,7 +536,7 @@ impl U256 {
 impl U256 {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(value: &str) -> Self {
-        U256 {
+        Self {
             value: u256::from_str_radix(value, 10).expect("invalid decimal number string"),
         }
     }
@@ -562,15 +562,17 @@ impl U256 {
     }
 
     pub fn addn(&self, n: u32) -> Self {
-        Self {
-            value: self.value + n as u128,
-        }
+        self.add(n)
     }
 
     pub fn muln(&self, n: u32) -> Self {
-        Self {
-            value: self.value * n as u128,
-        }
+        self.mul(n)
+    }
+}
+
+impl Default for U256 {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 
@@ -594,6 +596,16 @@ impl Mul for U256 {
     fn mul(self, rhs: Self) -> Self::Output {
         Self {
             value: self.value.mul(rhs.value),
+        }
+    }
+}
+
+impl Mul<u32> for U256 {
+    type Output = U256;
+
+    fn mul(self, rhs: u32) -> Self::Output {
+        Self {
+            value: self.value * rhs as u128,
         }
     }
 }
@@ -633,6 +645,16 @@ impl Add for U256 {
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             value: self.value.add(rhs.value),
+        }
+    }
+}
+
+impl Add<u32> for U256 {
+    type Output = U256;
+
+    fn add(self, rhs: u32) -> Self::Output {
+        Self {
+            value: self.value + rhs as u128,
         }
     }
 }

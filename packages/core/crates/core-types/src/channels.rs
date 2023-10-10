@@ -1,6 +1,5 @@
 use crate::errors::{CoreTypesError, Result};
 use bindings::hopr_channels::RedeemTicketCall;
-use core_crypto::random::random_float;
 use core_crypto::{
     errors::CryptoError::SignatureVerification,
     keypairs::{ChainKeypair, Keypair},
@@ -14,7 +13,6 @@ use serde::{
     Deserialize, Serialize,
 };
 use serde_repr::*;
-use std::ops::Add;
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
@@ -152,18 +150,6 @@ impl ChannelEntry {
         } else {
             Some(0u64)
         }
-    }
-
-    /// Calculates weight of this channel based on the channel information.
-    /// The `weight` value is used for channel graph path selection algorithm.
-    pub fn get_weight(&self) -> U256 {
-        const PATH_RANDOMNESS: f64 = 0.1;
-
-        let r = random_float() * PATH_RANDOMNESS;
-        let base = self.balance.value().addn(1);
-
-        // (stake + 1) * (1 + r)
-        base.add(base.multiply_f64(r).unwrap())
     }
 
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
@@ -715,7 +701,7 @@ impl Ticket {
         // Add + 1 to "round to next integer"
         let win_prob = (u64::from_be_bytes(win_prob) >> 4) + 1 + 1;
 
-        (*self.amount.value() * win_prob.into()) >> U256::from(52u64)
+        (*self.amount.value() * U256::from(win_prob)) >> U256::from(52u64)
     }
 
     /// Recovers the signer public key from the embedded ticket signature.

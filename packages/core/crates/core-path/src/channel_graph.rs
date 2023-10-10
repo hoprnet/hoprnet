@@ -1,11 +1,12 @@
 use crate::errors::Result;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+use petgraph::algo::has_path_connecting;
 use petgraph::graphmap::DiGraphMap;
+use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use petgraph::visit::EdgeRef;
 use utils_log::info;
 use utils_types::primitives::Address;
 
@@ -61,15 +62,24 @@ impl ChannelGraph {
     /// Looks up an `Open` channel given the source and destination.
     /// Returns `None` if no such edge exists in the graph or if it is not `Open`.
     pub fn get_channel(&self, source: Address, destination: Address) -> Option<&ChannelEntry> {
-        self.graph.edge_weight(source, destination)
+        self.graph
+            .edge_weight(source, destination)
             .map(|w| &w.channel)
             .filter(|c| c.status == ChannelStatus::Open)
     }
 
     /// Gets all `Open` outgoing channels going from the given `Address`
     pub fn open_channels_from(&self, source: Address) -> impl Iterator<Item = (Address, Address, &ChannelEdge)> {
-        self.graph.edges_directed(source, Direction::Outgoing)
+        self.graph
+            .edges_directed(source, Direction::Outgoing)
             .filter(|c| c.weight().channel.status == ChannelStatus::Open)
+    }
+
+    /// Checks whether there's any path via Open channels that connects `source` and `destination`
+    /// This does not need to be necessarily a multi-hop path.
+    pub fn has_path(&self, source: Address, destination: Address) -> bool {
+        let only_open_graph = EdgeFiltered::from_fn(&self.graph, |e| e.weight().channel.status == ChannelStatus::Open);
+        has_path_connecting(&only_open_graph, source, destination, None)
     }
 
     /// Inserts or updates the given channel in the channel graph.
@@ -127,6 +137,4 @@ impl ChannelGraph {
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}

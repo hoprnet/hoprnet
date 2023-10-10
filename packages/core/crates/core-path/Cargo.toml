@@ -34,6 +34,8 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
 async-std = {version = "1.12.0", features = ["unstable"]}
+mockall = "0.11.4"
+lazy_static = "1.4.0"
 hex-literal = "0.4"
 tempfile = "3"
 wasm-bindgen-test = "0.3.36"
