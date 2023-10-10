@@ -108,14 +108,13 @@ pub mod wasm_impls {
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_network::network::NetworkConfig;
-    use core_path::channel_graph::{ChannelChange, ChannelGraph};
+    use core_path::channel_graph::ChannelGraph;
     use core_path::path::Path;
     use core_strategy::strategy::MultiStrategyConfig;
-    use core_types::channels::ChannelStatus;
+    use core_types::channels::{ChannelStatus, ChannelChange};
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
-    use core_types::channels::ChannelStatus;
 
     #[wasm_bindgen]
     #[derive(Clone)]
@@ -302,8 +301,8 @@ pub mod wasm_impls {
                                 &channel,
                                 own_channel_direction,
                                 ChannelChange::Status {
-                                    old: ChannelStatus::Closed,
-                                    new: ChannelStatus::Open,
+                                    left: ChannelStatus::Closed,
+                                    right: ChannelStatus::Open,
                                 },
                             )
                             .await;

@@ -1039,7 +1039,6 @@ name = "core-crypto"
 version = "0.5.1"
 dependencies = [
  "aes 0.8.3",
- "async-std",
  "blake2",
  "chacha20 0.9.1",
  "console_error_panic_hook",
@@ -1048,7 +1047,6 @@ dependencies = [
  "digest 0.10.7",
  "ed25519-dalek 1.0.1",
  "elliptic-curve",
- "futures",
  "generic-array",
  "getrandom 0.2.10",
  "hex",
@@ -1070,7 +1068,6 @@ dependencies = [
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
- "wasm-bindgen-futures",
  "zeroize",
 ]
 
@@ -1121,7 +1118,6 @@ dependencies = [
  "lazy_static",
  "serde",
  "serde-wasm-bindgen",
- "stdext",
  "utils-db",
  "utils-log",
  "utils-misc",
@@ -1176,7 +1172,6 @@ dependencies = [
  "core-types",
  "env_logger",
  "ethers",
- "futures",
  "hex",
  "hex-literal",
  "js-sys",
@@ -5857,12 +5852,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "stdext"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f3b6b32ae82412fb897ef134867d53a294f57ba5b758f06d71e865352c3e207"
-
-[[package]]
 name = "string_cache"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6507,14 +6496,12 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 name = "utils-db"
 version = "0.2.3"
 dependencies = [
- "async-lock",
  "async-std",
  "async-trait",
  "bincode",
  "console_error_panic_hook",
  "futures-lite",
  "getrandom 0.2.10",
- "gloo-timers 0.3.0",
  "hex",
  "hex-literal",
  "js-sys",
@@ -6564,15 +6551,11 @@ name = "utils-misc"
 version = "0.2.1"
 dependencies = [
  "console_error_panic_hook",
- "futures",
  "js-sys",
  "real-base",
  "serde",
- "serde-wasm-bindgen",
- "serde_bytes",
  "serde_json",
  "wasm-bindgen",
- "wasm-bindgen-futures",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -6583,7 +6566,6 @@ version = "0.2.8"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
- "enum-iterator",
  "ethnum",
  "getrandom 0.2.10",
  "hex",
@@ -6605,12 +6587,7 @@ dependencies = [
 name = "utils-validation"
 version = "0.1.0"
 dependencies = [
- "console_error_panic_hook",
  "proc-macro-regex",
- "real-base",
- "serde",
- "serde_json",
- "utils-types",
  "wasm-opt",
  "wasm-pack",
 ]
