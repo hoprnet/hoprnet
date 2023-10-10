@@ -2,11 +2,12 @@ pub mod legacy;
 
 use crate::channel_graph::ChannelGraph;
 use crate::errors::{PathError::MissingChannel, Result};
-use crate::path::ChannelPath;
-use core_types::channels::ChannelEntry;
+use crate::path::{BasePath, ChannelPath};
+use core_types::channels::{ChannelEntry, ChannelStatus};
 use core_types::protocol::INTERMEDIATE_HOPS;
 use std::ops::Add;
 use utils_types::primitives::{Address, U256};
+use crate::errors::PathError::ChannelNotOpened;
 
 /// Computes weights of edges corresponding to `ChannelEntry`.
 pub trait EdgeWeighting<W>
@@ -25,6 +26,11 @@ where
             let w = graph
                 .get_channel(initial_addr, *hop)
                 .ok_or(MissingChannel(initial_addr.to_string(), hop.to_string()))?;
+
+            if w.status != ChannelStatus::Open {
+                return Err(ChannelNotOpened(initial_addr.to_string(), hop.to_string()))
+            }
+
             weight = weight.add(Self::calculate_weight(w));
             initial_addr = *hop;
         }

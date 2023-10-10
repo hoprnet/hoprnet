@@ -211,3 +211,31 @@ mod tests {
         graph
     }
 }
+
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use core_ethereum_db::db::wasm::Database;
+    use utils_misc::utils::wasm::JsResult;
+    use utils_types::primitives::Address;
+    use crate::channel_graph::ChannelGraph;
+    use crate::path::Path;
+    use crate::path::wasm::PathResolver;
+    use crate::selectors::legacy::LegacyPathSelector;
+    use crate::selectors::PathSelector;
+
+    #[wasm_bindgen]
+    pub async fn legacy_path_select(graph: &ChannelGraph,
+                              database: &Database,
+                              source: &Address,
+                              destination: &Address,
+                              max_hops: u32) -> JsResult<Path> {
+        let selector = LegacyPathSelector::default();
+        let cp = selector.select_path(graph, *source, *destination, max_hops as usize)?;
+
+        let database = database.as_ref_counted();
+        let g = database.read().await;
+
+        Ok(cp.to_path(&PathResolver(&*g)).await?)
+    }
+}

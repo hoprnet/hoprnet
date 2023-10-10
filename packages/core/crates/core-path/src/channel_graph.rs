@@ -31,6 +31,7 @@ pub struct ChannelEdge {
 /// is preferred for per-packet path-finding computations.
 /// Per default, the graph does not track channels in `Closed` state, and therefore
 /// cannot detect channel re-openings.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
@@ -59,13 +60,12 @@ impl ChannelGraph {
         self.me
     }
 
-    /// Looks up an `Open` channel given the source and destination.
-    /// Returns `None` if no such edge exists in the graph or if it is not `Open`.
+    /// Looks up an `Open` or `PendingToClose' channel given the source and destination.
+    /// Returns `None` if no such edge exists in the graph.
     pub fn get_channel(&self, source: Address, destination: Address) -> Option<&ChannelEntry> {
         self.graph
             .edge_weight(source, destination)
             .map(|w| &w.channel)
-            .filter(|c| c.status == ChannelStatus::Open)
     }
 
     /// Gets all `Open` outgoing channels going from the given `Address`
@@ -86,7 +86,7 @@ impl ChannelGraph {
     /// Returns a set of changes if the channel was already present in the graphs or
     /// None if the channel was not previously present in the channel graph.
     pub fn update_channel(&mut self, channel: ChannelEntry) -> Option<Vec<ChannelChange>> {
-        // Remove the edge if we do not allow Closed channels
+        // Remove the edge since we don't allow Closed channels
         if channel.status == ChannelStatus::Closed {
             let ret = if let Some(old_value) = self.graph.remove_edge(channel.source, channel.destination) {
                 Some(ChannelChange::diff_channels(&old_value.channel, &channel))

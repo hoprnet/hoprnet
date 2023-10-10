@@ -5,7 +5,6 @@ use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
 use core_crypto::types::OffchainPublicKey;
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::ChannelStatus;
 use core_types::protocol::PeerAddressResolver;
 use futures::future::FutureExt;
@@ -13,11 +12,52 @@ use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
+use std::hash::Hash;
 use utils_log::warn;
 use utils_types::primitives::Address;
 use utils_types::traits::{PeerIdLike, ToHex};
 
-/// Represents a path in the `ChannelGraph`.
+/// Base implementation of an abstract path.
+/// Must contain always at least a single hop
+pub trait BasePath<N>: Display + Clone + Eq + PartialEq
+where N: Copy + Clone + Eq + PartialEq + Hash {
+    /// Individual hops in the path.
+    /// There must be always at least one hop.
+    fn hops(&self) -> &[N];
+
+    /// Shorthand for number of hops.
+    fn length(&self) -> usize {
+        self.hops().len()
+    }
+
+    /// Gets the last hop
+    fn last_hop(&self) -> &N {
+        self.hops().last().expect("path is invalid")
+    }
+
+    /// Checks if the path contains simple hops between the same addresses.
+    /// If `true`, implies `is_cyclic()` to be `true` as well.
+    fn has_simple_loops(&self) -> bool {
+        let mut last_addr = self.hops()[0];
+        for addr in self.hops().iter().skip(1) {
+            if last_addr.eq(addr) {
+                return true;
+            }
+            last_addr = *addr;
+        }
+        false
+    }
+
+    /// Checks if all the hops in this path are to distinct addresses.
+    /// Returns `true` if there are duplicate Addresses on this path.
+    /// If `true` does not imply `has_simple_loops()` to be necessarily `true` as well.
+    fn is_cyclic(&self) -> bool {
+        let set = HashSet::<&N, RandomState>::from_iter(self.hops().iter());
+        set.len() != self.hops().len()
+    }
+}
+
+/// Represents an on-chain path in the `ChannelGraph`.
 /// The path is never allowed to be empty and is always constructed from
 /// hops that must be known to have open channels (at the time of construction).
 /// The path may or may not contain simple loops (same adjacent nodes).
@@ -64,11 +104,12 @@ impl ChannelPath {
         Ok(Self { hops })
     }
 
-    pub fn new_valid(hops: Vec<Address>) -> Self {
+    pub(crate) fn new_valid(hops: Vec<Address>) -> Self {
         assert!(!hops.is_empty(), "must not be empty");
         Self { hops }
     }
 
+    /// Resolves this on-chain `ChannelPath` into the off-chain `Path`.
     pub async fn to_path<R: PeerAddressResolver>(&self, resolver: &R) -> Result<Path> {
         let hops = self
             .hops
@@ -85,33 +126,11 @@ impl ChannelPath {
 
         Ok(Path::new_valid(hops))
     }
+}
 
-    /// Individual hops in the path.
-    pub fn hops(&self) -> &[Address] {
+impl BasePath<Address> for ChannelPath {
+    fn hops(&self) -> &[Address] {
         &self.hops
-    }
-
-    /// Gets the last hop
-    pub fn last_hop(&self) -> &Address {
-        self.hops.last().unwrap()
-    }
-
-    /// Checks if the path contains simple hops between the same addresses.
-    pub fn has_simple_loops(&self) -> bool {
-        let last_addr = self.hops[0];
-        for addr in self.hops.iter().skip(1) {
-            if last_addr.eq(addr) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /// Checks if all the hops in this path are to distinct addresses.
-    /// Returns `true` if there are duplicate Addresses on this path.
-    pub fn is_cyclic(&self) -> bool {
-        let set = HashSet::<&Address, RandomState>::from_iter(self.hops.iter());
-        set.len() != self.hops.len()
     }
 }
 
@@ -126,31 +145,52 @@ impl Display for ChannelPath {
     }
 }
 
-/// Represents a path for a packet.
-/// The path must be always valid
+/// Represents an off-chain path of `PeerId`s.
+/// The path is never allowed to be empty and is always constructed from
+/// hops that must be known to have open channels (at the time of construction).
+/// The path may or may not contain simple loops (same adjacent nodes).
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Path {
     hops: Vec<PeerId>,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 impl Path {
-    /// Number of hops in the path.
-    pub fn length(&self) -> u32 {
-        self.hops.len() as u32
+    /// Resolves vector of `PeerIds` into the corresponding `Path` and `ChannelPath` pair.
+    /// This works by first resolving `PeerId`s into `Address`es and then validating the `ChannelPath`.
+    /// To do an inverse resolution, from `Address`es to `PeerId`s, construct the `ChannelPath` and use `ChannelPath::to_path()` to resolve the
+    /// on-chain path.
+    pub async fn resolve<R: PeerAddressResolver>(peers: Vec<PeerId>, allow_loops: bool, resolver: &R, graph: &ChannelGraph) -> Result<(Self, ChannelPath)> {
+        let (addrs, hops) = peers
+            .into_iter()
+            .map(|peer| async move {
+                let key = OffchainPublicKey::from_peerid(&peer)?;
+                resolver
+                    .resolve_chain_key(&key)
+                    .await
+                    .map(|addr| (addr, peer))
+                    .ok_or(InvalidPeer(peer.to_string()))
+            })
+            .collect::<FuturesOrdered<_>>()
+            .try_collect::<Vec<_>>()
+            .await?
+            .into_iter()
+            .unzip();
+
+        Ok((Self { hops }, ChannelPath::new(addrs, allow_loops, graph)?))
     }
 }
 
 impl Path {
     /// Creates an already pre-validated path.
-    pub fn new_valid(hops: Vec<PeerId>) -> Self {
+   pub(crate) fn new_valid(hops: Vec<PeerId>) -> Self {
         assert!(!hops.is_empty(), "must not be empty");
         Self { hops }
     }
+}
 
-    /// Individual hops in the path.
-    pub fn hops(&self) -> &[PeerId] {
+impl BasePath<PeerId> for Path {
+    fn hops(&self) -> &[PeerId] {
         &self.hops
     }
 }
@@ -183,17 +223,20 @@ impl Display for Path {
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
     use crate::errors::PathError;
-    use crate::path::Path;
+    use crate::path::{BasePath, Path};
     use core_crypto::types::{OffchainPublicKey, PublicKey};
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use hex_literal::hex;
     use libp2p_identity::PeerId;
+    use core_types::protocol::PeerAddressResolver;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::PeerIdLike;
+    use crate::channel_graph::ChannelGraph;
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
@@ -205,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_path_validated() {
-        const HOPS: u32 = 5;
+        const HOPS: usize = 5;
         let peer_ids = (0..HOPS).map(|_| PeerId::random()).collect::<Vec<_>>();
 
         let path = Path::new_valid(peer_ids.clone());
@@ -266,10 +309,10 @@ mod tests {
             peers.push(packet_key.to_peerid());
         }
 
-        // Add a closed channel between 4 -> 0
+        // Add a pending to close channel between 4 -> 0
         let chain_key_0 = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
         let chain_key_4 = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
-        let channel = create_dummy_channel(chain_key_4, chain_key_0, ChannelStatus::Closed);
+        let channel = create_dummy_channel(chain_key_4, chain_key_0, ChannelStatus::PendingToClose);
         db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
             .await
             .unwrap();
@@ -277,44 +320,77 @@ mod tests {
         db
     }
 
+    struct TestResolver(CoreEthereumDb<RustyLevelDbShim>);
+
+    #[async_trait(? Send)]
+    impl PeerAddressResolver for TestResolver {
+        async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
+            self.0.get_packet_key(onchain_key).await.ok().flatten()
+        }
+
+        async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
+            self.0.get_chain_key(offchain_key).await.ok().flatten()
+        }
+
+        async fn link_keys(&mut self, _onchain_key: &Address, _offchain_key: &OffchainPublicKey) -> bool {
+            panic!("should not be called in tests")
+        }
+    }
+
     #[async_std::test]
     async fn test_path_validation() {
         let mut peers = Vec::new();
-        let db = create_db_with_channel_topology(&mut peers).await;
 
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let mut cg = ChannelGraph::new(me);
 
-        let path = Path::new(vec![peers[1], peers[2]], &me, false, &db)
+        let db = create_db_with_channel_topology(&mut peers).await;
+        cg.sync_channels(&db).await.expect("failed to sync graph with the DB");
+        let resolver = TestResolver(db);
+
+        let (path,cpath) = Path::resolve(vec![peers[1], peers[2]], false, &resolver, &cg)
             .await
             .expect("path 0 -> 1 -> 2 must be valid");
 
         assert_eq!(2, path.length());
+        assert!(!path.has_simple_loops(), "path must not have loops");
+        assert!(!cpath.has_simple_loops(), "channel path must not have loops");
+        assert_eq!(cpath.length(), path.length(), "length must be equal");
 
-        let path = Path::new(vec![peers[2]], &me, false, &db)
+        let path_2 = cpath.to_path(&resolver).await.expect("must be reverse-resolvable");
+        assert_eq!(path, path_2, "must be equal");
+
+        let (path,_) = Path::resolve(vec![peers[2]], false, &resolver, &cg)
             .await
             .expect("path 0 -> 2 must be valid, because channel not needed for direct message");
 
         assert_eq!(1, path.length());
 
-        let path = Path::new(vec![peers[1], peers[2], peers[3]], &me, false, &db)
+        let (path,_) = Path::resolve(vec![peers[1], peers[2], peers[3]], false, &resolver, &cg)
             .await
             .expect("path 0 -> 1 -> 2 -> 3 must be valid");
 
         assert_eq!(3, path.length());
+        assert!(!path.has_simple_loops(), "must not have loops");
 
-        let path = Path::new(vec![peers[1], peers[2], peers[3], peers[4]], &me, false, &db)
+        let (path,_) = Path::resolve(vec![peers[1], peers[2], peers[3], peers[4]], false, &resolver, &cg)
             .await
             .expect("path 0 -> 1 -> 2 -> 3 -> 4 must be valid");
 
         assert_eq!(4, path.length());
+        assert!(!path.has_simple_loops(), "must not have loops");
 
-        let path = Path::new(vec![peers[1], peers[2], peers[2], peers[3]], &me, true, &db)
+        let (path, cpath) = Path::resolve(vec![peers[1], peers[2], peers[2], peers[3]], true, &resolver, &cg)
             .await
             .expect("path 0 -> 1 -> 2 -> 2 -> 3 must be valid if loops are allowed");
 
         assert_eq!(4, path.length()); // loop still counts as a hop
+        assert!(path.has_simple_loops(), "must have loops");
+        assert!(path.is_cyclic(), "must be cyclic");
+        assert!(cpath.has_simple_loops(), "must have loops");
+        assert!(cpath.is_cyclic(), "must be cyclic");
 
-        match Path::new(vec![peers[1], peers[2], peers[2], peers[3]], &me, false, &db)
+        match Path::resolve(vec![peers[1], peers[2], peers[2], peers[3]], false, &resolver, &cg)
             .await
             .expect_err("path 0 -> 1 -> 2 -> 2 must be invalid if loops are not allowed")
         {
@@ -322,7 +398,7 @@ mod tests {
             _ => panic!("error must be LoopsNotAllowed"),
         };
 
-        match Path::new(vec![peers[3], peers[4]], &me, false, &db)
+        match Path::resolve(vec![peers[3], peers[4]], false, &resolver, &cg)
             .await
             .expect_err("path 0 -> 3 must be invalid, because channel 0 -> 3 is not opened")
         {
@@ -330,7 +406,7 @@ mod tests {
             _ => panic!("error must be MissingChannel"),
         };
 
-        match Path::new(vec![peers[1], peers[3], peers[4]], &me, false, &db)
+        match Path::resolve(vec![peers[1], peers[3], peers[4]], false, &resolver, &cg)
             .await
             .expect_err("path 0 -> 1 -> 3 -> 4 must be invalid, because channel 1 -> 3 is not opened")
         {
@@ -338,11 +414,11 @@ mod tests {
             _ => panic!("error must be MissingChannel"),
         };
 
-        match Path::new(
+        match Path::resolve(
             vec![peers[1], peers[2], peers[3], peers[4], peers[0], peers[1]],
-            &me,
             false,
-            &db,
+            &resolver,
+            &cg
         )
         .await
         .expect_err("path 0 -> 1 -> 2 -> 3 -> 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
@@ -351,8 +427,15 @@ mod tests {
             _ => panic!("error must be ChannelNotOpened"),
         };
 
+
         let me = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
-        match Path::new(vec![peers[0], peers[1]], &me, false, &db)
+        let mut cg = ChannelGraph::new(me);
+
+        let db = create_db_with_channel_topology(&mut peers).await;
+        cg.sync_channels(&db).await.expect("failed to sync graph with the DB");
+        let resolver = TestResolver(db);
+
+        match Path::resolve(vec![peers[0], peers[1]], false, &resolver, &cg)
             .await
             .expect_err("path 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
         {
@@ -364,51 +447,67 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::errors::PathError::InvalidPeer;
-    use crate::errors::Result;
-    use crate::path::Path;
-    use core_ethereum_db::db::wasm::Database;
+    use std::str::FromStr;
+    use async_trait::async_trait;
     use js_sys::JsString;
     use libp2p_identity::PeerId;
-    use std::str::FromStr;
-    use utils_misc::ok_or_jserr;
+    use crate::path::{BasePath, Path};
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use core_crypto::types::OffchainPublicKey;
+    use core_ethereum_db::db::wasm::Database;
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_types::protocol::PeerAddressResolver;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::channel_graph::ChannelGraph;
+    use crate::errors::{Result, PathError::InvalidPeer};
+
+    pub struct PathResolver<'a, Db: HoprCoreEthereumDbActions>(pub &'a Db);
+
+    #[async_trait(? Send)]
+    impl<Db: HoprCoreEthereumDbActions> PeerAddressResolver for PathResolver<'_, Db> {
+        async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
+            self.0.get_packet_key(onchain_key).await.ok().flatten()
+        }
+
+        async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
+            self.0.get_chain_key(offchain_key).await.ok().flatten()
+        }
+
+        async fn link_keys(&mut self, _onchain_key: &Address, _offchain_key: &OffchainPublicKey) -> bool {
+            unimplemented!()
+        }
+    }
 
     #[wasm_bindgen]
     impl Path {
-        #[wasm_bindgen(constructor)]
-        pub fn _new_validated(validated_path: Vec<JsString>) -> JsResult<Path> {
-            Ok(Path::new_valid(
-                validated_path
-                    .into_iter()
-                    .map(|p| PeerId::from_str(&p.as_string().unwrap()).map_err(|_| InvalidPeer(p.as_string().unwrap())))
-                    .collect::<Result<Vec<PeerId>>>()?,
-            ))
-        }
-
         #[wasm_bindgen(js_name = "validated")]
-        pub async fn _new(
+        pub async fn _validated(
             path: Vec<JsString>,
-            self_addr: &Address,
             allow_loops: bool,
             db: &Database,
+            channel_graph: &ChannelGraph
         ) -> JsResult<Path> {
             let database = db.as_ref_counted();
             let g = database.read().await;
-            ok_or_jserr!(
-                Path::new(
+            Ok(
+                Path::resolve(
                     path.into_iter()
                         .map(|p| PeerId::from_str(&p.as_string().unwrap())
                             .map_err(|_| InvalidPeer(p.as_string().unwrap())))
                         .collect::<Result<Vec<PeerId>>>()?,
-                    self_addr,
                     allow_loops,
-                    &*g
+                    &PathResolver(&*g),
+                    channel_graph
                 )
                 .await
+                .map(|(p,_)| p)?
             )
+        }
+
+        #[wasm_bindgen(js_name = "length")]
+        pub fn _length(&self) -> u32 {
+            self.length() as u32
         }
 
         #[wasm_bindgen(js_name = "to_string")]
