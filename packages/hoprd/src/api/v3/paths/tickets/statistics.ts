@@ -1,6 +1,7 @@
 import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
+import { debug } from '@hoprnet/hopr-utils'
 
 export const getTicketsStatistics = async (node: Hopr) => {
   const stats = await node.getTicketStatistics()
@@ -14,6 +15,7 @@ export const getTicketsStatistics = async (node: Hopr) => {
     losingTickets: stats.losing,
     winProportion: stats.winProportion,
     neglected: stats.neglected,
+    neglectedValue: stats.neglectedValue.to_string(),
     rejected: stats.rejected,
     rejectedValue: stats.rejectedValue.to_string()
   }
@@ -21,13 +23,15 @@ export const getTicketsStatistics = async (node: Hopr) => {
 
 const GET: Operation = [
   async (req, res, _next) => {
+    const log = debug('hoprd:api:v3:get-statistics')
     const { node }: { node: Hopr } = req.context
 
     try {
-      console.log(`about to get ticket statistics`)
+      log(`about to get ticket statistics`)
       const tickets = await getTicketsStatistics(node)
       return res.status(200).send(tickets)
     } catch (err) {
+      log(`failed to get ticket statistics: ${err}`)
       return res
         .status(422)
         .send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: err instanceof Error ? err.message : 'Unknown error' })
@@ -74,6 +78,7 @@ GET.apiDoc = {
                 description:
                   'Number of tickets that were not redeemed in time before channel was closed. Those cannot be redeemed anymore.'
               },
+              neglectedValue: { type: 'string', description: 'Total value of all neglected tickets in Hopr tokens.' },
               rejected: {
                 type: 'number',
                 description:

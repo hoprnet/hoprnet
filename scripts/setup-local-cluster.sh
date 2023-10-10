@@ -119,6 +119,7 @@ function cleanup {
 
   log "Removing cluster env file"
   rm -f "${env_file}"
+  rm -f "${tmp_dir}/cluster.status"
 
   exit $EXIT_CODE
 }
@@ -143,7 +144,7 @@ function setup_node() {
   healthcheck_port=$(( node_healthcheck_base_port + node_id ))
   safe_args="$(<${dir}.safe.args)"
 
-  api_endpoints+="localhost:${api_port} "
+  api_endpoints+="${listen_host}:${api_port} "
 
   log "Run node ${node_id} on rest port ${api_port} -> ${log}"
 
@@ -180,8 +181,6 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
-      --allowLocalNodeConnections \
-      --allowPrivateNodeConnections \
       --healthCheck \
       --healthCheckHost "${host}" \
       --healthCheckPort "${healthcheck_port}" \
@@ -193,8 +192,8 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete || true
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -exec rm {} \; || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id"  -exec rm {} \; || true
 
   env ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
     hopli identity \
@@ -209,7 +208,7 @@ function generate_local_identities() {
 function create_local_safes() {
   log "Create safe"
 
-  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -type f -maxdepth 1 -name "${node_prefix}_*.id" | sort || true)"
+  mapfile -t id_files <<< "$(find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" | sort || true)"
 
   # create a loop so safes are created for all the nodes TODO:
   for id_file in ${id_files[@]}; do
@@ -351,10 +350,18 @@ for endpoint in ${api_endpoints}; do
   peers+=(${peer})
 done
 # }}}
+# --- Get node addresses for reporting --- {{{
+declare -a node_addrs
+for endpoint in ${api_endpoints}; do
+  declare node_addr
+  node_addr="$(get_native_address "${api_token}@${endpoint}")"
+  node_addrs+=(${node_addr})
+done
+# }}}
 
 log "NOTE:"
 log ""
-log "\tThe following links expect HOPR Admin to run at http://localhost:3000"
+log "\tThe following links expect HOPR Admin to run at http://${listen_host}:3000"
 log "\tYou may use \`make run-hopr-admin\`"
 log ""
 log "Node port info"
@@ -372,14 +379,15 @@ for node_id in ${!id_files[@]}; do
 
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
-  log "\t\tRest API:\thttp://localhost:${api_port}/api/v3/_swagger"
-  log "\t\tAdmin UI:\thttp://localhost:3000/?apiEndpoint=http://localhost:${api_port}&apiToken=${api_token}"
-  log "\t\tHealthcheck:\thttp://localhost:$(( node_healthcheck_base_port + node_id ))/"
-  log "\t\tWebSocket:\tws://localhost:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
-  log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://localhost:${api_port}&apiToken=${api_token}"
+  log "\t\tAddress:\t${node_addrs[$node_id]}"
+  log "\t\tRest API:\thttp://${listen_host}:${api_port}/api/v3/_swagger"
+  log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
+  log "\t\tHealthcheck:\thttp://${listen_host}:$(( node_healthcheck_base_port + node_id ))/"
+  log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
+  log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
 
   cat <<EOF >> "${env_file}"
-export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://127.0.0.1:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://127.0.0.1:${api_port}/api/v3/messages/websocket"
+export HOPR_NODE_${node_id}_ADDR=${peers[$node_id]} HOPR_NODE_${node_id}_HTTP_URL=http://${listen_host}:${api_port} HOPR_NODE_${node_id}_WS_URL=ws://${listen_host}:${api_port}/api/v3/messages/websocket"
 echo "---"
 echo "Node ${node_name} REST API URL:  \$HOPR_NODE_${node_id}_HTTP_URL"
 echo "Node ${node_name} WebSocket URL: \$HOPR_NODE_${node_id}_WS_URL"
@@ -395,6 +403,8 @@ else
   log "Run: 'source ${env_file}' in your shell to setup environment variables for this cluster (HOPR_NODE_1_ADDR, HOPR_NODE_1_HTTP_URL,... etc.)"
 fi
 
+# Needed by the Pluto HealthCheck
+echo "running" > "${tmp_dir}/cluster.status"
 log "Terminating this script will clean up the running local cluster"
 trap - SIGINT SIGTERM ERR
 wait

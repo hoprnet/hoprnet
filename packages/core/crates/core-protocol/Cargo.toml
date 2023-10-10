@@ -1,0 +1,72 @@
+[package]
+name = "core-protocol"
+version = "0.2.2"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook", "wasm", "prometheus"]
+wasm = [
+    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom", "dep:gloo-timers",
+    "core-crypto/wasm", "core-ethereum-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
+    "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-types/wasm", "utils-metrics?/wasm",
+]
+prometheus = ["dep:utils-metrics"]
+
+[dependencies]
+# a better separation of tcp + async-std for non wasm case could be designed
+async-trait = { workspace = true }
+async-std = { workspace = true, features = ["attributes", "unstable"] }
+async-lock = { workspace = true }
+futures = { workspace = true }
+futures-lite = { workspace = true }
+hex = { workspace = true }
+hex-literal = "0.4"
+lazy_static = { workspace = true }
+rand = "0.8.5"
+rust-stream-ext-concurrent = { workspace = true }
+serde = { workspace = true, features = ["derive"]}
+serde_with = { workspace = true }
+thiserror = { workspace = true }
+validator = { workspace = true }
+
+# wasm
+getrandom = { workspace = true, optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+js-sys = { version = "0.3.63", optional = true }
+libp2p-identity = { workspace = true }
+libp2p = { workspace = true, features = ["noise", "request-response"] }
+gloo-timers = { workspace = true, optional = true}
+
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4.36", optional = true }
+#wee_alloc = { version = "0.4.5", optional = true }
+
+core-crypto = { workspace = true }
+core-ethereum-db = { workspace = true }
+core-packet = { workspace = true }
+core-path = { workspace = true }
+core-types = { workspace = true }
+utils-db = { workspace = true }
+utils-log = { workspace = true }
+utils-types = { workspace = true }
+utils-metrics = { optional = true, workspace = true }
+utils-misc = { optional = true, workspace = true }
+
+[dev-dependencies]
+env_logger = "0.10.0"
+hex-literal = "0.4.1"
+more-asserts = "0.3.1"
+parameterized = "1.0"
+serial_test = "2.0"
+wasm-bindgen-test = "0.3.36"
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']

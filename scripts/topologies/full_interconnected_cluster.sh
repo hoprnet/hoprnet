@@ -50,7 +50,7 @@ done
 
 for endpoint in ${endpoints}; do
   log "Validate funds for ${endpoint}"
-  api_validate_node_balance_gt0 "${endpoint}"
+  api_validate_balances_gt0 "${endpoint}"
   log "Validate funds for ${endpoint} - OK"
 done
 

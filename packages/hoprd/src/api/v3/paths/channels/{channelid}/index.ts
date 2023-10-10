@@ -1,22 +1,21 @@
 import {
-  debug,
-  Hash,
   channel_status_to_string,
-  stringToU8a,
+  ChannelDirection,
   ChannelStatus,
+  debug,
   defer,
-  type DeferType
+  type DeferType,
+  Hash,
+  stringToU8a
 } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
-import { ChannelTopologyInfo, formatChannelTopologyInfo } from '../index.js'
+import { formatChannelTopologyInfo } from '../index.js'
 
 import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 
 const closingRequests = new Map<string, DeferType<void>>()
-
-const log = debug('hoprd:api:v3:channel-close')
 
 /**
  * Closes a channel with channel id.
@@ -36,9 +35,22 @@ export async function closeChannel(
       receipt: string
     }
 > {
+  const log = debug('hoprd:api:v3:channel-close')
+
   const channelIdHash = Hash.deserialize(stringToU8a(channelIdStr))
+
   const channel = await node.db.get_channel(channelIdHash)
+
+  if (!channel) {
+    return { success: false, reason: STATUS_CODES.CHANNEL_NOT_FOUND }
+  }
+
   const channelId = channel.get_id()
+
+  if (channel.status == ChannelStatus.Closed) {
+    log(`channel ${channelId.to_hex()} is already closed`)
+    return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
+  }
 
   let closingRequest = closingRequests.get(channelId.to_hex())
   if (closingRequest == null) {
@@ -49,14 +61,14 @@ export async function closeChannel(
   }
 
   // incoming if destination is me, outgoing if source is me
-  let direction
+  let direction: ChannelDirection
   let counterpartyAddress
 
   if (channel.source.to_string() == node.getEthereumAddress().to_string()) {
-    direction = 'outgoing'
+    direction = ChannelDirection.Outgoing
     counterpartyAddress = channel.destination
   } else if (channel.destination.to_string() == node.getEthereumAddress().to_string()) {
-    direction = 'incoming'
+    direction = ChannelDirection.Incoming
     counterpartyAddress = channel.source
   } else {
     return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }
@@ -66,14 +78,11 @@ export async function closeChannel(
     const { status: channelStatus, receipt } = await node.closeChannel(counterpartyAddress, direction)
     return { success: true, channelStatus, receipt }
   } catch (err) {
-    log(`${err}`)
-    const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+    log(`close channel error: ${err}`)
 
-    if (errString.match(/Channel is already closed/)) {
-      // @TODO insert receipt
+    const errString: string = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+    if (errString.includes('channel is already closed')) {
       return { success: true, receipt: /* @fixme */ '0x', channelStatus: ChannelStatus.Closed }
-    } else if (errString.includes('Incoming channel')) {
-      return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }
     } else {
       return { success: false, reason: STATUS_CODES.UNKNOWN_FAILURE }
     }
@@ -172,39 +181,26 @@ DELETE.apiDoc = {
   }
 }
 
-/**
- * Fetches channel information by channel id.
- * @returns the channel information
- */
-export const getChannel = async (node: Hopr, channelIdStr: string): Promise<ChannelTopologyInfo> => {
-  try {
-    const channel = await node.db.get_channel(Hash.deserialize(new TextEncoder().encode(channelIdStr)))
-
-    return formatChannelTopologyInfo(node, channel)
-  } catch {
-    throw Error(STATUS_CODES.CHANNEL_NOT_FOUND)
-  }
-}
-
 const GET: Operation = [
   async (req, res, _next) => {
+    const log = debug('hoprd:api:v3:channel-get')
+
     const { node }: { node: Hopr } = req.context
     const { channelid } = req.params
 
     try {
-      const channel = await getChannel(node, channelid)
-      return res.status(200).send(channel)
-    } catch (err) {
-      const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
-
-      switch (errString) {
-        case STATUS_CODES.INVALID_CHANNELID:
-          return res.status(400).send({ status: STATUS_CODES.INVALID_CHANNELID })
-        case STATUS_CODES.CHANNEL_NOT_FOUND:
-          return res.status(404).send({ status: STATUS_CODES.CHANNEL_NOT_FOUND })
-        default:
-          return res.status(422).send({ status: STATUS_CODES.UNKNOWN_FAILURE, error: errString })
+      const channelIdHash = Hash.deserialize(stringToU8a(channelid))
+      const channel = await node.db.get_channel(channelIdHash)
+      if (!channel) {
+        return res.status(404).send()
       }
+      const response = await formatChannelTopologyInfo(node, channel)
+      return res.status(200).send(response)
+    } catch (err) {
+      log(`${err}`)
+      const error = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
+      const status = STATUS_CODES.UNKNOWN_FAILURE
+      res.status(422).send({ status, error })
     }
   }
 ]
@@ -229,9 +225,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            items: {
-              $ref: '#/components/schemas/ChannelTopology'
-            }
+            $ref: '#/components/schemas/ChannelTopology'
           }
         }
       }
@@ -256,17 +250,7 @@ GET.apiDoc = {
       $ref: '#/components/responses/Forbidden'
     },
     '404': {
-      description: 'Channel with that channel id was not found. You can list all channels using /channels/ endpoint.',
-      content: {
-        'application/json': {
-          schema: {
-            $ref: '#/components/schemas/RequestStatus'
-          },
-          example: {
-            status: STATUS_CODES.CHANNEL_NOT_FOUND
-          }
-        }
-      }
+      $ref: '#/components/responses/NotFound'
     },
     '422': {
       description: 'Unknown failure.',

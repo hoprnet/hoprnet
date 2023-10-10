@@ -8,16 +8,16 @@ use core_crypto::{
 use enum_iterator::{all, Sequence};
 use ethers::contract::EthCall;
 use hex_literal::hex;
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, Deserializer, Visitor},
+    Deserialize, Serialize,
+};
 use serde_repr::*;
-use std::fmt::{Display, Formatter};
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter},
+};
 use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, U256};
-
-#[cfg(all(feature = "wasm", not(test)))]
-use utils_misc::time::wasm::current_timestamp;
-
-#[cfg(any(not(feature = "wasm"), test))]
-use utils_misc::time::native::current_timestamp;
 
 use utils_types::traits::{BinarySerializable, ToHex};
 
@@ -29,9 +29,10 @@ pub type EncodedWinProb = [u8; 7];
 
 /// Describes status of a channel
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelStatus {
+    #[default]
     Closed = 0,
     Open = 1,
     PendingToClose = 2,
@@ -57,6 +58,27 @@ impl Display for ChannelStatus {
     }
 }
 
+/// Describes a direction of node's own channel.
+/// The direction of a channel that is not own is undefined.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub enum ChannelDirection {
+    /// The other party is initiator of the channel.
+    Incoming = 0,
+    /// Our own node is the initiator of the channel.
+    Outgoing = 1,
+}
+
+impl Display for ChannelDirection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChannelDirection::Incoming => write!(f, "incoming"),
+            ChannelDirection::Outgoing => write!(f, "outgoing"),
+        }
+    }
+}
+
 /// Overall description of a channel
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
@@ -68,6 +90,7 @@ pub struct ChannelEntry {
     pub status: ChannelStatus,
     pub channel_epoch: U256,
     pub closure_time: U256,
+    id: Hash,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -91,19 +114,21 @@ impl ChannelEntry {
             status,
             channel_epoch,
             closure_time,
+            id: generate_channel_id(&source, &destination),
         }
     }
 
     /// Generates the channel ID using the source and destination address
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn get_id(&self) -> Hash {
-        generate_channel_id(&self.source, &self.destination)
+        self.id
     }
 
     /// Checks if the closure time of this channel has passed.
-    pub fn closure_time_passed(&self) -> Option<bool> {
+    pub fn closure_time_passed(&self, current_timestamp_ms: u64) -> Option<bool> {
+        assert!(current_timestamp_ms > 0, "invalid timestamp");
         // round clock ms to seconds
-        let now_seconds: U256 = U256::from(current_timestamp()) / 1000u64.into();
+        let now_seconds: U256 = U256::from(current_timestamp_ms) / 1000u64.into();
 
         if self.closure_time.eq(&U256::zero()) {
             None
@@ -112,15 +137,16 @@ impl ChannelEntry {
         }
     }
 
-    /// Calculates the remaining channel closure grace period.
-    pub fn remaining_closure_time(&self) -> Option<u64> {
+    /// Calculates the remaining channel closure grace period in seconds.
+    pub fn remaining_closure_time(&self, current_timestamp_ms: u64) -> Option<u64> {
+        assert!(current_timestamp_ms > 0, "invalid timestamp");
         // round clock ms to seconds
-        let now_seconds = U256::from(current_timestamp()) / 1000u64.into();
+        let now_seconds = U256::from(current_timestamp_ms) / 1000u64.into();
 
         if self.closure_time.eq(&U256::zero()) {
             None
-        } else if now_seconds >= self.closure_time {
-            Some((now_seconds - self.closure_time).as_u64())
+        } else if self.closure_time > now_seconds {
+            Some((self.closure_time - now_seconds).as_u64())
         } else {
             Some(0u64)
         }
@@ -132,17 +158,31 @@ impl ChannelEntry {
     }
 }
 
-impl std::fmt::Display for ChannelEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("ChannelEntry")
-            .field("source", &self.source.to_string())
-            .field("destination", &self.destination.to_string())
-            .field("balance", &format!("{}", self.balance))
-            .field("ticket_index", &self.ticket_index.to_string())
-            .field("status", &self.status.to_string())
-            .field("channel_epoch", &self.channel_epoch.to_string())
-            .field("closure_time", &self.closure_time.to_string())
-            .finish()
+impl ChannelEntry {
+    /// Determines the channel direction given the self address.
+    /// Returns `None` if neither source nor destination is equal to `me`.
+    pub fn direction(&self, me: &Address) -> Option<ChannelDirection> {
+        if self.source.eq(me) {
+            Some(ChannelDirection::Outgoing)
+        } else if self.destination.eq(me) {
+            Some(ChannelDirection::Incoming)
+        } else {
+            None
+        }
+    }
+}
+
+impl Display for ChannelEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} channel {} ({}): {} -> {}",
+            self.status,
+            self.get_id(),
+            self.closure_time,
+            self.source,
+            self.destination,
+        )
     }
 }
 
@@ -160,7 +200,7 @@ impl BinarySerializable for ChannelEntry {
                 .ok_or(utils_types::errors::GeneralError::ParseError)?;
             let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            Ok(Self {
+            Ok(Self::new(
                 source,
                 destination,
                 balance,
@@ -168,7 +208,7 @@ impl BinarySerializable for ChannelEntry {
                 status,
                 channel_epoch,
                 closure_time,
-            })
+            ))
         } else {
             Err(utils_types::errors::GeneralError::ParseError)
         }
@@ -193,7 +233,7 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 }
 
 /// Contains the overall description of a ticket with a signature
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Ticket {
     pub channel_id: Hash,
     pub amount: Balance,
@@ -203,6 +243,63 @@ pub struct Ticket {
     pub channel_epoch: u32,
     pub challenge: EthereumChallenge,
     pub signature: Option<Signature>,
+}
+
+impl PartialOrd for Ticket {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Ticket {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.channel_id.cmp(&other.channel_id) {
+            Ordering::Equal => match self.channel_epoch.cmp(&other.channel_epoch) {
+                Ordering::Equal => self.index.cmp(&other.index),
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Less => Ordering::Less,
+            },
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Less => Ordering::Less,
+        }
+    }
+}
+
+// Use compact serialization for ticket as they are used very often
+impl Serialize for Ticket {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_bytes(self.to_bytes().as_ref())
+    }
+}
+
+struct TicketVisitor {}
+
+impl<'de> Visitor<'de> for TicketVisitor {
+    type Value = Ticket;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_fmt(format_args!("a byte-array with {} elements", Ticket::SIZE))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ticket::from_bytes(v).map_err(|e| de::Error::custom(e.to_string()))
+    }
+}
+
+// Use compact deserialization for tickets as they are used very often
+impl<'de> Deserialize<'de> for Ticket {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_bytes(TicketVisitor {})
+    }
 }
 
 impl Default for Ticket {
@@ -217,6 +314,16 @@ impl Default for Ticket {
             challenge: EthereumChallenge::default(),
             signature: None,
         }
+    }
+}
+
+impl Display for Ticket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ticket #{}, epoch {} in channel {}",
+            self.index, self.channel_epoch, self.channel_id
+        )
     }
 }
 
@@ -260,7 +367,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(&own_address, counterparty);
 
         let mut ret = Ticket {
             channel_id,
@@ -300,7 +407,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(own_address, counterparty);
 
         let ret = Ticket {
             channel_id,
@@ -313,7 +420,7 @@ impl Ticket {
             signature: Some(signature),
         };
 
-        ret.verify(&own_address, domain_separator)
+        ret.verify(own_address, domain_separator)
             .map_err(|_| CoreTypesError::InvalidInputData("Invalid signature".into()))?;
 
         Ok(ret)
@@ -340,7 +447,7 @@ impl Ticket {
             channel_epoch,
         )?;
 
-        let channel_id = generate_channel_id(&own_address, &counterparty);
+        let channel_id = generate_channel_id(own_address, counterparty);
 
         Ok(Ticket {
             channel_id,
@@ -366,7 +473,7 @@ impl Ticket {
         win_prob: f64,
         channel_epoch: U256,
     ) -> Result<()> {
-        if own_address.eq(&counterparty) {
+        if own_address.eq(counterparty) {
             return Err(CoreTypesError::InvalidInputData(
                 "Source and destination must be different".into(),
             ));
@@ -478,7 +585,7 @@ impl Ticket {
     }
 
     /// Convenience method for creating a zero-hop ticket
-    pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Self {
+    pub fn new_zero_hop(destination: &Address, private_key: &ChainKeypair, domain_separator: &Hash) -> Result<Self> {
         Self::new(
             destination,
             &Balance::new(0u32.into(), BalanceType::HOPR),
@@ -490,7 +597,6 @@ impl Ticket {
             private_key,
             domain_separator,
         )
-        .expect("Failed to create zero-hop ticket")
     }
 
     /// Based on the price of this ticket, determines the path position (hop number) this ticket
@@ -498,7 +604,7 @@ impl Ticket {
     ///
     /// Does not support path lengths greater than 255
     pub fn get_path_position(&self, price_per_packet: U256) -> Result<u8> {
-        Ok((self.get_expected_payout() / price_per_packet)
+        (self.get_expected_payout() / price_per_packet)
             .as_u64()
             .try_into() // convert to u8
             .map_err(|_| {
@@ -506,7 +612,7 @@ impl Ticket {
                     "Cannot convert {} to u8",
                     price_per_packet / self.get_expected_payout()
                 ))
-            })?)
+            })
     }
 
     pub fn get_expected_payout(&self) -> U256 {
@@ -538,6 +644,11 @@ impl Ticket {
             .eq(address)
             .then_some(())
             .ok_or(SignatureVerification)
+    }
+
+    pub fn is_aggregated(&self) -> bool {
+        // Aggregated tickets have always an index offset > 1
+        self.index_offset > 1
     }
 }
 
@@ -664,16 +775,19 @@ pub mod tests {
         traits::BinarySerializable,
     };
 
-    const ADDRESS_1: [u8; 20] = hex!("3829b806aea42200c623c4d6b9311670577480ed");
-    const ADDRESS_2: [u8; 20] = hex!("1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1");
-    const ALICE: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
-    const BOB: [u8; 32] = hex!("07af9653b11d609139597aecd26360fce1f9c23864d0c6ce1035bdb77ea4e27c");
+    lazy_static::lazy_static! {
+        static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
+        static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).unwrap();
+
+        static ref ADDRESS_1: Address = Address::from_bytes(&hex!("3829b806aea42200c623c4d6b9311670577480ed")).unwrap();
+        static ref ADDRESS_2: Address = Address::from_bytes(&hex!("1a34729c69e95d6e11c3a9b9be3ea0c62c6dc5b1")).unwrap();
+    }
 
     #[test]
     pub fn channel_entry_test() {
         let ce1 = ChannelEntry::new(
-            Address::from_bytes(&ADDRESS_1).unwrap(),
-            Address::from_bytes(&ADDRESS_2).unwrap(),
+            *ADDRESS_1,
+            *ADDRESS_2,
             Balance::new(10u64.into(), BalanceType::HOPR),
             23u64.into(),
             ChannelStatus::PendingToClose,
@@ -739,18 +853,15 @@ pub mod tests {
 
     #[test]
     pub fn test_ticket_serialize_deserialize() {
-        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
-        let bob = ChainKeypair::from_secret(&BOB).unwrap();
-
         let initial_ticket = super::Ticket::new(
-            &bob.public().to_address(),
+            &BOB.public().to_address(),
             &Balance::new(U256::one(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
             1.0,
             U256::one(),
             EthereumChallenge::default(),
-            &alice,
+            &ALICE,
             &Hash::default(),
         )
         .unwrap();
@@ -761,19 +872,37 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_ticket_sign_verify() {
-        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
-        let bob = ChainKeypair::from_secret(&BOB).unwrap();
-
+    pub fn test_ticket_serialize_deserialize_serde() {
         let initial_ticket = super::Ticket::new(
-            &bob.public().to_address(),
+            &BOB.public().to_address(),
             &Balance::new(U256::one(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
             1.0,
             U256::one(),
             EthereumChallenge::default(),
-            &alice,
+            &ALICE,
+            &Hash::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            initial_ticket,
+            bincode::deserialize(&bincode::serialize(&initial_ticket).unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    pub fn test_ticket_sign_verify() {
+        let initial_ticket = super::Ticket::new(
+            &BOB.public().to_address(),
+            &Balance::new(U256::one(), BalanceType::HOPR),
+            U256::zero(),
+            U256::one(),
+            1.0,
+            U256::one(),
+            EthereumChallenge::default(),
+            &ALICE,
             &Hash::default(),
         )
         .unwrap();
@@ -781,18 +910,15 @@ pub mod tests {
         assert_ne!(*initial_ticket.get_hash(&Hash::default()).to_bytes(), [0u8; Hash::SIZE]);
 
         assert!(initial_ticket
-            .verify(&alice.public().to_address(), &Hash::default())
+            .verify(&ALICE.public().to_address(), &Hash::default())
             .is_ok());
     }
 
     #[test]
     pub fn test_ticket_expected_payout() {
-        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
-        let bob = ChainKeypair::from_secret(&BOB).unwrap();
-
         let mut ticket = Ticket::new_partial(
-            &alice.public().to_address(),
-            &bob.public().to_address(),
+            &ALICE.public().to_address(),
+            &BOB.public().to_address(),
             &Balance::new(U256::one(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
@@ -814,11 +940,9 @@ pub mod tests {
 
     #[test]
     pub fn test_path_position() {
-        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
-        let bob = ChainKeypair::from_secret(&BOB).unwrap();
         let mut ticket = Ticket::new_partial(
-            &alice.public().to_address(),
-            &bob.public().to_address(),
+            &ALICE.public().to_address(),
+            &BOB.public().to_address(),
             &Balance::new(U256::one(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
@@ -846,11 +970,9 @@ pub mod tests {
 
     #[test]
     pub fn test_path_position_bad_examples() {
-        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
-        let bob = ChainKeypair::from_secret(&BOB).unwrap();
         let ticket = Ticket::new_partial(
-            &alice.public().to_address(),
-            &bob.public().to_address(),
+            &ALICE.public().to_address(),
+            &BOB.public().to_address(),
             &Balance::new(256u64.into(), BalanceType::HOPR),
             U256::zero(),
             U256::one(),
@@ -864,12 +986,9 @@ pub mod tests {
 
     #[test]
     pub fn test_zero_hop() {
-        let alice = ChainKeypair::from_secret(&ALICE).unwrap();
-        let bob = ChainKeypair::from_secret(&BOB).unwrap();
-
-        let zero_hop_ticket = Ticket::new_zero_hop(&bob.public().to_address(), &alice, &Hash::default());
+        let zero_hop_ticket = Ticket::new_zero_hop(&BOB.public().to_address(), &ALICE, &Hash::default()).unwrap();
         assert!(zero_hop_ticket
-            .verify(&alice.public().to_address(), &Hash::default())
+            .verify(&ALICE.public().to_address(), &Hash::default())
             .is_ok());
     }
 }
@@ -924,7 +1043,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         pub fn size() -> u32 {
@@ -966,8 +1085,8 @@ pub mod wasm {
             })
         }
 
-        #[wasm_bindgen]
-        pub fn default() -> Ticket {
+        #[wasm_bindgen(js_name = "make_default")]
+        pub fn _default() -> Ticket {
             Self {
                 w: super::Ticket::default(),
             }
@@ -975,12 +1094,12 @@ pub mod wasm {
 
         #[wasm_bindgen(getter)]
         pub fn channel_id(&self) -> Hash {
-            self.w.channel_id.clone()
+            self.w.channel_id
         }
 
         #[wasm_bindgen(getter)]
         pub fn amount(&self) -> Balance {
-            self.w.amount.clone()
+            self.w.amount
         }
 
         #[wasm_bindgen(getter)]
@@ -1013,12 +1132,13 @@ pub mod wasm {
             self.w.signature.clone()
         }
 
-        #[wasm_bindgen]
-        pub fn to_string(&self) -> String {
-            format!("{:?}", self.w)
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.w.to_string()
         }
 
-        pub fn clone(&self) -> Ticket {
+        #[wasm_bindgen(js_name = "clone")]
+        pub fn _clone(&self) -> Ticket {
             Self { w: self.w.clone() }
         }
     }

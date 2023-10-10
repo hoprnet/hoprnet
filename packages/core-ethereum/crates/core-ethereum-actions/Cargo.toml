@@ -1,0 +1,52 @@
+[package]
+name = "core-ethereum-actions"
+version = "0.1.1"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "High-level Core-Ethereum functions that translate to on-chain transactions"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+async-std = { workspace = true }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
+futures = { workspace = true }
+gloo-timers = { workspace = true, optional = true }
+hex = { workspace = true }
+js-sys = { workspace = true, optional = true }
+lazy_static = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde-wasm-bindgen = { workspace = true, optional = true }
+thiserror = { workspace = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, features = ["futures-core-03-stream"], optional = true }
+
+core-crypto = { workspace = true }
+core-ethereum-db = { workspace = true }
+core-ethereum-misc = { workspace = true }
+core-types = { workspace = true }
+bindings = { workspace = true }
+utils-db = { workspace = true }
+utils-misc = { workspace = true }
+utils-log = { workspace = true }
+utils-types = { workspace = true }
+
+[dev-dependencies]
+async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
+env_logger = "0.10"
+mockall = "0.11.4"
+hex-literal = "0.4"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["wasm"]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
+    "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-crypto/wasm", "core-types/wasm",
+    "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]

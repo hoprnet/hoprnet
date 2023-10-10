@@ -77,6 +77,8 @@ impl From<&wasm::ContractAddresses> for ContractAddresses {
 pub trait IndexerCallbacks {
     fn own_channel_updated(&self, channel_entry: &ChannelEntry);
 
+    fn ticket_redeemed(&self, channel_entry: &ChannelEntry, ticket_amount: &Balance);
+
     fn node_not_allowed_to_access_network(&self, address: &Address);
 
     fn node_allowed_to_access_network(&self, address: &Address);
@@ -88,7 +90,7 @@ pub struct ContractEventHandlers<Cbs> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: ContractAddresses,
-    /// monitor the Hopr Token events, ignore rest
+    /// Safe on-chain address which we are monitoring
     address_to_monitor: Address,
     /// own address, aka msg.sender
     chain_key: Address,
@@ -168,6 +170,10 @@ where
                     &address_announcement.base_multiaddr,
                     &address_announcement.node.to_string()
                 );
+                // safeguard against empty multiaddrs, skip
+                if address_announcement.base_multiaddr.is_empty() {
+                    return Err(CoreEthereumIndexerError::AnnounceEmptyMultiaddr);
+                }
 
                 if let Some(mut account) = maybe_account {
                     let new_entry_type = AccountType::Announced {
@@ -236,9 +242,8 @@ where
                 let maybe_channel = db.get_channel(&balance_decreased.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    channel.balance = channel
-                        .balance
-                        .sub(&Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR));
+                    let old_balance = channel.balance;
+                    channel.balance = Balance::new(balance_decreased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
@@ -246,6 +251,10 @@ where
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
                     }
+
+                    // we need to infer the amount since the actual amount is not part of any event
+                    let amount = old_balance.sub(&channel.balance);
+                    self.cbs.ticket_redeemed(&channel, &amount);
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -254,9 +263,7 @@ where
                 let maybe_channel = db.get_channel(&balance_increased.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
-                    channel.balance = channel
-                        .balance
-                        .add(&Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR));
+                    channel.balance = Balance::new(balance_increased.new_balance.into(), BalanceType::HOPR);
 
                     db.update_channel_and_snapshot(&balance_increased.channel_id.try_into()?, &channel, snapshot)
                         .await?;
@@ -272,11 +279,15 @@ where
                 let maybe_channel = db.get_channel(&channel_closed.channel_id.try_into()?).await?;
 
                 if let Some(mut channel) = maybe_channel {
+                    // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Closed;
+                    channel.balance = Balance::new(U256::zero(), BalanceType::HOPR);
+                    channel.closure_time = 0u64.into();
+                    channel.ticket_index = 0u64.into();
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel.destination.eq(&self.chain_key) {
-                        db.delete_acknowledged_tickets_from(channel).await?;
+                        db.mark_acknowledged_tickets_neglected(channel).await?;
                     }
 
                     db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
@@ -305,7 +316,10 @@ where
                 );
 
                 if let Some(mut channel) = maybe_channel {
+                    // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Open;
+                    channel.ticket_index = 0u64.into();
+                    channel.channel_epoch = channel.channel_epoch + 1u64.into();
 
                     db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
 
@@ -421,6 +435,7 @@ where
                     allowance.to_string()
                 );
 
+                // if approval is for tokens on Safe contract to be spend by HoprChannels
                 if owner.eq(&self.address_to_monitor) && spender.eq(&self.addresses.channels) {
                     db.set_staking_safe_allowance(&Balance::new(allowance, BalanceType::HOPR), snapshot)
                         .await?;
@@ -603,7 +618,7 @@ pub mod tests {
         },
         hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
-        hopr_token::TransferFilter,
+        hopr_token::{ApprovalFilter, TransferFilter},
     };
     use core_crypto::{
         keypairs::{Keypair, OffchainKeypair},
@@ -623,8 +638,7 @@ pub mod tests {
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
-    use std::sync::{Arc, Mutex};
-    use utils_db::{db::DB, leveldb::rusty::RustyLevelDbShim};
+    use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
         traits::BinarySerializable,
@@ -646,13 +660,7 @@ pub mod tests {
     }
 
     fn create_mock_db() -> CoreEthereumDb<RustyLevelDbShim> {
-        let opt = rusty_leveldb::in_memory();
-        let db = rusty_leveldb::DB::open("test", opt).unwrap();
-
-        CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(db)))),
-            Address::random(),
-        )
+        CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random())
     }
 
     struct DummyCallbacks {}
@@ -661,6 +669,8 @@ pub mod tests {
         fn new_announcement(&self, _account_entry: &AccountEntry) {}
 
         fn own_channel_updated(&self, _channel_entry: &ChannelEntry) {}
+
+        fn ticket_redeemed(&self, _channel_entry: &ChannelEntry, _ticket_amount: &Balance) {}
 
         fn node_not_allowed_to_access_network(&self, _address: &Address) {}
 
@@ -739,6 +749,32 @@ pub mod tests {
             .await
             .unwrap();
 
+        let test_multiaddr_empty: Multiaddr = "".parse().unwrap();
+
+        let address_announcement_empty_log = RawLog {
+            topics: vec![AddressAnnouncementFilter::signature()],
+            data: encode(&[
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::String(test_multiaddr_empty.to_string()),
+            ]),
+        };
+
+        let _error = handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.announcements,
+                0u32,
+                &address_announcement_empty_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            account_entry
+        );
+
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse().unwrap();
 
         let address_announcement_log = RawLog {
@@ -772,6 +808,41 @@ pub mod tests {
         assert_eq!(
             db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
             announced_account_entry
+        );
+
+        let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse().unwrap();
+
+        let address_announcement_dns_log = RawLog {
+            topics: vec![AddressAnnouncementFilter::signature()],
+            data: encode(&[
+                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.to_bytes())),
+                Token::String(test_multiaddr_dns.to_string()),
+            ]),
+        };
+
+        let announced_dns_account_entry = AccountEntry::new(
+            SELF_PRIV_KEY.public().clone(),
+            *SELF_CHAIN_ADDRESS,
+            AccountType::Announced {
+                multiaddr: test_multiaddr_dns,
+                updated_block: 0,
+            },
+        );
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.announcements,
+                0u32,
+                &address_announcement_dns_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_account(&SELF_CHAIN_ADDRESS).await.unwrap().unwrap(),
+            announced_dns_account_entry
         );
     }
 
@@ -894,6 +965,58 @@ pub mod tests {
             db.get_hopr_balance().await.unwrap(),
             Balance::new(U256::zero(), BalanceType::HOPR)
         )
+    }
+
+    #[async_std::test]
+    async fn on_token_approval_correct() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let log = RawLog {
+            topics: vec![
+                ApprovalFilter::signature(),
+                H256::from_slice(&handlers.address_to_monitor.to_bytes32()),
+                H256::from_slice(&handlers.addresses.channels.to_bytes32()),
+            ],
+            data: encode(&[Token::Uint(EthU256::from(1000u64))]),
+        };
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(0u64), BalanceType::HOPR)
+        );
+
+        handlers
+            .on_event(&mut db, &handlers.addresses.token, 0u32, &log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(1000u64), BalanceType::HOPR)
+        );
+
+        // reduce allowance manually to verify a second time
+        let _ = db
+            .set_staking_safe_allowance(
+                &Balance::new(U256::from(10u64), BalanceType::HOPR),
+                &Snapshot::default(),
+            )
+            .await;
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(10u64), BalanceType::HOPR)
+        );
+
+        handlers
+            .on_event(&mut db, &handlers.addresses.token, 0u32, &log, &Snapshot::default())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db.get_staking_safe_allowance().await.unwrap(),
+            Balance::new(U256::from(1000u64), BalanceType::HOPR)
+        );
     }
 
     #[async_std::test]
@@ -1261,7 +1384,7 @@ pub mod tests {
 
         assert_eq!(
             *db.get_channel(&channel_id).await.unwrap().unwrap().balance.value(),
-            U256::zero()
+            solidity_balance
         );
     }
 
@@ -1271,13 +1394,14 @@ pub mod tests {
         let mut db = create_mock_db();
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
+        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR);
 
         db.update_channel_and_snapshot(
             &channel_id,
             &ChannelEntry::new(
                 *SELF_CHAIN_ADDRESS,
                 *COUNTERPARTY_CHAIN_ADDRESS,
-                Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+                starting_balance,
                 U256::zero(),
                 ChannelStatus::Open,
                 U256::one(),
@@ -1307,10 +1431,12 @@ pub mod tests {
             .await
             .unwrap();
 
-        assert_eq!(
-            db.get_channel(&channel_id).await.unwrap().unwrap().status,
-            ChannelStatus::Closed
-        );
+        let closed_channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(closed_channel.status, ChannelStatus::Closed);
+        assert_eq!(closed_channel.ticket_index, 0u64.into());
+
+        assert!(closed_channel.balance.value().eq(&U256::zero()));
     }
 
     #[async_std::test]
@@ -1343,6 +1469,58 @@ pub mod tests {
         let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
 
         assert_eq!(channel.status, ChannelStatus::Open);
+        assert_eq!(channel.channel_epoch, 1u64.into());
+        assert_eq!(channel.ticket_index, 0u64.into());
+    }
+
+    #[async_std::test]
+    async fn on_channel_reopened() {
+        let handlers = init_handlers();
+        let mut db = create_mock_db();
+
+        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
+
+        db.update_channel_and_snapshot(
+            &channel_id,
+            &ChannelEntry::new(
+                *SELF_CHAIN_ADDRESS,
+                *COUNTERPARTY_CHAIN_ADDRESS,
+                Balance::zero(BalanceType::HOPR),
+                U256::zero(),
+                ChannelStatus::Open,
+                3u64.into(),
+                U256::zero(),
+            ),
+            &Snapshot::default(),
+        )
+        .await
+        .unwrap();
+
+        let channel_opened_log = RawLog {
+            topics: vec![
+                ChannelOpenedFilter::signature(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()),
+            ],
+            data: encode(&[]),
+        };
+
+        handlers
+            .on_event(
+                &mut db,
+                &handlers.addresses.channels,
+                0u32,
+                &channel_opened_log,
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+
+        assert_eq!(channel.status, ChannelStatus::Open);
+        assert_eq!(channel.channel_epoch, 4u64.into());
+        assert_eq!(channel.ticket_index, 0u64.into());
     }
 
     #[async_std::test]
@@ -1542,7 +1720,7 @@ pub mod wasm {
     use std::str::FromStr;
     use utils_log::error;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
-    use utils_types::primitives::{Address, Snapshot};
+    use utils_types::primitives::{Address, Balance, Snapshot};
     use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_futures;
 
@@ -1553,6 +1731,9 @@ pub mod wasm {
 
         #[wasm_bindgen(method, js_name = "ownChannelUpdated")]
         pub fn js_own_channel_updated(this: &IndexerCallbacks, channel_entry: ChannelEntry);
+
+        #[wasm_bindgen(method, js_name = "ticketRedeemed")]
+        pub fn js_ticket_redeemed(this: &IndexerCallbacks, channel_entry: ChannelEntry, ticket_amount: Balance);
 
         #[wasm_bindgen(method, js_name = "newAnnouncement")]
         pub fn js_new_announcement(this: &IndexerCallbacks, account_entry: AccountEntry);
@@ -1572,6 +1753,10 @@ pub mod wasm {
 
         fn own_channel_updated(&self, channel_entry: &ChannelEntry) {
             self.js_own_channel_updated(*channel_entry)
+        }
+
+        fn ticket_redeemed(&self, channel_entry: &ChannelEntry, ticket_amount: &Balance) {
+            self.js_ticket_redeemed(*channel_entry, *ticket_amount)
         }
 
         fn node_allowed_to_access_network(&self, address: &Address) {

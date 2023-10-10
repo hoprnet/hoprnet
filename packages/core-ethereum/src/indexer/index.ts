@@ -6,10 +6,9 @@ import { Multiaddr } from '@multiformats/multiaddr'
 import {
   defer,
   ChannelStatus,
-  Balance,
-  BalanceType,
   Address,
   ChannelEntry,
+  Balance,
   AccountEntry,
   Snapshot,
   debug,
@@ -100,7 +99,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   constructor(
     private address: Address,
     private db: Database,
-    private maxConfirmations: number,
+    private confirmations: number,
     private blockRange: number
   ) {
     super()
@@ -134,6 +133,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       {
         newAnnouncement: this.onAnnouncementUpdate.bind(this),
         ownChannelUpdated: this.onOwnChannelUpdated.bind(this),
+        ticketRedeemed: this.onTicketRedeemed.bind(this),
         nodeNotAllowedToAccessNetwork: this.onNodeNotAllowedToAccessNetwork.bind(this),
         nodeAllowedToAccessNetwork: this.onNodeAllowedToAccessNetwork.bind(this)
       }
@@ -158,29 +158,11 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     let fromBlock = latestSavedBlock
-    if (fromBlock - this.maxConfirmations > 0) {
-      fromBlock = fromBlock - this.maxConfirmations
+    if (fromBlock - this.confirmations > 0) {
+      fromBlock = fromBlock - this.confirmations
     }
     // no need to query before HoprChannels or HoprNetworkRegistry existed
     fromBlock = Math.max(fromBlock, this.genesisBlock)
-
-    // update the base valuse of balance and allowance of token for safe
-    if (!this.lastSnapshot) {
-      // update safe's HOPR token balance
-      log(`get safe ${this.safeAddress.to_string()} HOPR balance at block ${fromBlock}`)
-      const hoprBalance = await this.chain.getBalanceAtBlock(this.safeAddress, fromBlock)
-      await this.db.set_hopr_balance(Balance.deserialize(hoprBalance.serialize_value(), BalanceType.HOPR))
-      log(`set safe HOPR balance to ${hoprBalance.to_formatted_string()}`)
-
-      // update safe's HORP token allowance granted to Channels contract
-      log(`get safe ${this.safeAddress.to_string()} HOPR allowance at block ${fromBlock}`)
-      const safeAllowance = await this.chain.getTokenAllowanceGrantedToChannelsAt(this.safeAddress, fromBlock)
-      await this.db.set_staking_safe_allowance(
-        Balance.deserialize(safeAllowance.serialize_value(), BalanceType.HOPR),
-        new Snapshot(new U256('0'), new U256('0'), new U256('0')) // dummy snapshot
-      )
-      log(`set safe allowance to ${safeAllowance.to_formatted_string()}`)
-    }
 
     log('Starting to index from block %d, sync progress 0%%', fromBlock)
 
@@ -491,13 +473,13 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     }
     this.blockProcessingLock = defer<void>()
 
-    const currentBlock = blockNumber - this.maxConfirmations
+    const currentBlock = blockNumber - this.confirmations
 
     if (currentBlock < 0) {
       return
     }
 
-    log('Indexer got new block %d, handling block %d', blockNumber, blockNumber - this.maxConfirmations)
+    log('Indexer got new block %d, handling block %d', blockNumber, blockNumber - this.confirmations)
     this.emit('block', blockNumber)
 
     // update latest block
@@ -516,12 +498,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         let nativeTxHashes: string[] | undefined
         try {
           // This new block marks a previous block
-          // (blockNumber - this.maxConfirmations) is final.
+          // (blockNumber - this.confirmations) is final.
           // Confirm native token transactions in that previous block.
           nativeTxHashes = await this.chain.getTransactionsInBlock(currentBlock)
         } catch (err) {
           log(
-            `error: failed to retrieve information about block ${currentBlock} with finality ${this.maxConfirmations}`,
+            `error: failed to retrieve information about block ${currentBlock} with finality ${this.confirmations}`,
             err
           )
         }
@@ -558,12 +540,12 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       for (let i = 0; i < RETRIES; i++) {
         log(
-          `fetchEvents at currentBlock ${currentBlock} startupBlock ${this.startupBlock} maxConfirmations ${
-            this.maxConfirmations
-          }. ${currentBlock > this.startupBlock + this.maxConfirmations}`
+          `fetchEvents at currentBlock ${currentBlock} startupBlock ${this.startupBlock} confirmations ${
+            this.confirmations
+          }. ${currentBlock > this.startupBlock + this.confirmations}`
         )
         if (currentBlock > this.startupBlock) {
-          // between starting block "Latest on-chain block" and finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - maxConfirmations, "Latest on-chain block"]
+          // between starting block "Latest on-chain block" and finality + 1 to prevent double processing of events in blocks ["Latest on-chain block" - confirmations, "Latest on-chain block"]
           res = await this.getEvents(currentBlock, currentBlock, true)
         } else {
           res = await this.getEvents(currentBlock, currentBlock, false)
@@ -701,24 +683,24 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       blockNumber,
       this.unconfirmedEvents.size(),
       this.unconfirmedEvents.size() > 0
-        ? isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
+        ? isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.confirmations)
         : null,
       this.unconfirmedEvents.size() > 0 ? this.unconfirmedEvents.peek().blockNumber : 0,
-      this.maxConfirmations
+      this.confirmations
     )
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
       this.unconfirmedEvents.size() > 0 &&
-      isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.maxConfirmations)
+      isConfirmedBlock(this.unconfirmedEvents.peek().blockNumber, blockNumber, this.confirmations)
     ) {
       const event = this.unconfirmedEvents.shift()
       log(
-        'Processing event at blockNumber=%s maxConfirmations=%s',
+        'Processing event at blockNumber=%s confirmations=%s',
         // @TODO: fix type clash
         blockNumber,
-        this.maxConfirmations
+        this.confirmations
       )
 
       // if we find a previous snapshot, compare event's snapshot with last processed
@@ -775,6 +757,10 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.emit('own-channel-updated', channel)
   }
 
+  onTicketRedeemed(channel: ChannelEntry, ticketAmount: Balance) {
+    this.emit('ticket-redeemed', channel, ticketAmount)
+  }
+
   onNodeNotAllowedToAccessNetwork(address: Address) {
     this.emit('network-registry-node-not-allowed', address)
   }
@@ -782,46 +768,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   onNodeAllowedToAccessNetwork(address: Address) {
     this.emit('network-registry-node-allowed', address)
   }
-
-  /**
-   * TODO: event update
-   */
-  // private async onTicketRedeemed(event: Event<'TicketRedeemed'>, lastSnapshot: Snapshot) {
-  //   if (Address.from_string(event.args.source).eq(this.address)) {
-  //     // the node used to lock outstandingTicketBalance
-  //     // rebuild part of the Ticket
-  //     const partialTicket: Partial<Ticket> = {
-  //       counterparty: Address.from_string(event.args.destination),
-  //       amount: new Balance(event.args.amount.toString(), BalanceType.HOPR)
-  //     }
-  //     const outstandingBalance = Balance.deserialize(
-  //       (
-  //         await this.db.get_pending_balance_to(Address.deserialize(partialTicket.counterparty.serialize()))
-  //       ).serialize_value(),
-  //       BalanceType.HOPR
-  //     )
-
-  //     assert(lastSnapshot !== undefined)
-  //     try {
-  //       // Negative case:
-  //       // It falls into this case when db of sender gets erased while having tickets pending.
-  //       // TODO: handle this may allow sender to send arbitrary amount of tickets through open
-  //       // channels with positive balance, before the counterparty initiates closure.
-  //       const balance = outstandingBalance.lte(Balance.zero(BalanceType.HOPR))
-  //         ? Balance.zero(BalanceType.HOPR)
-  //         : outstandingBalance
-  //       await this.db.resolve_pending(
-  //         Address.deserialize(partialTicket.counterparty.serialize()),
-  //         Balance.deserialize(balance.serialize_value(), BalanceType.HOPR),
-  //         Snapshot.deserialize(lastSnapshot.serialize())
-  //       )
-  //       metric_ticketsRedeemed.increment()
-  //     } catch (error) {
-  //       log(`error in onTicketRedeemed ${error}`)
-  //       throw new Error(`error in onTicketRedeemed ${error}`)
-  //     }
-  //   }
-  // }
 
   private indexEvent(indexerEvent: IndexerEventsType) {
     log(`Indexer indexEvent ${indexerEvent}`)

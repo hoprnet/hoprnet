@@ -48,6 +48,7 @@ describe('POST /messages/pop', function () {
     expect(res.status).to.equal(200)
     expect(res.body.tag).to.equal(tag)
     expect(res.body.body).to.equal('hello world')
+    expect(res.body.receivedAt).to.greaterThan(0)
     expect(await inbox.size(tag)).to.equal(0)
   })
 

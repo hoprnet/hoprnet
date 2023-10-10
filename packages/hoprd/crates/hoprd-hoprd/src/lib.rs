@@ -1,17 +1,21 @@
+pub mod cli;
+pub mod config;
+pub mod errors;
+
 #[cfg(feature = "wasm")]
 pub mod wasm {
     // Temporarily re-export crates
 
     #[allow(unused_imports)]
-    use core_strategy::passive::wasm::*;
-
-    #[allow(unused_imports)]
-    use core_strategy::promiscuous::wasm::*;
-
-    #[allow(unused_imports)]
     //use core_misc::constants::wasm::*;
     #[allow(unused_imports)]
     use core_network::network::wasm::*;
+
+    #[allow(unused_imports)]
+    use core_ethereum_actions::channels::wasm::*;
+
+    #[allow(unused_imports)]
+    use core_ethereum_actions::redeem::wasm::*;
 
     #[allow(unused_imports)]
     use core_ethereum_db::db::wasm::*;
@@ -30,9 +34,6 @@ pub mod wasm {
 
     #[allow(unused_imports)]
     use core_hopr::wasm::*;
-
-    #[allow(unused_imports)]
-    use hoprd_misc::cli::wasm::*;
 
     #[allow(unused_imports)]
     use hoprd_inbox::inbox::wasm::*;

@@ -112,7 +112,10 @@ export async function setupRestApi(
   }
 ): Promise<ReturnType<typeof initialize>> {
   // log request and responses
-  service.use(urlPath, morgan('combined'))
+  service.use(
+    urlPath,
+    morgan('[:date[clf]] ":method :url" :status :res[content-length] :response-time ":referrer" ":user-agent"')
+  )
 
   // this API uses JSON data only
   service.use(urlPath, bodyParser.json())
@@ -272,8 +275,11 @@ export async function setupRestApi(
     }
   }
 
-  service.use(urlPath, ((err, _req, res, _next) => {
-    res.status(err.status).json(err)
+  service.use(urlPath, ((err, _req, res, next) => {
+    if (res.headersSent) {
+      return next(err)
+    }
+    res.status(500).json(err)
   }) as express.ErrorRequestHandler)
 
   return apiInstance

@@ -1,0 +1,69 @@
+---
+name: Promote Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_release_name:
+        type: string
+        required: true
+        description: 'New release name ( bali | saint-luis )'
+      tag_name:
+        type: string
+        required: true
+        description: 'Git tag name which the release will be branched (v2.0.0-rc.6)'
+
+concurrency:
+  group: promote-release
+  cancel-in-progress: true
+
+jobs:
+  promote-release:
+    name: Promote Release
+    runs-on: ubuntu-2-core
+    steps:
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Login Google Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Promote release
+        run: |
+          git fetch --all
+          # Checkout to tag revision
+          if ! git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }};
+          then 
+            echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
+            exit 1
+          fi
+
+          # Create new branch or reuse an existing branch
+          release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
+          if git branch -al release/${release_name} | grep ${release_name};
+          then
+            git checkout ${{ github.event.inputs.tag_name }}
+            git checkout -b release/${release_name}
+            git push --set-upstream origin release/${release_name}
+          else
+            echo "Branch release/${release_name} already exists"
+            exit 1
+          fi
+          gh variable set BRANCH_RELEASE_RELEASE_NAME --body "${release_name}"
+          gh variable set BRANCH_MASTER_RELEASE_NAME --body "${{ github.event.inputs.new_release_name }}"
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}

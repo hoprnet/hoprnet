@@ -50,7 +50,7 @@ use utils_types::{
 /// Extend support for arbitrary array sizes in serde
 ///
 /// Array of arbitrary sizes are not supported in serde due to backwards compatibility.
-/// Read more in: https://github.com/serde-rs/serde/issues/1937
+/// Read more in: `<https://github.com/serde-rs/serde/issues/1937>`
 mod arrays {
     use std::{convert::TryInto, marker::PhantomData};
 
@@ -323,6 +323,11 @@ impl HalfKey {
         ret
     }
 
+    /// Generates random half key, useful for tests.
+    pub fn random() -> Self {
+        Self::new(&random_group_element().0)
+    }
+
     /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
@@ -427,7 +432,7 @@ impl From<HalfKey> for HalfKeyChallenge {
 
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Hash {
     hash: [u8; Self::SIZE],
@@ -1201,9 +1206,9 @@ impl PartialEq for Signature {
 impl Eq for Signature {}
 
 /// A method that turns all lower-cased hexadecimal address to a checksum-ed address
-/// according to https://eips.ethereum.org/EIPS/eip-55
+/// according to `<https://eips.ethereum.org/EIPS/eip-55>`
 pub trait ToChecksum {
-    /// Checksum of self according to https://eips.ethereum.org/EIPS/eip-55
+    /// Checksum of self according to `<https://eips.ethereum.org/EIPS/eip-55>`
     fn to_checksum(&self) -> String;
 }
 
@@ -1740,7 +1745,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
-            self.clone()
+            *self
         }
 
         #[wasm_bindgen]

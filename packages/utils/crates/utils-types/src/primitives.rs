@@ -1,15 +1,18 @@
 use ethnum::{u256, AsU256};
 use getrandom::getrandom;
 use primitive_types::H160;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::ops::{Add, Div, Mul, Shl, Shr, Sub};
+use std::fmt::{Debug, Display, Formatter};
+use std::iter::Sum;
+use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
+use std::str::FromStr;
 
 use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
 use crate::traits::{AutoBinarySerializable, BinarySerializable, ToHex};
 
 /// Represents an Ethereum address
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Address {
     addr: [u8; Self::SIZE],
@@ -45,13 +48,6 @@ impl Address {
         ret.extend_from_slice(&self.addr);
         ret.into_boxed_slice()
     }
-
-    // impl std::string::ToString {
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
-    pub fn _to_string(&self) -> String {
-        self.to_hex()
-    }
-    // }
 
     /// Creates a random Ethereum address, mostly used for testing
     pub fn random() -> Self {
@@ -98,7 +94,7 @@ impl TryFrom<H160> for Address {
     }
 }
 
-impl std::str::FromStr for Address {
+impl FromStr for Address {
     type Err = GeneralError;
 
     fn from_str(value: &str) -> Result<Address> {
@@ -128,8 +124,29 @@ pub enum BalanceType {
     HOPR,
 }
 
+impl Display for BalanceType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Native => write!(f, "Native"),
+            Self::HOPR => write!(f, "HOPR"),
+        }
+    }
+}
+
+impl FromStr for BalanceType {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "NATIVE" => Ok(Self::Native),
+            "HOPR" => Ok(Self::HOPR),
+            _ => Err(ParseError),
+        }
+    }
+}
+
 /// Represents balance of some coin or token.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Balance {
     value: U256,
@@ -140,7 +157,7 @@ pub struct Balance {
 impl Balance {
     /// Creates new balance of the given type from the base 10 integer string
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
-    pub fn from_str(value: &str, balance_type: BalanceType) -> Self {
+    pub fn new_from_str(value: &str, balance_type: BalanceType) -> Self {
         Self {
             value: U256 {
                 value: u256::from_str_radix(value, 10).unwrap_or_else(|_| panic!("invalid number {}", value)),
@@ -164,7 +181,7 @@ impl Balance {
 
     /// Creates balance of the given value with the same symbol
     pub fn of_same(&self, value: &str) -> Self {
-        Self::from_str(value, self.balance_type)
+        Self::new_from_str(value, self.balance_type)
     }
 
     /// Serializes just the value of the balance (not the symbol)
@@ -257,8 +274,61 @@ impl Balance {
         }
     }
 
+    /// Divides the balance by a float in inverval (0,1]
+    pub fn div_f64(&self, divisor: f64) -> Self {
+        Self {
+            value: self.value().divide_f64(divisor).expect("divisor must be in (0,1]"),
+            balance_type: self.balance_type,
+        }
+    }
+
+    /// Multiplies the balance by a float in inverval (0,1]
+    pub fn mul_f64(&self, coefficient: f64) -> Self {
+        Self {
+            value: self
+                .value()
+                .multiply_f64(coefficient)
+                .expect("coefficient must be in (0,1]"),
+            balance_type: self.balance_type,
+        }
+    }
+
     pub fn amount(&self) -> U256 {
         self.value
+    }
+
+    pub fn to_formatted_string(&self) -> String {
+        let mut val = self.value.to_string();
+
+        if val.len() > Self::SCALE {
+            let (l, r) = val.split_at(val.len() - Self::SCALE + 1);
+            format!(
+                "{l}.{} {}",
+                &r[..r.len() - (val.len() - Self::SCALE)],
+                self.balance_type
+            )
+        } else if val.len() < Self::SCALE {
+            for _ in 0..(Self::SCALE - val.len() - 1) {
+                val = "0".to_owned() + &val;
+            }
+            format!("0.{val} {}", self.balance_type)
+        } else {
+            let (l, r) = val.split_at(1);
+            format!("{l}.{r} {}", self.balance_type)
+        }
+    }
+}
+
+impl PartialEq for Balance {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value && self.balance_type == other.balance_type
+    }
+}
+
+impl Debug for Balance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Intentionally same as Display
+        write!(f, "{} {:?}", self.value(), self.balance_type)
     }
 }
 
@@ -268,9 +338,27 @@ impl Display for Balance {
     }
 }
 
+impl FromStr for Balance {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let regex = Regex::new(r"^\s*(\d+)\s*([A-z]+)\s*$").unwrap();
+        let cap = regex.captures(s).ok_or(ParseError)?;
+
+        if cap.len() == 3 {
+            Ok(Self::new_from_str(&cap[1], BalanceType::from_str(&cap[2])?))
+        } else {
+            Err(ParseError)
+        }
+    }
+}
+
 impl Balance {
     /// Size of the balance value is equal to U256 size (32 bytes)
     pub const SIZE: usize = U256::SIZE;
+
+    /// Number of digits in the base unit
+    pub const SCALE: usize = 18;
 
     pub fn new(value: U256, balance_type: BalanceType) -> Self {
         Balance { value, balance_type }
@@ -404,7 +492,7 @@ impl U256 {
     /// Multiply with float in the interval [0.0, 1.0]
     pub fn multiply_f64(&self, rhs: f64) -> Result<Self> {
         if rhs < 0.0 || rhs > 1.0 {
-            return Err(GeneralError::InvalidInput);
+            return Err(InvalidInput);
         }
 
         if rhs == 1.0 {
@@ -487,6 +575,14 @@ impl Display for U256 {
     }
 }
 
+impl Sum for U256 {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        Self {
+            value: iter.map(|u| u.value).sum(),
+        }
+    }
+}
+
 impl Mul for U256 {
     type Output = U256;
 
@@ -533,6 +629,12 @@ impl Add for U256 {
         Self {
             value: self.value.add(rhs.value),
         }
+    }
+}
+
+impl AddAssign for U256 {
+    fn add_assign(&mut self, rhs: Self) {
+        self.value.add_assign(&rhs.value);
     }
 }
 
@@ -691,11 +793,27 @@ mod tests {
 
     #[test]
     fn balance_test_serialize() {
-        let b_1 = Balance::from_str("10", BalanceType::HOPR);
+        let b_1 = Balance::new_from_str("10", BalanceType::HOPR);
         assert_eq!("10 HOPR".to_string(), b_1.to_string(), "to_string failed");
 
         let b_2 = Balance::deserialize(&b_1.serialize_value(), BalanceType::HOPR).unwrap();
         assert_eq!(b_1, b_2, "deserialized balance does not match");
+
+        assert_eq!(
+            b_1,
+            Balance::from_str(&b_1.to_string()).expect("must parse balance 1"),
+            "string representations must match 1"
+        );
+        assert_eq!(
+            b_1,
+            Balance::from_str("10HOPR").expect("must parse balance 2"),
+            "string representations must match 2"
+        );
+        assert_eq!(
+            b_1,
+            Balance::from_str(" 10   hOpR").expect("must parse balance 3"),
+            "string representations must match 3"
+        );
     }
 
     #[test]
@@ -735,6 +853,24 @@ mod tests {
 
         assert!(b3.lt(&b4) && b4.gt(&b3), "lte or lt test failed");
         assert!(b3.lte(&b3) && b4.gte(&b4), "gte or gt test failed");
+    }
+
+    #[test]
+    fn balance_test_formatted_string() {
+        let mut base = "123".to_string();
+        for _ in 0..Balance::SCALE - 3 {
+            base += "0";
+        }
+
+        let b1 = Balance::new_from_str(&base, BalanceType::HOPR);
+        let b2 = b1.imul(100);
+        let b3 = Balance::new_from_str(&base[..Balance::SCALE - 3], BalanceType::HOPR);
+        let b4 = Balance::new_from_str(&base[..Balance::SCALE - 1], BalanceType::HOPR);
+
+        assert_eq!("1.23000000000000000 HOPR", b1.to_formatted_string());
+        assert_eq!("123.000000000000000 HOPR", b2.to_formatted_string());
+        assert_eq!("0.00123000000000000 HOPR", b3.to_formatted_string());
+        assert_eq!("0.12300000000000000 HOPR", b4.to_formatted_string());
     }
 
     #[test]
@@ -811,6 +947,11 @@ pub mod wasm {
             ok_or_jserr!(Address::from_bytes(data))
         }
 
+        #[wasm_bindgen(js_name = "to_string")]
+        pub fn _to_string(&self) -> String {
+            self.to_string()
+        }
+
         #[wasm_bindgen(js_name = "to_hex")]
         pub fn _to_hex(&self) -> String {
             self.to_hex()
@@ -842,11 +983,6 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "deserialize")]
         pub fn _deserialize(data: &[u8], balance_type: BalanceType) -> JsResult<Balance> {
             ok_or_jserr!(Balance::deserialize(data, balance_type))
-        }
-
-        #[wasm_bindgen]
-        pub fn to_formatted_string(&self) -> String {
-            self.to_string()
         }
 
         #[wasm_bindgen(js_name = "eq")]
@@ -985,7 +1121,7 @@ pub mod wasm {
 
     #[wasm_bindgen]
     impl Snapshot {
-        #[wasm_bindgen(js_name = "default")]
+        #[wasm_bindgen(js_name = "make_default")]
         pub fn _default() -> Self {
             Snapshot::default()
         }

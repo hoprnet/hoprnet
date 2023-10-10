@@ -86,13 +86,29 @@ impl AsyncKVStorage for BinaryHashMapStorage {
         let mut first_key: Vec<u8> = prefix.clone().into();
         first_key.extend((0..suffix_size).map(|_| 0u8));
 
-        let mut last_key: Vec<u8> = prefix.clone().into();
+        let mut last_key: Vec<u8> = prefix.into();
         last_key.extend((0..suffix_size).map(|_| 0xffu8));
 
         let d = iter(self.data.clone().into_iter())
             .filter(move |(key, _)| {
                 let upper_bound = key.as_ref().cmp(&last_key);
                 let lower_bound = key.as_ref().cmp(&first_key);
+                upper_bound != Ordering::Greater && lower_bound != Ordering::Less
+            })
+            .map(|(_, v)| Ok(v));
+
+        Ok(Box::new(d))
+    }
+
+    fn iterate_range(
+        &self,
+        start: Self::Key,
+        end: Self::Key,
+    ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
+        let d = iter(self.data.clone().into_iter())
+            .filter(move |(key, _)| {
+                let upper_bound = key.as_ref().cmp(&start);
+                let lower_bound = key.as_ref().cmp(&end);
                 upper_bound != Ordering::Greater && lower_bound != Ordering::Less
             })
             .map(|(_, v)| Ok(v));

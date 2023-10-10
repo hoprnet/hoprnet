@@ -6,5 +6,6 @@ export const sampleChainOptions: ChainOptions = {
   maxFeePerGas: '10 gwei',
   maxPriorityFeePerGas: '1 gwei',
   chain: 'anvil',
-  provider: 'http://localhost:8545'
+  provider: 'http://localhost:8545',
+  confirmations: 2
 }

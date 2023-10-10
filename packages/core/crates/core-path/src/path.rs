@@ -49,7 +49,7 @@ impl Path {
         path: Vec<PeerId>,
         self_addr: &Address,
         allow_loops: bool,
-        db: &T,
+        db: &T, // TODO: refactor this so it uses the ChannelGraph instead of DB
     ) -> Result<Self> {
         if path.is_empty() {
             return Err(PathNotValid);
@@ -135,9 +135,8 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use hex_literal::hex;
     use libp2p_identity::PeerId;
-    use std::sync::{Arc, Mutex};
     use utils_db::db::DB;
-    use utils_db::leveldb::rusty::RustyLevelDbShim;
+    use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::PeerIdLike;
 
@@ -178,12 +177,7 @@ mod tests {
         let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
 
         let mut last_addr = chain_key.to_address();
-        let mut db = CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new(Arc::new(Mutex::new(
-                rusty_leveldb::DB::open("test", rusty_leveldb::in_memory()).unwrap(),
-            )))),
-            last_addr,
-        );
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), last_addr);
 
         let packet_key = OffchainPublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap();
         peers.push(packet_key.to_peerid());

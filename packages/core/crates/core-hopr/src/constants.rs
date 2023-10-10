@@ -1,5 +1,5 @@
 /// Application version as presented externally using the heartbeat mechanism
-pub const APP_VERSION: &str = "2.0.0";
+pub const APP_VERSION: &str = "2.0.0-rc.8";
 
 /// Name of the metadata key holding the protocol version
 pub const PEER_METADATA_PROTOCOL_VERSION: &str = "protocol_version";

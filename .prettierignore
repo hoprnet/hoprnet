@@ -73,7 +73,6 @@ vendor/
 /scripts/**/*.mjs
 /scripts/**/*.cts
 /scripts/**/*.cjs
-!/packages/connect/src/@types/*.d.ts
 !/packages/hoprd/src/main.cts
 
 /.venv/

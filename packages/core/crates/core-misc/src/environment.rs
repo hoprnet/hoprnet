@@ -56,6 +56,8 @@ pub struct ChainOptions {
     pub max_priority_fee_per_gas: String,
     pub native_token_name: String,
     pub hopr_token_name: String,
+    /// number of follow-on blocks required until a block is considered confirmed on-chain
+    pub confirmations: u32,
     pub tags: Option<Vec<String>>,
 }
 
@@ -103,6 +105,8 @@ pub struct Network {
     pub tags: Vec<String>,
     /// contract addresses used by the network
     pub addresses: Addresses,
+    /// number of follow-on blocks required until a block is considered confirmed on-chain
+    pub confirmations: u32,
 }
 
 // duplicate due to issue of wasm_bindgen with proc macros on struct properties
@@ -124,6 +128,12 @@ pub struct Network {
     pub tags: Vec<String>,
     /// contract addresses used by the network
     pub addresses: Addresses,
+    /// Number of blockchain block to wait until an on-chain state-change is considered to be final
+    ///
+    /// Note that the probability that on-chain state changes will get pruned due to
+    /// block reorganizations increases exponentially in the number of confirmations, e.g.
+    /// after one block it is `0.5` whereas after two blocks it is `0.25 = 0.5^2`  etc.
+    pub confirmations: u32,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -251,6 +261,8 @@ pub struct ResolvedNetwork {
     pub announcements: String,
     /// factory contract to produce Safe instances
     pub node_stake_v2_factory: String,
+    /// number of follow-on blocks required until a block is considered confirmed on-chain
+    pub confirmations: u32,
 }
 
 impl ResolvedNetwork {
@@ -275,19 +287,20 @@ impl ResolvedNetwork {
 
         match real::satisfies(version.as_str(), network.version_range.as_str()) {
             Ok(true) => Ok(ResolvedNetwork {
-                id: id.into(),
+                announcements: network.addresses.announcements.to_owned(),
                 chain: chain.to_owned(),
-                environment_type: network.environment_type,
                 channel_contract_deploy_block: network.indexer_start_block_number,
-                token: network.addresses.token.to_owned(),
                 channels: network.addresses.channels.to_owned(),
+                confirmations: network.confirmations,
+                environment_type: network.environment_type,
+                id: id.into(),
+                module_implementation: network.addresses.module_implementation.to_owned(),
                 network_registry: network.addresses.network_registry.to_owned(),
                 network_registry_proxy: network.addresses.network_registry_proxy.to_owned(),
-                module_implementation: network.addresses.module_implementation.to_owned(),
                 node_safe_registry: network.addresses.node_safe_registry.to_owned(),
-                ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
-                announcements: network.addresses.announcements.to_owned(),
                 node_stake_v2_factory: network.addresses.node_stake_v2_factory.to_owned(),
+                ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
+                token: network.addresses.token.to_owned(),
             }),
             Ok(false) => protocol_config.supported_networks(mono_repo_path).and_then(|envs| {
                 Err(format!(

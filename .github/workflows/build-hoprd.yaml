@@ -13,10 +13,6 @@ on:
       K8S_SSH_SERVICE_USERNAME:
         required: true
       K8S_SSH_SERVICE_PASSWORD:
-    inputs:
-      build_toolchain:
-        type: string
-        required: true
 
 concurrency:
   group: ${{ github.head_ref }}-hoprd
@@ -26,11 +22,11 @@ jobs:
 
   build:
     name: docker
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     timeout-minutes: 60
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         timeout-minutes: 10
 
       - name: Set up Google Cloud Credentials
@@ -41,33 +37,31 @@ jobs:
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Login Google Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: europe-west3-docker.pkg.dev
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: kubernetes
 
-      - name: "Set PR number on version"
+      - name: "Update version"
         run: |
-          if [ "${{ github.event.pull_request.number }}" == "${{ vars.RELEASE_PR }}" ]; then
-            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ vars.RELEASE_CANDIDATE_NUMBER }} true
+          if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
+            docker_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
           else
-            ./scripts/bump-version.sh ${{ github.event.pull_request.base.ref }} ${{ github.event.pull_request.number }}
-          fi
-          new_version=$(./scripts/get-package-version.sh | sed 's/+/-/')
-          echo "DOCKER_TAG=${new_version}" >> $GITHUB_ENV
-
-          if [ "${{ inputs.build_toolchain }}" == "true" ]; then
-            echo "TOOLCHAIN_IMAGE_TAG=${new_version}" >> $GITHUB_ENV
-          else
-            echo "TOOLCHAIN_IMAGE_TAG=latest" >> $GITHUB_ENV
+            next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
+            ./scripts/bump-version.sh ${next_version}
+            docker_tag=$(echo "${next_version}" | sed 's/+/-/')
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV            
           fi
 
       - name: Build and push docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           push: true
           file: packages/hoprd/Dockerfile
@@ -75,16 +69,16 @@ jobs:
           cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}-cache,mode=max
           tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}
           build-args: |
-            TOOLCHAIN_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.TOOLCHAIN_IMAGE_TAG }}
+            TOOLCHAIN_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.DOCKER_TAG }}
 
   restart_deployment:
     name: Restart deployment
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-2-core
     needs: build
     if: ${{ contains(github.event.pull_request.labels.*.name, 'deploy_nodes') }}
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: "Restart deployments"
         run: |

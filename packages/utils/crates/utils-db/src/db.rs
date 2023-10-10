@@ -20,13 +20,15 @@ pub fn serialize_to_bytes<S: Serialize + BinarySerializable>(s: &S) -> Result<Ve
     // bincode::serialize(&s).map_err(|e| DbError::SerializationError(e.to_string()))
 }
 
-impl Batch {
-    pub fn new() -> Self {
+impl Default for Batch {
+    fn default() -> Self {
         Self {
             ops: Vec::with_capacity(10),
         }
     }
+}
 
+impl Batch {
     pub fn put<U: Serialize>(&mut self, key: Key, value: U) {
         let key: Box<[u8]> = key.into();
         let value: Box<[u8]> = bincode::serialize(&value).unwrap().into_boxed_slice();
@@ -50,7 +52,24 @@ pub struct Key {
 
 impl Display for Key {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(&self.key))
+        if let Some(unprintable_idx) = self.key.iter().position(|b| !b.is_ascii_graphic()) {
+            write!(
+                f,
+                "{}{}",
+                core::str::from_utf8(&self.key[..unprintable_idx])
+                    .map(|s| s.to_owned())
+                    .unwrap_or_else(|_| hex::encode(&self.key[..unprintable_idx])),
+                hex::encode(&self.key[unprintable_idx..])
+            )
+        } else {
+            write!(
+                f,
+                "{}",
+                core::str::from_utf8(&self.key)
+                    .map(|s| s.to_owned())
+                    .unwrap_or_else(|_| hex::encode(&self.key))
+            )
+        }
     }
 }
 
@@ -88,9 +107,9 @@ impl Key {
     }
 }
 
-impl Into<Box<[u8]>> for Key {
-    fn into(self) -> Box<[u8]> {
-        self.key
+impl From<Key> for Box<[u8]> {
+    fn from(value: Key) -> Self {
+        value.key
     }
 }
 
@@ -116,13 +135,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     }
 
     pub async fn get_or_none<V: DeserializeOwned>(&self, key: Key) -> Result<Option<V>> {
+        let key_id = key.to_string();
         let key: T::Key = key.into();
 
-        match self.backend.get(key.into()).await {
+        match self.backend.get(key).await {
             Ok(Some(val)) => match bincode::deserialize(&val) {
                 Ok(deserialized) => Ok(Some(deserialized)),
                 Err(e) => Err(DbError::DeserializationError(format!(
-                    "during get operation: {}",
+                    "during get operation of {key_id}: {}",
                     e.to_string().as_str()
                 ))),
             },
@@ -135,6 +155,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
     where
         V: Serialize + DeserializeOwned,
     {
+        let key_id = key.to_string();
         let key: T::Key = key.into();
         let value: T::Value = bincode::serialize(&value)
             .map_err(|e| DbError::SerializationError(e.to_string()))?
@@ -142,18 +163,22 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
 
         match self.backend.set(key, value).await? {
             Some(v) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
-                DbError::DeserializationError(format!("during set operation: {}", e.to_string().as_str()))
+                DbError::DeserializationError(format!("during set operation of {key_id}: {}", e.to_string().as_str()))
             }),
             None => Ok(None),
         }
     }
 
     pub async fn remove<V: DeserializeOwned>(&mut self, key: Key) -> Result<Option<V>> {
+        let key_id = key.to_string();
         let key: T::Key = key.into();
 
         match self.backend.remove(key).await? {
             Some(v) => bincode::deserialize(v.as_ref()).map(|v| Some(v)).map_err(|e| {
-                DbError::DeserializationError(format!("during remove operation: {}", e.to_string().as_str()))
+                DbError::DeserializationError(format!(
+                    "during remove operation of {key_id}: {}",
+                    e.to_string().as_str()
+                ))
             }),
             None => Ok(None),
         }
@@ -182,6 +207,35 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
         Ok(output)
     }
 
+    pub async fn get_more_range<V: DeserializeOwned>(
+        &self,
+        start: Box<[u8]>,
+        end: Box<[u8]>,
+        filter: &dyn Fn(&V) -> bool,
+    ) -> Result<Vec<V>> {
+        if start.len() != end.len() {
+            return Err(DbError::InvalidInput(
+                "length of provided suffixes does not match".into(),
+            ));
+        }
+
+        let mut output = Vec::new();
+
+        let mut data_stream = Box::into_pin(self.backend.iterate_range(start, end)?);
+
+        // fail fast for the first value that cannot be deserialized
+        while let Some(value) = data_stream.next().await {
+            let value =
+                bincode::deserialize::<V>(value?.as_ref()).map_err(|e| DbError::DeserializationError(e.to_string()))?;
+
+            if (*filter)(&value) {
+                output.push(value);
+            }
+        }
+
+        Ok(output)
+    }
+
     pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
         self.backend.batch(batch.ops, wait_for_write).await
     }
@@ -195,6 +249,17 @@ mod tests {
     use mockall::predicate;
     use serde::Deserialize;
     use utils_types::traits::BinarySerializable;
+
+    #[test]
+    fn test_key_to_string() {
+        let k1 = Key::new_from_str("abcd").unwrap();
+        let k2 = Key::new_bytes_with_prefix(&[0xde, 0xad, 0xbe, 0xef], "test-").unwrap();
+        let k3 = Key::new_bytes_with_prefix(&[0xde, 0xad, 0xbe, 0xef], "").unwrap();
+
+        assert_eq!("abcd", k1.to_string());
+        assert_eq!("test-deadbeef", k2.to_string());
+        assert_eq!("deadbeef", k3.to_string());
+    }
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     struct TestKey {

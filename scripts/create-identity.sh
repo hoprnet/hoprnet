@@ -12,19 +12,20 @@ workspace_dir="${script_dir}/.."
 
 
 : "${DEPLOYER_PRIVATE_KEY?"Missing environment variable DEPLOYER_PRIVATE_KEY"}"
+: "${PRIVATE_KEY?"Missing environment variable PRIVATE_KEY"}"
 : "${IDENTITY_PASSWORD?"Missing environment variable IDENTITY_PASSWORD"}"
 : "${HOPRD_API_TOKEN?"Missing environment variable HOPRD_API_TOKEN"}"
-export PRIVATE_KEY=${DEPLOYER_PRIVATE_KEY}
+
 
 if ! command -v hopli; then
     export PATH="${PATH}:${workspace_dir}/packages/hopli/.cargo/bin"
 fi
 
-network=${1:-rotsee}
+network=${1}
 number=${2:-1}
 docker_tag=${3:-latest}
 hopr_amount=${4:-10}
-native_amount=${5:-0.1}
+native_amount=${5:-0.01}
 random="${RANDOM}"
 
 for (( i=1; i<=${number}; i++ )) do

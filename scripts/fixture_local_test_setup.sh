@@ -20,18 +20,18 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-s|--skip-cleanup] [-c|--just-cleanup]"
+  msg "Usage: $0 [-h|--help] [-s|--setup] [-t|--teardown]"
   msg
-  msg "The cleanup process can be skipped by using '--skip-cleanup'."
-  msg "The cleanup process can be triggered by using '--just-cleanup'."
+  msg "The cleanup process can be skipped by using '--setup'."
+  msg "The cleanup process can be triggered by using '--teardown'."
   msg
 }
 
 # verify and set parameters
 declare wait_delay=2
 declare wait_max_wait=1000
-declare skip_cleanup="false"
-declare just_cleanup="false"
+declare setup="false"
+declare teardown="false"
 declare default_api_token="e2e-API-token^^"
 
 while (( "$#" )); do
@@ -41,12 +41,12 @@ while (( "$#" )); do
       usage
       exit 0
       ;;
-    -s|--skip-cleanup)
-      skip_cleanup="true"
+    -s|--setup)
+      setup="true"
       shift
       ;;
-    -c|--just-cleanup)
-      just_cleanup="true"
+    -t|--teardown)
+      teardown="true"
       shift
       ;;
     -*|--*=)
@@ -69,13 +69,13 @@ declare tmp_dir="$(find_tmp_dir)"
 
 declare node_prefix="hopr-smoke-test-node"
 
-declare node1_dir="${tmp_dir}/${node_prefix}_0"
-declare node2_dir="${tmp_dir}/${node_prefix}_1"
-declare node3_dir="${tmp_dir}/${node_prefix}_2"
-declare node4_dir="${tmp_dir}/${node_prefix}_3"
-declare node5_dir="${tmp_dir}/${node_prefix}_4"
-declare node6_dir="${tmp_dir}/${node_prefix}_5"
-declare node7_dir="${tmp_dir}/${node_prefix}_6"
+declare node1_dir="${tmp_dir}/${node_prefix}_1"
+declare node2_dir="${tmp_dir}/${node_prefix}_2"
+declare node3_dir="${tmp_dir}/${node_prefix}_3"
+declare node4_dir="${tmp_dir}/${node_prefix}_4"
+declare node5_dir="${tmp_dir}/${node_prefix}_5"
+declare node6_dir="${tmp_dir}/${node_prefix}_6"
+declare node7_dir="${tmp_dir}/${node_prefix}_7"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -152,12 +152,12 @@ function cleanup {
   fi
 }
 
-if [ "${just_cleanup}" == "1" ] || [ "${just_cleanup}" == "true" ]; then
+if [ "${teardown}" == "1" ] || [ "${teardown}" == "true" ]; then
   cleanup
   exit $?
 fi
 
-if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+if [ "${setup}" != "1" ] && [ "${setup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
@@ -165,8 +165,8 @@ function reuse_pregenerated_identities() {
   log "Reuse pre-generated identities"
 
   # remove existing identity files in tmp folder, .safe.args
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete || true
 
   local ready_id_files
   mapfile -t ready_id_files <<< "$(find -L "${mydir}/../tests/identities/" -maxdepth 1 -type f -name "*.id" | sort)"
@@ -179,7 +179,8 @@ function reuse_pregenerated_identities() {
 
   log "ADDRESSES INFORMATION"
   for i in ${!ready_id_files[@]}; do
-    cp "${ready_id_files[$i]}" "${tmp_dir}/${node_prefix}_${i}.id"
+    local node_nr=$(( i + 1 ))
+    cp "${ready_id_files[$i]}" "${tmp_dir}/${node_prefix}_${node_nr}.id"
 
     local peer_id native_address id_file
     id_file="$(basename ${ready_id_files[$i]})"
@@ -187,6 +188,7 @@ function reuse_pregenerated_identities() {
     native_address="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.native_address")"
 
     log "\tnode ${i}"
+    log "\t\tidentity file: ${tmp_dir}/${node_prefix}_${node_nr}.id"
     log "\t\tpeer id: ${peer_id}"
     log "\t\tnative address: ${native_address}"
   done
@@ -196,8 +198,8 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete || true
 
   env ETHERSCAN_API_KEY="${ETHERSCAN_API_KEY:-}" IDENTITY_PASSWORD="${password}" \
     hopli identity \
@@ -225,7 +227,8 @@ function create_local_safes() {
       hopli create-safe-module \
         --network anvil-localhost \
         --identity-from-path "${id_file}" \
-        --contracts-root "./packages/ethereum/contracts" > "${id_file%.id}.safe.log"
+        --contracts-root "./packages/ethereum/contracts" > "${id_file%.id}.safe.log" \
+        --hopr-amount "20000.0"
 
     # store safe arguments in separate file for later use
     grep -oE "\--safeAddress.*--moduleAddress.*" "${id_file%.id}.safe.log" > "${id_file%.id}.safe.args"
@@ -240,7 +243,8 @@ function create_local_safes() {
 # $4 = node data directory
 # $5 = node log file
 # $6 = node id file
-# $7 = OPTIONAL: additional args to hoprd
+# $7 = node host addr
+# $8 = OPTIONAL: additional args to hoprd
 function setup_node() {
   local api_port=${1}
   local api_token=${2}
@@ -248,7 +252,8 @@ function setup_node() {
   local dir=${4}
   local log=${5}
   local id=${6}
-  local additional_args=${7:-""}
+  local host_addr=${7}
+  local additional_args=${8:-""}
 
   local safe_args
   safe_args="$(<${dir}.safe.args)"
@@ -272,6 +277,12 @@ function setup_node() {
   # read safe args and append to additional_args TODO:
   additional_args="${additional_args} ${safe_args}"
 
+  # add explicit yaml config, if it exists
+  CFG=$(echo -e "${log}" | sed 's/\(.*\).log/\1.cfg.yaml/')
+  if [[ -f "$CFG" ]]; then
+      additional_args="${additional_args} --configurationFilePath=${CFG}"
+  fi
+
   log "Additional args: \"${additional_args}\""
 
   # Using a mix of CLI parameters and env variables to ensure
@@ -283,11 +294,10 @@ function setup_node() {
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
     node packages/hoprd/lib/main.cjs \
       --data="${dir}" \
-      --host="127.0.0.1:${node_port}" \
+      --host="${host_addr}:${node_port}" \
       --identity="${id}" \
       --init \
       --password="${password}" \
@@ -297,8 +307,6 @@ function setup_node() {
       --disableTicketAutoRedeem \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
-      --allowLocalNodeConnections \
-      --allowPrivateNodeConnections \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
@@ -377,16 +385,16 @@ reuse_pregenerated_identities
 create_local_safes
 
 #  --- Run nodes --- {{{
-setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
 # use empty auth token to be able to test this in the security tests
-setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "--announce"
-setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "--announce"
-setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "--testNoDirectConnections --announce"
-setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "--testNoDirectConnections --announce"
+setup_node 13302 ""                   19092 "${node2_dir}" "${node2_log}" "${node2_id}" "127.0.0.1" "--announce"
+setup_node 13303 ${default_api_token} 19093 "${node3_dir}" "${node3_log}" "${node3_id}" "localhost" "--announce"
+setup_node 13304 ${default_api_token} 19094 "${node4_dir}" "${node4_log}" "${node4_id}" "127.0.0.1" " --announce"
+setup_node 13305 ${default_api_token} 19095 "${node5_dir}" "${node5_log}" "${node5_id}" "localhost" " --announce"
 # should not be able to talk to the rest
-setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "--announce --network anvil-localhost2"
+setup_node 13306 ${default_api_token} 19096 "${node6_dir}" "${node6_log}" "${node6_id}" "127.0.0.1" "--announce --network anvil-localhost2"
 # node n7 will be the only one NOT registered
-setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "--announce"
+setup_node 13307 ${default_api_token} 19097 "${node7_dir}" "${node7_log}" "${node7_id}" "localhost" "--announce"
 # }}}
 
 # DO NOT MOVE THIS STEP
@@ -402,8 +410,15 @@ wait_for_regex "${node7_log}" "please fund this node"
 
 log "Funding nodes"
 #  --- Fund nodes --- {{{
-make -C "${mydir}/../" fund-local-all \
-  id_password="${password}" id_prefix="${node_prefix}" id_dir="${tmp_dir}"
+env \
+  ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${password}" \
+  PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+  hopli faucet \
+  --network anvil-localhost \
+  --identity-prefix "${node_prefix}" \
+  --identity-directory "${tmp_dir}" \
+  --contracts-root "./packages/ethereum/contracts" \
+  --hopr-amount "0.0"
 # }}}
 
 log "Waiting for port binding"
@@ -422,18 +437,18 @@ wait_for_regex "${node7_log}" "STARTED NODE"
 log "Sleep for 30 seconds to ensure announcements are confirmed on-chain"
 sleep 30
 
-# log "Restarting node 1 to ensure restart works as expected"
-# #  --- Restart check --- {{{
-# lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
-# setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "--announce"
-# wait_for_regex "${node1_log}" "STARTED NODE"
-# # }}}
+log "Restarting node 1 to ensure restart works as expected"
+#  --- Restart check --- {{{
+lsof -i ":13301" -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
+setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
+wait_for_regex "${node1_log}" "STARTED NODE"
+# }}}
 
 #  --- Ensure data directories are used --- {{{
 for node_dir in ${node1_dir} ${node2_dir} ${node3_dir} ${node4_dir} ${node5_dir} ${node6_dir} ${node7_dir}; do
-  declare node_dir_db="${node_dir}/db/db.sqlite"
+  declare node_dir_db="${node_dir}/db"
   declare node_dir_tbf="${node_dir}/tbf"
-  [ -f "${node_dir_db}" ] || { echo "Data file ${node_dir_db} missing"; exit 1; }
+  [ -d "${node_dir_db}" ] || { echo "Data directory ${node_dir_db} missing"; exit 1; }
   [ -f "${node_dir_tbf}" ] || { echo "Data file ${node_dir_tbf} missing"; exit 1; }
 done
 # }}}

@@ -7,9 +7,7 @@ export * from './types.js'
 export * from './u8a/index.js'
 export * from './time.js'
 export * from './constants.js'
-export * from './db/index.js'
 export * from './ethereum/index.js'
-export * from './utils.js'
 
 export {
   app_version,
@@ -30,7 +28,8 @@ export {
   SimpleTimer,
   merge_encoded_metrics,
   gather_all_metrics,
-  get_package_version
+  get_package_version,
+  HoprdConfig
 } from '../../hoprd/lib/hoprd_hoprd.js'
 
 export type MetricCollector = () => string

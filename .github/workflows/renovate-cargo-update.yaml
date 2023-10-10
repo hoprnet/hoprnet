@@ -1,7 +1,6 @@
 name: Dependencies
 
 env:
-  HOPR_GITHUB_REF: ${{ github.ref }}
   RUST_BACKTRACE: "1"
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -15,7 +14,7 @@ jobs:
     runs-on: ubuntu-2-core
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -33,7 +32,7 @@ jobs:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v23
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -68,7 +67,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
 
       - name: Update vendored cargo dependencies
         run: |
@@ -81,3 +79,4 @@ jobs:
         run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: 'chore(cargo): updated vendored dependencies'
+          HOPR_GITHUB_REF: ${{ github.ref }}

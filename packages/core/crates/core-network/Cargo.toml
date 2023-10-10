@@ -18,9 +18,10 @@ futures-lite = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
 rand = { version = "0.8.5", features = ["std_rng"] }
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
+serde_with = { workspace = true }
 thiserror = "1.0"
-validator = { version = "0.16.1", features = ["derive"] }
+validator = { workspace = true }
 gloo-timers = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 getrandom = { workspace = true }
@@ -28,11 +29,11 @@ js-sys = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
 
-core-crypto = { path = "../core-crypto", default-features = false }
-utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
-utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
-utils-metrics = { path = "../../../utils/crates/utils-metrics", default-features = false }
-utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+core-crypto = { workspace = true, default-features = false }
+utils-log = { workspace = true, default-features = false }
+utils-misc = { workspace = true, default-features = false }
+utils-metrics = { workspace = true, default-features = false }
+utils-types = { workspace = true, default-features = false }
 
 [dev-dependencies]
 mockall = "0.11.3"

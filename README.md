@@ -30,6 +30,8 @@
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
+  - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
+  - [Local node with safe staking service (rotsee network)](#local-node-with-safe-staking-service-rotsee-network)
 - [Local cluster](#local-cluster)
 - [Test](#test)
   - [Unit testing](#unit-testing)
@@ -41,7 +43,6 @@
       - [Test execution](#test-execution)
 - [Deploy](#deploy)
   - [Using Google Cloud Platform](#using-google-cloud-platform)
-  - [Using Google Cloud Platform and a Default Topology](#using-google-cloud-platform-and-a-default-topology)
 - [Tooling](#tooling)
 - [Contact](#contact)
 - [License](#license)
@@ -167,16 +168,8 @@ Options:
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit
           initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
-      --allowLocalNodeConnections
-          Allow connections to other nodes running on localhost [env: HOPRD_ALLOW_LOCAL_NODE_CONNECTIONS=]
-      --allowPrivateNodeConnections
-          Allow connections to other nodes running on private addresses [env: HOPRD_ALLOW_PRIVATE_NODE_CONNECTIONS=]
-      --maxParallelConnections <CONNECTIONS>
-          Set maximum parallel connections [env: HOPRD_MAX_PARALLEL_CONNECTIONS=] [default: 50000]
       --testAnnounceLocalAddresses
           For testing local testnets. Announce local addresses [env: HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES=]
-      --noRelay
-          disable NAT relay functionality entirely [env: HOPRD_NO_RELAY=]
       --heartbeatInterval <MILLISECONDS>
           Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL=] [default: 60000]
       --heartbeatThreshold <MILLISECONDS>
@@ -500,7 +493,7 @@ by using the same script but setting the cleanup switch:
 
 ```sh
 HOPRD_PERFORM_CLEANUP=true \
-  ./scripts/setup-gcloud-cluster.sh dufour my-cluster
+  ./scripts/setup-gcloud-cluster.sh my-cluster 3
 ```
 
 ## Tooling

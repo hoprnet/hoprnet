@@ -1,5 +1,5 @@
 # Append here when new Rust WASM crate is added (the list is space separated)
-PACKAGES = core-crypto core-hopr core-misc core-mixer core-network core-path core-packet core-strategy core-types
+PACKAGES = core-crypto core-hopr core-misc core-network core-path core-packet core-protocol core-strategy core-types
 ##########################################
 
 PKG_DIRS = $(addsuffix /pkg, $(PACKAGES))
@@ -23,7 +23,7 @@ ifneq ($(PACKAGES),)
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.ts) ../lib/
 	install $(foreach pkg, $(PKG_DIRS), $(pkg)/*.wasm) ../lib/
 
-	WASM_EXT_SUFFIX=$$(find ../lib/ -type f -exec grep -oP 'libp2p-wasm-ext-\K\w+' {} \; | uniq); \
+	WASM_EXT_SUFFIX=$$(find ../lib/ -type f -exec grep -oe 'libp2p-wasm-ext-.*' {} \; | uniq); \
 	mkdir -p ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
 	install ../../../vendor/cargo/libp2p-wasm-ext*/src/*.js ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/; \
 	echo "{}" >| ../lib/snippets/libp2p-wasm-ext-$${WASM_EXT_SUFFIX}/src/package.json

@@ -148,7 +148,7 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
             return ();
         }
 
-        if let Err(e) = poll_fn(|cx| Pin::new(&mut self.send_ping).poll_ready(cx)).await {
+        if let Err(e) = poll_fn(|cx| Pin::new(&self.send_ping).poll_ready(cx)).await {
             error!("The ping receiver is not listening: {}", e);
             return ();
         }

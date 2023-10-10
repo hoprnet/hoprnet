@@ -1,0 +1,67 @@
+---
+host:
+  address: !IPv4 127.0.0.1
+  port: 19091
+identity:
+  file: '/tmp/local_5.id'
+  password: ''
+  private_key:
+db:
+  data: '/tmp/local_5'
+  initialize: true
+  force_initialize: false
+inbox:
+  capacity: 512
+  max_age: 900
+  excluded_tags:
+    - 0
+api:
+  enable: true
+  auth: !Token '^^LOCAL-testing-123^^'
+  host:
+    address: !IPv4 127.0.0.1
+    port: 13301
+strategy:
+  on_fail_continue: true
+  allow_recursive: false
+  strategies: []
+heartbeat:
+  variance: 1000
+  interval: 2500
+  threshold: 2500
+network_options:
+  min_delay: 1
+  max_delay: 300
+  quality_bad_threshold: 0.2
+  quality_offline_threshold: 0.3
+  quality_step: 0.1
+  ignore_timeframe: 600
+  backoff_exponent: 1.5
+  backoff_min: 2
+  backoff_max: 300
+healthcheck:
+  enable: true
+  host: 127.0.0.1
+  port: 18081
+protocol:
+  ack:
+    timeout: 15
+  heartbeat:
+    timeout: 15
+  msg:
+    timeout: 15
+  ticket_aggregation:
+    timeout: 15
+network: anvil-localhost
+chain:
+  announce: true
+  provider: null
+  check_unrealized_balance: true
+safe_module:
+  safe_transaction_service_provider: null
+  safe_address: null
+  module_address: null
+test:
+  announce_local_addresses: true
+  prefer_local_addresses: true
+  use_weak_crypto: true

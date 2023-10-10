@@ -20,6 +20,9 @@ pub enum CoreEthereumIndexerError {
     #[error("Address announcement without a preceding key binding.")]
     AnnounceBeforeKeyBinding,
 
+    #[error("Address announcement contains empty Multiaddr.")]
+    AnnounceEmptyMultiaddr,
+
     #[error("Node has already announced a key binding. Reassigning keys is not supported.")]
     UnsupportedKeyRebinding,
 

@@ -3,7 +3,6 @@
   // Typescript Project references, see https://www.typescriptlang.org/docs/handbook/project-references.html
   "files": [],
   "references": [
-    { "path": "packages/connect" },
     { "path": "packages/core" },
     { "path": "packages/core-ethereum" },
     { "path": "packages/hoprd" },

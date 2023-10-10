@@ -1,6 +1,6 @@
 [package]
 name = "core-path"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Contains mixnet path construction and path finding logic"
@@ -12,17 +12,19 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-core-ethereum-db = { path = "../../../core-ethereum/crates/core-ethereum-db", default-features = false }
-core-crypto = { path = "../../../core/crates/core-crypto", default-features = false }
-core-types = { path = "../../../core/crates/core-types", default-features = false }
-hex = "0.4"
+core-ethereum-db = { workspace = true, default-features = false }
+core-crypto = { workspace = true, default-features = false }
+core-types = { workspace = true, default-features = false }
+hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
-thiserror = "1"
-utils-log = { path = "../../../utils/crates/utils-log", default-features = false }
-utils-db = { path = "../../../utils/crates/utils-db", default-features = false }
-utils-misc = { path = "../../../utils/crates/utils-misc", default-features = false }
-utils-types = { path = "../../../utils/crates/utils-types", default-features = false }
+petgraph = {version = "0.6.4", features = ["serde-1"] }
+serde = { workspace = true }
+thiserror = { workspace = true }
+utils-log = { workspace = true, default-features = false }
+utils-db = { workspace = true, default-features = false }
+utils-misc = { workspace = true, default-features = false }
+utils-types = { workspace = true, default-features = false }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 
@@ -32,7 +34,6 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 async-std = {version = "1.12.0", features = ["unstable"]}
 hex-literal = "0.4"
 tempfile = "3"
-rusty-leveldb = "1"
 wasm-bindgen-test = "0.3.36"
 
 [features]

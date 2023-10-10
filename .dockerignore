@@ -83,7 +83,6 @@ packages/*/crates/*/pkg
 /scripts/**/*.mjs
 /scripts/**/*.cts
 /scripts/**/*.cjs
-!/packages/connect/src/@types/*.d.ts
 !/packages/hoprd/src/main.cts
 
 # Avado package builds

@@ -19,6 +19,9 @@ pub enum PathError {
     #[error("path contains loop on {0}")]
     LoopsNotAllowed(String),
 
+    #[error("cannot find {0} hop path {0} -> {1} in the channel graph")]
+    PathNotFound(usize, String, String),
+
     #[error(transparent)]
     DatabaseError(#[from] DbError),
 

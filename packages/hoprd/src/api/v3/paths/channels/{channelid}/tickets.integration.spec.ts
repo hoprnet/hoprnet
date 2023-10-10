@@ -7,7 +7,7 @@ import { STATUS_CODES } from '../../../utils.js'
 import { Balance, BalanceType, U256, ChannelStatus, ChannelEntry, Ticket } from '@hoprnet/hopr-utils'
 
 let node = sinon.fake() as any
-node.getTickets = sinon.fake.returns([Ticket.default()])
+node.getTickets = sinon.fake.returns([Ticket.make_default()])
 
 describe('GET /channels/{channelid}/tickets', () => {
   let service: any
