@@ -78,4 +78,4 @@ jobs:
               echo "Milestone ${{ steps.bump.outputs.next_version }} already created"
             fi
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
