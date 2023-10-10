@@ -681,7 +681,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 acked_ticket.ticket.channel_id
             );
 
-            Err(DbError::GenericError(format!("channel {} not found", acked_ticket.ticket.channel_id)))
+            Err(DbError::GenericError(format!(
+                "channel {} not found",
+                acked_ticket.ticket.channel_id
+            )))
         }
     }
 
@@ -717,7 +720,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 acked_ticket.ticket.channel_id
             );
 
-            return Err(DbError::GenericError(format!("channel {} not found", acked_ticket.ticket.channel_id)));
+            return Err(DbError::GenericError(format!(
+                "channel {} not found",
+                acked_ticket.ticket.channel_id
+            )));
         }
 
         self.db.batch(ops, true).await
