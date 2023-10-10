@@ -210,7 +210,7 @@ async function main() {
 
   try {
     log(`This is HOPRd version ${version}`)
-    metric_version.set([pickVersion(version)], 1.0)
+    metric_version.set([version], 1.0)
 
     if (on_dappnode) {
       log('This node appears to be running on an Dappnode')
