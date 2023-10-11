@@ -10,7 +10,6 @@ import {
   // setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
-  pickVersion,
   defer,
   debug,
   health_to_string,
