@@ -24,6 +24,7 @@ lazy_static = { workspace = true }
 multiaddr = "0.18"
 primitive-types = "0.12.1"
 serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0"
 serde-wasm-bindgen = { workspace = true, optional = true }
 thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
@@ -52,7 +53,7 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:gloo-timers", "dep:serde-wasm-bindgen",
     "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 prometheus = [ "dep:utils-metrics" ]

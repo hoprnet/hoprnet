@@ -51,7 +51,7 @@ done
 cd "${mydir}/../"
 
 declare release_config="${mydir}/../packages/hoprd/releases.json"
-declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare protocol_config="${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 for git_ref in $(cat "${release_config}" | jq -r "to_entries[] | .value.git_ref" | uniq); do

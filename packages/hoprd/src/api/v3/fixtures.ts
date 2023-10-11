@@ -14,7 +14,12 @@ import {
   U256
 } from '@hoprnet/hopr-utils'
 
-import { MessageInbox, MessageInboxConfiguration, hoprd_hoprd_initialize_crate } from '../../../lib/hoprd_hoprd.js'
+import {
+  MessageInbox,
+  MessageInboxConfiguration,
+  hoprd_hoprd_initialize_crate,
+  HoprdPersistentDatabase
+} from '../../../lib/hoprd_hoprd.js'
 hoprd_hoprd_initialize_crate()
 
 import type { PeerId } from '@libp2p/interface-peer-id'
@@ -86,12 +91,22 @@ export const createTestApiInstance = async (node: any) => {
   let cfg = new MessageInboxConfiguration()
   cfg.capacity = 2
   let inbox = new MessageInbox(cfg)
+  let db = HoprdPersistentDatabase.newInMemory()
   return {
-    api: await setupRestApi(service, '/api/v3', node, inbox, createTestMocks(), {
-      disableApiAuthentication: true
-    }),
+    api: await setupRestApi(
+      service,
+      '/api/v3',
+      node,
+      inbox,
+      createTestMocks(),
+      {
+        disableApiAuthentication: true
+      },
+      db
+    ),
     service,
-    inbox
+    inbox,
+    db
   }
 }
 
@@ -102,12 +117,22 @@ export const createTestApiInstance = async (node: any) => {
 export const createAuthenticatedTestApiInstance = async (node: any) => {
   const service = express()
   let inbox = new MessageInbox(new MessageInboxConfiguration())
+  let db = HoprdPersistentDatabase.newInMemory()
   return {
-    api: await setupRestApi(service, '/api/v3', node, inbox, createTestMocks(), {
-      apiToken: 'superuser'
-    }),
+    api: await setupRestApi(
+      service,
+      '/api/v3',
+      node,
+      inbox,
+      createTestMocks(),
+      {
+        apiToken: 'superuser'
+      },
+      db
+    ),
     service,
-    inbox
+    inbox,
+    db
   }
 }
 
@@ -117,7 +142,6 @@ export const createAuthenticatedTestApiInstance = async (node: any) => {
  */
 export const createTestMocks = () => {
   let state: State = {
-    aliases: new Map(),
     settings: { includeRecipient: false /*strategy: 'passive', maxAutoChannels: undefined, autoRedeemTickets: false*/ }
   }
 

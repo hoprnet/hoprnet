@@ -17,6 +17,7 @@ async-std = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
+lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 petgraph = {version = "0.6.4", features = ["serde-1"] }
 serde = { workspace = true }
@@ -29,6 +30,7 @@ core-crypto = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
+utils-metrics = { workspace = true, optional = true, default-features = false }
 utils-misc = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
 
@@ -44,7 +46,8 @@ wasm-bindgen-test = "0.3.36"
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-log/wasm", "utils-db/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-log/wasm", "utils-db/wasm", "utils-metrics?/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+prometheus = ["dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]

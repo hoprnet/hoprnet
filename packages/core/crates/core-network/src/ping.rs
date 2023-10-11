@@ -5,10 +5,6 @@ use futures::{future::poll_fn, StreamExt};
 use libp2p_identity::PeerId;
 
 use utils_log::{debug, error, info};
-use utils_metrics::histogram_start_measure;
-use utils_metrics::metrics::SimpleCounter;
-use utils_metrics::metrics::SimpleHistogram;
-use utils_metrics::metrics::SimpleTimer;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
@@ -17,6 +13,27 @@ use crate::messaging::ControlMessage;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::{SimpleCounter, SimpleHistogram};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_PING: SimpleHistogram =
+        SimpleHistogram::new(
+            "core_histogram_ping_time_seconds",
+            "Measures total time it takes to ping a single node (seconds)",
+            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
+        ).unwrap();
+    static ref METRIC_SUCCESSFUL_PING_COUNT: SimpleCounter = SimpleCounter::new(
+            "core_counter_heartbeat_successful_pings",
+            "Total number of successful pings",
+        ).unwrap();
+    static ref METRIC_FAILED_PINT_COUNT: SimpleCounter = SimpleCounter::new(
+            "core_counter_heartbeat_failed_pings",
+            "Total number of failed pings",
+        ).unwrap();
+}
 
 const MAX_PARALLEL_PINGS: usize = 14;
 
@@ -60,12 +77,9 @@ pub struct Ping<T: PingExternalAPI> {
     send_ping: HeartbeatSendPingTx,
     receive_pong: HeartbeatGetPongRx,
     external_api: T,
-    metric_time_to_ping: Option<SimpleHistogram>,
-    metric_successful_ping_count: Option<SimpleCounter>,
-    metric_failed_ping_count: Option<SimpleCounter>,
 }
 
-type PingStartedRecord = (u64, ControlMessage, Option<SimpleTimer>);
+type PingStartedRecord = (u64, ControlMessage);
 
 impl<T: PingExternalAPI> Ping<T> {
     pub fn new(
@@ -84,46 +98,20 @@ impl<T: PingExternalAPI> Ping<T> {
             send_ping,
             receive_pong,
             external_api,
-            metric_time_to_ping: if cfg!(test) {
-                None
-            } else {
-                SimpleHistogram::new(
-                    "core_histogram_ping_time_seconds",
-                    "Measures total time it takes to ping a single node (seconds)",
-                    vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
-                )
-                .ok()
-            },
-            metric_successful_ping_count: SimpleCounter::new(
-                "core_counter_heartbeat_successful_pings",
-                "Total number of successful pings",
-            )
-            .ok(),
-            metric_failed_ping_count: SimpleCounter::new(
-                "core_counter_heartbeat_failed_pings",
-                "Total number of failed pings",
-            )
-            .ok(),
         }
     }
 
     fn initiate_peer_ping(
         &mut self,
         peer: &PeerId,
-    ) -> Result<(u64, ControlMessage, std::option::Option<SimpleTimer>), ()> {
+    ) -> Result<(u64, ControlMessage), ()> {
         info!("Pinging peer '{}'", peer);
 
         let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();
 
-        let ping_peer_timer = if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
-            Some(histogram_start_measure!(metric_time_to_ping))
-        } else {
-            None
-        };
-
         self.send_ping
             .start_send((peer.clone(), ping_challenge.clone()))
-            .map(move |_| (current_timestamp(), ping_challenge, ping_peer_timer))
+            .map(move |_| (current_timestamp(), ping_challenge))
             .map_err(|_| ())
     }
 }
@@ -179,7 +167,7 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
 
             let (peer, result, version) = match response {
                 Ok((pong, version)) => {
-                    let (start, challenge, timer) = record.expect("Should hold a value at this point");
+                    let (start, challenge) = record.expect("Should hold a value at this point");
                     let duration: std::result::Result<std::time::Duration, ()> = {
                         if ControlMessage::validate_pong_response(&challenge, &pong).is_ok() {
                             info!("Successfully pinged peer {}", peer);
@@ -190,10 +178,6 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
                         }
                     };
 
-                    if let Some(metric_time_to_ping) = &self.metric_time_to_ping {
-                        metric_time_to_ping.record_measure(timer.unwrap());
-                    }
-
                     (peer, duration, version)
                 }
                 Err(_) => {
@@ -202,16 +186,14 @@ impl<T: PingExternalAPI> Pinging for Ping<T> {
                 }
             };
 
+            #[cfg(all(feature = "prometheus", not(test)))]
             match result {
-                Ok(_) => {
-                    if let Some(metric_successful_ping_count) = &self.metric_successful_ping_count {
-                        metric_successful_ping_count.increment();
-                    };
+                Ok(duration) => {
+                    METRIC_TIME_TO_PING.observe(duration.as_millis() as f64);
+                    METRIC_SUCCESSFUL_PING_COUNT.increment();
                 }
                 Err(_) => {
-                    if let Some(metric_failed_ping_count) = &self.metric_failed_ping_count {
-                        metric_failed_ping_count.increment();
-                    };
+                    METRIC_FAILED_PINT_COUNT.increment();
                 }
             }
 

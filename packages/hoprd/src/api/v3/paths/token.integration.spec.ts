@@ -3,25 +3,23 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 
-import { Database } from '@hoprnet/hopr-utils'
+import { Hopr, HoprdPersistentDatabase } from '@hoprnet/hopr-utils'
 
 import { createToken, storeToken } from '../../token.js'
-import { createAuthenticatedTestApiInstance, ALICE_ETHEREUM_ADDR } from './../fixtures.js'
-
-import type { Hopr } from '@hoprnet/hopr-core'
+import { createAuthenticatedTestApiInstance } from './../fixtures.js'
 
 describe('GET /token', function () {
   let node: Hopr
   let service: any
+  let db: HoprdPersistentDatabase
 
   before(async function () {
     node = sinon.fake() as any
-    node.db = Database.new_in_memory(ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)
 
     service = loaded.service
-
+    db = loaded.db
     // @ts-ignore ESM / CommonJS compatibility issue
     chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
   })
@@ -41,8 +39,8 @@ describe('GET /token', function () {
   it('should fail with unauthorized error when using token with missing capability', async function () {
     // create token with wrong capability
     const caps = [{ endpoint: 'tokensCreate' }]
-    const token = await createToken(node.db, undefined, caps)
-    await storeToken(node.db, token)
+    const token = await createToken(db, undefined, caps)
+    await storeToken(db, token)
 
     const res = await request(service).get('/api/v3/token').set('x-auth-token', token.id)
     expect(res.status).to.equal(403)
@@ -52,8 +50,8 @@ describe('GET /token', function () {
   it('should succeed when using token with correct capability', async function () {
     // create token with correct capability
     const caps = [{ endpoint: 'tokensGetToken' }]
-    const token = await createToken(node.db, undefined, caps)
-    await storeToken(node.db, token)
+    const token = await createToken(db, undefined, caps)
+    await storeToken(db, token)
 
     const res = await request(service).get('/api/v3/token').set('x-auth-token', token.id)
     expect(res.status).to.equal(200)

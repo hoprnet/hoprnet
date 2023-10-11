@@ -3,16 +3,14 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 import { Multiaddr } from '@multiformats/multiaddr'
-import { Health } from '@hoprnet/hopr-core'
 
-import { hoprd_hoprd_initialize_crate, type ResolvedNetwork } from '../../../../../lib/hoprd_hoprd.js'
+import { hoprd_hoprd_initialize_crate } from '../../../../../lib/hoprd_hoprd.js'
+// import { hoprd_hoprd_initialize_crate, type ResolvedNetwork } from '../../../../../lib/hoprd_hoprd.js'
 hoprd_hoprd_initialize_crate()
 
-import { health_to_string } from '@hoprnet/hopr-utils'
+import { health_to_string, Hopr, Health, WasmHealth } from '@hoprnet/hopr-utils'
 
 import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
-
-import type { Hopr } from '@hoprnet/hopr-core'
 
 const node = sinon.fake() as any as Hopr
 
@@ -44,7 +42,9 @@ describe('GET /node/info', () => {
   })
 
   it('should get info', async () => {
-    node.network = { id: 'anvil-localhost' } as ResolvedNetwork
+    // TODO: Add network ID
+    // node.network = { id: 'anvil-localhost' } as ResolvedNetwork
+    // TODO: return this? or the cchainconfiginfo?
     node.smartContractInfo = sinon.fake.returns({
       chain: 'a',
       hoprTokenAddress: HOPR_TOKEN_ADDRESS,
@@ -56,14 +56,14 @@ describe('GET /node/info', () => {
       safeAddress: SAFE_ADDRESS,
       noticePeriodChannelClosure: 60
     })
-    node.getAddressesAnnouncedToDHT = sinon.fake.resolves(DHT_ADDRESSES)
-    node.getListeningAddresses = async () => {
-      return LISTENING_ADDRS
+    node.getMultiaddressesAnnouncedToDHT = sinon.fake.resolves(DHT_ADDRESSES.map((ma) => ma.toString()))
+    node.getListeningMultiaddresses = async () => {
+      return LISTENING_ADDRS.map((ma) => ma.toString())
     }
-    node.getId = sinon.fake.returns(ALICE_PEER_ID)
-    node.isAllowedAccessToNetwork = sinon.fake.returns(Promise.resolve(true))
-    node.getConnectivityHealth = async () => {
-      return Health.Green
+    node.peerId = sinon.fake.returns(ALICE_PEER_ID)
+    node.isAllowedToAccessNetwork = sinon.fake.returns(Promise.resolve(true))
+    node.networkHealth = async () => {
+      return WasmHealth.green()
     }
 
     const res = await request(service).get(`/api/v3/node/info`)

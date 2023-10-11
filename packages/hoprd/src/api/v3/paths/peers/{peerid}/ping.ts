@@ -1,20 +1,18 @@
 import { peerIdFromString } from '@libp2p/peer-id'
-import { PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
+import { Hopr, peer_metadata_protocol_version_name } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 
 import type { Operation } from 'express-openapi'
-import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Hopr } from '@hoprnet/hopr-core'
 
 /**
  * Pings another peer to check its availability.
  * @returns Latency and HOPR protocol version (once known) if ping was successful.
  */
 export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => {
-  let validPeerId: PeerId
+  let validPeerId: string
   try {
-    validPeerId = peerIdFromString(peerId)
+    validPeerId = peerIdFromString(peerId).toString()
   } catch (err) {
     throw Error(STATUS_CODES.INVALID_PEERID)
   }
@@ -32,11 +30,11 @@ export const ping = async ({ node, peerId }: { node: Hopr; peerId: string }) => 
     throw error
   }
 
-  if (pingResult.latency >= 0) {
-    const info = await node.getConnectionInfo(validPeerId)
-    let protocol_version = info.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
+  if (pingResult !== undefined && pingResult >= 0) {
+    const info = await node.getPeerInfo(validPeerId)
+    let protocol_version = info.metadata().get(peer_metadata_protocol_version_name()) ?? 'unknown'
 
-    return { latency: pingResult.latency, reportedVersion: protocol_version }
+    return { latency: pingResult, reportedVersion: protocol_version }
   }
 
   throw Error(STATUS_CODES.TIMEOUT)

@@ -8,7 +8,7 @@ import {
   BOB_ETHEREUM_ADDR,
   CHARLIE_ETHEREUM_ADDR
 } from '../../../../fixtures.js'
-import { Balance, BalanceType, U256, ChannelStatus, ChannelEntry } from '@hoprnet/hopr-utils'
+import { Balance, BalanceType, U256, ChannelStatus, ChannelEntry, Ticket } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../../utils.js'
 
@@ -67,7 +67,7 @@ describe('POST /channels/{channelid}/tickets/redeem', () => {
   })
 
   it('should fail when no tickets to redeem', async () => {
-    node.getTickets = sinon.fake.returns([])
+    node.getTickets = sinon.fake.returns([Ticket.make_default()])
     const res = await request(service).post(`/api/v3/channels/${incoming.get_id().to_hex()}/tickets/redeem`)
     expect(res.status).to.equal(404)
     expect(res).to.satisfyApiSpec

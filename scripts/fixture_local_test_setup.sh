@@ -352,7 +352,7 @@ for p in "${all_ports[@]}"; do
 done
 # }}}
 
-declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare protocol_config="${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{

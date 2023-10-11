@@ -2,6 +2,7 @@ import { setImmediate as setImmediatePromise } from 'timers/promises'
 
 import { providers, utils, errors, BigNumber, ethers, type UnsignedTransaction, type ContractTransaction } from 'ethers'
 import {
+  debug,
   Address,
   Balance,
   BalanceType,
@@ -9,12 +10,13 @@ import {
   type DeferType,
   create_counter,
   ChainKeypair,
-  CORE_ETHEREUM_CONSTANTS
+  CORE_ETHEREUM_CONSTANTS,
+
+  SmartContractConfig
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
 import TransactionManager, { type TransactionPayload } from './transaction-manager.js'
-import { debug } from '@hoprnet/hopr-utils'
 
 import type { Block } from '@ethersproject/abstract-provider'
 
@@ -57,18 +59,8 @@ export type SendTransactionReturn =
       code: SendTransactionStatus.DUPLICATE
     }
 
-export type DeploymentExtract = {
-  hoprAnnouncementsAddress: string
-  hoprTokenAddress: string
-  hoprChannelsAddress: string
-  hoprNetworkRegistryAddress: string
-  hoprNodeSafeRegistryAddress: string
-  hoprTicketPriceOracleAddress: string
-  indexerStartBlockNumber: number
-}
-
 export async function createChainWrapper(
-  deploymentExtract: DeploymentExtract,
+  deploymentExtract: SmartContractConfig,
   safeModuleOptions: SafeModuleOptions,
   networkInfo: {
     provider: string
@@ -102,12 +94,12 @@ export async function createChainWrapper(
   log(`[DEBUG] safeModuleOptions.safeAddress ${JSON.stringify(safeModuleOptions.safeAddress.to_hex(), null, 2)}`)
   log(`[DEBUG] safeModuleOptions.moduleAddress ${JSON.stringify(safeModuleOptions.moduleAddress.to_hex(), null, 2)}`)
 
-  const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
+  const token = new ethers.Contract(deploymentExtract.hopr_token_address, HOPR_TOKEN_ABI, provider)
 
-  const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
+  const channels = new ethers.Contract(deploymentExtract.hopr_channels_address, HOPR_CHANNELS_ABI, provider)
 
   const networkRegistry = new ethers.Contract(
-    deploymentExtract.hoprNetworkRegistryAddress,
+    deploymentExtract.hopr_network_registry_address,
     HOPR_NETWORK_REGISTRY_ABI,
     provider
   )
@@ -115,13 +107,13 @@ export async function createChainWrapper(
   const nodeManagementModule = new ethers.Contract(safeModuleOptions.moduleAddress.to_hex(), HOPR_MODULE_ABI, provider)
 
   const nodeSafeRegistry = new ethers.Contract(
-    deploymentExtract.hoprNodeSafeRegistryAddress,
+    deploymentExtract.hopr_node_safe_registry_address,
     HOPR_NODE_SAFE_REGISTRY_ABI,
     provider
   )
 
   //getGenesisBlock, taking the earlier deployment block between the channel and network Registery
-  const genesisBlock = deploymentExtract.indexerStartBlockNumber
+  const genesisBlock = deploymentExtract.indexer_start_block_number
   const noticePeriodChannelClosure = await channels.noticePeriodChannelClosure()
 
   const transactions = new TransactionManager()
@@ -628,12 +620,12 @@ export async function createChainWrapper(
     getPublicKey: () => publicKey,
     getInfo: () => ({
       chain: networkInfo.chain,
-      hoprAnnouncementsAddress: deploymentExtract.hoprAnnouncementsAddress,
-      hoprTokenAddress: deploymentExtract.hoprTokenAddress,
-      hoprChannelsAddress: deploymentExtract.hoprChannelsAddress,
-      hoprNetworkRegistryAddress: deploymentExtract.hoprNetworkRegistryAddress,
-      hoprNodeSafeRegistryAddress: deploymentExtract.hoprNodeSafeRegistryAddress,
-      hoprTicketPriceOracleAddress: deploymentExtract.hoprTicketPriceOracleAddress,
+      hoprAnnouncementsAddress: deploymentExtract.hopr_announcements_address,
+      hoprTokenAddress: deploymentExtract.hopr_token_address,
+      hoprChannelsAddress: deploymentExtract.hopr_channels_address,
+      hoprNetworkRegistryAddress: deploymentExtract.hopr_network_registry_address,
+      hoprNodeSafeRegistryAddress: deploymentExtract.hopr_node_safe_registry_address,
+      hoprTicketPriceOracleAddress: deploymentExtract.hopr_ticket_price_oracle_address,
       moduleAddress: safeModuleOptions.moduleAddress.to_hex(),
       safeAddress: safeModuleOptions.safeAddress.to_hex(),
       noticePeriodChannelClosure

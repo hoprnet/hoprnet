@@ -3,12 +3,10 @@ import request from 'supertest'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 
-import { generate_channel_id } from '@hoprnet/hopr-utils'
+import { generate_channel_id, Hopr } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 import { createTestApiInstance, ALICE_ETHEREUM_ADDR, BOB_ETHEREUM_ADDR } from './../../../fixtures.js'
-
-import type { Hopr } from '@hoprnet/hopr-core'
 
 describe('POST /channels/{channelid}/fund', function () {
   let node: Hopr

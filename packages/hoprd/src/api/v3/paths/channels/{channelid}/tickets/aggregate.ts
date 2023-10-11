@@ -1,7 +1,6 @@
-import { Hash, stringToU8a, debug } from '@hoprnet/hopr-utils'
+import { Hash, stringToU8a, debug, Hopr } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../../../utils.js'
 
-import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 
 const log = debug('hoprd:api:v3:channel-ticket-aggregate')

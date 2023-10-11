@@ -1,11 +1,9 @@
 import { WebSocketServer } from 'ws'
 import express from 'express'
 import http from 'http'
-import { debug } from '@hoprnet/hopr-utils'
+import { debug, Hopr, HoprdPersistentDatabase, MessageInbox } from '@hoprnet/hopr-utils'
 import * as api from './v3.js'
-import { type MessageInbox } from '../../lib/hoprd_hoprd.js'
 
-import type { Hopr } from '@hoprnet/hopr-core'
 import type { StateOps } from '../types.js'
 
 const debugLog = debug('hoprd:api')
@@ -19,14 +17,15 @@ export default function setupAPI(
     apiHost: string
     apiPort: number
     apiToken?: string
-  }
+  },
+  db: HoprdPersistentDatabase
 ): () => void {
   debugLog('Enabling Rest API v3 and WS API v3')
   const service = express()
   const server = http.createServer(service)
 
-  api.setupRestApi(service, '/api/v3', node, inbox, stateOps, options)
-  api.setupWsApi(server, new WebSocketServer({ noServer: true }), node, options)
+  api.setupRestApi(service, '/api/v3', node, inbox, stateOps, options, db)
+  api.setupWsApi(server, new WebSocketServer({ noServer: true }), node, options, db)
 
   return function listen() {
     server

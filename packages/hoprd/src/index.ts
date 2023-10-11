@@ -2,42 +2,41 @@ import path from 'path'
 import retimer from 'retimer'
 
 import {
-  create_gauge,
-  create_multi_gauge,
   get_package_version,
   Balance,
   BalanceType,
-  // setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
-  defer,
   debug,
-  health_to_string,
   MessageInbox,
   HoprKeys,
+  Hopr,
   IdentityOptions,
-  ApplicationData,
-  MessageInboxConfiguration
+  ApplicationData
 } from '@hoprnet/hopr-utils'
-import { Health, createHoprNode, type Hopr } from '@hoprnet/hopr-core'
 
 import {
   parse_cli_arguments,
   fetch_configuration,
+  to_hoprlib_config,
   parse_private_key,
   HoprdConfig,
   type Api,
   type CliArgs,
-  hoprd_hoprd_initialize_crate
+  hoprd_hoprd_initialize_crate,
+  HoprdPersistentDatabase,
+  HoprLibConfig
 } from '../lib/hoprd_hoprd.js'
 hoprd_hoprd_initialize_crate()
 
 import type { State } from './types.js'
 import setupAPI from './api/index.js'
-import setupHealthcheck from './healthcheck.js'
+import { createHoprNode } from './hopr.js'
 
 import { decodeMessage } from './api/utils.js'
 import { RPCH_MESSAGE_REGEXP } from './api/v3.js'
+
+export { WasmChainQuery, WasmHoprMessageEmitter } from './hopr.js'
 
 const ONBOARDING_INFORMATION_INTERVAL = 30000 // show information every 30sec
 
@@ -58,26 +57,11 @@ process.on('SIGINT', stopGracefully)
 process.on('SIGTERM', stopGracefully)
 
 // Metrics
-const metric_processStartTime = create_gauge(
-  'hoprd_gauge_startup_unix_time_seconds',
-  'The unix timestamp at which the process was started'
-)
-const metric_nodeStartupTime = create_histogram_with_buckets(
-  'hoprd_histogram_startup_time_seconds',
-  'Time it takes for a node to start up',
-  new Float64Array([5.0, 10.0, 30.0, 60.0, 120.0, 180.0, 300.0, 600.0, 1200.0])
-)
-const metric_timeToGreen = create_histogram_with_buckets(
-  'hoprd_histogram_time_to_green_seconds',
-  'Time it takes for a node to transition to the GREEN network state',
-  new Float64Array([30.0, 60.0, 90.0, 120.0, 180.0, 240.0, 300.0, 420.0, 600.0, 900.0, 1200.0])
-)
 const metric_latency = create_histogram_with_buckets(
   'hoprd_histogram_message_latency_ms',
   'Histogram of measured received message latencies',
   new Float64Array([10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 20000.0])
 )
-const metric_version = create_multi_gauge('hoprd_mgauge_version', 'Executed version of HOPRd', ['version'])
 
 // reading the version manually to ensure the path is read correctly
 const packageFile = path.normalize(new URL('../package.json', import.meta.url).pathname)
@@ -88,10 +72,9 @@ const on_dappnode = (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true'
 // This function may exit the calling process entirely if an error is
 // encountered or the version or help are rendered.
 function parseCliArguments(args: string[]) {
-  const mono_repo_path = new URL('../../../', import.meta.url).pathname
   let argv: CliArgs
   try {
-    argv = parse_cli_arguments(args, process.env, mono_repo_path, process.env.HOME) as CliArgs
+    argv = parse_cli_arguments(args, process.env) as CliArgs
   } catch (err) {
     // both --version and --help are treated as errors, therefore we need some
     // special handling here to be able to return exit code 0 in such cases
@@ -137,13 +120,9 @@ async function main() {
   // Increase the default maximum number of event listeners
   ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
-  metric_processStartTime.set(Date.now() / 1000)
-  const metric_startupTimer = metric_nodeStartupTime.start_measure()
-
   let node: Hopr
   let inbox: MessageInbox
   let state: State = {
-    aliases: new Map(),
     settings: {
       includeRecipient: false
     }
@@ -157,51 +136,15 @@ async function main() {
     return state
   }
 
-  let metric_timerToGreen = metric_timeToGreen.start_measure()
-
-  const networkHealthChanged = (oldState: Health, newState: Health): void => {
-    // Log the network health indicator state change (goes over the WS as well)
-    log(`Network health indicator changed: ${health_to_string(oldState)} -> ${health_to_string(newState)}`)
-    log(`NETWORK HEALTH: ${health_to_string(newState)}`)
-    if (metric_timerToGreen && newState == Health.Green) {
-      metric_timeToGreen.record_measure(metric_timerToGreen)
-      metric_timerToGreen = undefined
-    }
-  }
-
-  const logMessageToNode = async (data: ApplicationData) => {
-    log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
-    try {
-      let decodedMsg = decodeMessage(data.plain_text)
-      log(`Message: ${decodedMsg.msg}`)
-      log(`App tag: ${data.application_tag ?? 0}`)
-      log(`Latency: ${decodedMsg.latency} ms`)
-      metric_latency.observe(decodedMsg.latency)
-
-      if (RPCH_MESSAGE_REGEXP.test(decodedMsg.msg)) {
-        log(`RPCh: received message [${decodedMsg.msg}]`)
-      }
-
-      // Needs to be created new, because the incoming `data` is from serde_wasmbindgen and not a Rust WASM object
-      // Use the plain message, not the RLP encoded form. At this point we don't
-      // care about the latency anymore.
-      let appData = new ApplicationData(data.application_tag, new TextEncoder().encode(decodedMsg.msg))
-      await inbox.push(appData)
-    } catch (err) {
-      log('Could not decode message', err instanceof Error ? err.message : 'Unknown error', data.plain_text.toString())
-    }
-  }
-
   const argv = parseCliArguments(process.argv.slice(1))
   let cfg: HoprdConfig
   try {
     cfg = fetch_configuration(argv as CliArgs) as HoprdConfig
+    console.log('Node configuration: ' + cfg.as_redacted_string())
   } catch (err) {
     console.error(err)
     process.exit(1)
   }
-
-  console.log('Node configuration: ' + cfg.as_redacted_string())
 
   if (argv.dry_run) {
     process.exit(0)
@@ -209,23 +152,29 @@ async function main() {
 
   try {
     log(`This is HOPRd version ${version}`)
-    metric_version.set([version], 1.0)
 
     if (on_dappnode) {
       log('This node appears to be running on an Dappnode')
     }
 
     // 1. Find or create an identity
-    const keypair = HoprKeys.init(
-      new IdentityOptions(
-        cfg.db.initialize,
-        cfg.identity.file,
-        cfg.identity.password,
-        cfg.test.use_weak_crypto,
-        cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
-      )
+    const parsed_private_key =
+      cfg.identity.private_key === undefined ? undefined : parse_private_key(cfg.identity.private_key)
+    const identity_opts = new IdentityOptions(
+      cfg.hopr.db.initialize,
+      cfg.identity.file,
+      cfg.identity.password,
+      cfg.test.use_weak_crypto,
+      parsed_private_key
     )
 
+    const keypair = HoprKeys.init(identity_opts)
+
+    log(
+      `This node '${keypair.packet_key.public().to_peerid_str()} uses blockchain address '${keypair.chain_key
+        .public()
+        .to_hex(true)}''`
+    )
     log(`chain_key ${keypair.chain_key.public().to_hex(true)}`)
     log(`packet_key ${keypair.packet_key.public().to_peerid_str()}`)
 
@@ -235,38 +184,54 @@ async function main() {
       )
     }
 
+    inbox = new MessageInbox(cfg.inbox)
+
+    const logMessageToNode = async (data: ApplicationData) => {
+      log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
+      try {
+        let decodedMsg = decodeMessage(data.plain_text)
+        log(`Message: ${decodedMsg.msg}`)
+        log(`App tag: ${data.application_tag ?? 0}`)
+        log(`Latency: ${decodedMsg.latency} ms`)
+        metric_latency.observe(decodedMsg.latency)
+
+        if (RPCH_MESSAGE_REGEXP.test(decodedMsg.msg)) {
+          log(`RPCh: received message [${decodedMsg.msg}]`)
+        }
+
+        // Needs to be created new, because the incoming `data` is from serde_wasmbindgen and not a Rust WASM object
+        // Use the plain message, not the RLP encoded form. At this point we don't
+        // care about the latency anymore.
+        let appData = new ApplicationData(data.application_tag, new TextEncoder().encode(decodedMsg.msg))
+        await inbox.push(appData)
+      } catch (err) {
+        log(
+          'Could not decode message',
+          err instanceof Error ? err.message : 'Unknown error',
+          data.plain_text.toString()
+        )
+      }
+    }
+
     // 2. Create node instance
     log('Creating HOPR Node')
-    node = await createHoprNode(keypair.chain_key, keypair.packet_key, cfg, false)
-    log('Status: PENDING')
+    // TODO: originally (DAPPNODE support) the safe and module address could have been undefined to allow safe setup
+    // if safe address or module address is not provided, replace with values stored in the db
+    const hoprlib_cfg: HoprLibConfig = to_hoprlib_config(cfg)
+    node = await createHoprNode(keypair.chain_key, keypair.packet_key, hoprlib_cfg)
+    let loop_executor = await node.run()
 
     // Subscribe to node events
+    log('Subscribing incoming messages to inbox')
     node.on('hopr:message', logMessageToNode)
-    node.on('hopr:network-health-changed', networkHealthChanged)
-
-    let continueStartup = defer<void>()
-    node.subscribeOnConnector('hopr:connector:created', () => {
-      // 2.b - Connector has been created, and we can now trigger the next set of steps.
-      log('Connector has been loaded properly.')
-      node.emit('hopr:monitoring:start')
-      continueStartup.resolve()
-    })
-
-    // 2.a - Setup connector listener to bubble up to node. Emit connector creation.
-    log(`Ready to request on-chain connector to connect to provider.`)
-    node.emitOnConnector('connector:create')
-
-    await continueStartup.promise
-
-    // 3. start all monitoring services, and continue with the rest of the setup.
-
-    let inboxCfg = new MessageInboxConfiguration()
-    // TODO: pass configuration parameters for the inbox
-
-    inbox = new MessageInbox(inboxCfg)
 
     let api = cfg.api as Api
     console.log(JSON.stringify(api, null, 2))
+
+    log('Creating HOPRd only database (auth...)')
+    const hoprd_db_path = path.join(cfg.hopr.db.data, 'db', 'hoprd')
+    let hoprdDb = new HoprdPersistentDatabase(hoprd_db_path)
+
     const startApiListen = setupAPI(
       node,
       inbox,
@@ -276,14 +241,11 @@ async function main() {
         apiHost: api.host.address(),
         apiPort: api.host.port,
         apiToken: api.is_auth_disabled() ? null : api.auth_token()
-      }
+      },
+      hoprdDb
     )
     // start API server only if API flag is true
     if (cfg.api.enable) startApiListen()
-
-    if (cfg.healthcheck.enable) {
-      setupHealthcheck(node, cfg.healthcheck.host, cfg.healthcheck.port)
-    }
 
     const ethAddr = node.getEthereumAddress().to_hex()
     const fundsReq = new Balance(SUGGESTED_NATIVE_BALANCE.toString(10), BalanceType.Native).to_formatted_string()
@@ -292,22 +254,12 @@ async function main() {
 
     showOnboardingInformation(node)
 
-    // 2.5 Await funding of wallet.
-    await node.waitForFunds()
-    log('Node has been funded, starting...')
-
-    // 3. Start the node.
-    await node.start()
-
-    // alias self
-    state.aliases.set('me', node.getId())
-
-    log('Status: READY')
-    log('Node has started!')
-    metric_nodeStartupTime.record_measure(metric_startupTimer)
-
     // Won't return until node is terminated
-    await node.startProcessing()
+    log('# STARTED NODE')
+    log('ID {}', node.peerId())
+    log('Protocol version', node.getVersionCoerced())
+
+    await loop_executor.execute()
   } catch (e) {
     log('Node failed to start: ' + e)
     process.exit(1)
@@ -315,14 +267,16 @@ async function main() {
 }
 
 async function showOnboardingInformation(node: Hopr): Promise<void> {
-  const address = node.getEthereumAddress().to_string()
+  let address_original = node.getEthereumAddress()
+  let address = address_original.to_string()
   const version = node.getVersion()
-  const isAllowed = await node.isAllowedAccessToNetwork(node.getId())
+  const peer_id = node.peerId()
+  const isAllowed = await node.isAllowedToAccessNetwork(peer_id)
   if (isAllowed) {
     const msg = `
       Node information:
 
-      Node peerID: ${node.getId().toString()}
+      Node peerID: ${peer_id}
       Node address: ${address}
       Node version: ${version}
       `
@@ -333,7 +287,7 @@ async function showOnboardingInformation(node: Hopr): Promise<void> {
   const msg = `
     Node information:
 
-    Node peerID: ${node.getId().toString()}
+    Node peerID: ${peer_id}
     Node address: ${address}
     Node version: ${version}
 

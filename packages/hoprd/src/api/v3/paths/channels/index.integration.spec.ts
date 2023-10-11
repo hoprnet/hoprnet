@@ -17,15 +17,15 @@ import {
 import { STATUS_CODES } from '../../utils.js'
 
 let node = sinon.fake as any
-node.getId = sinon.fake.returns(ALICE_PEER_ID)
+node.peerId = sinon.fake.returns(ALICE_PEER_ID)
 node.getEthereumAddress = sinon.fake.returns(ALICE_ETHEREUM_ADDR.clone())
 node.getSafeBalance = sinon.fake.resolves(new Balance('10', BalanceType.HOPR))
 
 const CHANNEL_ID = channelEntryCreateMock().get_id()
 
 node.openChannel = sinon.fake.resolves({
-  channelId: CHANNEL_ID,
-  receipt: 'testReceipt'
+  channel_id: CHANNEL_ID,
+  tx_hash: 'testReceipt'
 })
 
 describe('GET /channels', function () {

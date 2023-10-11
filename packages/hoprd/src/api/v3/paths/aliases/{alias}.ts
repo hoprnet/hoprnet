@@ -1,35 +1,15 @@
 import type { Operation } from 'express-openapi'
-import type { State, StateOps } from '../../../../types.js'
 import { STATUS_CODES } from '../../utils.js'
-
-/**
- * Removes alias and it's assigned PeerId.
- * Updates HOPRd's state.
- * @returns new state
- */
-export const removeAlias = (stateOps: StateOps, alias: string): State => {
-  const state = stateOps.getState()
-  state.aliases.delete(alias)
-  stateOps.setState(state)
-  return state
-}
-
-/**
- * @returns The PeerId associated with the alias.
- */
-export const getAlias = (state: Readonly<State>, alias: string): string => {
-  const peerId = state.aliases.get(alias)
-  if (!peerId) throw Error(STATUS_CODES.PEERID_NOT_FOUND)
-  return peerId.toString()
-}
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { stateOps }: { stateOps: StateOps } = req.context
+    const { node } = req.context
     const { alias } = req.params
 
     try {
-      const peerId = getAlias(stateOps.getState(), alias as string)
+      const peerId = await node.getAlias(alias as string)
+      if (!peerId) throw Error(STATUS_CODES.PEERID_NOT_FOUND)
+
       return res.status(200).send({ peerId })
     } catch (err) {
       const errString = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'
@@ -110,11 +90,11 @@ GET.apiDoc = {
 
 const DELETE: Operation = [
   async (req, res, _next) => {
-    const { stateOps } = req.context
+    const { node } = req.context
     const { alias } = req.params
 
     try {
-      removeAlias(stateOps, alias)
+      await node.removeAlias(alias)
       return res.status(204).send()
     } catch (err) {
       return res

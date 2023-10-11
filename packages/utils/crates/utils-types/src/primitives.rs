@@ -154,7 +154,7 @@ impl FromStr for BalanceType {
 
 /// Represents balance of some coin or token.
 #[derive(Clone, Copy, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct Balance {
     value: U256,
     balance_type: BalanceType,
@@ -1078,7 +1078,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "to_string")]
         pub fn _to_string(&self) -> String {
-            self.value.to_string()
+            format!("{} {}", self.value.to_string(), self.balance_type)
         }
 
         #[wasm_bindgen]

@@ -14,8 +14,19 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use utils_log::{debug, info};
-use utils_metrics::histogram_start_measure;
-use utils_metrics::metrics::SimpleHistogram;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::{histogram_start_measure, metrics::SimpleHistogram};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_HEARTBEAT: SimpleHistogram =
+        SimpleHistogram::new(
+            "core_histogram_heartbeat_time_seconds",
+            "Measures total time it takes to probe all other nodes (in seconds)",
+            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
+        ).unwrap();
+}
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
@@ -80,7 +91,7 @@ pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     pinger: T,
     external_api: API,
     rng: rand::rngs::ThreadRng,
-    metric_time_to_heartbeat: Option<SimpleHistogram>,
+    
 }
 
 impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
@@ -90,16 +101,6 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
             pinger,
             external_api,
             rng: rand::thread_rng(),
-            metric_time_to_heartbeat: if cfg!(test) {
-                None
-            } else {
-                SimpleHistogram::new(
-                    "core_histogram_heartbeat_time_seconds",
-                    "Measures total time it takes to probe all other nodes (in seconds)",
-                    vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0, 90.0, 120.0, 300.0],
-                )
-                .ok()
-            },
         }
     }
 
@@ -112,11 +113,8 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
     /// components have been initialized.
     pub async fn heartbeat_loop(&mut self) {
         loop {
-            let heartbeat_round_timer = if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
-                Some(histogram_start_measure!(metric_time_to_heartbeat))
-            } else {
-                None
-            };
+            #[cfg(all(feature = "prometheus", not(test)))]
+            let heartbeat_round_timer = histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT);
 
             let start = current_timestamp();
             let from_timestamp = start.checked_sub(self.config.threshold).unwrap_or(start);
@@ -150,10 +148,6 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 Either::Right(_) => info!("Heartbeat round finished for all peers"),
             };
 
-            if let Some(metric_time_to_heartbeat) = &self.metric_time_to_heartbeat {
-                metric_time_to_heartbeat.record_measure(heartbeat_round_timer.unwrap());
-            };
-
             let this_round_actual_duration_in_ms = current_timestamp().checked_sub(start).unwrap_or(0u64);
             if this_round_actual_duration_in_ms < this_round_planned_duration_in_ms {
                 let time_to_wait_for_next_round = this_round_planned_duration_in_ms - this_round_actual_duration_in_ms;
@@ -161,6 +155,9 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
                 debug!("Heartbeat sleeping for: {}ms", time_to_wait_for_next_round);
                 sleep(std::time::Duration::from_millis(time_to_wait_for_next_round)).await
             }
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_TIME_TO_HEARTBEAT.record_measure(heartbeat_round_timer);
         }
     }
 }

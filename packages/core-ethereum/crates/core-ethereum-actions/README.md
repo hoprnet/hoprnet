@@ -5,7 +5,7 @@ Contains high-level Core-Ethereum traits that translate to on-chain transactions
 ## `transaction_queue`
 
 The `TransactionQueue` object acts as general outgoing on-chain transaction MPSC queue. The queue is picked up
-one-by-one in an infinite loop that's executed in `core-hopr`. Any component that gets a `TransactionSender` type,
+one-by-one in an infinite loop that's executed in `core-transport`. Any component that gets a `TransactionSender` type,
 can send new transaction requests to the queue via its `send` method.
 A new `TransactionSender` can be obtained by calling `new_sender` method on the `TransactionQueue` and can be subsequently cloned.
 The possible transactions that can be sent into the queue are declared in the `Transaction` enum.
