@@ -160,8 +160,8 @@ mod tests {
     use crate::channel_graph::ChannelGraph;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use lazy_static::lazy_static;
-    use utils_types::primitives::{Address, Balance, U256};
     use std::str::FromStr;
+    use utils_types::primitives::{Address, Balance, U256};
 
     lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
@@ -214,24 +214,30 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::channel_graph::wasm::ChannelGraph;
+    use crate::path::wasm::PathResolver;
+    use crate::path::Path;
+    use crate::selectors::legacy::LegacyPathSelector;
+    use crate::selectors::PathSelector;
     use core_ethereum_db::db::wasm::Database;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
-    use crate::channel_graph::ChannelGraph;
-    use crate::path::Path;
-    use crate::path::wasm::PathResolver;
-    use crate::selectors::legacy::LegacyPathSelector;
-    use crate::selectors::PathSelector;
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
-    pub async fn legacy_path_select(graph: &ChannelGraph,
-                              database: &Database,
-                              source: &Address,
-                              destination: &Address,
-                              max_hops: u32) -> JsResult<Path> {
+    pub async fn legacy_path_select(
+        graph: &ChannelGraph,
+        database: &Database,
+        source: &Address,
+        destination: &Address,
+        max_hops: u32,
+    ) -> JsResult<Path> {
         let selector = LegacyPathSelector::default();
-        let cp = selector.select_path(graph, *source, *destination, max_hops as usize)?;
+        let cp = {
+            let cgraph = graph.as_ref_counted();
+            let cg = cgraph.read().await;
+            selector.select_path(&*cg, *source, *destination, max_hops as usize)?
+        };
 
         let database = database.as_ref_counted();
         let g = database.read().await;

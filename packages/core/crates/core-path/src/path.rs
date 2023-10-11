@@ -1,5 +1,3 @@
-use std::collections::hash_map::RandomState;
-use std::collections::HashSet;
 use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
@@ -11,6 +9,8 @@ use futures::future::FutureExt;
 use futures::stream::FuturesOrdered;
 use futures::TryStreamExt;
 use libp2p_identity::PeerId;
+use std::collections::hash_map::RandomState;
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use utils_log::warn;
@@ -20,7 +20,9 @@ use utils_types::traits::{PeerIdLike, ToHex};
 /// Base implementation of an abstract path.
 /// Must contain always at least a single hop
 pub trait BasePath<N>: Display + Clone + Eq + PartialEq
-where N: Copy + Clone + Eq + PartialEq + Hash {
+where
+    N: Copy + Clone + Eq + PartialEq + Hash,
+{
     /// Individual hops in the path.
     /// There must be always at least one hop.
     fn hops(&self) -> &[N];
@@ -160,7 +162,12 @@ impl Path {
     /// This works by first resolving `PeerId`s into `Address`es and then validating the `ChannelPath`.
     /// To do an inverse resolution, from `Address`es to `PeerId`s, construct the `ChannelPath` and use `ChannelPath::to_path()` to resolve the
     /// on-chain path.
-    pub async fn resolve<R: PeerAddressResolver>(peers: Vec<PeerId>, allow_loops: bool, resolver: &R, graph: &ChannelGraph) -> Result<(Self, ChannelPath)> {
+    pub async fn resolve<R: PeerAddressResolver>(
+        peers: Vec<PeerId>,
+        allow_loops: bool,
+        resolver: &R,
+        graph: &ChannelGraph,
+    ) -> Result<(Self, ChannelPath)> {
         let (addrs, hops) = peers
             .into_iter()
             .map(|peer| async move {
@@ -183,7 +190,8 @@ impl Path {
 
 impl Path {
     /// Creates an already pre-validated path.
-   pub(crate) fn new_valid(hops: Vec<PeerId>) -> Self {
+    /// Used for testing only.
+    pub fn new_valid(hops: Vec<PeerId>) -> Self {
         assert!(!hops.is_empty(), "must not be empty");
         Self { hops }
     }
@@ -223,20 +231,20 @@ impl Display for Path {
 
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
+    use crate::channel_graph::ChannelGraph;
     use crate::errors::PathError;
     use crate::path::{BasePath, Path};
+    use async_trait::async_trait;
     use core_crypto::types::{OffchainPublicKey, PublicKey};
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::channels::{ChannelEntry, ChannelStatus};
+    use core_types::protocol::PeerAddressResolver;
     use hex_literal::hex;
     use libp2p_identity::PeerId;
-    use core_types::protocol::PeerAddressResolver;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::PeerIdLike;
-    use crate::channel_graph::ChannelGraph;
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
@@ -348,7 +356,7 @@ mod tests {
         cg.sync_channels(&db).await.expect("failed to sync graph with the DB");
         let resolver = TestResolver(db);
 
-        let (path,cpath) = Path::resolve(vec![peers[1], peers[2]], false, &resolver, &cg)
+        let (path, cpath) = Path::resolve(vec![peers[1], peers[2]], false, &resolver, &cg)
             .await
             .expect("path 0 -> 1 -> 2 must be valid");
 
@@ -360,20 +368,20 @@ mod tests {
         let path_2 = cpath.to_path(&resolver).await.expect("must be reverse-resolvable");
         assert_eq!(path, path_2, "must be equal");
 
-        let (path,_) = Path::resolve(vec![peers[2]], false, &resolver, &cg)
+        let (path, _) = Path::resolve(vec![peers[2]], false, &resolver, &cg)
             .await
             .expect("path 0 -> 2 must be valid, because channel not needed for direct message");
 
         assert_eq!(1, path.length());
 
-        let (path,_) = Path::resolve(vec![peers[1], peers[2], peers[3]], false, &resolver, &cg)
+        let (path, _) = Path::resolve(vec![peers[1], peers[2], peers[3]], false, &resolver, &cg)
             .await
             .expect("path 0 -> 1 -> 2 -> 3 must be valid");
 
         assert_eq!(3, path.length());
         assert!(!path.has_simple_loops(), "must not have loops");
 
-        let (path,_) = Path::resolve(vec![peers[1], peers[2], peers[3], peers[4]], false, &resolver, &cg)
+        let (path, _) = Path::resolve(vec![peers[1], peers[2], peers[3], peers[4]], false, &resolver, &cg)
             .await
             .expect("path 0 -> 1 -> 2 -> 3 -> 4 must be valid");
 
@@ -418,7 +426,7 @@ mod tests {
             vec![peers[1], peers[2], peers[3], peers[4], peers[0], peers[1]],
             false,
             &resolver,
-            &cg
+            &cg,
         )
         .await
         .expect_err("path 0 -> 1 -> 2 -> 3 -> 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
@@ -426,7 +434,6 @@ mod tests {
             PathError::ChannelNotOpened(_, _) => {}
             _ => panic!("error must be ChannelNotOpened"),
         };
-
 
         let me = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
         let mut cg = ChannelGraph::new(me);
@@ -447,20 +454,20 @@ mod tests {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use std::str::FromStr;
-    use async_trait::async_trait;
-    use js_sys::JsString;
-    use libp2p_identity::PeerId;
+    use crate::channel_graph::wasm::ChannelGraph;
+    use crate::errors::{PathError::InvalidPeer, Result};
     use crate::path::{BasePath, Path};
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use async_trait::async_trait;
     use core_crypto::types::OffchainPublicKey;
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::protocol::PeerAddressResolver;
+    use js_sys::JsString;
+    use libp2p_identity::PeerId;
+    use std::str::FromStr;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
-    use crate::channel_graph::ChannelGraph;
-    use crate::errors::{Result, PathError::InvalidPeer};
+    use wasm_bindgen::prelude::wasm_bindgen;
 
     pub struct PathResolver<'a, Db: HoprCoreEthereumDbActions>(pub &'a Db);
 
@@ -486,23 +493,22 @@ pub mod wasm {
             path: Vec<JsString>,
             allow_loops: bool,
             db: &Database,
-            channel_graph: &ChannelGraph
+            channel_graph: &ChannelGraph,
         ) -> JsResult<Path> {
             let database = db.as_ref_counted();
+            let graph = channel_graph.as_ref_counted();
             let g = database.read().await;
-            Ok(
-                Path::resolve(
-                    path.into_iter()
-                        .map(|p| PeerId::from_str(&p.as_string().unwrap())
-                            .map_err(|_| InvalidPeer(p.as_string().unwrap())))
-                        .collect::<Result<Vec<PeerId>>>()?,
-                    allow_loops,
-                    &PathResolver(&*g),
-                    channel_graph
-                )
-                .await
-                .map(|(p,_)| p)?
+            let cg = graph.read().await;
+            Ok(Path::resolve(
+                path.into_iter()
+                    .map(|p| PeerId::from_str(&p.as_string().unwrap()).map_err(|_| InvalidPeer(p.as_string().unwrap())))
+                    .collect::<Result<Vec<PeerId>>>()?,
+                allow_loops,
+                &PathResolver(&*g),
+                &*cg,
             )
+            .await
+            .map(|(p, _)| p)?)
         }
 
         #[wasm_bindgen(js_name = "length")]

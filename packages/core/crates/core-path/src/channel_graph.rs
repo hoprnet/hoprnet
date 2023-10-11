@@ -31,7 +31,6 @@ pub struct ChannelEdge {
 /// is preferred for per-packet path-finding computations.
 /// Per default, the graph does not track channels in `Closed` state, and therefore
 /// cannot detect channel re-openings.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelGraph {
     me: Address,
@@ -63,9 +62,7 @@ impl ChannelGraph {
     /// Looks up an `Open` or `PendingToClose' channel given the source and destination.
     /// Returns `None` if no such edge exists in the graph.
     pub fn get_channel(&self, source: Address, destination: Address) -> Option<&ChannelEntry> {
-        self.graph
-            .edge_weight(source, destination)
-            .map(|w| &w.channel)
+        self.graph.edge_weight(source, destination).map(|w| &w.channel)
     }
 
     /// Gets all `Open` outgoing channels going from the given `Address`
@@ -138,3 +135,26 @@ impl ChannelGraph {
 
 #[cfg(test)]
 mod tests {}
+
+#[cfg(feature = "wasm")]
+pub mod wasm {
+    use async_std::sync::RwLock;
+    use std::sync::Arc;
+    use wasm_bindgen::prelude::wasm_bindgen;
+
+    #[wasm_bindgen]
+    #[derive(Clone)]
+    pub struct ChannelGraph {
+        w: Arc<RwLock<super::ChannelGraph>>,
+    }
+
+    impl ChannelGraph {
+        pub fn new(w: Arc<RwLock<super::ChannelGraph>>) -> Self {
+            Self { w }
+        }
+
+        pub fn as_ref_counted(&self) -> Arc<RwLock<super::ChannelGraph>> {
+            self.w.clone()
+        }
+    }
+}

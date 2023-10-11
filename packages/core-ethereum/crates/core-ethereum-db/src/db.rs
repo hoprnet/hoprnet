@@ -1763,7 +1763,7 @@ mod tests {
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * path_pos.into(),
+                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(path_pos),
                 BalanceType::HOPR,
             ),
             index.unwrap_or(U256::one()),

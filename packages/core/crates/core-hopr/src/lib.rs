@@ -126,6 +126,7 @@ pub mod wasm_impls {
         tx_sender: TransactionSender,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
         channel_events: ChannelEventEmitter,
+        channel_graph: core_path::channel_graph::wasm::ChannelGraph,
     }
 
     impl HoprTools {
@@ -138,6 +139,7 @@ pub mod wasm_impls {
             tx_sender: TransactionSender,
             ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
             channel_events: ChannelEventEmitter,
+            channel_graph: core_path::channel_graph::wasm::ChannelGraph,
         ) -> Self {
             Self {
                 ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
@@ -147,6 +149,7 @@ pub mod wasm_impls {
                 ticket_aggregate_actions,
                 tx_sender,
                 channel_events,
+                channel_graph,
             }
         }
     }
@@ -167,6 +170,10 @@ pub mod wasm_impls {
 
         pub fn channel_events(&self) -> ChannelEventEmitter {
             self.channel_events.clone()
+        }
+
+        pub fn channel_graph(&self) -> core_path::channel_graph::wasm::ChannelGraph {
+            self.channel_graph.clone()
         }
 
         pub async fn send_message(
@@ -347,6 +354,7 @@ pub mod wasm_impls {
             ChannelEventEmitter {
                 tx: on_channel_event_tx,
             },
+            core_path::channel_graph::wasm::ChannelGraph::new(channel_graph.clone()),
         );
 
         let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();

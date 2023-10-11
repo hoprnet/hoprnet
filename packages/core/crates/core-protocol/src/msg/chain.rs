@@ -9,7 +9,7 @@ use core_packet::{
     packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
 };
-use core_path::path::Path;
+use core_path::path::{BasePath, Path};
 use core_types::channels::Ticket;
 use core_types::protocol::INTERMEDIATE_HOPS;
 use libp2p_identity::PeerId;

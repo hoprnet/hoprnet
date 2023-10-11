@@ -18,7 +18,7 @@ use core_packet::errors::PacketError::{
     PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use core_packet::errors::Result;
-use core_path::path::Path;
+use core_path::path::{BasePath, Path};
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
@@ -391,7 +391,7 @@ where
         self.db
             .write()
             .await
-            .set_current_ticket_index(&channel_id, current_ticket_index + 1u64.into())
+            .set_current_ticket_index(&channel_id, current_ticket_index + 1u32)
             .await?;
 
         let ticket = {
@@ -807,7 +807,7 @@ mod tests {
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_packet::por::ProofOfRelayValues;
-    use core_path::path::Path;
+    use core_path::path::{BasePath, Path};
     use core_types::{
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
         channels::{ChannelEntry, ChannelStatus},
