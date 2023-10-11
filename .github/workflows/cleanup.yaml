@@ -44,7 +44,7 @@ jobs:
         run: |
           docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
           date=`date +%Y-%m-%d'T'%H:%M'Z' -d "60 days ago"`
-          images=('hopli' 'hoprd' 'hopr-anvil' 'hopr-pluto' 'hopr-toolchain' 'hoprd')
+          images=('hopli' 'hoprd' 'hopr-anvil' 'hopr-pluto' 'hopr-toolchain')
           for image in "${images[@]}"; do
             old_pr_image_tags=$(gcloud artifacts docker images list --include-tags ${docker_registry}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | match("-pr.")).version')
             old_untagged_images=$(gcloud artifacts docker images list --include-tags ${docker_registry}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | length == 0).version')
