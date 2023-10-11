@@ -998,7 +998,6 @@ externs! {
     extern "C" {
         fn __wbindgen_object_clone_ref(idx: u32) -> u32;
         fn __wbindgen_object_drop_ref(idx: u32) -> ();
-        fn __wbg_log_b4ec9a3e66714cb7(ptr: *const u8, len: usize) -> u32;
 
         fn __wbindgen_string_new(ptr: *const u8, len: usize) -> u32;
         fn __wbindgen_number_new(f: f64) -> u32;
@@ -1446,8 +1445,6 @@ pub mod __rt {
         where
             T: Sized,
         {
-            // let foo = std::format!("{:?}", JsValue::from(value));
-            // super::__wbg_log_b4ec9a3e66714cb7(foo.as_ptr(), foo.len());
             WasmRefCell {
                 value: UnsafeCell::new(value),
                 borrow: Cell::new(0),
@@ -1461,8 +1458,7 @@ pub mod __rt {
         pub fn borrow(&self) -> Ref<T> {
             unsafe {
                 if self.borrow.get() == usize::max_value() {
-
-                    borrow_fail(std::format!("{:?}", self.value.get()).as_str());
+                    borrow_fail();
                 }
                 self.borrow.set(self.borrow.get() + 1);
                 Ref {
@@ -1475,7 +1471,7 @@ pub mod __rt {
         pub fn borrow_mut(&self) -> RefMut<T> {
             unsafe {
                 if self.borrow.get() != 0 {
-                    borrow_fail(std::format!("{:?}", self.value.get()).as_str());
+                    borrow_fail();
                 }
                 self.borrow.set(usize::max_value());
                 RefMut {
@@ -1561,11 +1557,10 @@ pub mod __rt {
         }
     }
 
-    fn borrow_fail(str: &str) -> ! {
-        panic!("wasm_bindgen borrow checker");
+    fn borrow_fail() -> ! {
         super::throw_str(
-            std::format!("recursive use of an object detected which would lead to \
-             unsafe aliasing in rust {}", str).as_str(),
+            "recursive use of an object detected which would lead to \
+             unsafe aliasing in rust",
         );
     }
 
