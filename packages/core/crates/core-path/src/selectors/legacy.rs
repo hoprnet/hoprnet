@@ -102,7 +102,7 @@ where
         max_hops: usize,
     ) -> Result<ChannelPath> {
         if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) {
-            return Err(InvalidInput.into())
+            return Err(InvalidInput.into());
         }
 
         let mut queue = BinaryHeap::new();

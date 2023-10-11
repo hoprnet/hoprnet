@@ -63,7 +63,8 @@ import {
   WasmNetwork,
   WasmPing,
   WasmTxExecutor,
-  withdraw, legacy_path_select
+  withdraw,
+  legacy_path_select
 } from '@hoprnet/hopr-utils'
 
 import { MAX_HOPS, MAX_PARALLEL_PINGS, PACKET_SIZE, VERSION } from './constants.js'
