@@ -1023,11 +1023,11 @@ __metadata:
   linkType: hard
 
 "@types/ws@npm:^8.5.5":
-  version: 8.5.6
-  resolution: "@types/ws@npm:8.5.6"
+  version: 8.5.7
+  resolution: "@types/ws@npm:8.5.7"
   dependencies:
     "@types/node": "*"
-  checksum: 7addb0c5fa4e7713d5209afb8a90f1852b12c02cb537395adf7a05fbaf21205dc5f7c110fd5ad6f3dbf147112cbff33fb11d8633059cb344f0c14f595b1ea1fb
+  checksum: 4502085c0f7ae6b36d5419c0fc6ce4b9002ee5e997a8708d6ed10b393e97091e1b986e8038ec604945c194f14aac150e74d6596629a2775628d122f552009c35
   languageName: node
   linkType: hard
 
