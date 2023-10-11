@@ -63,10 +63,10 @@ import {
   WasmNetwork,
   WasmPing,
   WasmTxExecutor,
-  withdraw
+  withdraw, legacy_path_select
 } from '@hoprnet/hopr-utils'
 
-import { INTERMEDIATE_HOPS, MAX_HOPS, MAX_PARALLEL_PINGS, PACKET_SIZE, VERSION } from './constants.js'
+import { MAX_HOPS, MAX_PARALLEL_PINGS, PACKET_SIZE, VERSION } from './constants.js'
 
 import { findPath } from './path/index.js'
 
@@ -694,7 +694,7 @@ export class Hopr extends EventEmitter {
       // Validate the manually specified intermediate path
       let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
       try {
-        path = await Path.validated(withDestination, this.chainKeypair.to_address(), true, this.db)
+        path = await Path.validated(withDestination, true, this.db, this.tools.channel_graph())
       } catch (e) {
         metric_sentMessageFailCount.increment()
         throw e
@@ -702,15 +702,8 @@ export class Hopr extends EventEmitter {
     } else {
       let chain_key = await this.peerIdToChainKey(destination)
       if (chain_key) {
-        intermediatePath = await this.getIntermediateNodes(chain_key, hops)
-
-        if (intermediatePath == null || !intermediatePath.length) {
-          metric_sentMessageFailCount.increment()
-          throw Error(`Failed to find automatic path`)
-        }
-
-        let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
-        path = new Path(withDestination)
+        let graph = this.tools.channel_graph()
+        path = await legacy_path_select(graph, this.db, chain_key, hops ?? MAX_HOPS)
       } else {
         throw Error(`Failed to obtain chain key for peer id ${destination}`)
       }
@@ -1268,39 +1261,6 @@ export class Hopr extends EventEmitter {
       return await this.db.is_allowed_to_access_network(chain_key)
     }
     return false
-  }
-
-  /**
-   * Takes a destination, and optionally the desired number of hops,
-   * and samples randomly intermediate nodes
-   * that will relay that message before it reaches its destination.
-   *
-   * @param destination ethereum address of the destination node
-   * @param hops optional number of required intermediate nodes (must be an integer 1,2,...MAX_HOPS inclusive)
-   */
-  private async getIntermediateNodes(destination: Address, hops?: number): Promise<OffchainPublicKey[]> {
-    if (!hops) {
-      hops = INTERMEDIATE_HOPS
-    } else if (![...Array(MAX_HOPS).keys()].map((i) => i + 1).includes(hops)) {
-      throw new Error(`the number of intermediate nodes must be an integer between 1 and ${MAX_HOPS} inclusive`)
-    }
-    const path = await findPath(
-      this.getEthereumAddress(),
-      destination,
-      hops,
-      async (address: Address) => {
-        try {
-          const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(address)
-          return await this.networkPeers.quality_of(pk.to_peerid_str())
-        } catch (e) {
-          log(`error while looking up the packet key of ${address}`)
-          return 0
-        }
-      },
-      HoprCoreEthereum.getInstance().getOpenChannelsFrom.bind(HoprCoreEthereum.getInstance())
-    )
-
-    return await Promise.all(path.map((x) => HoprCoreEthereum.getInstance().getPacketKeyOf(x)))
   }
 
   /**

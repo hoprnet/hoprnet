@@ -46,6 +46,7 @@ where
     W: Default + Add<W, Output = W>,
 {
     /// Select path of maximum `max_hops` from `source` to `destination` in the given channel graph.
+    /// NOTE: the resulting path does not contain `source` but does contain `destination`.
     /// Fails if no such path can be found.
     fn select_path(
         &self,

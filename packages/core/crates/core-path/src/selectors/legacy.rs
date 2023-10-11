@@ -10,6 +10,7 @@ use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
 use std::marker::PhantomData;
 use std::ops::Add;
+use utils_types::errors::GeneralError::InvalidInput;
 use utils_types::primitives::{Address, U256};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -100,6 +101,10 @@ where
         destination: Address,
         max_hops: usize,
     ) -> Result<ChannelPath> {
+        if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) {
+            return Err(InvalidInput.into())
+        }
+
         let mut queue = BinaryHeap::new();
         let mut dead_ends = HashSet::new();
 
@@ -118,7 +123,9 @@ where
             let current_path_len = current_path.0.len();
 
             if current_path_len >= max_hops && current_path_len <= INTERMEDIATE_HOPS {
-                return Ok(ChannelPath::new_valid(queue.pop().unwrap().0));
+                let mut res = queue.pop().unwrap().0;
+                res.push(destination); // Need to add the destination address
+                return Ok(ChannelPath::new_valid(res));
             }
 
             let last_peer = *current_path.0.last().unwrap();
@@ -228,7 +235,6 @@ pub mod wasm {
     pub async fn legacy_path_select(
         graph: &ChannelGraph,
         database: &Database,
-        source: &Address,
         destination: &Address,
         max_hops: u32,
     ) -> JsResult<Path> {
@@ -236,7 +242,7 @@ pub mod wasm {
         let cp = {
             let cgraph = graph.as_ref_counted();
             let cg = cgraph.read().await;
-            selector.select_path(&*cg, *source, *destination, max_hops as usize)?
+            selector.select_path(&*cg, cg.my_address(), *destination, max_hops as usize)?
         };
 
         let database = database.as_ref_counted();

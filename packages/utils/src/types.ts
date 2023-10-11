@@ -71,6 +71,7 @@ export {
   is_allowed_to_access_network,
   KeyBinding,
   KeyPair,
+  legacy_path_select,
   merge_encoded_metrics,
   MessageInbox,
   MessageInboxConfiguration,
