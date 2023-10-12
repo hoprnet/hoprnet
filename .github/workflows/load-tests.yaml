@@ -21,8 +21,8 @@ on:
         type: choice
         options:
           - simple
-          - full
           - endurance
+          - full
         required: true
         description: 'Type of workload'
       rate:
