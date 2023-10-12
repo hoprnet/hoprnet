@@ -29,9 +29,10 @@ pub type EncodedWinProb = [u8; 7];
 
 /// Describes status of a channel
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize_repr, Deserialize_repr, Sequence)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelStatus {
+    #[default]
     Closed = 0,
     Open = 1,
     PendingToClose = 2,
@@ -57,12 +58,25 @@ impl Display for ChannelStatus {
     }
 }
 
+/// Describes a direction of node's own channel.
+/// The direction of a channel that is not own is undefined.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum ChannelDirection {
+    /// The other party is initiator of the channel.
     Incoming = 0,
+    /// Our own node is the initiator of the channel.
     Outgoing = 1,
+}
+
+impl Display for ChannelDirection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChannelDirection::Incoming => write!(f, "incoming"),
+            ChannelDirection::Outgoing => write!(f, "outgoing"),
+        }
+    }
 }
 
 /// Overall description of a channel
@@ -76,6 +90,7 @@ pub struct ChannelEntry {
     pub status: ChannelStatus,
     pub channel_epoch: U256,
     pub closure_time: U256,
+    id: Hash,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -99,13 +114,14 @@ impl ChannelEntry {
             status,
             channel_epoch,
             closure_time,
+            id: generate_channel_id(&source, &destination),
         }
     }
 
     /// Generates the channel ID using the source and destination address
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
     pub fn get_id(&self) -> Hash {
-        generate_channel_id(&self.source, &self.destination)
+        self.id
     }
 
     /// Checks if the closure time of this channel has passed.
@@ -129,8 +145,8 @@ impl ChannelEntry {
 
         if self.closure_time.eq(&U256::zero()) {
             None
-        } else if now_seconds >= self.closure_time {
-            Some((now_seconds - self.closure_time).as_u64())
+        } else if self.closure_time > now_seconds {
+            Some((self.closure_time - now_seconds).as_u64())
         } else {
             Some(0u64)
         }
@@ -144,14 +160,14 @@ impl ChannelEntry {
 
 impl ChannelEntry {
     /// Determines the channel direction given the self address.
-    /// Panics if source nor destination are equal to the given address.
-    pub fn direction(&self, me: &Address) -> ChannelDirection {
+    /// Returns `None` if neither source nor destination is equal to `me`.
+    pub fn direction(&self, me: &Address) -> Option<ChannelDirection> {
         if self.source.eq(me) {
-            ChannelDirection::Outgoing
+            Some(ChannelDirection::Outgoing)
         } else if self.destination.eq(me) {
-            ChannelDirection::Incoming
+            Some(ChannelDirection::Incoming)
         } else {
-            panic!("foreign channel: {self}")
+            None
         }
     }
 }
@@ -160,11 +176,12 @@ impl Display for ChannelEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} channel {}: {} -> {}",
+            "{} channel {} ({}): {} -> {}",
             self.status,
             self.get_id(),
+            self.closure_time,
             self.source,
-            self.destination
+            self.destination,
         )
     }
 }
@@ -183,7 +200,7 @@ impl BinarySerializable for ChannelEntry {
                 .ok_or(utils_types::errors::GeneralError::ParseError)?;
             let channel_epoch = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
             let closure_time = U256::from_bytes(b.drain(0..U256::SIZE).as_ref())?;
-            Ok(Self {
+            Ok(Self::new(
                 source,
                 destination,
                 balance,
@@ -191,7 +208,7 @@ impl BinarySerializable for ChannelEntry {
                 status,
                 channel_epoch,
                 closure_time,
-            })
+            ))
         } else {
             Err(utils_types::errors::GeneralError::ParseError)
         }
@@ -627,6 +644,11 @@ impl Ticket {
             .eq(address)
             .then_some(())
             .ok_or(SignatureVerification)
+    }
+
+    pub fn is_aggregated(&self) -> bool {
+        // Aggregated tickets have always an index offset > 1
+        self.index_offset > 1
     }
 }
 

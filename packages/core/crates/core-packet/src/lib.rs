@@ -1,5 +1,4 @@
 pub mod errors;
-pub mod interaction;
 pub mod packet;
 pub mod por;
 pub mod validation;

@@ -10,6 +10,7 @@ if (!process) {
 
 // Gives the process a meaningful name, Node.js default is `node`
 process.title = 'hoprd'
+Error.stackTraceLimit = 100
 
 const nodeVersion = process.version
 

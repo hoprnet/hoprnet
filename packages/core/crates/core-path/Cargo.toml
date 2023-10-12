@@ -1,6 +1,6 @@
 [package]
 name = "core-path"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Contains mixnet path construction and path finding logic"
@@ -18,7 +18,9 @@ core-types = { workspace = true, default-features = false }
 hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
-thiserror = "1"
+petgraph = {version = "0.6.4", features = ["serde-1"] }
+serde = { workspace = true }
+thiserror = { workspace = true }
 utils-log = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-misc = { workspace = true, default-features = false }

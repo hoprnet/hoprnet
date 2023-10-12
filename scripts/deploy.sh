@@ -13,13 +13,18 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 source "${mydir}/gcloud.sh"
 
 declare cluster_template_name=${1?"Missing parameter cluster_template"}
+declare remove_db=${2:-false}
 instances=($(gcloud compute instances list --filter="labels.cluster:${cluster_template_name}" --format="csv[no-heading](zone,name)"))
 
 restart(){
   zone=${1}
   instance=${2}
   echo "Restarting ${instance}"
-  gcloud compute ssh --zone ${zone} ${instance} --command 'sudo service hoprd restart'
+  if [ "${remove_db}" == "true" ]; then
+    gcloud compute ssh --ssh-key-expire-after 5m --zone ${zone} ${instance} --command 'sudo service hoprd stop && sudo rm -rf /opt/hoprd/db && sudo service hoprd start'
+  else
+    gcloud compute ssh --ssh-key-expire-after 5m --zone ${zone} ${instance} --command 'sudo service hoprd restart'
+  fi
 }
 
 # Iterate through all VM instances

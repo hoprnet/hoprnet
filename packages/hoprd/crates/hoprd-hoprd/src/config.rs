@@ -5,9 +5,9 @@ use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-use core_ethereum_misc::constants::DEFAULT_CONFIRMATIONS;
 use core_network::{heartbeat::HeartbeatConfig, network::NetworkConfig};
-use core_strategy::config::StrategyConfig;
+use core_strategy::Strategy::AutoRedeeming;
+use core_strategy::{Strategy, StrategyConfig};
 use utils_types::primitives::Address;
 
 #[cfg(not(feature = "wasm"))]
@@ -220,7 +220,6 @@ pub struct Chain {
     pub announce: bool,
     pub provider: Option<String>,
     pub check_unrealized_balance: bool,
-    pub on_chain_confirmations: u32,
 }
 
 impl Default for Chain {
@@ -229,7 +228,6 @@ impl Default for Chain {
             announce: false,
             provider: None,
             check_unrealized_balance: true,
-            on_chain_confirmations: DEFAULT_CONFIRMATIONS,
         }
     }
 }
@@ -360,34 +358,130 @@ pub struct Protocol {
     pub ticket_aggregation: core_protocol::ticket_aggregation::config::TicketAggregationProtocolConfig,
 }
 
+/// The main configuration object of the entire node.
+///
+/// The configuration is composed of individual configuration of corresponding
+/// component configuration objects.
+///
+/// An always up-to-date config YAML example can be found in [`EXAMPLE_YAML`].
+///
+/// The default configuration as it would appear from the configuration YAML file.
+/// ```yaml
+/// ---
+///
+/// host:
+///   address: !IPv4 127.0.0.1
+///   port: 47462
+/// identity:
+///   file: identity
+///   password: ''
+///   private_key: ''
+/// db:
+///   data: /tmp/db
+///   initialize: false
+///   force_initialize: false
+/// inbox:
+///   capacity: 512
+///   max_age: 900
+///   excluded_tags:
+///   - 0
+/// api:
+///   enable: true
+///   auth: !Token sdjkghsfg
+/// host:
+///   address: !IPv4 127.0.0.1
+///   port: 1233
+/// strategy:
+///   on_fail_continue: true
+///   allow_recursive: true
+///   strategies: []
+/// heartbeat:
+///   variance: 0
+///   interval: 0
+///   threshold: 0
+/// network_options:
+///   min_delay: 1
+///   max_delay: 300
+///   quality_bad_threshold: 0.2
+///   quality_offline_threshold: 0.0
+///   quality_step: 0.1
+///   ignore_timeframe: 600
+///   backoff_exponent: 1.5
+///   backoff_min: 2.0
+///   backoff_max: 300.0
+/// healthcheck:
+///   enable: false
+///   host: 127.0.0.1
+///   port: 0
+/// protocol:
+///   ack:
+///     timeout: 15
+///   heartbeat:
+///     timeout: 15
+///   msg:
+///     timeout: 15
+///   ticket_aggregation:
+///     timeout: 15
+/// network: testing
+/// chain:
+///   announce: false
+///   provider: null
+///   check_unrealized_balance: true
+/// safe_module:
+///   safe_transaction_service_provider: null
+///   safe_address: null
+///   module_address: null
+/// test:
+///   announce_local_addresses: false
+///   prefer_local_addresses: false
+///   use_weak_crypto: false
+/// ```
+///
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 pub struct HoprdConfig {
+    /// Configuration related to host specifics
     #[validate]
     pub host: Host,
+    /// Configuration regarding the identity of the node
     #[validate]
     pub identity: Identity,
+    /// Configuration of the underlying database engine
     #[validate]
     pub db: Db,
+    /// Configuration of the message inbox
     #[validate]
     inbox: MessageInboxConfiguration,
+    /// Configuration relevant for the API of the node
     #[validate]
     pub api: Api,
+    /// Configuration of underlying node behavior in the form strategies
+    ///
+    /// Strategies represent automatically executable behavior performed by
+    /// the node given pre-configured triggers.
     #[validate]
     pub strategy: StrategyConfig,
+    /// Configuration of the protocol heartbeat mechanism
     #[validate]
     pub heartbeat: HeartbeatConfig,
+    /// Configuration of network properties
     #[validate]
     pub network_options: NetworkConfig,
+    /// Configuration of the health check mechanism
     #[validate]
     pub healthcheck: HealthCheck,
+    /// Configuration specific to protocol execution on the p2p layer
     #[validate]
     pub protocol: Protocol,
+    /// Network name
     pub network: String,
+    /// Blockchain specific configuration
     #[validate]
     pub chain: Chain,
+    /// Configuration of the `Safe` mechanism
     #[validate]
     pub safe_module: SafeModule,
+    /// Configuration for enabling test specific behavior
     #[validate]
     pub test: Testing,
 }
@@ -403,7 +497,7 @@ impl Default for HoprdConfig {
             db: Db::default(),
             inbox: MessageInboxConfiguration::default(),
             api: Api::default(),
-            strategy: StrategyConfig::default(),
+            strategy: core_strategy::hopr_default_strategies(),
             heartbeat: HeartbeatConfig::default(),
             network_options: NetworkConfig::default(),
             healthcheck: HealthCheck::default(),
@@ -508,15 +602,16 @@ impl HoprdConfig {
             cfg.identity.private_key = Some(x)
         };
 
-        // strategy
-        if let Some(x) = cli_args.default_strategy {
-            cfg.strategy.name = x
-        };
-        if let Some(x) = cli_args.max_auto_channels {
-            cfg.strategy.max_auto_channels = Some(x)
-        };
+        // TODO: resolve CLI configuration of strategies
 
-        cfg.strategy.auto_redeem_tickets = cli_args.auto_redeem_tickets;
+        // strategy
+        if let Some(x) = cli_args.default_strategy.and_then(|s| Strategy::from_str(&s).ok()) {
+            cfg.strategy.get_strategies().push(x);
+        }
+
+        if cli_args.auto_redeem_tickets {
+            cfg.strategy.get_strategies().push(AutoRedeeming(Default::default()));
+        }
 
         // chain
         cfg.chain.announce = cli_args.announce;
@@ -525,9 +620,6 @@ impl HoprdConfig {
             cfg.chain.provider = Some(x)
         };
         cfg.chain.check_unrealized_balance = cli_args.check_unrealized_balance;
-        if let Some(x) = cli_args.on_chain_confirmations {
-            cfg.chain.on_chain_confirmations = x
-        };
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {
@@ -591,6 +683,75 @@ pub mod wasm {
     }
 }
 
+/// Used in the testing and documentation
+pub const EXAMPLE_YAML: &'static str = r#"host:
+  address: !IPv4 127.0.0.1
+  port: 47462
+identity:
+  file: identity
+  password: ''
+  private_key: ''
+db:
+  data: /tmp/db
+  initialize: false
+  force_initialize: false
+inbox:
+  capacity: 512
+  max_age: 900
+  excluded_tags:
+  - 0
+api:
+  enable: false
+  auth: None
+  host:
+    address: !IPv4 127.0.0.1
+    port: 1233
+strategy:
+  on_fail_continue: true
+  allow_recursive: true
+  strategies: []
+heartbeat:
+  variance: 0
+  interval: 0
+  threshold: 0
+network_options:
+  min_delay: 1
+  max_delay: 300
+  quality_bad_threshold: 0.2
+  quality_offline_threshold: 0.0
+  quality_step: 0.1
+  ignore_timeframe: 600
+  backoff_exponent: 1.5
+  backoff_min: 2.0
+  backoff_max: 300.0
+healthcheck:
+  enable: false
+  host: 127.0.0.1
+  port: 0
+protocol:
+  ack:
+    timeout: 15
+  heartbeat:
+    timeout: 15
+  msg:
+    timeout: 15
+  ticket_aggregation:
+    timeout: 15
+network: testing
+chain:
+  announce: false
+  provider: null
+  check_unrealized_balance: true
+safe_module:
+  safe_transaction_service_provider: null
+  safe_address: null
+  module_address: null
+test:
+  announce_local_addresses: false
+  prefer_local_addresses: false
+  use_weak_crypto: false
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -609,11 +770,7 @@ mod tests {
                 password: "".to_owned(),
                 private_key: Some("".to_owned()),
             },
-            strategy: StrategyConfig {
-                name: "passive".to_owned(),
-                max_auto_channels: None,
-                auto_redeem_tickets: true,
-            },
+            strategy: StrategyConfig::default(),
             db: Db {
                 data: "/tmp/db".to_owned(),
                 initialize: false,
@@ -649,7 +806,6 @@ mod tests {
                 announce: false,
                 provider: None,
                 check_unrealized_balance: true,
-                on_chain_confirmations: 0,
             },
             safe_module: SafeModule {
                 safe_transaction_service_provider: None,
@@ -663,75 +819,6 @@ mod tests {
             },
         }
     }
-
-    const EXAMPLE_YAML: &'static str = r#"host:
-  address: !IPv4 127.0.0.1
-  port: 47462
-identity:
-  file: identity
-  password: ''
-  private_key: ''
-db:
-  data: /tmp/db
-  initialize: false
-  force_initialize: false
-inbox:
-  capacity: 512
-  max_age: 900
-  excluded_tags:
-  - 0
-api:
-  enable: false
-  auth: None
-  host:
-    address: !IPv4 127.0.0.1
-    port: 1233
-strategy:
-  name: passive
-  max_auto_channels: null
-  auto_redeem_tickets: true
-heartbeat:
-  variance: 0
-  interval: 0
-  threshold: 0
-network_options:
-  min_delay: 1
-  max_delay: 300
-  quality_bad_threshold: 0.2
-  quality_offline_threshold: 0.0
-  quality_step: 0.1
-  ignore_timeframe: 600
-  backoff_exponent: 1.5
-  backoff_min: 2.0
-  backoff_max: 300.0
-healthcheck:
-  enable: false
-  host: 127.0.0.1
-  port: 0
-protocol:
-  ack:
-    timeout: 15
-  heartbeat:
-    timeout: 15
-  msg:
-    timeout: 15
-  ticket_aggregation:
-    timeout: 15
-network: testing
-chain:
-  announce: false
-  provider: null
-  check_unrealized_balance: true
-  on_chain_confirmations: 0
-safe_module:
-  safe_transaction_service_provider: null
-  safe_address: null
-  module_address: null
-test:
-  announce_local_addresses: false
-  prefer_local_addresses: false
-  use_weak_crypto: false
-"#;
 
     #[test]
     fn test_config_should_be_serializable_into_string() -> Result<(), Box<dyn std::error::Error>> {

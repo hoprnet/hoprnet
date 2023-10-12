@@ -3,10 +3,14 @@ use core_network::{
     network::{Health, Network, NetworkEvent, NetworkExternalActions, PeerStatus},
     PeerId,
 };
-use core_strategy::generic::PeerQuality;
 use futures::channel::mpsc::Sender;
 use std::sync::Arc;
 use utils_log::{error, warn};
+
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_misc::time::native::current_timestamp;
+#[cfg(all(feature = "wasm", not(test)))]
+use utils_misc::time::wasm::current_timestamp;
 
 pub struct ExternalNetworkInteractions {
     emitter: Sender<NetworkEvent>,
@@ -28,6 +32,9 @@ impl NetworkExternalActions for ExternalNetworkInteractions {
         if let Err(e) = self.emitter.clone().start_send(event.clone()) {
             error!("Failed to emit a network status: {}: {}", event, e)
         }
+    }
+    fn create_timestamp(&self) -> u64 {
+        current_timestamp()
     }
 }
 
@@ -54,8 +61,28 @@ pub mod wasm {
     use futures::{future::poll_fn, StreamExt};
     use js_sys::JsString;
     use utils_misc::utils::wasm::js_map_to_hash_map;
+    use utils_types::primitives::Address;
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
+
+    /// Object needed only to simplify the iteration over the address and quality pair until
+    /// the strategy is migrated into Rust
+    #[wasm_bindgen]
+    pub struct PeerQuality {
+        peers_with_quality: Vec<(Address, f64)>,
+    }
+
+    impl PeerQuality {
+        pub fn new(peers: Vec<(Address, f64)>) -> Self {
+            Self {
+                peers_with_quality: peers,
+            }
+        }
+
+        pub fn take(&self) -> Vec<(Address, f64)> {
+            self.peers_with_quality.clone()
+        }
+    }
 
     /// Wrapper object for the `Network` functionality to be callable from outside
     /// the WASM environment.

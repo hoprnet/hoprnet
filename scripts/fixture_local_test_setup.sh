@@ -20,18 +20,18 @@ PATH="${mydir}/../.foundry/bin:${mydir}/../.cargo/bin:${PATH}"
 
 usage() {
   msg
-  msg "Usage: $0 [-h|--help] [-s|--skip-cleanup] [-c|--just-cleanup]"
+  msg "Usage: $0 [-h|--help] [-s|--setup] [-t|--teardown]"
   msg
-  msg "The cleanup process can be skipped by using '--skip-cleanup'."
-  msg "The cleanup process can be triggered by using '--just-cleanup'."
+  msg "The cleanup process can be skipped by using '--setup'."
+  msg "The cleanup process can be triggered by using '--teardown'."
   msg
 }
 
 # verify and set parameters
 declare wait_delay=2
 declare wait_max_wait=1000
-declare skip_cleanup="false"
-declare just_cleanup="false"
+declare setup="false"
+declare teardown="false"
 declare default_api_token="e2e-API-token^^"
 
 while (( "$#" )); do
@@ -41,12 +41,12 @@ while (( "$#" )); do
       usage
       exit 0
       ;;
-    -s|--skip-cleanup)
-      skip_cleanup="true"
+    -s|--setup)
+      setup="true"
       shift
       ;;
-    -c|--just-cleanup)
-      just_cleanup="true"
+    -t|--teardown)
+      teardown="true"
       shift
       ;;
     -*|--*=)
@@ -69,13 +69,13 @@ declare tmp_dir="$(find_tmp_dir)"
 
 declare node_prefix="hopr-smoke-test-node"
 
-declare node1_dir="${tmp_dir}/${node_prefix}_0"
-declare node2_dir="${tmp_dir}/${node_prefix}_1"
-declare node3_dir="${tmp_dir}/${node_prefix}_2"
-declare node4_dir="${tmp_dir}/${node_prefix}_3"
-declare node5_dir="${tmp_dir}/${node_prefix}_4"
-declare node6_dir="${tmp_dir}/${node_prefix}_5"
-declare node7_dir="${tmp_dir}/${node_prefix}_6"
+declare node1_dir="${tmp_dir}/${node_prefix}_1"
+declare node2_dir="${tmp_dir}/${node_prefix}_2"
+declare node3_dir="${tmp_dir}/${node_prefix}_3"
+declare node4_dir="${tmp_dir}/${node_prefix}_4"
+declare node5_dir="${tmp_dir}/${node_prefix}_5"
+declare node6_dir="${tmp_dir}/${node_prefix}_6"
+declare node7_dir="${tmp_dir}/${node_prefix}_7"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -152,12 +152,12 @@ function cleanup {
   fi
 }
 
-if [ "${just_cleanup}" == "1" ] || [ "${just_cleanup}" == "true" ]; then
+if [ "${teardown}" == "1" ] || [ "${teardown}" == "true" ]; then
   cleanup
   exit $?
 fi
 
-if [ "${skip_cleanup}" != "1" ] && [ "${skip_cleanup}" != "true" ]; then
+if [ "${setup}" != "1" ] && [ "${setup}" != "true" ]; then
   trap cleanup SIGINT SIGTERM ERR EXIT
 fi
 
@@ -165,8 +165,8 @@ function reuse_pregenerated_identities() {
   log "Reuse pre-generated identities"
 
   # remove existing identity files in tmp folder, .safe.args
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete || true
 
   local ready_id_files
   mapfile -t ready_id_files <<< "$(find -L "${mydir}/../tests/identities/" -maxdepth 1 -type f -name "*.id" | sort)"
@@ -179,7 +179,8 @@ function reuse_pregenerated_identities() {
 
   log "ADDRESSES INFORMATION"
   for i in ${!ready_id_files[@]}; do
-    cp "${ready_id_files[$i]}" "${tmp_dir}/${node_prefix}_${i}.id"
+    local node_nr=$(( i + 1 ))
+    cp "${ready_id_files[$i]}" "${tmp_dir}/${node_prefix}_${node_nr}.id"
 
     local peer_id native_address id_file
     id_file="$(basename ${ready_id_files[$i]})"
@@ -187,7 +188,7 @@ function reuse_pregenerated_identities() {
     native_address="$(echo "${ids_info}" | jq -r "to_entries[] | select(.key==\"${id_file}\").value.native_address")"
 
     log "\tnode ${i}"
-    log "\t\tidentity file: ${tmp_dir}/${node_prefix}_${i}.id"
+    log "\t\tidentity file: ${tmp_dir}/${node_prefix}_${node_nr}.id"
     log "\t\tpeer id: ${peer_id}"
     log "\t\tnative address: ${native_address}"
   done
@@ -197,8 +198,8 @@ function generate_local_identities() {
   log "Generate local identities"
 
   # remove existing identity files, .safe.args
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete
-  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.safe.args" -delete || true
+  find -L "${tmp_dir}" -maxdepth 1 -type f -name "${node_prefix}_*.id" -delete || true
 
   env ETHERSCAN_API_KEY="${ETHERSCAN_API_KEY:-}" IDENTITY_PASSWORD="${password}" \
     hopli identity \
@@ -276,6 +277,12 @@ function setup_node() {
   # read safe args and append to additional_args TODO:
   additional_args="${additional_args} ${safe_args}"
 
+  # add explicit yaml config, if it exists
+  CFG=$(echo -e "${log}" | sed 's/\(.*\).log/\1.cfg.yaml/')
+  if [[ -f "$CFG" ]]; then
+      additional_args="${additional_args} --configurationFilePath=${CFG}"
+  fi
+
   log "Additional args: \"${additional_args}\""
 
   # Using a mix of CLI parameters and env variables to ensure
@@ -287,7 +294,6 @@ function setup_node() {
     HOPRD_HEARTBEAT_THRESHOLD=2500 \
     HOPRD_HEARTBEAT_VARIANCE=1000 \
     HOPRD_NETWORK_QUALITY_THRESHOLD="0.3" \
-    HOPRD_ON_CHAIN_CONFIRMATIONS=2 \
     NODE_OPTIONS="--experimental-wasm-modules" \
     node packages/hoprd/lib/main.cjs \
       --data="${dir}" \

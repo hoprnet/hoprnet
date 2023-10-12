@@ -1,6 +1,6 @@
 [package]
 name = "core-hopr"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR interface for the core library"
 edition = "2021"
@@ -14,7 +14,7 @@ default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:gloo-timers",
     "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-ethereum-actions/wasm",
-    "core-crypto/wasm", "core-network/wasm", "core-mixer/wasm", "core-path/wasm", "core-packet/wasm", "core-p2p/wasm", "core-protocol/wasm", "core-strategy/wasm", "core-types/wasm",
+    "core-crypto/wasm", "core-network/wasm", "core-strategy/wasm", "core-path/wasm", "core-packet/wasm", "core-p2p/wasm", "core-protocol/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
 prometheus = ["dep:utils-metrics", "core-packet/prometheus", "core-protocol/prometheus"]
@@ -40,7 +40,6 @@ core-crypto = { workspace = true, default-features = false }
 core-ethereum-actions = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-misc = { workspace = true, default-features = false }
-core-mixer = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false }
 core-p2p = { workspace = true, default-features = false }
 core-packet = { workspace = true, default-features = false }

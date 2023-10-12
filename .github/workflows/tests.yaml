@@ -4,10 +4,6 @@ env:
   RUST_BACKTRACE: "1"
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
-  HOPR_GITHUB_REF: ${{ github.ref }}
-  MATRIX_ROOM: ${{ secrets.MATRIX_ROOM }}
-  MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
-  MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
   FOUNDRY_PROFILE: ci
 
 on:
@@ -26,7 +22,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Disable sccache (act-only)
         if: ${{ env.ACT }}
@@ -41,7 +37,7 @@ jobs:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v23
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -76,7 +72,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
             .foundry/bin/
 
       - name: Install dependencies
@@ -97,7 +92,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Google Cloud Credentials
         id: auth
@@ -119,7 +114,7 @@ jobs:
           version: "v0.4.0"
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v23
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -154,7 +149,6 @@ jobs:
             ~/.cargo/git/db/
             target/
             .cargo/.package-cache/
-            .cargo/bin/
             .foundry/bin/
 
       - name: Install dependencies

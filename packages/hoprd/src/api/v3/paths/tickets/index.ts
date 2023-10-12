@@ -6,7 +6,7 @@ import { STATUS_CODES } from '../../utils.js'
 export function formatTicket(ticket: Ticket) {
   return {
     channelId: ticket.channel_id.to_hex(),
-    amount: ticket.amount.to_formatted_string(),
+    amount: ticket.amount.to_string(),
     index: ticket.index.to_string(),
     indexOffset: ticket.index_offset.to_string(),
     winProb: ticket.win_prob.toString(),

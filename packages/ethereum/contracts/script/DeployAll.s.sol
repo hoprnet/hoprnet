@@ -182,6 +182,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 || !isValidAddress(currentNetworkDetail.addresses.channelsContractAddress)
         ) {
             // deploy channels contract
+            // set closure time to 15 seconds if running in local Anvil, otherwise 5 minutes
             uint256 noticePeriodChannelClosure = currentEnvironmentType == EnvironmentType.LOCAL ? 15 : 5 * 60;
             currentNetworkDetail.addresses.channelsContractAddress = deployCode(
                 "Channels.sol:HoprChannels",
@@ -310,7 +311,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         }
         // grant manager roles to more accounts
         for (uint256 i = 0; i < PRODUCT_TEAM_MANAGER_ADDRESSES.length; i++) {
-            (bool successGrantManagerRole,) = contractAddress.call(
+            contractAddress.call(
                 abi.encodeWithSignature("grantRole(bytes32,address)", MANAGER_ROLE, PRODUCT_TEAM_MANAGER_ADDRESSES[i])
             );
         }

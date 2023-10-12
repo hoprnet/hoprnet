@@ -1,9 +1,22 @@
 import logging
+import os
+import random
+import shutil
 import subprocess
 
 import pytest
 
+from hopr import HoprdAPI
+
+random_data = os.urandom(8)
+SEED = int.from_bytes(random_data, byteorder="big")
+random.seed(SEED)
+
 LOCALHOST = "127.0.0.1"
+OPEN_CHANNEL_FUNDING_VALUE = "1000000000000000000000"
+
+TICKET_AGGREGATION_THRESHOLD = 100
+TICKET_PRICE_PER_HOP = 100
 
 
 def pytest_addoption(parser):
@@ -46,43 +59,54 @@ def cmd_line_args(request):
     return args
 
 
+FIXTURE_FILES_DIR = "/tmp/"
+FIXTURE_FILES_PREFIX = "hopr-smoke-test"
+
+
 DEFAULT_API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 NODES = {
     "1": {
         "p2p_port": 19091,
         "api_port": 13301,
-        "peer_id": "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7",
+        "peer_id": "12D3KooWKSzQgdszZzipRVGSRwBcC3etYwjSmqqTqcySn97EGWTm",
+        "address": "0x7d1e530e9c82c21b75644a2c23402aa858ae4a69",
     },
     "2": {
         "p2p_port": 19092,
         "api_port": 13302,
-        "peer_id": "16Uiu2HAmEH1GFK9TdMVusuBdLkEAdqzcYZqegWH9iBRThW6TmuUn",
+        "peer_id": "12D3KooWLWoHJjaS1z9cXn19DE9gPrSbYHkf7CHMbUtLUqbZKDby",
+        "address": "0x1b482420afa04aec1ef0e4a00c18451e84466c75",
     },
     "3": {
         "p2p_port": 19093,
         "api_port": 13303,
-        "peer_id": "16Uiu2HAkyMzkTpuMtgGPQCuSnLWJGaWF4pbmCxBQ58Md9TqxSis2",
+        "peer_id": "12D3KooWJ4E4q6wr8nzXyRKnAofQSeoGoRFRRtQJK3jCpLtLNVZj",
+        "address": "0x05b17e37fd43c18741877fca80846ad8c84aa750",
     },
     "4": {
         "p2p_port": 19094,
         "api_port": 13304,
-        "peer_id": "16Uiu2HAmBDXcqtEp5RjTq6PKiJdfgYPNTkDqjmxBVAmvqoi5PLxk",
+        "peer_id": "12D3KooWA494BRhXs2DpMm5e2DWkPZcot3WpYwB4KBj2udP9xvPC",
+        "address": "0xcc70a22331998454160472f097acb43ca9b1e646",
     },
     "5": {
         "p2p_port": 19095,
         "api_port": 13305,
-        "peer_id": "16Uiu2HAm7exqjZrqS79AnrxmBBuioRbCdXu8BrwpCMtLKqAnAV1m",
+        "peer_id": "12D3KooWQCHVYhdnLT76rhHoFUu3b4L2aUiY8o1y8erhAwg8evFx",
+        "address": "0xe4bb1970e6c9e5689c5ef68ee2545b4366c49be4",
     },
     "6": {
         "p2p_port": 19096,
         "api_port": 13306,
-        "peer_id": "16Uiu2HAmUDhBPjFuDXUy1S65uBGAxGmUooH72433jTAkLvk1Cc4Y",
+        "peer_id": "12D3KooWHc2LPyvYGLJbHoQeJUBXBjDRfMY7msobsPoWj8rCAGHr",
+        "address": "0xf90c1eb2557a443c2b27d399afac075fa752cd92",
     },
     "7": {
         "p2p_port": 19097,
         "api_port": 13307,
-        "peer_id": "16Uiu2HAmQWRq84LRiA41t4np7HkCTWKsLqF9xg8ct6dNBJzXvALU",
+        "peer_id": "12D3KooWGPUAcSaJhKBmmwP2Bz3PbZyrErosBmCbZKgPPt7XHwqh",
+        "address": "0xe63ececd80c503548516e9e23ebb44d95c4d5ac2",
     },
 }
 
@@ -112,25 +136,36 @@ def check_socket(address, port):
 
 
 @pytest.fixture(scope="module")
-def setup_7_nodes(request):
+def swarm7(request):
+    logging.info(f"Using the random seed: {SEED}")
+
     log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}-setup.log"
+
+    for f in ["node_5.cfg.yaml"]:
+        shutil.copyfile(f"./tests/{f}", f"{FIXTURE_FILES_DIR}/{FIXTURE_FILES_PREFIX}-{f}")
+
     try:
-        logging.info("Creating a 7 node cluster from source")
+        logging.debug("Creating a 7 node cluster from bash")
         res = subprocess.run(
-            f"./scripts/fixture_local_test_setup.sh --skip-cleanup 2>&1 | tee {log_file_path}",
+            f"./scripts/fixture_local_test_setup.sh --setup 2>&1 | tee {log_file_path}",
             shell=True,
             capture_output=True,
             check=True,
         )
         res.check_returncode()
-        yield NODES
+        nodes = NODES.copy()
+        for key in NODES.keys():
+            port = NODES[key]["api_port"]
+            nodes[key]["api"] = HoprdAPI(f"http://localhost:{port}", DEFAULT_API_TOKEN)
+        yield nodes
     except Exception:
-        logging.info("Creating a 7 node cluster from source - FAILED")
+        logging.error("Creating a 7 node cluster from bash - FAILED")
     finally:
-        logging.info("Tearing down the 7 node cluster from source")
+        logging.debug("Tearing down the 7 node cluster from bash")
         subprocess.run(
-            "./scripts/fixture_local_test_setup.sh --just-cleanup",
+            f"./scripts/fixture_local_test_setup.sh --teardown 2>&1 | tee --append {log_file_path}",
             shell=True,
             capture_output=True,
-            check=True,
+            check=False,
         )
+        pass

@@ -6,7 +6,6 @@ members = [
     "packages/core/crates/core-crypto",
     "packages/core/crates/core-hopr",
     "packages/core/crates/core-misc",
-    "packages/core/crates/core-mixer",
     "packages/core/crates/core-network",
     "packages/core/crates/core-path",
     "packages/core/crates/core-packet",
@@ -36,6 +35,7 @@ members = [
 async-lock = "2.7.0"
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-trait = "0.1"
+ethers = { version = "2.0.10", default-features = false }
 futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"
@@ -49,6 +49,7 @@ libp2p-mplex = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "r
 libp2p-wasm-ext = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
 libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "release/providence-update-20230828" }
 multiaddr = "0.18.0"
+rust-stream-ext-concurrent = { git = "https://github.com/hoprnet/rust-stream-ext-concurrent.git", branch = "main"}
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = { version = "3.3" }
@@ -68,7 +69,6 @@ core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-in
 core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
 core-hopr = { path = "packages/core/crates/core-hopr", default-features = false }
 core-misc = { path = "packages/core/crates/core-misc", default-features = false }
-core-mixer = { path = "packages/core/crates/core-mixer", default-features = false }
 core-network = { path = "packages/core/crates/core-network", default-features = false }
 core-packet = { path = "packages/core/crates/core-packet", default-features = false }
 core-path = { path = "packages/core/crates/core-path", default-features = false }

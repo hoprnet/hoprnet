@@ -225,9 +225,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            items: {
-              $ref: '#/components/schemas/ChannelTopology'
-            }
+            $ref: '#/components/schemas/ChannelTopology'
           }
         }
       }

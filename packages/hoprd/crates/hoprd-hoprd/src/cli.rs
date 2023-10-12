@@ -5,11 +5,11 @@ use std::str::FromStr;
 use clap::builder::{PossibleValuesParser, ValueParser};
 use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
 use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
-use core_strategy::config::StrategyConfig;
-use core_strategy::{generic::ChannelStrategy, passive::PassiveStrategy, promiscuous::PromiscuousStrategy};
+use core_strategy::Strategy;
 use hex;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use strum::VariantNames;
 use utils_misc::ok_or_str;
 
 #[cfg(not(feature = "wasm"))]
@@ -213,7 +213,7 @@ pub struct CliArgs {
         help = "Default channel strategy to use after node starts up",
         env = "HOPRD_DEFAULT_STRATEGY",
         value_name = "DEFAULT_STRATEGY",
-        value_parser = PossibleValuesParser::new([PromiscuousStrategy::NAME, PassiveStrategy::NAME ])
+        value_parser = PossibleValuesParser::new(Strategy::VARIANTS)
     )]
     pub default_strategy: Option<String>,
 
@@ -231,7 +231,7 @@ pub struct CliArgs {
         env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
         help = "Disables automatic redeeming of winning tickets.",
         action = ArgAction::SetFalse,
-        default_value_t = StrategyConfig::default().auto_redeem_tickets
+        default_value_t = false
     )]
     pub auto_redeem_tickets: bool,
 
@@ -352,15 +352,6 @@ pub struct CliArgs {
         env = "HOPRD_HEARTBEAT_VARIANCE"
     )]
     pub heartbeat_variance: Option<u64>,
-
-    #[arg(
-        long = "onChainConfirmations",
-        help = "Number of confirmations required for on-chain transactions",
-        value_name = "CONFIRMATIONS",
-        value_parser = clap::value_parser ! (u32),
-        env = "HOPRD_ON_CHAIN_CONFIRMATIONS",
-    )]
-    pub on_chain_confirmations: Option<u32>,
 
     #[arg(
         long = "networkQualityThreshold",

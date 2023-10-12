@@ -18,6 +18,8 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>>;
 
+    async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> Result<()>;
+
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
 
     async fn get_pending_acknowledgement(
@@ -105,7 +107,7 @@ pub trait HoprCoreEthereumDbActions {
 
     // core-ethereum only part
     /// Delete acknowledged tickets belonging to a channel
-    async fn delete_acknowledged_tickets_from(&mut self, source: ChannelEntry) -> Result<()>;
+    async fn mark_acknowledged_tickets_neglected(&mut self, source: ChannelEntry) -> Result<()>;
 
     /// Get the value of the lastest block number.
     async fn get_latest_block_number(&self) -> Result<u32>;
@@ -146,6 +148,9 @@ pub trait HoprCoreEthereumDbActions {
     /// Get the total number of neglected tickets.
     async fn get_neglected_tickets_count(&self) -> Result<usize>;
 
+    /// Get the total value of neglected tickets.
+    async fn get_neglected_tickets_value(&self) -> Result<Balance>;
+
     /// Get the total number of pending tickets.
     async fn get_pending_tickets_count(&self) -> Result<usize>;
 
@@ -173,8 +178,14 @@ pub trait HoprCoreEthereumDbActions {
     /// Get all channels from a given address.
     async fn get_channels_from(&self, address: &Address) -> Result<Vec<ChannelEntry>>;
 
+    /// Get all the outgoing channels from current node.
+    async fn get_outgoing_channels(&self) -> Result<Vec<ChannelEntry>>;
+
     /// Get all channels to a given address.
     async fn get_channels_to(&self, address: &Address) -> Result<Vec<ChannelEntry>>;
+
+    /// Get all the incoming channels from current node.
+    async fn get_incoming_channels(&self) -> Result<Vec<ChannelEntry>>;
 
     /// Get the current balance.
     async fn get_hopr_balance(&self) -> Result<Balance>;

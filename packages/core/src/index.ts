@@ -25,7 +25,6 @@ import {
   close_channel,
   compareAddressesLocalMode,
   compareAddressesPublicMode,
-  CoreApp,
   create_counter,
   create_gauge,
   create_histogram_with_buckets,
@@ -34,7 +33,6 @@ import {
   debug,
   durations,
   fund_channel,
-  get_peers_with_quality,
   getBackoffRetries,
   getBackoffRetryTimeout,
   HalfKeyChallenge,
@@ -59,7 +57,7 @@ import {
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   Snapshot,
-  StrategyTickResult,
+  CoreApp,
   Ticket,
   WasmIndexerInteractions,
   WasmNetwork,
@@ -77,15 +75,6 @@ import HoprCoreEthereum, {
   NetworkRegistryNodeAllowedEventName,
   NetworkRegistryNodeNotAllowedEventName
 } from '@hoprnet/hopr-core-ethereum'
-
-import {
-  type ChannelStrategyInterface,
-  isStrategy,
-  OutgoingChannelStatus,
-  SaneDefaults,
-  Strategy,
-  StrategyFactory
-} from './channel-strategy.js'
 
 import { type ResolvedNetwork, resolveNetwork } from './network.js'
 import { utils as ethersUtils } from 'ethers/lib/ethers.js'
@@ -117,19 +106,6 @@ const metric_pathLength = create_histogram_with_buckets(
   'Distribution of number of hops of sent messages',
   new Float64Array([0, 1, 2, 3, 4])
 )
-const metric_strategyTicks = create_counter('core_counter_strategy_ticks', 'Number of strategy decisions (ticks)')
-const metric_strategyLastOpened = create_gauge(
-  'core_gauge_strategy_last_opened_channels',
-  'Number of opened channels in the last strategy tick'
-)
-const metric_strategyLastClosed = create_gauge(
-  'core_gauge_strategy_last_closed_channels',
-  'Number of closed channels in the last strategy tick'
-)
-const metric_strategyMaxChannels = create_gauge(
-  'core_gauge_strategy_max_auto_channels',
-  'Maximum number of channels the current strategy can open'
-)
 
 /// Maximum time to wait for a packet to be pushed to the interaction queue in milliseconds
 const PACKET_QUEUE_TIMEOUT_MILLISECONDS = 15000n
@@ -147,7 +123,6 @@ export class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
 
   private stopPeriodicCheck: (() => void) | undefined
-  private strategy: ChannelStrategyInterface
   private tools: HoprTools
   private networkPeers: WasmNetwork
   private pinger: WasmPing
@@ -268,16 +243,12 @@ export class Hopr extends EventEmitter {
       this.emit('hopr:message-acknowledged', ackChallenge.to_hex())
     }
 
-    const onAcknowledgedTicket = (ackTicket: AcknowledgedTicket) => {
-      connector.emit('ticket:acknowledged', ackTicket)
-    }
-
     let packetCfg = new PacketInteractionConfig(this.packetKeypair, this.chainKeypair)
     packetCfg.check_unrealized_balance = this.cfg.chain.check_unrealized_balance
 
-    const onReceivedMessage = (msg: Uint8Array) => {
+    const onReceivedMessage = (msg: ApplicationData) => {
       try {
-        this.emit('hopr:message', ApplicationData.deserialize(msg))
+        this.emit('hopr:message', msg)
       } catch (err) {
         log(`could not deserialize application data: ${err}`)
       }
@@ -317,7 +288,6 @@ export class Hopr extends EventEmitter {
       this.cfg.heartbeat,
       ping_cfg,
       onAcknowledgement,
-      onAcknowledgedTicket,
       packetCfg,
       onReceivedMessage,
       tagBloomFilter,
@@ -333,7 +303,8 @@ export class Hopr extends EventEmitter {
       this.cfg.protocol.ack,
       this.cfg.protocol.heartbeat,
       this.cfg.protocol.msg,
-      this.cfg.protocol.ticket_aggregation
+      this.cfg.protocol.ticket_aggregation,
+      this.cfg.strategy
     )
 
     this.tools = coreApp.tools()
@@ -420,18 +391,6 @@ export class Hopr extends EventEmitter {
     // subscribe so we can process channel ticket redeemed events
     connector.indexer.on('ticket-redeemed', this.onTicketRedeemed.bind(this))
 
-    let strategy: ChannelStrategyInterface
-    if (isStrategy(this.cfg.strategy.name)) {
-      strategy = StrategyFactory.getStrategy(this.cfg.strategy.name, this)
-      strategy.configure({
-        auto_redeem_tickets: this.cfg.strategy.auto_redeem_tickets,
-        max_channels: this.cfg.strategy.max_auto_channels ?? undefined
-      })
-    } else {
-      strategy = StrategyFactory.getStrategy('passive', this)
-    }
-    this.setChannelStrategy(strategy)
-
     log('announcing done, strategy interval')
     this.startPeriodicStrategyCheck()
 
@@ -475,8 +434,10 @@ export class Hopr extends EventEmitter {
    * @param channel object
    */
   private async onOwnChannelUpdated(channel: ChannelEntry): Promise<void> {
-    if (channel.status === ChannelStatus.PendingToClose) {
-      await this.strategy.onChannelWillClose(channel)
+    try {
+      await this.tools.channel_events().send_event(channel)
+    } catch (e) {
+      log(`failed to emit channel closure event`)
     }
   }
 
@@ -578,37 +539,6 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  private async strategyOpenChannel(status: OutgoingChannelStatus) {
-    try {
-      const destinationAddress = Address.from_string(status.address)
-      const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(Address.from_string(status.address))
-      const stake = new BN(status.stake_str)
-
-      const pId = peerIdFromString(pk.to_peerid_str())
-      if (await this.isAllowedAccessToNetwork(pId)) {
-        await this.networkPeers.register(pId.toString(), PeerOrigin.StrategyNewChannel)
-
-        const hash = await this.openChannel(destinationAddress, stake)
-        verbose('- opened channel', status.address, hash)
-        this.emit('hopr:channel:opened', status)
-      } else {
-        error(`Protocol error: strategy wants to open channel to non-registered peer ${status.address}`)
-      }
-    } catch (e) {
-      error(`strategy could not open channel to ${status.address}`, e)
-    }
-  }
-
-  private async strategyCloseChannel(destination: string) {
-    try {
-      await this.closeChannel(Address.from_string(destination), ChannelDirection.Outgoing)
-      verbose(`closed channel to ${destination.toString()}`)
-      this.emit('hopr:channel:closed', destination)
-    } catch (e) {
-      error(`strategy could not close channel ${destination}`)
-    }
-  }
-
   private async updateChannelMetrics() {
     const selfAddr = this.getEthereumAddress()
 
@@ -643,70 +573,6 @@ export class Hopr extends EventEmitter {
       metric_outChannelCount.set(outgoingChannels)
     } catch (e) {
       error(`error: failed to update channel metrics`, e)
-    }
-  }
-
-  // On the strategy interval, poll the strategy to see what channel changes
-  // need to be made.
-  private async tickChannelStrategy() {
-    verbose('strategy tick', this.status, this.strategy.name)
-    if (this.status != 'RUNNING') {
-      throw new Error('node is not RUNNING')
-    }
-
-    let tickResult: StrategyTickResult
-    try {
-      // Retrieve all outgoing channels
-      const outgoingChannels = await this.getChannelsFrom(this.getEthereumAddress())
-      verbose(`strategy tracks ${outgoingChannels.length} outgoing channels`)
-
-      // Check if all peer ids are still registered
-      await Promise.all(
-        outgoingChannels.map(async (channel) => {
-          const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(
-            Address.from_string(channel.destination.to_string())
-          )
-
-          if (await this.isAllowedAccessToNetwork(peerIdFromString(pk.to_peerid_str()))) {
-            await this.networkPeers.register(pk.to_peerid_str(), PeerOrigin.StrategyExistingChannel)
-          } else {
-            error(`Protocol error: Strategy is monitoring non-registered peer ${channel.destination.to_hex()}`)
-          }
-        })
-      )
-
-      // Perform the strategy tick
-      tickResult = this.strategy.tick(
-        new BN((await this.getBalance()).to_string()),
-        await get_peers_with_quality(this.networkPeers, this.db),
-        outgoingChannels.map((c) => {
-          return {
-            address: c.destination.to_string(),
-            stake_str: c.balance.to_string(),
-            status: c.status
-          }
-        })
-      )
-      metric_strategyTicks.increment()
-      metric_strategyMaxChannels.set(tickResult.max_auto_channels)
-    } catch (e) {
-      error(`failed to do a strategy tick`, e)
-      throw new Error('error while performing strategy tick')
-    }
-
-    let allClosedChannels = tickResult.to_close()
-    verbose(`strategy wants to close ${allClosedChannels.length} channels`)
-    metric_strategyLastClosed.set(allClosedChannels.length)
-
-    let allOpenedChannels: OutgoingChannelStatus[] = tickResult.to_open()
-    verbose(`strategy wants to open ${allOpenedChannels.length} new channels`)
-    metric_strategyLastOpened.set(allOpenedChannels.length)
-
-    try {
-      await Promise.all(allClosedChannels.map(this.strategyCloseChannel.bind(this)))
-      await Promise.all(allOpenedChannels.map(this.strategyOpenChannel.bind(this)))
-    } catch (e) {
-      error(`error when strategy was trying to open or close channels`, e)
     }
   }
 
@@ -795,7 +661,7 @@ export class Hopr extends EventEmitter {
       throw new Error('No tickets found in channel')
     }
 
-    await this.tools.aggregate_tickets(channelId, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
+    await this.tools.aggregate_tickets(channel, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
   }
 
   /**
@@ -923,6 +789,7 @@ export class Hopr extends EventEmitter {
     HoprCoreEthereum.getInstance().emit(event)
   }
 
+  // This now only used to update metrics
   public startPeriodicStrategyCheck() {
     const periodicCheck = async function (this: Hopr) {
       log('periodic check. Current status:', this.status)
@@ -930,23 +797,20 @@ export class Hopr extends EventEmitter {
         return
       }
       const timer = retimer(() => {
-        log('strategy tick took longer than 10 secs')
+        log('tick took longer than 10 secs')
       }, 10000)
       try {
-        log('Triggering tick channel strategy')
-        await this.tickChannelStrategy()
+        log('Triggering tick')
         await this.updateChannelMetrics()
       } catch (e) {
         log('error in periodic check', e)
       }
       log('Clearing out logging timeout.')
       timer.clear()
-      log(`Setting up timeout for ${this.strategy.tickInterval}ms`)
     }.bind(this)
 
-    log(`Starting periodicCheck interval with ${this.strategy.tickInterval}ms`)
-
-    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => this.strategy.tickInterval)
+    log(`Starting periodicCheck interval with 60000ms`)
+    this.stopPeriodicCheck = intervalTimer(periodicCheck, () => 60000)
   }
 
   /**
@@ -1082,23 +946,6 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  public setChannelStrategy(strategy: ChannelStrategyInterface): void {
-    log('setting channel strategy from', this.strategy?.name, 'to', strategy.name)
-    this.strategy = strategy
-
-    HoprCoreEthereum.getInstance().on('ticket:acknowledged', async (ack: AcknowledgedTicket) => {
-      try {
-        await this.strategy.onAckedTicket(ack)
-      } catch (err) {
-        error(`Strategy error while handling acknowledged ticket`, err)
-      }
-    })
-  }
-
-  public getChannelStrategy(): ChannelStrategyInterface {
-    return this.strategy
-  }
-
   public async getBalance(): Promise<Balance> {
     verbose('Requesting hopr balance for node')
     // we do not keep the node's hopr balance in the db anymore, therefore use
@@ -1205,7 +1052,7 @@ export class Hopr extends EventEmitter {
     try {
       let self_addr = this.getEthereumAddress()
       let tx_sender = this.tools.get_tx_sender()
-      let res = await close_channel(this.db, counterparty, self_addr, direction, tx_sender)
+      let res = await close_channel(this.db, counterparty, self_addr, direction, false, tx_sender)
       return { receipt: res.tx_hash.to_hex(), status: res.status }
     } catch (err) {
       log('failed to close channel', err)
@@ -1268,24 +1115,25 @@ export class Hopr extends EventEmitter {
       redeemed: await this.db.get_redeemed_tickets_count(),
       redeemedValue: await this.db.get_redeemed_tickets_value(),
       neglected: await this.db.get_neglected_tickets_count(),
+      neglectedValue: await this.db.get_neglected_tickets_value(),
       rejected: await this.db.get_rejected_tickets_count(),
       rejectedValue: await this.db.get_rejected_tickets_value()
     }
   }
 
-  public async redeemAllTickets() {
+  public async redeemAllTickets(onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemAllTickets: Node is not ready for on-chain operations')
     }
     try {
       let tx_sender = this.tools.get_tx_sender()
-      await redeem_all_tickets(this.db, this.chainKeypair.to_address(), tx_sender)
+      await redeem_all_tickets(this.db, onlyAggregated, tx_sender)
     } catch (err) {
       log(`error during all tickets redemption: ${err}`)
     }
   }
 
-  public async redeemTicketsInChannel(channelId: Hash) {
+  public async redeemTicketsInChannel(channelId: Hash, onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemTicketsInChannel: Node is not ready for on-chain operations')
     }
@@ -1294,7 +1142,7 @@ export class Hopr extends EventEmitter {
       const channel = await this.db.get_channel(channelId)
       let tx_sender = this.tools.get_tx_sender()
       if (channel?.destination.eq(this.getEthereumAddress())) {
-        await redeem_tickets_in_channel(this.db, channel, tx_sender)
+        await redeem_tickets_in_channel(this.db, channel, onlyAggregated, tx_sender)
       } else {
         log(`cannot redeem tickets in channel ${channelId.to_hex()}`)
       }
@@ -1303,14 +1151,14 @@ export class Hopr extends EventEmitter {
     }
   }
 
-  public async redeemTicketsWithCounterparty(counterparty: Address) {
+  public async redeemTicketsWithCounterparty(counterparty: Address, onlyAggregated: boolean = false) {
     if (!this.isReady) {
       log('redeemTicketsWithCounterparty: Node is not ready for on-chain operations')
     }
 
     try {
       let tx_sender = this.tools.get_tx_sender()
-      await redeem_tickets_with_counterparty(this.db, counterparty, tx_sender)
+      await redeem_tickets_with_counterparty(this.db, counterparty, onlyAggregated, tx_sender)
     } catch (err) {
       log(`error during ticket redemption with counterparty ${counterparty.to_hex()}: ${err}`)
     }
@@ -1518,16 +1366,5 @@ export class Hopr extends EventEmitter {
 
 export { PEER_METADATA_PROTOCOL_VERSION } from './constants.js'
 export { createHoprNode } from './main.js'
-export {
-  Strategy,
-  StrategyFactory,
-  StrategyTickResult,
-  isStrategy,
-  SaneDefaults,
-  findPath,
-  PeerOrigin,
-  PeerStatus,
-  Health,
-  type ChannelStrategyInterface
-}
+export { findPath, PeerOrigin, PeerStatus, Health }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'
