@@ -52,9 +52,11 @@ jobs:
 
       - name: Run Load test
         run: |
+          npm install
           npm run test:${{ github.event.inputs.network }}:setup
           kubectl delete -f k6-test-run.yaml 2>& /dev/null || true
-          kubectl apply -f k6-test-run.yaml 
+          kubectl apply -f k6-test-run.yaml
+        working-directory: "./k6"
         env:
           ENVIRONMENT_NAME: ${{ github.event.inputs.network }}
           WORKLOAD_NAME: ${{ github.event.inputs.workload }}
