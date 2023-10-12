@@ -1,4 +1,10 @@
 ---
+#################################################################################
+# Internal pipeline triggered by a merged pull request labeled with 'release' to perform the following steps:
+# 1. Create a pull request to bump version
+# 2. Create the new milestone
+#################################################################################
+
 name: Open Release
 
 on:

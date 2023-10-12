@@ -1,4 +1,7 @@
 ---
+#################################################################################
+# Child pipeline to build Hopli docker image (europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopli)
+#################################################################################
 name: Build Hopli
 
 on:

@@ -1,5 +1,7 @@
-# See docs: https://github.com/actions/stale
-
+---
+#################################################################################
+# Cron daily pipeline to clean cache contents (stale issues and docker images)
+#################################################################################
 name: Cleanup
 
 on:
@@ -12,6 +14,7 @@ jobs:
     runs-on: ubuntu-2-core
     timeout-minutes: 10
     steps:
+        # See docs: https://github.com/actions/stale
       - uses: actions/stale@v8
         with:
           stale-issue-message: 'This issue is stale because it has been open 60 days with no activity. Remove stale label or comment or this will be closed in 30 days.'

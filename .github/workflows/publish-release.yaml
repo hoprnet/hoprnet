@@ -1,4 +1,7 @@
 ---
+#################################################################################
+# Manual pipeline to clone a docker image tag based on other docker image tag
+#################################################################################
 name: Publish Release
 
 on:
