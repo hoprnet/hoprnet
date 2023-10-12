@@ -45,6 +45,11 @@ jobs:
           repository: hoprnet/hoprd-test
           ref: main
 
+      - name: Setup NodeJs
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
       - name: Run Load test
         run: |
           npm run test:${{ github.event.inputs.network }}:setup
