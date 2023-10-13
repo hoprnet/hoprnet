@@ -18,7 +18,7 @@ use core_packet::errors::PacketError::{
     PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use core_packet::errors::Result;
-use core_path::path::{BasePath, Path};
+use core_path::path::{TransportPath, Path};
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
@@ -73,7 +73,7 @@ const PACKET_RX_QUEUE_SIZE: usize = 2048;
 #[derive(Debug)]
 pub enum MsgToProcess {
     ToReceive(Box<[u8]>, PeerId),
-    ToSend(ApplicationData, Path, PacketSendFinalizer),
+    ToSend(ApplicationData, TransportPath, PacketSendFinalizer),
     ToForward(Box<[u8]>, PeerId),
 }
 
@@ -112,7 +112,7 @@ where
 {
     type Input = ApplicationData;
 
-    async fn into_outgoing(&self, data: Self::Input, path: &Path) -> Result<TransportPacket> {
+    async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket> {
         let next_peer = self
             .db
             .read()
@@ -528,7 +528,7 @@ pub struct PacketActions {
 /// Pushes the packet with the given payload for sending via the given valid path.
 impl PacketActions {
     /// Pushes a new packet from this node into processing.
-    pub fn send_packet(&mut self, data: ApplicationData, path: Path) -> Result<PacketSendAwaiter> {
+    pub fn send_packet(&mut self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
 
         self.process(MsgToProcess::ToSend(data, path, PacketSendFinalizer::new(tx)))
@@ -807,7 +807,7 @@ mod tests {
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_packet::por::ProofOfRelayValues;
-    use core_path::path::{BasePath, Path};
+    use core_path::path::{TransportPath, Path};
     use core_types::{
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
         channels::{ChannelEntry, ChannelStatus},
@@ -1219,7 +1219,7 @@ mod tests {
         let components = peer_setup_for(peer_count).await;
 
         // Peer 1: start sending out packets
-        let packet_path = Path::new_valid(
+        let packet_path = TransportPath::new_valid(
             PEERS[1..peer_count]
                 .iter()
                 .map(|p| p.public().to_peerid())

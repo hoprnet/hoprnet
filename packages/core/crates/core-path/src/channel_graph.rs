@@ -59,7 +59,7 @@ impl ChannelGraph {
         self.me
     }
 
-    /// Looks up an `Open` or `PendingToClose' channel given the source and destination.
+    /// Looks up an `Open` or `PendingToClose` channel given the source and destination.
     /// Returns `None` if no such edge exists in the graph.
     pub fn get_channel(&self, source: Address, destination: Address) -> Option<&ChannelEntry> {
         self.graph.edge_weight(source, destination).map(|w| &w.channel)
@@ -118,6 +118,12 @@ impl ChannelGraph {
         }
     }
 
+    /// Gets quality of the given channel. Returns `None` if no such channel exists or no
+    /// quality has been set for that channel.
+    pub fn get_channel_quality(&self, source: Address, destination: Address) -> Option<f64> {
+        self.graph.edge_weight(source, destination).map(|w| w.quality).flatten()
+    }
+
     /// Synchronizes the channel entries in this graph with the database.
     /// The synchronization is one-way from DB to the graph, not vice versa.
     pub async fn sync_channels<Db: HoprCoreEthereumDbActions>(&mut self, db: &Db) -> Result<()> {
@@ -134,7 +140,240 @@ impl ChannelGraph {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::channel_graph::ChannelGraph;
+    use core_ethereum_db::db::CoreEthereumDb;
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+    use lazy_static::lazy_static;
+    use std::str::FromStr;
+    use utils_db::db::DB;
+    use utils_db::rusty::RustyLevelDbShim;
+    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot};
+
+    lazy_static! {
+        static ref ADDRESSES: [Address; 6] = [
+            Address::from_str("0xafe8c178cf70d966be0a798e666ce2782c7b2288").unwrap(),
+            Address::from_str("0x1223d5786d9e6799b3297da1ad55605b91e2c882").unwrap(),
+            Address::from_str("0x0e3e60ddced1e33c9647a71f4fc2cf4ed33e4a9d").unwrap(),
+            Address::from_str("0x27644105095c8c10f804109b4d1199a9ac40ed46").unwrap(),
+            Address::from_str("0x4701a288c38fa8a0f4b79127747257af4a03a623").unwrap(),
+            Address::from_str("0xfddd2f462ec709cf181bbe44a7e952487bd4591d").unwrap(),
+        ];
+    }
+
+    fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
+        ChannelEntry::new(
+            src,
+            dst,
+            Balance::new_from_str("1", BalanceType::HOPR),
+            1u32.into(),
+            status,
+            1u32.into(),
+            0u32.into(),
+        )
+    }
+
+    #[test]
+    fn test_channel_graph_self_addr() {
+        let cg = ChannelGraph::new(ADDRESSES[0]);
+        assert_eq!(ADDRESSES[0], cg.my_address(), "must produce correct self address");
+    }
+
+    #[test]
+    fn test_channel_graph_has_path() {
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+
+        let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
+        cg.update_channel(c.clone());
+
+        assert!(cg.contains_channel(&c), "must contain channel");
+        assert!(cg.has_path(ADDRESSES[0], ADDRESSES[1]), "must have simple path");
+        assert!(
+            !cg.has_path(ADDRESSES[0], ADDRESSES[2]),
+            "must not have non existent path"
+        );
+    }
+
+    #[test]
+    fn test_channel_graph_update_quality() {
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+
+        let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
+        cg.update_channel(c.clone());
+
+        assert!(cg.contains_channel(&c), "must contain channel");
+        assert!(
+            cg.get_channel_quality(ADDRESSES[0], ADDRESSES[1]).is_none(),
+            "must start with no quality info"
+        );
+
+        cg.update_channel_quality(ADDRESSES[0], ADDRESSES[1], 0.5_f64);
+
+        let q = cg
+            .get_channel_quality(ADDRESSES[0], ADDRESSES[1])
+            .expect("must have quality when set");
+        assert_eq!(0.5_f64, q, "quality must be equal");
+    }
+
+    #[test]
+    fn test_channel_graph_is_own_channel() {
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+
+        let c1 = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
+        let c2 = dummy_channel(ADDRESSES[1], ADDRESSES[2], ChannelStatus::Open);
+        cg.update_channel(c1.clone());
+        cg.update_channel(c2.clone());
+
+        assert!(cg.is_own_channel(&c1), "must detect as own channel");
+        assert!(!cg.is_own_channel(&c2), "must not detect as own channel");
+    }
+
+    #[test]
+    fn test_channel_graph_update_changes() {
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+
+        let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
+
+        let changes = cg.update_channel(c.clone());
+        assert!(changes.is_none(), "must not produce changes for a new channel");
+
+        let cr = cg
+            .get_channel(ADDRESSES[0], ADDRESSES[1])
+            .expect("must contain channel");
+        assert!(c.eq(cr), "channels must be equal");
+
+        c.balance = Balance::zero(BalanceType::HOPR);
+        c.status = ChannelStatus::PendingToClose;
+        let changes = cg.update_channel(c.clone()).expect("must contain changes");
+        assert_eq!(2, changes.len(), "must contain 2 changes");
+
+        for change in changes {
+            match change {
+                ChannelChange::Status { left, right } => {
+                    assert_eq!(ChannelStatus::Open, left, "previous status does not match");
+                    assert_eq!(ChannelStatus::PendingToClose, right, "new status does not match");
+                }
+                ChannelChange::CurrentBalance { left, right } => {
+                    assert_eq!(
+                        Balance::new(1u32.into(), BalanceType::HOPR),
+                        left,
+                        "previous balance does not match"
+                    );
+                    assert_eq!(Balance::zero(BalanceType::HOPR), right, "new balance does not match");
+                }
+                _ => panic!("unexpected change"),
+            }
+        }
+
+        let cr = cg
+            .get_channel(ADDRESSES[0], ADDRESSES[1])
+            .expect("must contain channel");
+        assert!(c.eq(cr), "channels must be equal");
+    }
+
+    #[test]
+    fn test_channel_graph_update_changes_on_close() {
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+
+        let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose);
+
+        let changes = cg.update_channel(c.clone());
+        assert!(changes.is_none(), "must not produce changes for a new channel");
+
+        let cr = cg
+            .get_channel(ADDRESSES[0], ADDRESSES[1])
+            .expect("must contain channel");
+        assert!(c.eq(cr), "channels must be equal");
+
+        c.balance = Balance::zero(BalanceType::HOPR);
+        c.status = ChannelStatus::Closed;
+        let changes = cg.update_channel(c.clone()).expect("must contain changes");
+        assert_eq!(2, changes.len(), "must contain 2 changes");
+
+        for change in changes {
+            match change {
+                ChannelChange::Status { left, right } => {
+                    assert_eq!(ChannelStatus::PendingToClose, left, "previous status does not match");
+                    assert_eq!(ChannelStatus::Closed, right, "new status does not match");
+                }
+                ChannelChange::CurrentBalance { left, right } => {
+                    assert_eq!(
+                        Balance::new(1u32.into(), BalanceType::HOPR),
+                        left,
+                        "previous balance does not match"
+                    );
+                    assert_eq!(Balance::zero(BalanceType::HOPR), right, "new balance does not match");
+                }
+                _ => panic!("unexpected change"),
+            }
+        }
+
+        let cr = cg.get_channel(ADDRESSES[0], ADDRESSES[1]);
+        assert!(cr.is_none(), "must not contain channel after closing");
+    }
+
+    #[test]
+    fn test_channel_graph_update_should_not_allow_closed_channels() {
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let changes = cg.update_channel(dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Closed));
+        assert!(changes.is_none(), "must not produce changes for a closed channel");
+
+        let c = cg.get_channel(ADDRESSES[0], ADDRESSES[1]);
+        assert!(c.is_none(), "must not allow adding closed channels");
+    }
+
+    #[test]
+    fn test_channel_graph_update_should_allow_pending_to_close_channels() {
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let changes = cg.update_channel(dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose));
+        assert!(changes.is_none(), "must not produce changes for a closed channel");
+
+        cg.get_channel(ADDRESSES[0], ADDRESSES[1])
+            .expect("must allow PendingToClose channels");
+    }
+
+    #[async_std::test]
+    async fn test_channel_graph_sync() {
+        let testing_snapshot = Snapshot::default();
+        let mut last_addr = ADDRESSES[0];
+        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), last_addr);
+
+        for current_addr in ADDRESSES.iter().skip(1) {
+            // Open channel from last node to us
+            let channel = dummy_channel(last_addr, *current_addr, ChannelStatus::Open);
+            db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
+                .await
+                .unwrap();
+
+            last_addr = *current_addr;
+        }
+
+        // Add a pending to close channel between 4 -> 0
+        let channel = dummy_channel(ADDRESSES[4], ADDRESSES[0], ChannelStatus::Closed);
+        db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
+            .await
+            .unwrap();
+
+        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        cg.sync_channels(&db).await.expect("should sync graph");
+
+        assert!(cg.has_path(ADDRESSES[0], ADDRESSES[4]), "must have path from 0 -> 4");
+        assert!(
+            cg.get_channel(ADDRESSES[4], ADDRESSES[0]).is_none(),
+            "must not sync closed channel"
+        );
+        assert!(
+            db.get_channels()
+                .await
+                .unwrap()
+                .into_iter()
+                .filter(|c| c.status != ChannelStatus::Closed)
+                .all(|c| cg.contains_channel(&c)),
+            "must contain all non-closed channels"
+        );
+    }
+}
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

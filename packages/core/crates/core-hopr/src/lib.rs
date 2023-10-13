@@ -109,7 +109,7 @@ pub mod wasm_impls {
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_network::network::NetworkConfig;
     use core_path::channel_graph::ChannelGraph;
-    use core_path::path::Path;
+    use core_path::path::TransportPath;
     use core_strategy::strategy::MultiStrategyConfig;
     use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::protocol::ApplicationData;
@@ -179,7 +179,7 @@ pub mod wasm_impls {
         pub async fn send_message(
             &self,
             msg: ApplicationData,
-            path: Path,
+            path: TransportPath,
             timeout_in_millis: u64,
         ) -> Result<HalfKeyChallenge, JsValue> {
             match self.pkt_sender.clone().send_packet(msg, path) {

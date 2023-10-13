@@ -695,7 +695,7 @@ export class Hopr extends EventEmitter {
       // Validate the manually specified intermediate path
       let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
       try {
-        path = await Path.validated(withDestination, true, this.db, this.tools.channel_graph())
+        path = await Path.validated(withDestination, this.db, this.tools.channel_graph())
       } catch (e) {
         metric_sentMessageFailCount.increment()
         throw e

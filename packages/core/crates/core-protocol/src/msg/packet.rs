@@ -1,4 +1,4 @@
-use core_path::path::Path;
+use core_path::path::TransportPath;
 use libp2p_identity::PeerId;
 
 use core_crypto::{derivation::PacketTag, keypairs::OffchainKeypair, types::HalfKeyChallenge};
@@ -33,7 +33,7 @@ pub enum TransportPacket {
 pub trait PacketConstructing {
     type Input;
 
-    async fn into_outgoing(&self, data: Self::Input, path: &Path) -> Result<TransportPacket>;
+    async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket>;
 
     async fn from_incoming(
         &self,

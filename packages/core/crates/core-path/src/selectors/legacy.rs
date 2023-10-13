@@ -83,8 +83,8 @@ where
         current: &[Address],
         dead_ends: &HashSet<Address>,
     ) -> bool {
-        !destination.eq(&channel.channel.destination) &&               // last hop does not need channel
-            channel.quality.unwrap_or(0_f64) > self.quality_threshold &&  // quality threshold
+        !destination.eq(&channel.channel.destination) &&                    // last hop does not need channel
+            channel.quality.unwrap_or(1_f64) > self.quality_threshold &&  // quality threshold
             !current.contains(&channel.channel.destination) &&     // must not be in the path already (no loops allowed)
             !dead_ends.contains(&channel.channel.destination) // must not be in the dead end list
     }
@@ -123,9 +123,7 @@ where
             let current_path_len = current_path.0.len();
 
             if current_path_len >= max_hops && current_path_len <= INTERMEDIATE_HOPS {
-                let mut res = queue.pop().unwrap().0;
-                res.push(destination); // Need to add the destination address
-                return Ok(ChannelPath::new_valid(res));
+                return Ok(ChannelPath::new_valid(queue.pop().unwrap().0));
             }
 
             let last_peer = *current_path.0.last().unwrap();
@@ -165,6 +163,7 @@ pub type LegacyPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 #[cfg(test)]
 mod tests {
     use crate::channel_graph::ChannelGraph;
+    use crate::path::{ChannelPath, Path};
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use lazy_static::lazy_static;
     use std::str::FromStr;
@@ -217,13 +216,50 @@ mod tests {
 
         graph
     }
+
+    fn initialize_arrow_graph<F>(stake: Balance, quality: F) -> ChannelGraph
+    where
+        F: Fn(Address, Address) -> f64,
+    {
+        let mut graph = ChannelGraph::new(ADDRESSES[0]);
+
+        graph.update_channel(create_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open, stake));
+        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[1], quality(ADDRESSES[0], ADDRESSES[1]));
+
+        graph.update_channel(create_channel(ADDRESSES[1], ADDRESSES[2], ChannelStatus::Open, stake));
+        graph.update_channel_quality(ADDRESSES[1], ADDRESSES[2], quality(ADDRESSES[1], ADDRESSES[2]));
+
+        graph.update_channel(create_channel(ADDRESSES[2], ADDRESSES[3], ChannelStatus::Open, stake));
+        graph.update_channel_quality(ADDRESSES[2], ADDRESSES[3], quality(ADDRESSES[2], ADDRESSES[3]));
+
+        graph
+    }
+
+    fn check_path(path: &ChannelPath, graph: &ChannelGraph) {
+        assert!(!path.contains_cycle(), "path must not be cyclic");
+
+        let last_addr = path.hops[0];
+        for hop in path.hops().iter().skip(1) {
+            let edge = graph
+                .get_channel(last_addr, *hop)
+                .expect("path must contain existing edge");
+            assert_eq!(
+                ChannelStatus::Open,
+                edge.status,
+                "edge in path must be represented by an Open channel"
+            );
+        }
+    }
+
+    #[test]
+    fn test_dfs_should_find_path_in_reliable_star() {}
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::channel_graph::wasm::ChannelGraph;
     use crate::path::wasm::PathResolver;
-    use crate::path::Path;
+    use crate::path::TransportPath;
     use crate::selectors::legacy::LegacyPathSelector;
     use crate::selectors::PathSelector;
     use core_ethereum_db::db::wasm::Database;
@@ -237,7 +273,7 @@ pub mod wasm {
         database: &Database,
         destination: &Address,
         max_hops: u32,
-    ) -> JsResult<Path> {
+    ) -> JsResult<TransportPath> {
         let selector = LegacyPathSelector::default();
         let cp = {
             let cgraph = graph.as_ref_counted();
@@ -248,6 +284,6 @@ pub mod wasm {
         let database = database.as_ref_counted();
         let g = database.read().await;
 
-        Ok(cp.to_path(&PathResolver(&*g)).await?)
+        Ok(cp.to_path(&PathResolver(&*g), *destination).await?)
     }
 }

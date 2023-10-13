@@ -9,7 +9,7 @@ use core_packet::{
     packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
 };
-use core_path::path::{BasePath, Path};
+use core_path::path::{Path, TransportPath};
 use core_types::channels::Ticket;
 use core_types::protocol::INTERMEDIATE_HOPS;
 use libp2p_identity::PeerId;
@@ -72,7 +72,7 @@ impl ChainPacketComponents {
     /// * `first_ticket` ticket for the first hop on the path
     pub fn into_outgoing(
         msg: &[u8],
-        path: &Path,
+        path: &TransportPath,
         chain_keypair: &ChainKeypair,
         mut ticket: Ticket,
         domain_separator: &Hash,
@@ -230,7 +230,7 @@ mod tests {
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, PublicKey},
     };
-    use core_path::path::Path;
+    use core_path::path::{Path, TransportPath};
     use core_types::channels::Ticket;
     use parameterized::parameterized;
     use utils_types::{
@@ -279,7 +279,7 @@ mod tests {
         let ticket = mock_ticket(&channel_pairs[0].public().0, keypairs.len(), &own_channel_kp);
 
         let test_message = b"some testing message";
-        let path = Path::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
+        let path = TransportPath::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
         let mut packet =
             ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())
                 .expect("failed to construct packet");

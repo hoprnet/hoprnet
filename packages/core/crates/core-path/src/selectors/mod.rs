@@ -3,7 +3,7 @@ pub mod legacy;
 use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError::ChannelNotOpened;
 use crate::errors::{PathError::MissingChannel, Result};
-use crate::path::{BasePath, ChannelPath};
+use crate::path::{ChannelPath, Path};
 use core_types::channels::{ChannelEntry, ChannelStatus};
 use core_types::protocol::INTERMEDIATE_HOPS;
 use std::ops::Add;
