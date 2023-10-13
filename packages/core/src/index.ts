@@ -47,7 +47,6 @@ import {
   OffchainPublicKey,
   open_channel,
   PacketInteractionConfig,
-  Path,
   PeerOrigin,
   PeerStatus,
   PingConfig,
@@ -64,7 +63,7 @@ import {
   WasmPing,
   WasmTxExecutor,
   withdraw,
-  legacy_path_select
+  legacy_path_select, TransportPath
 } from '@hoprnet/hopr-utils'
 
 import { MAX_HOPS, MAX_PARALLEL_PINGS, PACKET_SIZE, VERSION } from './constants.js'
@@ -688,12 +687,12 @@ export class Hopr extends EventEmitter {
       throw Error(`Message does not fit into one packet. Please split message into chunks of ${PACKET_SIZE} bytes`)
     }
 
-    let path: Path
+    let path: TransportPath
     if (intermediatePath != undefined) {
       // Validate the manually specified intermediate path
       let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
       try {
-        path = await Path.validated(withDestination, this.db, this.tools.channel_graph())
+        path = await TransportPath.validated(withDestination, this.db, this.tools.channel_graph())
       } catch (e) {
         metric_sentMessageFailCount.increment()
         throw e

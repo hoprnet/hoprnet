@@ -85,7 +85,7 @@ export {
   OffchainSignature,
   open_channel,
   PacketInteractionConfig,
-  Path,
+  TransportPath,
   PeerOrigin,
   PeerStatus,
   PublicKey,
