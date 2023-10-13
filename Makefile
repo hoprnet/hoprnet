@@ -78,14 +78,6 @@ init: ## initialize repository (idempotent operation)
 		ln -sf "../../$${gh}" .git/hooks/; \
 	done
 
-.PHONY: $(CRATES)
-$(CRATES): ## builds all Rust crates with wasm-pack (except for hopli)
-# --out-dir is relative to working directory
-	echo "use wasm-pack build"
-	wasm-pack build --target=bundler --out-dir ./pkg $@
-	#env WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 \
-		wasm-pack build --target=bundler --out-dir ./pkg $@
-
 .PHONY: $(HOPLI_CRATE)
 $(HOPLI_CRATE): ## builds hopli Rust crates with cargo
 	echo "use cargo build"
@@ -176,7 +168,7 @@ build: build-yarn
 .PHONY: build-solidity-types
 build-solidity-types: ## generate Solidity typings
 	echo "Foundry create binding"
-	$(MAKE) -C packages/ethereum/contracts/ overwrite-sc-bindings
+	$(MAKE) -C packages/ethereum/contracts/ ../crates/bindings/src
 # add [lib] as rlib is necessary to run integration tests
 # note: $(mydir) ends with '/'
 	grep cdylib $(mydir)packages/ethereum/crates/bindings/Cargo.toml || \
@@ -203,7 +195,7 @@ build-cargo: build-solidity-types
 # Skip building Rust crates
 ifeq ($(origin NO_CARGO),undefined)
 # Build crates and copy bindings to their destination
-	WASM_BINDGEN_WEAKREF=1 WASM_BINDGEN_EXTERNREF=1 wasm-pack build --target=bundler `pwd`/packages/hoprd/crates/hoprd-hoprd
+	wasm-pack build --weak-refs --reference-types --target=bundler `pwd`/packages/hoprd/crates/hoprd-hoprd
 	$(MAKE) -C packages/hoprd/crates install-hoprd
 ifeq ($(origin NO_HOPLI),undefined)
 # build hopli
