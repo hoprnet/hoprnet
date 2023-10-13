@@ -10,6 +10,10 @@ on:
   #   - cron: '00 2 * * *'
   workflow_dispatch:
     inputs:
+      test_id:
+        type: string
+        required: true
+        description: 'Test name'
       network:
         type: choice
         options:
@@ -20,7 +24,7 @@ on:
       workload:
         type: choice
         options:
-          - simple
+          - sanity-check
           - endurance
           - full
         required: true
@@ -64,4 +68,7 @@ jobs:
           ENVIRONMENT_NAME: ${{ github.event.inputs.network }}
           WORKLOAD_NAME: ${{ github.event.inputs.workload }}
           SCENARIO_ITERATIONS: ${{ github.event.inputs.rate }}
+          TESTID: ${{ github.event.inputs.test_id }}
           HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+
+
