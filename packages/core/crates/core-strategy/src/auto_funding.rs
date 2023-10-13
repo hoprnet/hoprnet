@@ -102,10 +102,10 @@ mod tests {
         #[async_trait(? Send)]
         impl TransactionExecutor for TxExec {
             async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
-            async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
             async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult;
-            async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
-            async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
+            async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
+            async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
+            async fn close_incoming_channel(&self, src: Address) -> TransactionResult;
             async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
         }
     }
@@ -191,7 +191,7 @@ mod tests {
                 if dst.eq(&c2.destination) {
                     tx.send(()).unwrap();
                 }
-                TransactionResult::FundChannel {
+                TransactionResult::ChannelFunded {
                     tx_hash: Hash::default(),
                 }
             });

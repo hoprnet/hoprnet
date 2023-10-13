@@ -382,35 +382,37 @@ mod tests {
     #[async_trait(? Send)]
     impl TransactionExecutor for MockTransactionExecutor {
         async fn redeem_ticket(&self, _ticket: AcknowledgedTicket) -> TransactionResult {
-            TransactionResult::RedeemTicket {
+            TransactionResult::TicketRedeemed {
                 tx_hash: Hash::default(),
             }
         }
-        async fn open_channel(&self, _destination: Address, _balance: Balance) -> TransactionResult {
-            TransactionResult::OpenChannel {
-                tx_hash: Hash::default(),
-                channel_id: Hash::default(),
-            }
-        }
+
         async fn fund_channel(&self, _destination: Address, _amount: Balance) -> TransactionResult {
-            TransactionResult::FundChannel {
+            TransactionResult::ChannelFunded {
                 tx_hash: Hash::default(),
             }
         }
-        async fn close_channel_initialize(&self, _src: Address, _dst: Address) -> TransactionResult {
-            TransactionResult::CloseChannel {
+
+        async fn initiate_outgoing_channel_closure(&self, _dst: Address) -> TransactionResult {
+            TransactionResult::ChannelClosed {
                 tx_hash: Hash::default(),
-                status: ChannelStatus::Open,
             }
         }
-        async fn close_channel_finalize(&self, _src: Address, _dst: Address) -> TransactionResult {
-            TransactionResult::CloseChannel {
+
+        async fn finalize_outgoing_channel_closure(&self, _dst: Address) -> TransactionResult {
+            TransactionResult::ChannelClosed {
                 tx_hash: Hash::default(),
-                status: ChannelStatus::PendingToClose,
             }
         }
+
         async fn withdraw(&self, _recipient: Address, _amount: Balance) -> TransactionResult {
-            TransactionResult::Withdraw {
+            TransactionResult::Withdrawn {
+                tx_hash: Hash::default(),
+            }
+        }
+
+        async fn close_incoming_channel(&self, _source: Address) -> TransactionResult {
+            TransactionResult::ChannelClosed {
                 tx_hash: Hash::default(),
             }
         }
