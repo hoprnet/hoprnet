@@ -34,9 +34,6 @@ pub trait PeerAddressResolver {
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
     /// Tries to resolve on-chain public key given the off-chain public key
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address>;
-    /// Links the on-chain and off-chain public key, returning `true` if the key linkage was not
-    /// previously present in this resolver.
-    async fn link_keys(&mut self, onchain_key: &Address, offchain_key: &OffchainPublicKey) -> bool;
 }
 
 /// Bloom filter for packet tags to detect packet replays.

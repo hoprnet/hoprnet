@@ -411,10 +411,6 @@ mod tests {
         async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
             self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
         }
-
-        async fn link_keys(&mut self, _onchain_key: &Address, _offchain_key: &OffchainPublicKey) -> bool {
-            unimplemented!()
-        }
     }
 
     #[async_std::test]
@@ -712,34 +708,13 @@ pub mod wasm {
     use crate::channel_graph::wasm::ChannelGraph;
     use crate::errors::{PathError::InvalidPeer, Result};
     use crate::path::{Path, TransportPath};
-    use async_trait::async_trait;
-    use core_crypto::types::OffchainPublicKey;
+    use crate::DbPeerAddressResolver;
     use core_ethereum_db::db::wasm::Database;
-    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_types::protocol::PeerAddressResolver;
     use js_sys::JsString;
     use libp2p_identity::PeerId;
     use std::str::FromStr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Address;
     use wasm_bindgen::prelude::wasm_bindgen;
-
-    pub struct PathResolver<'a, Db: HoprCoreEthereumDbActions>(pub &'a Db);
-
-    #[async_trait(? Send)]
-    impl<Db: HoprCoreEthereumDbActions> PeerAddressResolver for PathResolver<'_, Db> {
-        async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
-            self.0.get_packet_key(onchain_key).await.ok().flatten()
-        }
-
-        async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
-            self.0.get_chain_key(offchain_key).await.ok().flatten()
-        }
-
-        async fn link_keys(&mut self, _onchain_key: &Address, _offchain_key: &OffchainPublicKey) -> bool {
-            unimplemented!()
-        }
-    }
 
     #[wasm_bindgen]
     impl TransportPath {
@@ -749,16 +724,14 @@ pub mod wasm {
             db: &Database,
             channel_graph: &ChannelGraph,
         ) -> JsResult<TransportPath> {
-            let database = db.as_ref_counted();
             let graph = channel_graph.as_ref_counted();
-            let g = database.read().await;
             let cg = graph.read().await;
             Ok(TransportPath::resolve(
                 path.into_iter()
                     .map(|p| PeerId::from_str(&p.as_string().unwrap()).map_err(|_| InvalidPeer(p.as_string().unwrap())))
                     .collect::<Result<Vec<PeerId>>>()?,
-                &PathResolver(&*g),
-                &*cg,
+                &DbPeerAddressResolver(db.as_ref_counted()),
+                &cg,
             )
             .await
             .map(|(p, _)| p)?)

@@ -110,9 +110,11 @@ pub mod wasm_impls {
     use core_network::network::NetworkConfig;
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::TransportPath;
+    use core_path::DbPeerAddressResolver;
     use core_strategy::strategy::MultiStrategyConfig;
     use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::protocol::ApplicationData;
+    use utils_db::rusty::RustyLevelDbShim;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
 
@@ -131,7 +133,9 @@ pub mod wasm_impls {
 
     impl HoprTools {
         pub fn new(
-            ping: Ping<adaptors::ping::PingExternalInteractions>,
+            ping: Ping<
+                adaptors::ping::PingExternalInteractions<DbPeerAddressResolver<CoreEthereumDb<RustyLevelDbShim>>>,
+            >,
             peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
             change_notifier: Sender<NetworkEvent>,
             indexer: adaptors::indexer::WasmIndexerInteractions,
@@ -222,7 +226,7 @@ pub mod wasm_impls {
     pub fn build_components(
         me: libp2p_identity::Keypair,
         me_onchain: ChainKeypair,
-        db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+        db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
         network_cfg: NetworkConfig,
         hb_cfg: HeartbeatConfig,
         ping_cfg: PingConfig,
@@ -251,6 +255,7 @@ pub mod wasm_impls {
         )));
 
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
+        let addr_resolver = Arc::new(RwLock::new(DbPeerAddressResolver(db.clone())));
 
         let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
@@ -335,7 +340,11 @@ pub mod wasm_impls {
             ping_cfg.clone(),
             ping_tx,
             pong_rx,
-            adaptors::ping::PingExternalInteractions::new(network.clone()),
+            adaptors::ping::PingExternalInteractions::new(
+                network.clone(),
+                addr_resolver.clone(),
+                channel_graph.clone(),
+            ),
         );
 
         let (indexer_update_tx, indexer_update_rx) =
@@ -366,6 +375,8 @@ pub mod wasm_impls {
         let swarm_network_clone = network.clone();
         let tbf_clone = tbf.clone();
         let multistrategy_clone = multi_strategy.clone();
+        let cg_clone = channel_graph.clone();
+        let resolver_clone = addr_resolver.clone();
 
         let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
             Box::pin(async move {
@@ -373,7 +384,7 @@ pub mod wasm_impls {
                     ping_cfg,
                     hb_ping_tx,
                     hb_pong_rx,
-                    adaptors::ping::PingExternalInteractions::new(ping_network_clone),
+                    adaptors::ping::PingExternalInteractions::new(ping_network_clone, resolver_clone, cg_clone),
                 );
                 Heartbeat::new(
                     hb_cfg,

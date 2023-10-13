@@ -85,11 +85,10 @@ impl ChannelGraph {
     pub fn update_channel(&mut self, channel: ChannelEntry) -> Option<Vec<ChannelChange>> {
         // Remove the edge since we don't allow Closed channels
         if channel.status == ChannelStatus::Closed {
-            let ret = if let Some(old_value) = self.graph.remove_edge(channel.source, channel.destination) {
-                Some(ChannelChange::diff_channels(&old_value.channel, &channel))
-            } else {
-                None
-            };
+            let ret = self
+                .graph
+                .remove_edge(channel.source, channel.destination)
+                .map(|old_value| ChannelChange::diff_channels(&old_value.channel, &channel));
 
             info!("removed {channel}");
             return ret;
@@ -121,7 +120,7 @@ impl ChannelGraph {
     /// Gets quality of the given channel. Returns `None` if no such channel exists or no
     /// quality has been set for that channel.
     pub fn get_channel_quality(&self, source: Address, destination: Address) -> Option<f64> {
-        self.graph.edge_weight(source, destination).map(|w| w.quality).flatten()
+        self.graph.edge_weight(source, destination).and_then(|w| w.quality)
     }
 
     /// Synchronizes the channel entries in this graph with the database.

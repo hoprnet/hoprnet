@@ -1242,10 +1242,6 @@ mod tests {
             async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
                 self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
             }
-
-            async fn link_keys(&mut self, _onchain_key: &Address, _offchain_key: &OffchainPublicKey) -> bool {
-                unimplemented!()
-            }
         }
 
         TransportPath::resolve(peers, &TestResolver(peers_addrs), &cg)

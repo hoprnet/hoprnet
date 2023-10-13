@@ -398,10 +398,10 @@ mod tests {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::channel_graph::wasm::ChannelGraph;
-    use crate::path::wasm::PathResolver;
     use crate::path::TransportPath;
     use crate::selectors::legacy::LegacyPathSelector;
     use crate::selectors::PathSelector;
+    use crate::DbPeerAddressResolver;
     use core_ethereum_db::db::wasm::Database;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::Address;
@@ -418,12 +418,11 @@ pub mod wasm {
         let cp = {
             let cgraph = graph.as_ref_counted();
             let cg = cgraph.read().await;
-            selector.select_path(&*cg, cg.my_address(), *destination, max_hops as usize)?
+            selector.select_path(&cg, cg.my_address(), *destination, max_hops as usize)?
         };
 
-        let database = database.as_ref_counted();
-        let g = database.read().await;
-
-        Ok(cp.to_path(&PathResolver(&*g), *destination).await?)
+        Ok(cp
+            .to_path(&DbPeerAddressResolver(database.as_ref_counted()), *destination)
+            .await?)
     }
 }
