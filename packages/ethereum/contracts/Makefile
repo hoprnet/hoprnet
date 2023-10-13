@@ -1,6 +1,10 @@
+# Gets all solidity files which the bindings depend on
+SOLIDITY_SRC_FILES := $(shell find ./src -type f -name "*.sol")
+SOLIDITY_DEP_FILES := $(shell find ./../../../vendor/solidity -type f -name "*.sol")
+SOLIDITY_FILES := $(SOLIDITY_SRC_FILES) $(SOLIDITY_DEP_FILES)
+
 # Use local foundry directory (for binaries)
 FOUNDRY_DIR ?= ${CURDIR}/../../../.foundry
-
 # add local Foundry install path (only once)
 PATH := $(subst :${FOUNDRY_DIR}/bin,,$(PATH)):${FOUNDRY_DIR}/bin
 
@@ -27,8 +31,8 @@ sc-audit-coverage:
 forked-local-anvil:
 	anvil -f 'https://provider-proxy.hoprnet.workers.dev/xdai_mainnet'
 
-.PHONY: overwrite-sc-bindings
-overwrite-sc-bindings: ## Only create types for Hopr* contracts
+../crates/bindings/src: ${SOLIDITY_FILES}
+../crates/bindings/src: ## Only create types for Hopr* contracts
 	$(forge-bind) --bindings-path ../crates/bindings --crate-name bindings \
 		--overwrite --select '^Hopr.*?(Boost|[^t])$$'
 
