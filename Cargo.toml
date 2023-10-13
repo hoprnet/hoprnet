@@ -35,6 +35,7 @@ members = [
 async-lock = "2.7.0"
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-trait = "0.1"
+ethers = { version = "2.0.10", default-features = false }
 futures = "0.3.28"
 futures-lite = "1.12.0"
 futures-concurrency = "7.3.0"

@@ -25,7 +25,7 @@ wasm-bindgen = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 hex-literal = "0.4.1"
 thiserror = "1.0"
-ethers = { version = "2", default-features = false }
+ethers = { workspace = true, default-features = false }
 
 bindings =  { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }

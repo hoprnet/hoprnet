@@ -7,10 +7,9 @@ import {
   get_package_version,
   Balance,
   BalanceType,
-  setupPromiseRejectionFilter,
+  // setupPromiseRejectionFilter,
   SUGGESTED_NATIVE_BALANCE,
   create_histogram_with_buckets,
-  pickVersion,
   defer,
   debug,
   health_to_string,
@@ -44,6 +43,20 @@ const ONBOARDING_INFORMATION_INTERVAL = 30000 // show information every 30sec
 
 const log = debug('hoprd')
 
+function stopGracefully(signal) {
+  log(`Process exiting with signal ${signal}`)
+  process.exit()
+}
+
+process.on('uncaughtExceptionMonitor', (err, origin) => {
+  // Make sure we get a log.
+  log(`FATAL ERROR, exiting with uncaught exception`, origin, err)
+})
+
+process.once('exit', stopGracefully)
+process.on('SIGINT', stopGracefully)
+process.on('SIGTERM', stopGracefully)
+
 // Metrics
 const metric_processStartTime = create_gauge(
   'hoprd_gauge_startup_unix_time_seconds',
@@ -74,7 +87,7 @@ const on_dappnode = (process.env.DAPPNODE ?? 'false').toLowerCase() === 'true'
 // Parse the CLI arguments and return the processed object.
 // This function may exit the calling process entirely if an error is
 // encountered or the version or help are rendered.
-export function parseCliArguments(args: string[]) {
+function parseCliArguments(args: string[]) {
   const mono_repo_path = new URL('../../../', import.meta.url).pathname
   let argv: CliArgs
   try {
@@ -94,6 +107,8 @@ export function parseCliArguments(args: string[]) {
   return argv
 }
 
+// TODO: Possibly not needed anymore since this used to catch unhandled promise rejections from hopr-connect and js-libp2p
+/*
 async function addUnhandledPromiseRejectionHandler() {
   if (process.env.NODE_ENV !== 'production') {
     console.log(
@@ -111,13 +126,14 @@ async function addUnhandledPromiseRejectionHandler() {
   // one reason or the other
   setupPromiseRejectionFilter()
 }
+*/
 
 async function main() {
   // Starting with Node.js 15, undhandled promise rejections terminate the
   // process with a non-zero exit code, which makes debugging quite difficult.
   // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
-  addUnhandledPromiseRejectionHandler()
+  // addUnhandledPromiseRejectionHandler()
   // Increase the default maximum number of event listeners
   ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
@@ -132,20 +148,6 @@ async function main() {
       includeRecipient: false
     }
   }
-
-  function stopGracefully(signal) {
-    log(`Process exiting with signal ${signal}`)
-    process.exit()
-  }
-
-  process.on('uncaughtExceptionMonitor', (err, origin) => {
-    // Make sure we get a log.
-    log(`FATAL ERROR, exiting with uncaught exception: ${origin} ${err}`)
-  })
-
-  process.once('exit', stopGracefully)
-  process.on('SIGINT', stopGracefully)
-  process.on('SIGTERM', stopGracefully)
 
   const setState = (newState: State): void => {
     state = newState
@@ -207,7 +209,7 @@ async function main() {
 
   try {
     log(`This is HOPRd version ${version}`)
-    metric_version.set([pickVersion(version)], 1.0)
+    metric_version.set([version], 1.0)
 
     if (on_dappnode) {
       log('This node appears to be running on an Dappnode')
