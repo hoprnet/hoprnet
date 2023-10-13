@@ -18,7 +18,7 @@ use core_packet::errors::PacketError::{
     PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use core_packet::errors::Result;
-use core_path::path::{TransportPath, Path};
+use core_path::path::{Path, TransportPath};
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
@@ -798,6 +798,8 @@ mod tests {
         msg::mixer::MixerConfig,
     };
     use async_std::sync::RwLock;
+    use async_trait::async_trait;
+    use core_crypto::types::OffchainPublicKey;
     use core_crypto::{
         derivation::derive_ack_key_share,
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -807,7 +809,9 @@ mod tests {
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_packet::por::ProofOfRelayValues;
-    use core_path::path::{TransportPath, Path};
+    use core_path::channel_graph::ChannelGraph;
+    use core_path::path::{Path, TransportPath};
+    use core_types::protocol::PeerAddressResolver;
     use core_types::{
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
         channels::{ChannelEntry, ChannelStatus},
@@ -1203,6 +1207,53 @@ mod tests {
         (received_packets, received_challenges, received_tickets)
     }
 
+    async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
+        let peers_addrs = peers
+            .iter()
+            .map(|p| (OffchainPublicKey::from_peerid(p).unwrap(), Address::random()))
+            .collect::<Vec<_>>();
+        let mut cg = ChannelGraph::new(Address::random());
+        let mut last_addr = cg.my_address();
+        for (_, addr) in peers_addrs.iter() {
+            let c = ChannelEntry::new(
+                last_addr,
+                *addr,
+                Balance::new(1000u32.into(), BalanceType::HOPR),
+                0u32.into(),
+                ChannelStatus::Open,
+                0u32.into(),
+                0u32.into(),
+            );
+            cg.update_channel(c);
+            last_addr = *addr;
+        }
+
+        struct TestResolver(Vec<(OffchainPublicKey, Address)>);
+
+        #[async_trait(? Send)]
+        impl PeerAddressResolver for TestResolver {
+            async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
+                self.0
+                    .iter()
+                    .find(|(_, addr)| addr.eq(onchain_key))
+                    .map(|(pk, _)| pk.clone())
+            }
+
+            async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
+                self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+            }
+
+            async fn link_keys(&mut self, _onchain_key: &Address, _offchain_key: &OffchainPublicKey) -> bool {
+                unimplemented!()
+            }
+        }
+
+        TransportPath::resolve(peers, &TestResolver(peers_addrs), &cg)
+            .await
+            .unwrap()
+            .0
+    }
+
     async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usize) {
         assert!(peer_count >= 3, "invalid peer count given");
         assert!(pending_packets >= 1, "at least one packet must be given");
@@ -1219,12 +1270,13 @@ mod tests {
         let components = peer_setup_for(peer_count).await;
 
         // Peer 1: start sending out packets
-        let packet_path = TransportPath::new_valid(
+        let packet_path = resolve_mock_path(
             PEERS[1..peer_count]
                 .iter()
                 .map(|p| p.public().to_peerid())
                 .collect::<Vec<PeerId>>(),
-        );
+        )
+        .await;
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
         let mut packet_challenges = Vec::new();

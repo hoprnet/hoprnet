@@ -200,9 +200,8 @@ impl TransportPath {
         }
     }
 
-    /// Creates an already pre-validated path.
     /// Used for testing only.
-    pub fn new_valid(hops: Vec<PeerId>) -> Self {
+    pub(crate) fn new_valid(hops: Vec<PeerId>) -> Self {
         assert!(!hops.is_empty(), "must not be empty");
         Self { hops }
     }
