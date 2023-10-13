@@ -69,8 +69,6 @@ import {
 
 import { MAX_HOPS, MAX_PARALLEL_PINGS, PACKET_SIZE, VERSION } from './constants.js'
 
-import { findPath } from './path/index.js'
-
 import HoprCoreEthereum, {
   type Indexer,
   NetworkRegistryNodeAllowedEventName,
@@ -1327,5 +1325,5 @@ export class Hopr extends EventEmitter {
 
 export { PEER_METADATA_PROTOCOL_VERSION } from './constants.js'
 export { createHoprNode } from './main.js'
-export { findPath, PeerOrigin, PeerStatus, Health }
+export { PeerOrigin, PeerStatus, Health }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'

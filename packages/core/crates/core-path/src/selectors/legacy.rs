@@ -83,7 +83,7 @@ where
         current: &[Address],
         dead_ends: &HashSet<Address>,
     ) -> bool {
-        !destination.eq(&channel.channel.destination) &&                    // last hop does not need channel
+        !destination.eq(&channel.channel.destination) &&                    // last hop does not need a channel
             channel.quality.unwrap_or(1_f64) > self.quality_threshold &&  // quality threshold
             !current.contains(&channel.channel.destination) &&     // must not be in the path already (no loops allowed)
             !dead_ends.contains(&channel.channel.destination) // must not be in the dead end list
@@ -164,10 +164,12 @@ pub type LegacyPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 mod tests {
     use crate::channel_graph::ChannelGraph;
     use crate::path::{ChannelPath, Path};
+    use crate::selectors::legacy::DfsPathSelector;
+    use crate::selectors::{EdgeWeighting, PathSelector};
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use lazy_static::lazy_static;
     use std::str::FromStr;
-    use utils_types::primitives::{Address, Balance, U256};
+    use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
     lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
@@ -184,75 +186,213 @@ mod tests {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero(), U256::zero())
     }
 
-    fn initialize_star_graph<F>(stake: Balance, quality: F) -> ChannelGraph
+    fn initialize_star_graph<Q, B>(me: Address, stake: B, quality: Q) -> ChannelGraph
     where
-        F: Fn(Address, Address) -> f64,
+        Q: Fn(Address, Address) -> f64,
+        B: Fn(Address, Address) -> Balance,
     {
-        let mut graph = ChannelGraph::new(ADDRESSES[0]);
+        let mut graph = ChannelGraph::new(me);
 
-        graph.update_channel(create_channel(ADDRESSES[1], ADDRESSES[0], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[1],
+            ADDRESSES[0],
+            ChannelStatus::Open,
+            stake(ADDRESSES[1], ADDRESSES[0]),
+        ));
         graph.update_channel_quality(ADDRESSES[1], ADDRESSES[0], quality(ADDRESSES[1], ADDRESSES[0]));
 
-        graph.update_channel(create_channel(ADDRESSES[2], ADDRESSES[0], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[2],
+            ADDRESSES[0],
+            ChannelStatus::Open,
+            stake(ADDRESSES[2], ADDRESSES[0]),
+        ));
         graph.update_channel_quality(ADDRESSES[2], ADDRESSES[0], quality(ADDRESSES[2], ADDRESSES[0]));
 
-        graph.update_channel(create_channel(ADDRESSES[3], ADDRESSES[0], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[3],
+            ADDRESSES[0],
+            ChannelStatus::Open,
+            stake(ADDRESSES[3], ADDRESSES[0]),
+        ));
         graph.update_channel_quality(ADDRESSES[3], ADDRESSES[0], quality(ADDRESSES[3], ADDRESSES[0]));
 
-        graph.update_channel(create_channel(ADDRESSES[4], ADDRESSES[0], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[4],
+            ADDRESSES[0],
+            ChannelStatus::Open,
+            stake(ADDRESSES[4], ADDRESSES[0]),
+        ));
         graph.update_channel_quality(ADDRESSES[4], ADDRESSES[0], quality(ADDRESSES[4], ADDRESSES[0]));
 
-        graph.update_channel(create_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[0],
+            ADDRESSES[1],
+            ChannelStatus::Open,
+            stake(ADDRESSES[0], ADDRESSES[1]),
+        ));
         graph.update_channel_quality(ADDRESSES[0], ADDRESSES[1], quality(ADDRESSES[0], ADDRESSES[1]));
 
-        graph.update_channel(create_channel(ADDRESSES[0], ADDRESSES[2], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[0],
+            ADDRESSES[2],
+            ChannelStatus::Open,
+            stake(ADDRESSES[0], ADDRESSES[2]),
+        ));
         graph.update_channel_quality(ADDRESSES[0], ADDRESSES[2], quality(ADDRESSES[0], ADDRESSES[2]));
 
-        graph.update_channel(create_channel(ADDRESSES[0], ADDRESSES[3], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[0],
+            ADDRESSES[3],
+            ChannelStatus::Open,
+            stake(ADDRESSES[0], ADDRESSES[3]),
+        ));
         graph.update_channel_quality(ADDRESSES[0], ADDRESSES[3], quality(ADDRESSES[0], ADDRESSES[3]));
 
-        graph.update_channel(create_channel(ADDRESSES[0], ADDRESSES[4], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[0],
+            ADDRESSES[4],
+            ChannelStatus::Open,
+            stake(ADDRESSES[0], ADDRESSES[4]),
+        ));
         graph.update_channel_quality(ADDRESSES[0], ADDRESSES[4], quality(ADDRESSES[0], ADDRESSES[4]));
 
         graph
     }
 
-    fn initialize_arrow_graph<F>(stake: Balance, quality: F) -> ChannelGraph
+    fn initialize_arrow_graph<Q, B>(me: Address, stake: B, quality: Q) -> ChannelGraph
     where
-        F: Fn(Address, Address) -> f64,
+        Q: Fn(Address, Address) -> f64,
+        B: Fn(Address, Address) -> Balance,
     {
-        let mut graph = ChannelGraph::new(ADDRESSES[0]);
+        let mut graph = ChannelGraph::new(me);
 
-        graph.update_channel(create_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[0],
+            ADDRESSES[1],
+            ChannelStatus::Open,
+            stake(ADDRESSES[0], ADDRESSES[1]),
+        ));
         graph.update_channel_quality(ADDRESSES[0], ADDRESSES[1], quality(ADDRESSES[0], ADDRESSES[1]));
 
-        graph.update_channel(create_channel(ADDRESSES[1], ADDRESSES[2], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[1],
+            ADDRESSES[2],
+            ChannelStatus::Open,
+            stake(ADDRESSES[1], ADDRESSES[2]),
+        ));
         graph.update_channel_quality(ADDRESSES[1], ADDRESSES[2], quality(ADDRESSES[1], ADDRESSES[2]));
 
-        graph.update_channel(create_channel(ADDRESSES[2], ADDRESSES[3], ChannelStatus::Open, stake));
+        graph.update_channel(create_channel(
+            ADDRESSES[2],
+            ADDRESSES[3],
+            ChannelStatus::Open,
+            stake(ADDRESSES[2], ADDRESSES[3]),
+        ));
         graph.update_channel_quality(ADDRESSES[2], ADDRESSES[3], quality(ADDRESSES[2], ADDRESSES[3]));
 
         graph
     }
 
-    fn check_path(path: &ChannelPath, graph: &ChannelGraph) {
+    fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) {
+        let other = ChannelPath::new(path.hops().into(), graph).expect("path must be valid");
+        assert_eq!(other, path.clone(), "valid paths must be equal");
         assert!(!path.contains_cycle(), "path must not be cyclic");
+        assert!(!path.hops().contains(&dst), "path must not contain destination");
+    }
 
-        let last_addr = path.hops[0];
-        for hop in path.hops().iter().skip(1) {
-            let edge = graph
-                .get_channel(last_addr, *hop)
-                .expect("path must contain existing edge");
-            assert_eq!(
-                ChannelStatus::Open,
-                edge.status,
-                "edge in path must be represented by an Open channel"
-            );
+    pub struct TestWeights;
+    impl EdgeWeighting<U256> for TestWeights {
+        fn calculate_weight(channel: &ChannelEntry) -> U256 {
+            *channel.balance.value() + 1u32
         }
     }
 
     #[test]
-    fn test_dfs_should_find_path_in_reliable_star() {}
+    fn test_dfs_should_find_path_in_reliable_star() {
+        let star = initialize_star_graph(
+            ADDRESSES[1],
+            |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
+            |_, _| 1_f64,
+        );
+        let selector = DfsPathSelector::<TestWeights>::default();
+        let path = selector
+            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 2)
+            .expect("should find a path");
+
+        check_path(&path, &star, ADDRESSES[5]);
+        assert_eq!(2, path.length(), "should have 2 hops");
+    }
+
+    #[test]
+    fn test_dfs_should_find_most_valuable_path_in_reliable_star() {
+        let star = initialize_star_graph(
+            ADDRESSES[1],
+            |_, b| {
+                Balance::new(
+                    (ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1).into(),
+                    BalanceType::HOPR,
+                )
+            },
+            |_, _| 1_f64,
+        );
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+        let path = selector
+            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 2)
+            .expect("should find a path");
+
+        check_path(&path, &star, ADDRESSES[5]);
+        assert_eq!(2, path.length(), "should have 2 hops");
+        assert_eq!(path.hops()[1], ADDRESSES[4], "last hop should be the most valuable one");
+    }
+
+    #[test]
+    fn test_dfs_should_not_find_path_when_does_not_exist() {
+        let star = initialize_star_graph(
+            ADDRESSES[1],
+            |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
+            |_, _| 1_f64,
+        );
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        selector
+            .select_path(&star, ADDRESSES[1], ADDRESSES[5], 3)
+            .expect_err("should not find a path 1");
+        selector
+            .select_path(&star, ADDRESSES[5], ADDRESSES[0], 3)
+            .expect_err("should not find a path 2");
+    }
+
+    #[test]
+    fn test_dfs_should_find_path_in_reliable_arrow() {
+        let arrow = initialize_arrow_graph(
+            ADDRESSES[0],
+            |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
+            |_, _| 1_f64,
+        );
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        let path = selector
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
+            .expect("should find a path");
+        check_path(&path, &arrow, ADDRESSES[5]);
+        assert_eq!(3, path.length(), "should have 3 hops");
+    }
+
+    #[test]
+    fn test_dfs_should_not_find_path_if_unreliable_node_in_arrow() {
+        let arrow = initialize_arrow_graph(
+            ADDRESSES[0],
+            |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
+            |_, dst| if dst == ADDRESSES[3] { 0.1_f64 } else { 1_f64 },
+        ); // node 3 is unreliable
+
+        let selector = DfsPathSelector::<TestWeights>::default();
+        selector
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
+            .expect_err("should not find a path");
+    }
 }
 
 #[cfg(feature = "wasm")]
