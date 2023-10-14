@@ -133,9 +133,7 @@ pub mod wasm_impls {
 
     impl HoprTools {
         pub fn new(
-            ping: Ping<
-                adaptors::ping::PingExternalInteractions<DbPeerAddressResolver<CoreEthereumDb<RustyLevelDbShim>>>,
-            >,
+            ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
             peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
             change_notifier: Sender<NetworkEvent>,
             indexer: adaptors::indexer::WasmIndexerInteractions,
@@ -255,7 +253,7 @@ pub mod wasm_impls {
         )));
 
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
-        let addr_resolver = Arc::new(RwLock::new(DbPeerAddressResolver(db.clone())));
+        let addr_resolver = DbPeerAddressResolver(db.clone());
 
         let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
@@ -378,7 +376,7 @@ pub mod wasm_impls {
         let cg_clone = channel_graph.clone();
         let resolver_clone = addr_resolver.clone();
 
-        let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+        let ready_loops: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
             Box::pin(async move {
                 let hb_pinger = Ping::new(
                     ping_cfg,

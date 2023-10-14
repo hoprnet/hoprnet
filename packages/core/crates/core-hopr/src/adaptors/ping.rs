@@ -26,14 +26,14 @@ use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_META
 #[derive(Clone)]
 pub struct PingExternalInteractions<R: PeerAddressResolver> {
     network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
-    resolver: Arc<RwLock<R>>,
+    resolver: R,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 }
 
 impl<R: PeerAddressResolver> PingExternalInteractions<R> {
     pub fn new(
         network: Arc<RwLock<Network<ExternalNetworkInteractions>>>,
-        resolver: Arc<RwLock<R>>,
+        resolver: R,
         channel_graph: Arc<RwLock<ChannelGraph>>,
     ) -> Self {
         Self {
@@ -58,9 +58,10 @@ impl<R: PeerAddressResolver> PingExternalAPI for PingExternalInteractions<R> {
         };
 
         let updated = self.network.write().await.update_with_metadata(peer, result, metadata);
+
         if let Some(status) = updated {
             if let Ok(pk) = OffchainPublicKey::from_peerid(&peer) {
-                let maybe_chain_key = self.resolver.read().await.resolve_chain_key(&pk).await;
+                let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                 if let Some(chain_key) = maybe_chain_key {
                     let mut g = self.channel_graph.write().await;
                     let self_addr = g.my_address();
@@ -78,7 +79,6 @@ impl<R: PeerAddressResolver> PingExternalAPI for PingExternalInteractions<R> {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::*;
-    use core_ethereum_db::db::CoreEthereumDb;
     use core_network::ping::Pinging;
     use core_path::DbPeerAddressResolver;
     use futures::{
@@ -87,20 +87,17 @@ pub mod wasm {
     };
     use gloo_timers::future::sleep;
     use std::str::FromStr;
-    use utils_db::rusty::RustyLevelDbShim;
     use utils_log::info;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
     #[derive(Clone)]
     pub struct WasmPing {
-        ping: Arc<RwLock<Ping<PingExternalInteractions<DbPeerAddressResolver<CoreEthereumDb<RustyLevelDbShim>>>>>>,
+        ping: Arc<RwLock<Ping<PingExternalInteractions<DbPeerAddressResolver>>>>,
     }
 
     impl WasmPing {
-        pub(crate) fn new(
-            ping: Arc<RwLock<Ping<PingExternalInteractions<DbPeerAddressResolver<CoreEthereumDb<RustyLevelDbShim>>>>>>,
-        ) -> Self {
+        pub(crate) fn new(ping: Arc<RwLock<Ping<PingExternalInteractions<DbPeerAddressResolver>>>>) -> Self {
             Self { ping }
         }
     }
