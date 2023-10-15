@@ -253,6 +253,7 @@ pub mod wasm_impls {
         )));
 
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
+
         let addr_resolver = DbPeerAddressResolver(db.clone());
 
         let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
@@ -451,7 +452,17 @@ pub mod wasm_impls {
         ];
         let mut futs = helpers::to_futures_unordered(ready_loops);
 
+        let cg_clone = channel_graph.clone();
+        let db_clone = db.clone();
         let main_loop = async move {
+            // TODO: move this to a specialized one-shot startup initialization function?
+            {
+                let db = db_clone.read().await;
+                if let Err(e) = cg_clone.write().await.sync_channels(&db).await {
+                    error!("failed to initialize channel graph from the DB: {e}");
+                }
+            }
+
             while let Some(process) = futs.next().await {
                 error!("CRITICAL: the core system loop unexpectedly stopped: '{}'", process);
                 unreachable!("Futures inside the main loop should never terminate, but run in the background");

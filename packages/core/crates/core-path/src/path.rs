@@ -236,7 +236,7 @@ impl Display for TransportPath {
             f,
             "[ {} ] ({} hops)",
             self.hops.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("->"),
-            self.length()
+            self.length() - 1
         )
     }
 }

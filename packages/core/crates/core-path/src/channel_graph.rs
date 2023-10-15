@@ -7,7 +7,7 @@ use petgraph::visit::{EdgeFiltered, EdgeRef};
 use petgraph::Direction;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use utils_log::info;
+use utils_log::{debug, info};
 use utils_types::primitives::Address;
 
 /// Structure that adds additional data to a `ChannelEntry`, which
@@ -111,9 +111,14 @@ impl ChannelGraph {
     }
 
     /// Updates the quality value of network connection between `source` and `destination`
+    /// The given quality value must be always non-negative
     pub fn update_channel_quality(&mut self, source: Address, destination: Address, quality: f64) {
+        assert!(quality >= 0_f64, "quality must be non-negative");
         if let Some(channel) = self.graph.edge_weight_mut(source, destination) {
-            channel.quality = Some(quality);
+            if quality != channel.quality.unwrap_or(-1_f64) {
+                channel.quality = Some(quality);
+                debug!("updated quality of {} to {quality}", channel.channel);
+            }
         }
     }
 

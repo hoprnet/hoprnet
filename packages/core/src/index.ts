@@ -703,6 +703,7 @@ export class Hopr extends EventEmitter {
       if (chain_key) {
         let graph = this.tools.channel_graph()
         path = await legacy_path_select(graph, this.db, chain_key, hops ?? MAX_HOPS)
+        log(`found auto-path to ${chain_key.to_string()}: ${path.to_string()}`)
       } else {
         throw Error(`Failed to obtain chain key for peer id ${destination}`)
       }
