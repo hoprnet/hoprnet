@@ -21,7 +21,7 @@ pub struct ChannelEdge {
     pub quality: Option<f64>,
 }
 
-/// Implements a HOPR payment channel graph cached in-memory.
+/// Implements a HOPR payment channel graph (directed) cached in-memory.
 /// This structure is useful for tracking channel state changes and
 /// packet path finding.
 /// The structure is updated only from the Indexer and therefore contains only
@@ -134,6 +134,7 @@ impl ChannelGraph {
         db.get_channels().await?.into_iter().for_each(|c| {
             self.update_channel(c);
         });
+        info!("synced {} channels to the graph", self.graph.edge_count());
         Ok(())
     }
 
