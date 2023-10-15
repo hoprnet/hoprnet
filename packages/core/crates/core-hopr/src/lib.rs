@@ -458,7 +458,7 @@ pub mod wasm_impls {
             // TODO: move this to a specialized one-shot startup initialization function?
             {
                 let db = db_clone.read().await;
-                if let Err(e) = cg_clone.write().await.sync_channels(&db).await {
+                if let Err(e) = cg_clone.write().await.sync_channels(&*db).await {
                     error!("failed to initialize channel graph from the DB: {e}");
                 }
             }
