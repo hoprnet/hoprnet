@@ -272,9 +272,12 @@ impl Display for ChannelChange {
 
 impl ChannelChange {
     /// Compares the two given channels and returns a vector of `ChannelChange`s
+    /// Both channels must have the same ID (source,destination and direction) to be comparable using this function.
+    /// The function panics if `left` and `right` do not have equal ids.
     /// Note that only some fields are tracked for changes, and therefore an empty vector returned
     /// does not imply the two `ChannelEntry` instances are equal.
     pub fn diff_channels(left: &ChannelEntry, right: &ChannelEntry) -> Vec<Self> {
+        assert_eq!(left.id, right.id, "must have equal ids"); // misuse
         let mut ret = Vec::with_capacity(4);
         if left.status != right.status {
             ret.push(ChannelChange::Status {
@@ -303,8 +306,6 @@ impl ChannelChange {
                 right: right.ticket_index.as_u64(),
             })
         }
-
-        //debug!("{channel} update changes: {:?}",ret);
 
         ret
     }

@@ -299,7 +299,7 @@ impl Balance {
     }
 
     pub fn to_formatted_string(&self) -> String {
-        let mut val = self.value.to_string();
+        let val = self.value.to_string();
 
         match val.len().cmp(&Self::SCALE) {
             Ordering::Greater => {
@@ -310,12 +310,12 @@ impl Balance {
                     self.balance_type
                 )
             }
-            Ordering::Less => {
-                for _ in 0..(Self::SCALE - val.len() - 1) {
-                    val = "0".to_owned() + &val;
-                }
-                format!("0.{val} {}", self.balance_type)
-            }
+            Ordering::Less => format!(
+                "0.{empty:0>width$} {currency}",
+                empty = &val,
+                width = Self::SCALE - 1,
+                currency = self.balance_type
+            ),
             Ordering::Equal => {
                 let (l, r) = val.split_at(1);
                 format!("{l}.{r} {}", self.balance_type)

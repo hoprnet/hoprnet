@@ -267,14 +267,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let mut batch_ops = utils_db::db::Batch::default();
 
-        let mut done = false;
-        while !tickets.is_empty() && !done {
+        let mut should_continue = true;
+        while !tickets.is_empty() && should_continue {
             let tickets_len = tickets.len();
             for (index, ticket) in tickets.iter_mut().enumerate() {
                 if let AcknowledgedTicketStatus::BeingRedeemed { tx_hash: _ } = ticket.status {
                     if index + 1 > tickets_len {
                         tickets = vec![];
-                        done = true;
+                        should_continue = false;
                     } else {
                         tickets = tickets.split_at_mut(index + 1).1.to_vec();
                     }
@@ -295,7 +295,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 );
 
                 if index == tickets_len - 1 {
-                    done = true;
+                    should_continue = false;
                 }
             }
         }
