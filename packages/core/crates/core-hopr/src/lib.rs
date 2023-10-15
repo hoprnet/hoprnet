@@ -51,6 +51,7 @@ use core_types::channels::ChannelEntry;
 
 const MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE: usize = 2000;
 
+/// This is used by the indexer to emit events when a change on channel entry is detected.
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct ChannelEventEmitter {
@@ -101,15 +102,16 @@ pub mod wasm_impls {
     use std::str::FromStr;
 
     use super::*;
-    use core_crypto::{
-        keypairs::OffchainKeypair,
-        types::{HalfKeyChallenge, Hash},
-    };
+    use core_crypto::keypairs::Keypair;
+    use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
     use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
     use core_ethereum_db::db::wasm::Database;
+    use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_network::network::NetworkConfig;
+    use core_path::channel_graph::{ChannelChange, ChannelGraph};
     use core_path::path::Path;
     use core_strategy::strategy::MultiStrategyConfig;
+    use core_types::channels::ChannelStatus;
     use core_types::protocol::ApplicationData;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
@@ -186,9 +188,13 @@ pub mod wasm_impls {
             }
         }
 
-        pub async fn aggregate_tickets(&mut self, channel_id: &Hash, timeout_in_millis: u64) -> Result<(), JsValue> {
+        pub async fn aggregate_tickets(
+            &mut self,
+            channel: &ChannelEntry,
+            timeout_in_millis: u64,
+        ) -> Result<(), JsValue> {
             ok_or_jserr!(
-                ok_or_jserr!(self.ticket_aggregate_actions.aggregate_tickets(channel_id))?
+                ok_or_jserr!(self.ticket_aggregate_actions.aggregate_tickets(channel))?
                     .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
                     .await
             )
@@ -237,6 +243,8 @@ pub mod wasm_impls {
             adaptors::network::ExternalNetworkInteractions::new(network_events_tx.clone()),
         )));
 
+        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
+
         let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
@@ -248,6 +256,7 @@ pub mod wasm_impls {
             tx_queue.new_sender(),
             ticket_aggregation.writer(),
         ));
+        info!("initialized strategies: {multi_strategy:?}");
 
         let on_ack_tx = adaptors::interactions::wasm::spawn_ack_receiver_loop(on_acknowledgement);
 
@@ -256,16 +265,49 @@ pub mod wasm_impls {
         let ms_clone = multi_strategy.clone();
         wasm_bindgen_futures::spawn_local(async move {
             while let Some(ack) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                let _ = ms_clone.on_acknowledged_ticket(&ack).await;
+                let _ = ms_clone.on_acknowledged_winning_ticket(&ack).await;
             }
         });
 
         // on channel state change notifier
         let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
         let ms_clone = multi_strategy.clone();
+        let cg_clone = channel_graph.clone();
+        let db_clone = db.clone();
+        let my_addr = me_onchain.public().to_address();
         wasm_bindgen_futures::spawn_local(async move {
             while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
-                let _ = ms_clone.on_channel_state_changed(&channel);
+                let maybe_direction = channel.direction(&my_addr);
+                let change = cg_clone.write().await.update_channel(channel);
+
+                // Check if this is our own channel
+                if let Some(own_channel_direction) = maybe_direction {
+                    if let Some(change_set) = change {
+                        for channel_change in change_set {
+                            let _ = ms_clone
+                                .on_own_channel_changed(&channel, own_channel_direction, channel_change)
+                                .await;
+
+                            // Cleanup invalid tickets from the DB if epoch has changed
+                            // TODO: this should be moved somewhere else once event broadcasts are implemented
+                            if let ChannelChange::Epoch { .. } = channel_change {
+                                let _ = db_clone.write().await.cleanup_invalid_channel_tickets(&channel).await;
+                            }
+                        }
+                    } else if channel.status == ChannelStatus::Open {
+                        // Emit Opening event if the channel did not exist before in the graph
+                        let _ = ms_clone
+                            .on_own_channel_changed(
+                                &channel,
+                                own_channel_direction,
+                                ChannelChange::Status {
+                                    old: ChannelStatus::Closed,
+                                    new: ChannelStatus::Open,
+                                },
+                            )
+                            .await;
+                    }
+                }
             }
         });
 
@@ -394,7 +436,7 @@ pub mod wasm_impls {
 
         let main_loop = async move {
             while let Some(process) = futs.next().await {
-                error!("CRITICAL: the core system loop unexpectadly stopped: '{}'", process);
+                error!("CRITICAL: the core system loop unexpectedly stopped: '{}'", process);
                 unreachable!("Futures inside the main loop should never terminate, but run in the background");
             }
         };

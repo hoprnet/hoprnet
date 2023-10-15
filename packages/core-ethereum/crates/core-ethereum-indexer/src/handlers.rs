@@ -287,7 +287,7 @@ where
 
                     // Incoming channel, so once closed. All unredeemed tickets just became invalid
                     if channel.destination.eq(&self.chain_key) {
-                        db.delete_acknowledged_tickets_from(channel).await?;
+                        db.mark_acknowledged_tickets_neglected(channel).await?;
                     }
 
                     db.update_channel_and_snapshot(&channel_closed.channel_id.into(), &channel, snapshot)

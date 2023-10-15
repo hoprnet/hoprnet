@@ -56,7 +56,7 @@ impl KeyBinding {
         chain_key: Address,
         packet_key: OffchainPublicKey,
         signature: OffchainSignature,
-    ) -> Result<Self, GeneralError> {
+    ) -> crate::errors::Result<Self> {
         let to_verify = Self::prepare_for_signing(&chain_key, &packet_key);
         signature
             .verify_message(&to_verify, &packet_key)
@@ -65,7 +65,7 @@ impl KeyBinding {
                 packet_key,
                 signature,
             })
-            .ok_or(GeneralError::Other(CryptoError::SignatureVerification.into()))
+            .ok_or(CryptoError::SignatureVerification.into())
     }
 }
 
@@ -80,7 +80,7 @@ impl Display for KeyBinding {
 }
 
 /// Structure containing data used for on-chain announcement.
-/// That is the decapsulated multiaddress (with the /p2p/<peer id> suffix removed) and
+/// That is the decapsulated multiaddress (with the /p2p/{peer_id} suffix removed) and
 /// optional `KeyBinding` (announcement can be done with key bindings or without)
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]

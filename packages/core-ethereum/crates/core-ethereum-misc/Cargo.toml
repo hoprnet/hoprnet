@@ -25,7 +25,7 @@ thiserror = "1.0"
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 multiaddr = "0.18"
-ethers = { version = "2", default-features = false, features = ["ethers-solc"] }
+ethers = { workspace = true, default-features = false, features = ["ethers-solc"] }
 serde = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen = { workspace = true }
 

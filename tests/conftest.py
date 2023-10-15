@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import shutil
 import subprocess
 
 import pytest
@@ -56,6 +57,10 @@ def cmd_line_args(request):
     }
 
     return args
+
+
+FIXTURE_FILES_DIR = "/tmp/"
+FIXTURE_FILES_PREFIX = "hopr-smoke-test"
 
 
 DEFAULT_API_TOKEN = "e2e-API-token^^"
@@ -135,10 +140,14 @@ def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
     log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}-setup.log"
+
+    for f in ["node_5.cfg.yaml"]:
+        shutil.copyfile(f"./tests/{f}", f"{FIXTURE_FILES_DIR}/{FIXTURE_FILES_PREFIX}-{f}")
+
     try:
         logging.debug("Creating a 7 node cluster from bash")
         res = subprocess.run(
-            f"./scripts/fixture_local_test_setup.sh --skip-cleanup 2>&1 | tee {log_file_path}",
+            f"./scripts/fixture_local_test_setup.sh --setup 2>&1 | tee {log_file_path}",
             shell=True,
             capture_output=True,
             check=True,
@@ -154,7 +163,7 @@ def swarm7(request):
     finally:
         logging.debug("Tearing down the 7 node cluster from bash")
         subprocess.run(
-            f"./scripts/fixture_local_test_setup.sh --just-cleanup 2>&1 | tee --append {log_file_path}",
+            f"./scripts/fixture_local_test_setup.sh --teardown 2>&1 | tee --append {log_file_path}",
             shell=True,
             capture_output=True,
             check=False,

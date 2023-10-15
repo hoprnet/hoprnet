@@ -10,6 +10,8 @@ use core_types::{
         ChannelStatus::{Closed, Open, PendingToClose},
     },
 };
+use futures::future::Either;
+use futures::{pin_mut, FutureExt};
 use std::{
     fmt::{Display, Formatter},
     sync::Arc,
@@ -22,10 +24,13 @@ use crate::errors::Result;
 use crate::transaction_queue::TransactionResult::{Failure, TicketRedeemed};
 
 #[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::spawn_local;
+use async_std::task::{sleep, spawn_local};
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use gloo_timers::future::sleep;
 
 /// Enumerates all possible on-chain state change requests
 #[derive(Clone, PartialEq, Debug)]
@@ -126,6 +131,9 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
     /// Number of pending transactions in the queue
     pub const ETHEREUM_TX_QUEUE_SIZE: usize = 2048;
 
+    /// Maximum time (in seconds) to wait for the transaction to be confirmed on-chain and indexed
+    pub const MAX_TX_CONFIRMATION_WAIT_SECS: usize = 180;
+
     /// Creates a new instance with the given `TransactionExecutor` implementation.
     pub fn new(db: Arc<RwLock<Db>>, tx_exec: Box<dyn TransactionExecutor>) -> Self {
         let (queue_send, queue_recv) = bounded(Self::ETHEREUM_TX_QUEUE_SIZE);
@@ -146,11 +154,8 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         db: Arc<RwLock<Db>>,
         tx_exec: Arc<Box<dyn TransactionExecutor>>,
         tx: Transaction,
-        tx_finisher: TransactionFinisher,
-    ) {
-        let tx_id = tx.to_string();
-
-        let tx_result = match tx {
+    ) -> TransactionResult {
+        match tx {
             Transaction::RedeemTicket(ack) => match ack.status {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
@@ -222,15 +227,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             },
 
             Transaction::Withdraw(recipient, amount) => tx_exec.withdraw(recipient, amount).await,
-        };
-
-        if let Failure(err) = &tx_result {
-            error!("{tx_id} failed: {err}");
-        } else {
-            info!("transaction {tx_id} succeeded");
         }
-
-        let _ = tx_finisher.send(tx_result);
     }
 
     /// Consumes self and runs the main queue processing loop until the queue is closed.
@@ -238,8 +235,37 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         while let Ok((tx, tx_finisher)) = self.queue_recv.recv().await {
             let db_clone = self.db.clone();
             let tx_exec_clone = self.tx_exec.clone();
+            let tx_id = tx.to_string();
 
-            spawn_local(async move { Self::execute_transaction(db_clone, tx_exec_clone, tx, tx_finisher).await });
+            spawn_local(async move {
+                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx);
+
+                // Put an upper bound on the transaction to get confirmed and indexed
+                let timeout = sleep(std::time::Duration::from_secs(
+                    Self::MAX_TX_CONFIRMATION_WAIT_SECS as u64,
+                ))
+                .fuse();
+
+                pin_mut!(timeout, tx_fut);
+
+                debug!("start executing {tx_id}");
+                let tx_result = match futures::future::select(tx_fut, timeout).await {
+                    Either::Left((result, _)) => {
+                        if let Failure(err) = &result {
+                            error!("{tx_id} failed: {err}");
+                        } else {
+                            info!("transaction {tx_id} succeeded");
+                        }
+                        result
+                    }
+                    Either::Right((_, _)) => Failure(format!(
+                        "awaiting for confirmation of {tx_id} timed out after {} seconds",
+                        Self::MAX_TX_CONFIRMATION_WAIT_SECS
+                    )),
+                };
+
+                let _ = tx_finisher.send(tx_result);
+            });
         }
         warn!("transaction queue has finished");
     }

@@ -50,7 +50,7 @@ use utils_types::{
 /// Extend support for arbitrary array sizes in serde
 ///
 /// Array of arbitrary sizes are not supported in serde due to backwards compatibility.
-/// Read more in: https://github.com/serde-rs/serde/issues/1937
+/// Read more in: `<https://github.com/serde-rs/serde/issues/1937>`
 mod arrays {
     use std::{convert::TryInto, marker::PhantomData};
 
@@ -1204,9 +1204,9 @@ impl PartialEq for Signature {
 impl Eq for Signature {}
 
 /// A method that turns all lower-cased hexadecimal address to a checksum-ed address
-/// according to https://eips.ethereum.org/EIPS/eip-55
+/// according to `<https://eips.ethereum.org/EIPS/eip-55>`
 pub trait ToChecksum {
-    /// Checksum of self according to https://eips.ethereum.org/EIPS/eip-55
+    /// Checksum of self according to `<https://eips.ethereum.org/EIPS/eip-55>`
     fn to_checksum(&self) -> String;
 }
 

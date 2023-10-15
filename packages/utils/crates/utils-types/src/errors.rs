@@ -15,9 +15,8 @@ pub enum GeneralError {
 
     #[error("non-specific error: {0}")]
     NonSpecificError(String),
-
-    #[error(transparent)]
-    Other(#[from] AnyError),
+    //#[error(transparent)]
+    //Other(#[from] AnyError),
 }
 
 pub type Result<T> = core::result::Result<T, GeneralError>;

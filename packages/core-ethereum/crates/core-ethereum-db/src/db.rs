@@ -105,6 +105,66 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         Ok(acked_tickets)
     }
 
+    async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> Result<()> {
+        // Get all ack tickets in the given channel with channel epoch less than the one on the channel
+        let ack_tickets = self
+            .db
+            .get_more::<AcknowledgedTicket>(
+                Vec::from(ACKNOWLEDGED_TICKETS_PREFIX.as_bytes()).into_boxed_slice(),
+                ACKNOWLEDGED_TICKETS_KEY_LENGTH as u32,
+                &|ack: &AcknowledgedTicket| {
+                    channel.get_id() == ack.ticket.channel_id
+                        && channel.channel_epoch.as_u32() > ack.ticket.channel_epoch
+                },
+            )
+            .await?
+            .into_iter()
+            .map(|ack| (ack.ticket.amount, get_acknowledged_ticket_key(&ack)));
+
+        // Get all unack tickets in the given channel with channel epoch less than the one on the channel
+        let unack_tickets = self
+            .db
+            .get_more::<PendingAcknowledgement>(
+                Vec::from(PENDING_ACKNOWLEDGEMENTS_PREFIX.as_bytes()).into_boxed_slice(),
+                HalfKeyChallenge::SIZE as u32,
+                &move |v: &PendingAcknowledgement| match v {
+                    PendingAcknowledgement::WaitingAsSender => false,
+                    PendingAcknowledgement::WaitingAsRelayer(unack) => {
+                        channel.get_id() == unack.ticket.channel_id
+                            && channel.channel_epoch.as_u32() > unack.ticket.channel_epoch
+                    }
+                },
+            )
+            .await?
+            .into_iter()
+            .filter_map(|pa| match pa {
+                PendingAcknowledgement::WaitingAsSender => None,
+                PendingAcknowledgement::WaitingAsRelayer(unack) => Some((
+                    unack.ticket.amount,
+                    utils_db::db::Key::new_with_prefix(&unack.own_key.to_challenge(), PENDING_ACKNOWLEDGEMENTS_PREFIX),
+                )),
+            });
+
+        let count_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
+        let value_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;
+
+        let mut count = self.get_rejected_tickets_count().await?;
+        let mut balance = self.get_rejected_tickets_value().await?;
+
+        let mut batch_ops = Batch::default();
+
+        // All invalid tickets will be marked as neglected
+        for (amount, maybe_key) in ack_tickets.chain(unack_tickets) {
+            batch_ops.del(maybe_key?);
+            balance = balance.add(&amount);
+            count += 1;
+        }
+
+        batch_ops.put(count_key, count);
+        batch_ops.put(value_key, balance);
+        self.db.batch(batch_ops, true).await
+    }
+
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()> {
         let count = self.get_rejected_tickets_count().await?;
         let count_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_COUNT)?;
@@ -416,19 +476,28 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     // core-ethereum only part
-    async fn delete_acknowledged_tickets_from(&mut self, channel: ChannelEntry) -> Result<()> {
+    async fn mark_acknowledged_tickets_neglected(&mut self, channel: ChannelEntry) -> Result<()> {
         let acknowledged_tickets = self.get_acknowledged_tickets(Some(channel)).await?;
 
-        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
-        let neglected_ticket_count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
+        let count_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
+        let value_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;
+
+        let neglected_ticket_count = self.db.get_or_none::<usize>(count_key.clone()).await?.unwrap_or(0);
+        let mut neglected_ticket_value = self
+            .db
+            .get_or_none::<Balance>(count_key.clone())
+            .await?
+            .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let mut batch_ops = utils_db::db::Batch::default();
         for acked_ticket in acknowledged_tickets.iter() {
             batch_ops.del(get_acknowledged_ticket_key(&acked_ticket)?);
+            neglected_ticket_value = neglected_ticket_value.add(&acked_ticket.ticket.amount);
         }
 
         if !acknowledged_tickets.is_empty() {
-            batch_ops.put(key, neglected_ticket_count + acknowledged_tickets.len())
+            batch_ops.put(count_key, neglected_ticket_count + acknowledged_tickets.len());
+            batch_ops.put(value_key, neglected_ticket_value);
         }
 
         self.db.batch(batch_ops, true).await
@@ -520,9 +589,19 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn get_neglected_tickets_count(&self) -> Result<usize> {
-        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKET_COUNT)?;
+        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
 
         Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
+    }
+
+    async fn get_neglected_tickets_value(&self) -> Result<Balance> {
+        let key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;
+
+        Ok(self
+            .db
+            .get_or_none::<Balance>(key)
+            .await?
+            .unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
     async fn get_pending_tickets_count(&self) -> Result<usize> {
@@ -550,16 +629,21 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
-        debug!("marking {} as redeemed", acked_ticket);
+        // TODO: for debugging purposes this operation has been un-batched
+        // Note that if any of the un-batched operations fail, the stats of redeemed
+        // tickets will be in an inconsistent state.
+        // Once the underlying issue is resolved, it should be batched again.
 
-        let mut ops = Batch::default();
-
-        let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
-        let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
-        ops.put(key, count + 1);
+        debug!("start marking {acked_ticket} as redeemed");
 
         let key = get_acknowledged_ticket_key(&acked_ticket)?;
-        ops.del(key);
+        self.db.remove::<AcknowledgedTicket>(key).await?;
+        debug!("removed {acked_ticket} from the DB");
+
+        let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_COUNT)?;
+        let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0) + 1;
+        self.db.set(key, &count).await?;
+        debug!("updated redeemed tickets count to {count}");
 
         let key = utils_db::db::Key::new_from_str(REDEEMED_TICKETS_VALUE)?;
         let balance = self
@@ -569,7 +653,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
-        ops.put(key, new_redeemed_balance);
+        self.db.set(key, &new_redeemed_balance).await?;
+        debug!("updated redeemed tickets value to {new_redeemed_balance}");
 
         if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
             if c.source == self.me {
@@ -586,15 +671,21 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 .unwrap_or(Balance::zero(BalanceType::HOPR));
 
             let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
-            ops.put(key, new_pending_balance);
+            self.db.set(key, &new_pending_balance).await?;
+            debug!("updated pending balance with {counterparty} to: {new_pending_balance}");
+
+            Ok(())
         } else {
             error!(
-                "could not update redeemed tickets count: unable to find channel with id {}",
+                "could not update pending balance: unable to find channel with id {}",
                 acked_ticket.ticket.channel_id
-            )
-        }
+            );
 
-        self.db.batch(ops, true).await
+            Err(DbError::GenericError(format!(
+                "channel {} not found",
+                acked_ticket.ticket.channel_id
+            )))
+        }
     }
 
     async fn mark_losing_acked_ticket(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
@@ -627,7 +718,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             error!(
                 "could not update losing tickets count: unable to find channel with id {}",
                 acked_ticket.ticket.channel_id
-            )
+            );
+
+            return Err(DbError::GenericError(format!(
+                "channel {} not found",
+                acked_ticket.ticket.channel_id
+            )));
         }
 
         self.db.batch(ops, true).await
@@ -1216,11 +1312,11 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn delete_acknowledged_tickets_from(&self, source: ChannelEntry) -> Result<(), JsValue> {
+        pub async fn mark_acknowledged_tickets_neglected(&self, source: ChannelEntry) -> Result<(), JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_write! {
             let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.delete_acknowledged_tickets_from(source).await)
+            utils_misc::ok_or_jserr!(db.mark_acknowledged_tickets_neglected(source).await)
             //}
         }
 
@@ -1337,6 +1433,15 @@ pub mod wasm {
             //check_lock_read! {
             let db = data.read().await;
             utils_misc::ok_or_jserr!(db.get_neglected_tickets_count().await)
+            //}
+        }
+
+        #[wasm_bindgen]
+        pub async fn get_neglected_tickets_value(&self) -> Result<Balance, JsValue> {
+            let data = self.core_ethereum_db.clone();
+            //check_lock_read! {
+            let db = data.read().await;
+            utils_misc::ok_or_jserr!(db.get_neglected_tickets_value().await)
             //}
         }
 

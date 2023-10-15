@@ -49,7 +49,7 @@ impl Path {
         path: Vec<PeerId>,
         self_addr: &Address,
         allow_loops: bool,
-        db: &T,
+        db: &T, // TODO: refactor this so it uses the ChannelGraph instead of DB
     ) -> Result<Self> {
         if path.is_empty() {
             return Err(PathNotValid);

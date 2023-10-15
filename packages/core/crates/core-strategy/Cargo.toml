@@ -1,8 +1,8 @@
 [package]
 name = "core-strategy"
-version = "0.4.0"
+version = "0.4.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Contains implementations of different (automatic) HOPR payment channel strategies"
+description = "Contains implementations of different HOPR strategies"
 edition = "2021"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -32,6 +32,7 @@ core-types = { workspace = true }
 core-crypto = { workspace = true }
 core-network = { workspace = true }
 core-protocol = { workspace = true }
+core-path = { workspace = true }
 core-ethereum-db = { workspace = true }
 core-ethereum-actions = { workspace = true }
 core-ethereum-misc = { workspace = true }
@@ -39,11 +40,10 @@ utils-db = { workspace = true }
 utils-log = { workspace = true }
 utils-misc = { workspace = true }
 utils-types = { workspace = true }
-log = "0.4.20"
-
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
+env_logger = "0.10.0"
 lazy_static = "1.4"
 vector_assertions = "0.1.0"
 mockall = "0.11.4"

@@ -350,6 +350,14 @@ for endpoint in ${api_endpoints}; do
   peers+=(${peer})
 done
 # }}}
+# --- Get node addresses for reporting --- {{{
+declare -a node_addrs
+for endpoint in ${api_endpoints}; do
+  declare node_addr
+  node_addr="$(get_native_address "${api_token}@${endpoint}")"
+  node_addrs+=(${node_addr})
+done
+# }}}
 
 log "NOTE:"
 log ""
@@ -371,6 +379,7 @@ for node_id in ${!id_files[@]}; do
 
   log "\t${node_name}"
   log "\t\tPeer Id:\t${peers[$node_id]}"
+  log "\t\tAddress:\t${node_addrs[$node_id]}"
   log "\t\tRest API:\thttp://${listen_host}:${api_port}/api/v3/_swagger"
   log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
   log "\t\tHealthcheck:\thttp://${listen_host}:$(( node_healthcheck_base_port + node_id ))/"

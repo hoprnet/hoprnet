@@ -31,7 +31,7 @@ macro_rules! ok_or_str {
     };
 }
 
-/// Macro used to convert Vec<JsString> to Vec<&str>
+/// Macro used to convert `Vec<JsString>` to `Vec<&str>`
 #[cfg(feature = "wasm")]
 #[macro_export]
 macro_rules! convert_from_jstrvec {
@@ -41,7 +41,7 @@ macro_rules! convert_from_jstrvec {
     };
 }
 
-/// Macro used to convert Vec<&str> or Vec<String> to Vec<JString>
+/// Macro used to convert `Vec<&str>` or `Vec<String>` to `Vec<JString>`
 #[cfg(feature = "wasm")]
 #[macro_export]
 macro_rules! convert_to_jstrvec {

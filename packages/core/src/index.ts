@@ -662,7 +662,7 @@ export class Hopr extends EventEmitter {
       throw new Error('No tickets found in channel')
     }
 
-    await this.tools.aggregate_tickets(channelId, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
+    await this.tools.aggregate_tickets(channel, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
   }
 
   /**
@@ -1116,6 +1116,7 @@ export class Hopr extends EventEmitter {
       redeemed: await this.db.get_redeemed_tickets_count(),
       redeemedValue: await this.db.get_redeemed_tickets_value(),
       neglected: await this.db.get_neglected_tickets_count(),
+      neglectedValue: await this.db.get_neglected_tickets_value(),
       rejected: await this.db.get_rejected_tickets_count(),
       rejectedValue: await this.db.get_rejected_tickets_value()
     }

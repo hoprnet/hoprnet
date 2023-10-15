@@ -7,13 +7,13 @@ use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use utils_log::info;
 use validator::Validate;
 
 /// Configuration object for the `AutoRedeemingStrategy`
-#[derive(Debug, Clone, PartialEq, Eq, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
     /// Defaults to true.
@@ -23,7 +23,7 @@ pub struct AutoRedeemingStrategyConfig {
 impl Default for AutoRedeemingStrategyConfig {
     fn default() -> Self {
         Self {
-            redeem_only_aggregated: false,
+            redeem_only_aggregated: true,
         }
     }
 }
@@ -34,13 +34,18 @@ impl Default for AutoRedeemingStrategyConfig {
 pub struct AutoRedeemingStrategy<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
     tx_sender: TransactionSender,
-    #[allow(dead_code)]
     cfg: AutoRedeemingStrategyConfig,
+}
+
+impl<Db: HoprCoreEthereumDbActions> Debug for AutoRedeemingStrategy<Db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
+    }
 }
 
 impl<Db: HoprCoreEthereumDbActions> Display for AutoRedeemingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::AutoRedeeming(Default::default()))
+        write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
@@ -52,10 +57,11 @@ impl<Db: HoprCoreEthereumDbActions> AutoRedeemingStrategy<Db> {
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeemingStrategy<Db> {
-    async fn on_acknowledged_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
+    async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
             info!("{self} strategy: auto-redeeming {ack}");
-            let _ = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
+            let rx = redeem_ticket(self.db.clone(), ack.clone(), self.tx_sender.clone()).await?;
+            std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
         }
         Ok(())
     }
@@ -187,7 +193,7 @@ mod tests {
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db.clone(), tx_sender);
-        ars.on_acknowledged_ticket(&ack_ticket).await.unwrap();
+        ars.on_acknowledged_winning_ticket(&ack_ticket).await.unwrap();
 
         awaiter.await.unwrap();
     }
@@ -242,8 +248,8 @@ mod tests {
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db.clone(), tx_sender);
-        ars.on_acknowledged_ticket(&ack_ticket_unagg).await.unwrap();
-        ars.on_acknowledged_ticket(&ack_ticket_agg).await.unwrap();
+        ars.on_acknowledged_winning_ticket(&ack_ticket_unagg).await.unwrap();
+        ars.on_acknowledged_winning_ticket(&ack_ticket_agg).await.unwrap();
 
         awaiter.await.unwrap();
     }

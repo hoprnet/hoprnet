@@ -14,13 +14,13 @@ use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::{
     channels::{close_channel, open_channel},
-    transaction_queue::{TransactionCompleted, TransactionSender},
+    transaction_queue::TransactionSender,
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
+use serde_with::{serde_as, DisplayFromStr};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use validator::Validate;
 
@@ -35,22 +35,27 @@ pub const SMA_WINDOW_SIZE: usize = 3;
 type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
 
 /// Config of promiscuous strategy.
-#[derive(Debug, Clone, PartialEq, Validate, Serialize, Deserialize)]
+#[serde_as]
+#[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
     /// Defaults to 0.5
+    #[validate(range(min = 0_f32, max = 1.0_f32))]
     pub network_quality_threshold: f64,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
     /// Defaults to 10 HOPR
+    #[serde_as(as = "DisplayFromStr")]
     pub new_channel_stake: Balance,
 
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
     /// Defaults to 10 HOPR
+    #[serde_as(as = "DisplayFromStr")]
     pub minimum_node_balance: Balance,
 
     /// Maximum number of opened channels the strategy should maintain.
     /// Defaults to square-root of the sampled network size.
+    #[validate(range(min = 1))]
     pub max_channels: Option<usize>,
 
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
@@ -64,8 +69,8 @@ impl Default for PromiscuousStrategyConfig {
     fn default() -> Self {
         PromiscuousStrategyConfig {
             network_quality_threshold: 0.5,
-            new_channel_stake: Balance::from_str("10000000000000000000", BalanceType::HOPR),
-            minimum_node_balance: Balance::from_str("10000000000000000000", BalanceType::HOPR),
+            new_channel_stake: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
+            minimum_node_balance: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             max_channels: None,
             enforce_max_channels: true,
         }
@@ -82,7 +87,7 @@ where
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<Net>>>,
     tx_sender: TransactionSender,
-    config: PromiscuousStrategyConfig,
+    cfg: PromiscuousStrategyConfig,
     sma: RwLock<SimpleMovingAvg>,
 }
 
@@ -92,7 +97,7 @@ where
     Net: NetworkExternalActions,
 {
     pub fn new(
-        config: PromiscuousStrategyConfig,
+        cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
         network: Arc<RwLock<Network<Net>>>,
         tx_sender: TransactionSender,
@@ -101,7 +106,7 @@ where
             db,
             network,
             tx_sender,
-            config,
+            cfg,
             sma: RwLock::new(SimpleMovingAvg::new()),
         }
     }
@@ -124,7 +129,7 @@ where
             // get the Ethereum address of the peer
             if let Some(address) = self.db.read().await.get_chain_key(&packet_key).await? {
                 if tick_decision.will_channel_be_closed(&address)
-                    || new_channel_candidates.iter().find(|(p, _)| p.eq(&address)).is_some()
+                    || new_channel_candidates.iter().any(|(p, _)| p.eq(&address))
                 {
                     // Skip this peer if we already processed it (iterator may have duplicates)
                     debug!("encountered duplicate peer {}", peer);
@@ -137,15 +142,15 @@ where
                     .find(|c| c.status == Open && c.destination.eq(&address));
 
                 if let Some(channel) = channel_with_peer {
-                    if quality <= self.config.network_quality_threshold {
+                    if quality <= self.cfg.network_quality_threshold {
                         // Need to close the channel, because quality has dropped
                         debug!("new channel closure candidate with {} (quality {})", address, quality);
-                        tick_decision.add_to_close(channel.clone());
+                        tick_decision.add_to_close(*channel);
                     }
-                } else if quality >= self.config.network_quality_threshold {
+                } else if quality >= self.cfg.network_quality_threshold {
                     // Try to open channel with this peer, because it is high-quality
                     debug!("new channel opening candidate {} with quality {}", address, quality);
-                    new_channel_candidates.push((address.clone(), quality));
+                    new_channel_candidates.push((address, quality));
                 }
 
                 active_addresses.insert(address, quality);
@@ -174,7 +179,7 @@ where
             .iter()
             .filter(|c| c.status == PendingToClose)
             .for_each(|c| {
-                tick_decision.add_to_close(c.clone());
+                tick_decision.add_to_close(*c);
             });
         debug!(
             "{} channels are in PendingToClose, so strategy will mark them for closing too",
@@ -183,7 +188,7 @@ where
 
         // We compute the upper bound for channels as a square-root of the perceived network size
         let max_auto_channels = self
-            .config
+            .cfg
             .max_channels
             .unwrap_or((self.sma.read().await.get_average() as f64).sqrt().ceil() as usize);
         debug!(
@@ -201,7 +206,7 @@ where
 
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
-        if occupied > max_auto_channels && self.config.enforce_max_channels {
+        if occupied > max_auto_channels && self.cfg.enforce_max_channels {
             warn!(
                 "there are {} opened channels, but the strategy allows only {}",
                 occupied, max_auto_channels
@@ -218,7 +223,7 @@ where
                 active_addresses
                     .get(&p1.destination)
                     .zip(active_addresses.get(&p2.destination))
-                    .and_then(|(q1, q2)| q1.partial_cmp(&q2))
+                    .and_then(|(q1, q2)| q1.partial_cmp(q2))
                     .expect(format!("failed to retrieve quality of {} or {}", p1.destination, p2.destination).as_str())
             });
 
@@ -241,10 +246,10 @@ where
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
             // Go through the new candidates for opening channels allow them to open based on our available node balance
-            let mut remaining_balance = balance.clone();
+            let mut remaining_balance = balance;
             for address in new_channel_candidates.into_iter().map(|(p, _)| p) {
                 // Stop if we ran out of balance
-                if remaining_balance.lte(&self.config.minimum_node_balance) {
+                if remaining_balance.lte(&self.cfg.minimum_node_balance) {
                     warn!(
                         "strategy ran out of allowed node balance - balance is {}",
                         remaining_balance.to_string()
@@ -255,8 +260,8 @@ where
                 // If we haven't added this peer yet, add it to the list for channel opening
                 if !tick_decision.will_address_be_opened(&address) {
                     debug!("promoting peer {} for channel opening", address);
-                    tick_decision.add_to_open(address.clone(), self.config.new_channel_stake.clone());
-                    remaining_balance = balance.sub(&self.config.new_channel_stake);
+                    tick_decision.add_to_open(address, self.cfg.new_channel_stake);
+                    remaining_balance = balance.sub(&self.cfg.new_channel_stake);
                 }
             }
         }
@@ -271,13 +276,23 @@ where
     }
 }
 
+impl<Db, Net> Debug for PromiscuousStrategy<Db, Net>
+where
+    Db: HoprCoreEthereumDbActions,
+    Net: NetworkExternalActions,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", Strategy::Promiscuous(self.cfg))
+    }
+}
+
 impl<Db, Net> Display for PromiscuousStrategy<Db, Net>
 where
     Db: HoprCoreEthereumDbActions,
     Net: NetworkExternalActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Strategy::Promiscuous(Default::default()))
+        write!(f, "{}", Strategy::Promiscuous(self.cfg))
     }
 }
 
@@ -289,8 +304,6 @@ where
 {
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
-
-        let mut receivers = futures::stream::FuturesUnordered::<TransactionCompleted>::new();
 
         // close all the channels, need to be synchronous because Ethereum transactions
         // are synchronous, especially due nonces
@@ -305,11 +318,12 @@ where
             )
             .await
             {
-                Ok(successful_tx) => {
-                    receivers.push(successful_tx);
+                Ok(_) => {
+                    // Intentionally do not await result of the channel transaction
+                    info!("{self} strategy: issued channel closing tx: {}", channel_to_close);
                 }
                 Err(e) => {
-                    error!("promiscuous strategy: error while closing channel: {e}");
+                    error!("{self} strategy: error while closing channel: {e}");
                 }
             }
         }
@@ -327,13 +341,13 @@ where
             )
             .await
             {
-                Ok(receiver) => {
-                    info!("{self} strategy: opened channel to {}", channel_to_open.0);
-                    receivers.push(receiver)
+                Ok(_) => {
+                    // Intentionally do not await result of the channel transaction
+                    info!("{self} strategy: issued channel opening tx: {}", channel_to_open.0);
                 }
                 Err(e) => {
                     error!(
-                        "{self} strategy: error while opening channel to {}: {e}",
+                        "{self} strategy: error while issuing channel opening to {}: {e}",
                         channel_to_open.0
                     );
                 }
@@ -342,7 +356,7 @@ where
 
         debug!("{self} strategy: open channels done");
 
-        while let Some(_) = receivers.next().await {}
+        //while let Some(_) = receivers.next().await {}
 
         debug!("{self} strategy: channel operations done");
 
@@ -509,9 +523,9 @@ mod tests {
         }))
         .await;
 
-        let balance = Balance::from_str("11000000000000000000", BalanceType::HOPR); // 11 HOPR
-        let low_balance = Balance::from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
-                                                                                    // set HOPR balance in DB
+        let balance = Balance::new_from_str("11000000000000000000", BalanceType::HOPR); // 11 HOPR
+        let low_balance = Balance::new_from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
+                                                                                        // set HOPR balance in DB
         strat.db.write().await.set_hopr_balance(&balance).await.unwrap();
         // link chain key and packet key
         join_all(address_peer_id_pairs.iter().map(|pair| async {
