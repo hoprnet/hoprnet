@@ -450,7 +450,7 @@ pub mod test {
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * path_pos.into(),
+                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(path_pos),
                 BalanceType::HOPR,
             ),
             U256::zero(),
@@ -680,13 +680,10 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn set_redeem_tx_hash(&mut self, tx_hash_str: &str) {
             if let Ok(tx_hash) = Hash::from_hex(tx_hash_str) {
-                match self.w.status {
-                    BeingRedeemed { .. } => {
-                        if !tx_hash.eq(&Hash::default()) {
-                            self.w.status = BeingRedeemed { tx_hash }
-                        }
+                if let BeingRedeemed { .. } = self.w.status {
+                    if !tx_hash.eq(&Hash::default()) {
+                        self.w.status = BeingRedeemed { tx_hash }
                     }
-                    _ => {}
                 }
             }
         }

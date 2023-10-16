@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-trait = { workspace = true }
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 enum-iterator = "1.4.1"
 js-sys = { workspace = true, optional = true }

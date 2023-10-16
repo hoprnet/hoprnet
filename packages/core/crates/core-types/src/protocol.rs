@@ -1,12 +1,15 @@
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
+use async_trait::async_trait;
 use bloomfilter::Bloom;
 use core_crypto::derivation::PacketTag;
 use core_crypto::random::random_bytes;
+use core_crypto::types::OffchainPublicKey;
 use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use utils_log::warn;
 use utils_types::errors::GeneralError::ParseError;
+use utils_types::primitives::Address;
 use utils_types::traits::{AutoBinarySerializable, BinarySerializable};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
@@ -23,6 +26,15 @@ pub type Tag = u16;
 
 /// Represent a default application tag if none is specified in `send_packet`.
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
+
+/// Trait for linking and resolving the corresponding `OffchainPublicKey` and on-chain `Address`.
+#[async_trait(? Send)] // TODO: the resolver should not be async once detached from the DB ? Also make it `Send` once DB is `Send` too
+pub trait PeerAddressResolver {
+    /// Tries to resolve off-chain public key given the on-chain address
+    async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey>;
+    /// Tries to resolve on-chain public key given the off-chain public key
+    async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address>;
+}
 
 /// Bloom filter for packet tags to detect packet replays.
 /// In addition, this structure also holds the number of items in the filter

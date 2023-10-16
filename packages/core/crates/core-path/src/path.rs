@@ -1,82 +1,87 @@
+use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
 use core_crypto::types::OffchainPublicKey;
-use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::ChannelStatus;
+use core_types::protocol::PeerAddressResolver;
+use futures::future::FutureExt;
+use futures::stream::FuturesOrdered;
+use futures::TryStreamExt;
 use libp2p_identity::PeerId;
+use std::collections::hash_map::RandomState;
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
-use utils_log::warn;
+use std::hash::Hash;
 use utils_types::primitives::Address;
 use utils_types::traits::{PeerIdLike, ToHex};
 
-/// Represents a path for a packet.
-/// The type internally carries an information if the path has been already validated or not (since path validation
-/// is potentially an expensive operation).
-/// Path validation process checks if all the channels on the path exist and are in an `Open` state.
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-#[derive(Debug, Clone)]
-pub struct Path {
-    hops: Vec<PeerId>,
-    valid: bool,
+/// Base implementation of an abstract path.
+/// Must contain always at least a single entry.
+pub trait Path<N>: Display + Clone + Eq + PartialEq
+where
+    N: Copy + Clone + Eq + PartialEq + Hash,
+{
+    /// Individual hops in the path.
+    /// There must be always at least one hop.
+    fn hops(&self) -> &[N];
+
+    /// Shorthand for number of hops.
+    fn length(&self) -> usize {
+        self.hops().len()
+    }
+
+    /// Gets the last hop
+    fn last_hop(&self) -> &N {
+        self.hops().last().expect("path is invalid")
+    }
+
+    /// Checks if all the hops in this path are to distinct addresses.
+    /// Returns `true` if there are duplicate Addresses on this path.
+    /// Note that the duplicate Addresses can never be adjacent.
+    fn contains_cycle(&self) -> bool {
+        let set = HashSet::<&N, RandomState>::from_iter(self.hops().iter());
+        set.len() != self.hops().len()
+    }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-impl Path {
-    /// Number of hops in the path.
-    pub fn length(&self) -> u32 {
-        self.hops.len() as u32
-    }
-
-    /// Determines with the path is valid.
-    pub fn valid(&self) -> bool {
-        !self.hops.is_empty() && self.valid
-    }
+/// Represents an on-chain path in the `ChannelGraph`.
+/// This path is never allowed to be empty and is always constructed from
+/// `Addresses` that must be known to have open channels between them (at the time of construction).
+/// This path is not useful for transport, because it *does never contain the last hop*
+/// to the destination (which does not require and open channel).
+/// To make it useful for transport, it must be converted to a `TransportPath` via `to_path`.
+/// The `ChannelPath` does not allow simple loops (same adjacent hops)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChannelPath {
+    pub(crate) hops: Vec<Address>,
 }
 
-impl Path {
-    /// Creates an already pre-validated path.
-    pub fn new_valid(validated_path: Vec<PeerId>) -> Self {
-        Self {
-            hops: validated_path,
-            valid: true,
-        }
-    }
-
-    /// Creates a new path by validating the list of peer ids using the channel database
-    /// The given path does not contain the sender node, which is given by `self_addr`
-    pub async fn new<T: HoprCoreEthereumDbActions>(
-        path: Vec<PeerId>,
-        self_addr: &Address,
-        allow_loops: bool,
-        db: &T, // TODO: refactor this so it uses the ChannelGraph instead of DB
-    ) -> Result<Self> {
-        if path.is_empty() {
+impl ChannelPath {
+    /// Creates a new path by validating the list of addresses using the channel graph.
+    /// The given list of `hops` *must not* contain the sender node as the first entry,
+    /// since this node is always assumed to be the sender.
+    /// The list of `hops` also *must not* contain the destination, because an open
+    /// channel is not required for the last hop.
+    pub fn new(hops: Vec<Address>, graph: &ChannelGraph) -> Result<Self> {
+        if hops.is_empty() || hops[0] == graph.my_address() {
             return Err(PathNotValid);
         }
 
         let mut ticket_receiver;
-        let mut ticket_issuer = *self_addr;
+        let mut ticket_issuer = graph.my_address();
 
-        // Ignore the last hop in the check, because channels are not required for direct messages
-        for hop in path.iter().take(path.len() - 1) {
-            ticket_receiver = db
-                .get_chain_key(&OffchainPublicKey::from_peerid(hop)?)
-                .await?
-                .ok_or(InvalidPeer(format!("could not find channel key for {hop}")))?;
+        for hop in hops.iter() {
+            ticket_receiver = *hop;
 
             // Check for loops
             if ticket_issuer == ticket_receiver {
-                if !allow_loops {
-                    return Err(LoopsNotAllowed(ticket_receiver.to_hex()));
-                }
-                warn!("duplicated adjacent path entries")
+                return Err(LoopsNotAllowed(ticket_receiver.to_hex()));
             }
 
             // Check if the channel is opened
-            let channel = db
-                .get_channel_x(&ticket_issuer, &ticket_receiver)
-                .await?
+            let channel = graph
+                .get_channel(ticket_issuer, ticket_receiver)
                 .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
 
             if channel.status != ChannelStatus::Open {
@@ -86,58 +91,167 @@ impl Path {
             ticket_issuer = ticket_receiver;
         }
 
-        Ok(Self::new_valid(path))
+        Ok(Self { hops })
     }
 
-    /// Individual hops in the path.
-    pub fn hops(&self) -> &[PeerId] {
+    /// For internal use and testing only
+    pub(crate) fn new_valid(hops: Vec<Address>) -> Self {
+        assert!(!hops.is_empty(), "must not be empty");
+        Self { hops }
+    }
+
+    /// Resolves this on-chain `ChannelPath` into the off-chain `TransportPath` and adds the final hop
+    /// to the given `destination` (which does not require an open channel).
+    pub async fn to_path<R: PeerAddressResolver>(&self, resolver: &R, destination: Address) -> Result<TransportPath> {
+        let mut hops = self
+            .hops
+            .iter()
+            .map(|addr| {
+                resolver
+                    .resolve_packet_key(addr)
+                    .map(move |opt| opt.map(|k| k.to_peerid()).ok_or(InvalidPeer(addr.to_string())))
+            })
+            .collect::<FuturesOrdered<_>>()
+            .try_collect::<Vec<_>>()
+            .await?;
+
+        let last_hop = resolver
+            .resolve_packet_key(&destination)
+            .await
+            .ok_or(InvalidPeer(destination.to_string()))
+            .map(|key| key.to_peerid())?;
+
+        hops.push(last_hop);
+        Ok(TransportPath::new_valid(hops))
+    }
+}
+
+impl Path<Address> for ChannelPath {
+    fn hops(&self) -> &[Address] {
         &self.hops
     }
 }
 
-impl<T> TryFrom<&Path> for Vec<T>
+impl Display for ChannelPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "[ {} ] ({} hops)",
+            self.hops.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("->"),
+            self.hops.len()
+        )
+    }
+}
+
+/// Represents an off-chain path of `PeerId`s.
+/// The path is never allowed to be empty and *always contains the destination*.
+/// In case of the direct path, this path contains only the destination.
+/// In case o multiple hops, it also must represent a valid `ChannelPath`, therefore
+/// open channels must exist (at the time of construction) except for the last hop.
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransportPath {
+    hops: Vec<PeerId>,
+}
+
+impl TransportPath {
+    /// Resolves vector of `PeerId`s into the corresponding `TransportPath` and optionally an associated `ChannelPath`.
+    /// - If `peers` contains only a single entry (destination), the resulting `TransportPath` contains just this entry.
+    /// Since in this case the `ChannelPath` would be empty (0-hop), it is `None`. This case is equivalent to construction with `direct()`.
+    /// - If `peers` contains more than a single entry, it first resolves `PeerId`s into `Address`es and then validates and returns
+    ///  also the multi-hop `ChannelPath`.
+    /// To do an inverse resolution, from `Address`es to `PeerId`s, construct the `ChannelPath` and use `ChannelPath::to_path()` to resolve the
+    /// on-chain path.
+    pub async fn resolve<R: PeerAddressResolver>(
+        peers: Vec<PeerId>,
+        resolver: &R,
+        graph: &ChannelGraph,
+    ) -> Result<(Self, Option<ChannelPath>)> {
+        if peers.is_empty() {
+            Err(PathNotValid)
+        } else if peers.len() == 1 {
+            Ok((Self { hops: peers }, None))
+        } else {
+            let (mut addrs, hops): (Vec<Address>, Vec<PeerId>) = peers
+                .into_iter()
+                .map(|peer| async move {
+                    let key = OffchainPublicKey::from_peerid(&peer)?;
+                    resolver
+                        .resolve_chain_key(&key)
+                        .await
+                        .map(|addr| (addr, peer))
+                        .ok_or(InvalidPeer(peer.to_string()))
+                })
+                .collect::<FuturesOrdered<_>>()
+                .try_collect::<Vec<_>>()
+                .await?
+                .into_iter()
+                .unzip();
+
+            addrs.pop(); // remove the last hop
+            Ok((Self { hops }, Some(ChannelPath::new(addrs, graph)?)))
+        }
+    }
+
+    /// Constructs a direct `TransportPath` (= 0-hop `ChannelPath`)
+    pub fn direct(destination: PeerId) -> Self {
+        Self {
+            hops: vec![destination],
+        }
+    }
+
+    /// Used for testing only.
+    pub(crate) fn new_valid(hops: Vec<PeerId>) -> Self {
+        assert!(!hops.is_empty(), "must not be empty");
+        Self { hops }
+    }
+}
+
+impl Path<PeerId> for TransportPath {
+    /// The `TransportPath` always returns one extra hop to the destination.
+    /// So it contains one more hop than a `ChannelPath` (the final hop does not require a channel).
+    fn hops(&self) -> &[PeerId] {
+        &self.hops
+    }
+}
+
+impl<T> TryFrom<&TransportPath> for Vec<T>
 where
     T: PeerIdLike,
 {
     type Error = PathError;
 
-    fn try_from(value: &Path) -> std::result::Result<Self, Self::Error> {
-        if value.valid() {
-            value
-                .hops()
-                .iter()
-                .map(|p| T::from_peerid(p).map_err(|_| InvalidPeer(p.to_string())))
-                .collect()
-        } else {
-            Err(PathNotValid)
-        }
+    fn try_from(value: &TransportPath) -> std::result::Result<Self, Self::Error> {
+        value
+            .hops()
+            .iter()
+            .map(|p| T::from_peerid(p).map_err(|_| InvalidPeer(p.to_string())))
+            .collect()
     }
 }
 
-impl Display for Path {
+impl Display for TransportPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{} ] ({} hops)",
-            if self.valid { "[ " } else { "[ !! " },
+            "[ {} ] ({} hops)",
             self.hops.iter().map(|p| p.to_string()).collect::<Vec<_>>().join("->"),
-            self.length()
+            self.length() - 1
         )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::PathError;
-    use crate::path::Path;
+    use crate::channel_graph::ChannelGraph;
+    use crate::path::{ChannelPath, Path, TransportPath};
+    use async_trait::async_trait;
     use core_crypto::types::{OffchainPublicKey, PublicKey};
-    use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_types::channels::{ChannelEntry, ChannelStatus};
+    use core_types::protocol::PeerAddressResolver;
     use hex_literal::hex;
     use libp2p_identity::PeerId;
-    use utils_db::db::DB;
-    use utils_db::rusty::RustyLevelDbShim;
-    use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
+    use utils_types::primitives::{Address, Balance, BalanceType};
     use utils_types::traits::PeerIdLike;
 
     const PEERS_PRIVS: [[u8; 32]; 5] = [
@@ -148,213 +262,484 @@ mod tests {
         hex!("0726a9704d56a013980a9077d195520a61b5aed28f92d89c50bca6e0e0c48cfc"),
     ];
 
-    #[test]
-    fn test_path_validated() {
-        const HOPS: u32 = 5;
-        let peer_ids = (0..HOPS).map(|_| PeerId::random()).collect::<Vec<_>>();
-
-        let path = Path::new_valid(peer_ids.clone());
-        assert_eq!(HOPS, path.length());
-        assert_eq!(&peer_ids, path.hops());
-        assert!(path.valid());
-    }
-
-    fn create_dummy_channel(source: Address, destination: Address, status: ChannelStatus) -> ChannelEntry {
+    fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
         ChannelEntry::new(
-            source,
-            destination,
-            Balance::new(U256::from(1234 * 10000000000000000u128), BalanceType::HOPR),
-            U256::zero(),
+            src,
+            dst,
+            Balance::new_from_str("1", BalanceType::HOPR),
+            1u32.into(),
             status,
-            U256::zero(),
-            U256::zero(),
+            1u32.into(),
+            0u32.into(),
         )
     }
 
-    // Channels: 0 -> 1 -> 2 -> 3 -> 4, 4 /> 0
-    async fn create_db_with_channel_topology(peers: &mut Vec<PeerId>) -> CoreEthereumDb<RustyLevelDbShim> {
-        let chain_key = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap();
-        let testing_snapshot = Snapshot::new(U256::zero(), U256::zero(), U256::zero());
+    fn create_graph_and_resolver_entries(me: Address) -> (ChannelGraph, Vec<(OffchainPublicKey, Address)>) {
+        let mut cg = ChannelGraph::new(me);
+        let addrs = PEERS_PRIVS
+            .iter()
+            .map(|p| {
+                (
+                    OffchainPublicKey::from_privkey(p).unwrap(),
+                    PublicKey::from_privkey(p).unwrap().to_address(),
+                )
+            })
+            .collect::<Vec<_>>();
 
-        let mut last_addr = chain_key.to_address();
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), last_addr);
+        // Channels: 0 -> 1 -> 2 -> 3 -> 4, 4 /> 0, 3 -> 1
+        cg.update_channel(dummy_channel(addrs[0].1, addrs[1].1, ChannelStatus::Open));
+        cg.update_channel(dummy_channel(addrs[1].1, addrs[2].1, ChannelStatus::Open));
+        cg.update_channel(dummy_channel(addrs[2].1, addrs[3].1, ChannelStatus::Open));
+        cg.update_channel(dummy_channel(addrs[3].1, addrs[4].1, ChannelStatus::Open));
+        cg.update_channel(dummy_channel(addrs[3].1, addrs[1].1, ChannelStatus::Open));
+        cg.update_channel(dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose));
 
-        let packet_key = OffchainPublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap();
-        peers.push(packet_key.to_peerid());
+        (cg, addrs)
+    }
 
-        db.link_chain_and_packet_keys(&chain_key.to_address(), &packet_key, &testing_snapshot)
-            .await
-            .unwrap();
+    #[test]
+    fn test_channel_path_zero_hop_should_fail() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, _) = create_graph_and_resolver_entries(me);
 
-        for peer in PEERS_PRIVS.iter().skip(1) {
-            // For testing purposes only: derive both keys from the same secret key, which does not work in general
-            let chain_key = PublicKey::from_privkey(peer).unwrap();
-            let packet_key = OffchainPublicKey::from_privkey(peer).unwrap();
+        ChannelPath::new(vec![], &cg).expect_err("path must not be constructible");
+    }
 
-            // Link both keys
-            db.link_chain_and_packet_keys(&chain_key.to_address(), &packet_key, &testing_snapshot)
-                .await
-                .unwrap();
+    #[test]
+    fn test_channel_path_one_hop() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
-            // Open channel to self
-            let channel = create_dummy_channel(chain_key.to_address(), chain_key.to_address(), ChannelStatus::Open);
-            db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-                .await
-                .unwrap();
+        // path: 0 -> 1
+        let cp = ChannelPath::new(vec![addrs[1]], &cg).expect("path must be constructible");
+        assert_eq!(1, cp.length(), "must be one hop");
+        assert!(!cp.contains_cycle(), "must not be cyclic");
+    }
 
-            // Open channel from last node to us
-            let channel = create_dummy_channel(last_addr, chain_key.to_address(), ChannelStatus::Open);
-            db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-                .await
-                .unwrap();
+    #[test]
+    fn test_channel_path_two_hop() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
 
-            last_addr = chain_key.to_address();
-            peers.push(packet_key.to_peerid());
+        // path: 0 -> 1 -> 2
+        let cp = ChannelPath::new(vec![addrs[1], addrs[2]], &cg).expect("path must be constructible");
+        assert_eq!(2, cp.length(), "must be two hop");
+        assert!(!cp.contains_cycle(), "must not be cyclic");
+    }
+
+    #[test]
+    fn test_channel_path_three_hop() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
+
+        // path: 0 -> 1 -> 2 -> 3
+        let cp = ChannelPath::new(vec![addrs[1], addrs[2], addrs[3]], &cg).expect("path must be constructible");
+        assert_eq!(3, cp.length(), "must be three hop");
+        assert!(!cp.contains_cycle(), "must not be cyclic");
+    }
+
+    #[test]
+    fn test_channel_path_must_allow_cyclic() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
+
+        // path: 0 -> 1 -> 2 -> 3 -> 1
+        let cp =
+            ChannelPath::new(vec![addrs[1], addrs[2], addrs[3], addrs[1]], &cg).expect("path must be constructible");
+        assert_eq!(4, cp.length(), "must be four hop");
+        assert!(cp.contains_cycle(), "must not be cyclic");
+    }
+
+    #[test]
+    fn test_channel_path_should_fail_for_non_open_channel() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
+
+        // path: 0 -> 4 -> 0 (channel 4 -> 0 is PendingToClose)
+        ChannelPath::new(vec![addrs[4], addrs[0]], &cg).expect_err("path must not be constructible");
+    }
+
+    #[test]
+    fn test_channel_path_should_fail_for_non_open_channel_from_self() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
+
+        // path: 4 -> 0
+        ChannelPath::new(vec![addrs[4], addrs[0]], &cg).expect_err("path must not be constructible");
+    }
+
+    #[test]
+    fn test_channel_path_should_fail_for_non_existing_channel() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
+
+        // path: 0 -> 1 -> 3 (channel 1 -> 3 does not exist)
+        ChannelPath::new(vec![addrs[1], addrs[3]], &cg).expect_err("path 1 must not be constructible");
+
+        // path: 0 -> 1 -> 2 -> 4 (channel 2 -> 4 does not exist)
+        ChannelPath::new(vec![addrs[1], addrs[2], addrs[4]], &cg).expect_err("path 2 must not be constructible");
+    }
+
+    #[test]
+    fn test_channel_path_should_not_allow_loops() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let (_, addrs): (Vec<OffchainPublicKey>, Vec<Address>) = peer_addrs.into_iter().unzip();
+
+        // path: 0 -> 1 -> 1 -> 2
+        ChannelPath::new(vec![addrs[1], addrs[1], addrs[0]], &cg).expect_err("path must not be constructible");
+    }
+
+    struct TestResolver(Vec<(OffchainPublicKey, Address)>);
+
+    #[async_trait(? Send)]
+    impl PeerAddressResolver for TestResolver {
+        async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
+            self.0
+                .iter()
+                .find(|(_, addr)| addr.eq(onchain_key))
+                .map(|(pk, _)| pk.clone())
         }
 
-        // Add a closed channel between 4 -> 0
-        let chain_key_0 = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
-        let chain_key_4 = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
-        let channel = create_dummy_channel(chain_key_4, chain_key_0, ChannelStatus::Closed);
-        db.update_channel_and_snapshot(&channel.get_id(), &channel, &testing_snapshot)
-            .await
-            .unwrap();
-
-        db
+        async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
+            self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+        }
     }
 
     #[async_std::test]
-    async fn test_path_validation() {
-        let mut peers = Vec::new();
-        let db = create_db_with_channel_topology(&mut peers).await;
-
+    async fn test_transport_path_empty_should_fail() {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
 
-        let path = Path::new(vec![peers[1], peers[2]], &me, false, &db)
+        TransportPath::resolve(vec![], &resolver, &cg)
             .await
-            .expect("path 0 -> 1 -> 2 must be valid");
+            .expect_err("should not resolve path");
+    }
 
-        assert_eq!(2, path.length());
+    #[async_std::test]
+    async fn test_transport_path_resolve_direct() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
 
-        let path = Path::new(vec![peers[2]], &me, false, &db)
+        // path 0 -> 1
+        let (p, cp) = TransportPath::resolve(vec![peers[1]], &resolver, &cg)
             .await
-            .expect("path 0 -> 2 must be valid, because channel not needed for direct message");
+            .expect("should resolve path");
+        assert_eq!(1, p.length(), "must contain destination");
+        assert!(cp.is_none(), "no channel path for direct message")
+    }
 
-        assert_eq!(1, path.length());
+    #[async_std::test]
+    async fn test_transport_path_resolve_direct_to_self() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
 
-        let path = Path::new(vec![peers[1], peers[2], peers[3]], &me, false, &db)
+        // path 0 -> 0
+        let (p, cp) = TransportPath::resolve(vec![peers[0]], &resolver, &cg)
             .await
-            .expect("path 0 -> 1 -> 2 -> 3 must be valid");
+            .expect("should resolve path");
+        assert_eq!(1, p.length(), "must contain destination");
+        assert!(cp.is_none(), "no channel path for direct message")
+    }
 
-        assert_eq!(3, path.length());
+    #[async_std::test]
+    async fn test_transport_path_resolve_direct_is_allowed_without_channel_to_destination() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
 
-        let path = Path::new(vec![peers[1], peers[2], peers[3], peers[4]], &me, false, &db)
+        // path 0 -> 3
+        let (p, cp) = TransportPath::resolve(vec![peers[3]], &resolver, &cg)
             .await
-            .expect("path 0 -> 1 -> 2 -> 3 -> 4 must be valid");
+            .expect("should resolve path");
+        assert_eq!(1, p.length(), "must contain destination");
+        assert!(cp.is_none(), "no channel path for direct message");
+    }
 
-        assert_eq!(4, path.length());
-
-        let path = Path::new(vec![peers[1], peers[2], peers[2], peers[3]], &me, true, &db)
-            .await
-            .expect("path 0 -> 1 -> 2 -> 2 -> 3 must be valid if loops are allowed");
-
-        assert_eq!(4, path.length()); // loop still counts as a hop
-
-        match Path::new(vec![peers[1], peers[2], peers[2], peers[3]], &me, false, &db)
-            .await
-            .expect_err("path 0 -> 1 -> 2 -> 2 must be invalid if loops are not allowed")
-        {
-            PathError::LoopsNotAllowed(_) => {}
-            _ => panic!("error must be LoopsNotAllowed"),
-        };
-
-        match Path::new(vec![peers[3], peers[4]], &me, false, &db)
-            .await
-            .expect_err("path 0 -> 3 must be invalid, because channel 0 -> 3 is not opened")
-        {
-            PathError::MissingChannel(_, _) => {}
-            _ => panic!("error must be MissingChannel"),
-        };
-
-        match Path::new(vec![peers[1], peers[3], peers[4]], &me, false, &db)
-            .await
-            .expect_err("path 0 -> 1 -> 3 -> 4 must be invalid, because channel 1 -> 3 is not opened")
-        {
-            PathError::MissingChannel(_, _) => {}
-            _ => panic!("error must be MissingChannel"),
-        };
-
-        match Path::new(
-            vec![peers[1], peers[2], peers[3], peers[4], peers[0], peers[1]],
-            &me,
-            false,
-            &db,
-        )
-        .await
-        .expect_err("path 0 -> 1 -> 2 -> 3 -> 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
-        {
-            PathError::ChannelNotOpened(_, _) => {}
-            _ => panic!("error must be ChannelNotOpened"),
-        };
-
+    #[async_std::test]
+    async fn test_transport_path_resolve_direct_is_allowed_with_closed_channel_to_destination() {
         let me = PublicKey::from_privkey(&PEERS_PRIVS[4]).unwrap().to_address();
-        match Path::new(vec![peers[0], peers[1]], &me, false, &db)
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 4 -> 0
+        let (p, cp) = TransportPath::resolve(vec![peers[0]], &resolver, &cg)
             .await
-            .expect_err("path 4 -> 0 -> 1 must be invalid, because channel 4 -> 0 is already closed")
-        {
-            PathError::ChannelNotOpened(_, _) => {}
-            _ => panic!("error must be ChannelNotOpened"),
-        };
+            .expect("should resolve path");
+        assert_eq!(1, p.length(), "must contain destination");
+        assert!(cp.is_none(), "no channel path for direct message")
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_resolve_one_hop() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
+            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 0 -> 1 -> 2
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2]], &resolver, &cg)
+            .await
+            .expect("should resolve path");
+        assert_eq!(2, p.length(), "must be two hop");
+        assert!(!p.contains_cycle(), "transport path must not contain a cycle");
+
+        let cp = cp.expect("must have channel path");
+        assert_eq!(1, cp.length(), "channel path must be one hop");
+        assert_eq!(vec![addrs[1]], cp.hops(), "channel path address must match");
+        assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_resolve_one_hop_without_channel_to_destination() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
+            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 0 -> 1 -> 4
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[4]], &resolver, &cg)
+            .await
+            .expect("should resolve path");
+        assert_eq!(2, p.length(), "must be two hop");
+        assert!(!p.contains_cycle(), "transport path must not contain a cycle");
+
+        let cp = cp.expect("must have channel path");
+        assert_eq!(1, cp.length(), "channel path must be one hop");
+        assert_eq!(vec![addrs[1]], cp.hops(), "channel path address must match");
+        assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_resolve_two_hop() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
+            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 0 -> 1 -> 2 -> 3
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3]], &resolver, &cg)
+            .await
+            .expect("should resolve path");
+        assert_eq!(3, p.length(), "must be three hop");
+        assert!(!p.contains_cycle(), "transport path must not contain a cycle");
+
+        let cp = cp.expect("must have channel path");
+        assert_eq!(2, cp.length(), "channel path must be two hop");
+        assert_eq!(vec![addrs[1], addrs[2]], cp.hops(), "channel path address must match");
+        assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_resolve_two_hop_without_channel_to_destination() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
+            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 0 -> 1 -> 2 -> 4
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[4]], &resolver, &cg)
+            .await
+            .expect("should resolve path");
+        assert_eq!(3, p.length(), "must be three hop");
+        assert!(!p.contains_cycle(), "transport path must not contain a cycle");
+
+        let cp = cp.expect("must have channel path");
+        assert_eq!(2, cp.length(), "channel path must be two hop");
+        assert_eq!(vec![addrs[1], addrs[2]], cp.hops(), "channel path address must match");
+        assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_resolve_three_hop() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
+            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 0 -> 1 -> 2 -> 3 -> 4
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[4]], &resolver, &cg)
+            .await
+            .expect("should resolve path");
+        assert_eq!(4, p.length(), "must have 4 entries");
+        assert!(!p.contains_cycle(), "transport path must not contain a cycle");
+
+        let cp = cp.expect("must have channel path");
+        assert_eq!(3, cp.length(), "channel path must be two hop");
+        assert_eq!(
+            vec![addrs[1], addrs[2], addrs[3]],
+            cp.hops(),
+            "channel path address must match"
+        );
+        assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_resolve_with_cycle() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
+            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 0 -> 1 -> 2 -> 3 -> 1
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[1]], &resolver, &cg)
+            .await
+            .expect("should resolve path");
+        assert_eq!(4, p.length(), "must have 4 entries");
+        assert!(p.contains_cycle(), "transport path must contain a cycle");
+
+        let cp = cp.expect("must have channel path");
+        assert_eq!(3, cp.length(), "channel path must be 3 hop");
+        assert_eq!(
+            vec![addrs[1], addrs[2], addrs[3]],
+            cp.hops(),
+            "channel path address must match"
+        );
+        assert!(!cp.contains_cycle(), "channel path must not contain a cycle");
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_resolve_with_channel_cycle() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
+            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 0 -> 1 -> 2 -> 3 -> 1 -> 2
+        let (p, cp) = TransportPath::resolve(vec![peers[1], peers[2], peers[3], peers[1], peers[2]], &resolver, &cg)
+            .await
+            .expect("should resolve path");
+        assert_eq!(5, p.length(), "must be 5 hop");
+        assert!(p.contains_cycle(), "transport path must contain a cycle");
+
+        let cp = cp.expect("must have channel path");
+        assert_eq!(4, cp.length(), "channel path must be 4 hop");
+        assert_eq!(
+            vec![addrs[1], addrs[2], addrs[3], addrs[1]],
+            cp.hops(),
+            "channel path address must match"
+        );
+        assert!(cp.contains_cycle(), "channel path must not contain a cycle");
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_should_not_resolve_for_non_existing_intermediate_channel() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 0 -> 2 -> 3
+        TransportPath::resolve(vec![peers[2], peers[3]], &resolver, &cg)
+            .await
+            .expect_err("should not resolve path 1");
+
+        // path 0 -> 1 -> 3 -> 1
+        TransportPath::resolve(vec![peers[1], peers[3], peers[1]], &resolver, &cg)
+            .await
+            .expect_err("should not resolve path 2");
+    }
+
+    #[async_std::test]
+    async fn test_transport_path_should_not_resolve_for_non_open_intermediate_channel() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[2]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, _): (Vec<PeerId>, Vec<Address>) = peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path 2 -> 3 -> 4 -> 0 -> 1
+        TransportPath::resolve(vec![peers[3], peers[4], peers[0], peers[1]], &resolver, &cg)
+            .await
+            .expect_err("should not resolve path");
+    }
+
+    #[async_std::test]
+    async fn test_channel_path_to_transport_path() {
+        let me = PublicKey::from_privkey(&PEERS_PRIVS[0]).unwrap().to_address();
+        let (cg, peer_addrs) = create_graph_and_resolver_entries(me);
+        let resolver = TestResolver(peer_addrs.clone());
+        let (peers, addrs): (Vec<PeerId>, Vec<Address>) =
+            peer_addrs.into_iter().map(|(p, a)| (p.to_peerid(), a)).unzip();
+
+        // path: 0 -> 1 -> 2 -> 3
+        let cp = ChannelPath::new(vec![addrs[1], addrs[2], addrs[3]], &cg).expect("path must be constructible");
+
+        // path: 0 -> 1 -> 2 -> 3 -> 4
+        let tp = cp
+            .to_path(&resolver, addrs[4])
+            .await
+            .expect("should convert to transport path");
+        assert_eq!(
+            tp.length(),
+            cp.length() + 1,
+            "transport path must have extra hop to destination"
+        );
+        assert_eq!(
+            vec![peers[1], peers[2], peers[3], peers[4]],
+            tp.hops(),
+            "must contain all peer ids"
+        );
     }
 }
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::errors::PathError::InvalidPeer;
-    use crate::errors::Result;
-    use crate::path::Path;
+    use crate::channel_graph::wasm::ChannelGraph;
+    use crate::errors::{PathError::InvalidPeer, Result};
+    use crate::path::{Path, TransportPath};
+    use crate::DbPeerAddressResolver;
     use core_ethereum_db::db::wasm::Database;
     use js_sys::JsString;
     use libp2p_identity::PeerId;
     use std::str::FromStr;
-    use utils_misc::ok_or_jserr;
     use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Address;
     use wasm_bindgen::prelude::wasm_bindgen;
 
     #[wasm_bindgen]
-    impl Path {
-        #[wasm_bindgen(constructor)]
-        pub fn _new_validated(validated_path: Vec<JsString>) -> JsResult<Path> {
-            Ok(Path::new_valid(
-                validated_path
-                    .into_iter()
+    impl TransportPath {
+        #[wasm_bindgen(js_name = "validated")]
+        pub async fn _validated(
+            path: Vec<JsString>,
+            db: &Database,
+            channel_graph: &ChannelGraph,
+        ) -> JsResult<TransportPath> {
+            let graph = channel_graph.as_ref_counted();
+            let cg = graph.read().await;
+            Ok(TransportPath::resolve(
+                path.into_iter()
                     .map(|p| PeerId::from_str(&p.as_string().unwrap()).map_err(|_| InvalidPeer(p.as_string().unwrap())))
                     .collect::<Result<Vec<PeerId>>>()?,
-            ))
+                &DbPeerAddressResolver(db.as_ref_counted()),
+                &cg,
+            )
+            .await
+            .map(|(p, _)| p)?)
         }
 
-        #[wasm_bindgen(js_name = "validated")]
-        pub async fn _new(
-            path: Vec<JsString>,
-            self_addr: &Address,
-            allow_loops: bool,
-            db: &Database,
-        ) -> JsResult<Path> {
-            let database = db.as_ref_counted();
-            let g = database.read().await;
-            ok_or_jserr!(
-                Path::new(
-                    path.into_iter()
-                        .map(|p| PeerId::from_str(&p.as_string().unwrap())
-                            .map_err(|_| InvalidPeer(p.as_string().unwrap())))
-                        .collect::<Result<Vec<PeerId>>>()?,
-                    self_addr,
-                    allow_loops,
-                    &*g
-                )
-                .await
-            )
+        #[wasm_bindgen(js_name = "length")]
+        pub fn _length(&self) -> u32 {
+            self.length() as u32
         }
 
         #[wasm_bindgen(js_name = "to_string")]

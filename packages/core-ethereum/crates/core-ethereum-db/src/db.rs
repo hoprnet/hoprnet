@@ -173,8 +173,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let value_key = utils_db::db::Key::new_from_str(REJECTED_TICKETS_VALUE)?;
 
         let mut batch_ops = utils_db::db::Batch::default();
-        batch_ops.put(count_key, &(count + 1));
-        batch_ops.put(value_key, &balance.add(&ticket.amount));
+        batch_ops.put(count_key, count + 1);
+        batch_ops.put(value_key, balance.add(&ticket.amount));
 
         self.db.batch(batch_ops, true).await
     }
@@ -267,14 +267,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let mut batch_ops = utils_db::db::Batch::default();
 
-        let mut done = false;
-        while tickets.len() > 0 && !done {
+        let mut should_continue = true;
+        while !tickets.is_empty() && should_continue {
             let tickets_len = tickets.len();
             for (index, ticket) in tickets.iter_mut().enumerate() {
                 if let AcknowledgedTicketStatus::BeingRedeemed { tx_hash: _ } = ticket.status {
                     if index + 1 > tickets_len {
                         tickets = vec![];
-                        done = true;
+                        should_continue = false;
                     } else {
                         tickets = tickets.split_at_mut(index + 1).1.to_vec();
                     }
@@ -295,7 +295,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
                 );
 
                 if index == tickets_len - 1 {
-                    done = true;
+                    should_continue = false;
                 }
             }
         }
@@ -345,7 +345,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
             if let AcknowledgedTicketStatus::BeingRedeemed { tx_hash: _ } = acked_ticket.status {
                 return Ok(());
             }
-            batch.del(get_acknowledged_ticket_key(&acked_ticket)?);
+            batch.del(get_acknowledged_ticket_key(acked_ticket)?);
         }
 
         batch.put(get_acknowledged_ticket_key(&aggregated_ticket)?, aggregated_ticket);
@@ -377,7 +377,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
     }
 
     async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
-        let key = get_acknowledged_ticket_key(&ticket)?;
+        let key = get_acknowledged_ticket_key(ticket)?;
         if self.db.contains(key.clone()).await {
             self.db.set(key, ticket).await.map(|_| ())
         } else {
@@ -491,7 +491,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
 
         let mut batch_ops = utils_db::db::Batch::default();
         for acked_ticket in acknowledged_tickets.iter() {
-            batch_ops.del(get_acknowledged_ticket_key(&acked_ticket)?);
+            batch_ops.del(get_acknowledged_ticket_key(acked_ticket)?);
             neglected_ticket_value = neglected_ticket_value.add(&acked_ticket.ticket.amount);
         }
 
@@ -697,7 +697,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let count = self.db.get_or_none::<usize>(key.clone()).await?.unwrap_or(0);
         ops.put(key, count + 1);
 
-        let key = get_acknowledged_ticket_key(&acked_ticket)?;
+        let key = get_acknowledged_ticket_key(acked_ticket)?;
         ops.del(key);
 
         if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
@@ -1035,7 +1035,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> HoprCoreEthereumDbAc
         let mut batch_ops = utils_db::db::Batch::default();
         batch_ops.put(
             utils_db::db::Key::new_from_str(LATEST_CONFIRMED_SNAPSHOT_KEY)?,
-            &snapshot,
+            snapshot,
         );
 
         if allowed {
@@ -1780,7 +1780,7 @@ mod tests {
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * path_pos.into(),
+                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(path_pos),
                 BalanceType::HOPR,
             ),
             index.unwrap_or(U256::one()),

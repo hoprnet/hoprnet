@@ -1,9 +1,9 @@
 [package]
 name = "core-path"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Contains mixnet path construction and path finding logic"
+description = "Contains mixnet path construction and path selection logic"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -12,26 +12,32 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-core-ethereum-db = { workspace = true, default-features = false }
-core-crypto = { workspace = true, default-features = false }
-core-types = { workspace = true, default-features = false }
+async-trait = { workspace = true }
+async-std = { workspace = true }
+futures = { workspace = true }
 hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 petgraph = {version = "0.6.4", features = ["serde-1"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
+
+core-ethereum-db = { workspace = true, default-features = false }
+core-crypto = { workspace = true, default-features = false }
+core-types = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-misc = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
-async-std = {version = "1.12.0", features = ["unstable"]}
+async-std = { version = "1.12.0", features = ["unstable", "attributes"] }
+mockall = "0.11.4"
+lazy_static = "1.4.0"
 hex-literal = "0.4"
 tempfile = "3"
 wasm-bindgen-test = "0.3.36"

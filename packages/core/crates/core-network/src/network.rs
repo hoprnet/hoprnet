@@ -303,7 +303,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
     /// Update the PeerId record in the network
     pub fn update(&mut self, peer: &PeerId, ping_result: crate::types::Result) {
-        self.update_with_metadata(peer, ping_result, None)
+        self.update_with_metadata(peer, ping_result, None);
     }
 
     /// Update the PeerId record in the network (with optional metadata entries that will be merged into the existing ones)
@@ -312,7 +312,7 @@ impl<T: NetworkExternalActions> Network<T> {
         peer: &PeerId,
         ping_result: crate::types::Result,
         metadata: Option<HashMap<String, String>>,
-    ) {
+    ) -> Option<PeerStatus> {
         if let Some(existing) = self.entries.get(peer) {
             let mut entry = existing.clone();
             entry.heartbeats_sent = entry.heartbeats_sent + 1;
@@ -339,7 +339,7 @@ impl<T: NetworkExternalActions> Network<T> {
                         .emit(NetworkEvent::CloseConnection(entry.id.clone()));
                     self.prune_from_network_status(&entry.id);
                     self.entries.remove(&entry.id);
-                    return;
+                    return Some(entry);
                 } else if entry.quality < self.cfg.quality_bad_threshold {
                     self.ignored
                         .insert(entry.id, self.network_actions_api.create_timestamp());
@@ -355,9 +355,12 @@ impl<T: NetworkExternalActions> Network<T> {
             }
 
             self.refresh_network_status(&entry);
-            self.entries.insert(entry.id.clone(), entry);
+            self.entries.insert(entry.id.clone(), entry.clone());
+
+            Some(entry)
         } else {
             info!("Ignoring update request for unknown peer {}", peer);
+            None
         }
     }
 

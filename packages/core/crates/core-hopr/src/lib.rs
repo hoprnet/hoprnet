@@ -108,11 +108,13 @@ pub mod wasm_impls {
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_network::network::NetworkConfig;
-    use core_path::channel_graph::{ChannelChange, ChannelGraph};
-    use core_path::path::Path;
+    use core_path::channel_graph::ChannelGraph;
+    use core_path::path::TransportPath;
+    use core_path::DbPeerAddressResolver;
     use core_strategy::strategy::MultiStrategyConfig;
-    use core_types::channels::ChannelStatus;
+    use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::protocol::ApplicationData;
+    use utils_db::rusty::RustyLevelDbShim;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
 
@@ -126,11 +128,12 @@ pub mod wasm_impls {
         tx_sender: TransactionSender,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
         channel_events: ChannelEventEmitter,
+        channel_graph: core_path::channel_graph::wasm::ChannelGraph,
     }
 
     impl HoprTools {
         pub fn new(
-            ping: Ping<adaptors::ping::PingExternalInteractions>,
+            ping: Ping<adaptors::ping::PingExternalInteractions<DbPeerAddressResolver>>,
             peers: Arc<RwLock<Network<adaptors::network::ExternalNetworkInteractions>>>,
             change_notifier: Sender<NetworkEvent>,
             indexer: adaptors::indexer::WasmIndexerInteractions,
@@ -138,6 +141,7 @@ pub mod wasm_impls {
             tx_sender: TransactionSender,
             ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
             channel_events: ChannelEventEmitter,
+            channel_graph: core_path::channel_graph::wasm::ChannelGraph,
         ) -> Self {
             Self {
                 ping: adaptors::ping::wasm::WasmPing::new(Arc::new(RwLock::new(ping))),
@@ -147,6 +151,7 @@ pub mod wasm_impls {
                 ticket_aggregate_actions,
                 tx_sender,
                 channel_events,
+                channel_graph,
             }
         }
     }
@@ -169,10 +174,14 @@ pub mod wasm_impls {
             self.channel_events.clone()
         }
 
+        pub fn channel_graph(&self) -> core_path::channel_graph::wasm::ChannelGraph {
+            self.channel_graph.clone()
+        }
+
         pub async fn send_message(
             &self,
             msg: ApplicationData,
-            path: Path,
+            path: TransportPath,
             timeout_in_millis: u64,
         ) -> Result<HalfKeyChallenge, JsValue> {
             match self.pkt_sender.clone().send_packet(msg, path) {
@@ -215,7 +224,7 @@ pub mod wasm_impls {
     pub fn build_components(
         me: libp2p_identity::Keypair,
         me_onchain: ChainKeypair,
-        db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+        db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
         network_cfg: NetworkConfig,
         hb_cfg: HeartbeatConfig,
         ping_cfg: PingConfig,
@@ -244,6 +253,8 @@ pub mod wasm_impls {
         )));
 
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
+
+        let addr_resolver = DbPeerAddressResolver(db.clone());
 
         let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
@@ -301,8 +312,8 @@ pub mod wasm_impls {
                                 &channel,
                                 own_channel_direction,
                                 ChannelChange::Status {
-                                    old: ChannelStatus::Closed,
-                                    new: ChannelStatus::Open,
+                                    left: ChannelStatus::Closed,
+                                    right: ChannelStatus::Open,
                                 },
                             )
                             .await;
@@ -328,7 +339,11 @@ pub mod wasm_impls {
             ping_cfg.clone(),
             ping_tx,
             pong_rx,
-            adaptors::ping::PingExternalInteractions::new(network.clone()),
+            adaptors::ping::PingExternalInteractions::new(
+                network.clone(),
+                addr_resolver.clone(),
+                channel_graph.clone(),
+            ),
         );
 
         let (indexer_update_tx, indexer_update_rx) =
@@ -347,6 +362,7 @@ pub mod wasm_impls {
             ChannelEventEmitter {
                 tx: on_channel_event_tx,
             },
+            core_path::channel_graph::wasm::ChannelGraph::new(channel_graph.clone()),
         );
 
         let (hb_ping_tx, hb_ping_rx) = futures::channel::mpsc::unbounded::<(PeerId, ControlMessage)>();
@@ -358,14 +374,16 @@ pub mod wasm_impls {
         let swarm_network_clone = network.clone();
         let tbf_clone = tbf.clone();
         let multistrategy_clone = multi_strategy.clone();
+        let cg_clone = channel_graph.clone();
+        let resolver_clone = addr_resolver.clone();
 
-        let ready_loops: Vec<std::pin::Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+        let ready_loops: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
             Box::pin(async move {
                 let hb_pinger = Ping::new(
                     ping_cfg,
                     hb_ping_tx,
                     hb_pong_rx,
-                    adaptors::ping::PingExternalInteractions::new(ping_network_clone),
+                    adaptors::ping::PingExternalInteractions::new(ping_network_clone, resolver_clone, cg_clone),
                 );
                 Heartbeat::new(
                     hb_cfg,
@@ -434,7 +452,17 @@ pub mod wasm_impls {
         ];
         let mut futs = helpers::to_futures_unordered(ready_loops);
 
+        let cg_clone = channel_graph.clone();
+        let db_clone = db.clone();
         let main_loop = async move {
+            // TODO: move this to a specialized one-shot startup initialization function?
+            {
+                let db = db_clone.read().await;
+                if let Err(e) = cg_clone.write().await.sync_channels(&*db).await {
+                    error!("failed to initialize channel graph from the DB: {e}");
+                }
+            }
+
             while let Some(process) = futs.next().await {
                 error!("CRITICAL: the core system loop unexpectedly stopped: '{}'", process);
                 unreachable!("Futures inside the main loop should never terminate, but run in the background");
