@@ -14,12 +14,11 @@ use core_crypto::{
 };
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_packet::errors::PacketError::{
-    self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError, PathError,
+    self, ChannelNotFound, MissingDomainSeparator, OutOfFunds, PacketConstructionError, PacketDecodingError,
     PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use core_packet::errors::Result;
-use core_path::errors::PathError::PathNotValid;
-use core_path::path::Path;
+use core_path::path::{Path, TransportPath};
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
@@ -74,7 +73,7 @@ const PACKET_RX_QUEUE_SIZE: usize = 2048;
 #[derive(Debug)]
 pub enum MsgToProcess {
     ToReceive(Box<[u8]>, PeerId),
-    ToSend(ApplicationData, Path, PacketSendFinalizer),
+    ToSend(ApplicationData, TransportPath, PacketSendFinalizer),
     ToForward(Box<[u8]>, PeerId),
 }
 
@@ -113,7 +112,7 @@ where
 {
     type Input = ApplicationData;
 
-    async fn into_outgoing(&self, data: Self::Input, path: &Path) -> Result<TransportPacket> {
+    async fn into_outgoing(&self, data: Self::Input, path: &TransportPath) -> Result<TransportPacket> {
         let next_peer = self
             .db
             .read()
@@ -392,7 +391,7 @@ where
         self.db
             .write()
             .await
-            .set_current_ticket_index(&channel_id, current_ticket_index + 1u64.into())
+            .set_current_ticket_index(&channel_id, current_ticket_index + 1u32)
             .await?;
 
         let ticket = {
@@ -529,12 +528,7 @@ pub struct PacketActions {
 /// Pushes the packet with the given payload for sending via the given valid path.
 impl PacketActions {
     /// Pushes a new packet from this node into processing.
-    pub fn send_packet(&mut self, data: ApplicationData, path: Path) -> Result<PacketSendAwaiter> {
-        // Check if the path is valid
-        if !path.valid() {
-            return Err(PathError(PathNotValid));
-        }
-
+    pub fn send_packet(&mut self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<HalfKeyChallenge>();
 
         self.process(MsgToProcess::ToSend(data, path, PacketSendFinalizer::new(tx)))
@@ -804,6 +798,8 @@ mod tests {
         msg::mixer::MixerConfig,
     };
     use async_std::sync::RwLock;
+    use async_trait::async_trait;
+    use core_crypto::types::OffchainPublicKey;
     use core_crypto::{
         derivation::derive_ack_key_share,
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -813,7 +809,9 @@ mod tests {
     };
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_packet::por::ProofOfRelayValues;
-    use core_path::path::Path;
+    use core_path::channel_graph::ChannelGraph;
+    use core_path::path::{Path, TransportPath};
+    use core_types::protocol::PeerAddressResolver;
     use core_types::{
         acknowledgement::{AcknowledgedTicket, Acknowledgement, PendingAcknowledgement},
         channels::{ChannelEntry, ChannelStatus},
@@ -1209,6 +1207,49 @@ mod tests {
         (received_packets, received_challenges, received_tickets)
     }
 
+    async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
+        let peers_addrs = peers
+            .iter()
+            .map(|p| (OffchainPublicKey::from_peerid(p).unwrap(), Address::random()))
+            .collect::<Vec<_>>();
+        let mut cg = ChannelGraph::new(Address::random());
+        let mut last_addr = cg.my_address();
+        for (_, addr) in peers_addrs.iter() {
+            let c = ChannelEntry::new(
+                last_addr,
+                *addr,
+                Balance::new(1000u32.into(), BalanceType::HOPR),
+                0u32.into(),
+                ChannelStatus::Open,
+                0u32.into(),
+                0u32.into(),
+            );
+            cg.update_channel(c);
+            last_addr = *addr;
+        }
+
+        struct TestResolver(Vec<(OffchainPublicKey, Address)>);
+
+        #[async_trait(? Send)]
+        impl PeerAddressResolver for TestResolver {
+            async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
+                self.0
+                    .iter()
+                    .find(|(_, addr)| addr.eq(onchain_key))
+                    .map(|(pk, _)| pk.clone())
+            }
+
+            async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
+                self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+            }
+        }
+
+        TransportPath::resolve(peers, &TestResolver(peers_addrs), &cg)
+            .await
+            .unwrap()
+            .0
+    }
+
     async fn packet_relayer_workflow_n_peers(peer_count: usize, pending_packets: usize) {
         assert!(peer_count >= 3, "invalid peer count given");
         assert!(pending_packets >= 1, "at least one packet must be given");
@@ -1225,12 +1266,13 @@ mod tests {
         let components = peer_setup_for(peer_count).await;
 
         // Peer 1: start sending out packets
-        let packet_path = Path::new_valid(
+        let packet_path = resolve_mock_path(
             PEERS[1..peer_count]
                 .iter()
                 .map(|p| p.public().to_peerid())
                 .collect::<Vec<PeerId>>(),
-        );
+        )
+        .await;
         assert_eq!(peer_count - 1, packet_path.length() as usize, "path has invalid length");
 
         let mut packet_challenges = Vec::new();

@@ -3,6 +3,7 @@ use getrandom::getrandom;
 use primitive_types::{H160, U256 as EthereumU256};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Shl, Shr, Sub};
@@ -300,23 +301,27 @@ impl Balance {
     }
 
     pub fn to_formatted_string(&self) -> String {
-        let mut val = self.value.to_string();
+        let val = self.value.to_string();
 
-        if val.len() > Self::SCALE {
-            let (l, r) = val.split_at(val.len() - Self::SCALE + 1);
-            format!(
-                "{l}.{} {}",
-                &r[..r.len() - (val.len() - Self::SCALE)],
-                self.balance_type
-            )
-        } else if val.len() < Self::SCALE {
-            for _ in 0..(Self::SCALE - val.len() - 1) {
-                val = "0".to_owned() + &val;
+        match val.len().cmp(&Self::SCALE) {
+            Ordering::Greater => {
+                let (l, r) = val.split_at(val.len() - Self::SCALE + 1);
+                format!(
+                    "{l}.{} {}",
+                    &r[..r.len() - (val.len() - Self::SCALE)],
+                    self.balance_type
+                )
             }
-            format!("0.{val} {}", self.balance_type)
-        } else {
-            let (l, r) = val.split_at(1);
-            format!("{l}.{r} {}", self.balance_type)
+            Ordering::Less => format!(
+                "0.{empty:0>width$} {currency}",
+                empty = &val,
+                width = Self::SCALE - 1,
+                currency = self.balance_type
+            ),
+            Ordering::Equal => {
+                let (l, r) = val.split_at(1);
+                format!("{l}.{r} {}", self.balance_type)
+            }
         }
     }
 }
@@ -493,7 +498,7 @@ impl U256 {
 
     /// Multiply with float in the interval [0.0, 1.0]
     pub fn multiply_f64(&self, rhs: f64) -> Result<Self> {
-        if rhs < 0.0 || rhs > 1.0 {
+        if !(0.0..=1.0).contains(&rhs) {
             return Err(InvalidInput);
         }
 
@@ -533,7 +538,7 @@ impl U256 {
 impl U256 {
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(constructor))]
     pub fn new(value: &str) -> Self {
-        U256 {
+        Self {
             value: u256::from_str_radix(value, 10).expect("invalid decimal number string"),
         }
     }
@@ -559,15 +564,17 @@ impl U256 {
     }
 
     pub fn addn(&self, n: u32) -> Self {
-        Self {
-            value: self.value + n as u128,
-        }
+        self.add(n)
     }
 
     pub fn muln(&self, n: u32) -> Self {
-        Self {
-            value: self.value * n as u128,
-        }
+        self.mul(n)
+    }
+}
+
+impl Default for U256 {
+    fn default() -> Self {
+        Self::zero()
     }
 }
 
@@ -591,6 +598,16 @@ impl Mul for U256 {
     fn mul(self, rhs: Self) -> Self::Output {
         Self {
             value: self.value.mul(rhs.value),
+        }
+    }
+}
+
+impl Mul<u32> for U256 {
+    type Output = U256;
+
+    fn mul(self, rhs: u32) -> Self::Output {
+        Self {
+            value: self.value * rhs as u128,
         }
     }
 }
@@ -630,6 +647,16 @@ impl Add for U256 {
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             value: self.value.add(rhs.value),
+        }
+    }
+}
+
+impl Add<u32> for U256 {
+    type Output = U256;
+
+    fn add(self, rhs: u32) -> Self::Output {
+        Self {
+            value: self.value + rhs as u128,
         }
     }
 }

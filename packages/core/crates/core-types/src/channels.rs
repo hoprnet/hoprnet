@@ -232,6 +232,85 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
     Hash::create(&[&source.to_bytes(), &destination.to_bytes()])
 }
 
+/// Enumerates possible changes on a channel entry update
+#[derive(Clone, Copy, Debug)]
+pub enum ChannelChange {
+    /// Channel status has changed
+    Status { left: ChannelStatus, right: ChannelStatus },
+
+    /// Channel balance has changed
+    CurrentBalance { left: Balance, right: Balance },
+
+    /// Channel epoch has changed
+    Epoch { left: u32, right: u32 },
+
+    /// Ticket index has changed
+    TicketIndex { left: u64, right: u64 },
+}
+
+impl Display for ChannelChange {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChannelChange::Status { left, right } => {
+                write!(f, "Status: {left} -> {right}")
+            }
+
+            ChannelChange::CurrentBalance { left, right } => {
+                write!(f, "Balance: {left} -> {right}")
+            }
+
+            ChannelChange::Epoch { left, right } => {
+                write!(f, "Epoch: {left} -> {right}")
+            }
+
+            ChannelChange::TicketIndex { left, right } => {
+                write!(f, "TicketIndex: {left} -> {right}")
+            }
+        }
+    }
+}
+
+impl ChannelChange {
+    /// Compares the two given channels and returns a vector of `ChannelChange`s
+    /// Both channels must have the same ID (source,destination and direction) to be comparable using this function.
+    /// The function panics if `left` and `right` do not have equal ids.
+    /// Note that only some fields are tracked for changes, and therefore an empty vector returned
+    /// does not imply the two `ChannelEntry` instances are equal.
+    pub fn diff_channels(left: &ChannelEntry, right: &ChannelEntry) -> Vec<Self> {
+        assert_eq!(left.id, right.id, "must have equal ids"); // misuse
+        let mut ret = Vec::with_capacity(4);
+        if left.status != right.status {
+            ret.push(ChannelChange::Status {
+                left: left.status,
+                right: right.status,
+            });
+        }
+
+        if left.balance != right.balance {
+            ret.push(ChannelChange::CurrentBalance {
+                left: left.balance,
+                right: right.balance,
+            });
+        }
+
+        if left.channel_epoch != right.channel_epoch {
+            ret.push(ChannelChange::Epoch {
+                left: left.channel_epoch.as_u32(),
+                right: right.channel_epoch.as_u32(),
+            });
+        }
+
+        if left.ticket_index != right.ticket_index {
+            ret.push(ChannelChange::TicketIndex {
+                left: left.ticket_index.as_u64(),
+                right: right.ticket_index.as_u64(),
+            })
+        }
+
+        ret
+    }
+}
+
 /// Contains the overall description of a ticket with a signature
 #[derive(Clone, Eq, PartialEq)]
 pub struct Ticket {
@@ -623,7 +702,7 @@ impl Ticket {
         // Add + 1 to "round to next integer"
         let win_prob = (u64::from_be_bytes(win_prob) >> 4) + 1 + 1;
 
-        (*self.amount.value() * win_prob.into()) >> U256::from(52u64)
+        (*self.amount.value() * U256::from(win_prob)) >> U256::from(52u64)
     }
 
     /// Recovers the signer public key from the embedded ticket signature.
@@ -734,7 +813,7 @@ pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
 
 /// Encodes [0.0f64, 1.0f64] to [0x00000000000000, 0xffffffffffffff]
 pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
-    if win_prob > 1.0 || win_prob < 0.0 {
+    if !(0.0..=1.0).contains(&win_prob) {
         return Err(CoreTypesError::InvalidInputData(
             "Winning probability must be in [0.0, 1.0]".into(),
         ));
