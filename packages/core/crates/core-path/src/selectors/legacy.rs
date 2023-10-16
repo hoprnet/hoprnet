@@ -170,6 +170,7 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use lazy_static::lazy_static;
     use std::str::FromStr;
+    use regex::Regex;
     use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
     lazy_static! {
@@ -187,120 +188,38 @@ mod tests {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero(), U256::zero())
     }
 
-    fn initialize_star_graph<Q, B>(me: Address, stake: B, quality: Q) -> ChannelGraph
-    where
-        Q: Fn(Address, Address) -> f64,
-        B: Fn(Address, Address) -> Balance,
-    {
-        let mut graph = ChannelGraph::new(me);
-
-        graph.update_channel(create_channel(
-            ADDRESSES[1],
-            ADDRESSES[0],
-            ChannelStatus::Open,
-            stake(ADDRESSES[1], ADDRESSES[0]),
-        ));
-        graph.update_channel_quality(ADDRESSES[1], ADDRESSES[0], quality(ADDRESSES[1], ADDRESSES[0]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[2],
-            ADDRESSES[0],
-            ChannelStatus::Open,
-            stake(ADDRESSES[2], ADDRESSES[0]),
-        ));
-        graph.update_channel_quality(ADDRESSES[2], ADDRESSES[0], quality(ADDRESSES[2], ADDRESSES[0]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[3],
-            ADDRESSES[0],
-            ChannelStatus::Open,
-            stake(ADDRESSES[3], ADDRESSES[0]),
-        ));
-        graph.update_channel_quality(ADDRESSES[3], ADDRESSES[0], quality(ADDRESSES[3], ADDRESSES[0]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[4],
-            ADDRESSES[0],
-            ChannelStatus::Open,
-            stake(ADDRESSES[4], ADDRESSES[0]),
-        ));
-        graph.update_channel_quality(ADDRESSES[4], ADDRESSES[0], quality(ADDRESSES[4], ADDRESSES[0]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[1],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[1]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[1], quality(ADDRESSES[0], ADDRESSES[1]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[2],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[2]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[2], quality(ADDRESSES[0], ADDRESSES[2]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[3],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[3]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[3], quality(ADDRESSES[0], ADDRESSES[3]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[4],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[4]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[4], quality(ADDRESSES[0], ADDRESSES[4]));
-
-        graph
-    }
-
-    fn initialize_arrow_graph<Q, B>(me: Address, stake: B, quality: Q) -> ChannelGraph
-    where
-        Q: Fn(Address, Address) -> f64,
-        B: Fn(Address, Address) -> Balance,
-    {
-        let mut graph = ChannelGraph::new(me);
-
-        graph.update_channel(create_channel(
-            ADDRESSES[0],
-            ADDRESSES[1],
-            ChannelStatus::Open,
-            stake(ADDRESSES[0], ADDRESSES[1]),
-        ));
-        graph.update_channel_quality(ADDRESSES[0], ADDRESSES[1], quality(ADDRESSES[0], ADDRESSES[1]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[1],
-            ADDRESSES[2],
-            ChannelStatus::Open,
-            stake(ADDRESSES[1], ADDRESSES[2]),
-        ));
-        graph.update_channel_quality(ADDRESSES[1], ADDRESSES[2], quality(ADDRESSES[1], ADDRESSES[2]));
-
-        graph.update_channel(create_channel(
-            ADDRESSES[2],
-            ADDRESSES[3],
-            ChannelStatus::Open,
-            stake(ADDRESSES[2], ADDRESSES[3]),
-        ));
-        graph.update_channel_quality(ADDRESSES[2], ADDRESSES[3], quality(ADDRESSES[2], ADDRESSES[3]));
-
-        graph
-    }
-
     fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) {
         let other = ChannelPath::new(path.hops().into(), graph).expect("path must be valid");
         assert_eq!(other, path.clone(), "valid paths must be equal");
         assert!(!path.contains_cycle(), "path must not be cyclic");
         assert!(!path.hops().contains(&dst), "path must not contain destination");
     }
+
+    fn define_graph<B,Q>(def: &str, me: Address, stake: B, quality: Q) -> ChannelGraph
+    where
+        Q: Fn(Address, Address) -> f64,
+        B: Fn(Address, Address) -> Balance {
+
+        let mut graph = ChannelGraph::new(me);
+        let re = Regex::new(r"^\s*(\d+)\s*(<?->)\s*(\d+)\s*$").unwrap();
+        for edge in def.split(",") {
+            let cap = re.captures(edge).unwrap();
+            let addr_a = ADDRESSES[usize::from_str(cap.get(1).unwrap().as_str()).unwrap()];
+            let addr_b = ADDRESSES[usize::from_str(cap.get(3).unwrap().as_str()).unwrap()];
+            let dir = cap.get(2).unwrap().as_str();
+
+            graph.update_channel(create_channel(addr_a, addr_b, ChannelStatus::Open, stake(addr_a, addr_b)));
+            graph.update_channel_quality(addr_a, addr_b, quality(addr_a, addr_b));
+
+            if dir == "<->" {
+                graph.update_channel(create_channel(addr_b, addr_a, ChannelStatus::Open, stake(addr_b, addr_a)));
+                graph.update_channel_quality(addr_b, addr_a, quality(addr_b, addr_a));
+            }
+        }
+
+        graph
+    }
+
 
     pub struct TestWeights;
     impl EdgeWeighting<U256> for TestWeights {
@@ -311,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_dfs_should_find_path_in_reliable_star() {
-        let star = initialize_star_graph(
+        let star = define_graph("0 <-> 1, 0 <-> 2, 0 <-> 3, 0 <-> 4",
             ADDRESSES[1],
             |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
             |_, _| 1_f64,
@@ -327,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_dfs_should_find_most_valuable_path_in_reliable_star() {
-        let star = initialize_star_graph(
+        let star = define_graph("0 <-> 1, 0 <-> 2, 0 <-> 3, 0 <-> 4",
             ADDRESSES[1],
             |_, b| {
                 Balance::new(
@@ -350,7 +269,7 @@ mod tests {
 
     #[test]
     fn test_dfs_should_not_find_path_when_does_not_exist() {
-        let star = initialize_star_graph(
+        let star = define_graph("0 <-> 1, 0 <-> 2, 0 <-> 3, 0 <-> 4",
             ADDRESSES[1],
             |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
             |_, _| 1_f64,
@@ -367,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_dfs_should_find_path_in_reliable_arrow() {
-        let arrow = initialize_arrow_graph(
+        let arrow = define_graph("0 -> 1, 1 -> 2, 2 -> 3",
             ADDRESSES[0],
             |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
             |_, _| 1_f64,
@@ -383,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_dfs_should_not_find_path_if_unreliable_node_in_arrow() {
-        let arrow = initialize_arrow_graph(
+        let arrow = define_graph("0 -> 1, 1 -> 2, 2 -> 3",
             ADDRESSES[0],
             |_, _| Balance::new(1u32.into(), BalanceType::HOPR),
             |_, dst| if dst == ADDRESSES[3] { 0.1_f64 } else { 1_f64 },
@@ -397,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_dfs_should_find_path_in_reliable_arrow_with_lower_weight() {
-        let arrow = initialize_arrow_graph(
+        let arrow = define_graph("0 -> 1, 1 -> 2, 2 -> 3, 1 -> 3",
             ADDRESSES[0],
             |_,b| Balance::new(
                 (ADDRESSES.iter().position(|a| b.eq(a)).unwrap().rem(3) as u32).into(),
@@ -416,7 +335,7 @@ mod tests {
 
     #[test]
     fn test_dfs_should_find_path_in_reliable_arrow_with_higher_weight() {
-        let arrow = initialize_arrow_graph(
+        let arrow = define_graph("0 -> 1, 1 -> 2, 2 -> 3, 1 -> 3",
             ADDRESSES[0],
             |_,b| Balance::new(
                 (ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1).into(),
@@ -435,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_dfs_should_find_path_in_reliable_arrow_with_random_weight() {
-        let arrow = initialize_arrow_graph(
+        let arrow = define_graph("0 -> 1, 1 -> 2, 2 -> 3, 1 -> 3",
             ADDRESSES[0],
             |_,b| Balance::new(
                 (ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1).into(),
