@@ -162,9 +162,10 @@ pub type LegacyPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Rem;
     use crate::channel_graph::ChannelGraph;
     use crate::path::{ChannelPath, Path};
-    use crate::selectors::legacy::DfsPathSelector;
+    use crate::selectors::legacy::{DfsPathSelector, RandomizedEdgeWeighting};
     use crate::selectors::{EdgeWeighting, PathSelector};
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use lazy_static::lazy_static;
@@ -392,6 +393,63 @@ mod tests {
         selector
             .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
             .expect_err("should not find a path");
+    }
+
+    #[test]
+    fn test_dfs_should_find_path_in_reliable_arrow_with_lower_weight() {
+        let arrow = initialize_arrow_graph(
+            ADDRESSES[0],
+            |_,b| Balance::new(
+                (ADDRESSES.iter().position(|a| b.eq(a)).unwrap().rem(3) as u32).into(),
+                BalanceType::HOPR,
+            ),
+            |_, _| 1_f64,
+        );
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        let path = selector
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
+            .expect("should find a path");
+        check_path(&path, &arrow, ADDRESSES[5]);
+        assert_eq!(3, path.length(), "should have 3 hops");
+    }
+
+    #[test]
+    fn test_dfs_should_find_path_in_reliable_arrow_with_higher_weight() {
+        let arrow = initialize_arrow_graph(
+            ADDRESSES[0],
+            |_,b| Balance::new(
+                (ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1).into(),
+                BalanceType::HOPR,
+            ),
+            |_, _| 1_f64,
+        );
+        let selector = DfsPathSelector::<TestWeights>::default();
+
+        let path = selector
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
+            .expect("should find a path");
+        check_path(&path, &arrow, ADDRESSES[5]);
+        assert_eq!(3, path.length(), "should have 3 hops");
+    }
+
+    #[test]
+    fn test_dfs_should_find_path_in_reliable_arrow_with_random_weight() {
+        let arrow = initialize_arrow_graph(
+            ADDRESSES[0],
+            |_,b| Balance::new(
+                (ADDRESSES.iter().position(|a| b.eq(a)).unwrap() as u32 + 1).into(),
+                BalanceType::HOPR,
+            ),
+            |_, _| 1_f64,
+        );
+        let selector = DfsPathSelector::<RandomizedEdgeWeighting>::default();
+
+        let path = selector
+            .select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3)
+            .expect("should find a path");
+        check_path(&path, &arrow, ADDRESSES[5]);
+        assert_eq!(3, path.length(), "should have 3 hops");
     }
 }
 
