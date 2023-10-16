@@ -12,6 +12,7 @@ use core_types::{
 };
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
+use std::rc::Rc;
 use std::{
     fmt::{Display, Formatter},
     sync::Arc,
@@ -85,6 +86,7 @@ pub trait TransactionExecutor {
 }
 
 /// Represents a result of an Ethereum transaction after it has been confirmed.
+/// These are counter parts to the `Transaction` type.
 #[derive(Clone, Debug)]
 pub enum TransactionResult {
     TicketRedeemed { tx_hash: Hash },
@@ -98,6 +100,7 @@ pub enum TransactionResult {
 /// Notifies about completion of a transaction (success or failure).
 pub type TransactionCompleted = futures::channel::oneshot::Receiver<TransactionResult>;
 
+/// Future that resolves once the transaction has been confirmed by the Indexer.
 type TransactionFinisher = futures::channel::oneshot::Sender<TransactionResult>;
 
 /// Sends a future Ethereum transaction into the `TransactionQueue`.
@@ -124,7 +127,7 @@ pub struct TransactionQueue<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
     queue_send: Sender<(Transaction, TransactionFinisher)>,
     queue_recv: Receiver<(Transaction, TransactionFinisher)>,
-    tx_exec: Arc<Box<dyn TransactionExecutor>>,
+    tx_exec: Rc<Box<dyn TransactionExecutor>>, // TODO: Make this Arc once TransactionExecutor is Send
 }
 
 impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
@@ -141,7 +144,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             db,
             queue_send,
             queue_recv,
-            tx_exec: Arc::new(tx_exec),
+            tx_exec: Rc::new(tx_exec),
         }
     }
 
@@ -152,7 +155,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
 
     async fn execute_transaction(
         db: Arc<RwLock<Db>>,
-        tx_exec: Arc<Box<dyn TransactionExecutor>>,
+        tx_exec: Rc<Box<dyn TransactionExecutor>>,
         tx: Transaction,
     ) -> TransactionResult {
         match tx {
@@ -402,6 +405,45 @@ pub mod wasm {
         }
     }
 
+    enum SendTransactionResult {
+        Success(Hash),
+        Duplicate,
+        Failure(String),
+    }
+
+    impl WasmTxExecutor {
+        async fn send_transaction(&self, tx: TypedTransaction, confirmation_prefix: &str) -> SendTransactionResult {
+            let payload = match TransactionPayload::try_from(tx) {
+                Ok(tx) => tx,
+                Err(e) => return SendTransactionResult::Failure(e.to_string()),
+            };
+
+            match await_js_promise(self.send_transaction.call2(
+                &JsValue::undefined(),
+                &JsValue::from(payload),
+                &JsString::from(confirmation_prefix).into(),
+            ))
+            .await
+            {
+                Ok(v) => {
+                    let result = SendTransactionReturn::from(v.clone());
+                    let res_code = result.code().to_uppercase();
+                    match res_code.as_str() {
+                        "SUCCESS" => match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
+                            Ok(tx_hash) => SendTransactionResult::Success(tx_hash),
+                            Err(_) => SendTransactionResult::Failure(format!("could not convert js object. {v:?}")),
+                        },
+                        "DUPLICATE" => SendTransactionResult::Duplicate,
+                        _ => SendTransactionResult::Failure(format!(
+                            "transaction sending failed with unknown error {v:?}"
+                        )),
+                    }
+                }
+                Err(e) => SendTransactionResult::Failure(e),
+            }
+        }
+    }
+
     #[async_trait(? Send)]
     impl TransactionExecutor for WasmTxExecutor {
         async fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> TransactionResult {
@@ -413,34 +455,14 @@ pub mod wasm {
             });
             tx.set_to(H160::from(self.hopr_channels));
 
-            match await_js_promise(self.send_transaction.call2(
-                &JsValue::undefined(),
-                &JsValue::from(match TransactionPayload::try_from(tx) {
-                    Ok(tx) => tx,
-                    Err(e) => return TransactionResult::Failure(e.to_string()),
-                }),
-                &JsString::from("channel-updated-").into(),
-            ))
-            .await
-            {
-                Ok(v) => {
-                    let result = SendTransactionReturn::from(v.clone());
-
-                    if result.code().eq("SUCCESS") {
-                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
-                            Ok(tx_hash) => TransactionResult::TicketRedeemed { tx_hash },
-                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
-                        };
-                    } else if result.code().eq("DUPLICATE") {
-                        return TransactionResult::Failure(format!("ticket redeem transaction is a duplicate."));
-                    } else {
-                        return TransactionResult::Failure(format!(
-                            "ticket redeem transaction failed with unknown error {:?}",
-                            v
-                        ));
-                    }
+            match self.send_transaction(tx, "channel-updated-").await {
+                SendTransactionResult::Success(tx_hash) => TransactionResult::TicketRedeemed { tx_hash },
+                SendTransactionResult::Duplicate => {
+                    TransactionResult::Failure("ticket redeem transaction is a duplicate".to_string())
                 }
-                Err(e) => TransactionResult::Failure(e),
+                SendTransactionResult::Failure(e) => {
+                    TransactionResult::Failure(format!("ticket redeem send transaction failed: {e}"))
+                }
             }
         }
 
@@ -453,34 +475,14 @@ pub mod wasm {
             });
             tx.set_to(H160::from(self.hopr_channels));
 
-            match await_js_promise(self.send_transaction.call2(
-                &JsValue::undefined(),
-                &JsValue::from(match TransactionPayload::try_from(tx) {
-                    Ok(tx) => tx,
-                    Err(e) => return TransactionResult::Failure(e.to_string()),
-                }),
-                &JsString::from("channel-updated-").into(),
-            ))
-            .await
-            {
-                Ok(v) => {
-                    let result = SendTransactionReturn::from(v.clone());
-
-                    if result.code().eq("SUCCESS") {
-                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
-                            Ok(tx_hash) => TransactionResult::ChannelFunded { tx_hash },
-                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
-                        };
-                    } else if result.code().eq("DUPLICATE") {
-                        return TransactionResult::Failure(format!("fund channel transaction is a duplicate."));
-                    } else {
-                        return TransactionResult::Failure(format!(
-                            "fund channel transaction failed with unknown error {:?}",
-                            v
-                        ));
-                    }
+            match self.send_transaction(tx, "channel-updated-").await {
+                SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelFunded { tx_hash },
+                SendTransactionResult::Duplicate => {
+                    TransactionResult::Failure("fund channel transaction is a duplicate".to_string())
                 }
-                Err(e) => TransactionResult::Failure(e),
+                SendTransactionResult::Failure(e) => {
+                    TransactionResult::Failure(format!("fund channel send transaction failed: {e}"))
+                }
             }
         }
 
@@ -493,36 +495,14 @@ pub mod wasm {
             });
             tx.set_to(H160::from(self.hopr_channels));
 
-            match await_js_promise(self.send_transaction.call2(
-                &JsValue::undefined(),
-                &JsValue::from(match TransactionPayload::try_from(tx) {
-                    Ok(tx) => tx,
-                    Err(e) => return TransactionResult::Failure(e.to_string()),
-                }),
-                &JsString::from("channel-updated-").into(),
-            ))
-            .await
-            {
-                Ok(v) => {
-                    let result = SendTransactionReturn::from(v.clone());
-
-                    if result.code().eq("SUCCESS") {
-                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
-                            Ok(tx_hash) => TransactionResult::ChannelClosureInitiated { tx_hash },
-                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
-                        };
-                    } else if result.code().eq("DUPLICATE") {
-                        return TransactionResult::Failure(format!(
-                            "initiate channel closure transaction is a duplicate."
-                        ));
-                    } else {
-                        return TransactionResult::Failure(format!(
-                            "initiate channel closure transaction failed with unknown error {:?}",
-                            v
-                        ));
-                    }
+            match self.send_transaction(tx, "channel-updated-").await {
+                SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosureInitiated { tx_hash },
+                SendTransactionResult::Duplicate => {
+                    TransactionResult::Failure("init close outgoing channel transaction is a duplicate".to_string())
                 }
-                Err(e) => TransactionResult::Failure(e),
+                SendTransactionResult::Failure(e) => {
+                    TransactionResult::Failure(format!("init close outgoing channel send transaction failed: {e}"))
+                }
             }
         }
 
@@ -535,36 +515,14 @@ pub mod wasm {
             });
             tx.set_to(H160::from(self.hopr_channels));
 
-            match await_js_promise(self.send_transaction.call2(
-                &JsValue::undefined(),
-                &JsValue::from(match TransactionPayload::try_from(tx) {
-                    Ok(tx) => tx,
-                    Err(e) => return TransactionResult::Failure(e.to_string()),
-                }),
-                &JsString::from("channel-updated-").into(),
-            ))
-            .await
-            {
-                Ok(v) => {
-                    let result = SendTransactionReturn::from(v.clone());
-
-                    if result.code().eq("SUCCESS") {
-                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
-                            Ok(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
-                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
-                        };
-                    } else if result.code().eq("DUPLICATE") {
-                        return TransactionResult::Failure(format!(
-                            "finalize channel close transaction is a duplicate."
-                        ));
-                    } else {
-                        return TransactionResult::Failure(format!(
-                            "finalize channel close transaction failed with unknown error {:?}",
-                            v
-                        ));
-                    }
+            match self.send_transaction(tx, "channel-updated-").await {
+                SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
+                SendTransactionResult::Duplicate => {
+                    TransactionResult::Failure("finalize close outgoing channel transaction is a duplicate".to_string())
                 }
-                Err(e) => TransactionResult::Failure(e),
+                SendTransactionResult::Failure(e) => {
+                    TransactionResult::Failure(format!("finalize close outgoing channel send transaction failed: {e}"))
+                }
             }
         }
 
@@ -577,44 +535,21 @@ pub mod wasm {
             });
             tx.set_to(H160::from(self.hopr_channels));
 
-            match await_js_promise(self.send_transaction.call2(
-                &JsValue::undefined(),
-                &JsValue::from(match TransactionPayload::try_from(tx) {
-                    Ok(tx) => tx,
-                    Err(e) => return TransactionResult::Failure(e.to_string()),
-                }),
-                &JsString::from("channel-updated-").into(),
-            ))
-            .await
-            {
-                Ok(v) => {
-                    let result = SendTransactionReturn::from(v.clone());
-
-                    if result.code().eq("SUCCESS") {
-                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
-                            Ok(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
-                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
-                        };
-                    } else if result.code().eq("DUPLICATE") {
-                        return TransactionResult::Failure(format!(
-                            "close incoming channel transaction is a duplicate."
-                        ));
-                    } else {
-                        return TransactionResult::Failure(format!(
-                            "close incoming channel transaction failed with unknown error {:?}",
-                            v
-                        ));
-                    }
+            match self.send_transaction(tx, "channel-updated-").await {
+                SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
+                SendTransactionResult::Duplicate => {
+                    TransactionResult::Failure("close incoming channel transaction is a duplicate".to_string())
                 }
-                Err(e) => TransactionResult::Failure(e),
+                SendTransactionResult::Failure(e) => {
+                    TransactionResult::Failure(format!("close incoming channel send transaction failed: {e}"))
+                }
             }
         }
 
         async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            let event_string: String;
-            match amount.balance_type() {
+            let event_string = match amount.balance_type() {
                 BalanceType::HOPR => {
                     tx.set_data(match self.generator.transfer(&recipient, &amount) {
                         Ok(payload) => payload.into(),
@@ -622,44 +557,24 @@ pub mod wasm {
                     });
                     tx.set_to(H160::from(self.hopr_token));
 
-                    event_string = "withdraw-hopr-".into();
+                    "withdraw-hopr-"
                 }
                 BalanceType::Native => {
                     tx.set_to(H160::from(recipient));
                     tx.set_value(U256(primitive_types::U256::from(amount.value()).0));
 
-                    event_string = "withdraw-native-".into();
+                    "withdraw-native-"
                 }
-            }
+            };
 
-            match await_js_promise(self.send_transaction.call2(
-                &JsValue::undefined(),
-                &JsValue::from(match TransactionPayload::try_from(tx) {
-                    Ok(tx) => tx,
-                    Err(e) => return TransactionResult::Failure(e.to_string()),
-                }),
-                &JsString::from(event_string),
-            ))
-            .await
-            {
-                Ok(v) => {
-                    let result = SendTransactionReturn::from(v.clone());
-
-                    if result.code().eq("SUCCESS") {
-                        return match Hash::from_hex(result.tx().unwrap().hash().as_str()) {
-                            Ok(tx_hash) => TransactionResult::Withdrawn { tx_hash },
-                            Err(_) => TransactionResult::Failure(format!("Could not convert js object. {:?}", v)),
-                        };
-                    } else if result.code().eq("DUPLICATE") {
-                        return TransactionResult::Failure(format!("withdraw transaction is a duplicate."));
-                    } else {
-                        return TransactionResult::Failure(format!(
-                            "withdraw transaction failed with unknown error {:?}",
-                            v
-                        ));
-                    }
+            match self.send_transaction(tx, event_string).await {
+                SendTransactionResult::Success(tx_hash) => TransactionResult::Withdrawn { tx_hash },
+                SendTransactionResult::Duplicate => {
+                    TransactionResult::Failure("withdraw transaction is a duplicate".to_string())
                 }
-                Err(e) => TransactionResult::Failure(e),
+                SendTransactionResult::Failure(e) => {
+                    TransactionResult::Failure(format!("withdraw send transaction failed: {e}"))
+                }
             }
         }
     }

@@ -610,8 +610,8 @@ pub mod wasm {
         ack_ticket: &AcknowledgedTicket,
         on_chain_tx_sender: &TransactionSender,
     ) -> JsResult<()> {
-        // We do not await the on-chain confirmation
-        let _ = super::redeem_ticket(db.as_ref_counted(), ack_ticket.into(), on_chain_tx_sender.clone()).await?;
+        let fin = super::redeem_ticket(db.as_ref_counted(), ack_ticket.into(), on_chain_tx_sender.clone()).await?;
+        std::mem::drop(fin); // We do not await the on-chain confirmation
         Ok(())
     }
 }
