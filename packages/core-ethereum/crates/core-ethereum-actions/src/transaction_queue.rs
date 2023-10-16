@@ -199,7 +199,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 ChannelDirection::Outgoing => match channel.status {
                     Open => {
                         debug!("initiating closure of {channel}");
-                        let res = tx_exec.initiate_outgoing_channel_closure(channel.source).await;
+                        let res = tx_exec.initiate_outgoing_channel_closure(channel.destination).await;
                         if let TransactionResult::ChannelClosureInitiated { .. } = res {
                             debug!("deleting pending balance of {channel} after initiating closure");
                             if let Err(e) = db.write().await.reset_pending_balance_to(&channel.destination).await {

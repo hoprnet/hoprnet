@@ -597,6 +597,8 @@ mod tests {
 
     #[async_std::test]
     async fn test_close_channel_outgoing() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
         let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
 
