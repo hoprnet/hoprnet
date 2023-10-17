@@ -1,9 +1,8 @@
-use async_lock::RwLock;
+use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::errors::CoreEthereumError::{InvalidArguments, InvalidState};
 use core_types::channels::{ChannelDirection, ChannelStatus};
-use std::sync::Arc;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
@@ -22,157 +21,142 @@ use crate::{
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
+use crate::redeem::TicketRedeemActions;
+use crate::CoreEthereumActions;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
-pub async fn open_channel<Db>(
-    db: Arc<RwLock<Db>>,
-    tx_sender: TransactionSender,
-    destination: Address,
-    self_addr: Address,
-    amount: Balance,
-) -> Result<TransactionCompleted>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    if self_addr == destination {
-        return Err(InvalidArguments("cannot open channel to self".into()).into());
-    }
+/// Gathers all channel related on-chain actions.
+#[async_trait(? Send)]
+pub trait ChannelActions {
+    /// Opens a channel to the given `destination` with the given `amount` staked.
+    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<TransactionCompleted>;
 
-    if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
-        return Err(InvalidArguments("invalid balance or balance type given".into()).into());
-    }
+    /// Funds the given channel with the given `amount`
+    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<TransactionCompleted>;
 
-    let allowance = db.read().await.get_staking_safe_allowance().await?;
-    debug!("current staking safe allowance is {allowance}");
-    if allowance.lt(&amount) {
-        return Err(NotEnoughAllowance);
-    }
-
-    if db.read().await.is_network_registry_enabled().await?
-        && !db.read().await.is_allowed_to_access_network(&destination).await?
-    {
-        return Err(PeerAccessDenied);
-    }
-
-    let maybe_channel = db.read().await.get_channel_x(&self_addr, &destination).await?;
-    if let Some(channel) = maybe_channel {
-        debug!("already found existing {channel}");
-        if channel.status != ChannelStatus::Closed {
-            error!("channel to {destination} is already opened or pending to close");
-            return Err(ChannelAlreadyExists);
-        }
-    }
-
-    tx_sender.send(Transaction::OpenChannel(destination, amount)).await
+    /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that channel.
+    async fn close_channel(
+        &self,
+        counterparty: Address,
+        direction: ChannelDirection,
+        redeem_before_close: bool,
+    ) -> Result<TransactionCompleted>;
 }
 
-pub async fn fund_channel<Db>(
-    db: Arc<RwLock<Db>>,
-    tx_sender: TransactionSender,
-    channel_id: Hash,
-    amount: Balance,
-) -> Result<TransactionCompleted>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
-        return Err(InvalidArguments("invalid balance or balance type given".into()).into());
-    }
+#[async_trait(? Send)]
+impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActions<Db> {
+    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<TransactionCompleted> {
+        if self.me == destination {
+            return Err(InvalidArguments("cannot open channel to self".into()).into());
+        }
 
-    let allowance = db.read().await.get_staking_safe_allowance().await?;
-    debug!("current staking safe allowance is {allowance}");
-    if allowance.lt(&amount) {
-        return Err(NotEnoughAllowance);
-    }
+        if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
+            return Err(InvalidArguments("invalid balance or balance type given".into()).into());
+        }
 
-    let maybe_channel = db.read().await.get_channel(&channel_id).await?;
-    match maybe_channel {
-        Some(channel) => {
-            if channel.status == ChannelStatus::Open {
-                tx_sender.send(Transaction::FundChannel(channel, amount)).await
-            } else {
-                Err(InvalidState(format!("channel {channel_id} is not opened")).into())
+        let allowance = self.db.read().await.get_staking_safe_allowance().await?;
+        debug!("current staking safe allowance is {allowance}");
+        if allowance.lt(&amount) {
+            return Err(NotEnoughAllowance);
+        }
+
+        if self.db.read().await.is_network_registry_enabled().await?
+            && !self.db.read().await.is_allowed_to_access_network(&destination).await?
+        {
+            return Err(PeerAccessDenied);
+        }
+
+        let maybe_channel = self.db.read().await.get_channel_x(&self.me, &destination).await?;
+        if let Some(channel) = maybe_channel {
+            debug!("already found existing {channel}");
+            if channel.status != ChannelStatus::Closed {
+                error!("channel to {destination} is already opened or pending to close");
+                return Err(ChannelAlreadyExists);
             }
         }
-        None => Err(ChannelDoesNotExist),
+
+        self.tx_sender.send(Transaction::OpenChannel(destination, amount)).await
     }
-}
 
-pub async fn close_channel<Db>(
-    db: Arc<RwLock<Db>>,
-    tx_sender: TransactionSender,
-    counterparty: Address,
-    self_address: Address,
-    direction: ChannelDirection,
-    redeem_before_close: bool,
-) -> Result<TransactionCompleted>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    let maybe_channel = match direction {
-        ChannelDirection::Incoming => db.read().await.get_channel_x(&counterparty, &self_address).await?,
-        ChannelDirection::Outgoing => db.read().await.get_channel_x(&self_address, &counterparty).await?,
-    };
+    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<TransactionCompleted> {
+        if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
+            return Err(InvalidArguments("invalid balance or balance type given".into()).into());
+        }
 
-    match maybe_channel {
-        Some(channel) => {
-            match channel.status {
-                ChannelStatus::Closed => Err(ChannelAlreadyClosed),
-                ChannelStatus::PendingToClose => {
-                    info!(
-                        "{channel} - remaining closure time is {:?}",
-                        channel.remaining_closure_time(current_timestamp())
-                    );
-                    if channel.closure_time_passed(current_timestamp()).unwrap_or(false) {
+        let allowance = self.db.read().await.get_staking_safe_allowance().await?;
+        debug!("current staking safe allowance is {allowance}");
+        if allowance.lt(&amount) {
+            return Err(NotEnoughAllowance);
+        }
+
+        let maybe_channel = self.db.read().await.get_channel(&channel_id).await?;
+        match maybe_channel {
+            Some(channel) => {
+                if channel.status == ChannelStatus::Open {
+                    self.tx_sender.send(Transaction::FundChannel(channel, amount)).await
+                } else {
+                    Err(InvalidState(format!("channel {channel_id} is not opened")).into())
+                }
+            }
+            None => Err(ChannelDoesNotExist),
+        }
+    }
+
+    async fn close_channel(
+        &self,
+        counterparty: Address,
+        direction: ChannelDirection,
+        redeem_before_close: bool,
+    ) -> Result<TransactionCompleted> {
+        let maybe_channel = match direction {
+            ChannelDirection::Incoming => self.db.read().await.get_channel_x(&counterparty, &self.me).await?,
+            ChannelDirection::Outgoing => self.db.read().await.get_channel_x(&self.me, &counterparty).await?,
+        };
+
+        match maybe_channel {
+            Some(channel) => {
+                match channel.status {
+                    ChannelStatus::Closed => Err(ChannelAlreadyClosed),
+                    ChannelStatus::PendingToClose => {
+                        info!(
+                            "{channel} - remaining closure time is {:?}",
+                            channel.remaining_closure_time(current_timestamp())
+                        );
+                        if channel.closure_time_passed(current_timestamp()).unwrap_or(false) {
+                            // TODO: emit "channel state change" event
+                            self.tx_sender.send(Transaction::CloseChannel(channel, direction)).await
+                        } else {
+                            Err(ClosureTimeHasNotElapsed(
+                                channel
+                                    .remaining_closure_time(current_timestamp())
+                                    .unwrap_or(u32::MAX as u64),
+                            ))
+                        }
+                    }
+                    ChannelStatus::Open => {
+                        if redeem_before_close {
+                            // TODO: trigger aggregation
+                            // Do not await the redemption, just submit it to the queue
+                            let redeemed = self.redeem_tickets_in_channel(&channel, false).await?.len();
+                            info!("{redeemed} tickets will be redeemed before closing {channel}");
+                        }
+
+                        self.tx_sender.send(Transaction::CloseChannel(channel, direction)).await
                         // TODO: emit "channel state change" event
-                        tx_sender.send(Transaction::CloseChannel(channel, direction)).await
-                    } else {
-                        Err(ClosureTimeHasNotElapsed(
-                            channel
-                                .remaining_closure_time(current_timestamp())
-                                .unwrap_or(u32::MAX as u64),
-                        ))
                     }
-                }
-                ChannelStatus::Open => {
-                    if redeem_before_close {
-                        // TODO: trigger aggregation
-                        // Do not await the redemption, just submit it to the queue
-                        let redeemed = redeem_tickets_in_channel(db.clone(), &channel, false, tx_sender.clone())
-                            .await?
-                            .len();
-                        info!("{redeemed} tickets will be redeemed before closing {channel}");
-                    }
-
-                    tx_sender.send(Transaction::CloseChannel(channel, direction)).await
-                    // TODO: emit "channel state change" event
                 }
             }
+            None => Err(ChannelDoesNotExist),
         }
-        None => Err(ChannelDoesNotExist),
     }
 }
-
-pub async fn withdraw(
-    tx_sender: TransactionSender,
-    recipient: Address,
-    amount: Balance,
-) -> Result<TransactionCompleted> {
-    if amount.eq(&amount.of_same("0")) {
-        return Err(InvalidArguments("cannot withdraw zero amount".into()).into());
-    }
-
-    tx_sender.send(Transaction::Withdraw(recipient, amount)).await
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{
-        channels::{close_channel, fund_channel, open_channel, withdraw},
-        errors::CoreEthereumActionsError,
-        transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult},
-    };
+    use crate::channels::ChannelActions;
+    use crate::errors::CoreEthereumActionsError;
+    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
+    use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use core_crypto::{random::random_bytes, types::Hash};
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
@@ -235,11 +219,9 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = open_channel(db.clone(), tx_sender.clone(), *BOB, *ALICE, stake)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
+
+        let tx_res = actions.open_channel(*BOB, stake).await.unwrap().await.unwrap();
 
         match tx_res {
             TransactionResult::ChannelFunded { tx_hash } => {
@@ -290,12 +272,11 @@ mod tests {
             .await
             .unwrap();
 
+        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+
         assert!(
             matches!(
-                open_channel(db.clone(), tx_queue.new_sender(), *BOB, *ALICE, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(*BOB, stake).await.err().unwrap(),
                 CoreEthereumActionsError::ChannelAlreadyExists
             ),
             "should fail when channel exists"
@@ -323,12 +304,11 @@ mod tests {
             .await
             .unwrap();
 
+        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+
         assert!(
             matches!(
-                open_channel(db.clone(), tx_queue.new_sender(), *ALICE, *ALICE, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(*ALICE, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not create channel to self"
@@ -357,25 +337,21 @@ mod tests {
             .await
             .unwrap();
 
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32.into(), BalanceType::Native);
         assert!(
             matches!(
-                open_channel(db.clone(), tx_queue.new_sender(), self_addr, bob, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not allow invalid balance"
         );
 
         let stake = Balance::new(0_u32.into(), BalanceType::HOPR);
+
         assert!(
             matches!(
-                open_channel(db.clone(), tx_queue.new_sender(), self_addr, bob, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not allow invalid balance"
@@ -402,12 +378,11 @@ mod tests {
             .await
             .unwrap();
 
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+
         assert!(
             matches!(
-                open_channel(db.clone(), tx_queue.new_sender(), bob, self_addr, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -464,7 +439,10 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = fund_channel(db.clone(), tx_sender.clone(), channel.get_id(), stake)
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
+
+        let tx_res = actions
+            .fund_channel(channel.get_id(), stake)
             .await
             .unwrap()
             .await
@@ -501,13 +479,11 @@ mod tests {
             .await
             .unwrap();
 
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
         assert!(
             matches!(
-                fund_channel(db.clone(), tx_queue.new_sender(), channel_id, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.fund_channel(channel_id, stake).await.err().unwrap(),
                 CoreEthereumActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
@@ -537,13 +513,11 @@ mod tests {
             .await
             .unwrap();
 
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_u32.into(), BalanceType::Native);
         assert!(
             matches!(
-                open_channel(db.clone(), tx_queue.new_sender(), self_addr, bob, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not allow invalid balance"
@@ -552,10 +526,7 @@ mod tests {
         let stake = Balance::new(0_u32.into(), BalanceType::HOPR);
         assert!(
             matches!(
-                fund_channel(db.clone(), tx_queue.new_sender(), channel_id, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.fund_channel(channel_id, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not allow invalid balance"
@@ -582,13 +553,11 @@ mod tests {
             .await
             .unwrap();
 
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
         let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
         assert!(
             matches!(
-                fund_channel(db.clone(), tx_queue.new_sender(), channel_id, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.fund_channel(channel_id, stake).await.err().unwrap(),
                 CoreEthereumActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -645,18 +614,14 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = close_channel(
-            db.clone(),
-            tx_sender.clone(),
-            *BOB,
-            *ALICE,
-            ChannelDirection::Outgoing,
-            false,
-        )
-        .await
-        .unwrap()
-        .await
-        .unwrap();
+        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
+
+        let tx_res = actions
+            .close_channel(*BOB, direction, false)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
 
         match tx_res {
             TransactionResult::ChannelClosureInitiated { tx_hash } => {
@@ -680,18 +645,12 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_res = close_channel(
-            db.clone(),
-            tx_sender.clone(),
-            *BOB,
-            *ALICE,
-            ChannelDirection::Outgoing,
-            false,
-        )
-        .await
-        .unwrap()
-        .await
-        .unwrap();
+        let tx_res = actions
+            .close_channel(*BOB, direction, false)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {
@@ -795,19 +754,15 @@ mod tests {
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
 
+        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
+
         assert!(
             matches!(
-                close_channel(
-                    db.clone(),
-                    tx_queue.new_sender(),
-                    *BOB,
-                    *ALICE,
-                    ChannelDirection::Outgoing,
-                    false,
-                )
-                .await
-                .err()
-                .unwrap(),
+                actions
+                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .await
+                    .err()
+                    .unwrap(),
                 CoreEthereumActionsError::ClosureTimeHasNotElapsed(_)
             ),
             "should fail when the channel closure period did not elapse"
@@ -823,20 +778,15 @@ mod tests {
             *ALICE,
         )));
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                close_channel(
-                    db.clone(),
-                    tx_queue.new_sender(),
-                    *BOB,
-                    *ALICE,
-                    ChannelDirection::Outgoing,
-                    false
-                )
-                .await
-                .err()
-                .unwrap(),
+                actions
+                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .await
+                    .err()
+                    .unwrap(),
                 CoreEthereumActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
@@ -854,6 +804,7 @@ mod tests {
             *ALICE,
         )));
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
 
         let channel = ChannelEntry::new(
             *ALICE,
@@ -872,196 +823,14 @@ mod tests {
 
         assert!(
             matches!(
-                close_channel(
-                    db.clone(),
-                    tx_queue.new_sender(),
-                    *BOB,
-                    *ALICE,
-                    ChannelDirection::Outgoing,
-                    false
-                )
-                .await
-                .err()
-                .unwrap(),
+                actions
+                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .await
+                    .err()
+                    .unwrap(),
                 CoreEthereumActionsError::ChannelAlreadyClosed
             ),
             "should fail when channel is already closed"
         );
-    }
-
-    #[async_std::test]
-    async fn test_withdraw() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
-        let random_hash = Hash::new(&random_bytes::<{ Hash::SIZE }>());
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
-            *ALICE,
-        )));
-
-        let mut tx_exec = MockTransactionExecutor::new();
-        tx_exec
-            .expect_withdraw()
-            .times(1)
-            .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::Withdrawn { tx_hash: random_hash });
-
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
-        let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn_local(async move {
-            tx_queue.transaction_loop().await;
-        });
-
-        let tx_res = withdraw(tx_sender.clone(), *BOB, stake).await.unwrap().await.unwrap();
-
-        match tx_res {
-            TransactionResult::Withdrawn { tx_hash } => {
-                assert_eq!(random_hash, tx_hash, "tx hash must be equal");
-            }
-            _ => panic!("invalid or failed tx result"),
-        }
-    }
-
-    #[async_std::test]
-    async fn test_should_not_withdraw_zero_amount() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
-            *ALICE,
-        )));
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
-
-        assert!(
-            matches!(
-                withdraw(tx_queue.new_sender(), *BOB, Balance::zero(BalanceType::HOPR))
-                    .await
-                    .err()
-                    .unwrap(),
-                CoreEthereumActionsError::OtherError(_)
-            ),
-            "should not allow to withdraw 0"
-        );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::transaction_queue::{TransactionResult, TransactionSender};
-    use core_crypto::types::Hash;
-    use core_ethereum_db::db::wasm::Database;
-    use core_types::channels::{generate_channel_id, ChannelDirection, ChannelStatus};
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::{Address, Balance};
-    use wasm_bindgen::prelude::wasm_bindgen;
-    use wasm_bindgen::JsValue;
-
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct OpenChannelResult {
-        pub tx_hash: Hash,
-        pub channel_id: Hash,
-    }
-
-    #[wasm_bindgen(getter_with_clone)]
-    pub struct CloseChannelResult {
-        pub tx_hash: Hash,
-        pub status: ChannelStatus,
-    }
-
-    #[wasm_bindgen]
-    pub async fn open_channel(
-        db: &Database,
-        destination: &Address,
-        self_addr: &Address,
-        amount: &Balance,
-        on_chain_tx_sender: &TransactionSender,
-    ) -> JsResult<OpenChannelResult> {
-        let awaiter = super::open_channel(
-            db.as_ref_counted(),
-            on_chain_tx_sender.clone(),
-            *destination,
-            *self_addr,
-            *amount,
-        )
-        .await?;
-
-        let channel_id = generate_channel_id(self_addr, destination);
-        match awaiter
-            .await
-            .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
-        {
-            TransactionResult::ChannelFunded { tx_hash } => Ok(OpenChannelResult { tx_hash, channel_id }),
-            _ => Err(JsValue::from("open channel transaction failed".to_string())),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub async fn fund_channel(
-        db: &Database,
-        channel_id: &Hash,
-        amount: &Balance,
-        on_chain_tx_sender: &TransactionSender,
-    ) -> JsResult<Hash> {
-        let awaiter =
-            super::fund_channel(db.as_ref_counted(), on_chain_tx_sender.clone(), *channel_id, *amount).await?;
-        match awaiter
-            .await
-            .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
-        {
-            TransactionResult::ChannelFunded { tx_hash } => Ok(tx_hash),
-            _ => Err(JsValue::from("fund channel transaction failed".to_string())),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub async fn close_channel(
-        db: &Database,
-        counterparty: &Address,
-        self_addr: &Address,
-        direction: ChannelDirection,
-        redeem_before_close: bool,
-        on_chain_tx_sender: &TransactionSender,
-    ) -> JsResult<CloseChannelResult> {
-        let awaiter = super::close_channel(
-            db.as_ref_counted(),
-            on_chain_tx_sender.clone(),
-            *counterparty,
-            *self_addr,
-            direction,
-            redeem_before_close,
-        )
-        .await?;
-        match awaiter
-            .await
-            .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
-        {
-            TransactionResult::ChannelClosureInitiated { tx_hash } => Ok(CloseChannelResult {
-                tx_hash,
-                status: ChannelStatus::PendingToClose,
-            }),
-            TransactionResult::ChannelClosed { tx_hash } => Ok(CloseChannelResult {
-                tx_hash,
-                status: ChannelStatus::Closed,
-            }),
-            _ => Err(JsValue::from("close channel transaction failed".to_string())),
-        }
-    }
-
-    #[wasm_bindgen]
-    pub async fn withdraw(
-        recipient: &Address,
-        amount: &Balance,
-        on_chain_tx_sender: &TransactionSender,
-    ) -> JsResult<Hash> {
-        let awaiter = super::withdraw(on_chain_tx_sender.clone(), *recipient, *amount).await?;
-        match awaiter
-            .await
-            .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
-        {
-            TransactionResult::Withdrawn { tx_hash } => Ok(tx_hash),
-            _ => Err(JsValue::from("withdraw transaction failed".to_string())),
-        }
     }
 }

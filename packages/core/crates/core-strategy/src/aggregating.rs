@@ -5,6 +5,7 @@ use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::TicketAggregationActions;
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
+use core_types::channels::ChannelDirection::Incoming;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
@@ -15,15 +16,14 @@ use std::{
     time::Duration,
 };
 use utils_log::{debug, error, info, warn};
+use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
-use core_ethereum_actions::redeem::redeem_tickets_in_channel;
-use core_ethereum_actions::transaction_queue::TransactionSender;
-use core_types::channels::ChannelDirection::Incoming;
-use utils_types::primitives::{Balance, BalanceType};
+use core_ethereum_actions::redeem::TicketRedeemActions;
+use core_ethereum_actions::CoreEthereumActions;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
@@ -75,53 +75,52 @@ impl Default for AggregatingStrategyConfig {
 /// above the given threshold.
 /// Optionally, the strategy can also redeem the aggregated ticket, if the aggregation
 /// was successful.
-pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions, T, U> {
+pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions + Clone, T, U> {
     db: Arc<RwLock<Db>>,
-    tx_sender: TransactionSender,
+    chain_actions: CoreEthereumActions<Db>,
     ticket_aggregator: Arc<Mutex<TicketAggregationActions<T, U>>>,
     cfg: AggregatingStrategyConfig,
 }
 
 impl<Db, T, U> Debug for AggregatingStrategy<Db, T, U>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Aggregating(self.cfg))
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions, T, U> Display for AggregatingStrategy<Db, T, U> {
+impl<Db: HoprCoreEthereumDbActions + Clone, T, U> Display for AggregatingStrategy<Db, T, U> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Aggregating(self.cfg))
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions, T, U> AggregatingStrategy<Db, T, U> {
+impl<Db: HoprCoreEthereumDbActions + Clone, T, U> AggregatingStrategy<Db, T, U> {
     pub fn new(
         cfg: AggregatingStrategyConfig,
         db: Arc<RwLock<Db>>,
-        tx_sender: TransactionSender,
+        chain_actions: CoreEthereumActions<Db>,
         ticket_aggregator: TicketAggregationActions<T, U>,
     ) -> Self {
         Self {
             cfg,
             db,
-            tx_sender,
+            chain_actions,
             ticket_aggregator: Arc::new(Mutex::new(ticket_aggregator)),
         }
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U> {
+impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<Db, T, U> {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
         debug!("{self} strategy: starting aggregation in {channel}");
         match self.ticket_aggregator.lock().await.aggregate_tickets(&channel) {
             Ok(mut awaiter) => {
                 // Spawn waiting for the aggregation as a separate task
                 let agg_timeout = self.cfg.aggregation_timeout;
-                let tx_sender_clone = self.tx_sender.clone();
-                let db_clone = self.db.clone();
+                let actions_clone = self.chain_actions.clone();
                 let strategy_id = self.to_string();
 
                 spawn_local(async move {
@@ -136,9 +135,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U
                             if redeem_if_failed {
                                 info!("{strategy_id} strategy: initiating redemption of all tickets in {channel} after aggregation failure");
 
-                                if let Err(e) =
-                                    redeem_tickets_in_channel(db_clone, &channel, false, tx_sender_clone).await
-                                {
+                                if let Err(e) = actions_clone.redeem_tickets_in_channel(&channel, false).await {
                                     error!("{strategy_id} strategy: failed to issue redeeming of all tickets in {channel}: {e}");
                                 }
 
@@ -159,7 +156,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U
 }
 
 #[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for AggregatingStrategy<Db, T, U> {
+impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for AggregatingStrategy<Db, T, U> {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;
 
@@ -291,6 +288,7 @@ mod tests {
     use core_ethereum_actions::transaction_queue::{
         TransactionExecutor, TransactionQueue, TransactionResult, TransactionSender,
     };
+    use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
@@ -528,8 +526,9 @@ mod tests {
             aggregate_on_channel_close: false,
         };
 
-        let aggregation_strategy =
-            super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob_aggregator);
+        let actions = CoreEthereumActions::new(PEERS_CHAIN[1].public().to_address(), dbs[1].clone(), tx_sender.clone());
+
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
         let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
@@ -597,8 +596,9 @@ mod tests {
             aggregate_on_channel_close: false,
         };
 
-        let aggregation_strategy =
-            super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob_aggregator);
+        let actions = CoreEthereumActions::new(PEERS_CHAIN[1].public().to_address(), dbs[1].clone(), tx_sender.clone());
+
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
         let threshold_ticket = acked_tickets.last().unwrap();
 
@@ -667,8 +667,9 @@ mod tests {
         let (bob_aggregator, awaiter) =
             spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
 
-        let aggregation_strategy =
-            super::AggregatingStrategy::new(cfg, dbs[1].clone(), tx_sender.clone(), bob_aggregator);
+        let actions = CoreEthereumActions::new(PEERS_CHAIN[1].public().to_address(), dbs[1].clone(), tx_sender.clone());
+
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
         channel.status = ChannelStatus::PendingToClose;
         dbs[1]

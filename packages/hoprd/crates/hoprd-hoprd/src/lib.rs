@@ -12,13 +12,7 @@ pub mod wasm {
     use core_network::network::wasm::*;
 
     #[allow(unused_imports)]
-    use core_ethereum_actions::channels::wasm::*;
-
-    #[allow(unused_imports)]
     use core_ethereum_actions::payload::wasm::*;
-
-    #[allow(unused_imports)]
-    use core_ethereum_actions::redeem::wasm::*;
 
     #[allow(unused_imports)]
     use core_ethereum_db::db::wasm::*;

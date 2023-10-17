@@ -1,6 +1,6 @@
 # core-ethereum-actions
 
-Contains high-level Core-Ethereum functions that translate to on-chain transactions
+Contains high-level Core-Ethereum traits that translate to on-chain transactions
 
 ## `transaction_queue`
 
@@ -14,7 +14,7 @@ wishes to await the transaction being confirmed.
 
 ## `redeem`
 
-There are 4 functions that can be used to redeem tickets:
+There are 4 functions that can be used to redeem tickets in the `TicketRedeemActions` trait:
 
 - `redeem_all_tickets`
 - `redeem_tickets_in_channel`
@@ -29,14 +29,19 @@ confirmation of each ticket redemption.
 
 ## `channels`
 
-This submodule adds 4 basic high-level on-chain functions:
+This submodule adds 4 basic high-level on-chain functions in the `ChannelActions` trait:
 
 - `open_channel`
 - `fund_channel`
 - `close_channel`
-- `withdraw`
 
 All the functions do the necessary validations using the DB and then post the corresponding transaction
 into the `TransactionQueue`.
 The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
 confirmation of the corresponding operation.
+
+## `node`
+
+Submodule containing high-level on-chain actions in the `NodeActions` trait, which related to HOPR node itself.
+
+- `withdraw`

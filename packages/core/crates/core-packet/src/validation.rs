@@ -132,6 +132,7 @@ mod tests {
 
     mock! {
         pub Db { }
+
         #[async_trait(? Send)]
         impl HoprCoreEthereumDbActions for Db {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
@@ -243,6 +244,12 @@ mod tests {
             async fn set_allowed_to_access_network(&mut self, node: &Address, allowed: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn get_from_network_registry(&self, stake_account: &Address) -> core_ethereum_db::errors::Result<Vec<Address>>;
             async fn set_eligible(&mut self, account: &Address, eligible: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<Vec<Address>>;
+        }
+    }
+
+    impl Clone for MockDb {
+        fn clone(&self) -> Self {
+            MockDb::new()
         }
     }
 
