@@ -6,7 +6,7 @@ use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
-use core_ethereum_actions::transaction_queue::TransactionSender;
+use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
@@ -105,11 +105,11 @@ impl MultiStrategy {
         cfg: MultiStrategyConfig,
         db: Arc<RwLock<Db>>,
         network: Arc<RwLock<Network<Net>>>,
-        tx_sender: TransactionSender,
+        chain_actions: CoreEthereumActions<Db>,
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where
-        Db: HoprCoreEthereumDbActions + 'static,
+        Db: HoprCoreEthereumDbActions + Clone + 'static,
         Net: NetworkExternalActions + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
@@ -120,23 +120,21 @@ impl MultiStrategy {
                     sub_cfg.clone(),
                     db.clone(),
                     network.clone(),
-                    tx_sender.clone(),
+                    chain_actions.clone(),
                 ))),
                 Strategy::Aggregating(sub_cfg) => strategies.push(Box::new(AggregatingStrategy::new(
                     sub_cfg.clone(),
                     db.clone(),
-                    tx_sender.clone(),
+                    chain_actions.clone(),
                     ticket_aggregator.clone(),
                 ))),
                 Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
                     sub_cfg.clone(),
-                    db.clone(),
-                    tx_sender.clone(),
+                    chain_actions.clone(),
                 ))),
                 Strategy::AutoFunding(sub_cfg) => strategies.push(Box::new(AutoFundingStrategy::new(
                     sub_cfg.clone(),
-                    db.clone(),
-                    tx_sender.clone(),
+                    chain_actions.clone(),
                 ))),
                 Strategy::Multi(sub_cfg) => {
                     if cfg.allow_recursive {
@@ -147,7 +145,7 @@ impl MultiStrategy {
                             cfg_clone,
                             db.clone(),
                             network.clone(),
-                            tx_sender.clone(),
+                            chain_actions.clone(),
                             ticket_aggregator.clone(),
                         )))
                     } else {

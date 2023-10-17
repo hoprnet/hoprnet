@@ -40,7 +40,7 @@ use std::{sync::Arc, time::Duration};
 use utils_log::{error, info};
 use utils_types::traits::BinarySerializable;
 
-use core_ethereum_actions::transaction_queue::{TransactionQueue, TransactionSender};
+use core_ethereum_actions::transaction_queue::TransactionQueue;
 
 use core_strategy::{
     strategy::{MultiStrategy, SingularStrategy},
@@ -105,6 +105,7 @@ pub mod wasm_impls {
     use core_crypto::keypairs::Keypair;
     use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
     use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
+    use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_network::network::NetworkConfig;
@@ -125,7 +126,7 @@ pub mod wasm_impls {
         network: adaptors::network::wasm::WasmNetwork,
         indexer: adaptors::indexer::WasmIndexerInteractions,
         pkt_sender: PacketActions,
-        tx_sender: TransactionSender,
+        chain_actions: core_ethereum_actions::wasm::WasmCoreEthereumActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
         channel_events: ChannelEventEmitter,
         channel_graph: core_path::channel_graph::wasm::ChannelGraph,
@@ -138,7 +139,7 @@ pub mod wasm_impls {
             change_notifier: Sender<NetworkEvent>,
             indexer: adaptors::indexer::WasmIndexerInteractions,
             pkt_sender: PacketActions,
-            tx_sender: TransactionSender,
+            chain_actions: core_ethereum_actions::wasm::WasmCoreEthereumActions,
             ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
             channel_events: ChannelEventEmitter,
             channel_graph: core_path::channel_graph::wasm::ChannelGraph,
@@ -149,7 +150,7 @@ pub mod wasm_impls {
                 indexer,
                 pkt_sender,
                 ticket_aggregate_actions,
-                tx_sender,
+                chain_actions,
                 channel_events,
                 channel_graph,
             }
@@ -209,8 +210,8 @@ pub mod wasm_impls {
             )
         }
 
-        pub fn get_tx_sender(&self) -> TransactionSender {
-            self.tx_sender.clone()
+        pub fn chain_actions(&self) -> core_ethereum_actions::wasm::WasmCoreEthereumActions {
+            self.chain_actions.clone()
         }
     }
 
@@ -260,11 +261,14 @@ pub mod wasm_impls {
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
 
+        let chain_actions =
+            CoreEthereumActions::new(me_onchain.public().to_address(), db.clone(), tx_queue.new_sender());
+
         let multi_strategy = Arc::new(MultiStrategy::new(
             strategy_cfg,
             db.clone(),
             network.clone(),
-            tx_queue.new_sender(),
+            chain_actions.clone(),
             ticket_aggregation.writer(),
         ));
         info!("initialized strategies: {multi_strategy:?}");
@@ -357,7 +361,7 @@ pub mod wasm_impls {
             network_events_tx,
             indexer_updater,
             packet_actions.writer(),
-            tx_queue.new_sender(),
+            core_ethereum_actions::wasm::WasmCoreEthereumActions::new_from_actions(chain_actions),
             ticket_aggregation.writer(),
             ChannelEventEmitter {
                 tx: on_channel_event_tx,

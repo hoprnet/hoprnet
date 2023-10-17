@@ -12,10 +12,8 @@ use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_std::sync::RwLock;
 use async_trait::async_trait;
-use core_ethereum_actions::{
-    channels::{close_channel, open_channel},
-    transaction_queue::TransactionSender,
-};
+use core_ethereum_actions::channels::ChannelActions;
+use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use serde::{Deserialize, Serialize};
@@ -81,31 +79,31 @@ impl Default for PromiscuousStrategyConfig {
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<Net>>>,
-    tx_sender: TransactionSender,
+    chain_actions: CoreEthereumActions<Db>,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SimpleMovingAvg>,
 }
 
 impl<Db, Net> PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     pub fn new(
         cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
         network: Arc<RwLock<Network<Net>>>,
-        tx_sender: TransactionSender,
+        chain_actions: CoreEthereumActions<Db>,
     ) -> Self {
         Self {
             db,
             network,
-            tx_sender,
+            chain_actions,
             cfg,
             sma: RwLock::new(SimpleMovingAvg::new()),
         }
@@ -278,7 +276,7 @@ where
 
 impl<Db, Net> Debug for PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -288,7 +286,7 @@ where
 
 impl<Db, Net> Display for PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -299,7 +297,7 @@ where
 #[async_trait(? Send)]
 impl<Db, Net> SingularStrategy for PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     async fn on_tick(&self) -> Result<()> {
@@ -308,15 +306,14 @@ where
         // close all the channels, need to be synchronous because Ethereum transactions
         // are synchronous, especially due nonces
         for channel_to_close in tick_decision.get_to_close() {
-            match close_channel(
-                self.db.clone(),
-                self.tx_sender.clone(),
-                channel_to_close.destination,
-                channel_to_close.source,
-                ChannelDirection::Outgoing,
-                false, // TODO: get this value from config
-            )
-            .await
+            match self
+                .chain_actions
+                .close_channel(
+                    channel_to_close.destination,
+                    ChannelDirection::Outgoing,
+                    false, // TODO: get this value from config
+                )
+                .await
             {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction
@@ -332,14 +329,10 @@ where
         // open all the channels, need to be synchronous because Ethereum
         // transactions are synchronous, especially due to nonces
         for channel_to_open in tick_decision.get_to_open() {
-            match open_channel(
-                self.db.clone(),
-                self.tx_sender.clone(),
-                channel_to_open.0,
-                Address::default(),
-                channel_to_open.1,
-            )
-            .await
+            match self
+                .chain_actions
+                .open_channel(channel_to_open.0, channel_to_open.1)
+                .await
             {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction
@@ -453,7 +446,7 @@ mod tests {
         peer: &PeerId,
         steps: u32,
     ) where
-        Db: HoprCoreEthereumDbActions,
+        Db: HoprCoreEthereumDbActions + Clone,
         Net: NetworkExternalActions,
     {
         strategy.network.write().await.add(peer, PeerOrigin::Initialization);
@@ -499,9 +492,11 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
+        let actions = CoreEthereumActions::new(alice_address, db.clone(), tx_sender);
+
         let strat_cfg = PromiscuousStrategyConfig::default();
 
-        let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
+        let strat = PromiscuousStrategy::new(strat_cfg, db, network, actions);
 
         // create a network with:
         let peers: Vec<(PeerId, u32)> = vec![
