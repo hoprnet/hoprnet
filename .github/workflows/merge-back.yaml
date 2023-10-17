@@ -1,4 +1,7 @@
 ---
+#################################################################################
+# Manual pipeline which merges the changes done in a given release name to the master branch
+#################################################################################
 name: Merge Back
 
 on:

@@ -1,4 +1,8 @@
 ---
+#################################################################################
+# Manual pipeline to close a hoprd release
+# https://github.com/hoprnet/hoprnet/blob/master/.processes/release.md#close-release
+#################################################################################
 name: Close Release
 
 on:

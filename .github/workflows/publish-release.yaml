@@ -1,4 +1,7 @@
 ---
+#################################################################################
+# Manual pipeline to clone a docker image tag based on other docker image tag
+#################################################################################
 name: Publish Release
 
 on:
@@ -8,12 +11,12 @@ on:
         type: string
         required: true
         default: 'providence'
-        description: 'New release name ( providence | saint-luis )'
+        description: 'Source tag name'
       to_tag:
         type: string
         required: true
+        description: 'Target tag name'
         default: 'stable'
-
 
 concurrency:
   group: publish-release
