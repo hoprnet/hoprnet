@@ -31,7 +31,6 @@ export {
   ChannelStatus,
   channel_status_to_number,
   channel_status_to_string,
-  close_channel,
   ChannelDirection,
   OpenChannelResult,
   CloseChannelResult,
@@ -54,7 +53,6 @@ export {
   derive_mac_key,
   derive_packet_tag,
   EthereumChallenge,
-  fund_channel,
   gather_all_metrics,
   generate_channel_id,
   get_package_version,
@@ -83,7 +81,6 @@ export {
   OffchainKeypair,
   OffchainPublicKey,
   OffchainSignature,
-  open_channel,
   PacketInteractionConfig,
   TransportPath,
   PeerOrigin,
@@ -94,10 +91,6 @@ export {
   random_fill,
   random_float,
   random_integer,
-  redeem_ticket,
-  redeem_all_tickets,
-  redeem_tickets_in_channel,
-  redeem_tickets_with_counterparty,
   Response,
   Signature,
   SimpleCounter,
@@ -118,6 +111,6 @@ export {
   WasmPing,
   WasmIndexerInteractions,
   PingConfig,
-  WasmTxExecutor,
-  withdraw
+  WasmCoreEthereumActions,
+  WasmTxExecutor
 } from '../../hoprd/lib/hoprd_hoprd.js'

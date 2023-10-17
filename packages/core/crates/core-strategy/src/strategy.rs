@@ -6,6 +6,7 @@ use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
+use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
@@ -16,7 +17,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use utils_log::{error, warn};
 use validator::Validate;
-use core_ethereum_actions::CoreEthereumActions;
 
 /// Basic single strategy.
 #[cfg_attr(test, mockall::automock)]

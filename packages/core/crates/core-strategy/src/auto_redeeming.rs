@@ -1,12 +1,12 @@
 use async_trait::async_trait;
+use core_ethereum_actions::redeem::TicketRedeemActions;
+use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use utils_log::info;
 use validator::Validate;
-use core_ethereum_actions::CoreEthereumActions;
-use core_ethereum_actions::redeem::TicketRedeemActions;
 
 use crate::strategy::SingularStrategy;
 use crate::Strategy;
@@ -74,6 +74,7 @@ mod tests {
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::{Challenge, CurvePoint, HalfKey, Hash};
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
+    use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
@@ -81,7 +82,6 @@ mod tests {
     use hex_literal::hex;
     use mockall::mock;
     use std::sync::Arc;
-    use core_ethereum_actions::CoreEthereumActions;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;

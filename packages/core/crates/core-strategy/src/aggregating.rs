@@ -5,6 +5,7 @@ use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::TicketAggregationActions;
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
+use core_types::channels::ChannelDirection::Incoming;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
@@ -15,18 +16,16 @@ use std::{
     time::Duration,
 };
 use utils_log::{debug, error, info, warn};
-use validator::Validate;
-use core_types::channels::ChannelDirection::Incoming;
 use utils_types::primitives::{Balance, BalanceType};
+use validator::Validate;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
+use core_ethereum_actions::redeem::TicketRedeemActions;
+use core_ethereum_actions::CoreEthereumActions;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
-use core_ethereum_actions::CoreEthereumActions;
-use core_ethereum_actions::redeem::TicketRedeemActions;
-
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
@@ -289,6 +288,7 @@ mod tests {
     use core_ethereum_actions::transaction_queue::{
         TransactionExecutor, TransactionQueue, TransactionResult, TransactionSender,
     };
+    use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
     use core_protocol::ticket_aggregation::processor::{
         TicketAggregationActions, TicketAggregationInteraction, TicketAggregationProcessed,
@@ -307,7 +307,6 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
-    use core_ethereum_actions::CoreEthereumActions;
     use utils_db::{constants::ACKNOWLEDGED_TICKETS_PREFIX, db::DB, rusty::RustyLevelDbShim};
     use utils_types::{
         primitives::{Address, Balance, BalanceType, Snapshot, U256},
@@ -529,8 +528,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(PEERS_CHAIN[1].public().to_address(), dbs[1].clone(), tx_sender.clone());
 
-        let aggregation_strategy =
-            super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
         let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy
@@ -600,8 +598,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(PEERS_CHAIN[1].public().to_address(), dbs[1].clone(), tx_sender.clone());
 
-        let aggregation_strategy =
-            super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
         let threshold_ticket = acked_tickets.last().unwrap();
 
@@ -672,8 +669,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(PEERS_CHAIN[1].public().to_address(), dbs[1].clone(), tx_sender.clone());
 
-        let aggregation_strategy =
-            super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
         channel.status = ChannelStatus::PendingToClose;
         dbs[1]

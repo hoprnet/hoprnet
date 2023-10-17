@@ -1,10 +1,10 @@
+use crate::errors::Result;
+use crate::transaction_queue::{Transaction, TransactionCompleted};
+use crate::CoreEthereumActions;
 use async_trait::async_trait;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
 use utils_types::primitives::{Address, Balance};
-use crate::CoreEthereumActions;
-use crate::transaction_queue::{Transaction, TransactionCompleted};
-use crate::errors::Result;
 
 /// Contains all on-chain calls specific to HOPR node itself.
 #[async_trait(? Send)]
@@ -16,12 +16,8 @@ pub trait NodeActions {
 }
 
 #[async_trait(? Send)]
-impl <Db: HoprCoreEthereumDbActions> NodeActions for CoreEthereumActions<Db> {
-    async fn withdraw(
-        &self,
-        recipient: Address,
-        amount: Balance,
-    ) -> Result<TransactionCompleted> {
+impl<Db: HoprCoreEthereumDbActions> NodeActions for CoreEthereumActions<Db> {
+    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<TransactionCompleted> {
         if amount.eq(&amount.of_same("0")) {
             return Err(InvalidArguments("cannot withdraw zero amount".into()).into());
         }
@@ -32,19 +28,19 @@ impl <Db: HoprCoreEthereumDbActions> NodeActions for CoreEthereumActions<Db> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use crate::errors::CoreEthereumActionsError;
+    use crate::node::NodeActions;
+    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
+    use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use core_crypto::random::random_bytes;
     use core_crypto::types::Hash;
     use core_ethereum_db::db::CoreEthereumDb;
+    use std::sync::Arc;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType};
     use utils_types::traits::BinarySerializable;
-    use crate::CoreEthereumActions;
-    use crate::node::NodeActions;
-    use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
-    use crate::errors::CoreEthereumActionsError;
 
     #[async_std::test]
     async fn test_withdraw() {
@@ -101,7 +97,8 @@ mod tests {
 
         assert!(
             matches!(
-                actions.withdraw(bob, Balance::zero(BalanceType::HOPR))
+                actions
+                    .withdraw(bob, Balance::zero(BalanceType::HOPR))
                     .await
                     .err()
                     .unwrap(),

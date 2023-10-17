@@ -4,18 +4,18 @@ pub mod node;
 pub mod redeem;
 pub mod transaction_queue;
 
-use std::sync::Arc;
+use crate::transaction_queue::TransactionSender;
 use async_lock::RwLock;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use std::sync::Arc;
 use utils_types::primitives::Address;
-use crate::transaction_queue::TransactionSender;
 
 /// Contains all actions that a node can execute on-chain.
 #[derive(Clone)]
 pub struct CoreEthereumActions<Db: HoprCoreEthereumDbActions> {
     me: Address,
     db: Arc<RwLock<Db>>,
-    tx_sender: TransactionSender
+    tx_sender: TransactionSender,
 }
 
 impl<Db: HoprCoreEthereumDbActions> CoreEthereumActions<Db> {
@@ -32,26 +32,26 @@ impl<Db: HoprCoreEthereumDbActions> CoreEthereumActions<Db> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use wasm_bindgen::JsValue;
-    use wasm_bindgen::prelude::wasm_bindgen;
+    use crate::channels::ChannelActions;
+    use crate::node::NodeActions;
+    use crate::redeem::TicketRedeemActions;
+    use crate::transaction_queue::{TransactionResult, TransactionSender};
+    use crate::CoreEthereumActions;
     use core_crypto::types::Hash;
-    use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::db::wasm::Database;
+    use core_ethereum_db::db::CoreEthereumDb;
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
     use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
     use utils_db::rusty::RustyLevelDbShim;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::{Address, Balance};
-    use crate::channels::ChannelActions;
-    use crate::CoreEthereumActions;
-    use crate::node::NodeActions;
-    use crate::redeem::TicketRedeemActions;
-    use crate::transaction_queue::{TransactionResult, TransactionSender};
+    use wasm_bindgen::prelude::wasm_bindgen;
+    use wasm_bindgen::JsValue;
 
     #[derive(Clone)]
     #[wasm_bindgen]
     pub struct WasmCoreEthereumActions {
-        w: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>
+        w: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
     }
 
     impl WasmCoreEthereumActions {
@@ -81,20 +81,12 @@ pub mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(me: Address, db: &Database, tx_sender: &TransactionSender) -> Self {
             Self {
-                w: CoreEthereumActions::new(me, db.as_ref_counted(), tx_sender.clone())
+                w: CoreEthereumActions::new(me, db.as_ref_counted(), tx_sender.clone()),
             }
         }
 
-        pub async fn open_channel(
-            &self,
-            destination: &Address,
-            amount: &Balance,
-        ) -> JsResult<OpenChannelResult> {
-            let awaiter = self.w.open_channel(
-                *destination,
-                *amount,
-            )
-                .await?;
+        pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> JsResult<OpenChannelResult> {
+            let awaiter = self.w.open_channel(*destination, *amount).await?;
             match awaiter
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
@@ -104,13 +96,8 @@ pub mod wasm {
             }
         }
 
-        pub async fn fund_channel(
-            &self,
-            channel_id: &Hash,
-            amount: &Balance,
-        ) -> JsResult<Hash> {
-            let awaiter =
-                self.w.fund_channel(*channel_id, *amount).await?;
+        pub async fn fund_channel(&self, channel_id: &Hash, amount: &Balance) -> JsResult<Hash> {
+            let awaiter = self.w.fund_channel(*channel_id, *amount).await?;
             match awaiter
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
@@ -126,11 +113,9 @@ pub mod wasm {
             direction: ChannelDirection,
             redeem_before_close: bool,
         ) -> JsResult<CloseChannelResult> {
-            let awaiter = self.w.close_channel(
-                *counterparty,
-                direction,
-                redeem_before_close,
-            )
+            let awaiter = self
+                .w
+                .close_channel(*counterparty, direction, redeem_before_close)
                 .await?;
             match awaiter
                 .await
@@ -141,11 +126,7 @@ pub mod wasm {
             }
         }
 
-        pub async fn withdraw(
-            &self,
-            recipient: &Address,
-            amount: &Balance,
-        ) -> JsResult<Hash> {
+        pub async fn withdraw(&self, recipient: &Address, amount: &Balance) -> JsResult<Hash> {
             let awaiter = self.w.withdraw(*recipient, *amount).await?;
             match awaiter
                 .await
@@ -156,10 +137,7 @@ pub mod wasm {
             }
         }
 
-        pub async fn redeem_all_tickets(
-            &self,
-            only_aggregated: bool,
-        ) -> JsResult<()> {
+        pub async fn redeem_all_tickets(&self, only_aggregated: bool) -> JsResult<()> {
             // We do not await the on-chain confirmation
             self.w.redeem_all_tickets(only_aggregated).await?;
             Ok(())
@@ -171,31 +149,19 @@ pub mod wasm {
             only_aggregated: bool,
         ) -> JsResult<()> {
             // We do not await the on-chain confirmation
-            self.w.redeem_tickets_with_counterparty(
-                counterparty,
-                only_aggregated,
-            ).await?;
+            self.w
+                .redeem_tickets_with_counterparty(counterparty, only_aggregated)
+                .await?;
             Ok(())
         }
 
-        pub async fn redeem_tickets_in_channel(
-            &self,
-            channel: &ChannelEntry,
-            only_aggregated: bool,
-        ) -> JsResult<()> {
+        pub async fn redeem_tickets_in_channel(&self, channel: &ChannelEntry, only_aggregated: bool) -> JsResult<()> {
             // We do not await the on-chain confirmation
-            self.w.redeem_tickets_in_channel(
-                channel,
-                only_aggregated,
-            )
-            .await?;
+            self.w.redeem_tickets_in_channel(channel, only_aggregated).await?;
             Ok(())
         }
 
-        pub async fn redeem_ticket(
-            &self,
-            ack_ticket: &AcknowledgedTicket,
-        ) -> JsResult<()> {
+        pub async fn redeem_ticket(&self, ack_ticket: &AcknowledgedTicket) -> JsResult<()> {
             // We do not await the on-chain confirmation
             let _ = self.w.redeem_ticket(ack_ticket.into()).await?;
             Ok(())
