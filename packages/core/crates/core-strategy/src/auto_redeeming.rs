@@ -30,31 +30,31 @@ impl Default for AutoRedeemingStrategyConfig {
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<Db: HoprCoreEthereumDbActions> {
+pub struct AutoRedeemingStrategy<Db: HoprCoreEthereumDbActions + Clone> {
     chain_actions: CoreEthereumActions<Db>,
     cfg: AutoRedeemingStrategyConfig,
 }
 
-impl<Db: HoprCoreEthereumDbActions> Debug for AutoRedeemingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> Debug for AutoRedeemingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions> Display for AutoRedeemingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> Display for AutoRedeemingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions> AutoRedeemingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> AutoRedeemingStrategy<Db> {
     pub fn new(cfg: AutoRedeemingStrategyConfig, chain_actions: CoreEthereumActions<Db>) -> Self {
         Self { cfg, chain_actions }
     }
 }
 
 #[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + 'static> SingularStrategy for AutoRedeemingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + 'static + Clone> SingularStrategy for AutoRedeemingStrategy<Db> {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
             info!("{self} strategy: auto-redeeming {ack}");

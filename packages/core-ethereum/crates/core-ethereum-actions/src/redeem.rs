@@ -96,7 +96,7 @@ where
 }
 
 #[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions> TicketRedeemActions for CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> TicketRedeemActions for CoreEthereumActions<Db> {
     async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<TransactionCompleted>> {
         let incoming_channels = self.db.read().await.get_incoming_channels().await?;
         debug!(

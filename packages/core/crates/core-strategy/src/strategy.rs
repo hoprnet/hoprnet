@@ -109,7 +109,7 @@ impl MultiStrategy {
         ticket_aggregator: BasicTicketAggregationActions<std::result::Result<Ticket, String>>,
     ) -> Self
     where
-        Db: HoprCoreEthereumDbActions + 'static,
+        Db: HoprCoreEthereumDbActions + Clone + 'static,
         Net: NetworkExternalActions + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();

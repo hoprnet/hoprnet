@@ -75,7 +75,7 @@ impl Default for AggregatingStrategyConfig {
 /// above the given threshold.
 /// Optionally, the strategy can also redeem the aggregated ticket, if the aggregation
 /// was successful.
-pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions, T, U> {
+pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions + Clone, T, U> {
     db: Arc<RwLock<Db>>,
     chain_actions: CoreEthereumActions<Db>,
     ticket_aggregator: Arc<Mutex<TicketAggregationActions<T, U>>>,
@@ -84,20 +84,20 @@ pub struct AggregatingStrategy<Db: HoprCoreEthereumDbActions, T, U> {
 
 impl<Db, T, U> Debug for AggregatingStrategy<Db, T, U>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Aggregating(self.cfg))
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions, T, U> Display for AggregatingStrategy<Db, T, U> {
+impl<Db: HoprCoreEthereumDbActions + Clone, T, U> Display for AggregatingStrategy<Db, T, U> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Aggregating(self.cfg))
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions, T, U> AggregatingStrategy<Db, T, U> {
+impl<Db: HoprCoreEthereumDbActions + Clone, T, U> AggregatingStrategy<Db, T, U> {
     pub fn new(
         cfg: AggregatingStrategyConfig,
         db: Arc<RwLock<Db>>,
@@ -113,7 +113,7 @@ impl<Db: HoprCoreEthereumDbActions, T, U> AggregatingStrategy<Db, T, U> {
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U> {
+impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<Db, T, U> {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
         debug!("{self} strategy: starting aggregation in {channel}");
         match self.ticket_aggregator.lock().await.aggregate_tickets(&channel) {
@@ -156,7 +156,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static, T, U> AggregatingStrategy<Db, T, U
 }
 
 #[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions + 'static, T, U> SingularStrategy for AggregatingStrategy<Db, T, U> {
+impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for AggregatingStrategy<Db, T, U> {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         let channel_id = ack.ticket.channel_id;
 

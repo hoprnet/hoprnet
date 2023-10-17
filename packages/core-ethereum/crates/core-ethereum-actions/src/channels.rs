@@ -40,7 +40,7 @@ pub trait ChannelActions {
 }
 
 #[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions> ChannelActions for CoreEthereumActions<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActions<Db> {
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<TransactionCompleted> {
         if self.me == destination {
             return Err(InvalidArguments("cannot open channel to self".into()).into());
