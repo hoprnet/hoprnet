@@ -1,8 +1,8 @@
+use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::errors::CoreEthereumError::{InvalidArguments, InvalidState};
 use core_types::channels::{ChannelDirection, ChannelStatus};
-use async_trait::async_trait;
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
@@ -16,10 +16,10 @@ use crate::transaction_queue::{Transaction, TransactionCompleted};
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
+use crate::redeem::TicketRedeemActions;
+use crate::CoreEthereumActions;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
-use crate::CoreEthereumActions;
-use crate::redeem::TicketRedeemActions;
 
 /// Gathers all channel related on-chain actions.
 #[async_trait(? Send)]
@@ -31,18 +31,17 @@ pub trait ChannelActions {
     async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<TransactionCompleted>;
 
     /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that channel.
-    async fn close_channel(&self, counterparty: Address, direction: ChannelDirection, redeem_before_close: bool) -> Result<TransactionCompleted>;
-
+    async fn close_channel(
+        &self,
+        counterparty: Address,
+        direction: ChannelDirection,
+        redeem_before_close: bool,
+    ) -> Result<TransactionCompleted>;
 }
 
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions> ChannelActions for CoreEthereumActions<Db> {
-    async fn open_channel(
-        &self,
-        destination: Address,
-        amount: Balance,
-    ) -> Result<TransactionCompleted>
-    {
+    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<TransactionCompleted> {
         if self.me == destination {
             return Err(InvalidArguments("cannot open channel to self".into()).into());
         }
@@ -75,11 +74,7 @@ impl<Db: HoprCoreEthereumDbActions> ChannelActions for CoreEthereumActions<Db> {
         self.tx_sender.send(Transaction::OpenChannel(destination, amount)).await
     }
 
-    async fn fund_channel(
-        &self,
-        channel_id: Hash,
-        amount: Balance,
-    ) -> Result<TransactionCompleted> {
+    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<TransactionCompleted> {
         if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments("invalid balance or balance type given".into()).into());
         }
@@ -120,9 +115,9 @@ impl<Db: HoprCoreEthereumDbActions> ChannelActions for CoreEthereumActions<Db> {
                     ChannelStatus::Closed => Err(ChannelAlreadyClosed),
                     ChannelStatus::PendingToClose => {
                         info!(
-                        "{channel} - remaining closure time is {:?}",
-                        channel.remaining_closure_time(current_timestamp())
-                    );
+                            "{channel} - remaining closure time is {:?}",
+                            channel.remaining_closure_time(current_timestamp())
+                        );
                         if channel.closure_time_passed(current_timestamp()).unwrap_or(false) {
                             // TODO: emit "channel state change" event
                             self.tx_sender.send(Transaction::CloseChannel(channel)).await
@@ -138,9 +133,7 @@ impl<Db: HoprCoreEthereumDbActions> ChannelActions for CoreEthereumActions<Db> {
                         if redeem_before_close {
                             // TODO: trigger aggregation
                             // Do not await the redemption, just submit it to the queue
-                            let redeemed = self.redeem_tickets_in_channel(&channel, false)
-                                .await?
-                                .len();
+                            let redeemed = self.redeem_tickets_in_channel(&channel, false).await?.len();
                             info!("{redeemed} tickets will be redeemed before closing {channel}");
                         }
 
@@ -158,6 +151,7 @@ mod tests {
     use crate::channels::ChannelActions;
     use crate::errors::CoreEthereumActionsError;
     use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
+    use crate::CoreEthereumActions;
     use async_lock::RwLock;
     use core_crypto::random::random_bytes;
     use core_crypto::types::Hash;
@@ -172,7 +166,6 @@ mod tests {
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::BinarySerializable;
-    use crate::CoreEthereumActions;
 
     #[async_std::test]
     async fn test_open_channel() {
@@ -220,11 +213,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.open_channel(bob, stake)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+        let tx_res = actions.open_channel(bob, stake).await.unwrap().await.unwrap();
 
         match tx_res {
             TransactionResult::OpenChannel { tx_hash, channel_id } => {
@@ -283,10 +272,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::ChannelAlreadyExists
             ),
             "should fail when channel exists"
@@ -319,10 +305,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(self_addr, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(self_addr, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not create channel to self"
@@ -355,10 +338,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(bob, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not allow invalid balance"
@@ -368,10 +348,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not allow invalid balance"
@@ -402,10 +379,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions.open_channel(bob, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -464,7 +438,8 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.fund_channel(channel.get_id(), stake)
+        let tx_res = actions
+            .fund_channel(channel.get_id(), stake)
             .await
             .unwrap()
             .await
@@ -505,10 +480,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::HOPR);
         assert!(
             matches!(
-                actions.fund_channel(channel_id, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.fund_channel(channel_id, stake).await.err().unwrap(),
                 CoreEthereumActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
@@ -542,10 +514,7 @@ mod tests {
         let stake = Balance::new(10_u32.into(), BalanceType::Native);
         assert!(
             matches!(
-                actions.open_channel(bob, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.open_channel(bob, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not allow invalid balance"
@@ -554,10 +523,7 @@ mod tests {
         let stake = Balance::new(0_u32.into(), BalanceType::HOPR);
         assert!(
             matches!(
-                actions.fund_channel(channel_id, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.fund_channel(channel_id, stake).await.err().unwrap(),
                 CoreEthereumActionsError::OtherError(_)
             ),
             "should not allow invalid balance"
@@ -588,10 +554,7 @@ mod tests {
         let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
         assert!(
             matches!(
-                actions.fund_channel(channel_id, stake)
-                    .await
-                    .err()
-                    .unwrap(),
+                actions.fund_channel(channel_id, stake).await.err().unwrap(),
                 CoreEthereumActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
@@ -672,7 +635,8 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.close_channel(bob, direction, false)
+        let tx_res = actions
+            .close_channel(bob, direction, false)
             .await
             .unwrap()
             .await
@@ -701,7 +665,8 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_res = actions.close_channel(bob, direction, false)
+        let tx_res = actions
+            .close_channel(bob, direction, false)
             .await
             .unwrap()
             .await
@@ -766,14 +731,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.close_channel(
-                    bob,
-                    ChannelDirection::Outgoing,
-                    false
-                )
-                .await
-                .err()
-                .unwrap(),
+                actions
+                    .close_channel(bob, ChannelDirection::Outgoing, false)
+                    .await
+                    .err()
+                    .unwrap(),
                 CoreEthereumActionsError::ClosureTimeHasNotElapsed(_)
             ),
             "should fail when the channel closure period did not elapse"
@@ -796,14 +758,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.close_channel(
-                    bob,
-                    ChannelDirection::Outgoing,
-                    false
-                )
-                .await
-                .err()
-                .unwrap(),
+                actions
+                    .close_channel(bob, ChannelDirection::Outgoing, false)
+                    .await
+                    .err()
+                    .unwrap(),
                 CoreEthereumActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
@@ -842,14 +801,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.close_channel(
-                    bob,
-                    ChannelDirection::Outgoing,
-                    false
-                )
-                .await
-                .err()
-                .unwrap(),
+                actions
+                    .close_channel(bob, ChannelDirection::Outgoing, false)
+                    .await
+                    .err()
+                    .unwrap(),
                 CoreEthereumActionsError::ChannelAlreadyClosed
             ),
             "should fail when channel is already closed"

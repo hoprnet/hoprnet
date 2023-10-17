@@ -22,7 +22,6 @@ import {
   ChannelDirection,
   ChannelEntry,
   ChannelStatus,
-  close_channel,
   compareAddressesLocalMode,
   compareAddressesPublicMode,
   create_counter,
@@ -32,7 +31,6 @@ import {
   Database,
   debug,
   durations,
-  fund_channel,
   getBackoffRetries,
   getBackoffRetryTimeout,
   HalfKeyChallenge,
@@ -45,14 +43,10 @@ import {
   MIN_NATIVE_BALANCE,
   OffchainKeypair,
   OffchainPublicKey,
-  open_channel,
   PacketInteractionConfig,
   PeerOrigin,
   PeerStatus,
   PingConfig,
-  redeem_all_tickets,
-  redeem_tickets_in_channel,
-  redeem_tickets_with_counterparty,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   Snapshot,
@@ -62,7 +56,6 @@ import {
   WasmNetwork,
   WasmPing,
   WasmTxExecutor,
-  withdraw,
   legacy_path_select,
   TransportPath
 } from '@hoprnet/hopr-utils'
@@ -998,11 +991,10 @@ export class Hopr extends EventEmitter {
     if (!this.isReady) {
       log('openChannel: Node is not ready for on-chain operations')
     }
-    let self_addr = this.getEthereumAddress()
     let amount = new Balance(amountToFund.toString(10), BalanceType.HOPR)
-    let tx_sender = this.tools.get_tx_sender()
+    let actions = this.tools.chain_actions()
     try {
-      let res = await open_channel(this.db, counterparty, self_addr, amount, tx_sender)
+      let res = await actions.open_channel(counterparty, amount)
       return { channelId: res.channel_id, receipt: res.tx_hash.to_hex() }
     } catch (err) {
       log('failed to open channel', err)
@@ -1024,8 +1016,8 @@ export class Hopr extends EventEmitter {
 
     try {
       let newAmount = new Balance(amount.toString(10), BalanceType.HOPR)
-      let tx_sender = this.tools.get_tx_sender()
-      let res = await fund_channel(this.db, channelId, newAmount, tx_sender)
+      let actions = this.tools.chain_actions()
+      let res = await actions.fund_channel(channelId, newAmount)
       return res.to_hex()
     } catch (err) {
       log('failed to fund channel', err)
@@ -1043,9 +1035,8 @@ export class Hopr extends EventEmitter {
     }
 
     try {
-      let self_addr = this.getEthereumAddress()
-      let tx_sender = this.tools.get_tx_sender()
-      let res = await close_channel(this.db, counterparty, self_addr, direction, false, tx_sender)
+      let actions = this.tools.chain_actions()
+      let res = await actions.close_channel(counterparty, direction, false)
       return { receipt: res.tx_hash.to_hex(), status: res.status }
     } catch (err) {
       log('failed to close channel', err)
@@ -1119,8 +1110,8 @@ export class Hopr extends EventEmitter {
       log('redeemAllTickets: Node is not ready for on-chain operations')
     }
     try {
-      let tx_sender = this.tools.get_tx_sender()
-      await redeem_all_tickets(this.db, onlyAggregated, tx_sender)
+      let actions = this.tools.chain_actions()
+      await actions.redeem_all_tickets(onlyAggregated)
     } catch (err) {
       log(`error during all tickets redemption: ${err}`)
     }
@@ -1133,9 +1124,9 @@ export class Hopr extends EventEmitter {
     try {
       log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
       const channel = await this.db.get_channel(channelId)
-      let tx_sender = this.tools.get_tx_sender()
+      let actions = this.tools.chain_actions()
       if (channel?.destination.eq(this.getEthereumAddress())) {
-        await redeem_tickets_in_channel(this.db, channel, onlyAggregated, tx_sender)
+        await actions.redeem_tickets_in_channel(channel, onlyAggregated)
       } else {
         log(`cannot redeem tickets in channel ${channelId.to_hex()}`)
       }
@@ -1150,8 +1141,8 @@ export class Hopr extends EventEmitter {
     }
 
     try {
-      let tx_sender = this.tools.get_tx_sender()
-      await redeem_tickets_with_counterparty(this.db, counterparty, onlyAggregated, tx_sender)
+      let actions = this.tools.chain_actions()
+      await actions.redeem_tickets_with_counterparty(counterparty, onlyAggregated)
     } catch (err) {
       log(`error during ticket redemption with counterparty ${counterparty.to_hex()}: ${err}`)
     }
@@ -1232,8 +1223,8 @@ export class Hopr extends EventEmitter {
       log('withdraw: Node is not ready for on-chain operations')
     }
     try {
-      let tx_sender = this.tools.get_tx_sender()
-      let result = await withdraw(recipient, amount, tx_sender)
+      let actions = this.tools.chain_actions()
+      let result = await actions.withdraw(recipient, amount)
       return result.to_hex()
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)

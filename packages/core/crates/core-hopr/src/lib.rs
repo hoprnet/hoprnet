@@ -105,6 +105,7 @@ pub mod wasm_impls {
     use core_crypto::keypairs::Keypair;
     use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
     use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
+    use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_network::network::NetworkConfig;
@@ -117,7 +118,6 @@ pub mod wasm_impls {
     use utils_db::rusty::RustyLevelDbShim;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
-    use core_ethereum_actions::CoreEthereumActions;
 
     #[wasm_bindgen]
     #[derive(Clone)]
@@ -261,7 +261,8 @@ pub mod wasm_impls {
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
 
-        let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db.clone(), tx_queue.new_sender());
+        let chain_actions =
+            CoreEthereumActions::new(me_onchain.public().to_address(), db.clone(), tx_queue.new_sender());
 
         let multi_strategy = Arc::new(MultiStrategy::new(
             strategy_cfg,

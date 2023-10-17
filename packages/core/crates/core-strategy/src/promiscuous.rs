@@ -12,6 +12,7 @@ use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_std::sync::RwLock;
 use async_trait::async_trait;
+use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
@@ -20,7 +21,6 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use validator::Validate;
-use core_ethereum_actions::channels::ChannelActions;
 
 use crate::errors::Result;
 use crate::strategy::SingularStrategy;
@@ -306,12 +306,14 @@ where
         // close all the channels, need to be synchronous because Ethereum transactions
         // are synchronous, especially due nonces
         for channel_to_close in tick_decision.get_to_close() {
-            match self.chain_actions.close_channel(
-                channel_to_close.destination,
-                ChannelDirection::Outgoing,
-                false, // TODO: get this value from config
-            )
-            .await
+            match self
+                .chain_actions
+                .close_channel(
+                    channel_to_close.destination,
+                    ChannelDirection::Outgoing,
+                    false, // TODO: get this value from config
+                )
+                .await
             {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction
@@ -327,11 +329,10 @@ where
         // open all the channels, need to be synchronous because Ethereum
         // transactions are synchronous, especially due to nonces
         for channel_to_open in tick_decision.get_to_open() {
-            match self.chain_actions.open_channel(
-                channel_to_open.0,
-                channel_to_open.1,
-            )
-            .await
+            match self
+                .chain_actions
+                .open_channel(channel_to_open.0, channel_to_open.1)
+                .await
             {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction

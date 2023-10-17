@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use core_ethereum_actions::channels::ChannelActions;
+use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::channels::ChannelDirection::Outgoing;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
@@ -8,8 +10,6 @@ use std::fmt::{Debug, Display, Formatter};
 use utils_log::info;
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
-use core_ethereum_actions::channels::ChannelActions;
-use core_ethereum_actions::CoreEthereumActions;
 
 use crate::strategy::SingularStrategy;
 use crate::Strategy;
@@ -83,11 +83,10 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
                     channel.balance, self.cfg.min_stake_threshold
                 );
 
-                let rx = self.chain_actions.fund_channel(
-                    channel.get_id(),
-                    self.cfg.funding_amount,
-                )
-                .await?;
+                let rx = self
+                    .chain_actions
+                    .fund_channel(channel.get_id(), self.cfg.funding_amount)
+                    .await?;
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
                 info!(
                     "{self} strategy: issued re-staking of {channel} with {}",
@@ -108,6 +107,7 @@ mod tests {
     use async_trait::async_trait;
     use core_crypto::types::Hash;
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
+    use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::acknowledgement::AcknowledgedTicket;
@@ -116,7 +116,6 @@ mod tests {
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use mockall::mock;
     use std::sync::Arc;
-    use core_ethereum_actions::CoreEthereumActions;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Address, Balance, BalanceType, Snapshot};
