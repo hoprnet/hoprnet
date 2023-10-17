@@ -12,11 +12,9 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-async-std = { version = "1.12.0", features = ["attributes"] }
-async-trait = "0.1"
+async-trait = { workspace = true }
 async-lock = { workspace = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-futures = "0.3"
 hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
@@ -39,7 +37,7 @@ utils-log = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
 
 [dev-dependencies]
-async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
+async-std = "1.12.0"
 env_logger = "0.10"
 mockall = "0.11.4"
 hex-literal = "0.4"

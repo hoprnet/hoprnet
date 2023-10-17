@@ -5,9 +5,8 @@ use async_trait::async_trait;
 use core_ethereum_actions::channels::fund_channel;
 use core_ethereum_actions::transaction_queue::TransactionSender;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_path::channel_graph::ChannelChange;
 use core_types::channels::ChannelDirection::Outgoing;
-use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
+use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
@@ -79,7 +78,7 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
             return Ok(());
         }
 
-        if let ChannelChange::CurrentBalance { new, .. } = change {
+        if let ChannelChange::CurrentBalance { right: new, .. } = change {
             if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
                 info!(
                     "{self} strategy: stake on {channel} is below threshold {} < {}",
@@ -115,8 +114,8 @@ mod tests {
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_path::channel_graph::ChannelChange::CurrentBalance;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use core_types::channels::ChannelChange::CurrentBalance;
     use core_types::channels::ChannelDirection::Outgoing;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use mockall::mock;
@@ -241,8 +240,8 @@ mod tests {
             &c1,
             Outgoing,
             CurrentBalance {
-                old: Balance::zero(BalanceType::HOPR),
-                new: c1.balance,
+                left: Balance::zero(BalanceType::HOPR),
+                right: c1.balance,
             },
         )
         .await
@@ -251,8 +250,8 @@ mod tests {
             &c2,
             Outgoing,
             CurrentBalance {
-                old: Balance::zero(BalanceType::HOPR),
-                new: c2.balance,
+                left: Balance::zero(BalanceType::HOPR),
+                right: c2.balance,
             },
         )
         .await
@@ -261,8 +260,8 @@ mod tests {
             &c3,
             Outgoing,
             CurrentBalance {
-                old: Balance::zero(BalanceType::HOPR),
-                new: c3.balance,
+                left: Balance::zero(BalanceType::HOPR),
+                right: c3.balance,
             },
         )
         .await

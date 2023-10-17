@@ -13,7 +13,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 aes = "0.8.3"
-async-std = { version = "1.12.0", features = ["attributes"] }
 blake2 = { version = "0.10", features = ["reset"] }
 chacha20 = { version = "0.9", features = ["zeroize"] }
 ctr = "0.9"
@@ -22,11 +21,9 @@ curve25519-dalek = { version = "4.0.0", features = ["serde", "rand_core"] }
 digest = "0.10"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 elliptic-curve = { version = "0.13", features = ["serde"] }
-futures = "0.3.28"
 generic-array = { version = "0.14.7", features = ["zeroize"] }
 getrandom = { workspace = true, features = ["js"] }
 hex = { workspace = true }
-hex-literal = "0.4"
 hkdf = "0.12"
 hmac = "0.12"
 js-sys = { workspace = true, optional = true }
@@ -38,8 +35,7 @@ sha2 = "0.10"
 sha3 = "0.10"
 subtle = "2"
 typenum = "1.16"
-thiserror = "1.0"
-wasm-bindgen-futures = { version = "0.4.34", optional = true, features = ["futures-core-03-stream"] }
+thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 zeroize = { version = "1.6", features = ["zeroize_derive"] }
 
@@ -47,8 +43,8 @@ utils-log = { workspace = true }
 utils-misc = { workspace = true }
 utils-types = { workspace = true }
 
-
 [dev-dependencies]
+hex-literal = "0.4.1"
 parameterized = "1.0"
 
 [package.metadata.wasm-pack.profile.dev]
@@ -59,5 +55,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "getrandom/js", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "getrandom/js", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]

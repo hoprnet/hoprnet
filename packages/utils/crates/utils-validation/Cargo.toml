@@ -13,13 +13,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 proc-macro-regex = "~1.1.0"
-serde = { workspace = true }
-serde_json = { workspace = true }
-# serde_bytes = "0.11"
-console_error_panic_hook = { version = "0.1.7", optional = true }
-
-real-base = { workspace = true }
-utils-types = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
@@ -32,6 +25,5 @@ wasm-opt = false
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
-default = ["console_error_panic_hook", "wasm"]
+default = ["wasm"]
 wasm = []
-console_error_panic_hook = [ "dep:console_error_panic_hook" ]

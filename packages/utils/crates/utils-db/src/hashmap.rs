@@ -89,7 +89,7 @@ impl AsyncKVStorage for BinaryHashMapStorage {
         let mut last_key: Vec<u8> = prefix.into();
         last_key.extend((0..suffix_size).map(|_| 0xffu8));
 
-        let d = iter(self.data.clone().into_iter())
+        let d = iter(self.data.clone())
             .filter(move |(key, _)| {
                 let upper_bound = key.as_ref().cmp(&last_key);
                 let lower_bound = key.as_ref().cmp(&first_key);
@@ -105,7 +105,7 @@ impl AsyncKVStorage for BinaryHashMapStorage {
         start: Self::Key,
         end: Self::Key,
     ) -> crate::errors::Result<StorageValueIterator<Self::Value>> {
-        let d = iter(self.data.clone().into_iter())
+        let d = iter(self.data.clone())
             .filter(move |(key, _)| {
                 let upper_bound = key.as_ref().cmp(&start);
                 let lower_bound = key.as_ref().cmp(&end);

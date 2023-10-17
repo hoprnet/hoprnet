@@ -9,7 +9,7 @@ use core_packet::{
     packet::{CurrentSphinxSuite, ForwardedMetaPacket, MetaPacket, PACKET_LENGTH},
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
 };
-use core_path::path::Path;
+use core_path::path::{Path, TransportPath};
 use core_types::channels::Ticket;
 use core_types::protocol::INTERMEDIATE_HOPS;
 use libp2p_identity::PeerId;
@@ -72,7 +72,7 @@ impl ChainPacketComponents {
     /// * `first_ticket` ticket for the first hop on the path
     pub fn into_outgoing(
         msg: &[u8],
-        path: &Path,
+        path: &TransportPath,
         chain_keypair: &ChainKeypair,
         mut ticket: Ticket,
         domain_separator: &Hash,
@@ -226,13 +226,19 @@ impl ChainPacketComponents {
 #[cfg(test)]
 mod tests {
     use super::ChainPacketComponents;
+    use async_trait::async_trait;
+    use core_crypto::types::OffchainPublicKey;
     use core_crypto::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{Hash, PublicKey},
     };
-    use core_path::path::Path;
-    use core_types::channels::Ticket;
+    use core_path::channel_graph::ChannelGraph;
+    use core_path::path::TransportPath;
+    use core_types::channels::{ChannelEntry, ChannelStatus, Ticket};
+    use core_types::protocol::PeerAddressResolver;
+    use libp2p_identity::PeerId;
     use parameterized::parameterized;
+    use utils_types::primitives::Address;
     use utils_types::{
         primitives::{Balance, BalanceType, EthereumChallenge, U256},
         traits::PeerIdLike,
@@ -263,6 +269,48 @@ mod tests {
             Ticket::new_zero_hop(&next_peer_channel_key.to_address(), private_key, &Hash::default()).unwrap()
         }
     }
+    async fn resolve_mock_path(peers: Vec<PeerId>) -> TransportPath {
+        let peers_addrs = peers
+            .iter()
+            .map(|p| (OffchainPublicKey::from_peerid(p).unwrap(), Address::random()))
+            .collect::<Vec<_>>();
+        let mut cg = ChannelGraph::new(Address::random());
+        let mut last_addr = cg.my_address();
+        for (_, addr) in peers_addrs.iter() {
+            let c = ChannelEntry::new(
+                last_addr,
+                *addr,
+                Balance::new(1000u32.into(), BalanceType::HOPR),
+                0u32.into(),
+                ChannelStatus::Open,
+                0u32.into(),
+                0u32.into(),
+            );
+            cg.update_channel(c);
+            last_addr = *addr;
+        }
+
+        struct TestResolver(Vec<(OffchainPublicKey, Address)>);
+
+        #[async_trait(? Send)]
+        impl PeerAddressResolver for TestResolver {
+            async fn resolve_packet_key(&self, onchain_key: &Address) -> Option<OffchainPublicKey> {
+                self.0
+                    .iter()
+                    .find(|(_, addr)| addr.eq(onchain_key))
+                    .map(|(pk, _)| pk.clone())
+            }
+
+            async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Option<Address> {
+                self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr)
+            }
+        }
+
+        TransportPath::resolve(peers, &TestResolver(peers_addrs), &cg)
+            .await
+            .unwrap()
+            .0
+    }
 
     #[parameterized(amount = { 4, 3, 2 })]
     fn test_packet_create_and_transform(amount: usize) {
@@ -279,7 +327,10 @@ mod tests {
         let ticket = mock_ticket(&channel_pairs[0].public().0, keypairs.len(), &own_channel_kp);
 
         let test_message = b"some testing message";
-        let path = Path::new_valid(keypairs.iter().map(|kp| kp.public().to_peerid()).collect());
+        let path = async_std::task::block_on(resolve_mock_path(
+            keypairs.iter().map(|kp| kp.public().to_peerid()).collect(),
+        ));
+
         let mut packet =
             ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())
                 .expect("failed to construct packet");
