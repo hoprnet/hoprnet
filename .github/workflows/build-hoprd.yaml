@@ -1,7 +1,5 @@
 ---
-#################################################################################
 # Child pipeline to build Hoprd docker image (europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd)
-#################################################################################
 name: Build Hoprd
 
 on:
