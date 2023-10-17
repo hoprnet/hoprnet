@@ -79,7 +79,7 @@ impl Default for PromiscuousStrategyConfig {
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
 pub struct PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     db: Arc<RwLock<Db>>,
@@ -91,7 +91,7 @@ where
 
 impl<Db, Net> PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     pub fn new(
@@ -276,7 +276,7 @@ where
 
 impl<Db, Net> Debug for PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -286,7 +286,7 @@ where
 
 impl<Db, Net> Display for PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -297,7 +297,7 @@ where
 #[async_trait(? Send)]
 impl<Db, Net> SingularStrategy for PromiscuousStrategy<Db, Net>
 where
-    Db: HoprCoreEthereumDbActions,
+    Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
 {
     async fn on_tick(&self) -> Result<()> {
@@ -446,7 +446,7 @@ mod tests {
         peer: &PeerId,
         steps: u32,
     ) where
-        Db: HoprCoreEthereumDbActions,
+        Db: HoprCoreEthereumDbActions + Clone,
         Net: NetworkExternalActions,
     {
         strategy.network.write().await.add(peer, PeerOrigin::Initialization);

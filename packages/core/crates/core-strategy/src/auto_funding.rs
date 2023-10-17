@@ -40,31 +40,31 @@ impl Default for AutoFundingStrategyConfig {
 
 /// The `AutoFundingStrategy` automatically funds channel that
 /// dropped it's staked balance below the configured threshold.
-pub struct AutoFundingStrategy<Db: HoprCoreEthereumDbActions> {
+pub struct AutoFundingStrategy<Db: HoprCoreEthereumDbActions + Clone> {
     chain_actions: CoreEthereumActions<Db>,
     cfg: AutoFundingStrategyConfig,
 }
 
-impl<Db: HoprCoreEthereumDbActions> AutoFundingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> AutoFundingStrategy<Db> {
     pub fn new(cfg: AutoFundingStrategyConfig, chain_actions: CoreEthereumActions<Db>) -> Self {
         Self { cfg, chain_actions }
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions> Debug for AutoFundingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> Debug for AutoFundingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoFunding(self.cfg))
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> Display for AutoFundingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoFunding(self.cfg))
     }
 }
 
 #[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for AutoFundingStrategy<Db> {
     async fn on_own_channel_changed(
         &self,
         channel: &ChannelEntry,

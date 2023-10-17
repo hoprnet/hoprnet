@@ -11,7 +11,7 @@ use core_types::{
 use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
-pub trait HoprCoreEthereumDbActions: Clone {
+pub trait HoprCoreEthereumDbActions {
     // core only part
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
