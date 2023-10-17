@@ -1,4 +1,7 @@
 ---
+#################################################################################
+# Manual pipeline to start a load testing scenario
+#################################################################################
 name: Load Tests
 
 on:
@@ -6,7 +9,31 @@ on:
   # schedule:
   #   - cron: '00 2 * * *'
   workflow_dispatch:
-
+    inputs:
+      test_id:
+        type: string
+        required: true
+        description: 'Test name'
+      network:
+        type: choice
+        options:
+          - rotsee
+          - dufour
+        required: true
+        description: 'Cluster of nodes'
+      workload:
+        type: choice
+        options:
+          - sanity-check
+          - endurance
+          - full
+        required: true
+        description: 'Type of workload'
+      rate:
+        type: number
+        default: 1
+        required: true
+        description: 'Number of messages per seconds'
 
 concurrency:
   group: load-tests
@@ -25,14 +52,23 @@ jobs:
           repository: hoprnet/hoprd-test
           ref: main
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Setup NodeJs
+        uses: actions/setup-node@v3
         with:
-          driver: kubernetes
+          node-version: 18
 
-      - uses: isbang/compose-action@v1.5.1
-        with:
-          compose-file: "./k6/docker-compose.yaml"
+      - name: Run Load test
+        run: |
+          npm install
+          npm run test:${{ github.event.inputs.network }}:setup
+          kubectl delete -f k6-test-run.yaml 2> /dev/null || true
+          kubectl apply -f k6-test-run.yaml
+        working-directory: "./k6"
         env:
-          ENVIRONMENT_NAME: pluto
-          WORKLOAD_NAME: simple
+          ENVIRONMENT_NAME: ${{ github.event.inputs.network }}
+          WORKLOAD_NAME: ${{ github.event.inputs.workload }}
+          SCENARIO_ITERATIONS: ${{ github.event.inputs.rate }}
+          TESTID: ${{ github.event.inputs.test_id }}
+          HOPRD_API_TOKEN: ${{ secrets.HOPRD_API_TOKEN }}
+
+
