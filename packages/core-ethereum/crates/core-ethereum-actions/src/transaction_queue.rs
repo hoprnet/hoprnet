@@ -162,15 +162,19 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             Transaction::RedeemTicket(ack) => match ack.status {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
-                    match res {
+                    match &res {
                         TicketRedeemed { .. } => {
                             if let Err(e) = db.write().await.mark_redeemed(&ack).await {
                                 error!("failed to mark {ack} as redeemed: {e}");
                                 // Still declare the TX a success
                             }
                         }
-                        Failure(_) => {
-                            // TODO: if we know that the transaction failed due to on-chain execution, mark the ticket as losing here!
+                        Failure(e) => {
+                            error!("redeem tx failed, marking {ack} as losing: {e}");
+                            // TODO: distinguish here based on error message whether to mark as losing or whether to mark ticket as Untouched again.
+                            if let Err(e) = db.write().await.mark_losing_acked_ticket(&ack).await {
+                                error!("failed to mark {ack} as losing: {e}");
+                            }
                         }
                         _ => panic!("invalid tx result from ticket redeem"),
                     }
@@ -435,7 +439,7 @@ pub mod wasm {
                         },
                         "DUPLICATE" => SendTransactionResult::Duplicate,
                         _ => SendTransactionResult::Failure(format!(
-                            "transaction sending failed with unknown error {v:?}"
+                            "tx sender error: {v:?}"
                         )),
                     }
                 }
@@ -458,7 +462,7 @@ pub mod wasm {
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::TicketRedeemed { tx_hash },
                 SendTransactionResult::Duplicate => {
-                    TransactionResult::Failure("ticket redeem transaction is a duplicate".to_string())
+                    TransactionResult::Failure("ticket redeem transaction is a duplicate".into())
                 }
                 SendTransactionResult::Failure(e) => {
                     TransactionResult::Failure(format!("ticket redeem send transaction failed: {e}"))
@@ -478,7 +482,7 @@ pub mod wasm {
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelFunded { tx_hash },
                 SendTransactionResult::Duplicate => {
-                    TransactionResult::Failure("fund channel transaction is a duplicate".to_string())
+                    TransactionResult::Failure("fund channel transaction is a duplicate".into())
                 }
                 SendTransactionResult::Failure(e) => {
                     TransactionResult::Failure(format!("fund channel send transaction failed: {e}"))
@@ -498,7 +502,7 @@ pub mod wasm {
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosureInitiated { tx_hash },
                 SendTransactionResult::Duplicate => {
-                    TransactionResult::Failure("init close outgoing channel transaction is a duplicate".to_string())
+                    TransactionResult::Failure("init close outgoing channel transaction is a duplicate".into())
                 }
                 SendTransactionResult::Failure(e) => {
                     TransactionResult::Failure(format!("init close outgoing channel send transaction failed: {e}"))
@@ -518,7 +522,7 @@ pub mod wasm {
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
                 SendTransactionResult::Duplicate => {
-                    TransactionResult::Failure("finalize close outgoing channel transaction is a duplicate".to_string())
+                    TransactionResult::Failure("finalize close outgoing channel transaction is a duplicate".into())
                 }
                 SendTransactionResult::Failure(e) => {
                     TransactionResult::Failure(format!("finalize close outgoing channel send transaction failed: {e}"))
@@ -538,7 +542,7 @@ pub mod wasm {
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
                 SendTransactionResult::Duplicate => {
-                    TransactionResult::Failure("close incoming channel transaction is a duplicate".to_string())
+                    TransactionResult::Failure("close incoming channel transaction is a duplicate".into())
                 }
                 SendTransactionResult::Failure(e) => {
                     TransactionResult::Failure(format!("close incoming channel send transaction failed: {e}"))
@@ -570,7 +574,7 @@ pub mod wasm {
             match self.send_transaction(tx, event_string).await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::Withdrawn { tx_hash },
                 SendTransactionResult::Duplicate => {
-                    TransactionResult::Failure("withdraw transaction is a duplicate".to_string())
+                    TransactionResult::Failure("withdraw transaction is a duplicate".into())
                 }
                 SendTransactionResult::Failure(e) => {
                     TransactionResult::Failure(format!("withdraw send transaction failed: {e}"))

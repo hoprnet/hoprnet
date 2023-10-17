@@ -402,7 +402,7 @@ export async function createChainWrapper(
       throw new Error(`Failed in publishing transaction. ${error}`)
     }
 
-    log('Transaction with nonce %d successfully sent %s, waiting for confimation', populatedTx.nonce, transaction.hash)
+    log('Transaction with nonce %d successfully sent %s, waiting for confirmation', populatedTx.nonce, transaction.hash)
     metric_countSendTransaction.increment()
     nonceLock.releaseLock()
 
