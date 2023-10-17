@@ -44,9 +44,11 @@ pub mod wasm {
     use utils_types::primitives::{Address, Balance};
     use crate::channels::ChannelActions;
     use crate::CoreEthereumActions;
+    use crate::node::NodeActions;
     use crate::redeem::TicketRedeemActions;
     use crate::transaction_queue::{TransactionResult, TransactionSender};
 
+    #[derive(Clone)]
     #[wasm_bindgen]
     pub struct WasmCoreEthereumActions {
         w: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>
@@ -55,6 +57,10 @@ pub mod wasm {
     impl WasmCoreEthereumActions {
         pub fn inner_ref(&self) -> &CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>> {
             &self.w
+        }
+
+        pub fn new_from_actions(actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>) -> Self {
+            Self { w: actions }
         }
     }
 
