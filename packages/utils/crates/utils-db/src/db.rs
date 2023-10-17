@@ -121,11 +121,12 @@ impl Deref for Key {
     }
 }
 
-pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> {
+#[derive(Clone)]
+pub struct DB<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> {
     backend: T,
 }
 
-impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>>> DB<T> {
+impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> DB<T> {
     pub fn new(backend: T) -> Self {
         Self { backend }
     }
@@ -249,6 +250,12 @@ mod tests {
     use mockall::predicate;
     use serde::Deserialize;
     use utils_types::traits::BinarySerializable;
+
+    impl Clone for MockAsyncKVStorage {
+        fn clone(&self) -> Self {
+            Self::default()
+        }
+    }
 
     #[test]
     fn test_key_to_string() {

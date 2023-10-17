@@ -12,10 +12,7 @@ use utils_types::primitives::{Address, Balance, BalanceType};
 
 use async_std::sync::RwLock;
 use async_trait::async_trait;
-use core_ethereum_actions::{
-    channels::{close_channel, open_channel},
-    transaction_queue::TransactionSender,
-};
+use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use serde::{Deserialize, Serialize};
@@ -23,6 +20,7 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 use validator::Validate;
+use core_ethereum_actions::channels::ChannelActions;
 
 use crate::errors::Result;
 use crate::strategy::SingularStrategy;
@@ -86,7 +84,7 @@ where
 {
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<Net>>>,
-    tx_sender: TransactionSender,
+    chain_actions: CoreEthereumActions<Db>,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SimpleMovingAvg>,
 }
@@ -100,12 +98,12 @@ where
         cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
         network: Arc<RwLock<Network<Net>>>,
-        tx_sender: TransactionSender,
+        chain_actions: CoreEthereumActions<Db>,
     ) -> Self {
         Self {
             db,
             network,
-            tx_sender,
+            chain_actions,
             cfg,
             sma: RwLock::new(SimpleMovingAvg::new()),
         }
@@ -308,11 +306,8 @@ where
         // close all the channels, need to be synchronous because Ethereum transactions
         // are synchronous, especially due nonces
         for channel_to_close in tick_decision.get_to_close() {
-            match close_channel(
-                self.db.clone(),
-                self.tx_sender.clone(),
+            match self.chain_actions.close_channel(
                 channel_to_close.destination,
-                channel_to_close.source,
                 ChannelDirection::Outgoing,
                 false, // TODO: get this value from config
             )
@@ -332,11 +327,8 @@ where
         // open all the channels, need to be synchronous because Ethereum
         // transactions are synchronous, especially due to nonces
         for channel_to_open in tick_decision.get_to_open() {
-            match open_channel(
-                self.db.clone(),
-                self.tx_sender.clone(),
+            match self.chain_actions.open_channel(
                 channel_to_open.0,
-                Address::default(),
                 channel_to_open.1,
             )
             .await
@@ -499,9 +491,11 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
+        let actions = CoreEthereumActions::new(alice_address, db.clone(), tx_sender);
+
         let strat_cfg = PromiscuousStrategyConfig::default();
 
-        let strat = PromiscuousStrategy::new(strat_cfg, db, network, tx_sender);
+        let strat = PromiscuousStrategy::new(strat_cfg, db, network, actions);
 
         // create a network with:
         let peers: Vec<(PeerId, u32)> = vec![
