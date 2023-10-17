@@ -677,9 +677,10 @@ pub mod wasm {
     }
 
     #[wasm_bindgen]
-    pub fn fetch_configuration(cli_args: JsValue) -> Result<HoprdConfig, JsValue> {
-        let args: crate::cli::CliArgs = serde_wasm_bindgen::from_value(cli_args)?;
-        HoprdConfig::from_cli_args(args, false).map_err(|e| wasm_bindgen::JsValue::from(e.to_string()))
+    pub fn fetch_configuration(cli_args: JsValue) -> Result<HoprdConfig, JsError> {
+        let args: crate::cli::CliArgs =
+            serde_wasm_bindgen::from_value(cli_args).map_err(|e| JsError::new(e.to_string().as_str()))?;
+        HoprdConfig::from_cli_args(args, false).map_err(|e| JsError::new(e.to_string().as_str()))
     }
 }
 
