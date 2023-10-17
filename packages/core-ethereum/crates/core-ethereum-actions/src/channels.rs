@@ -14,8 +14,7 @@ use crate::{
         },
         Result,
     },
-    redeem::redeem_tickets_in_channel,
-    transaction_queue::{Transaction, TransactionCompleted, TransactionSender},
+    transaction_queue::{Transaction, TransactionCompleted},
 };
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -617,7 +616,7 @@ mod tests {
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, direction, false)
+            .close_channel(*BOB, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
             .await
@@ -646,7 +645,7 @@ mod tests {
             .unwrap();
 
         let tx_res = actions
-            .close_channel(*BOB, direction, false)
+            .close_channel(*BOB, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
             .await
@@ -701,11 +700,10 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
-        let tx_res = close_channel(
-            db.clone(),
-            tx_sender.clone(),
+        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
+
+        let tx_res = actions.close_channel(
             *BOB,
-            *ALICE,
             ChannelDirection::Incoming,
             false,
         )
@@ -804,7 +802,7 @@ mod tests {
             *ALICE,
         )));
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
-        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_queue.new_sender());
 
         let channel = ChannelEntry::new(
             *ALICE,

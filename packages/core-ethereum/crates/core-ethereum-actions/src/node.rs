@@ -61,7 +61,7 @@ mod tests {
             .expect_withdraw()
             .times(1)
             .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::Withdraw { tx_hash: random_hash });
+            .returning(move |_, _| TransactionResult::Withdrawn { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
         let tx_sender = tx_queue.new_sender();
@@ -74,7 +74,7 @@ mod tests {
         let tx_res = actions.withdraw(bob, stake).await.unwrap().await.unwrap();
 
         match tx_res {
-            TransactionResult::Withdraw { tx_hash } => {
+            TransactionResult::Withdrawn { tx_hash } => {
                 assert_eq!(random_hash, tx_hash, "tx hash must be equal");
             }
             _ => panic!("invalid or failed tx result"),
