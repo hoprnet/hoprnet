@@ -7,9 +7,11 @@ use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, Bei
 use core_types::channels::{generate_channel_id, ChannelEntry};
 use std::ops::DerefMut;
 use std::sync::Arc;
+use async_trait::async_trait;
 use utils_db::errors::DbError;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::Address;
+use crate::CoreEthereumActions;
 
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use crate::errors::{
@@ -23,70 +25,26 @@ lazy_static::lazy_static! {
     static ref EMPTY_TX_HASH: Hash = Hash::default();
 }
 
-/// Redeems all redeemable tickets in all channels.
-pub async fn redeem_all_tickets<Db>(
-    db: Arc<RwLock<Db>>,
-    only_aggregated: bool,
-    onchain_tx_sender: TransactionSender,
-) -> Result<Vec<TransactionCompleted>>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    let incoming_channels = db.read().await.get_incoming_channels().await?;
-    debug!(
-        "starting to redeem all tickets in {} incoming channels to us.",
-        incoming_channels.len()
-    );
+/// Gathers all the ticket redemption related on-chain calls.
+#[async_trait(? Send)]
+pub trait TicketRedeemActions {
+    /// Redeems all redeemable tickets in all channels.
+    async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<TransactionCompleted>>;
 
-    let mut receivers: Vec<TransactionCompleted> = vec![];
+    /// Redeems all redeemable tickets in the incoming channel from the given counterparty.
+    async fn redeem_tickets_with_counterparty(&self, counterparty: &Address, only_aggregated: bool) -> Result<Vec<TransactionCompleted>>;
 
-    // Must be synchronous because underlying Ethereum transactions are sequential
-    for incoming_channel in incoming_channels {
-        match redeem_tickets_in_channel(
-            db.clone(),
-            &incoming_channel,
-            only_aggregated,
-            onchain_tx_sender.clone(),
-        )
-        .await
-        {
-            Ok(mut successful_txs) => {
-                receivers.append(&mut successful_txs);
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to redeem tickets in channel {} due to {}",
-                    generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
-                    e
-                );
-            }
-        }
-    }
+    /// Redeems all redeemable tickets in the given channel.
+    async fn redeem_tickets_in_channel(&self, channel: &ChannelEntry, only_aggregated: bool) -> Result<Vec<TransactionCompleted>>;
 
-    Ok(receivers)
-}
-
-/// Redeems all redeemable tickets in the incoming channel from the given counterparty.
-pub async fn redeem_tickets_with_counterparty<Db>(
-    db: Arc<RwLock<Db>>,
-    counterparty: &Address,
-    only_aggregated: bool,
-    onchain_tx_sender: TransactionSender,
-) -> Result<Vec<TransactionCompleted>>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    let ch = db.read().await.get_channel_from(counterparty).await?;
-    if let Some(channel) = ch {
-        redeem_tickets_in_channel(db, &channel, only_aggregated, onchain_tx_sender).await
-    } else {
-        Err(ChannelDoesNotExist)
-    }
+    /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
+    /// Otherwise, the transaction hash of the on-chain redemption is returned.
+    async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> Result<TransactionCompleted>;
 }
 
 async fn set_being_redeemed<Db>(db: &mut Db, ack_ticket: &mut AcknowledgedTicket, tx_hash: Hash) -> Result<()>
-where
-    Db: HoprCoreEthereumDbActions,
+    where
+        Db: HoprCoreEthereumDbActions,
 {
     match ack_ticket.status {
         Untouched => {
@@ -117,112 +75,157 @@ where
     Ok(db.update_acknowledged_ticket(ack_ticket).await?)
 }
 
-/// Redeems all redeemable tickets in the given channel.
-pub async fn redeem_tickets_in_channel<Db>(
-    db: Arc<RwLock<Db>>,
-    channel: &ChannelEntry,
-    only_aggregated: bool,
-    onchain_tx_sender: TransactionSender,
-) -> Result<Vec<TransactionCompleted>>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    let channel_id = channel.get_id();
-
-    let count_redeemable_tickets = db
-        .read()
-        .await
-        .get_acknowledged_tickets(Some(*channel))
-        .await?
-        .iter()
-        .filter(|t| t.status == Untouched && (!only_aggregated || t.ticket.is_aggregated()))
-        .count();
-    info!("there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed");
-
-    // Return fast if there are no redeemable tickets
-    if count_redeemable_tickets == 0 {
-        return Ok(vec![]);
-    }
-
-    // Keep holding the DB write lock until we mark all the eligible tickets as BeginRedeemed
-    let mut to_redeem = Vec::new();
-    {
-        // Lock the database and retrieve again all the redeemable tickets
-        let mut db = db.write().await;
-        let redeemable = db
-            .get_acknowledged_tickets(Some(*channel))
-            .await?
-            .into_iter()
-            .filter(|t| Untouched == t.status && (!only_aggregated || t.ticket.is_aggregated()));
-
-        for mut avail_to_redeem in redeemable {
-            if let Err(e) = set_being_redeemed(db.deref_mut(), &mut avail_to_redeem, *EMPTY_TX_HASH).await {
-                error!("failed to update state of {}: {e}", avail_to_redeem.ticket)
-            } else {
-                to_redeem.push(avail_to_redeem);
-            }
-        }
-    }
-
-    info!(
-        "{} acknowledged tickets are still available to redeem in {channel_id}",
-        to_redeem.len()
-    );
-
-    let mut receivers: Vec<TransactionCompleted> = vec![];
-
-    for acked_ticket in to_redeem {
-        let ticket_index = acked_ticket.ticket.index;
-        match unchecked_ticket_redeem(db.clone(), acked_ticket, onchain_tx_sender.clone()).await {
-            Ok(successful_tx) => {
-                receivers.push(successful_tx);
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to submit transaction that redeem ticket with index {} in channel {} due to {}",
-                    ticket_index, channel_id, e
-                );
-            }
-        }
-    }
-
-    Ok(receivers)
-}
-
 async fn unchecked_ticket_redeem<Db>(
     db: Arc<RwLock<Db>>,
     mut ack_ticket: AcknowledgedTicket,
     on_chain_tx_sender: TransactionSender,
 ) -> Result<TransactionCompleted>
-where
-    Db: HoprCoreEthereumDbActions,
+    where
+        Db: HoprCoreEthereumDbActions,
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
     on_chain_tx_sender.send(Transaction::RedeemTicket(ack_ticket)).await
 }
 
-/// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
-/// Otherwise, the transaction hash of the on-chain redemption is returned.
-pub async fn redeem_ticket<Db>(
-    db: Arc<RwLock<Db>>,
-    ack_ticket: AcknowledgedTicket,
-    on_chain_tx_sender: TransactionSender,
-) -> Result<TransactionCompleted>
-where
-    Db: HoprCoreEthereumDbActions,
-{
-    if let Untouched = ack_ticket.status {
-        unchecked_ticket_redeem(db, ack_ticket, on_chain_tx_sender).await
-    } else {
-        Err(WrongTicketState(ack_ticket.to_string()))
+#[async_trait(? Send)]
+impl<Db: HoprCoreEthereumDbActions> TicketRedeemActions for CoreEthereumActions<Db> {
+    async fn redeem_all_tickets(
+        &self,
+        only_aggregated: bool,
+    ) -> Result<Vec<TransactionCompleted>> {
+        let incoming_channels = self.db.read().await.get_incoming_channels().await?;
+        debug!(
+        "starting to redeem all tickets in {} incoming channels to us.",
+        incoming_channels.len()
+    );
+
+        let mut receivers: Vec<TransactionCompleted> = vec![];
+
+        // Must be synchronous because underlying Ethereum transactions are sequential
+        for incoming_channel in incoming_channels {
+            match self.redeem_tickets_in_channel(
+                &incoming_channel,
+                only_aggregated,
+            )
+            .await
+            {
+                Ok(mut successful_txs) => {
+                    receivers.append(&mut successful_txs);
+                }
+                Err(e) => {
+                    warn!(
+                    "Failed to redeem tickets in channel {} due to {}",
+                    generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
+                    e
+                );
+                }
+            }
+        }
+
+        Ok(receivers)
+    }
+
+    /// Redeems all redeemable tickets in the incoming channel from the given counterparty.
+    async fn redeem_tickets_with_counterparty(
+        &self,
+        counterparty: &Address,
+        only_aggregated: bool,
+    ) -> Result<Vec<TransactionCompleted>>
+    {
+        let ch = self.db.read().await.get_channel_from(counterparty).await?;
+        if let Some(channel) = ch {
+            self.redeem_tickets_in_channel(&channel, only_aggregated).await
+        } else {
+            Err(ChannelDoesNotExist)
+        }
+    }
+
+
+
+    /// Redeems all redeemable tickets in the given channel.
+    async fn redeem_tickets_in_channel(
+        &self,
+        channel: &ChannelEntry,
+        only_aggregated: bool,
+    ) -> Result<Vec<TransactionCompleted>> {
+        let channel_id = channel.get_id();
+
+        let count_redeemable_tickets = self.db
+            .read()
+            .await
+            .get_acknowledged_tickets(Some(*channel))
+            .await?
+            .iter()
+            .filter(|t| t.status == Untouched && (!only_aggregated || t.ticket.is_aggregated()))
+            .count();
+        info!("there are {count_redeemable_tickets} acknowledged tickets in channel {channel_id} which can be redeemed");
+
+        // Return fast if there are no redeemable tickets
+        if count_redeemable_tickets == 0 {
+            return Ok(vec![]);
+        }
+
+        // Keep holding the DB write lock until we mark all the eligible tickets as BeginRedeemed
+        let mut to_redeem = Vec::new();
+        {
+            // Lock the database and retrieve again all the redeemable tickets
+            let mut db = self.db.write().await;
+            let redeemable = db
+                .get_acknowledged_tickets(Some(*channel))
+                .await?
+                .into_iter()
+                .filter(|t| Untouched == t.status && (!only_aggregated || t.ticket.is_aggregated()));
+
+            for mut avail_to_redeem in redeemable {
+                if let Err(e) = set_being_redeemed(&mut *db, &mut avail_to_redeem, *EMPTY_TX_HASH).await {
+                    error!("failed to update state of {}: {e}", avail_to_redeem.ticket)
+                } else {
+                    to_redeem.push(avail_to_redeem);
+                }
+            }
+        }
+
+        info!(
+        "{} acknowledged tickets are still available to redeem in {channel_id}",
+        to_redeem.len()
+    );
+
+        let mut receivers: Vec<TransactionCompleted> = vec![];
+
+        for acked_ticket in to_redeem {
+            let ticket_index = acked_ticket.ticket.index;
+            match unchecked_ticket_redeem(self.db.clone(),acked_ticket, self.tx_sender.clone()).await {
+                Ok(successful_tx) => {
+                    receivers.push(successful_tx);
+                }
+                Err(e) => {
+                    warn!(
+                    "Failed to submit transaction that redeem ticket with index {} in channel {} due to {}",
+                    ticket_index, channel_id, e
+                );
+                }
+            }
+        }
+
+        Ok(receivers)
+    }
+
+    /// Tries to redeem the given ticket. If the ticket is not redeemable, returns an error.
+    /// Otherwise, the transaction hash of the on-chain redemption is returned.
+    async fn redeem_ticket(
+        &self,
+        ack_ticket: AcknowledgedTicket,
+    ) -> Result<TransactionCompleted> {
+        if let Untouched = ack_ticket.status {
+            unchecked_ticket_redeem(self.db.clone(), ack_ticket, self.tx_sender.clone()).await
+        } else {
+            Err(WrongTicketState(ack_ticket.to_string()))
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::redeem::{
-        redeem_all_tickets, redeem_ticket, redeem_tickets_in_channel, redeem_tickets_with_counterparty,
-    };
     use crate::transaction_queue::{MockTransactionExecutor, TransactionQueue, TransactionResult};
     use async_lock::RwLock;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
@@ -240,6 +243,8 @@ mod tests {
     use utils_db::rusty::RustyLevelDbShim;
     use utils_types::primitives::{Balance, BalanceType, Snapshot, U256};
     use utils_types::traits::BinarySerializable;
+    use crate::CoreEthereumActions;
+    use crate::redeem::TicketRedeemActions;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).unwrap();
@@ -367,8 +372,10 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
+        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+
         futures::future::join_all(
-            redeem_all_tickets(db.clone(), false, tx_sender.clone())
+            actions.redeem_all_tickets(false)
                 .await
                 .expect("redeem_all_tickets should succeed")
                 .into_iter(),
@@ -439,8 +446,10 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
+        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+
         futures::future::join_all(
-            redeem_tickets_with_counterparty(db.clone(), &BOB.public().to_address(), false, tx_sender.clone())
+            actions.redeem_tickets_with_counterparty(&BOB.public().to_address(), false)
                 .await
                 .expect("redeem_tickets_with_counterparty should succeed")
                 .into_iter(),
@@ -523,8 +532,10 @@ mod tests {
             tx_queue.transaction_loop().await;
         });
 
+        let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender.clone());
+
         futures::future::join_all(
-            redeem_tickets_in_channel(db.clone(), &channel_from_bob, false, tx_sender.clone())
+            actions.redeem_tickets_in_channel(&channel_from_bob, false)
                 .await
                 .expect("redeem_tickets_in_channel should succeed")
                 .into_iter(),
@@ -532,86 +543,17 @@ mod tests {
         .await;
 
         assert!(
-            redeem_ticket(db.clone(), tickets[0].clone(), tx_sender.clone())
+            actions.redeem_ticket(tickets[0].clone())
                 .await
                 .is_err(),
             "cannot redeem a ticket that's being aggregated"
         );
 
         assert!(
-            redeem_ticket(db.clone(), tickets[1].clone(), tx_sender.clone())
+            actions.redeem_ticket(tickets[1].clone())
                 .await
                 .is_err(),
             "cannot redeem a ticket that's being redeemed"
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::transaction_queue::TransactionSender;
-    use core_ethereum_db::db::wasm::Database;
-    use core_types::acknowledgement::wasm::AcknowledgedTicket;
-    use core_types::channels::ChannelEntry;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Address;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    pub async fn redeem_all_tickets(
-        db: &Database,
-        only_aggregated: bool,
-        on_chain_tx_sender: &TransactionSender,
-    ) -> JsResult<()> {
-        // We do not await the on-chain confirmation
-        super::redeem_all_tickets(db.as_ref_counted(), only_aggregated, on_chain_tx_sender.clone()).await?;
-        Ok(())
-    }
-
-    #[wasm_bindgen]
-    pub async fn redeem_tickets_with_counterparty(
-        db: &Database,
-        counterparty: &Address,
-        only_aggregated: bool,
-        on_chain_tx_sender: &TransactionSender,
-    ) -> JsResult<()> {
-        // We do not await the on-chain confirmation
-        super::redeem_tickets_with_counterparty(
-            db.as_ref_counted(),
-            counterparty,
-            only_aggregated,
-            on_chain_tx_sender.clone(),
-        )
-        .await?;
-        Ok(())
-    }
-
-    #[wasm_bindgen]
-    pub async fn redeem_tickets_in_channel(
-        db: &Database,
-        channel: &ChannelEntry,
-        only_aggregated: bool,
-        on_chain_tx_sender: &TransactionSender,
-    ) -> JsResult<()> {
-        // We do not await the on-chain confirmation
-        super::redeem_tickets_in_channel(
-            db.as_ref_counted(),
-            channel,
-            only_aggregated,
-            on_chain_tx_sender.clone(),
-        )
-        .await?;
-        Ok(())
-    }
-
-    #[wasm_bindgen]
-    pub async fn redeem_ticket(
-        db: &Database,
-        ack_ticket: &AcknowledgedTicket,
-        on_chain_tx_sender: &TransactionSender,
-    ) -> JsResult<()> {
-        // We do not await the on-chain confirmation
-        let _ = super::redeem_ticket(db.as_ref_counted(), ack_ticket.into(), on_chain_tx_sender.clone()).await?;
-        Ok(())
     }
 }
