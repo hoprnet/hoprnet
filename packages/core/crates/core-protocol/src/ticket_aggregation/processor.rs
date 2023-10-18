@@ -3,7 +3,7 @@ use crate::errors::{
     Result,
 };
 use async_lock::RwLock;
-use core_crypto::{keypairs::ChainKeypair, types::OffchainPublicKey};
+use core_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
@@ -37,7 +37,6 @@ use gloo_timers::future::sleep;
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
-use core_crypto::types::Hash;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
