@@ -3,7 +3,7 @@ use async_std::sync::{Mutex, RwLock};
 use async_trait::async_trait;
 use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_protocol::ticket_aggregation::processor::TicketAggregationActions;
+use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use core_types::channels::ChannelDirection::Incoming;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
@@ -116,7 +116,24 @@ impl<Db: HoprCoreEthereumDbActions + Clone, T, U> AggregatingStrategy<Db, T, U> 
 impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<Db, T, U> {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
         debug!("{self} strategy: starting aggregation in {channel}");
-        match self.ticket_aggregator.lock().await.aggregate_tickets(&channel) {
+        let tickets_to_agg = self
+            .db
+            .write()
+            .await
+            .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
+            .await?;
+
+        info!(
+            "{self} strategy: will aggregate {} tickets in {channel}",
+            tickets_to_agg.len()
+        );
+
+        match self
+            .ticket_aggregator
+            .lock()
+            .await
+            .aggregate_tickets(AggregationList::TicketList(tickets_to_agg))
+        {
             Ok(mut awaiter) => {
                 // Spawn waiting for the aggregation as a separate task
                 let agg_timeout = self.cfg.aggregation_timeout;
