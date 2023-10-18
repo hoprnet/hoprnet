@@ -363,7 +363,6 @@ mod tests {
     use super::*;
     use core_crypto::{
         keypairs::{Keypair, OffchainKeypair},
-        types::Hash,
     };
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
@@ -374,56 +373,27 @@ mod tests {
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::ChannelStatus;
     use futures::future::join_all;
+    use mockall::mock;
+    use core_types::announcement::AnnouncementData;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_misc::time::native::current_timestamp;
     use utils_types::primitives::{Snapshot, U256};
 
-    struct MockTransactionExecutor;
-
-    impl MockTransactionExecutor {
-        pub fn new() -> Self {
-            Self {}
+    mock! {
+        TxExec { }
+        #[async_trait(? Send)]
+        impl TransactionExecutor for TxExec {
+            async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
+            async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult;
+            async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
+            async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
+            async fn close_incoming_channel(&self, src: Address) -> TransactionResult;
+            async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
+            async fn announce(&self, data: AnnouncementData, use_safe: bool) -> TransactionResult;
+            async fn register_safe(&self, safe_address: Address) -> TransactionResult;
         }
     }
 
-    #[async_trait(? Send)]
-    impl TransactionExecutor for MockTransactionExecutor {
-        async fn redeem_ticket(&self, _ticket: AcknowledgedTicket) -> TransactionResult {
-            TransactionResult::TicketRedeemed {
-                tx_hash: Hash::default(),
-            }
-        }
-
-        async fn fund_channel(&self, _destination: Address, _amount: Balance) -> TransactionResult {
-            TransactionResult::ChannelFunded {
-                tx_hash: Hash::default(),
-            }
-        }
-
-        async fn initiate_outgoing_channel_closure(&self, _dst: Address) -> TransactionResult {
-            TransactionResult::ChannelClosed {
-                tx_hash: Hash::default(),
-            }
-        }
-
-        async fn finalize_outgoing_channel_closure(&self, _dst: Address) -> TransactionResult {
-            TransactionResult::ChannelClosed {
-                tx_hash: Hash::default(),
-            }
-        }
-
-        async fn withdraw(&self, _recipient: Address, _amount: Balance) -> TransactionResult {
-            TransactionResult::Withdrawn {
-                tx_hash: Hash::default(),
-            }
-        }
-
-        async fn close_incoming_channel(&self, _source: Address) -> TransactionResult {
-            TransactionResult::ChannelClosed {
-                tx_hash: Hash::default(),
-            }
-        }
-    }
     struct MockNetworkExternalActions;
     impl NetworkExternalActions for MockNetworkExternalActions {
         fn is_public(&self, _: &PeerId) -> bool {
@@ -488,7 +458,7 @@ mod tests {
         )));
 
         // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTxExec::new()));
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;

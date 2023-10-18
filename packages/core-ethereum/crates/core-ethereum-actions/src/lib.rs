@@ -42,7 +42,7 @@ pub mod wasm {
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
-    use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
+    use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus, generate_channel_id};
     use utils_db::rusty::RustyLevelDbShim;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::{Address, Balance};
@@ -88,11 +88,12 @@ pub mod wasm {
 
         pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> JsResult<OpenChannelResult> {
             let awaiter = self.w.open_channel(*destination, *amount).await?;
+            let channel_id = generate_channel_id(&self.w.me, destination);
             match awaiter
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
             {
-                TransactionResult::OpenChannel { tx_hash, channel_id } => Ok(OpenChannelResult { tx_hash, channel_id }),
+                TransactionResult::ChannelFunded { tx_hash } => Ok(OpenChannelResult { tx_hash, channel_id }),
                 _ => Err(JsValue::from("open channel transaction failed".to_string())),
             }
         }
@@ -103,7 +104,7 @@ pub mod wasm {
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
             {
-                TransactionResult::FundChannel { tx_hash } => Ok(tx_hash),
+                TransactionResult::ChannelFunded { tx_hash } => Ok(tx_hash),
                 _ => Err(JsValue::from("fund channel transaction failed".to_string())),
             }
         }
@@ -122,7 +123,8 @@ pub mod wasm {
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
             {
-                TransactionResult::CloseChannel { tx_hash, status } => Ok(CloseChannelResult { tx_hash, status }),
+                TransactionResult::ChannelClosureInitiated { tx_hash } => Ok(CloseChannelResult { tx_hash, status: ChannelStatus::PendingToClose }),
+                TransactionResult::ChannelClosed { tx_hash } => Ok(CloseChannelResult { tx_hash, status: ChannelStatus::Closed }),
                 _ => Err(JsValue::from("close channel transaction failed".to_string())),
             }
         }
@@ -133,7 +135,7 @@ pub mod wasm {
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
             {
-                TransactionResult::Withdraw { tx_hash } => Ok(tx_hash),
+                TransactionResult::Withdrawn { tx_hash } => Ok(tx_hash),
                 _ => Err(JsValue::from("withdraw transaction failed".to_string())),
             }
         }

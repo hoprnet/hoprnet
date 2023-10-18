@@ -296,6 +296,7 @@ mod tests {
     use core_types::channels::ChannelDirection::Incoming;
     use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::{
+        announcement::AnnouncementData,
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelEntry, Ticket},
     };
@@ -340,6 +341,8 @@ mod tests {
             async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
             async fn close_incoming_channel(&self, src: Address) -> TransactionResult;
             async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
+            async fn announce(&self, data: AnnouncementData, use_safe: bool) -> TransactionResult;
+            async fn register_safe(&self, safe_address: Address) -> TransactionResult;
         }
     }
 

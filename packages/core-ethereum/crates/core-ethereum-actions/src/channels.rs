@@ -7,6 +7,7 @@ use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::{
+    CoreEthereumActions,
     errors::{
         CoreEthereumActionsError::{
             ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
@@ -14,14 +15,13 @@ use crate::{
         },
         Result,
     },
+    redeem::TicketRedeemActions,
     transaction_queue::{Transaction, TransactionCompleted},
 };
 
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
-use crate::redeem::TicketRedeemActions;
-use crate::CoreEthereumActions;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
@@ -75,6 +75,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
             }
         }
 
+        info!("initiating channel open to {destination} with {amount}");
         self.tx_sender.send(Transaction::OpenChannel(destination, amount)).await
     }
 
@@ -93,6 +94,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
         match maybe_channel {
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
+                    info!("initiating funding of {channel} with {amount}");
                     self.tx_sender.send(Transaction::FundChannel(channel, amount)).await
                 } else {
                     Err(InvalidState(format!("channel {channel_id} is not opened")).into())
@@ -123,7 +125,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
                             channel.remaining_closure_time(current_timestamp())
                         );
                         if channel.closure_time_passed(current_timestamp()).unwrap_or(false) {
-                            // TODO: emit "channel state change" event
+                            info!("initiating finalization of channel closure of {channel} in {direction}");
                             self.tx_sender.send(Transaction::CloseChannel(channel, direction)).await
                         } else {
                             Err(ClosureTimeHasNotElapsed(
@@ -141,8 +143,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
                             info!("{redeemed} tickets will be redeemed before closing {channel}");
                         }
 
+                        info!("initiating channel closure of {channel} in {direction}");
                         self.tx_sender.send(Transaction::CloseChannel(channel, direction)).await
-                        // TODO: emit "channel state change" event
                     }
                 }
             }

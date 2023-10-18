@@ -269,6 +269,8 @@ export class Hopr extends EventEmitter {
       this.chainKeypair,
       Address.from_string(chainConfig.hoprChannelsAddress),
       Address.from_string(chainConfig.hoprAnnouncementsAddress),
+      Address.from_string(chainConfig.moduleAddress),
+      Address.from_string(chainConfig.hoprNodeSafeRegistryAddress),
       Address.from_string(chainConfig.hoprTokenAddress)
     )
 

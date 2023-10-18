@@ -1,29 +1,36 @@
 import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { ChainWrapper, createChainWrapper, Receipt, type DeploymentExtract, SendTransactionReturn } from './ethereum.js'
+import {
+  ChainWrapper,
+  createChainWrapper,
+  type DeploymentExtract,
+  Receipt, SendTransactionStatus
+} from './ethereum.js'
 import { BigNumber } from 'ethers'
 import {
+  AccountEntry,
+  Address,
   Balance,
   BalanceType,
-  Address,
   cacheNoArgAsyncFunction,
-  Hash,
-  debug,
-  ChannelEntry,
-  type DeferType,
-  PublicKey,
-  AccountEntry,
-  OffchainPublicKey,
   ChainKeypair,
-  OffchainKeypair,
+  ChannelEntry,
   CORE_ETHEREUM_CONSTANTS,
-  Database
+  Database,
+  debug,
+  type DeferType,
+  Hash,
+  OffchainKeypair,
+  OffchainPublicKey,
+  PublicKey, WasmTransactionPayload
 } from '@hoprnet/hopr-utils'
-import { type TransactionPayload } from './transaction-manager.js'
+
+import { TransactionPayload } from './transaction-manager.js'
 
 import Indexer from './indexer/index.js'
 import { EventEmitter } from 'events'
 import type { IndexerEventsNames, IndexerEventsType } from './indexer/types.js'
+
 export {
   BlockEventName,
   BlockProcessedEventName,
@@ -197,10 +204,32 @@ export default class HoprCoreEthereum extends EventEmitter {
     return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
   }
 
-  public sendTransaction(txPayload: TransactionPayload, eventName: IndexerEventsNames): Promise<SendTransactionReturn> {
-    return this.chain.sendTransaction(true, txPayload, (txHash: string) =>
+  private async sendTransactionInternal(txPayload: TransactionPayload, eventName: IndexerEventsNames) {
+    return await this.chain.sendTransaction(true, txPayload, (txHash: string) =>
       this.setTxHandler(`${eventName}${txHash}`, txHash)
     )
+  }
+
+  public async sendTransaction(txPayload: WasmTransactionPayload, eventName: IndexerEventsNames) {
+    let innerPayload: TransactionPayload = {
+      data: txPayload.data,
+      to: txPayload.to,
+      value: BigNumber.from(txPayload.value)
+    }
+
+    let txResult =  await this.sendTransactionInternal(innerPayload, eventName)
+
+    if (txResult.code == SendTransactionStatus.SUCCESS) {
+      return {
+        code: 'SUCCESS',
+        tx: txResult.tx.hash
+      }
+    } else {
+      return {
+        code: txResult.code.toString(),
+        tx: undefined
+      }
+    }
   }
 
   public setTxHandler(evt: IndexerEventsType, tx: string): DeferType<string> {

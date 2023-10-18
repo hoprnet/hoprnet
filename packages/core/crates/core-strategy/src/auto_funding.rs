@@ -110,6 +110,7 @@ mod tests {
     use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+    use core_types::announcement::AnnouncementData;
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::ChannelChange::CurrentBalance;
     use core_types::channels::ChannelDirection::Outgoing;
@@ -130,6 +131,8 @@ mod tests {
             async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
             async fn close_incoming_channel(&self, src: Address) -> TransactionResult;
             async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
+            async fn announce(&self, data: AnnouncementData, use_safe: bool) -> TransactionResult;
+            async fn register_safe(&self, safe_address: Address) -> TransactionResult;
         }
     }
 
