@@ -116,7 +116,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone, T, U> AggregatingStrategy<Db, T, U> 
 impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<Db, T, U> {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
         debug!("{self} strategy: starting aggregation in {channel}");
-        // Perform marking as redeem ahead, to avoid concurrent aggregation race here
+        // Perform marking as aggregated ahead, to avoid concurrent aggregation races in spawn_local
         let tickets_to_agg = self
             .db
             .write()
