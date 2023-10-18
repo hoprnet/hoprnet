@@ -214,7 +214,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     let innerPayload: TransactionPayload = {
       data: txPayload.data,
       to: txPayload.to,
-      value: BigNumber.from(txPayload.value)
+      value: txPayload.value != '' ? BigNumber.from(txPayload.value) : BigNumber.from(0)
     }
 
     let txResult =  await this.sendTransactionInternal(innerPayload, eventName)
