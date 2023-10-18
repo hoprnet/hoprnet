@@ -112,6 +112,7 @@ pub mod wasm_impls {
     use core_path::channel_graph::ChannelGraph;
     use core_path::path::TransportPath;
     use core_path::DbPeerAddressResolver;
+    use core_protocol::ticket_aggregation::processor::AggregationList;
     use core_strategy::strategy::MultiStrategyConfig;
     use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::protocol::ApplicationData;
@@ -204,9 +205,11 @@ pub mod wasm_impls {
             timeout_in_millis: u64,
         ) -> Result<(), JsValue> {
             ok_or_jserr!(
-                ok_or_jserr!(self.ticket_aggregate_actions.aggregate_tickets(channel))?
-                    .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
-                    .await
+                ok_or_jserr!(self
+                    .ticket_aggregate_actions
+                    .aggregate_tickets(AggregationList::WholeChannel(channel.clone())))?
+                .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
+                .await
             )
         }
 

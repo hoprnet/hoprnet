@@ -1,6 +1,6 @@
 [package]
 name = "core-strategy"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
