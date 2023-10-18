@@ -255,7 +255,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         index_start: u64,
         index_end: u64,
     ) -> Result<Vec<AcknowledgedTicket>> {
-        let mut tickets = self.get_acknowledged_tickets_range(channel_id, epoch, index_start, index_end)?;
+        let mut tickets = self.get_acknowledged_tickets_range(channel_id, epoch, index_start, index_end).await?;
 
         let mut batch_ops = utils_db::db::Batch::default();
 
