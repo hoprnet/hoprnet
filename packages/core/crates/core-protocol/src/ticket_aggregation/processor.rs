@@ -81,7 +81,7 @@ pub enum AggregationList {
     },
 
     /// Aggregate the given list of acknowledged tickets.
-    /// The tickets must belong to the same channel.
+    /// The tickets must belong to the same channel and already be marked as `BeingAggregated`
     TicketList(Vec<AcknowledgedTicket>),
 }
 
@@ -360,7 +360,28 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
                     .prepare_aggregatable_tickets(&channel_id, epoch, index_start, index_end)
                     .await?
             }
-            AggregationList::TicketList(list) => list,
+            AggregationList::TicketList(list) => {
+                if list.is_empty() {
+                    debug!("got empty list of tickets to aggregate");
+                    return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
+                }
+
+                let signer = list[0].signer;
+                let channel_id = list[0].ticket.channel_id;
+
+                if !list.iter().all(|tkt| {
+                    tkt.signer == signer && tkt.ticket.channel_id == channel_id && tkt.status.is_being_aggregated()
+                }) {
+                    error!(
+                        "some tickets to aggregate in the given list do not come from the same channel or are not marked as BeingAggregated"
+                    );
+                    return Err(ProtocolTicketAggregation(
+                        "invalid list of tickets to aggregate given".into(),
+                    ));
+                }
+
+                list
+            }
         };
 
         if tickets_to_aggregate.is_empty() {
@@ -369,17 +390,6 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         }
 
         let signer = tickets_to_aggregate[0].signer;
-        let channel_id = tickets_to_aggregate[0].ticket.channel_id;
-
-        if !tickets_to_aggregate
-            .iter()
-            .all(|tkt| tkt.signer == signer || tkt.ticket.channel_id == channel_id)
-        {
-            error!("some tickets to aggregate in the given list do not come from the same signer or channel id");
-            return Err(ProtocolTicketAggregation(
-                "invalid list of tickets to aggregate given".into(),
-            ));
-        }
 
         let source_peer_id = self.db.read().await.get_packet_key(&signer).await?.ok_or_else(|| {
             ProtocolTicketAggregation(format!(
