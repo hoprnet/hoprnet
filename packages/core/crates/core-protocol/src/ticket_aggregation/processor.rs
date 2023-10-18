@@ -3,11 +3,11 @@ use crate::errors::{
     Result,
 };
 use async_lock::RwLock;
-use core_crypto::{keypairs::ChainKeypair, types::OffchainPublicKey};
+use core_crypto::{keypairs::ChainKeypair, types::Hash, types::OffchainPublicKey};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
     acknowledgement::AcknowledgedTicket,
-    channels::{generate_channel_id, Ticket},
+    channels::{generate_channel_id, ChannelEntry, Ticket},
 };
 use futures::{
     channel::{
@@ -18,6 +18,7 @@ use futures::{
     pin_mut,
 };
 use futures_lite::stream::{Stream, StreamExt};
+use libp2p::request_response::{RequestId, ResponseChannel};
 use libp2p_identity::PeerId;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
@@ -26,6 +27,12 @@ use utils_types::{
     primitives::{Balance, BalanceType, U256},
     traits::PeerIdLike,
 };
+
+#[cfg(any(not(feature = "wasm"), test))]
+use async_std::task::sleep;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use gloo_timers::future::sleep;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
@@ -54,12 +61,35 @@ lazy_static::lazy_static! {
 pub const TICKET_AGGREGATION_TX_QUEUE_SIZE: usize = 2048;
 pub const TICKET_AGGREGATION_RX_QUEUE_SIZE: usize = 2048;
 
+/// Variants of lists of acknowledged tickets for aggregation
+#[derive(Clone, Debug)]
+pub enum AggregationList {
+    /// Aggregate all acknowledged tickets in the given channel
+    WholeChannel(ChannelEntry),
+
+    /// Aggregate the given range of acknowledged tickets in a channel
+    ChannelRange {
+        /// ID of the channel
+        channel_id: Hash,
+        /// Channel epoch
+        epoch: u32,
+        /// Starting ticket index
+        index_start: u64,
+        /// The last ticket index (inclusive)
+        index_end: u64,
+    },
+
+    /// Aggregate the given list of acknowledged tickets.
+    /// The tickets must belong to the same channel and already be marked as `BeingAggregated`
+    TicketList(Vec<AcknowledgedTicket>),
+}
+
 /// The input to the processor background pipeline
 #[derive(Debug)]
 pub enum TicketAggregationToProcess<T, U> {
     ToReceive(PeerId, std::result::Result<Ticket, String>, U),
     ToProcess(PeerId, Vec<AcknowledgedTicket>, T),
-    ToSend(ChannelEntry, TicketAggregationFinalizer),
+    ToSend(AggregationList, TicketAggregationFinalizer),
 }
 
 /// Emitted by the processor background pipeline once processed
@@ -305,35 +335,66 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         Ok(acked_aggregated_ticket)
     }
 
-    pub async fn prepare_aggregatable_tickets(
+    pub async fn validate_tickets_to_aggregate(
         &self,
-        channel: &ChannelEntry,
+        ticket_list: AggregationList,
     ) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
-        // get aggregatable tickets and them as being aggregated
-        let tickets_to_aggregate = self
-            .db
-            .write()
-            .await
-            .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
-            .await?;
+        let tickets_to_aggregate = match ticket_list {
+            AggregationList::WholeChannel(channel) => {
+                self.db
+                    .write()
+                    .await
+                    .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
+                    .await?
+            }
+            AggregationList::ChannelRange {
+                channel_id,
+                epoch,
+                index_start,
+                index_end,
+            } => {
+                self.db
+                    .write()
+                    .await
+                    .prepare_aggregatable_tickets(&channel_id, epoch, index_start, index_end)
+                    .await?
+            }
+            AggregationList::TicketList(list) => {
+                if list.is_empty() {
+                    debug!("got empty list of tickets to aggregate");
+                    return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
+                }
+
+                let signer = list[0].signer;
+                let channel_id = list[0].ticket.channel_id;
+
+                if !list.iter().all(|tkt| {
+                    tkt.signer == signer && tkt.ticket.channel_id == channel_id && tkt.status.is_being_aggregated()
+                }) {
+                    error!(
+                        "some tickets to aggregate in the given list do not come from the same channel or are not marked as BeingAggregated"
+                    );
+                    return Err(ProtocolTicketAggregation(
+                        "invalid list of tickets to aggregate given".into(),
+                    ));
+                }
+
+                list
+            }
+        };
 
         if tickets_to_aggregate.is_empty() {
-            debug!("No tickets to aggregate in {channel}, dropping request");
-            return Err(ProtocolTicketAggregation("No tickets to aggregate".into()));
+            debug!("got empty list of tickets to aggregate");
+            return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
         }
 
-        let source_peer_id = self
-            .db
-            .read()
-            .await
-            .get_packet_key(&tickets_to_aggregate[0].signer)
-            .await?
-            .ok_or_else(|| {
-                ProtocolTicketAggregation(format!(
-                    "Cannot aggregate tickets because we do not know the peerId for node {}",
-                    tickets_to_aggregate[0].signer
-                ))
-            })?;
+        let signer = tickets_to_aggregate[0].signer;
+
+        let source_peer_id = self.db.read().await.get_packet_key(&signer).await?.ok_or_else(|| {
+            ProtocolTicketAggregation(format!(
+                "cannot aggregate tickets because we do not know the peer id for {signer}",
+            ))
+        })?;
 
         Ok((source_peer_id.to_peerid(), tickets_to_aggregate))
     }
@@ -349,13 +410,6 @@ impl From<oneshot::Receiver<()>> for TicketAggregationAwaiter {
         Self { rx: Some(value) }
     }
 }
-
-#[cfg(any(not(feature = "wasm"), test))]
-use async_std::task::sleep;
-use core_types::channels::ChannelEntry;
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-use libp2p::request_response::{RequestId, ResponseChannel};
 
 impl TicketAggregationAwaiter {
     pub async fn consume_and_wait(&mut self, until_timeout: std::time::Duration) -> Result<()> {
@@ -436,11 +490,11 @@ impl<T, U> TicketAggregationActions<T, U> {
     }
 
     /// Pushes a new collection of tickets into the processing.
-    pub fn aggregate_tickets(&mut self, channel: &ChannelEntry) -> Result<TicketAggregationAwaiter> {
+    pub fn aggregate_tickets(&mut self, ack_tickets: AggregationList) -> Result<TicketAggregationAwaiter> {
         let (tx, rx) = oneshot::channel::<()>();
 
         self.process(TicketAggregationToProcess::ToSend(
-            *channel,
+            ack_tickets,
             TicketAggregationFinalizer::new(tx),
         ))?;
 
@@ -516,8 +570,8 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                             }
                         }
                     }
-                    TicketAggregationToProcess::ToSend(channel, finalizer) => {
-                        match processor.prepare_aggregatable_tickets(&channel).await {
+                    TicketAggregationToProcess::ToSend(tickets_to_agg, finalizer) => {
+                        match processor.validate_tickets_to_aggregate(tickets_to_agg).await {
                             Ok((source, tickets)) => Some(TicketAggregationProcessed::Send(source, tickets, finalizer)),
                             Err(_) => None,
                         }
@@ -587,7 +641,7 @@ mod tests {
         traits::{BinarySerializable, PeerIdLike},
     };
 
-    use super::TicketAggregationProcessed;
+    use super::{AggregationList, TicketAggregationProcessed};
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![
@@ -734,7 +788,10 @@ mod tests {
         let mut alice = super::TicketAggregationInteraction::<(), ()>::new(dbs[0].clone(), &PEERS_CHAIN[0]);
         let mut bob = super::TicketAggregationInteraction::<(), ()>::new(dbs[1].clone(), &PEERS_CHAIN[1]);
 
-        let mut awaiter = bob.writer().aggregate_tickets(&channel_alice_bob).unwrap();
+        let mut awaiter = bob
+            .writer()
+            .aggregate_tickets(AggregationList::WholeChannel(channel_alice_bob))
+            .unwrap();
         let mut finalizer = None;
         match bob.next().await {
             Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer)) => {

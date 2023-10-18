@@ -256,15 +256,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         index_end: u64,
     ) -> Result<Vec<AcknowledgedTicket>> {
         let mut tickets = self
-            .db
-            .get_more_range::<AcknowledgedTicket>(
-                to_acknowledged_ticket_key(channel_id, epoch, index_start)?.into(),
-                to_acknowledged_ticket_key(channel_id, epoch, index_end)?.into(),
-                &|_| true,
-            )
+            .get_acknowledged_tickets_range(channel_id, epoch, index_start, index_end)
             .await?;
-
-        tickets.sort();
 
         let mut batch_ops = utils_db::db::Batch::default();
 
@@ -272,7 +265,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         while !tickets.is_empty() && should_continue {
             let tickets_len = tickets.len();
             for (index, ticket) in tickets.iter_mut().enumerate() {
-                if let AcknowledgedTicketStatus::BeingRedeemed { tx_hash: _ } = ticket.status {
+                if let AcknowledgedTicketStatus::BeingRedeemed { .. } = ticket.status {
                     if index + 1 > tickets_len {
                         tickets = vec![];
                         should_continue = false;
