@@ -32,7 +32,7 @@
     },
     "rotsee": {
       "environment_type": "staging",
-      "indexer_start_block_number": 29690361,
+      "indexer_start_block_number": 29521261,
       "addresses": {
         "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
         "module_implementation": "0x32863c4974fBb6253E338a0cb70C382DCeD2eFCb",
