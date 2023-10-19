@@ -80,7 +80,7 @@
       "chain": "xdai",
       "environment_type": "staging",
       "version_range": "*",
-      "indexer_start_block_number": 29690235,
+      "indexer_start_block_number": 29521261,
       "addresses": {
         "channels": "0xc060582564b12335cD804339842F5509dbF6F74d",
         "network_registry": "0xf08E27C3A09627D605bFd164459f7caF18D1d25f",
