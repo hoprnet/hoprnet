@@ -6,20 +6,20 @@ use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
+use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, Ticket};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
 use utils_log::{debug, error, warn};
 use validator::Validate;
-use core_ethereum_actions::channels::ChannelActions;
 
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
@@ -56,7 +56,7 @@ pub trait SingularStrategy: Display {
 /// which have elapsed the grace period
 struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone> {
     db: Arc<RwLock<Db>>,
-    chain_actions: CoreEthereumActions<Db>
+    chain_actions: CoreEthereumActions<Db>,
 }
 
 impl<Db: HoprCoreEthereumDbActions + Clone> Display for ChannelCloseFinalizer<Db> {
@@ -68,17 +68,28 @@ impl<Db: HoprCoreEthereumDbActions + Clone> Display for ChannelCloseFinalizer<Db
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFinalizer<Db> {
     async fn on_tick(&self) -> Result<()> {
-        let _ = self.db.read().await.get_outgoing_channels()
+        let _ = self
+            .db
+            .read()
+            .await
+            .get_outgoing_channels()
             .await?
             .iter()
-            .filter(|channel| channel.status == ChannelStatus::PendingToClose && channel.closure_time_passed(current_timestamp()).unwrap_or(false))
+            .filter(|channel| {
+                channel.status == ChannelStatus::PendingToClose
+                    && channel.closure_time_passed(current_timestamp()).unwrap_or(false)
+            })
             .map(|channel| async {
                 let channel_cpy = *channel;
-                match self.chain_actions.close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false).await {
+                match self
+                    .chain_actions
+                    .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
+                    .await
+                {
                     Ok(_) => {
                         // Currently, we're not interested in awaiting the Close transactions to confirmation
                         debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
-                    },
+                    }
                     Err(e) => error!("channel closure finalizer: failed to finalize closure of {channel_cpy}: {e}"),
                 }
             })
@@ -119,7 +130,12 @@ pub struct MultiStrategyConfig {
 }
 
 impl MultiStrategyConfig {
-    pub fn new(on_fail_continue: bool, allow_recursive: bool, finalize_channel_closure: bool, strategies: Vec<Strategy>) -> Self {
+    pub fn new(
+        on_fail_continue: bool,
+        allow_recursive: bool,
+        finalize_channel_closure: bool,
+        strategies: Vec<Strategy>,
+    ) -> Self {
         // This constructor can be removed once `strategies` field is made `pub`
         Self {
             on_fail_continue,
@@ -171,7 +187,10 @@ impl MultiStrategy {
         let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
 
         if cfg.finalize_channel_closure {
-            strategies.push(Box::new(ChannelCloseFinalizer { db: db.clone(), chain_actions: chain_actions.clone() }));
+            strategies.push(Box::new(ChannelCloseFinalizer {
+                db: db.clone(),
+                chain_actions: chain_actions.clone(),
+            }));
         }
 
         for strategy in cfg.strategies.iter() {

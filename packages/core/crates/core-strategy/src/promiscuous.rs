@@ -13,12 +13,12 @@ use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
 use validator::Validate;
 
 use crate::errors::Result;
@@ -126,7 +126,10 @@ where
     }
 
     async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
-        self.network.read().await.all_peers_with_quality()
+        self.network
+            .read()
+            .await
+            .all_peers_with_quality()
             .iter()
             .filter_map(|(peer, q)| match OffchainPublicKey::from_peerid(&peer) {
                 Ok(offchain_key) => Some((offchain_key, q)),
@@ -137,7 +140,14 @@ where
             })
             .map(|(key, q)| async {
                 let k_clone = key;
-                match self.db.read().await.get_chain_key(&k_clone).await.and_then(|addr| addr.ok_or(utils_db::errors::DbError::NotFound)) {
+                match self
+                    .db
+                    .read()
+                    .await
+                    .get_chain_key(&k_clone)
+                    .await
+                    .and_then(|addr| addr.ok_or(utils_db::errors::DbError::NotFound))
+                {
                     Ok(addr) => Some((addr, *q)),
                     Err(_) => {
                         error!("could not find on-chain address for {k_clone}");
@@ -155,7 +165,11 @@ where
         let mut tick_decision = ChannelDecision::default();
         let mut new_channel_candidates: Vec<(Address, f64)> = Vec::new();
 
-        let outgoing_open_channels = self.db.read().await.get_outgoing_channels()
+        let outgoing_open_channels = self
+            .db
+            .read()
+            .await
+            .get_outgoing_channels()
             .await?
             .into_iter()
             .filter(|channel| channel.status == ChannelStatus::Open)
@@ -165,16 +179,14 @@ where
         let peers_with_quality = self.get_peers_with_quality().await;
         let current_average_network_size = match self.sample_size_and_evaluate_avg(peers_with_quality.len()).await {
             Some(avg) => avg,
-            None => return Ok(tick_decision) // not enough samples yet
+            None => return Ok(tick_decision), // not enough samples yet
         };
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
         // which peer ids should become candidates for a new channel
         for (address, quality) in peers_with_quality.iter() {
             // Get channels we have opened with it
-            let channel_with_peer = outgoing_open_channels
-                .iter()
-                .find(|c| c.destination.eq(address));
+            let channel_with_peer = outgoing_open_channels.iter().find(|c| c.destination.eq(address));
 
             if let Some(channel) = channel_with_peer {
                 if *quality <= self.cfg.network_quality_threshold {
@@ -194,12 +206,12 @@ where
             .cfg
             .max_channels
             .unwrap_or((current_average_network_size as f64).sqrt().ceil() as usize);
-        debug!(
-            "current upper bound for maximum number of auto-channels is {max_auto_channels}"
-        );
+        debug!("current upper bound for maximum number of auto-channels is {max_auto_channels}");
 
         // Count all the effectively opened channels (ie. after the decision has been made)
-        let occupied = outgoing_open_channels.len().saturating_sub(tick_decision.get_to_close().len());
+        let occupied = outgoing_open_channels
+            .len()
+            .saturating_sub(tick_decision.get_to_close().len());
 
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
@@ -240,7 +252,6 @@ where
                 .for_each(|c| {
                     tick_decision.add_to_close(c.clone());
                 });
-
         } else if max_auto_channels > occupied {
             // Sort the new channel candidates by best quality first, then truncate to the number of available slots
             // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
@@ -256,9 +267,7 @@ where
             for (address, _) in new_channel_candidates {
                 // Stop if we ran out of balance
                 if remaining_balance.lte(&self.cfg.minimum_node_balance) {
-                    warn!(
-                        "{self} strategy: ran out of allowed node balance - balance is {remaining_balance}"
-                    );
+                    warn!("{self} strategy: ran out of allowed node balance - balance is {remaining_balance}");
                     break;
                 }
 
@@ -269,7 +278,8 @@ where
                     debug!("promoted peer {address} for channel opening");
                 }
             }
-        } else { // max_channels == occupied
+        } else {
+            // max_channels == occupied
             info!("{self} strategy: not going to allocate new channels, maximum number of effective channels is reached ({occupied})")
         }
 
@@ -356,9 +366,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_crypto::{
-        keypairs::{Keypair, OffchainKeypair},
-    };
+    use core_crypto::keypairs::{Keypair, OffchainKeypair};
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_network::{
