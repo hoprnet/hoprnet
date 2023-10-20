@@ -88,10 +88,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for AutoFundingStra
                     .fund_channel(channel.get_id(), self.cfg.funding_amount)
                     .await?;
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
-                info!(
-                    "issued re-staking of {channel} with {}",
-                    self.cfg.funding_amount
-                );
+                info!("issued re-staking of {channel} with {}", self.cfg.funding_amount);
             }
         }
 

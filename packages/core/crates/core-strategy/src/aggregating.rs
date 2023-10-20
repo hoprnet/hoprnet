@@ -124,10 +124,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<
             .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
             .await?;
 
-        info!(
-            "will aggregate {} tickets in {channel}",
-            tickets_to_agg.len()
-        );
+        info!("will aggregate {} tickets in {channel}", tickets_to_agg.len());
 
         match self
             .ticket_aggregator
@@ -197,9 +194,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
                     unredeemed_value = unredeemed_value.add(&ticket.ticket.amount);
                 }
                 AcknowledgedTicketStatus::BeingAggregated { .. } => {
-                    debug!(
-                        "{channel} already has ticket aggregation in progress, not aggregating yet"
-                    );
+                    debug!("{channel} already has ticket aggregation in progress, not aggregating yet");
                     return Ok(());
                 }
                 AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
@@ -271,9 +266,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
                         aggregatable_tickets += 1;
                     }
                     AcknowledgedTicketStatus::BeingAggregated { .. } => {
-                        debug!(
-                        "{channel} already has ticket aggregation in progress, not aggregating yet"
-                    );
+                        debug!("{channel} already has ticket aggregation in progress, not aggregating yet");
                         return Ok(());
                     }
                     AcknowledgedTicketStatus::BeingRedeemed { .. } => {}

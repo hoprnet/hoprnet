@@ -217,9 +217,7 @@ where
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
         if occupied > max_auto_channels && self.cfg.enforce_max_channels {
-            warn!(
-                "there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}"
-            );
+            warn!("there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}");
 
             // Get all open channels which are not planned to be closed
             let mut sorted_channels = outgoing_open_channels
@@ -351,10 +349,7 @@ where
                     debug!("issued channel opening tx: {}", channel_to_open.0);
                 }
                 Err(e) => {
-                    error!(
-                        "error while issuing channel opening to {}: {e}",
-                        channel_to_open.0
-                    );
+                    error!("error while issuing channel opening to {}: {e}", channel_to_open.0);
                 }
             }
         }
