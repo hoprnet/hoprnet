@@ -811,40 +811,6 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn set_use_safe(&self, enabled: bool) {
-            self.w.write().await.set_use_safe(enabled)
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_use_safe(&self) -> bool {
-            self.w.read().await.get_use_safe()
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_announce_payload(
-            &self,
-            announced_multiaddr: &str,
-            packet_key: &OffchainKeypair,
-            use_safe: bool,
-        ) -> JsResult<js_sys::Uint8Array> {
-            let reader = self.w.read().await;
-            match Multiaddr::from_str(announced_multiaddr) {
-                Ok(ma) => Ok(js_sys::Uint8Array::from(
-                    reader
-                        .announce(
-                            &ok_or_jserr!(AnnouncementData::new(
-                                &ma,
-                                Some(KeyBinding::new(reader.me, packet_key))
-                            ))?,
-                            use_safe,
-                        )
-                        .as_slice(),
-                )),
-                Err(e) => Err(JsValue::from(e.to_string())),
-            }
-        }
-
-        #[wasm_bindgen]
         pub async fn get_approve_payload(&self, amount: &Balance) -> JsResult<js_sys::Uint8Array> {
             ok_or_jserr!(self
                 .w

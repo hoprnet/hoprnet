@@ -112,14 +112,12 @@ export async function createChainWrapper(
 
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
 
+  // Use safe variants of SC calls from the start.
   const chainCalls = new ChainCalls(
     keypair,
     Address.from_string(deploymentExtract.hoprChannelsAddress),
     Address.from_string(deploymentExtract.hoprAnnouncementsAddress)
   )
-
-  // Use safe variants of SC calls from the start.
-  await chainCalls.set_use_safe(true)
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
