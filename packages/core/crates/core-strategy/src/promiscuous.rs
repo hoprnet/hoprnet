@@ -1,8 +1,5 @@
 use core_crypto::types::OffchainPublicKey;
-use core_types::channels::{
-    ChannelDirection, ChannelEntry,
-    ChannelStatus::{Open, PendingToClose},
-};
+use core_types::channels::{ChannelDirection, ChannelStatus};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use simple_moving_average::{SumTreeSMA, SMA};
@@ -16,6 +13,8 @@ use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
@@ -109,132 +108,151 @@ where
         }
     }
 
+    async fn sample_size_and_evaluate_avg(&self, sample: usize) -> Option<usize> {
+        self.sma.write().await.add_sample(sample);
+        info!("evaluated qualities of {sample} peers seen in the network");
+
+        let sma = self.sma.read().await;
+        if sma.get_num_samples() >= sma.get_sample_window_size() {
+            Some(sma.get_average())
+        } else {
+            info!(
+                "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
+                sma.get_num_samples(),
+                sma.get_sample_window_size()
+            );
+            None
+        }
+    }
+
+    async fn get_peers_with_quality(&self) -> HashMap<Address, f64> {
+        self.network
+            .read()
+            .await
+            .all_peers_with_quality()
+            .iter()
+            .filter_map(|(peer, q)| match OffchainPublicKey::from_peerid(&peer) {
+                Ok(offchain_key) => Some((offchain_key, q)),
+                Err(_) => {
+                    error!("encountered invalid peer id: {peer}");
+                    None
+                }
+            })
+            .map(|(key, q)| async {
+                let k_clone = key;
+                match self
+                    .db
+                    .read()
+                    .await
+                    .get_chain_key(&k_clone)
+                    .await
+                    .and_then(|addr| addr.ok_or(utils_db::errors::DbError::NotFound))
+                {
+                    Ok(addr) => Some((addr, *q)),
+                    Err(_) => {
+                        error!("could not find on-chain address for {k_clone}");
+                        None
+                    }
+                }
+            })
+            .collect::<FuturesUnordered<_>>()
+            .filter_map(|x| async move { x })
+            .collect::<HashMap<_, _>>()
+            .await
+    }
+
     async fn collect_tick_decision(&self) -> Result<ChannelDecision> {
         let mut tick_decision = ChannelDecision::default();
         let mut new_channel_candidates: Vec<(Address, f64)> = Vec::new();
-        let mut active_addresses: HashMap<Address, f64> = HashMap::new();
-        let mut network_size: usize = 0;
 
-        let balance: Balance = self.db.read().await.get_hopr_balance().await?;
-        let outgoing_channels = self.db.read().await.get_outgoing_channels().await?;
+        let outgoing_open_channels = self
+            .db
+            .read()
+            .await
+            .get_outgoing_channels()
+            .await?
+            .into_iter()
+            .filter(|channel| channel.status == ChannelStatus::Open)
+            .collect::<Vec<_>>();
+
+        // Check if we have enough network size samples before proceeding quality-based evaluation
+        let peers_with_quality = self.get_peers_with_quality().await;
+        let current_average_network_size = match self.sample_size_and_evaluate_avg(peers_with_quality.len()).await {
+            Some(avg) => avg,
+            None => return Ok(tick_decision), // not enough samples yet
+        };
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
         // which peer ids should become candidates for a new channel
-        // Also re-open all the channels that have dropped under minimum given balance
-        let peers_with_quality = self.network.read().await.all_peers_with_quality();
-        for (peer, quality) in peers_with_quality {
-            let packet_key = OffchainPublicKey::from_peerid(&peer)?;
-            // get the Ethereum address of the peer
-            if let Some(address) = self.db.read().await.get_chain_key(&packet_key).await? {
-                if tick_decision.will_channel_be_closed(&address)
-                    || new_channel_candidates.iter().any(|(p, _)| p.eq(&address))
-                {
-                    // Skip this peer if we already processed it (iterator may have duplicates)
-                    debug!("encountered duplicate peer {}", peer);
-                    continue;
+        for (address, quality) in peers_with_quality.iter() {
+            // Get channels we have opened with it
+            let channel_with_peer = outgoing_open_channels.iter().find(|c| c.destination.eq(address));
+
+            if let Some(channel) = channel_with_peer {
+                if *quality <= self.cfg.network_quality_threshold {
+                    // Need to close the channel, because quality has dropped
+                    debug!("new channel closure candidate with {address} (quality {quality})");
+                    tick_decision.add_to_close(*channel);
                 }
-
-                // Also get channels we have opened with it
-                let channel_with_peer = outgoing_channels
-                    .iter()
-                    .find(|c| c.status == Open && c.destination.eq(&address));
-
-                if let Some(channel) = channel_with_peer {
-                    if quality <= self.cfg.network_quality_threshold {
-                        // Need to close the channel, because quality has dropped
-                        debug!("new channel closure candidate with {} (quality {})", address, quality);
-                        tick_decision.add_to_close(*channel);
-                    }
-                } else if quality >= self.cfg.network_quality_threshold {
-                    // Try to open channel with this peer, because it is high-quality
-                    debug!("new channel opening candidate {} with quality {}", address, quality);
-                    new_channel_candidates.push((address, quality));
-                }
-
-                active_addresses.insert(address, quality);
-                network_size += 1;
-            } else {
-                error!("failed to get chain key from a packet key");
-                continue;
+            } else if *quality >= self.cfg.network_quality_threshold {
+                // Try to open channel with this peer, because it is high-quality and we don't yet have a channel with it
+                debug!("new channel opening candidate {address} with quality {quality}");
+                new_channel_candidates.push((*address, *quality));
             }
         }
-
-        self.sma.write().await.add_sample(network_size);
-        info!("evaluated qualities of {} peers seen in the network", network_size);
-
-        if self.sma.read().await.get_num_samples() < self.sma.read().await.get_sample_window_size() {
-            info!(
-                "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
-                self.sma.read().await.get_num_samples(),
-                self.sma.read().await.get_sample_window_size()
-            );
-            return Ok(tick_decision);
-        }
-
-        // Also mark for closing all channels which are in PendingToClose state
-        let before_pending = outgoing_channels.len();
-        outgoing_channels
-            .iter()
-            .filter(|c| c.status == PendingToClose)
-            .for_each(|c| {
-                tick_decision.add_to_close(*c);
-            });
-        debug!(
-            "{} channels are in PendingToClose, so strategy will mark them for closing too",
-            outgoing_channels.len() - before_pending
-        );
 
         // We compute the upper bound for channels as a square-root of the perceived network size
         let max_auto_channels = self
             .cfg
             .max_channels
-            .unwrap_or((self.sma.read().await.get_average() as f64).sqrt().ceil() as usize);
-        debug!(
-            "current upper bound for maximum number of auto-channels is {}",
-            max_auto_channels
-        );
+            .unwrap_or((current_average_network_size as f64).sqrt().ceil() as usize);
+        debug!("current upper bound for maximum number of auto-channels is {max_auto_channels}");
 
-        // Count all the opened channels
-        let count_opened = outgoing_channels.iter().filter(|c| c.status == Open).count();
-        let occupied = if count_opened > tick_decision.get_to_close().len() {
-            count_opened - tick_decision.get_to_close().len()
-        } else {
-            0
-        };
+        // Count all the effectively opened channels (ie. after the decision has been made)
+        let occupied = outgoing_open_channels
+            .len()
+            .saturating_sub(tick_decision.get_to_close().len());
 
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
         if occupied > max_auto_channels && self.cfg.enforce_max_channels {
             warn!(
-                "there are {} opened channels, but the strategy allows only {}",
-                occupied, max_auto_channels
+                "{self} strategy: there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}"
             );
 
-            let mut sorted_channels: Vec<ChannelEntry> = outgoing_channels
+            // Get all open channels which are not planned to be closed
+            let mut sorted_channels = outgoing_open_channels
                 .iter()
                 .filter(|c| !tick_decision.will_channel_be_closed(&c.destination))
-                .cloned()
-                .collect();
+                .collect::<Vec<_>>();
 
             // Sort by quality, lowest-quality first
             sorted_channels.sort_unstable_by(|p1, p2| {
-                active_addresses
-                    .get(&p1.destination)
-                    .zip(active_addresses.get(&p2.destination))
-                    .and_then(|(q1, q2)| q1.partial_cmp(q2))
-                    .expect(format!("failed to retrieve quality of {} or {}", p1.destination, p2.destination).as_str())
+                let q1 = match peers_with_quality.get(&p1.destination) {
+                    Some(q) => *q,
+                    None => {
+                        error!("could not determine peer quality for {p1}");
+                        0_f64
+                    }
+                };
+                let q2 = match peers_with_quality.get(&p2.destination) {
+                    Some(q) => *q,
+                    None => {
+                        error!("could not determine peer quality for {p2}");
+                        0_f64
+                    }
+                };
+                q1.partial_cmp(&q2).expect("invalid comparison")
             });
 
-            // Close the lowest-quality channels (those we did not mark for closing yet)
+            // Close the lowest-quality channels (those we did not mark for closing yet) to enforce the limit
             sorted_channels
                 .into_iter()
                 .take(occupied - max_auto_channels)
                 .for_each(|c| {
-                    tick_decision.add_to_close(c);
+                    tick_decision.add_to_close(c.clone());
                 });
-        }
-
-        if max_auto_channels > occupied {
+        } else if max_auto_channels > occupied {
             // Sort the new channel candidates by best quality first, then truncate to the number of available slots
             // This way, we'll prefer candidates with higher quality, when we don't have enough node balance
             // Shuffle first, so the equal candidates are randomized and then use unstable sorting for that purpose.
@@ -243,33 +261,28 @@ where
             new_channel_candidates.truncate(max_auto_channels - occupied);
             debug!("got {} new channel candidates", new_channel_candidates.len());
 
+            let mut remaining_balance = self.db.read().await.get_hopr_balance().await?;
+
             // Go through the new candidates for opening channels allow them to open based on our available node balance
-            let mut remaining_balance = balance;
-            for address in new_channel_candidates.into_iter().map(|(p, _)| p) {
+            for (address, _) in new_channel_candidates {
                 // Stop if we ran out of balance
                 if remaining_balance.lte(&self.cfg.minimum_node_balance) {
-                    warn!(
-                        "strategy ran out of allowed node balance - balance is {}",
-                        remaining_balance.to_string()
-                    );
+                    warn!("{self} strategy: ran out of allowed node balance - balance is {remaining_balance}");
                     break;
                 }
 
                 // If we haven't added this peer yet, add it to the list for channel opening
                 if !tick_decision.will_address_be_opened(&address) {
-                    debug!("promoting peer {} for channel opening", address);
                     tick_decision.add_to_open(address, self.cfg.new_channel_stake);
-                    remaining_balance = balance.sub(&self.cfg.new_channel_stake);
+                    remaining_balance = remaining_balance.sub(&self.cfg.new_channel_stake);
+                    debug!("promoted peer {address} for channel opening");
                 }
             }
+        } else {
+            // max_channels == occupied
+            info!("{self} strategy: not going to allocate new channels, maximum number of effective channels is reached ({occupied})")
         }
 
-        debug!(
-            "strategy tick #{} result: {} peers for channel opening, {} peer for channel closure",
-            self.sma.read().await.get_num_samples(),
-            tick_decision.get_to_open().len(),
-            tick_decision.get_to_close().len()
-        );
         Ok(tick_decision)
     }
 }
@@ -303,8 +316,8 @@ where
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
 
-        // close all the channels, need to be synchronous because Ethereum transactions
-        // are synchronous, especially due nonces
+        debug!("{self} strategy: on tick executing {tick_decision}");
+
         for channel_to_close in tick_decision.get_to_close() {
             match self
                 .chain_actions
@@ -317,17 +330,14 @@ where
             {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction
-                    info!("{self} strategy: issued channel closing tx: {}", channel_to_close);
+                    debug!("{self} strategy: issued channel closing tx: {}", channel_to_close);
                 }
                 Err(e) => {
                     error!("{self} strategy: error while closing channel: {e}");
                 }
             }
         }
-        debug!("{self} strategy: close channels done");
 
-        // open all the channels, need to be synchronous because Ethereum
-        // transactions are synchronous, especially due to nonces
         for channel_to_open in tick_decision.get_to_open() {
             match self
                 .chain_actions
@@ -336,7 +346,7 @@ where
             {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction
-                    info!("{self} strategy: issued channel opening tx: {}", channel_to_open.0);
+                    debug!("{self} strategy: issued channel opening tx: {}", channel_to_open.0);
                 }
                 Err(e) => {
                     error!(
@@ -347,12 +357,7 @@ where
             }
         }
 
-        debug!("{self} strategy: open channels done");
-
-        //while let Some(_) = receivers.next().await {}
-
-        debug!("{self} strategy: channel operations done");
-
+        info!("{self} strategy: on tick executed {tick_decision}");
         Ok(())
     }
 }
@@ -361,10 +366,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core_crypto::{
-        keypairs::{Keypair, OffchainKeypair},
-        types::Hash,
-    };
+    use core_crypto::keypairs::{Keypair, OffchainKeypair};
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_network::{
@@ -372,56 +374,26 @@ mod tests {
         PeerId,
     };
     use core_types::acknowledgement::AcknowledgedTicket;
-    use core_types::channels::ChannelStatus;
+    use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::future::join_all;
+    use mockall::mock;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_misc::time::native::current_timestamp;
     use utils_types::primitives::{Snapshot, U256};
 
-    struct MockTransactionExecutor;
-
-    impl MockTransactionExecutor {
-        pub fn new() -> Self {
-            Self {}
+    mock! {
+        TxExec { }
+        #[async_trait(? Send)]
+        impl TransactionExecutor for TxExec {
+            async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
+            async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
+            async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult;
+            async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
+            async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
+            async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
         }
     }
 
-    #[async_trait(? Send)]
-    impl TransactionExecutor for MockTransactionExecutor {
-        async fn redeem_ticket(&self, _ticket: AcknowledgedTicket) -> TransactionResult {
-            TransactionResult::RedeemTicket {
-                tx_hash: Hash::default(),
-            }
-        }
-        async fn open_channel(&self, _destination: Address, _balance: Balance) -> TransactionResult {
-            TransactionResult::OpenChannel {
-                tx_hash: Hash::default(),
-                channel_id: Hash::default(),
-            }
-        }
-        async fn fund_channel(&self, _destination: Address, _amount: Balance) -> TransactionResult {
-            TransactionResult::FundChannel {
-                tx_hash: Hash::default(),
-            }
-        }
-        async fn close_channel_initialize(&self, _src: Address, _dst: Address) -> TransactionResult {
-            TransactionResult::CloseChannel {
-                tx_hash: Hash::default(),
-                status: ChannelStatus::Open,
-            }
-        }
-        async fn close_channel_finalize(&self, _src: Address, _dst: Address) -> TransactionResult {
-            TransactionResult::CloseChannel {
-                tx_hash: Hash::default(),
-                status: ChannelStatus::PendingToClose,
-            }
-        }
-        async fn withdraw(&self, _recipient: Address, _amount: Balance) -> TransactionResult {
-            TransactionResult::Withdraw {
-                tx_hash: Hash::default(),
-            }
-        }
-    }
     struct MockNetworkExternalActions;
     impl NetworkExternalActions for MockNetworkExternalActions {
         fn is_public(&self, _: &PeerId) -> bool {
@@ -486,7 +458,7 @@ mod tests {
         )));
 
         // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTxExec::new()));
         let tx_sender = tx_queue.new_sender();
         async_std::task::spawn_local(async move {
             tx_queue.transaction_loop().await;
