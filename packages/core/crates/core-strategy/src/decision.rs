@@ -1,4 +1,5 @@
 use core_types::channels::ChannelEntry;
+use std::fmt::{Display, Formatter};
 use utils_types::primitives::{Address, Balance};
 
 /// A decision made by a strategy on each tick,
@@ -34,5 +35,16 @@ impl ChannelDecision {
 
     pub fn get_to_open(&self) -> &Vec<(Address, Balance)> {
         &self.to_open
+    }
+}
+
+impl Display for ChannelDecision {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "channel decision: opening ({}), closing({})",
+            self.to_open.len(),
+            self.to_close.len()
+        )
     }
 }

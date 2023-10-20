@@ -148,22 +148,16 @@ particular branch to deploy on every change.
 
 ```
 
-### Open release
-
-The process of opening a release should be done at the begining of the release. Ideally should be the first task to do right after the clousure of the previous release, so the team can start contributing to this new release by adding their issues and PR to the given milestone.
-
-1. Execute the manual workflow named [Open Release](https://github.com/hoprnet/hoprnet/actions/workflows/open-release.yaml) specifying the type of new release that you want to create and selecting the branch where you want to create it.
-2. A new PR will be created with the name `Create release <RELEASE_NUMBER>`. Review, approve and merge it.
-
 ### Close release
 
-The process of closing a release consists of building, tagging and publishing the given release of the branch. It does not perform any other action like bumping the version to the next release.
+The process of closing a release consists of building, tagging and publishing the given release of the branch.
 
 1. Make sure that the [milestone](https://github.com/hoprnet/hoprnet/milestones) issues are all close. Do not start the next step until all the issues and PR are closed.
 2. Execute the manual workflow named [Close Release](https://github.com/hoprnet/hoprnet/actions/workflows/close-release.yaml) selecting the branch where you want to close it.
 3. A new PR will be created with the name `Close release <RELEASE_NUMBER>`. Follow the instructions on the PR and merge it.
 4. Review the contents of the new [Github Release](https://github.com/hoprnet/hoprnet/releases) created and modify accordingly
-5. Share the links to the Github release and testnet wiki page in the `#release` Element channel.
+5. Review that the Element notification has been sent
+6. A new PR will be created with the name `Open release <RELEASE_NUMBER>`. Follow the instructions on the PR and merge it.
 
 ### Promote release
 

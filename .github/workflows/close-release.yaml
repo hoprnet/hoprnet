@@ -118,6 +118,7 @@ jobs:
             branch: bot/close-${{ steps.template.outputs.current_version }}
             delete-branch: true
             labels: release
+            draft: true
             assignees: ${{ github.actor }}
             team-reviewers: "@hoprnet/hopr-development"
 
@@ -125,6 +126,7 @@ jobs:
         run: |
             git fetch
             git checkout bot/close-${{ steps.template.outputs.current_version }}
+            gh pr ready
             gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
