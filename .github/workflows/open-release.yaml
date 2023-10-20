@@ -63,6 +63,7 @@ jobs:
             body: "The scope of this PR is to create the contents of the new release ${{ steps.bump.outputs.next_version }}"
             branch: bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
             delete-branch: true
+            draft: true
             assignees: ${{ github.actor }}
             team-reviewers: "@hoprnet/hopr-development"
 
@@ -70,6 +71,7 @@ jobs:
         run: |
             git fetch
             git checkout bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+            gh pr ready
             gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
