@@ -303,8 +303,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::{
-        errors::CoreEthereumActionsError,
-        payload::PayloadGenerator,
+        payload::SafePayloadGenerator,
         transaction_queue::{TransactionExecutor, TransactionResult, TransactionSender},
     };
     use async_trait::async_trait;
@@ -367,7 +366,7 @@ pub mod wasm {
     #[wasm_bindgen]
     pub struct WasmTxExecutor {
         send_transaction: js_sys::Function,
-        generator: PayloadGenerator,
+        generator: SafePayloadGenerator,
         hopr_channels: Address,
         hopr_token: Address,
         hopr_announcements: Address,
@@ -394,7 +393,7 @@ pub mod wasm {
                 hopr_channels,
                 hopr_token,
                 send_transaction,
-                generator: PayloadGenerator::new(chain_keypair, hopr_channels, hopr_announcements),
+                generator: SafePayloadGenerator::new(chain_keypair, hopr_channels, hopr_announcements),
             }
         }
     }
