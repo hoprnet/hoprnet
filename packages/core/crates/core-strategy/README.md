@@ -110,10 +110,15 @@ A Multi Strategy can also contain another Multi Strategy as a sub-strategy if `a
 However, this recursion is always allowed up to 2 levels only.
 Along with the `on_fail_continue` value, the recursive feature allows constructing more complex logical strategy chains.
 
+The MultiStrategy can also observe channels being `PendingToClose` and running out of closure grace period,
+and if this happens, it will issue automatically the final close transaction, which transitions the state to `Closed`.
+This can be controlled by the `finalize_channel_closure` parameter.
+
 ### Default parameters
 
 - `on_fail_continue`: true
 - `allow_recursive`: true
+- `finalize_channel_closure`: false
 - `strategies`: none (the Multi strategy behaves as Passive strategy per default)
 
 ## Configuring strategies in HOPRd

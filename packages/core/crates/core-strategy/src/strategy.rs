@@ -6,17 +6,26 @@ use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 use async_std::sync::RwLock;
 use async_trait::async_trait;
+use core_ethereum_actions::channels::ChannelActions;
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use core_protocol::ticket_aggregation::processor::BasicTicketAggregationActions;
 use core_types::acknowledgement::AcknowledgedTicket;
-use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, Ticket};
+use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, Ticket};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use utils_log::{error, warn};
+use utils_log::{debug, error, warn};
 use validator::Validate;
+
+#[cfg(any(not(feature = "wasm"), test))]
+use utils_misc::time::native::current_timestamp;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use utils_misc::time::wasm::current_timestamp;
 
 /// Basic single strategy.
 #[cfg_attr(test, mockall::automock)]
@@ -43,6 +52,55 @@ pub trait SingularStrategy: Display {
     }
 }
 
+/// Internal strategy which runs per tick and finalizes `PendingToClose` channels
+/// which have elapsed the grace period
+struct ChannelCloseFinalizer<Db: HoprCoreEthereumDbActions + Clone> {
+    db: Arc<RwLock<Db>>,
+    chain_actions: CoreEthereumActions<Db>,
+}
+
+impl<Db: HoprCoreEthereumDbActions + Clone> Display for ChannelCloseFinalizer<Db> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "channel_closure_finalizer")
+    }
+}
+
+#[async_trait(? Send)]
+impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFinalizer<Db> {
+    async fn on_tick(&self) -> Result<()> {
+        let _ = self
+            .db
+            .read()
+            .await
+            .get_outgoing_channels()
+            .await?
+            .iter()
+            .filter(|channel| {
+                channel.status == ChannelStatus::PendingToClose
+                    && channel.closure_time_passed(current_timestamp()).unwrap_or(false)
+            })
+            .map(|channel| async {
+                let channel_cpy = *channel;
+                match self
+                    .chain_actions
+                    .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
+                    .await
+                {
+                    Ok(_) => {
+                        // Currently, we're not interested in awaiting the Close transactions to confirmation
+                        debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
+                    }
+                    Err(e) => error!("channel closure finalizer: failed to finalize closure of {channel_cpy}: {e}"),
+                }
+            })
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await;
+
+        Ok(())
+    }
+}
+
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
@@ -59,17 +117,30 @@ pub struct MultiStrategyConfig {
     /// Default is `true`.
     pub allow_recursive: bool,
 
+    /// Indicates if the strategy should check for `PendingToClose` channels which have
+    /// elapsed the closure grace period, to issue another channel closing transaction to close them.
+    /// If not set, the user has to trigger the channel closure manually once again after the grace period
+    /// is over.
+    /// Default: false
+    pub finalize_channel_closure: bool,
+
     /// Configuration of individual sub-strategies.
     /// Default is empty, which makes the `MultiStrategy` behave as passive.
     pub(crate) strategies: Vec<Strategy>, // non-pub due to wasm
 }
 
 impl MultiStrategyConfig {
-    pub fn new(on_fail_continue: bool, allow_recursive: bool, strategies: Vec<Strategy>) -> Self {
+    pub fn new(
+        on_fail_continue: bool,
+        allow_recursive: bool,
+        finalize_channel_closure: bool,
+        strategies: Vec<Strategy>,
+    ) -> Self {
         // This constructor can be removed once `strategies` field is made `pub`
         Self {
             on_fail_continue,
             allow_recursive,
+            finalize_channel_closure,
             strategies,
         }
     }
@@ -84,6 +155,7 @@ impl Default for MultiStrategyConfig {
         Self {
             on_fail_continue: true,
             allow_recursive: true,
+            finalize_channel_closure: false,
             strategies: Vec::new(),
         }
     }
@@ -113,6 +185,13 @@ impl MultiStrategy {
         Net: NetworkExternalActions + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy>>::new();
+
+        if cfg.finalize_channel_closure {
+            strategies.push(Box::new(ChannelCloseFinalizer {
+                db: db.clone(),
+                chain_actions: chain_actions.clone(),
+            }));
+        }
 
         for strategy in cfg.strategies.iter() {
             match strategy {
@@ -249,6 +328,7 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: true,
             allow_recursive: true,
+            finalize_channel_closure: false,
             strategies: Vec::new(),
         };
 
@@ -275,6 +355,7 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: false,
             allow_recursive: true,
+            finalize_channel_closure: false,
             strategies: Vec::new(),
         };
 
