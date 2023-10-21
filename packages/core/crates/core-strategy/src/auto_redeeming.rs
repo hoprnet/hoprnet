@@ -57,7 +57,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> AutoRedeemingStrategy<Db> {
 impl<Db: HoprCoreEthereumDbActions + 'static + Clone> SingularStrategy for AutoRedeemingStrategy<Db> {
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
-            info!("{self} strategy: auto-redeeming {ack}");
+            info!("redeeming {ack}");
             let rx = self.chain_actions.redeem_ticket(ack.clone()).await?;
             std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
         }
