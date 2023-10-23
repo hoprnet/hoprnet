@@ -27,7 +27,7 @@ use crate::{decision::ChannelDecision, Strategy};
 use utils_types::traits::PeerIdLike;
 
 /// Size of the simple moving average window used to smoothen the number of registered peers.
-pub const SMA_WINDOW_SIZE: usize = 3;
+pub const SMA_WINDOW_SIZE: usize = 10;
 
 type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
 
@@ -174,6 +174,7 @@ where
             .into_iter()
             .filter(|channel| channel.status == ChannelStatus::Open)
             .collect::<Vec<_>>();
+        debug!("tracking {} open outgoing channels", outgoing_open_channels.len());
 
         // Check if we have enough network size samples before proceeding quality-based evaluation
         let peers_with_quality = self.get_peers_with_quality().await;
@@ -191,15 +192,18 @@ where
             if let Some(channel) = channel_with_peer {
                 if *quality <= self.cfg.network_quality_threshold {
                     // Need to close the channel, because quality has dropped
-                    debug!("new channel closure candidate with {address} (quality {quality})");
                     tick_decision.add_to_close(*channel);
                 }
             } else if *quality >= self.cfg.network_quality_threshold {
                 // Try to open channel with this peer, because it is high-quality and we don't yet have a channel with it
-                debug!("new channel opening candidate {address} with quality {quality}");
                 new_channel_candidates.push((*address, *quality));
             }
         }
+        debug!(
+            "proposed closures: {}, proposed new candidates: {}",
+            tick_decision.get_to_close().len(),
+            new_channel_candidates.len()
+        );
 
         // We compute the upper bound for channels as a square-root of the perceived network size
         let max_auto_channels = self
@@ -216,9 +220,7 @@ where
         // If there is still more channels opened than we allow, close some
         // lowest-quality ones which passed the threshold
         if occupied > max_auto_channels && self.cfg.enforce_max_channels {
-            warn!(
-                "{self} strategy: there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}"
-            );
+            warn!("there are {occupied} effectively opened channels, but the strategy allows only {max_auto_channels}");
 
             // Get all open channels which are not planned to be closed
             let mut sorted_channels = outgoing_open_channels
@@ -249,8 +251,9 @@ where
             sorted_channels
                 .into_iter()
                 .take(occupied - max_auto_channels)
-                .for_each(|c| {
-                    tick_decision.add_to_close(c.clone());
+                .for_each(|channel| {
+                    debug!("enforcing channel closure of {channel}");
+                    tick_decision.add_to_close(*channel);
                 });
         } else if max_auto_channels > occupied {
             // Sort the new channel candidates by best quality first, then truncate to the number of available slots
@@ -267,7 +270,7 @@ where
             for (address, _) in new_channel_candidates {
                 // Stop if we ran out of balance
                 if remaining_balance.lte(&self.cfg.minimum_node_balance) {
-                    warn!("{self} strategy: ran out of allowed node balance - balance is {remaining_balance}");
+                    warn!("ran out of allowed node balance - balance is {remaining_balance}");
                     break;
                 }
 
@@ -280,7 +283,7 @@ where
             }
         } else {
             // max_channels == occupied
-            info!("{self} strategy: not going to allocate new channels, maximum number of effective channels is reached ({occupied})")
+            info!("not going to allocate new channels, maximum number of effective channels is reached ({occupied})")
         }
 
         Ok(tick_decision)
@@ -316,7 +319,7 @@ where
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
 
-        debug!("{self} strategy: on tick executing {tick_decision}");
+        debug!("on tick executing {tick_decision}");
 
         for channel_to_close in tick_decision.get_to_close() {
             match self
@@ -330,10 +333,10 @@ where
             {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction
-                    debug!("{self} strategy: issued channel closing tx: {}", channel_to_close);
+                    debug!("issued channel closing tx: {}", channel_to_close);
                 }
                 Err(e) => {
-                    error!("{self} strategy: error while closing channel: {e}");
+                    error!("error while closing channel: {e}");
                 }
             }
         }
@@ -346,18 +349,15 @@ where
             {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction
-                    debug!("{self} strategy: issued channel opening tx: {}", channel_to_open.0);
+                    debug!("issued channel opening tx: {}", channel_to_open.0);
                 }
                 Err(e) => {
-                    error!(
-                        "{self} strategy: error while issuing channel opening to {}: {e}",
-                        channel_to_open.0
-                    );
+                    error!("error while issuing channel opening to {}: {e}", channel_to_open.0);
                 }
             }
         }
 
-        info!("{self} strategy: on tick executed {tick_decision}");
+        info!("on tick executed {tick_decision}");
         Ok(())
     }
 }
@@ -560,8 +560,9 @@ mod tests {
             .unwrap();
 
         // Add fake samples to allow the test to run
-        strat.sma.write().await.add_sample(peers.len());
-        strat.sma.write().await.add_sample(peers.len());
+        for _ in 0..SMA_WINDOW_SIZE - 1 {
+            strat.sma.write().await.add_sample(peers.len());
+        }
         (strat, address_peer_id_pairs)
     }
 

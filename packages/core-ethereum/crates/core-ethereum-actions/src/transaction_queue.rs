@@ -179,21 +179,23 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         tx: Transaction,
     ) -> TransactionResult {
         match tx {
-            Transaction::RedeemTicket(ack) => match ack.status {
+            Transaction::RedeemTicket(mut ack) => match &ack.status {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
                     match &res {
                         TicketRedeemed { .. } => {
                             if let Err(e) = db.write().await.mark_redeemed(&ack).await {
-                                error!("failed to mark {ack} as redeemed: {e}");
                                 // Still declare the TX a success
+                                error!("failed to mark {ack} as redeemed: {e}");
                             }
                         }
                         Failure(e) => {
-                            error!("redeem tx failed, marking {ack} as losing: {e}");
-                            // TODO: distinguish here based on error message whether to mark as losing or whether to mark ticket as Untouched again.
-                            if let Err(e) = db.write().await.mark_losing_acked_ticket(&ack).await {
-                                error!("failed to mark {ack} as losing: {e}");
+                            // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
+
+                            error!("marking the acknowledged ticket as untouched - edeem tx failed: {e}");
+                            ack.status = AcknowledgedTicketStatus::Untouched;
+                            if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
+                                error!("cannot mark {ack} as untouched: {e}");
                             }
                         }
                         _ => panic!("invalid tx result from ticket redeem"),
@@ -267,7 +269,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             let tx_id = tx.to_string();
 
             spawn_local(async move {
-                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx);
+                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx).fuse();
 
                 // Put an upper bound on the transaction to get confirmed and indexed
                 let timeout = sleep(std::time::Duration::from_secs(

@@ -448,12 +448,11 @@ export async function createChainWrapper(
     }
     // @ts-ignore fixme: treat result
     let sendResult: SendTransactionReturn
-    let error: unknown
 
     try {
       sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
-    } catch (err) {
-      error = err
+    } catch (error) {
+      throw new Error(`Failed in sending announce transaction due to ${error}`)
     }
 
     switch (sendResult.code) {
@@ -461,8 +460,6 @@ export async function createChainWrapper(
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
         throw new Error(`Failed in sending announce transaction because transaction is a duplicate`)
-      default:
-        throw new Error(`Failed in sending announce transaction due to ${error}`)
     }
   }
 
@@ -479,7 +476,6 @@ export async function createChainWrapper(
   ): Promise<Receipt> => {
     log('Register a node to safe %s globally', safeAddress.to_hex())
     let sendResult: SendTransactionReturn
-    let error: unknown
 
     const registerSafeByNodeEssentialTxPayload: TransactionPayload = {
       data: u8aToHex(await chainCalls.get_register_safe_by_node_payload(safeAddress)),
@@ -490,7 +486,7 @@ export async function createChainWrapper(
     try {
       sendResult = await sendTransaction(checkDuplicate, registerSafeByNodeEssentialTxPayload, txHandler)
     } catch (err) {
-      error = err
+      throw new Error(`Failed in sending registerSafeByNode transaction due to ${err}`)
     }
 
     switch (sendResult.code) {
@@ -498,8 +494,6 @@ export async function createChainWrapper(
         return sendResult.tx.hash
       case SendTransactionStatus.DUPLICATE:
         throw new Error(`Failed in sending registerSafeByNode transaction because transaction is a duplicate`)
-      default:
-        throw new Error(`Failed in sending registerSafeByNode transaction due to ${error}`)
     }
     // TODO: catch race-condition
   }

@@ -79,7 +79,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for AutoFundingStra
         if let ChannelChange::CurrentBalance { right: new, .. } = change {
             if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
                 info!(
-                    "{self} strategy: stake on {channel} is below threshold {} < {}",
+                    "stake on {channel} is below threshold {} < {}",
                     channel.balance, self.cfg.min_stake_threshold
                 );
 
@@ -88,10 +88,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for AutoFundingStra
                     .fund_channel(channel.get_id(), self.cfg.funding_amount)
                     .await?;
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
-                info!(
-                    "{self} strategy: issued re-staking of {channel} with {}",
-                    self.cfg.funding_amount
-                );
+                info!("issued re-staking of {channel} with {}", self.cfg.funding_amount);
             }
         }
 
