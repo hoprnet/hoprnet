@@ -125,31 +125,23 @@ impl ChannelEntry {
     }
 
     /// Checks if the closure time of this channel has passed.
-    pub fn closure_time_passed(&self, current_timestamp_ms: u64) -> Option<bool> {
-        assert!(current_timestamp_ms > 0, "invalid timestamp");
-        // round clock ms to seconds
-        let now_seconds: U256 = U256::from(current_timestamp_ms) / 1000u64.into();
-
-        if self.closure_time.eq(&U256::zero()) {
-            None
-        } else {
-            Some(self.closure_time < now_seconds)
-        }
+    /// Also returns `false` if the channel closure has not been initiated.
+    pub fn closure_time_passed(&self, current_timestamp_ms: u64) -> bool {
+        self.remaining_closure_time(current_timestamp_ms)
+            .map(|remaining| remaining == 0)
+            .unwrap_or(false)
     }
 
     /// Calculates the remaining channel closure grace period in seconds.
+    /// Returns `None` if the channel closure has not been initiated yet.
     pub fn remaining_closure_time(&self, current_timestamp_ms: u64) -> Option<u64> {
         assert!(current_timestamp_ms > 0, "invalid timestamp");
         // round clock ms to seconds
-        let now_seconds = U256::from(current_timestamp_ms) / 1000u64.into();
+        let now_seconds = current_timestamp_ms / 1000_u64;
 
-        if self.closure_time.eq(&U256::zero()) {
-            None
-        } else if self.closure_time > now_seconds {
-            Some((self.closure_time - now_seconds).as_u64())
-        } else {
-            Some(0u64)
-        }
+        self.closure_time
+            .gt(&0_u64.into())
+            .then(|| self.closure_time.as_u64().saturating_sub(now_seconds))
     }
 
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
@@ -160,7 +152,7 @@ impl ChannelEntry {
 
 impl ChannelEntry {
     /// Determines the channel direction given the self address.
-    /// Returns `None` if neither source nor destination is equal to `me`.
+    /// Returns `None` if neither source nor destination are equal to `me`.
     pub fn direction(&self, me: &Address) -> Option<ChannelDirection> {
         if self.source.eq(me) {
             Some(ChannelDirection::Outgoing)
@@ -885,6 +877,30 @@ pub mod tests {
 
         assert!(ChannelStatus::from_byte(231).is_none());
         assert_eq!(cs1, cs2, "channel status does not match");
+    }
+
+    #[test]
+    pub fn channel_entry_closure_time() {
+        let mut ce = ChannelEntry::new(
+            *ADDRESS_1,
+            *ADDRESS_2,
+            Balance::new(10u64.into(), BalanceType::HOPR),
+            23u64.into(),
+            ChannelStatus::Open,
+            3u64.into(),
+            0u64.into(),
+        );
+
+        assert!(!ce.closure_time_passed(10));
+        assert!(ce.remaining_closure_time(10).is_none());
+
+        ce.closure_time = 12_u32.into();
+
+        assert!(!ce.closure_time_passed(10000));
+        assert_eq!(2, ce.remaining_closure_time(10000).expect("must have closure time"));
+
+        assert!(ce.closure_time_passed(14000));
+        assert_eq!(0, ce.remaining_closure_time(14000).expect("must have closure time"));
     }
 
     #[test]
