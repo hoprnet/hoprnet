@@ -115,7 +115,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone, T, U> AggregatingStrategy<Db, T, U> 
 
 impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<Db, T, U> {
     async fn start_aggregation(&self, channel: ChannelEntry, redeem_if_failed: bool) -> crate::errors::Result<()> {
-        debug!("{self} strategy: starting aggregation in {channel}");
+        debug!("starting aggregation in {channel}");
         // Perform marking as aggregated ahead, to avoid concurrent aggregation races in spawn_local
         let tickets_to_agg = self
             .db
@@ -124,10 +124,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<
             .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
             .await?;
 
-        info!(
-            "{self} strategy: will aggregate {} tickets in {channel}",
-            tickets_to_agg.len()
-        );
+        info!("will aggregate {} tickets in {channel}", tickets_to_agg.len());
 
         match self
             .ticket_aggregator
@@ -139,22 +136,21 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<
                 // Spawn waiting for the aggregation as a separate task
                 let agg_timeout = self.cfg.aggregation_timeout;
                 let actions_clone = self.chain_actions.clone();
-                let strategy_id = self.to_string();
 
                 spawn_local(async move {
                     match awaiter.consume_and_wait(agg_timeout).await {
                         Ok(_) => {
                             // The TicketAggregationActions will raise the on_acknowledged_ticket event,
                             // so the AutoRedeem strategy can take care of redeeming if needed
-                            info!("{strategy_id} strategy: has completed ticket aggregation");
+                            info!("completed ticket aggregation");
                         }
                         Err(e) => {
-                            warn!("{strategy_id} strategy: could not aggregate tickets: {e}");
+                            warn!("could not aggregate tickets: {e}");
                             if redeem_if_failed {
-                                info!("{strategy_id} strategy: initiating redemption of all tickets in {channel} after aggregation failure");
+                                info!("initiating redemption of all tickets in {channel} after aggregation failure");
 
                                 if let Err(e) = actions_clone.redeem_tickets_in_channel(&channel, false).await {
-                                    error!("{strategy_id} strategy: failed to issue redeeming of all tickets in {channel}: {e}");
+                                    error!("failed to issue redeeming of all tickets in {channel}: {e}");
                                 }
 
                                 // We do not need to await the redemption completion of all the tickets
@@ -166,7 +162,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<
                 Ok(())
             }
             Err(e) => {
-                warn!("{self} strategy: could not initiate aggregate tickets due to {e}");
+                warn!("could not initiate aggregate tickets due to {e}");
                 Err(crate::errors::StrategyError::Other("ticket aggregation failed".into()))
             }
         }
@@ -181,7 +177,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
         let channel = match self.db.read().await.get_channel(&channel_id).await? {
             Some(channel) => channel,
             None => {
-                error!("{self} strategy: encountered {ack} in a non-existing channel!");
+                error!("encountered {ack} in a non-existing channel!");
                 return Err(ChannelDoesNotExist.into());
             }
         };
@@ -198,9 +194,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
                     unredeemed_value = unredeemed_value.add(&ticket.ticket.amount);
                 }
                 AcknowledgedTicketStatus::BeingAggregated { .. } => {
-                    debug!(
-                        "{self} strategy: {channel} already has ticket aggregation in progress, not aggregating yet"
-                    );
+                    debug!("{channel} already has ticket aggregation in progress, not aggregating yet");
                     return Ok(());
                 }
                 AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
@@ -212,10 +206,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
         // Check the aggregation threshold
         if let Some(agg_threshold) = self.cfg.aggregation_threshold {
             if aggregatable_tickets >= agg_threshold {
-                info!("{self} strategy: {channel} has {aggregatable_tickets} >= {agg_threshold} ack tickets");
+                info!("{channel} has {aggregatable_tickets} >= {agg_threshold} ack tickets");
                 can_aggregate = true;
             } else {
-                debug!("{self} strategy: {channel} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet");
+                debug!("{channel} has {aggregatable_tickets} < {agg_threshold} ack tickets, not aggregating yet");
             }
         }
         if let Some(unrealized_threshold) = self.cfg.unrealized_balance_ratio {
@@ -225,14 +219,14 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
             // and there are at least two tickets
             if unredeemed_value.gte(&diminished_balance) {
                 if aggregatable_tickets > 1 {
-                    info!("{self} strategy: {channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
+                    info!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} in {aggregatable_tickets} tickets");
                     can_aggregate = true;
                 } else {
-                    debug!("{self} strategy: {channel} has unrealized balance {unredeemed_value} >= {diminished_balance} but in just {aggregatable_tickets} tickets, not aggregating yet");
+                    debug!("{channel} has unrealized balance {unredeemed_value} >= {diminished_balance} but in just {aggregatable_tickets} tickets, not aggregating yet");
                 }
             } else {
                 debug!(
-                    "{self} strategy: {channel} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet"
+                    "{channel} has unrealized balance {unredeemed_value} < {diminished_balance} in {aggregatable_tickets} tickets, not aggregating yet"
                 );
             }
         }
@@ -241,7 +235,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
         if can_aggregate {
             self.start_aggregation(channel, false).await
         } else {
-            debug!("{self} strategy: channel {channel_id} has not met the criteria for aggregation");
+            debug!("channel {channel_id} has not met the criteria for aggregation");
             Ok(())
         }
     }
@@ -258,7 +252,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
 
         if let ChannelChange::Status { left: old, right: new } = change {
             if old != ChannelStatus::Open || new != ChannelStatus::PendingToClose {
-                debug!("{self} strategy: ignoring channel {channel} state change that's not in PendingToClose");
+                debug!("ignoring channel {channel} state change that's not in PendingToClose");
                 return Ok(());
             }
 
@@ -272,9 +266,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
                         aggregatable_tickets += 1;
                     }
                     AcknowledgedTicketStatus::BeingAggregated { .. } => {
-                        debug!(
-                        "{self} strategy: {channel} already has ticket aggregation in progress, not aggregating yet"
-                    );
+                        debug!("{channel} already has ticket aggregation in progress, not aggregating yet");
                         return Ok(());
                     }
                     AcknowledgedTicketStatus::BeingRedeemed { .. } => {}
@@ -282,10 +274,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
             }
 
             if aggregatable_tickets > 1 {
-                debug!("{self} strategy: {channel} has {aggregatable_tickets} aggregatable tickets");
+                debug!("{channel} has {aggregatable_tickets} aggregatable tickets");
                 self.start_aggregation(*channel, true).await
             } else {
-                debug!("{self} strategy: closing {channel} does not have more than 1 tickets to aggregate");
+                debug!("closing {channel} does not have more than 1 tickets to aggregate");
                 Ok(())
             }
         } else {
