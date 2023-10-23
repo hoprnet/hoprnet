@@ -1,6 +1,5 @@
 use async_lock::RwLock;
 use async_std::channel::{bounded, Receiver, Sender};
-use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
@@ -27,12 +26,14 @@ use crate::transaction_queue::TransactionResult::{Failure, TicketRedeemed};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
+use async_trait::async_trait;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
+use core_types::acknowledgement::AcknowledgedTicketStatus;
 
 
 /// Enumerates all possible on-chain state change requests
@@ -323,6 +324,7 @@ pub mod wasm {
     use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
     use wasm_bindgen_futures::JsFuture;
     use core_types::announcement::AnnouncementData;
+    use crate::payload::PayloadGenerator;
 
     #[wasm_bindgen]
     impl TransactionSender {
@@ -586,7 +588,10 @@ pub mod wasm {
         async fn announce(&self, data: AnnouncementData, use_safe: bool) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(self.generator.announce(&data, use_safe).into());
+            tx.set_data(match self.generator.announce(&data) {
+                Ok(payload) => payload.into(),
+                Err(e) => return TransactionResult::Failure(e.to_string()),
+            });
             if !use_safe {
                 tx.set_to(H160::from(self.hopr_announcements));
             } else {

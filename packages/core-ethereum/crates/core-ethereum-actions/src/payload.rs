@@ -791,6 +791,7 @@ pub mod wasm {
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::primitives::{Address, Balance};
     use wasm_bindgen::{prelude::*, JsValue};
+    use crate::payload::PayloadGenerator;
 
     #[wasm_bindgen]
     pub struct ChainCalls {
@@ -811,16 +812,6 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn set_use_safe(&self, enabled: bool) {
-            self.w.write().await.set_use_safe(enabled)
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_use_safe(&self) -> bool {
-            self.w.read().await.get_use_safe()
-        }
-
-        #[wasm_bindgen]
         pub async fn get_announce_payload(
             &self,
             announced_multiaddr: &str,
@@ -836,8 +827,7 @@ pub mod wasm {
                                 &ma,
                                 Some(KeyBinding::new(reader.me, packet_key))
                             ))?,
-                            use_safe,
-                        )
+                        )?
                         .as_slice(),
                 )),
                 Err(e) => Err(JsValue::from(e.to_string())),
