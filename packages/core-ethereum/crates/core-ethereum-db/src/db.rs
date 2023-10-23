@@ -149,8 +149,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         let count_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_COUNT)?;
         let value_key = utils_db::db::Key::new_from_str(NEGLECTED_TICKETS_VALUE)?;
 
-        let mut count = self.get_rejected_tickets_count().await?;
-        let mut balance = self.get_rejected_tickets_value().await?;
+        let mut count = self.get_neglected_tickets_count().await?;
+        let mut balance = self.get_neglected_tickets_value().await?;
 
         let mut batch_ops = Batch::default();
 
@@ -479,7 +479,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         let neglected_ticket_count = self.db.get_or_none::<usize>(count_key.clone()).await?.unwrap_or(0);
         let mut neglected_ticket_value = self
             .db
-            .get_or_none::<Balance>(count_key.clone())
+            .get_or_none::<Balance>(value_key.clone())
             .await?
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 

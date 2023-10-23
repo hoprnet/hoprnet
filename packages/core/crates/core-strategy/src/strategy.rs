@@ -18,7 +18,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use utils_log::{debug, error, warn};
+use utils_log::{debug, error, info, warn};
 use validator::Validate;
 
 #[cfg(any(not(feature = "wasm"), test))]
@@ -68,7 +68,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> Display for ChannelCloseFinalizer<Db
 #[async_trait(? Send)]
 impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFinalizer<Db> {
     async fn on_tick(&self) -> Result<()> {
-        let _ = self
+        let to_close = self
             .db
             .read()
             .await
@@ -76,11 +76,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFin
             .await?
             .iter()
             .filter(|channel| {
-                channel.status == ChannelStatus::PendingToClose
-                    && channel.closure_time_passed(current_timestamp()).unwrap_or(false)
+                channel.status == ChannelStatus::PendingToClose && channel.closure_time_passed(current_timestamp())
             })
             .map(|channel| async {
                 let channel_cpy = *channel;
+                info!("channel closure finalizer: finalizing closure of {channel_cpy}");
                 match self
                     .chain_actions
                     .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
@@ -95,8 +95,10 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFin
             })
             .collect::<FuturesUnordered<_>>()
             .collect::<Vec<_>>()
-            .await;
+            .await
+            .len();
 
+        info!("channel closure finalizer: initiated closure finalization of {to_close} channels");
         Ok(())
     }
 }
