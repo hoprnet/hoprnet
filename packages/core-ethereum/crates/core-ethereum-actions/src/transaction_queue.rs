@@ -409,6 +409,7 @@ pub mod wasm {
         hopr_announcements: Address,
         module_address: Address,
         node_safe_registry: Address,
+        use_safe: bool,
     }
 
     #[wasm_bindgen]
@@ -432,6 +433,7 @@ pub mod wasm {
                 send_transaction,
                 basic_generator: BasicPayloadGenerator::new(chain_keypair.public().to_address()),
                 safe_generator: SafePayloadGenerator::new(chain_keypair, hopr_channels, hopr_announcements),
+                use_safe: true,
             }
         }
     }
@@ -494,11 +496,21 @@ pub mod wasm {
         async fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.safe_generator.redeem_ticket(&acked_ticket) {
-                Ok(payload) => payload.into(),
-                Err(e) => return TransactionResult::Failure(e.to_string()),
-            });
-            tx.set_to(H160::from(self.hopr_channels));
+            if self.use_safe {
+                tx.set_data(match self.safe_generator.redeem_ticket(&acked_ticket) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
+                tx.set_to(H160::from(self.module_address));
+            } else {
+                tx.set_data(match self.basic_generator.redeem_ticket(&acked_ticket) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
+                tx.set_to(H160::from(self.hopr_channels));
+            }
 
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::TicketRedeemed { tx_hash },
@@ -514,11 +526,21 @@ pub mod wasm {
         async fn fund_channel(&self, destination: Address, balance: Balance) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.safe_generator.fund_channel(&destination, &balance) {
-                Ok(payload) => payload.into(),
-                Err(e) => return TransactionResult::Failure(e.to_string()),
-            });
-            tx.set_to(H160::from(self.hopr_channels));
+            if self.use_safe {
+                tx.set_data(match self.safe_generator.fund_channel(&destination, &balance) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
+                tx.set_to(H160::from(self.module_address));
+            } else {
+                tx.set_data(match self.basic_generator.fund_channel(&destination, &balance) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
+                tx.set_to(H160::from(self.hopr_channels));
+            }
 
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelFunded { tx_hash },
@@ -534,11 +556,21 @@ pub mod wasm {
         async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.safe_generator.initiate_outgoing_channel_closure(&dst) {
-                Ok(payload) => payload.into(),
-                Err(e) => return TransactionResult::Failure(e.to_string()),
-            });
-            tx.set_to(H160::from(self.hopr_channels));
+            if self.use_safe {
+                tx.set_data(match self.safe_generator.initiate_outgoing_channel_closure(&dst) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
+                tx.set_to(H160::from(self.module_address));
+            } else {
+                tx.set_data(match self.basic_generator.initiate_outgoing_channel_closure(&dst) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
+                tx.set_to(H160::from(self.hopr_channels));
+            }
 
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosureInitiated { tx_hash },
@@ -554,11 +586,21 @@ pub mod wasm {
         async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.safe_generator.finalize_outgoing_channel_closure(&dst) {
-                Ok(payload) => payload.into(),
-                Err(e) => return TransactionResult::Failure(e.to_string()),
-            });
-            tx.set_to(H160::from(self.hopr_channels));
+            if self.use_safe {
+                tx.set_data(match self.safe_generator.finalize_outgoing_channel_closure(&dst) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
+                tx.set_to(H160::from(self.module_address));
+            } else {
+                tx.set_data(match self.basic_generator.finalize_outgoing_channel_closure(&dst) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
+                tx.set_to(H160::from(self.hopr_channels));
+            }
 
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
@@ -574,11 +616,19 @@ pub mod wasm {
         async fn close_incoming_channel(&self, src: Address) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.safe_generator.close_incoming_channel(&src) {
-                Ok(payload) => payload.into(),
-                Err(e) => return TransactionResult::Failure(e.to_string()),
-            });
-            tx.set_to(H160::from(self.hopr_channels));
+            if self.use_safe {
+                tx.set_data(match self.safe_generator.close_incoming_channel(&src) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+                tx.set_to(H160::from(self.module_address));
+            } else {
+                tx.set_data(match self.basic_generator.close_incoming_channel(&src) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+                tx.set_to(H160::from(self.hopr_channels));
+            }
 
             match self.send_transaction(tx, "channel-updated-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
