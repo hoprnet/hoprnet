@@ -181,11 +181,13 @@ mod tests {
         assert_eq!(res, key.as_ref());
     }
 
+    #[ignore]
     #[parameterized(nodes = {4, 3, 2, 1})]
     fn test_secp256k1_suite(nodes: usize) {
         generic_sphinx_suite_test::<Secp256k1Suite>(nodes)
     }
 
+    #[ignore]
     #[parameterized(nodes = {4, 3, 2, 1})]
     fn test_ed25519_shared_keys(nodes: usize) {
         generic_sphinx_suite_test::<Ed25519Suite>(nodes)

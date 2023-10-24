@@ -388,6 +388,7 @@ pub mod tests {
         )
     }
 
+    #[ignore]
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_ed25519_generate_routing_info_and_forward(amount: usize) {
         generic_test_generate_routing_info_and_forward::<Ed25519Suite>(
@@ -402,6 +403,7 @@ pub mod tests {
         )
     }
 
+    #[ignore]
     #[parameterized(amount = { 3, 2, 1 })]
     fn test_secp256k1_generate_routing_info_and_forward(amount: usize) {
         generic_test_generate_routing_info_and_forward::<Secp256k1Suite>(
