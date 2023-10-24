@@ -1,0 +1,83 @@
+---
+#################################################################################
+# Pipeline to build dappnode package
+#################################################################################
+name: Build DappNode
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+
+concurrency:
+  group: dappnode
+  cancel-in-progress: false
+
+jobs:
+
+  build:
+    name: package
+    runs-on: ubuntu-2-core
+    timeout-minutes: 60
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Set up Google Cloud Credentials
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          install_components: beta
+
+      - name: Checkout DAppNodePackage-Hopr
+        uses: actions/checkout@v4
+        with:
+          repository: dappnode/DAppNodePackage-Hopr
+          path: "./DAppNodePackage-Hopr"
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          ref: main
+
+      - name: Setup variables
+        id: setup
+        run: |
+          current_version=$(jq -r '.version' packages/hoprd/package.json)
+          echo "current_version=${current_version}" >> $GITHUB_OUTPUT
+
+      - name: Bump version
+        run: |
+          docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" 2&> /dev/null | grep -v "cache" | grep -v "\-pr" | sed 's/,/@/')
+          dappnode_patch_version=$(jq -r '.version' dappnode_package.json | sed 's/.*\.//')
+          dappnode_minor_version=$(jq -r '.version' dappnode_package.json | sed 's/\.'${dappnode_patch_version}'//')
+          dappnode_patch_bumped_patch_version=$((dappnode_patch_version + 1))
+          dappnode_version="${dappnode_minor_version}.${dappnode_patch_version}"
+          dappnode_bumped_version="${dappnode_minor_version}.${dappnode_patch_bumped_patch_version}"
+
+          cat <<< $(jq --arg dappnode_bumped_version ${dappnode_bumped_version} ' . |= .+ { "version": $dappnode_bumped_version}' dappnode_package.json) > dappnode_package.json
+          cat <<< $(jq --arg dappnode_bumped_version ${dappnode_bumped_version} ' . |= .+ { "version": $dappnode_bumped_version}' dappnode_package.json) > dappnode_package.json
+          yq -i e ".services.node.image |= \"node.hopr.public.dappnode.eth:${dappnode_bumped_version}\"" docker-compose.yml
+          yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" docker-compose.yml
+        working-directory: "./DAppNodePackage-Hopr"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+            token: ${{ secrets.GH_RUNNER_TOKEN }}
+            push-to-fork: hoprnet/DAppNodePackage-Hopr
+            commit-message: "Update to release ${{ steps.setup.outputs.current_version }}"
+            title: "Update to release ${{ steps.setup.outputs.current_version }}"
+            body: "This pull request contains the changes needed to bump Hoprd to version ${{ steps.setup.outputs.current_version }}"
+            branch: bot/update-${{ steps.setup.outputs.current_version }}
+            path: "./DAppNodePackage-Hopr"
+            delete-branch: true
+            assignees: ${{ github.actor }}
+            reviewers: "ausias-armesto,tolbrino,NumberFour8,Teebor-Choka,Jaguaras"
