@@ -24,7 +24,6 @@ export {
   AuthorizationToken,
   Balance,
   BalanceType,
-  ChainCalls,
   ChainKeypair,
   Challenge,
   ChannelEntry,
