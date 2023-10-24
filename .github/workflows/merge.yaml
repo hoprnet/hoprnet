@@ -289,5 +289,4 @@ jobs:
     uses: ./.github/workflows/build-dappnode.yaml
     with:
       branch: ${{ github.event.pull_request.base.ref }}
-    secrets:
-      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+    secrets: inherit

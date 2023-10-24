@@ -10,9 +10,7 @@ on:
       branch:
         required: true
         type: string
-    secrets:
-      GH_RUNNER_TOKEN:
-        required: true
+
 concurrency:
   group: dappnode
   cancel-in-progress: false
@@ -20,7 +18,7 @@ concurrency:
 jobs:
 
   build:
-    name: docker
+    name: package
     runs-on: ubuntu-2-core
     timeout-minutes: 60
     steps:
