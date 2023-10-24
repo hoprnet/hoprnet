@@ -16,9 +16,9 @@ use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, Channe
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use strum::VariantNames;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
+use strum::VariantNames;
 use utils_log::{debug, error, info, warn};
 use validator::Validate;
 
@@ -211,6 +211,11 @@ impl MultiStrategy {
             }));
         }
 
+        #[cfg(all(feature = "prometheus", not(test)))]
+        Strategy::VARIANTS
+            .iter()
+            .for_each(|s| METRIC_ENABLED_STRATEGIES.set(&[*s], 0_f64));
+
         for strategy in cfg.strategies.iter() {
             match strategy {
                 Strategy::Promiscuous(sub_cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
@@ -255,12 +260,9 @@ impl MultiStrategy {
                     strategies: Vec::new(),
                 })),
             }
-        }
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            let strategy_names = cfg.strategies.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-            METRIC_ENABLED_STRATEGIES.set(&strategy_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 1_f64);
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_ENABLED_STRATEGIES.set(&[&strategy.to_string()], 1_f64);
         }
 
         Self { strategies, cfg }
