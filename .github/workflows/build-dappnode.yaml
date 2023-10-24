@@ -42,7 +42,7 @@ jobs:
       - name: Checkout DAppNodePackage-Hopr
         uses: actions/checkout@v4
         with:
-          repository: hoprnet/DAppNodePackage-Hopr
+          repository: dappnode/DAppNodePackage-Hopr
           path: "./DAppNodePackage-Hopr"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: main
@@ -53,13 +53,9 @@ jobs:
           current_version=$(jq -r '.version' packages/hoprd/package.json)
           echo "current_version=${current_version}" >> $GITHUB_OUTPUT
 
-      - name: Tag repository
-        id: tag
+      - name: Bump version
         run: |
-          # Tag semver
-          git tag v${{ steps.setup.outputs.current_version }}
-          git push origin v${{ steps.setup.outputs.current_version }}
-
+          set -x
           docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" 2&> /dev/null | grep -v "cache" | grep -v "\-pr" | sed 's/,/@/')
           git fetch upstream
           git pull
@@ -80,6 +76,7 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
             token: ${{ secrets.GH_RUNNER_TOKEN }}
+            push-to-fork: hoprnet/DAppNodePackage-Hopr
             commit-message: "Update to release ${{ steps.setup.outputs.current_version }}"
             title: "Update to release ${{ steps.setup.outputs.current_version }}"
             body-path: .github/files/${{ steps.setup.outputs.pr_template }}
