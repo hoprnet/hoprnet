@@ -238,9 +238,14 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns HOPR balance
    */
   public async getBalance(useIndexer: boolean = false): Promise<Balance> {
-    return useIndexer
-      ? Balance.deserialize((await this.db.get_hopr_balance()).serialize_value(), BalanceType.HOPR)
-      : this.chain.getBalance(this.chainKeypair.to_address())
+    let ret
+    if (useIndexer) {
+      ret = await this.db.get_hopr_balance()
+    } else {
+      let selfAddr = this.chainKeypair.to_address()
+      ret = this.chain.getBalance(selfAddr)
+    }
+    return ret
   }
 
   public getPublicKey(): PublicKey {
@@ -310,7 +315,8 @@ export default class HoprCoreEthereum extends EventEmitter {
   async openChannel(dest: Address, amount: Balance): Promise<{ channel_id: string; receipt: string }> {
     log(`opening channel to ${dest.to_hex()} with amount ${amount.to_formatted_string()}`)
     const receipt = await this.fundChannel(dest, amount)
-    return { channel_id: generate_channel_id(this.chainKeypair.to_address(), dest).to_hex(), receipt }
+    let selfAddr = this.chainKeypair.to_address()
+    return { channel_id: generate_channel_id(selfAddr, dest).to_hex(), receipt }
   }
 
   // This operation works on open and closed channels. More assertions must be
