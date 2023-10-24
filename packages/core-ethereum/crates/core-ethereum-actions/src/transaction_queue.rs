@@ -2,6 +2,7 @@ use async_lock::RwLock;
 use async_std::channel::{bounded, Receiver, Sender};
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_types::announcement::AnnouncementData;
 use core_types::{
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus::BeingRedeemed},
     channels::{
@@ -18,7 +19,6 @@ use std::{
 };
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
-use core_types::announcement::AnnouncementData;
 
 use crate::errors::CoreEthereumActionsError::TransactionSubmissionFailed;
 use crate::errors::Result;
@@ -31,10 +31,9 @@ use async_trait::async_trait;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
+use core_types::acknowledgement::AcknowledgedTicketStatus;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
-use core_types::acknowledgement::AcknowledgedTicketStatus;
-
 
 /// Enumerates all possible on-chain state change requests
 #[derive(Clone, PartialEq, Debug)]
@@ -58,7 +57,7 @@ pub enum Transaction {
     Announce(AnnouncementData, bool),
 
     /// Register safe address with this node
-    RegisterSafe(Address)
+    RegisterSafe(Address),
 }
 
 impl Display for Transaction {
@@ -84,7 +83,7 @@ impl Display for Transaction {
                     write!(f, "announce tx of {}", data.to_multiaddress_str())
                 }
             }
-            Transaction::RegisterSafe(safe_address) => write!(f, "register safe tx {safe_address}")
+            Transaction::RegisterSafe(safe_address) => write!(f, "register safe tx {safe_address}"),
         }
     }
 }
@@ -305,6 +304,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
+    use crate::payload::PayloadGenerator;
     use crate::{
         payload::SafePayloadGenerator,
         transaction_queue::{TransactionExecutor, TransactionResult, TransactionSender},
@@ -312,6 +312,7 @@ pub mod wasm {
     use async_trait::async_trait;
     use core_crypto::{keypairs::ChainKeypair, types::Hash};
     use core_types::acknowledgement::AcknowledgedTicket;
+    use core_types::announcement::AnnouncementData;
     use ethers::types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, NameOrAddress, H160, U256};
     use hex;
     use js_sys::{JsString, Promise};
@@ -323,8 +324,6 @@ pub mod wasm {
     };
     use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
     use wasm_bindgen_futures::JsFuture;
-    use core_types::announcement::AnnouncementData;
-    use crate::payload::PayloadGenerator;
 
     #[wasm_bindgen]
     impl TransactionSender {
@@ -358,7 +357,7 @@ pub mod wasm {
     #[derive(Serialize, Deserialize, Debug)]
     pub struct WasmSendTransactionResult {
         pub code: String,
-        pub tx: Option<String>
+        pub tx: Option<String>,
     }
 
     enum SendTransactionResult {
@@ -406,9 +405,14 @@ pub mod wasm {
         fn from(value: WasmSendTransactionResult) -> Self {
             let val = value.code.to_uppercase();
             match val.as_str() {
-                "SUCCESS" => SendTransactionResult::Success(value.tx.and_then(|tx| Hash::from_hex(&tx).ok()).expect("invalid tx hash returned")),
+                "SUCCESS" => SendTransactionResult::Success(
+                    value
+                        .tx
+                        .and_then(|tx| Hash::from_hex(&tx).ok())
+                        .expect("invalid tx hash returned"),
+                ),
                 "DUPLICATE" => SendTransactionResult::Duplicate,
-                _ => SendTransactionResult::Failure(format!("tx sender error: {value:?}"))
+                _ => SendTransactionResult::Failure(format!("tx sender error: {value:?}")),
             }
         }
     }
@@ -423,7 +427,7 @@ pub mod wasm {
                 to: match tx.to() {
                     Some(NameOrAddress::Address(addr)) => format!("0x{}", hex::encode(addr)),
                     Some(NameOrAddress::Name(_)) => todo!("ens names are not yet supported"),
-                    None => return SendTransactionResult::Failure("cannot set transaction target".into())
+                    None => return SendTransactionResult::Failure("cannot set transaction target".into()),
                 },
                 value: match tx.value() {
                     Some(x) => x.to_string(),
@@ -444,7 +448,6 @@ pub mod wasm {
                     } else {
                         SendTransactionResult::Failure("serde deserialization error".into())
                     }
-
                 }
                 Err(e) => SendTransactionResult::Failure(e),
             }
@@ -614,7 +617,7 @@ pub mod wasm {
 
             tx.set_data(match self.generator.register_safe_by_node(&safe_address) {
                 Ok(payload) => payload.into(),
-                Err(e) => return TransactionResult::Failure(e.to_string())
+                Err(e) => return TransactionResult::Failure(e.to_string()),
             });
             tx.set_to(H160::from(self.node_safe_registry));
 

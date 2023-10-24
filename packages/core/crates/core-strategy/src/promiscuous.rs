@@ -374,10 +374,10 @@ mod tests {
         PeerId,
     };
     use core_types::acknowledgement::AcknowledgedTicket;
+    use core_types::announcement::AnnouncementData;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::future::join_all;
     use mockall::mock;
-    use core_types::announcement::AnnouncementData;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_misc::time::native::current_timestamp;
     use utils_types::primitives::{Snapshot, U256};

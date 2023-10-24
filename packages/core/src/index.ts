@@ -826,8 +826,25 @@ export class Hopr extends EventEmitter {
 
     try {
       log('registering node safe on-chain... ')
-      const registryTxHash = await connector.registerSafeByNode()
-      log('registering node safe on-chain done in tx %s', registryTxHash)
+
+      const safeModuleAddr = this.cfg.safe_module.module_address
+      const safeAddress = this.cfg.safe_module.safe_address
+      if (!safeAddress || !safeModuleAddr) {
+        throw new Error(`cannot register safe: missing safe address or safe module address`)
+      }
+
+      if (await connector.canRegisterWithSafe()) {
+        let actions = this.tools.chain_actions()
+        let registryTxHash = await actions.register_node_with_safe(safeAddress)
+
+        log(`registering node safe on-chain done in tx ${registryTxHash.to_hex()}`)
+      } else {
+        log(`node is already registered with Safe`)
+      }
+
+      log('update safe and module addresses in database')
+      await this.db.set_staking_safe_address(safeAddress)
+      await this.db.set_staking_module_address(safeModuleAddr)
     } catch (err) {
       log('registering node safe on-chain failed')
       this.maybeEmitFundsEmptyEvent(err)
@@ -899,6 +916,7 @@ export class Hopr extends EventEmitter {
     // only announce when:
     // (1) directly, safe is not used
     // (2) safe is used, correctly set, and target has been configured with ALLOW_ALL
+    let actions = this.tools.chain_actions()
     try {
       if (!useSafe) {
         log(
@@ -906,8 +924,8 @@ export class Hopr extends EventEmitter {
           announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
           addrToAnnounce.toString()
         )
-        const announceTxHash = await connector.announce(addrToAnnounce)
-        log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
+        const announceTxHash = await actions.announce(addrToAnnounce.toString(), this.packetKeypair, false)
+        log(`announcing address ${addrToAnnounce.toString()} done in tx ${announceTxHash.to_hex()}`)
       } else {
         const isRegisteredCorrectly = await connector.isNodeSafeRegisteredCorrectly()
         const isAnnouncementAllowed = await connector.isSafeAnnouncementAllowed()
@@ -921,8 +939,8 @@ export class Hopr extends EventEmitter {
             announceRoutableAddress && routableAddressAvailable ? 'with' : 'without',
             addrToAnnounce.toString()
           )
-          const announceTxHash = await connector.announce(addrToAnnounce, true)
-          log('announcing address %s done in tx %s', addrToAnnounce.toString(), announceTxHash)
+          const announceTxHash = await actions.announce(addrToAnnounce.toString(), this.packetKeypair, true)
+          log(`announcing address ${addrToAnnounce.toString()} done in tx ${announceTxHash.to_hex()}`)
         } else {
           // FIXME: implement path through the Safe as delegate
           error('Cannot announce new multiaddress because Safe-Module configuration does not allow it')

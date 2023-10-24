@@ -107,8 +107,8 @@ mod tests {
     use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_types::announcement::AnnouncementData;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use core_types::announcement::AnnouncementData;
     use core_types::channels::ChannelChange::CurrentBalance;
     use core_types::channels::ChannelDirection::Outgoing;
     use core_types::channels::{ChannelEntry, ChannelStatus};

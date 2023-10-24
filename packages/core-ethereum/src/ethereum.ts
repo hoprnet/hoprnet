@@ -8,11 +8,8 @@ import {
   durations,
   type DeferType,
   create_counter,
-  OffchainKeypair,
-  u8aToHex,
   ChainKeypair,
-  CORE_ETHEREUM_CONSTANTS,
-  ChainCalls
+  CORE_ETHEREUM_CONSTANTS
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
@@ -32,7 +29,6 @@ import {
 } from './utils/index.js'
 
 import { SafeModuleOptions } from './index.js'
-import { Multiaddr } from '@multiformats/multiaddr'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -82,9 +78,7 @@ export async function createChainWrapper(
     chain: string
     network: string
   },
-  offchainKeypair: OffchainKeypair,
   keypair: ChainKeypair,
-  checkDuplicate: Boolean = true,
   txTimeout = constants.TX_CONFIRMATION_WAIT
 ) {
   log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`)
@@ -111,13 +105,6 @@ export async function createChainWrapper(
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
 
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
-
-  // Use safe variants of SC calls from the start.
-  const chainCalls = new ChainCalls(
-    keypair,
-    Address.from_string(deploymentExtract.hoprChannelsAddress),
-    Address.from_string(deploymentExtract.hoprAnnouncementsAddress)
-  )
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -422,81 +409,6 @@ export async function createChainWrapper(
   }
 
   /**
-   * Initiates a transaction that announces nodes on-chain.
-   * @param multiaddr Multiaddress to announce
-   * @param useSafe use Safe-variant for call if true
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves with the transaction hash
-   */
-  const announce = async (
-    multiaddr: Multiaddr,
-    useSafe: boolean,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<string> => {
-    let to = deploymentExtract.hoprAnnouncementsAddress
-    let data = u8aToHex(await chainCalls.get_announce_payload(multiaddr.toString(), offchainKeypair, useSafe))
-    if (useSafe) {
-      to = safeModuleOptions.moduleAddress.to_hex()
-    }
-
-    let confirmationEssentialTxPayload: TransactionPayload = {
-      data,
-      to,
-      value: BigNumber.from(0)
-    }
-    // @ts-ignore fixme: treat result
-    let sendResult: SendTransactionReturn
-
-    try {
-      sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
-    } catch (error) {
-      throw new Error(`Failed in sending announce transaction due to ${error}`)
-    }
-
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending announce transaction because transaction is a duplicate`)
-    }
-  }
-
-  /**
-   * Initiates a transaction that registers a safe address
-   * This function should not be called through safe/module
-   * @param safeAddress address of safe
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves with the transaction hash
-   */
-  const registerSafeByNode = async (
-    safeAddress: Address,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    log('Register a node to safe %s globally', safeAddress.to_hex())
-    let sendResult: SendTransactionReturn
-
-    const registerSafeByNodeEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(await chainCalls.get_register_safe_by_node_payload(safeAddress)),
-      to: nodeSafeRegistry.address,
-      value: BigNumber.from(0)
-    }
-
-    try {
-      sendResult = await sendTransaction(checkDuplicate, registerSafeByNodeEssentialTxPayload, txHandler)
-    } catch (err) {
-      throw new Error(`Failed in sending registerSafeByNode transaction due to ${err}`)
-    }
-
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending registerSafeByNode transaction because transaction is a duplicate`)
-    }
-    // TODO: catch race-condition
-  }
-
-  /**
    * Gets the transaction hashes of a specific block
    * @param blockNumber block number to look for
    * @returns a Promise that resolves with the transaction hashes of the requested block
@@ -683,8 +595,6 @@ export async function createChainWrapper(
     getNodeManagementModuleTargetInfo,
     getSafeFromNodeSafeRegistry,
     getModuleTargetAddress,
-    announce,
-    registerSafeByNode,
     getGenesisBlock: () => genesisBlock,
     sendTransaction, //: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
     waitUntilReady: async () => await provider.ready,

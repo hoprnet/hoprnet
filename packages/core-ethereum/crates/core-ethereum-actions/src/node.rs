@@ -2,11 +2,11 @@ use crate::errors::{CoreEthereumActionsError, Result};
 use crate::transaction_queue::{Transaction, TransactionCompleted};
 use crate::CoreEthereumActions;
 use async_trait::async_trait;
-use multiaddr::Multiaddr;
 use core_crypto::keypairs::OffchainKeypair;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
 use core_types::announcement::{AnnouncementData, KeyBinding};
+use multiaddr::Multiaddr;
 use utils_log::info;
 use utils_types::primitives::{Address, Balance};
 
@@ -17,7 +17,12 @@ pub trait NodeActions {
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<TransactionCompleted>;
 
     /// Announces node on-chain with key binding
-    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair, use_safe: bool) -> Result<TransactionCompleted>;
+    async fn announce(
+        &self,
+        multiaddr: &Multiaddr,
+        offchain_key: &OffchainKeypair,
+        use_safe: bool,
+    ) -> Result<TransactionCompleted>;
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted>;
 }
@@ -33,13 +38,19 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
         self.tx_sender.send(Transaction::Withdraw(recipient, amount)).await
     }
 
-    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair, use_safe: bool) -> Result<TransactionCompleted> {
-        let announcement_data = AnnouncementData::new(multiaddr, Some(
-            KeyBinding::new(self.me, offchain_key)
-        )).map_err(|e| CoreEthereumActionsError::OtherError(e.into()))?;
+    async fn announce(
+        &self,
+        multiaddr: &Multiaddr,
+        offchain_key: &OffchainKeypair,
+        use_safe: bool,
+    ) -> Result<TransactionCompleted> {
+        let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))
+            .map_err(|e| CoreEthereumActionsError::OtherError(e.into()))?;
 
         info!("initiating annoucement {announcement_data}");
-        self.tx_sender.send(Transaction::Announce(announcement_data, use_safe)).await
+        self.tx_sender
+            .send(Transaction::Announce(announcement_data, use_safe))
+            .await
     }
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted> {

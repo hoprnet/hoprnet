@@ -80,7 +80,8 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
         value: U256::zero(),
         data: call_data.into(),
         operation: Operation::Call as u8,
-    }.encode()
+    }
+    .encode()
 }
 
 /// Generates transaction payloads that do not use Safe-compliant ABI
@@ -109,12 +110,10 @@ impl PayloadGenerator for BasicPayloadGenerator {
                 }
                 .encode()
             }
-            None => {
-                AnnounceCall {
-                    base_multiaddr: announcement.to_multiaddress_str(),
-                }
-                .encode()
+            None => AnnounceCall {
+                base_multiaddr: announcement.to_multiaddress_str(),
             }
+            .encode(),
         })
     }
 
@@ -158,7 +157,8 @@ impl PayloadGenerator for BasicPayloadGenerator {
         Ok(FundChannelCall {
             account: EthereumAddress::from_slice(&dest.to_bytes()),
             amount: amount.value().as_u128(),
-        }.encode())
+        }
+        .encode())
     }
 
     fn close_incoming_channel(&self, source: &Address) -> Result<Vec<u8>> {
@@ -168,7 +168,8 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
         Ok(CloseIncomingChannelCall {
             source: EthereumAddress::from_slice(&source.to_bytes()),
-        }.encode())
+        }
+        .encode())
     }
 
     fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
@@ -180,7 +181,8 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
         Ok(InitiateOutgoingChannelClosureCall {
             destination: EthereumAddress::from_slice(&destination.to_bytes()),
-        }.encode())
+        }
+        .encode())
     }
 
     fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
@@ -192,7 +194,8 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
         Ok(FinalizeOutgoingChannelClosureCall {
             destination: H160::from_slice(&destination.to_bytes()),
-        }.encode())
+        }
+        .encode())
     }
 
     fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket) -> Result<Vec<u8>> {
@@ -209,7 +212,8 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
         Ok(RegisterSafeByNodeCall {
             safe_addr: H160::from_slice(&safe_addr.to_bytes()),
-        }.encode())
+        }
+        .encode())
     }
 
     fn deregister_node_by_safe(&self) -> Result<Vec<u8>> {
@@ -361,7 +365,7 @@ impl PayloadGenerator for SafePayloadGenerator {
             self_: H160::from_slice(&self.me.to_bytes()),
             destination: H160::from_slice(&destination.to_bytes()),
         }
-            .encode();
+        .encode();
 
         Ok(channels_payload(self.hopr_channels, call_data))
     }
@@ -778,77 +782,5 @@ pub mod tests {
             "{:?}",
             client.send_transaction(redeem_ticket_tx, None).await.unwrap().await
         );
-    }
-}
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use async_lock::RwLock;
-    use core_crypto::keypairs::{ChainKeypair, OffchainKeypair};
-    use core_types::announcement::{AnnouncementData, KeyBinding};
-    use multiaddr::Multiaddr;
-    use std::{str::FromStr, sync::Arc};
-    use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
-    use utils_types::primitives::{Address, Balance};
-    use wasm_bindgen::{prelude::*, JsValue};
-    use crate::payload::PayloadGenerator;
-
-    #[wasm_bindgen]
-    pub struct ChainCalls {
-        w: Arc<RwLock<super::SafePayloadGenerator>>,
-    }
-
-    #[wasm_bindgen]
-    impl ChainCalls {
-        #[wasm_bindgen(constructor)]
-        pub fn new(chain_keypair: &ChainKeypair, hopr_channels: Address, hopr_announcements: Address) -> Self {
-            Self {
-                w: Arc::new(RwLock::new(super::SafePayloadGenerator::new(
-                    chain_keypair,
-                    hopr_channels,
-                    hopr_announcements,
-                ))),
-            }
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_approve_payload(&self, amount: &Balance) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .approve(amount)
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_transfer_payload(&self, dest: &Address, amount: &Balance) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .transfer(dest, amount)
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_register_safe_by_node_payload(&self, safe_addr: &Address) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .register_safe_by_node(safe_addr)
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
-
-        #[wasm_bindgen]
-        pub async fn get_deregister_node_by_safe_payload(&self) -> JsResult<js_sys::Uint8Array> {
-            ok_or_jserr!(self
-                .w
-                .read()
-                .await
-                .deregister_node_by_safe()
-                .map(|v| js_sys::Uint8Array::from(v.as_slice())))
-        }
     }
 }

@@ -7,7 +7,6 @@ use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::{
-    CoreEthereumActions,
     errors::{
         CoreEthereumActionsError::{
             ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
@@ -17,6 +16,7 @@ use crate::{
     },
     redeem::TicketRedeemActions,
     transaction_queue::{Transaction, TransactionCompleted},
+    CoreEthereumActions,
 };
 
 #[cfg(all(feature = "wasm", not(test)))]
@@ -704,15 +704,12 @@ mod tests {
 
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.close_channel(
-            *BOB,
-            ChannelDirection::Incoming,
-            false,
-        )
-        .await
-        .unwrap()
-        .await
-        .unwrap();
+        let tx_res = actions
+            .close_channel(*BOB, ChannelDirection::Incoming, false)
+            .await
+            .unwrap()
+            .await
+            .unwrap();
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {

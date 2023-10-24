@@ -306,8 +306,8 @@ mod tests {
     use core_types::channels::ChannelDirection::Incoming;
     use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::{
-        announcement::AnnouncementData,
         acknowledgement::AcknowledgedTicket,
+        announcement::AnnouncementData,
         channels::{generate_channel_id, ChannelEntry, Ticket},
     };
     use futures::channel::oneshot::Receiver;

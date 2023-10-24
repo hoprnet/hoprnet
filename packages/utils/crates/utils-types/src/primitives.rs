@@ -43,6 +43,10 @@ impl Address {
         ret
     }
 
+    pub fn is_null(&self) -> bool {
+        self.addr == [0u8; Self::SIZE]
+    }
+
     pub fn to_bytes32(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(12 + Self::SIZE);
         ret.extend_from_slice(&[0u8; 12]);

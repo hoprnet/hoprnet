@@ -1,11 +1,5 @@
-import { Multiaddr } from '@multiformats/multiaddr'
 import type { PeerId } from '@libp2p/interface-peer-id'
-import {
-  ChainWrapper,
-  createChainWrapper,
-  type DeploymentExtract,
-  Receipt, SendTransactionStatus
-} from './ethereum.js'
+import { ChainWrapper, createChainWrapper, type DeploymentExtract, SendTransactionStatus } from './ethereum.js'
 import { BigNumber } from 'ethers'
 import {
   AccountEntry,
@@ -20,9 +14,9 @@ import {
   debug,
   type DeferType,
   Hash,
-  OffchainKeypair,
   OffchainPublicKey,
-  PublicKey, WasmTransactionPayload
+  PublicKey,
+  WasmTransactionPayload
 } from '@hoprnet/hopr-utils'
 
 import { TransactionPayload } from './transaction-manager.js'
@@ -73,7 +67,6 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   private constructor(
     private db: Database,
-    private offchainKeypair: OffchainKeypair,
     private chainKeypair: ChainKeypair,
     private options: ChainOptions,
     private safeModuleOptions: SafeModuleOptions,
@@ -93,7 +86,6 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public static async createInstance(
     db: Database,
-    offchainKeypair: OffchainKeypair,
     chainKeypair: ChainKeypair,
     options: ChainOptions,
     safeModuleOptions: SafeModuleOptions,
@@ -102,7 +94,6 @@ export default class HoprCoreEthereum extends EventEmitter {
   ) {
     HoprCoreEthereum._instance = new HoprCoreEthereum(
       db,
-      offchainKeypair,
       chainKeypair,
       options,
       safeModuleOptions,
@@ -151,9 +142,7 @@ export default class HoprCoreEthereum extends EventEmitter {
         deploymentAddresses,
         this.safeModuleOptions,
         this.options,
-        this.offchainKeypair,
-        this.chainKeypair,
-        true
+        this.chainKeypair
       )
     } catch (err) {
       const errMsg = 'failed to create provider chain wrapper'
@@ -199,11 +188,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     await this.indexer.stop()
   }
 
-  announce(multiaddr: Multiaddr, useSafe: boolean = false): Promise<string> {
-    // Currently we announce always with key bindings
-    return this.chain.announce(multiaddr, useSafe, (txHash: string) => this.setTxHandler(`announce-${txHash}`, txHash))
-  }
-
   private async sendTransactionInternal(txPayload: TransactionPayload, eventName: IndexerEventsNames) {
     return await this.chain.sendTransaction(true, txPayload, (txHash: string) =>
       this.setTxHandler(`${eventName}${txHash}`, txHash)
@@ -217,7 +201,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       value: txPayload.value != '' ? BigNumber.from(txPayload.value) : BigNumber.from(0)
     }
 
-    let txResult =  await this.sendTransactionInternal(innerPayload, eventName)
+    let txResult = await this.sendTransactionInternal(innerPayload, eventName)
 
     if (txResult.code == SendTransactionStatus.SUCCESS) {
       return {
@@ -345,7 +329,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     return registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))
   }
 
-  public async registerSafeByNode(): Promise<Receipt> {
+  public async canRegisterWithSafe() {
     const nodeAddress = this.chainKeypair.to_address()
     const safeAddress = this.safeModuleOptions.safeAddress
     log(`====> registerSafeByNode nodeAddress: ${nodeAddress.to_hex()} safeAddress ${safeAddress.to_hex()}`)
@@ -359,25 +343,16 @@ export default class HoprCoreEthereum extends EventEmitter {
     const registeredAddress = await this.chain.getSafeFromNodeSafeRegistry(nodeAddress)
     log('Currently registered Safe address in NodeSafeRegistry = %s', registeredAddress.to_string())
 
-    let receipt = undefined
     if (registeredAddress.eq(new Address(new Uint8Array(Address.size()).fill(0x00)))) {
       log('Node is not associated with a Safe in NodeSafeRegistry yet')
-      receipt = await this.chain.registerSafeByNode(safeAddress, (txHash: string) =>
-        this.setTxHandler(`node-safe-registered-${txHash}`, txHash)
-      )
-    } else if (!registeredAddress.eq(Address.deserialize(safeAddress.serialize()))) {
-      // the node has been associated with a differnt safe address
-      log('Node is associated with a different Safe in NodeSafeRegistry')
-      throw Error('Node has been registered with a different safe')
+      return true
+    } else if (!registeredAddress.eq(safeAddress)) {
+      throw Error('Node is associated with a different Safe in NodeSafeRegistry')
     } else {
       log('Node is associated with correct Safe in NodeSafeRegistry')
     }
 
-    log('update safe and module addresses in database')
-    await this.db.set_staking_safe_address(safeAddress)
-    await this.db.set_staking_module_address(this.safeModuleOptions.moduleAddress)
-
-    return receipt
+    return false
   }
 
   public static createMockInstance(chainKeypair: ChainKeypair, peerId: PeerId): HoprCoreEthereum {
@@ -414,9 +389,6 @@ export default class HoprCoreEthereum extends EventEmitter {
       waitForPublicNodes: () => {
         connectorLogger('On-chain request for existing public nodes.')
         return Promise.resolve([])
-      },
-      announce: () => {
-        connectorLogger('On-chain announce request sent')
       },
       on: (event: string) => {
         connectorLogger(`On-chain signal for event "${event}"`)
