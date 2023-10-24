@@ -15,8 +15,8 @@ The purpose of this document is to streamline the releases of hoprd.
 - [On a new chain](#on-a-new-chain)
 - [On a new release](#on-a-new-release)
   - [Release Cycle](#release-cycle)
-  - [Open Release](#open-release)
   - [Close Release](#close-release)
+  - [Publish dappNode](#publish-dappnode)
   - [Promote release](#promote-release)
   - [Create Patch](#create-patch)
   - [Merge Back](#merge-back)
@@ -158,6 +158,31 @@ The process of closing a release consists of building, tagging and publishing th
 4. Review the contents of the new [Github Release](https://github.com/hoprnet/hoprnet/releases) created and modify accordingly
 5. Review that the Element notification has been sent
 6. A new PR will be created with the name `Open release <RELEASE_NUMBER>`. Follow the instructions on the PR and merge it.
+7. A new PR will be created with the name `Update to release <RELEASE_NUMBER>` on [DAppNode repository](https://github.com/dappnode/DAppNodePackage-Hopr/pulls). Review and merge it
+
+### Publish DappNode
+
+The Dappnode package is versioned differently in its own repository: https://github.com/dappnode/DAppNodePackage-Hopr
+We maintain a fork of that repository at https://github.com/hoprnet/DAppNodePackage-Hopr and the previous pipeline creates an automatic pull request on each release.
+There should be a correspondence between the dappNode version an the upstream version of hoprd
+
+#### Prerequisites
+
+- In order to publish a new version on Dappnode the deployer needs to configure in its own machine the VPN to connect to dappNode
+  Follow this guide: https://welcome.dappnode.io/vpn and https://docs.dappnode.io/user/product-manual/vpn
+- Configure the Metamask account for Dappnode. The credentials are stored in Bitwarden under the name: `Dappnode Repo Owner Wallet`
+- In Site setting for site `https://dappnode.github.io/` make sure you allow Insecure content (it usually does an HTTP request to your Dappnode while itself being behind HTTPS).
+
+1. Open Metamask and switch to the Dappnode account. Check also that is connected to the Ethereum network (Mainnet).
+2. Turn on your Dappnode, and connect your laptop to its WiFi
+3. Connect to your Dappnode VPN: `System Preferences` -> `Network` -> `dAppNode Wireguard`
+4. Access to the recently published release https://github.com/dappnode/DAppNodePackage-Hopr/releases, and click the link that takes you to the pre-filled release signing form.
+5. Set the public ethereum address of the Metamask account into the form field named `Developer address`
+6. In the form, click on `Edit Settings` and set the field `IPFS API URLs` with the value `http://ipfs.dappnode:5001/`
+7. Click `Connect MetaMask` in the form.
+8. Click `Sign release` to sign the release (confirm in MM). New IPFS hash is created with the signed release, changes automatically in the Release hash field in the form.
+9. Click `Publish release` to publish the signed release (confirm transaction in MM).
+10. On the forked repo https://github.com/hoprnet/DAppNodePackage-Hopr GH page, do a Sync of the `main` branches from the Upstream repo.
 
 ### Promote release
 

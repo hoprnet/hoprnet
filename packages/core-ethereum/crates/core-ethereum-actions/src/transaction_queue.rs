@@ -164,7 +164,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                         Failure(e) => {
                             // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
 
-                            error!("marking the acknowledged ticket as untouched - edeem tx failed: {e}");
+                            error!("marking the acknowledged ticket as untouched - redeem tx failed: {e}");
                             ack.status = AcknowledgedTicketStatus::Untouched;
                             if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
                                 error!("cannot mark {ack} as untouched: {e}");
