@@ -35,6 +35,7 @@ core-ethereum-db = { workspace = true }
 core-ethereum-misc = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }
+utils-metrics = { workspace = true, optional = true, default-features = false }
 utils-misc = { workspace = true }
 utils-log = { workspace = true }
 utils-types = { workspace = true }
@@ -54,3 +55,4 @@ default = ["wasm"]
 wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
     "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+prometheus = [ "dep:utils-metrics" ]

@@ -1126,6 +1126,7 @@ dependencies = [
  "tokio",
  "utils-db",
  "utils-log",
+ "utils-metrics",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",

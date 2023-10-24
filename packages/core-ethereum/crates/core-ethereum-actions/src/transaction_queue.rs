@@ -1,7 +1,9 @@
 use async_lock::RwLock;
+use async_trait::async_trait;
 use async_std::channel::{bounded, Receiver, Sender};
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_types::acknowledgement::AcknowledgedTicketStatus;
 use core_types::announcement::AnnouncementData;
 use core_types::{
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus::BeingRedeemed},
@@ -26,14 +28,34 @@ use crate::transaction_queue::TransactionResult::{Failure, TicketRedeemed};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
-use async_trait::async_trait;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
-use core_types::acknowledgement::AcknowledgedTicketStatus;
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_SUCCESSFUL_TXS: SimpleCounter = SimpleCounter::new(
+        "core_ethereum_counter_successful_transactions",
+        "Number of successful transactions"
+    )
+    .unwrap();
+    static ref METRIC_COUNT_FAILED_TXS: SimpleCounter = SimpleCounter::new(
+        "core_ethereum_counter_failed_transactions",
+        "Number of failed transactions"
+    )
+    .unwrap();
+    static ref METRIC_COUNT_TIMEOUT_TXS: SimpleCounter = SimpleCounter::new(
+        "core_ethereum_counter_timeout_transactions",
+        "Number of timed out transactions"
+    )
+    .unwrap();
+}
 
 /// Enumerates all possible on-chain state change requests
 #[derive(Clone, PartialEq, Debug)]
@@ -284,15 +306,26 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                     Either::Left((result, _)) => {
                         if let Failure(err) = &result {
                             error!("{tx_id} failed: {err}");
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_COUNT_FAILED_TXS.increment();
                         } else {
                             info!("transaction {tx_id} succeeded");
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_COUNT_SUCCESSFUL_TXS.increment();
                         }
                         result
                     }
-                    Either::Right((_, _)) => Failure(format!(
-                        "awaiting for confirmation of {tx_id} timed out after {} seconds",
-                        Self::MAX_TX_CONFIRMATION_WAIT_SECS
-                    )),
+                    Either::Right((_, _)) => {
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_COUNT_TIMEOUT_TXS.increment();
+
+                        Failure(format!(
+                            "awaiting for confirmation of {tx_id} timed out after {} seconds",
+                            Self::MAX_TX_CONFIRMATION_WAIT_SECS
+                        ))
+                    },
                 };
 
                 let _ = tx_finisher.send(tx_result);
