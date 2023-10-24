@@ -37,14 +37,37 @@ pub enum Operation {
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.
 pub trait PayloadGenerator {
-    /// Creates the transaction payload to announce a node on-chain.
-    fn announce(&self, announcement: &AnnouncementData) -> Result<Vec<u8>>;
-
     /// Create a ERC20 approve transaction payload. Pre-requisite to open payment channels.
-    fn approve(&self, amount: &Balance) -> Result<Vec<u8>>;
+    /// The `spender` address is typically the HOPR Channels contract address.
+    fn approve(&self, spender: Address, amount: &Balance) -> Result<Vec<u8>> {
+        if amount.balance_type() != BalanceType::HOPR {
+            return Err(InvalidArguments(
+                "Invalid balance type. Expected a HOPR balance.".into(),
+            ));
+        }
+
+        Ok(ApproveCall {
+            spender: H160::from_slice(&spender.to_bytes()),
+            value: U256::from_big_endian(&amount.value().to_bytes()),
+        }
+        .encode())
+    }
 
     /// Create a ERC20 transfer transaction payload
-    fn transfer(&self, destination: &Address, amount: &Balance) -> Result<Vec<u8>>;
+    fn transfer(&self, destination: &Address, amount: &Balance) -> Result<Vec<u8>> {
+        if amount.balance_type() != BalanceType::HOPR {
+            return Err(InvalidArguments("Token transfer must have balance type HOPR".into()));
+        }
+
+        Ok(TransferCall {
+            recipient: H160::from_slice(&destination.to_bytes()),
+            amount: U256::from_big_endian(&amount.amount().to_bytes()),
+        }
+        .encode())
+    }
+
+    /// Creates the transaction payload to announce a node on-chain.
+    fn announce(&self, announcement: &AnnouncementData) -> Result<Vec<u8>>;
 
     /// Creates the transaction payload to open a payment channel
     fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>>;
@@ -85,14 +108,14 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
 }
 
 /// Generates transaction payloads that do not use Safe-compliant ABI
+#[derive(Debug, Clone)]
 pub struct BasicPayloadGenerator {
     me: Address,
-    hopr_channels: Address,
 }
 
 impl BasicPayloadGenerator {
-    pub fn new(me: Address, hopr_channels: Address) -> Self {
-        Self { me, hopr_channels }
+    pub fn new(me: Address) -> Self {
+        Self { me }
     }
 }
 
@@ -115,32 +138,6 @@ impl PayloadGenerator for BasicPayloadGenerator {
             }
             .encode(),
         })
-    }
-
-    fn approve(&self, amount: &Balance) -> Result<Vec<u8>> {
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments(
-                "Invalid balance type. Expected a HOPR balance.".into(),
-            ));
-        }
-
-        Ok(ApproveCall {
-            spender: H160::from_slice(&self.hopr_channels.to_bytes()),
-            value: U256::from_big_endian(&amount.value().to_bytes()),
-        }
-        .encode())
-    }
-
-    fn transfer(&self, destination: &Address, amount: &Balance) -> Result<Vec<u8>> {
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments("Token transfer must have balance type HOPR".into()));
-        }
-
-        Ok(TransferCall {
-            recipient: H160::from_slice(&destination.to_bytes()),
-            amount: U256::from_big_endian(&amount.amount().to_bytes()),
-        }
-        .encode())
     }
 
     fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>> {
@@ -224,6 +221,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
 }
 
 /// Payload generator that generates Safe-compliant ABI
+#[derive(Debug, Clone)]
 pub struct SafePayloadGenerator {
     me: Address,
     hopr_channels: Address,
@@ -277,32 +275,6 @@ impl PayloadGenerator for SafePayloadGenerator {
                 .encode()
             }
         })
-    }
-
-    fn approve(&self, amount: &Balance) -> Result<Vec<u8>> {
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments(
-                "Invalid balance type. Expected a HOPR balance.".into(),
-            ));
-        }
-
-        Ok(ApproveCall {
-            spender: H160::from_slice(&self.hopr_channels.to_bytes()),
-            value: U256::from_big_endian(&amount.value().to_bytes()),
-        }
-        .encode())
-    }
-
-    fn transfer(&self, destination: &Address, amount: &Balance) -> Result<Vec<u8>> {
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments("Token transfer must have balance type HOPR".into()));
-        }
-
-        Ok(TransferCall {
-            recipient: H160::from_slice(&destination.to_bytes()),
-            amount: U256::from_big_endian(&amount.amount().to_bytes()),
-        }
-        .encode())
     }
 
     fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>> {
@@ -384,15 +356,10 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(channels_payload(self.hopr_channels, call_data))
     }
 
-    fn register_safe_by_node(&self, safe_addr: &Address) -> Result<Vec<u8>> {
-        if safe_addr.eq(&self.me) {
-            return Err(InvalidArguments("Safe address must be different from node addr".into()));
-        }
-
-        Ok(RegisterSafeByNodeCall {
-            safe_addr: H160::from_slice(&safe_addr.to_bytes()),
-        }
-        .encode())
+    fn register_safe_by_node(&self, _safe_addr: &Address) -> Result<Vec<u8>> {
+        return Err(InvalidState(
+            "Can only register an address if Safe is not yet activated".into(),
+        ));
     }
 
     fn deregister_node_by_safe(&self) -> Result<Vec<u8>> {
@@ -653,10 +620,7 @@ pub mod tests {
 
         let chain_key = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
 
-        let chain = BasicPayloadGenerator::new(
-            chain_key.public().to_address(),
-            HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
-        );
+        let chain = BasicPayloadGenerator::new(chain_key.public().to_address());
 
         let ad = AnnouncementData::new(
             &test_multiaddr,
@@ -718,10 +682,7 @@ pub mod tests {
         .await;
 
         let keypair = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
-        let chain = BasicPayloadGenerator::new(
-            keypair.public().to_address(),
-            HoprAddress::from_bytes(&hopr_channels.address().0).unwrap(),
-        );
+        let chain = BasicPayloadGenerator::new(keypair.public().to_address());
 
         let counterparty = ChainKeypair::from_secret(&anvil.keys()[1].clone().to_bytes().as_slice()).unwrap();
 

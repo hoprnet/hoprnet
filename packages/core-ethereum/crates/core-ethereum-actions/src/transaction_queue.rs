@@ -304,13 +304,13 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
-    use crate::payload::PayloadGenerator;
+    use crate::payload::{BasicPayloadGenerator, PayloadGenerator};
     use crate::{
         payload::SafePayloadGenerator,
         transaction_queue::{TransactionExecutor, TransactionResult, TransactionSender},
     };
     use async_trait::async_trait;
-    use core_crypto::{keypairs::ChainKeypair, types::Hash};
+    use core_crypto::{keypairs::ChainKeypair, keypairs::Keypair, types::Hash};
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::announcement::AnnouncementData;
     use ethers::types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, NameOrAddress, H160, U256};
@@ -369,7 +369,8 @@ pub mod wasm {
     #[wasm_bindgen]
     pub struct WasmTxExecutor {
         send_transaction: js_sys::Function,
-        generator: SafePayloadGenerator,
+        safe_generator: SafePayloadGenerator,
+        basic_generator: BasicPayloadGenerator,
         hopr_channels: Address,
         hopr_token: Address,
         hopr_announcements: Address,
@@ -396,7 +397,8 @@ pub mod wasm {
                 hopr_channels,
                 hopr_token,
                 send_transaction,
-                generator: SafePayloadGenerator::new(chain_keypair, hopr_channels, hopr_announcements),
+                basic_generator: BasicPayloadGenerator::new(chain_keypair.public().to_address()),
+                safe_generator: SafePayloadGenerator::new(chain_keypair, hopr_channels, hopr_announcements),
             }
         }
     }
@@ -459,7 +461,7 @@ pub mod wasm {
         async fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.generator.redeem_ticket(&acked_ticket) {
+            tx.set_data(match self.safe_generator.redeem_ticket(&acked_ticket) {
                 Ok(payload) => payload.into(),
                 Err(e) => return TransactionResult::Failure(e.to_string()),
             });
@@ -479,7 +481,7 @@ pub mod wasm {
         async fn fund_channel(&self, destination: Address, balance: Balance) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.generator.fund_channel(&destination, &balance) {
+            tx.set_data(match self.safe_generator.fund_channel(&destination, &balance) {
                 Ok(payload) => payload.into(),
                 Err(e) => return TransactionResult::Failure(e.to_string()),
             });
@@ -499,7 +501,7 @@ pub mod wasm {
         async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.generator.initiate_outgoing_channel_closure(&dst) {
+            tx.set_data(match self.safe_generator.initiate_outgoing_channel_closure(&dst) {
                 Ok(payload) => payload.into(),
                 Err(e) => return TransactionResult::Failure(e.to_string()),
             });
@@ -519,7 +521,7 @@ pub mod wasm {
         async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.generator.finalize_outgoing_channel_closure(&dst) {
+            tx.set_data(match self.safe_generator.finalize_outgoing_channel_closure(&dst) {
                 Ok(payload) => payload.into(),
                 Err(e) => return TransactionResult::Failure(e.to_string()),
             });
@@ -539,7 +541,7 @@ pub mod wasm {
         async fn close_incoming_channel(&self, src: Address) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.generator.close_incoming_channel(&src) {
+            tx.set_data(match self.safe_generator.close_incoming_channel(&src) {
                 Ok(payload) => payload.into(),
                 Err(e) => return TransactionResult::Failure(e.to_string()),
             });
@@ -561,7 +563,7 @@ pub mod wasm {
 
             let event_string = match amount.balance_type() {
                 BalanceType::HOPR => {
-                    tx.set_data(match self.generator.transfer(&recipient, &amount) {
+                    tx.set_data(match self.safe_generator.transfer(&recipient, &amount) {
                         Ok(payload) => payload.into(),
                         Err(e) => return TransactionResult::Failure(e.to_string()),
                     });
@@ -591,13 +593,19 @@ pub mod wasm {
         async fn announce(&self, data: AnnouncementData, use_safe: bool) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.generator.announce(&data) {
-                Ok(payload) => payload.into(),
-                Err(e) => return TransactionResult::Failure(e.to_string()),
-            });
             if !use_safe {
+                tx.set_data(match self.basic_generator.announce(&data) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
                 tx.set_to(H160::from(self.hopr_announcements));
             } else {
+                tx.set_data(match self.safe_generator.announce(&data) {
+                    Ok(payload) => payload.into(),
+                    Err(e) => return TransactionResult::Failure(e.to_string()),
+                });
+
                 tx.set_to(H160::from(self.module_address));
             }
 
@@ -615,7 +623,7 @@ pub mod wasm {
         async fn register_safe(&self, safe_address: Address) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(match self.generator.register_safe_by_node(&safe_address) {
+            tx.set_data(match self.basic_generator.register_safe_by_node(&safe_address) {
                 Ok(payload) => payload.into(),
                 Err(e) => return TransactionResult::Failure(e.to_string()),
             });
