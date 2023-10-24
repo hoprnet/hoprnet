@@ -11,6 +11,15 @@ use validator::Validate;
 use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_AUTO_REDEEMS: SimpleCounter =
+        SimpleCounter::new("core_counter_strategy_auto_redeem_redeems", "Count of initiated automatic redemptions").unwrap();
+}
+
 /// Configuration object for the `AutoRedeemingStrategy`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
 pub struct AutoRedeemingStrategyConfig {
@@ -58,6 +67,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone> SingularStrategy for AutoR
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
         if !self.cfg.redeem_only_aggregated || ack.ticket.is_aggregated() {
             info!("redeeming {ack}");
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_COUNT_AUTO_REDEEMS.increment();
+
             let rx = self.chain_actions.redeem_ticket(ack.clone()).await?;
             std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
         }
