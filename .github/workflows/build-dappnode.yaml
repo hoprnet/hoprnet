@@ -78,7 +78,7 @@ jobs:
             push-to-fork: hoprnet/DAppNodePackage-Hopr
             commit-message: "Update to release ${{ steps.setup.outputs.current_version }}"
             title: "Update to release ${{ steps.setup.outputs.current_version }}"
-            body-path: .github/files/${{ steps.setup.outputs.pr_template }}
+            body: "This pull request contains the changes needed to bump Hoprd to version ${{ steps.setup.outputs.current_version }}"
             branch: bot/update-${{ steps.setup.outputs.current_version }}
             path: "./DAppNodePackage-Hopr"
             delete-branch: true
