@@ -1,21 +1,51 @@
-use elliptic_curve::rand_core::OsRng;
 use elliptic_curve::{Group, NonZeroScalar, ProjectivePoint};
 use generic_array::{ArrayLength, GenericArray};
 use k256::Secp256k1;
 use rand::{Rng, RngCore};
+use rand_core::OsRng;
 
 use crate::errors::CryptoError::InvalidInputValue;
 use crate::errors::Result;
 use crate::types::CurvePoint;
 
+#[cfg(test)]
+use rand_core::SeedableRng;
+
 /// Maximum random integer that can be generated.
 /// This is the last positive 64-bit value in the two's complement representation.
 pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
+#[cfg(test)]
+lazy_static::lazy_static! {
+    static ref TEST_RNG: std::sync::Mutex<rand_chacha::ChaCha20Rng> = {
+        let seed = OsRng.next_u64();
+        println!("--- RNG SEED: {seed} ---");
+        std::sync::Mutex::new(rand_chacha::ChaCha20Rng::seed_from_u64(seed))
+    };
+}
+
+#[cfg(test)]
+pub fn random_float() -> f64 {
+    TEST_RNG.lock().unwrap().gen()
+}
+
+#[cfg(test)]
+pub fn random_fill(buffer: &mut [u8]) {
+    TEST_RNG.lock().unwrap().fill_bytes(buffer);
+}
+
 /// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).
+#[cfg(not(test))]
 #[inline]
 pub fn random_float() -> f64 {
     OsRng.gen()
+}
+
+/// Fills the specific number of bytes starting from the given offset in the given buffer.
+#[cfg(not(test))]
+#[inline]
+pub fn random_fill(buffer: &mut [u8]) {
+    OsRng.fill_bytes(buffer);
 }
 
 /// Generates random unsigned integer which is at least `start` and optionally strictly less than `end`.
@@ -41,12 +71,6 @@ pub fn random_group_element() -> ([u8; 32], CurvePoint) {
         point = ProjectivePoint::<Secp256k1>::GENERATOR * scalar.as_ref();
     }
     (scalar.to_bytes().into(), point.to_affine().into())
-}
-
-/// Fills the specific number of bytes starting from the given offset in the given buffer.
-#[inline]
-pub fn random_fill(buffer: &mut [u8]) {
-    OsRng.fill_bytes(buffer);
 }
 
 /// Allocates array of the given size and fills it with random bytes
