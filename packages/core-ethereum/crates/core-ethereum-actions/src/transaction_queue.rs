@@ -1,6 +1,6 @@
 use async_lock::RwLock;
-use async_trait::async_trait;
 use async_std::channel::{bounded, Receiver, Sender};
+use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::acknowledgement::AcknowledgedTicketStatus;
@@ -325,7 +325,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                             "awaiting for confirmation of {tx_id} timed out after {} seconds",
                             Self::MAX_TX_CONFIRMATION_WAIT_SECS
                         ))
-                    },
+                    }
                 };
 
                 let _ = tx_finisher.send(tx_result);
@@ -664,9 +664,7 @@ pub mod wasm {
 
             match self.send_transaction(tx, "node-safe-registered-").await {
                 SendTransactionResult::Success(tx_hash) => TransactionResult::SafeRegistered { tx_hash },
-                SendTransactionResult::Duplicate => {
-                    TransactionResult::Failure("safe register is a duplicate".into())
-                }
+                SendTransactionResult::Duplicate => TransactionResult::Failure("safe register is a duplicate".into()),
                 SendTransactionResult::Failure(e) => {
                     TransactionResult::Failure(format!("safe register send transaction failed: {e}"))
                 }

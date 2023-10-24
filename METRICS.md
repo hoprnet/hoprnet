@@ -62,7 +62,7 @@ The following sections document the metrics per package:
 ### core-ethereum
 
 | Name                                                         | Type          | Description                                 | Note                                                                |
-|--------------------------------------------------------------|---------------|---------------------------------------------|---------------------------------------------------------------------|
+| ------------------------------------------------------------ | ------------- | ------------------------------------------- | ------------------------------------------------------------------- |
 | `core_ethereum_mcounter_indexer_provider_errors`             | multi counter | Multicounter for provider errors in Indexer |                                                                     |
 | `core_ethereum_counter_indexer_processed_unconfirmed_blocks` | counter       | Number of processed unconfirmed blocks      |                                                                     |
 | `core_ethereum_counter_indexer_announcements`                | counter       | Number of processed announcements           |                                                                     |
