@@ -57,8 +57,7 @@ jobs:
         run: |
           set -x
           docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" 2&> /dev/null | grep -v "cache" | grep -v "\-pr" | sed 's/,/@/')
-          git fetch upstream
-          git pull
+          docker_tag="2.0.0-rc.11-pr.5648@sha256:28a260c68125ba01faa99a2098620d54cf05d4170ba980941913ae7b1475ac60"
           dappnode_patch_version=$(jq -r '.version' dappnode_package.json | sed 's/.*\.//')
           dappnode_minor_version=$(jq -r '.version' dappnode_package.json | sed 's/\.'${dappnode_patch_version}'//')
           dappnode_patch_bumped_patch_version=$((dappnode_patch_version + 1))
