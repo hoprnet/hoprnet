@@ -1,6 +1,6 @@
 [package]
 name = "core-strategy"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -19,13 +19,14 @@ rand = "0.8.5"
 serde = { workspace = true, features = ["derive"] }
 serde_with = "3.3.0"
 simple_moving_average = "0.1.2"
+lazy_static = { workspace = true }
 strum = { version = "0.25", features = ["derive"] }
 thiserror = { workspace = true }
 validator = { workspace = true }
 futures = { workspace = true }
 serde-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen = { workspace = true, optional = true }
 js-sys = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = {workspace = true, optional = true}
 
 core-types = { workspace = true }
@@ -39,18 +40,15 @@ core-ethereum-misc = { workspace = true }
 utils-db = { workspace = true }
 utils-log = { workspace = true }
 utils-misc = { workspace = true }
+utils-metrics = { workspace = true, optional = true, default-features = false }
 utils-types = { workspace = true }
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
 env_logger = "0.10.0"
-lazy_static = "1.4"
-vector_assertions = "0.1.0"
 mockall = "0.11.4"
 hex-literal = "0.4.1"
 futures = "0.3.28"
-
-core-crypto = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }
@@ -64,3 +62,4 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen" ]
+prometheus = [ "dep:utils-metrics" ]

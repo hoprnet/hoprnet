@@ -1470,7 +1470,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1498,10 +1498,10 @@ dependencies = [
  "thiserror",
  "utils-db",
  "utils-log",
+ "utils-metrics",
  "utils-misc",
  "utils-types",
  "validator",
- "vector_assertions",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-opt",
@@ -6710,12 +6710,6 @@ name = "value-bag"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d92ccd67fb88503048c01b59152a04effd0782d035a83a6d256ce6085f08f4a3"
-
-[[package]]
-name = "vector_assertions"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e88c1aa999bb527615bd34ef503bedecf0dd890a11879a0eded47db881d8c619"
 
 [[package]]
 name = "version_check"

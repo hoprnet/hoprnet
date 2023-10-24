@@ -2,6 +2,8 @@ use crate::{strategy::SingularStrategy, Strategy};
 use async_std::sync::{Mutex, RwLock};
 use async_trait::async_trait;
 use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
+use core_ethereum_actions::redeem::TicketRedeemActions;
+use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_protocol::ticket_aggregation::processor::{AggregationList, TicketAggregationActions};
 use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
@@ -22,10 +24,17 @@ use validator::Validate;
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
-use core_ethereum_actions::redeem::TicketRedeemActions;
-use core_ethereum_actions::CoreEthereumActions;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_AGGREGATIONS: SimpleCounter =
+        SimpleCounter::new("core_counter_strategy_aggregating_aggregations", "Count of initiated automatic aggregations").unwrap();
+}
 
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
@@ -136,6 +145,9 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<
                 // Spawn waiting for the aggregation as a separate task
                 let agg_timeout = self.cfg.aggregation_timeout;
                 let actions_clone = self.chain_actions.clone();
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_COUNT_AGGREGATIONS.increment();
 
                 spawn_local(async move {
                     match awaiter.consume_and_wait(agg_timeout).await {
