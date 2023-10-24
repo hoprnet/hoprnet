@@ -445,7 +445,8 @@ export class Hopr extends EventEmitter {
   private async onTicketRedeemed(channel: ChannelEntry, ticketAmount: Balance): Promise<void> {
     // We are only interested in channels where we are the source, since only
     // then we track the pending balance.
-    if (channel.source.eq(this.getEthereumAddress())) {
+    let selfAddr = this.getEthereumAddress()
+    if (channel.source.eq(selfAddr)) {
       await this.db.resolve_pending(channel.destination, ticketAmount)
     }
   }
@@ -707,9 +708,8 @@ export class Hopr extends EventEmitter {
 
     metric_pathLength.observe(path.length())
 
-    return (
-      await this.tools.send_message(new ApplicationData(applicationTag, msg), path, PACKET_QUEUE_TIMEOUT_MILLISECONDS)
-    ).to_hex()
+    let appData = new ApplicationData(applicationTag, msg)
+    return (await this.tools.send_message(appData, path, PACKET_QUEUE_TIMEOUT_MILLISECONDS)).to_hex()
   }
 
   /**
@@ -904,7 +904,8 @@ export class Hopr extends EventEmitter {
     }
 
     // Check if there was a previous announcement from us
-    const ownAccount = await connector.getAccount(this.getEthereumAddress())
+    let selfAddr = this.getEthereumAddress()
+    const ownAccount = await connector.getAccount(selfAddr)
 
     // Do not announce if our last is equal to what we intend to announce
     log('known own multiaddr from previous announcement %s', ownAccount?.get_multiaddr_str())
@@ -964,7 +965,8 @@ export class Hopr extends EventEmitter {
 
   public async getNativeBalance(): Promise<Balance> {
     verbose('Requesting native balance for node')
-    return await HoprCoreEthereum.getInstance().getNativeBalance(this.getEthereumAddress().to_string(), true)
+    let selfAddr = this.getEthereumAddress()
+    return await HoprCoreEthereum.getInstance().getNativeBalance(selfAddr.to_string(), true)
   }
 
   public async getSafeBalance(): Promise<Balance> {
@@ -1079,7 +1081,8 @@ export class Hopr extends EventEmitter {
     log(`looking for tickets in channel ${channelId.to_hex()}`)
     const channel = await this.db.get_channel(channelId)
     // return no tickets if channel does not exist or is not an incoming channel
-    if (!channel || !channel.destination.eq(this.getEthereumAddress())) {
+    let selfAddr = this.getEthereumAddress()
+    if (!channel || !channel.destination.eq(selfAddr)) {
       return []
     }
 
@@ -1146,7 +1149,8 @@ export class Hopr extends EventEmitter {
       log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
       const channel = await this.db.get_channel(channelId)
       let actions = this.tools.chain_actions()
-      if (channel?.destination.eq(this.getEthereumAddress())) {
+      let selfAddr = this.getEthereumAddress()
+      if (channel?.destination.eq(selfAddr)) {
         await actions.redeem_tickets_in_channel(channel, onlyAggregated)
       } else {
         log(`cannot redeem tickets in channel ${channelId.to_hex()}`)
@@ -1234,7 +1238,6 @@ export class Hopr extends EventEmitter {
 
   /**
    * Withdraw on-chain assets to a given address
-   * @param currency either native currency or HOPR tokens
    * @param recipient the account where the assets should be transferred to
    * @param amount how many tokens to be transferred
    * @returns
@@ -1264,8 +1267,9 @@ export class Hopr extends EventEmitter {
    */
   public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
     // Don't wait for key binding and local linking if identity is the local node
+    let selfAddr = this.getEthereumAddress()
     if (this.id.equals(id)) {
-      return await this.db.is_allowed_to_access_network(this.getEthereumAddress())
+      return await this.db.is_allowed_to_access_network(selfAddr)
     }
     let chain_key: Address = await this.peerIdToChainKey(id)
     // Only check if we found a chain key, otherwise peer is not allowed

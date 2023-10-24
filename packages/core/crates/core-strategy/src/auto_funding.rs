@@ -14,6 +14,15 @@ use validator::Validate;
 use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_AUTO_FUNDINGS: SimpleCounter =
+        SimpleCounter::new("core_counter_strategy_auto_funding_fundings", "Count of initiated automatic fundings").unwrap();
+}
+
 /// Configuration for `AutoFundingStrategy`
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, Serialize, Deserialize)]
@@ -82,6 +91,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for AutoFundingStra
                     "stake on {channel} is below threshold {} < {}",
                     channel.balance, self.cfg.min_stake_threshold
                 );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_COUNT_AUTO_FUNDINGS.increment();
 
                 let rx = self
                     .chain_actions

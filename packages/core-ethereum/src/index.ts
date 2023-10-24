@@ -247,9 +247,14 @@ export default class HoprCoreEthereum extends EventEmitter {
    * @returns HOPR balance
    */
   public async getBalance(useIndexer: boolean = false): Promise<Balance> {
-    return useIndexer
-      ? Balance.deserialize((await this.db.get_hopr_balance()).serialize_value(), BalanceType.HOPR)
-      : this.chain.getBalance(this.chainKeypair.to_address())
+    let ret
+    if (useIndexer) {
+      ret = await this.db.get_hopr_balance()
+    } else {
+      let selfAddr = this.chainKeypair.to_address()
+      ret = this.chain.getBalance(selfAddr)
+    }
+    return ret
   }
 
   public getPublicKey(): PublicKey {
