@@ -28,8 +28,8 @@ use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
-use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 use super::packet::{PacketConstructing, TransportPacket};
+use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};

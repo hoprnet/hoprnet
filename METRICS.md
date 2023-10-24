@@ -27,7 +27,7 @@ The following sections document the metrics per package:
 ### core
 
 | Name                                                | Type        | Description                                                            | Note                                                                      |
-|-----------------------------------------------------|-------------|------------------------------------------------------------------------|---------------------------------------------------------------------------|
+| --------------------------------------------------- | ----------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `core_gauge_num_outgoing_channels`                  | gauge       | Number of outgoing channels                                            |                                                                           |
 | `core_gauge_num_incoming_channels`                  | gauge       | Number of incoming channels                                            |                                                                           |
 | `core_counter_sent_messages`                        | counter     | Number of sent messages                                                |                                                                           |
