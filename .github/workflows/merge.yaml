@@ -269,8 +269,12 @@ jobs:
           MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
           MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
 
+      - uses: ./.github/workflows/build-dappnode.yaml
+        with:
+          branch: ${{ github.event.pull_request.base.ref }}
+
   new_release:
-    name: Open release
+    name: Open new release
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs: 
       - create_release
