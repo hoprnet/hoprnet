@@ -630,7 +630,7 @@ pub mod wasm {
             tx.set_to(H160::from(self.node_safe_registry));
 
             match self.send_transaction(tx, "node-safe-registered-").await {
-                SendTransactionResult::Success(tx_hash) => TransactionResult::Announced { tx_hash },
+                SendTransactionResult::Success(tx_hash) => TransactionResult::SafeRegistered { tx_hash },
                 SendTransactionResult::Duplicate => {
                     TransactionResult::Failure("announce transaction is a duplicate".into())
                 }
