@@ -226,7 +226,7 @@ clean: # Cleanup build directories (lib,build, ...etc.)
 	cargo clean
 	yarn clean
 	find packages -type f -name "*.js" -path "packages/*/src/*" ! -path "packages/*/crates/*" -delete
-	find packages/ethereum/crates/bindings/src -type f -delete
+	find packages/ethereum/crates/bindings/src -delete
 
 .PHONY: reset
 reset: # Performs cleanup & also deletes all "node_modules" directories
