@@ -3,8 +3,8 @@ use async_std::channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::BeingRedeemed;
+use core_types::acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use core_types::channels::ChannelStatus::{Closed, Open, PendingToClose};
 use core_types::channels::{ChannelEntry, ChannelStatus};
 use futures::future::Either;
@@ -151,18 +151,24 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         tx: Transaction,
     ) -> TransactionResult {
         match tx {
-            Transaction::RedeemTicket(ack) => match ack.status {
+            Transaction::RedeemTicket(mut ack) => match &ack.status {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
-                    match res {
+                    match &res {
                         RedeemTicket { .. } => {
                             if let Err(e) = db.write().await.mark_redeemed(&ack).await {
-                                error!("failed to mark {ack} as redeemed: {e}");
                                 // Still declare the TX a success
+                                error!("failed to mark {ack} as redeemed: {e}");
                             }
                         }
-                        Failure(_) => {
-                            // TODO: if we know that the transaction failed due to on-chain execution, mark the ticket as losing here!
+                        Failure(e) => {
+                            // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
+
+                            error!("marking the acknowledged ticket as untouched - edeem tx failed: {e}");
+                            ack.status = AcknowledgedTicketStatus::Untouched;
+                            if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
+                                error!("cannot mark {ack} as untouched: {e}");
+                            }
                         }
                         _ => panic!("invalid tx result from ticket redeem"),
                     }
@@ -230,7 +236,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             let tx_id = tx.to_string();
 
             spawn_local(async move {
-                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx);
+                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx).fuse();
 
                 // Put an upper bound on the transaction to get confirmed and indexed
                 let timeout = sleep(std::time::Duration::from_secs(
