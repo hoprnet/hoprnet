@@ -12,8 +12,8 @@ name: Merge
 on:
   pull_request:
     types:
-      - closed
-      #- synchronize
+      # - closed
+      - synchronize
 
 concurrency:
   group: merge
@@ -23,126 +23,126 @@ permissions:
   contents: write
 
 jobs:
-  cleanup-actions:
-    name: Cleanup Actions
-    runs-on: ubuntu-2-core
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
-      - name: Cleanup
-        run: |
-          gh extension install actions/gh-actions-cache
+  # cleanup-actions:
+  #   name: Cleanup Actions
+  #   runs-on: ubuntu-2-core
+  #   steps:
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v4
+  #     - name: Cleanup
+  #       run: |
+  #         gh extension install actions/gh-actions-cache
 
-          REPO=${{ github.repository }}
-          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+  #         REPO=${{ github.repository }}
+  #         BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
 
-          echo "Fetching list of cache key"
-          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
+  #         echo "Fetching list of cache key"
+  #         cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
 
-          ## Setting this to not fail the workflow while deleting cache keys.
-          set +e
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForPR
-          do
-            gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-          done
-          echo "Done"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         ## Setting this to not fail the workflow while deleting cache keys.
+  #         set +e
+  #         echo "Deleting caches..."
+  #         for cacheKey in $cacheKeysForPR
+  #         do
+  #           gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+  #         done
+  #         echo "Done"
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  tag:
-    name: Tag images
-    runs-on: ubuntu-2-core
-    if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  # tag:
+  #   name: Tag images
+  #   runs-on: ubuntu-2-core
+  #   if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
+  #   steps:
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+  #     - name: Set up Google Cloud Credentials
+  #       id: auth
+  #       uses: google-github-actions/auth@v1
+  #       with:
+  #         token_format: "access_token"
+  #         credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
+  #     - name: Set up Google Cloud SDK
+  #       uses: google-github-actions/setup-gcloud@v1
+  #       with:
+  #         project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+  #         install_components: beta
 
-      - name: Login Google Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: europe-west3-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.auth.outputs.access_token }}
+  #     - name: Login Google Container Registry
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: europe-west3-docker.pkg.dev
+  #         username: oauth2accesstoken
+  #         password: ${{ steps.auth.outputs.access_token }}
 
-      - name: Tag docker images
-        run: |
-          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-          # Set docker PR tag
-          if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
-            docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
-          else
-            docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
-          fi
-          # Set docker stable tag
-          declare base_branch=${{ github.event.pull_request.base.ref }}
-          if [ "${base_branch}" == "master" ]; then
-            docker_stable_tag=latest
-          else
-            docker_stable_tag=${base_branch/release\//}
-          fi
+  #     - name: Tag docker images
+  #       run: |
+  #         docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
+  #         # Set docker PR tag
+  #         if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
+  #           docker_pr_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
+  #         else
+  #           docker_pr_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
+  #         fi
+  #         # Set docker stable tag
+  #         declare base_branch=${{ github.event.pull_request.base.ref }}
+  #         if [ "${base_branch}" == "master" ]; then
+  #           docker_stable_tag=latest
+  #         else
+  #           docker_stable_tag=${base_branch/release\//}
+  #         fi
 
-          # Tag images
-          images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
-          for image in ${images[@]}; 
-          do
-            echo "Tagging ${image}:${docker_stable_tag}"
-            gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_stable_tag}
-          done
+  #         # Tag images
+  #         images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
+  #         for image in ${images[@]}; 
+  #         do
+  #           echo "Tagging ${image}:${docker_stable_tag}"
+  #           gcloud artifacts docker tags add ${docker_registry}/${image}:${docker_pr_tag} ${docker_registry}/${image}:${docker_stable_tag}
+  #         done
 
-  deploy_nodes:
-    name: Deploy nodes
-    runs-on: ubuntu-2-core
-    if: needs.tag.result == 'success'
-    needs:
-      - tag
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+  # deploy_nodes:
+  #   name: Deploy nodes
+  #   runs-on: ubuntu-2-core
+  #   if: needs.tag.result == 'success'
+  #   needs:
+  #     - tag
+  #   steps:
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v4
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+  #     - name: Set up Google Cloud Credentials
+  #       id: auth
+  #       uses: google-github-actions/auth@v1
+  #       with:
+  #         credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
+  #     - name: Set up Google Cloud SDK
+  #       uses: google-github-actions/setup-gcloud@v1
+  #       with:
+  #         project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+  #         install_components: beta
 
-      - name: Deploy on GCP
-        run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.GCP_SA_DOCKER_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
-          echo "${{ secrets.GCP_SA_DOCKER_SSH_PUBLIC_KEY }}" > ~/.ssh/google_compute_engine.pub
-          chmod 400 ~/.ssh/google_compute_engine
-          chmod 644 ~/.ssh/google_compute_engine.pub
-          declare base_branch=${{ github.event.pull_request.base.ref }}
-          if [[ "${base_branch}" == "master" ]]; then
-            ./scripts/deploy.sh rotsee
-          elif [[ "${base_branch}" =~ ^"release" ]]; then
-            ./scripts/deploy.sh "dufour-${base_branch/release\/}"
-          else
-            echo "Skipping deployment"
-          fi
-          rm ~/.ssh/google_compute_engine*
+  #     - name: Deploy on GCP
+  #       run: |
+  #         mkdir -p ~/.ssh/
+  #         echo "${{ secrets.GCP_SA_DOCKER_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
+  #         echo "${{ secrets.GCP_SA_DOCKER_SSH_PUBLIC_KEY }}" > ~/.ssh/google_compute_engine.pub
+  #         chmod 400 ~/.ssh/google_compute_engine
+  #         chmod 644 ~/.ssh/google_compute_engine.pub
+  #         declare base_branch=${{ github.event.pull_request.base.ref }}
+  #         if [[ "${base_branch}" == "master" ]]; then
+  #           ./scripts/deploy.sh rotsee
+  #         elif [[ "${base_branch}" =~ ^"release" ]]; then
+  #           ./scripts/deploy.sh "dufour-${base_branch/release\/}"
+  #         else
+  #           echo "Skipping deployment"
+  #         fi
+  #         rm ~/.ssh/google_compute_engine*
 
 # FIXME: Disabled until hoprd nodes can work in Kubernetes
 #  deploy_natted_nodes:
@@ -173,114 +173,121 @@ jobs:
 #            kubectl rollout restart deployments -n ${network} $deployment;
 #          done
 
-  create_release:
-    name: Create Release
-    runs-on: ubuntu-2-core
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - tag
-    steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+  # create_release:
+  #   name: Create Release
+  #   runs-on: ubuntu-2-core
+  #   if: contains(github.event.pull_request.labels.*.name, 'release')
+  #   needs:
+  #     - tag
+  #   steps:
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@v4
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+  #     - name: Set up Google Cloud Credentials
+  #       id: auth
+  #       uses: google-github-actions/auth@v1
+  #       with:
+  #         credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
+  #     - name: Set up Google Cloud SDK
+  #       uses: google-github-actions/setup-gcloud@v1
+  #       with:
+  #         project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+  #         install_components: beta
 
-      - name: Setup variables
-        id: setup
-        run: |
-          current_version=$(jq -r '.version' packages/hoprd/package.json)
-          echo "current_version=${current_version}" >> $GITHUB_OUTPUT
-          if [[ $current_version == *"-rc."* ]]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-          fi
+  #     - name: Setup variables
+  #       id: setup
+  #       run: |
+  #         current_version=$(jq -r '.version' packages/hoprd/package.json)
+  #         echo "current_version=${current_version}" >> $GITHUB_OUTPUT
+  #         if [[ $current_version == *"-rc."* ]]; then
+  #           echo "prerelease=true" >> $GITHUB_OUTPUT
+  #         else
+  #           echo "prerelease=false" >> $GITHUB_OUTPUT
+  #         fi
 
-      - name: Tag repository
-        id: tag
-        run: |
-          # Tag semver
-          git tag v${{ steps.setup.outputs.current_version }}
-          git push origin v${{ steps.setup.outputs.current_version }}
+  #     - name: Tag repository
+  #       id: tag
+  #       run: |
+  #         # Tag semver
+  #         git tag v${{ steps.setup.outputs.current_version }}
+  #         git push origin v${{ steps.setup.outputs.current_version }}
 
-          declare base_branch=${{ github.event.pull_request.base.ref }}
-          # Tag release name
-          if [[ "${base_branch}" == "master" ]]; then
-            release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}
-          elif [[ "${base_branch}" =~ ^"release" ]]; then
-            release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
-          fi
-          git tag --force ${release_name}
-          git push --force origin ${release_name}
-          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
+  #         declare base_branch=${{ github.event.pull_request.base.ref }}
+  #         # Tag release name
+  #         if [[ "${base_branch}" == "master" ]]; then
+  #           release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}
+  #         elif [[ "${base_branch}" =~ ^"release" ]]; then
+  #           release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
+  #         fi
+  #         git tag --force ${release_name}
+  #         git push --force origin ${release_name}
+  #         echo "release_name=${release_name}" >> $GITHUB_OUTPUT
 
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-          ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog.md
-          echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
+  #     - name: Generate Changelog
+  #       id: changelog
+  #       run: |
+  #         milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
+  #         ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog.md
+  #         echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
+  #       env:
+  #         GH_TOKEN: ${{ github.token }}
 
-      - name: Tag docker images with release name
-        run: |
-          docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
-          images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
-          for image in ${images[@]};
-          do
-            echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
-            gcloud artifacts docker tags add ${docker_registry}/${image}:${{ steps.setup.outputs.current_version }} ${docker_registry}/${image}:${{ steps.tag.outputs.release_name }}
-          done
+  #     - name: Tag docker images with release name
+  #       run: |
+  #         docker_registry="europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images"
+  #         images=(hopr-toolchain hopli hoprd hopr-anvil hopr-pluto)
+  #         for image in ${images[@]};
+  #         do
+  #           echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
+  #           gcloud artifacts docker tags add ${docker_registry}/${image}:${{ steps.setup.outputs.current_version }} ${docker_registry}/${image}:${{ steps.tag.outputs.release_name }}
+  #         done
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          body_path: docs/changelog/changelog.md
-          prerelease: ${{ steps.setup.outputs.prerelease }}
-          name: HOPR - v${{ steps.setup.outputs.current_version }}
-          tag_name: v${{ steps.setup.outputs.current_version }}
+  #     - name: Create Release
+  #       uses: softprops/action-gh-release@v1
+  #       with:
+  #         body_path: docs/changelog/changelog.md
+  #         prerelease: ${{ steps.setup.outputs.prerelease }}
+  #         name: HOPR - v${{ steps.setup.outputs.current_version }}
+  #         tag_name: v${{ steps.setup.outputs.current_version }}
 
-      - name: Close Milestone
-        run: | 
-          gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
-        env:
-          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+  #     - name: Close Milestone
+  #       run: | 
+  #         gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
-      - name: Notify release on Element channel
-        run: |
-          messageHeader="<h3>&#9889; New Hoprd Release</h3><br><p>A new hoprd release has been launched. The tag <b>${{ steps.setup.outputs.current_version }}</b> is now available to be downloaded and use it</p>"
-          messageTagNumber="<code>docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${{ steps.setup.outputs.current_version }}</code>"
-          messageTagName="<code>docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${{ steps.tag.outputs.release_name }}</code>"
-          messageChangeLog="<p>Have a look at the <a href='https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }}'>Changelog</a> to see what you are missing</p>"
-          message="${messageHeader}${messageTagNumber}<br>${messageTagName}<br><br>${messageChangeLog}<br>"
-          ./scripts/notify-matrix.sh "${{ secrets.MATRIX_ROOM_RELEASES }}" "${message}"
-        env:
-          MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
-          MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
+  #     - name: Notify release on Element channel
+  #       run: |
+  #         messageHeader="<h3>&#9889; New Hoprd Release</h3><br><p>A new hoprd release has been launched. The tag <b>${{ steps.setup.outputs.current_version }}</b> is now available to be downloaded and use it</p>"
+  #         messageTagNumber="<code>docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${{ steps.setup.outputs.current_version }}</code>"
+  #         messageTagName="<code>docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:${{ steps.tag.outputs.release_name }}</code>"
+  #         messageChangeLog="<p>Have a look at the <a href='https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }}'>Changelog</a> to see what you are missing</p>"
+  #         message="${messageHeader}${messageTagNumber}<br>${messageTagName}<br><br>${messageChangeLog}<br>"
+  #         ./scripts/notify-matrix.sh "${{ secrets.MATRIX_ROOM_RELEASES }}" "${message}"
+  #       env:
+  #         MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
+  #         MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
 
-      - uses: ./.github/workflows/build-dappnode.yaml
-        with:
-          branch: ${{ github.event.pull_request.base.ref }}
+  # new_release:
+  #   name: Open new release
+  #   if: contains(github.event.pull_request.labels.*.name, 'release')
+  #   needs: 
+  #     - create_release
+  #   uses: ./.github/workflows/open-release.yaml
+  #   with:
+  #     release_type: ${{ vars.NEXT_RELEASE_TYPE }}
+  #     release_name: ${{ vars.NEXT_RELEASE_NAME }}
+  #   secrets:
+  #     GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
-  new_release:
-    name: Open new release
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs: 
-      - create_release
-    uses: ./.github/workflows/open-release.yaml
+  build_dappnode:
+    name: Build dappNode
+    # if: contains(github.event.pull_request.labels.*.name, 'release')
+    # needs: 
+    #   - create_release
+    uses: ./.github/workflows/build-dappnode.yaml
     with:
-      release_type: ${{ vars.NEXT_RELEASE_TYPE }}
-      release_name: ${{ vars.NEXT_RELEASE_NAME }}
+      branch: ${{ github.event.pull_request.base.ref }}
     secrets:
       GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
