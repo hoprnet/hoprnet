@@ -200,11 +200,11 @@ pub mod wasm {
             }
         }
 
-        pub async fn register_node_with_safe(&self, safe_address: Address) -> JsResult<Hash> {
+        pub async fn register_node_with_safe(&self, safe_address: &Address) -> JsResult<Hash> {
             // Here we need to await the TX completion
             match self
                 .w
-                .register_safe_by_node(safe_address)
+                .register_safe_by_node(*safe_address)
                 .await?
                 .await
                 .map_err(|_| JsValue::from("register safe tx has been cancelled".to_string()))?

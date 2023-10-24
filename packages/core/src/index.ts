@@ -835,7 +835,7 @@ export class Hopr extends EventEmitter {
 
       if (await connector.canRegisterWithSafe()) {
         let actions = this.tools.chain_actions()
-        let registryTxHash = await actions.register_node_with_safe(safeAddress.clone())
+        let registryTxHash = await actions.register_node_with_safe(safeAddress)
 
         log(`registering node safe on-chain done in tx ${registryTxHash.to_hex()}`)
       } else {
