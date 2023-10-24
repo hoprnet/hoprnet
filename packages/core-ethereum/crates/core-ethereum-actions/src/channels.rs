@@ -118,8 +118,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
                             "{channel} - remaining closure time is {:?}",
                             channel.remaining_closure_time(current_timestamp())
                         );
-                        if channel.closure_time_passed(current_timestamp()).unwrap_or(false) {
-                            // TODO: emit "channel state change" event
+                        if channel.closure_time_passed(current_timestamp()) {
                             self.tx_sender.send(Transaction::CloseChannel(channel)).await
                         } else {
                             Err(ClosureTimeHasNotElapsed(
