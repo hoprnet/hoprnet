@@ -1,6 +1,5 @@
 use async_lock::RwLock;
 use async_std::channel::{bounded, Receiver, Sender};
-use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_types::{
@@ -27,12 +26,14 @@ use crate::transaction_queue::TransactionResult::{Failure, TicketRedeemed};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
+use async_trait::async_trait;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
+use core_types::acknowledgement::AcknowledgedTicketStatus;
 
 
 /// Enumerates all possible on-chain state change requests
@@ -179,21 +180,23 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         tx: Transaction,
     ) -> TransactionResult {
         match tx {
-            Transaction::RedeemTicket(ack) => match ack.status {
+            Transaction::RedeemTicket(mut ack) => match &ack.status {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
                     match &res {
                         TicketRedeemed { .. } => {
                             if let Err(e) = db.write().await.mark_redeemed(&ack).await {
-                                error!("failed to mark {ack} as redeemed: {e}");
                                 // Still declare the TX a success
+                                error!("failed to mark {ack} as redeemed: {e}");
                             }
                         }
                         Failure(e) => {
-                            error!("redeem tx failed, marking {ack} as losing: {e}");
-                            // TODO: distinguish here based on error message whether to mark as losing or whether to mark ticket as Untouched again.
-                            if let Err(e) = db.write().await.mark_losing_acked_ticket(&ack).await {
-                                error!("failed to mark {ack} as losing: {e}");
+                            // TODO: once we can distinguish EVM execution failure from `e`, we can mark ticket as losing instead
+
+                            error!("marking the acknowledged ticket as untouched - edeem tx failed: {e}");
+                            ack.status = AcknowledgedTicketStatus::Untouched;
+                            if let Err(e) = db.write().await.update_acknowledged_ticket(&ack).await {
+                                error!("cannot mark {ack} as untouched: {e}");
                             }
                         }
                         _ => panic!("invalid tx result from ticket redeem"),
@@ -267,7 +270,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             let tx_id = tx.to_string();
 
             spawn_local(async move {
-                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx);
+                let tx_fut = Self::execute_transaction(db_clone, tx_exec_clone, tx).fuse();
 
                 // Put an upper bound on the transaction to get confirmed and indexed
                 let timeout = sleep(std::time::Duration::from_secs(
@@ -321,6 +324,7 @@ pub mod wasm {
     use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
     use wasm_bindgen_futures::JsFuture;
     use core_types::announcement::AnnouncementData;
+    use crate::payload::PayloadGenerator;
 
     #[wasm_bindgen]
     impl TransactionSender {
@@ -584,7 +588,10 @@ pub mod wasm {
         async fn announce(&self, data: AnnouncementData, use_safe: bool) -> TransactionResult {
             let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
-            tx.set_data(self.generator.announce(&data, use_safe).into());
+            tx.set_data(match self.generator.announce(&data) {
+                Ok(payload) => payload.into(),
+                Err(e) => return TransactionResult::Failure(e.to_string()),
+            });
             if !use_safe {
                 tx.set_to(H160::from(self.hopr_announcements));
             } else {

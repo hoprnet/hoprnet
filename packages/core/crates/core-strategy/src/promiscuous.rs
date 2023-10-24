@@ -192,15 +192,18 @@ where
             if let Some(channel) = channel_with_peer {
                 if *quality <= self.cfg.network_quality_threshold {
                     // Need to close the channel, because quality has dropped
-                    debug!("new channel closure candidate with {address} (quality {quality})");
                     tick_decision.add_to_close(*channel);
                 }
             } else if *quality >= self.cfg.network_quality_threshold {
                 // Try to open channel with this peer, because it is high-quality and we don't yet have a channel with it
-                debug!("new channel opening candidate {address} with quality {quality}");
                 new_channel_candidates.push((*address, *quality));
             }
         }
+        debug!(
+            "proposed closures: {}, proposed new candidates: {}",
+            tick_decision.get_to_close().len(),
+            new_channel_candidates.len()
+        );
 
         // We compute the upper bound for channels as a square-root of the perceived network size
         let max_auto_channels = self

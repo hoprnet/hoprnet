@@ -99,6 +99,7 @@ impl std::fmt::Display for HoprLoopComponents {
 
 #[cfg(feature = "wasm")]
 pub mod wasm_impls {
+    use futures::stream::FuturesUnordered;
     use std::str::FromStr;
 
     use super::*;
@@ -114,6 +115,7 @@ pub mod wasm_impls {
     use core_path::DbPeerAddressResolver;
     use core_protocol::ticket_aggregation::processor::AggregationList;
     use core_strategy::strategy::MultiStrategyConfig;
+    use core_types::acknowledgement::AcknowledgedTicketStatus;
     use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::protocol::ApplicationData;
     use utils_db::rusty::RustyLevelDbShim;
@@ -467,6 +469,29 @@ pub mod wasm_impls {
                 let db = db_clone.read().await;
                 if let Err(e) = cg_clone.write().await.sync_channels(&*db).await {
                     error!("failed to initialize channel graph from the DB: {e}");
+                }
+            }
+            {
+                // Since there's no way of tracking transaction results across restarts (yet),
+                // we need to reset all acknowledged ticket states to "Untouched"
+                // TODO: remove this once we add persistence of awaited TXs
+                let tkt_res = db_clone.read().await.get_acknowledged_tickets(None).await;
+                if let Ok(all_ack_tickets) = tkt_res {
+                    let acks = all_ack_tickets
+                        .iter()
+                        .filter(|tkt| tkt.status != AcknowledgedTicketStatus::Untouched)
+                        .map(|tkt| async {
+                            let mut ticket = tkt.clone();
+                            ticket.status = AcknowledgedTicketStatus::Untouched;
+                            if let Err(e) = db_clone.write().await.update_acknowledged_ticket(&ticket).await {
+                                error!("failed to reset state of {ticket}: {e}")
+                            }
+                        })
+                        .collect::<FuturesUnordered<_>>()
+                        .collect::<Vec<_>>()
+                        .await
+                        .len();
+                    info!("reset state of {acks} acknowledged tickets");
                 }
             }
 

@@ -791,6 +791,7 @@ pub mod wasm {
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use utils_types::primitives::{Address, Balance};
     use wasm_bindgen::{prelude::*, JsValue};
+    use crate::payload::PayloadGenerator;
 
     #[wasm_bindgen]
     pub struct ChainCalls {
