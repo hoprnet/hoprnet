@@ -26,6 +26,17 @@ use crate::strategy::SingularStrategy;
 use crate::{decision::ChannelDecision, Strategy};
 use utils_types::traits::PeerIdLike;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_OPENS: SimpleCounter =
+        SimpleCounter::new("core_counter_strategy_promiscuous_opened_channels", "Count of open channel decisions").unwrap();
+    static ref METRIC_COUNT_CLOSURES: SimpleCounter =
+        SimpleCounter::new("core_counter_strategy_promiscuous_closed_channels", "Count of close channel decisions").unwrap();
+}
+
 /// Size of the simple moving average window used to smoothen the number of registered peers.
 pub const SMA_WINDOW_SIZE: usize = 10;
 
@@ -355,6 +366,12 @@ where
                     error!("error while issuing channel opening to {}: {e}", channel_to_open.0);
                 }
             }
+        }
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_COUNT_OPENS.increment_by(tick_decision.get_to_open().len() as u64);
+            METRIC_COUNT_CLOSURES.increment_by(tick_decision.get_to_close().len() as u64);
         }
 
         info!("on tick executed {tick_decision}");

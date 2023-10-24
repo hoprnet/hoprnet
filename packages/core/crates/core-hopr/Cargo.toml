@@ -17,7 +17,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde
     "core-crypto/wasm", "core-network/wasm", "core-strategy/wasm", "core-path/wasm", "core-packet/wasm", "core-p2p/wasm", "core-protocol/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
-prometheus = ["dep:utils-metrics", "core-packet/prometheus", "core-protocol/prometheus"]
+prometheus = ["dep:utils-metrics", "core-packet/prometheus", "core-protocol/prometheus", "core-strategy/prometheus"]
 
 [dependencies]
 async-std = { workspace = true }

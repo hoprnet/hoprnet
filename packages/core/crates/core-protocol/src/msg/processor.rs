@@ -18,6 +18,7 @@ use core_packet::errors::PacketError::{
     PathPositionMismatch, Retry, TagReplay, TransportError,
 };
 use core_packet::errors::Result;
+use core_packet::validation::validate_unacknowledged_ticket;
 use core_path::path::{Path, TransportPath};
 use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, UnacknowledgedTicket};
 use core_types::channels::Ticket;
@@ -28,6 +29,7 @@ use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
 use crate::msg::{chain::ChainPacketComponents, mixer::MixerConfig};
+use super::packet::{PacketConstructing, TransportPacket};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
@@ -35,11 +37,9 @@ use async_std::task::{sleep, spawn_local};
 #[cfg(all(feature = "wasm", not(test)))]
 use {gloo_timers::future::sleep, wasm_bindgen_futures::spawn_local};
 
-use core_packet::validation::validate_unacknowledged_ticket;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::{SimpleCounter, SimpleGauge};
 
-use super::packet::{PacketConstructing, TransportPacket};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     // packet processing

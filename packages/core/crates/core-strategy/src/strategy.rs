@@ -27,6 +27,18 @@ use utils_misc::time::native::current_timestamp;
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::{SimpleCounter, MultiGauge};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: SimpleCounter =
+        SimpleCounter::new("core_counter_strategy_count_closure_finalization", "Count of channels where closure finalizing was initiated automatically").unwrap();
+
+     static ref METRIC_ENABLED_STRATEGIES: MultiGauge =
+        MultiGauge::new("core_multi_gauge_strategy_enabled_strategies", "List of enabled strategies", Strategy::VARIANTS).unwrap();
+}
+
 /// Basic single strategy.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
@@ -97,6 +109,9 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for ChannelCloseFin
             .collect::<Vec<_>>()
             .await
             .len();
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_COUNT_CLOSURE_FINALIZATIONS.increment_by(to_close as u64);
 
         info!("channel closure finalizer: initiated closure finalization of {to_close} channels");
         Ok(())
@@ -233,12 +248,18 @@ impl MultiStrategy {
                         error!("recursive multi-strategy not allowed and skipped")
                     }
                 }
-                // Passive strategy = empty Multistrategy
+                // Passive strategy = empty MultiStrategy
                 Strategy::Passive => strategies.push(Box::new(Self {
                     cfg: Default::default(),
                     strategies: Vec::new(),
                 })),
             }
+        }
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            let strategy_names = cfg.strategies.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+            METRIC_ENABLED_STRATEGIES.set(&strategy_names.iter().map(|s| s.as_str()).collect::<Vec<_>>(), 1_f64);
         }
 
         Self { strategies, cfg }
