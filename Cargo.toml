@@ -17,6 +17,7 @@ members = [
     "packages/core-ethereum/crates/core-ethereum-db",
     "packages/core-ethereum/crates/core-ethereum-indexer",
     "packages/core-ethereum/crates/core-ethereum-misc",
+    "packages/core-ethereum/crates/core-ethereum-rpc",
     "packages/ethereum/crates/bindings",
     "packages/hopli",
     "packages/real/crates/real-base",
