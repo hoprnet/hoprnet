@@ -7,7 +7,7 @@ name: Build DappNode
 on:
   workflow_call:
     inputs:
-      branch:
+      base_branch:
         required: true
         type: string
 
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ inputs.base_branch }}
 
       - name: Set up Google Cloud Credentials
         id: auth
