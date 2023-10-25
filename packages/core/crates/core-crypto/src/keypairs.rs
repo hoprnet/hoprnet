@@ -51,7 +51,12 @@ impl Keypair for OffchainKeypair {
     type Public = OffchainPublicKey;
 
     fn random() -> Self {
-        Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap()
+        let mut kp = Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap();
+        // TODO: remove this loop once https://github.com/hoprnet/hoprnet/pull/5665 is merged
+        while kp.1.to_bytes().as_ref()[0] == 0xff {
+            kp = Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap();
+        }
+        kp
     }
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
