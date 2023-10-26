@@ -6,18 +6,20 @@ use core_types::channels::{ChannelDirection, ChannelStatus};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
-use crate::errors::CoreEthereumActionsError::{ClosureTimeHasNotElapsed, NotEnoughAllowance, PeerAccessDenied};
+use crate::errors::CoreEthereumActionsError::{
+    BalanceTooLow, ClosureTimeHasNotElapsed, NotEnoughAllowance, PeerAccessDenied,
+};
 use crate::errors::{
     CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
     Result,
 };
+use crate::redeem::TicketRedeemActions;
 use crate::transaction_queue::{Transaction, TransactionCompleted};
+use crate::CoreEthereumActions;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
 
-use crate::redeem::TicketRedeemActions;
-use crate::CoreEthereumActions;
 #[cfg(any(not(feature = "wasm"), test))]
 use utils_misc::time::native::current_timestamp;
 
@@ -56,6 +58,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
             return Err(NotEnoughAllowance);
         }
 
+        let hopr_balance = self.db.read().await.get_hopr_balance().await?;
+        debug!("current node HOPR balance is {hopr_balance}");
+        if hopr_balance.lt(&amount) {
+            return Err(BalanceTooLow);
+        }
+
         if self.db.read().await.is_network_registry_enabled().await?
             && !self.db.read().await.is_allowed_to_access_network(&destination).await?
         {
@@ -83,6 +91,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
         debug!("current staking safe allowance is {allowance}");
         if allowance.lt(&amount) {
             return Err(NotEnoughAllowance);
+        }
+
+        let hopr_balance = self.db.read().await.get_hopr_balance().await?;
+        debug!("current node HOPR balance is {hopr_balance}");
+        if hopr_balance.lt(&amount) {
+            return Err(BalanceTooLow);
         }
 
         let maybe_channel = self.db.read().await.get_channel(&channel_id).await?;
