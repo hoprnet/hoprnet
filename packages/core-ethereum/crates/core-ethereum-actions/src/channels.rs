@@ -6,18 +6,20 @@ use core_types::channels::{ChannelDirection, ChannelStatus};
 use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
-use crate::{
-    errors::{
-        CoreEthereumActionsError::{
-            ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
-            NotEnoughAllowance, PeerAccessDenied,
-        },
+use crate::errors::CoreEthereumActionsError::{
+    BalanceTooLow, ClosureTimeHasNotElapsed, NotEnoughAllowance, PeerAccessDenied,
+};
+use crate::errors::{
+    CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
         Result,
     },
     redeem::TicketRedeemActions,
     transaction_queue::{Transaction, TransactionCompleted},
     CoreEthereumActions,
 };
+use crate::redeem::TicketRedeemActions;
+use crate::transaction_queue::{Transaction, TransactionCompleted};
+use crate::CoreEthereumActions;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use utils_misc::time::wasm::current_timestamp;
@@ -60,6 +62,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
             return Err(NotEnoughAllowance);
         }
 
+        let hopr_balance = self.db.read().await.get_hopr_balance().await?;
+        debug!("current node HOPR balance is {hopr_balance}");
+        if hopr_balance.lt(&amount) {
+            return Err(BalanceTooLow);
+        }
+
         if self.db.read().await.is_network_registry_enabled().await?
             && !self.db.read().await.is_allowed_to_access_network(&destination).await?
         {
@@ -88,6 +96,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
         debug!("current staking safe allowance is {allowance}");
         if allowance.lt(&amount) {
             return Err(NotEnoughAllowance);
+        }
+
+        let hopr_balance = self.db.read().await.get_hopr_balance().await?;
+        debug!("current node HOPR balance is {hopr_balance}");
+        if hopr_balance.lt(&amount) {
+            return Err(BalanceTooLow);
         }
 
         let maybe_channel = self.db.read().await.get_channel(&channel_id).await?;
@@ -203,6 +217,12 @@ mod tests {
 
         db.write()
             .await
+            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
+            .await
+            .unwrap();
+
+        db.write()
+            .await
             .set_network_registry(false, &Snapshot::default())
             .await
             .unwrap();
@@ -261,6 +281,13 @@ mod tests {
             )
             .await
             .unwrap();
+
+        db.write()
+            .await
+            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
+            .await
+            .unwrap();
+
         db.write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
@@ -391,6 +418,46 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_should_not_open_if_not_enough_token_balance() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let self_addr = Address::random();
+        let bob = Address::random();
+        let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            self_addr,
+        )));
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+
+        db.write()
+            .await
+            .set_staking_safe_allowance(
+                &Balance::new(1_000_000_u64.into(), BalanceType::HOPR),
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        db.write()
+            .await
+            .set_hopr_balance(&Balance::new(1_u64.into(), BalanceType::HOPR))
+            .await
+            .unwrap();
+
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+
+        assert!(
+            matches!(
+                actions.open_channel(bob, stake).await.err().unwrap(),
+                CoreEthereumActionsError::BalanceTooLow
+            ),
+            "should fail when not enough token balance"
+        );
+    }
+
+    #[async_std::test]
     async fn test_fund_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -409,6 +476,12 @@ mod tests {
                 &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
                 &Snapshot::default(),
             )
+            .await
+            .unwrap();
+
+        db.write()
+            .await
+            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
             .await
             .unwrap();
 
@@ -477,6 +550,12 @@ mod tests {
                 &Balance::new(10_000_000u64.into(), BalanceType::HOPR),
                 &Snapshot::default(),
             )
+            .await
+            .unwrap();
+
+        db.write()
+            .await
+            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
             .await
             .unwrap();
 
@@ -562,6 +641,46 @@ mod tests {
                 CoreEthereumActionsError::NotEnoughAllowance
             ),
             "should fail when not enough allowance"
+        );
+    }
+
+    #[async_std::test]
+    async fn test_should_not_fund_if_not_enough_balance() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let self_addr = Address::random();
+        let bob = Address::random();
+        let channel_id = generate_channel_id(&self_addr, &bob);
+
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            self_addr,
+        )));
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTransactionExecutor::new()));
+
+        db.write()
+            .await
+            .set_staking_safe_allowance(
+                &Balance::new(1_000_000_u64.into(), BalanceType::HOPR),
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
+
+        db.write()
+            .await
+            .set_hopr_balance(&Balance::new(1u64.into(), BalanceType::HOPR))
+            .await
+            .unwrap();
+
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_queue.new_sender());
+        let stake = Balance::new(10_000_u32.into(), BalanceType::HOPR);
+        assert!(
+            matches!(
+                actions.fund_channel(channel_id, stake).await.err().unwrap(),
+                CoreEthereumActionsError::BalanceTooLow
+            ),
+            "should fail when not enough balance"
         );
     }
 

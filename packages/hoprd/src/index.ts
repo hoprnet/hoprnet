@@ -229,6 +229,12 @@ async function main() {
     log(`chain_key ${keypair.chain_key.public().to_hex(true)}`)
     log(`packet_key ${keypair.packet_key.public().to_peerid_str()}`)
 
+    if (keypair.packet_key.public().to_string().startsWith('0xff')) {
+      log(
+        `WARNING: this node uses invalid packet key type and won't be able to become an effective relay, please create a new identity!`
+      )
+    }
+
     // 2. Create node instance
     log('Creating HOPR Node')
     node = await createHoprNode(keypair.chain_key, keypair.packet_key, cfg, false)

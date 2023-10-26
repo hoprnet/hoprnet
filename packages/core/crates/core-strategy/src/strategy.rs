@@ -18,7 +18,6 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use strum::VariantNames;
 use utils_log::{debug, error, info, warn};
 use validator::Validate;
 
@@ -29,7 +28,10 @@ use utils_misc::time::native::current_timestamp;
 use utils_misc::time::wasm::current_timestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use utils_metrics::metrics::{MultiGauge, SimpleCounter};
+use {
+    strum::VariantNames,
+    utils_metrics::metrics::{MultiGauge, SimpleCounter},
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
