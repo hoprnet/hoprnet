@@ -605,7 +605,7 @@ pub mod tests {
 
         deploy_erc1820(client.clone()).await;
 
-        let hopr_node_safe_registry = deploy_hopr_node_registry(client.clone()).await;
+        /*let hopr_node_safe_registry = deploy_hopr_node_registry(client.clone()).await;
 
         // Mint 1000 Hoprlis
         let hopr_token = deploy_hopr_token_and_mint_tokens(client.clone(), 1000.into()).await;
@@ -616,7 +616,7 @@ pub mod tests {
             &hopr_node_safe_registry.address(),
             client.clone(),
         )
-        .await;
+        .await;*/
 
         let chain_key = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
 

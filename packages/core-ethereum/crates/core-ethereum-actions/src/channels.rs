@@ -11,11 +11,7 @@ use crate::errors::CoreEthereumActionsError::{
 };
 use crate::errors::{
     CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
-        Result,
-    },
-    redeem::TicketRedeemActions,
-    transaction_queue::{Transaction, TransactionCompleted},
-    CoreEthereumActions,
+    Result,
 };
 use crate::redeem::TicketRedeemActions;
 use crate::transaction_queue::{Transaction, TransactionCompleted};
