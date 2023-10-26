@@ -26,6 +26,7 @@ serde-wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 thiserror = { workspace = true }
+validator = { workspace = true }
 
 bindings = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
