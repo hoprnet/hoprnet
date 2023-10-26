@@ -25,6 +25,9 @@ pub enum CoreEthereumActionsError {
     #[error("ticket is not a win")]
     NotAWinningTicket,
 
+    #[error("balance is too low to perform the operation")]
+    BalanceTooLow,
+
     #[error("safe does not have enough allowance to fund channel")]
     NotEnoughAllowance,
 
