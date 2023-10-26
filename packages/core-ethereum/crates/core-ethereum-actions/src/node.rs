@@ -21,7 +21,7 @@ pub trait NodeActions {
         &self,
         multiaddr: &Multiaddr,
         offchain_key: &OffchainKeypair,
-        use_safe: bool,
+        use_node_module: Option<Address>,
     ) -> Result<TransactionCompleted>;
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted>;
@@ -44,14 +44,14 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
         &self,
         multiaddr: &Multiaddr,
         offchain_key: &OffchainKeypair,
-        use_safe: bool,
+        use_node_module: Option<Address>
     ) -> Result<TransactionCompleted> {
         let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))
             .map_err(|e| CoreEthereumActionsError::OtherError(e.into()))?;
 
-        info!("initiating annoucement {announcement_data}");
+        info!("initiating announcement {announcement_data}");
         self.tx_sender
-            .send(Transaction::Announce(announcement_data, use_safe))
+            .send(Transaction::Announce(announcement_data, use_node_module))
             .await
     }
 

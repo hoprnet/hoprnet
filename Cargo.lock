@@ -1099,7 +1099,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-actions"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1108,6 +1108,7 @@ dependencies = [
  "core-crypto",
  "core-ethereum-db",
  "core-ethereum-misc",
+ "core-ethereum-rpc",
  "core-types",
  "env_logger",
  "ethers",
@@ -1232,7 +1233,9 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
+ "core-ethereum-misc",
  "core-types",
+ "ethers",
  "ethers-providers",
  "ethnum",
  "hex",
@@ -1242,6 +1245,7 @@ dependencies = [
  "primitive-types",
  "serde",
  "serde-wasm-bindgen",
+ "serde_json",
  "thiserror",
  "utils-db",
  "utils-log",

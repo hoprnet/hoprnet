@@ -1,6 +1,19 @@
+use serde::{Deserialize, Serialize};
+use utils_types::primitives::Address;
+
 pub mod constants;
 pub mod errors;
 pub mod network_registry;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContractAddresses {
+    pub token: Address,
+    pub channels: Address,
+    pub announcements: Address,
+    pub network_registry: Address,
+    pub safe_registry: Address,
+    pub price_oracle: Address,
+}
 
 #[cfg(feature = "wasm")]
 pub mod wasm {

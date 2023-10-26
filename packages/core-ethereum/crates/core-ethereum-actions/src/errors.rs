@@ -1,5 +1,6 @@
 use core_ethereum_misc::errors::CoreEthereumError;
 use thiserror::Error;
+use core_ethereum_rpc::errors::RpcError;
 use utils_db::errors::DbError;
 
 #[derive(Debug, Error)]
@@ -36,6 +37,9 @@ pub enum CoreEthereumActionsError {
 
     #[error(transparent)]
     DbError(#[from] DbError),
+
+    #[error(transparent)]
+    RpcError(#[from] RpcError),
 
     #[error(transparent)]
     OtherError(#[from] CoreEthereumError),

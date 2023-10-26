@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-actions"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -32,6 +32,7 @@ wasm-bindgen-futures = { workspace = true, features = ["futures-core-03-stream"]
 bindings = { workspace = true }
 core-crypto = { workspace = true }
 core-ethereum-db = { workspace = true }
+core-ethereum-rpc = { workspace = true }
 core-ethereum-misc = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }

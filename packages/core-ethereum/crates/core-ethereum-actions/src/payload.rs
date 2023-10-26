@@ -23,6 +23,7 @@ use ethers::{
     abi::AbiEncode,
     types::{Address as EthereumAddress, H160, H256, U256},
 };
+use core_ethereum_misc::ContractAddresses;
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
     traits::BinarySerializable,
@@ -224,57 +225,50 @@ impl PayloadGenerator for BasicPayloadGenerator {
 #[derive(Debug, Clone)]
 pub struct SafePayloadGenerator {
     me: Address,
-    hopr_channels: Address,
-    hopr_announcements: Address,
+    contract_addrs: ContractAddresses,
 }
 
 impl SafePayloadGenerator {
-    pub fn new(chain_keypair: &ChainKeypair, hopr_channels: Address, hopr_announcements: Address) -> Self {
+    pub fn new(chain_keypair: &ChainKeypair, contract_addrs: ContractAddresses) -> Self {
         Self {
             me: chain_keypair.public().to_address(),
-            hopr_channels,
-            hopr_announcements,
+            contract_addrs
         }
     }
 }
 
 impl PayloadGenerator for SafePayloadGenerator {
     fn announce(&self, announcement: &AnnouncementData) -> Result<Vec<u8>> {
-        Ok(match announcement.key_binding {
+        let call_data = match announcement.key_binding {
             Some(ref binding) => {
                 let serialized_signature = binding.signature.to_bytes();
 
-                let call_data = BindKeysAnnounceSafeCall {
+                BindKeysAnnounceSafeCall {
                     self_: H160::from_slice(&self.me.to_bytes()),
                     ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
                     ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
                     ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
                     base_multiaddr: announcement.to_multiaddress_str(),
                 }
-                .encode();
-                ExecTransactionFromModuleCall {
-                    to: H160::from_slice(&self.hopr_announcements.to_bytes()),
-                    value: U256::zero(),
-                    data: call_data.into(),
-                    operation: Operation::Call as u8,
-                }
                 .encode()
+
             }
             None => {
-                let call_data = AnnounceSafeCall {
+                AnnounceSafeCall {
                     self_: H160::from_slice(&self.me.to_bytes()),
                     base_multiaddr: announcement.to_multiaddress_str(),
                 }
-                .encode();
-                ExecTransactionFromModuleCall {
-                    to: H160::from_slice(&self.hopr_announcements.to_bytes()),
-                    value: U256::zero(),
-                    data: call_data.into(),
-                    operation: Operation::Call as u8,
-                }
                 .encode()
             }
-        })
+        };
+
+        Ok(ExecTransactionFromModuleCall {
+            to: H160::from_slice(&self.contract_addrs.announcements.to_bytes()),
+            value: U256::zero(),
+            data: call_data.into(),
+            operation: Operation::Call as u8,
+        }
+        .encode())
     }
 
     fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>> {
@@ -295,7 +289,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
         .encode();
 
-        Ok(channels_payload(self.hopr_channels, call_data))
+        Ok(channels_payload(self.contract_addrs.channels, call_data))
     }
 
     fn close_incoming_channel(&self, source: &Address) -> Result<Vec<u8>> {
@@ -323,7 +317,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
         .encode();
 
-        Ok(channels_payload(self.hopr_channels, call_data))
+        Ok(channels_payload(self.contract_addrs.channels, call_data))
     }
 
     fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
@@ -339,7 +333,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
         .encode();
 
-        Ok(channels_payload(self.hopr_channels, call_data))
+        Ok(channels_payload(self.contract_addrs.channels, call_data))
     }
 
     fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket) -> Result<Vec<u8>> {
@@ -353,7 +347,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
         .encode();
 
-        Ok(channels_payload(self.hopr_channels, call_data))
+        Ok(channels_payload(self.contract_addrs.channels, call_data))
     }
 
     fn register_safe_by_node(&self, _safe_addr: &Address) -> Result<Vec<u8>> {
