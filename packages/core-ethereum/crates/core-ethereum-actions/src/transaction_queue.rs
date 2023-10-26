@@ -334,4 +334,3 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
         warn!("transaction queue has finished");
     }
 }
-

@@ -44,7 +44,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
         &self,
         multiaddr: &Multiaddr,
         offchain_key: &OffchainKeypair,
-        use_node_module: Option<Address>
+        use_node_module: Option<Address>,
     ) -> Result<TransactionCompleted> {
         let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))
             .map_err(|e| CoreEthereumActionsError::OtherError(e.into()))?;

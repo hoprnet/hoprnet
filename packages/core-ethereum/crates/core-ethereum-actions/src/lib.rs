@@ -3,8 +3,8 @@ pub mod errors;
 pub mod node;
 pub mod payload;
 pub mod redeem;
-pub mod transaction_queue;
 pub mod rpc_tx_executor;
+pub mod transaction_queue;
 
 use crate::transaction_queue::TransactionSender;
 use async_lock::RwLock;

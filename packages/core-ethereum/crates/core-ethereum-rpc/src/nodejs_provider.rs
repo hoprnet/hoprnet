@@ -1,13 +1,13 @@
-use std::fmt::Debug;
 use async_trait::async_trait;
 use ethers::utils::__serde_json::Error;
 use ethers_providers::{JsonRpcClient, JsonRpcError, ProviderError, RpcError};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use thiserror::Error;
-use wasm_bindgen::JsValue;
-use wasm_bindgen::prelude::wasm_bindgen;
 use utils_misc::utils::wasm::js_value_to_error_msg;
+use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsValue;
 
 use crate::nodejs_provider::NodeJsRpcError::JsCallError;
 
@@ -23,7 +23,7 @@ pub enum NodeJsRpcError {
     JsCallError(String),
 
     #[error(transparent)]
-    SerializationError(#[from] serde_json::Error)
+    SerializationError(#[from] serde_json::Error),
 }
 
 impl RpcError for NodeJsRpcError {
@@ -40,7 +40,7 @@ impl From<NodeJsRpcError> for ProviderError {
     fn from(value: NodeJsRpcError) -> Self {
         match value {
             NodeJsRpcError::SerializationError(e) => ProviderError::SerdeJson(e),
-            JsCallError(e) => ProviderError::CustomError(e)
+            JsCallError(e) => ProviderError::CustomError(e),
         }
     }
 }
@@ -51,18 +51,28 @@ pub struct NodeJsRpcClient;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NodeJsHttpResponse {
     pub code: u16,
-    pub data: String
+    pub data: String,
 }
 
 #[async_trait(? Send)]
 impl JsonRpcClient for NodeJsRpcClient {
     type Error = NodeJsRpcError;
 
-    async fn request<T: Serialize + Send + Sync, R: DeserializeOwned>(&self, method: &str, params: T) -> Result<R, Self::Error> {
+    async fn request<T: Serialize + Send + Sync, R: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: T,
+    ) -> Result<R, Self::Error> {
         let json_params = serde_json::to_string(&params)?;
         let http_res = match http_request(method, &json_params).await {
-            Ok(s) => s.as_string().ok_or(JsCallError("expected string on http output".into()))?,
-            Err(err) => return Err(JsCallError(js_value_to_error_msg(err).unwrap_or("unknown error".into())))
+            Ok(s) => s
+                .as_string()
+                .ok_or(JsCallError("expected string on http output".into()))?,
+            Err(err) => {
+                return Err(JsCallError(
+                    js_value_to_error_msg(err).unwrap_or("unknown error".into()),
+                ))
+            }
         };
 
         Ok(serde_json::from_str(&http_res)?)

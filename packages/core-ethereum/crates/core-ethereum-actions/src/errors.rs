@@ -1,6 +1,6 @@
 use core_ethereum_misc::errors::CoreEthereumError;
-use thiserror::Error;
 use core_ethereum_rpc::errors::RpcError;
+use thiserror::Error;
 use utils_db::errors::DbError;
 
 #[derive(Debug, Error)]

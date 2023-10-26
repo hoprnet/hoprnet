@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use ethers::types::transaction::eip2718::TypedTransaction;
 use core_crypto::types::Hash;
+use ethers::types::transaction::eip2718::TypedTransaction;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::Result;
@@ -14,7 +14,6 @@ pub mod nodejs_provider;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprRpcOperations {
-
     async fn genesis_block(&self) -> Result<u64>;
 
     async fn block_number(&self) -> Result<u64>;

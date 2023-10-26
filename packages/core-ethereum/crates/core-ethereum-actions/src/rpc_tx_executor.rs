@@ -1,22 +1,22 @@
 // TODO: move this to core-ethereum-api once #5623 is merged
 
-use std::sync::Arc;
 use async_lock::Mutex;
 use async_trait::async_trait;
-use ethers::prelude::Eip1559TransactionRequest;
-use ethers::prelude::transaction::eip2718::TypedTransaction;
-use primitive_types::H160;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
+use core_crypto::types::Hash;
 use core_ethereum_misc::ContractAddresses;
 use core_ethereum_rpc::HoprRpcOperations;
-use core_crypto::types::Hash;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::announcement::AnnouncementData;
+use ethers::prelude::transaction::eip2718::TypedTransaction;
+use ethers::prelude::Eip1559TransactionRequest;
+use primitive_types::H160;
+use std::sync::Arc;
 use utils_types::primitives::{Address, Balance, BalanceType};
 
+use crate::errors::Result;
 use crate::payload::{BasicPayloadGenerator, PayloadGenerator, SafePayloadGenerator};
 use crate::transaction_queue::{TransactionExecutor, TransactionResult};
-use crate::errors::Result;
 
 pub struct RpcTransactionExecutor<Rpc: HoprRpcOperations> {
     rpc: Arc<Mutex<Rpc>>,
@@ -27,13 +27,18 @@ pub struct RpcTransactionExecutor<Rpc: HoprRpcOperations> {
 }
 
 impl<Rpc: HoprRpcOperations> RpcTransactionExecutor<Rpc> {
-    pub fn new(rpc: Arc<Mutex<Rpc>>, chain_keypair: &ChainKeypair, contract_addrs: ContractAddresses, node_module: Option<Address>) -> Self {
+    pub fn new(
+        rpc: Arc<Mutex<Rpc>>,
+        chain_keypair: &ChainKeypair,
+        contract_addrs: ContractAddresses,
+        node_module: Option<Address>,
+    ) -> Self {
         Self {
             rpc,
             contract_addrs,
             node_module,
             safe_generator: SafePayloadGenerator::new(chain_keypair, contract_addrs),
-            basic_generator: BasicPayloadGenerator::new(chain_keypair.public().to_address())
+            basic_generator: BasicPayloadGenerator::new(chain_keypair.public().to_address()),
         }
     }
 
@@ -68,7 +73,7 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
 
         match self.process_transaction(tx).await {
             Ok(tx_hash) => TransactionResult::TicketRedeemed { tx_hash },
-            Err(e) => TransactionResult::Failure(e.to_string())
+            Err(e) => TransactionResult::Failure(e.to_string()),
         }
     }
 
@@ -93,7 +98,7 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
 
         match self.process_transaction(tx).await {
             Ok(tx_hash) => TransactionResult::ChannelFunded { tx_hash },
-            Err(e) => TransactionResult::Failure(e.to_string())
+            Err(e) => TransactionResult::Failure(e.to_string()),
         }
     }
 
@@ -118,7 +123,7 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
 
         match self.process_transaction(tx).await {
             Ok(tx_hash) => TransactionResult::ChannelClosureInitiated { tx_hash },
-            Err(e) => TransactionResult::Failure(e.to_string())
+            Err(e) => TransactionResult::Failure(e.to_string()),
         }
     }
 
@@ -143,7 +148,7 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
 
         match self.process_transaction(tx).await {
             Ok(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
-            Err(e) => TransactionResult::Failure(e.to_string())
+            Err(e) => TransactionResult::Failure(e.to_string()),
         }
     }
 
@@ -166,7 +171,7 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
 
         match self.process_transaction(tx).await {
             Ok(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
-            Err(e) => TransactionResult::Failure(e.to_string())
+            Err(e) => TransactionResult::Failure(e.to_string()),
         }
     }
 
@@ -189,7 +194,7 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
 
         match self.process_transaction(tx).await {
             Ok(tx_hash) => TransactionResult::Withdrawn { tx_hash },
-            Err(e) => TransactionResult::Failure(e.to_string())
+            Err(e) => TransactionResult::Failure(e.to_string()),
         }
     }
 
@@ -197,7 +202,10 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
         let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
 
         if let Some(node_module) = use_node_module {
-            assert!(self.node_module.is_none() || self.node_module.unwrap().eq(&node_module), "inconsistent node module address");
+            assert!(
+                self.node_module.is_none() || self.node_module.unwrap().eq(&node_module),
+                "inconsistent node module address"
+            );
 
             tx.set_data(match self.safe_generator.announce(&data) {
                 Ok(payload) => payload.into(),
@@ -216,7 +224,7 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
 
         match self.process_transaction(tx).await {
             Ok(tx_hash) => TransactionResult::Announced { tx_hash },
-            Err(e) => TransactionResult::Failure(e.to_string())
+            Err(e) => TransactionResult::Failure(e.to_string()),
         }
     }
 
@@ -231,7 +239,7 @@ impl<Rpc: HoprRpcOperations> TransactionExecutor for RpcTransactionExecutor<Rpc>
 
         match self.process_transaction(tx).await {
             Ok(tx_hash) => TransactionResult::SafeRegistered { tx_hash },
-            Err(e) => TransactionResult::Failure(e.to_string())
+            Err(e) => TransactionResult::Failure(e.to_string()),
         }
     }
 }

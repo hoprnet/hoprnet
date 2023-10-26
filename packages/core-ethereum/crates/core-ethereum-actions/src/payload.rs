@@ -18,12 +18,12 @@ use core_crypto::{
     keypairs::{ChainKeypair, Keypair},
     types::VrfParameters,
 };
+use core_ethereum_misc::ContractAddresses;
 use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use ethers::{
     abi::AbiEncode,
     types::{Address as EthereumAddress, H160, H256, U256},
 };
-use core_ethereum_misc::ContractAddresses;
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
     traits::BinarySerializable,
@@ -232,7 +232,7 @@ impl SafePayloadGenerator {
     pub fn new(chain_keypair: &ChainKeypair, contract_addrs: ContractAddresses) -> Self {
         Self {
             me: chain_keypair.public().to_address(),
-            contract_addrs
+            contract_addrs,
         }
     }
 }
@@ -251,15 +251,12 @@ impl PayloadGenerator for SafePayloadGenerator {
                     base_multiaddr: announcement.to_multiaddress_str(),
                 }
                 .encode()
-
             }
-            None => {
-                AnnounceSafeCall {
-                    self_: H160::from_slice(&self.me.to_bytes()),
-                    base_multiaddr: announcement.to_multiaddress_str(),
-                }
-                .encode()
+            None => AnnounceSafeCall {
+                self_: H160::from_slice(&self.me.to_bytes()),
+                base_multiaddr: announcement.to_multiaddress_str(),
             }
+            .encode(),
         };
 
         Ok(ExecTransactionFromModuleCall {
