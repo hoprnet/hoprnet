@@ -9,7 +9,7 @@ pub mod errors;
 pub mod rpc;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-pub mod nodejs_provider;
+pub mod nodejs;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]

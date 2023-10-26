@@ -1284,6 +1284,7 @@ dependencies = [
  "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-misc",
+ "core-ethereum-rpc",
  "core-network",
  "core-p2p",
  "core-packet",

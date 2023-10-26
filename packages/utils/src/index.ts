@@ -9,6 +9,8 @@ export * from './time.js'
 export * from './constants.js'
 export * from './ethereum/index.js'
 
+export * from './http.js'
+
 export {
   app_version,
   create_counter,

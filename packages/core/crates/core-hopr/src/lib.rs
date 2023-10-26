@@ -105,7 +105,6 @@ pub mod wasm_impls {
     use super::*;
     use core_crypto::keypairs::Keypair;
     use core_crypto::{keypairs::OffchainKeypair, types::HalfKeyChallenge};
-    use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
     use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
@@ -129,7 +128,6 @@ pub mod wasm_impls {
         network: adaptors::network::wasm::WasmNetwork,
         indexer: adaptors::indexer::WasmIndexerInteractions,
         pkt_sender: PacketActions,
-        chain_actions: core_ethereum_actions::wasm::WasmCoreEthereumActions,
         ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
         channel_events: ChannelEventEmitter,
         channel_graph: core_path::channel_graph::wasm::ChannelGraph,
@@ -142,7 +140,6 @@ pub mod wasm_impls {
             change_notifier: Sender<NetworkEvent>,
             indexer: adaptors::indexer::WasmIndexerInteractions,
             pkt_sender: PacketActions,
-            chain_actions: core_ethereum_actions::wasm::WasmCoreEthereumActions,
             ticket_aggregate_actions: TicketAggregationActions<ResponseChannel<Result<Ticket, String>>, RequestId>,
             channel_events: ChannelEventEmitter,
             channel_graph: core_path::channel_graph::wasm::ChannelGraph,
@@ -153,7 +150,6 @@ pub mod wasm_impls {
                 indexer,
                 pkt_sender,
                 ticket_aggregate_actions,
-                chain_actions,
                 channel_events,
                 channel_graph,
             }
@@ -214,10 +210,6 @@ pub mod wasm_impls {
                 .await
             )
         }
-
-        pub fn chain_actions(&self) -> core_ethereum_actions::wasm::WasmCoreEthereumActions {
-            self.chain_actions.clone()
-        }
     }
 
     /// The main core function building all core components
@@ -239,7 +231,6 @@ pub mod wasm_impls {
         on_final_packet: js_sys::Function,
         tbf: TagBloomFilter,
         save_tbf: js_sys::Function,
-        tx_executor: WasmTxExecutor,
         my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
         ack_proto_cfg: AckProtocolConfig,
         heartbeat_proto_cfg: HeartbeatProtocolConfig,
@@ -366,7 +357,6 @@ pub mod wasm_impls {
             network_events_tx,
             indexer_updater,
             packet_actions.writer(),
-            core_ethereum_actions::wasm::WasmCoreEthereumActions::new_from_actions(chain_actions),
             ticket_aggregation.writer(),
             ChannelEventEmitter {
                 tx: on_channel_event_tx,
@@ -526,7 +516,6 @@ pub mod wasm_impls {
             on_final_packet: js_sys::Function,
             tbf: TagBloomFilter,
             save_tbf: js_sys::Function,
-            tx_executor: WasmTxExecutor,
             my_multiaddresses: Vec<js_sys::JsString>,
             ack_proto_cfg: AckProtocolConfig,
             heartbeat_proto_cfg: HeartbeatProtocolConfig,
