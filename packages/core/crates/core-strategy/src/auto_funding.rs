@@ -209,6 +209,12 @@ mod tests {
 
         db.write()
             .await
+            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
+            .await
+            .unwrap();
+
+        db.write()
+            .await
             .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
             .await
             .unwrap();
