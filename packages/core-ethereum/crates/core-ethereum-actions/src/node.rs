@@ -34,6 +34,8 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
             return Err(InvalidArguments("cannot withdraw zero amount".into()).into());
         }
 
+        // TODO: should we check native/token balance here before withdrawing ?
+
         info!("initiating withdrawal of {amount} to {recipient}");
         self.tx_sender.send(Transaction::Withdraw(recipient, amount)).await
     }
