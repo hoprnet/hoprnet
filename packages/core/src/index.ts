@@ -654,7 +654,7 @@ export class Hopr extends EventEmitter {
       throw new Error('No tickets found in channel')
     }
 
-    await this.tools.aggregate_tickets(channel, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
+    await this.tools.aggregate_tickets(this.db, channel, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
   }
 
   /**

@@ -28,6 +28,9 @@ use utils_types::{
     traits::PeerIdLike,
 };
 
+use core_types::acknowledgement::AcknowledgedTicketStatus;
+use futures::stream::FuturesUnordered;
+
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::sleep;
 
@@ -82,6 +85,97 @@ pub enum AggregationList {
     /// Aggregate the given list of acknowledged tickets.
     /// The tickets must belong to the same channel and already be marked as `BeingAggregated`
     TicketList(Vec<AcknowledgedTicket>),
+}
+
+impl AggregationList {
+    pub async fn rollback<Db: HoprCoreEthereumDbActions>(self, db: Arc<RwLock<Db>>) -> Result<()> {
+        let tickets = match self {
+            AggregationList::WholeChannel(channel) => {
+                db.read()
+                    .await
+                    .get_acknowledged_tickets_range(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
+                    .await?
+            }
+            AggregationList::ChannelRange {
+                channel_id,
+                epoch,
+                index_start,
+                index_end,
+            } => {
+                db.read()
+                    .await
+                    .get_acknowledged_tickets_range(&channel_id, epoch, index_start, index_end)
+                    .await?
+            }
+            AggregationList::TicketList(list) => list,
+        };
+
+        let reverted = tickets
+            .iter()
+            .map(|t| async {
+                let mut ticket = t.clone();
+                ticket.status = AcknowledgedTicketStatus::Untouched;
+                if let Err(e) = db.write().await.update_acknowledged_ticket(&ticket).await {
+                    error!("failed to revert {ticket} : {e}");
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .filter(|r| *r)
+            .count();
+
+        warn!("reverted {reverted} ack tickets to untouched state");
+        Ok(())
+    }
+
+    async fn into_vec<Db: HoprCoreEthereumDbActions>(self, db: Arc<RwLock<Db>>) -> Result<Vec<AcknowledgedTicket>> {
+        Ok(match self {
+            AggregationList::WholeChannel(channel) => {
+                db.write()
+                    .await
+                    .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
+                    .await?
+            }
+            AggregationList::ChannelRange {
+                channel_id,
+                epoch,
+                index_start,
+                index_end,
+            } => {
+                db.write()
+                    .await
+                    .prepare_aggregatable_tickets(&channel_id, epoch, index_start, index_end)
+                    .await?
+            }
+            AggregationList::TicketList(list) => {
+                if list.is_empty() {
+                    debug!("got empty list of tickets to aggregate");
+                    return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
+                }
+
+                let signer = list[0].signer;
+                let channel_id = list[0].ticket.channel_id;
+
+                if !list.iter().all(|tkt| {
+                    tkt.signer == signer && tkt.ticket.channel_id == channel_id && tkt.status.is_being_aggregated()
+                }) {
+                    error!(
+                        "some tickets to aggregate in the given list do not come from the same channel or are not marked as BeingAggregated"
+                    );
+                    return Err(ProtocolTicketAggregation(
+                        "invalid list of tickets to aggregate given".into(),
+                    ));
+                }
+
+                list
+            }
+        })
+    }
 }
 
 /// The input to the processor background pipeline
@@ -339,49 +433,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         &self,
         ticket_list: AggregationList,
     ) -> Result<(PeerId, Vec<AcknowledgedTicket>)> {
-        let tickets_to_aggregate = match ticket_list {
-            AggregationList::WholeChannel(channel) => {
-                self.db
-                    .write()
-                    .await
-                    .prepare_aggregatable_tickets(&channel.get_id(), channel.channel_epoch.as_u32(), 0u64, u64::MAX)
-                    .await?
-            }
-            AggregationList::ChannelRange {
-                channel_id,
-                epoch,
-                index_start,
-                index_end,
-            } => {
-                self.db
-                    .write()
-                    .await
-                    .prepare_aggregatable_tickets(&channel_id, epoch, index_start, index_end)
-                    .await?
-            }
-            AggregationList::TicketList(list) => {
-                if list.is_empty() {
-                    debug!("got empty list of tickets to aggregate");
-                    return Err(ProtocolTicketAggregation("no tickets to aggregate".into()));
-                }
-
-                let signer = list[0].signer;
-                let channel_id = list[0].ticket.channel_id;
-
-                if !list.iter().all(|tkt| {
-                    tkt.signer == signer && tkt.ticket.channel_id == channel_id && tkt.status.is_being_aggregated()
-                }) {
-                    error!(
-                        "some tickets to aggregate in the given list do not come from the same channel or are not marked as BeingAggregated"
-                    );
-                    return Err(ProtocolTicketAggregation(
-                        "invalid list of tickets to aggregate given".into(),
-                    ));
-                }
-
-                list
-            }
-        };
+        let tickets_to_aggregate = ticket_list.into_vec(self.db.clone()).await?;
 
         if tickets_to_aggregate.is_empty() {
             debug!("got empty list of tickets to aggregate");
@@ -565,7 +617,7 @@ impl<T: 'static, U: 'static> TicketAggregationInteraction<T, U> {
                                 }
                             },
                             Err(e) => {
-                                debug!("Counterparty refused to aggregrate tickets. {}", e);
+                                debug!("Counterparty refused to aggregate tickets. {}", e);
                                 None
                             }
                         }
