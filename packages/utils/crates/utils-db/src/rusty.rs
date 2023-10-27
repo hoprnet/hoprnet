@@ -193,6 +193,14 @@ impl AsyncKVStorage for RustyLevelDbShim {
             .write(wb, wait_for_write)
             .map_err(|e| DbError::GenericError(e.err))
     }
+
+    async fn flush(&mut self) -> crate::errors::Result<()> {
+        self.db
+            .lock()
+            .unwrap()
+            .flush()
+            .map_err(|e| DbError::GenericError(e.err))
+    }
 }
 
 #[cfg(any(feature = "wasm", test))]

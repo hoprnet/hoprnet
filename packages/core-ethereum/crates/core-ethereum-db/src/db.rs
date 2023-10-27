@@ -195,7 +195,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     ) -> Result<()> {
         let key = utils_db::db::Key::new_with_prefix(&half_key_challenge, PENDING_ACKNOWLEDGEMENTS_PREFIX)?;
 
-        let _ = self.db.set(key, &pending_acknowledgment).await?;
+        self.db.set(key, &pending_acknowledgment).await?;
+        self.db.flush().await?;
 
         Ok(())
     }
@@ -373,7 +374,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()> {
         let key = get_acknowledged_ticket_key(ticket)?;
         if self.db.contains(key.clone()).await {
-            self.db.set(key, ticket).await.map(|_| ())
+            self.db.set(key, ticket).await.map(|_| ())?;
+            self.db.flush().await
         } else {
             Err(DbError::NotFound)
         }
@@ -388,6 +390,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
             .unwrap_or(Balance::zero(ticket.amount.balance_type()));
 
         let _result = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await?;
+        self.db.flush().await?;
         Ok(())
     }
 
@@ -619,6 +622,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
         self.db.set(key.clone(), &current_balance.sub(balance)).await?;
+        self.db.flush().await?;
         Ok(())
     }
 
@@ -649,6 +653,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
         self.db.set(key, &new_redeemed_balance).await?;
         debug!("updated redeemed tickets value to {new_redeemed_balance}");
+        self.db.flush().await?;
 
         if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
             if c.source == self.me {
@@ -666,6 +671,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
             let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
             self.db.set(key, &new_pending_balance).await?;
+
+            self.db.flush().await?;
             debug!("updated pending balance with {counterparty} to: {new_pending_balance}");
 
             Ok(())

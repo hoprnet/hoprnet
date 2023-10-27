@@ -240,6 +240,10 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> DB<T> {
     pub async fn batch(&mut self, batch: Batch, wait_for_write: bool) -> Result<()> {
         self.backend.batch(batch.ops, wait_for_write).await
     }
+
+    pub async fn flush(&mut self) -> Result<()> {
+        self.backend.flush().await
+    }
 }
 
 #[cfg(test)]
