@@ -1446,6 +1446,7 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "libp2p-identity",
+ "log",
  "more-asserts",
  "parameterized",
  "rand 0.8.5",
