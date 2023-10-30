@@ -125,31 +125,23 @@ impl ChannelEntry {
     }
 
     /// Checks if the closure time of this channel has passed.
-    pub fn closure_time_passed(&self, current_timestamp_ms: u64) -> Option<bool> {
-        assert!(current_timestamp_ms > 0, "invalid timestamp");
-        // round clock ms to seconds
-        let now_seconds: U256 = U256::from(current_timestamp_ms) / 1000u64.into();
-
-        if self.closure_time.eq(&U256::zero()) {
-            None
-        } else {
-            Some(self.closure_time < now_seconds)
-        }
+    /// Also returns `false` if the channel closure has not been initiated.
+    pub fn closure_time_passed(&self, current_timestamp_ms: u64) -> bool {
+        self.remaining_closure_time(current_timestamp_ms)
+            .map(|remaining| remaining == 0)
+            .unwrap_or(false)
     }
 
     /// Calculates the remaining channel closure grace period in seconds.
+    /// Returns `None` if the channel closure has not been initiated yet.
     pub fn remaining_closure_time(&self, current_timestamp_ms: u64) -> Option<u64> {
         assert!(current_timestamp_ms > 0, "invalid timestamp");
         // round clock ms to seconds
-        let now_seconds = U256::from(current_timestamp_ms) / 1000u64.into();
+        let now_seconds = current_timestamp_ms / 1000_u64;
 
-        if self.closure_time.eq(&U256::zero()) {
-            None
-        } else if self.closure_time > now_seconds {
-            Some((self.closure_time - now_seconds).as_u64())
-        } else {
-            Some(0u64)
-        }
+        self.closure_time
+            .gt(&0_u64.into())
+            .then(|| self.closure_time.as_u64().saturating_sub(now_seconds))
     }
 
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(js_name = "to_string"))]
@@ -160,7 +152,7 @@ impl ChannelEntry {
 
 impl ChannelEntry {
     /// Determines the channel direction given the self address.
-    /// Returns `None` if neither source nor destination is equal to `me`.
+    /// Returns `None` if neither source nor destination are equal to `me`.
     pub fn direction(&self, me: &Address) -> Option<ChannelDirection> {
         if self.source.eq(me) {
             Some(ChannelDirection::Outgoing)
@@ -230,6 +222,85 @@ impl BinarySerializable for ChannelEntry {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
     Hash::create(&[&source.to_bytes(), &destination.to_bytes()])
+}
+
+/// Enumerates possible changes on a channel entry update
+#[derive(Clone, Copy, Debug)]
+pub enum ChannelChange {
+    /// Channel status has changed
+    Status { left: ChannelStatus, right: ChannelStatus },
+
+    /// Channel balance has changed
+    CurrentBalance { left: Balance, right: Balance },
+
+    /// Channel epoch has changed
+    Epoch { left: u32, right: u32 },
+
+    /// Ticket index has changed
+    TicketIndex { left: u64, right: u64 },
+}
+
+impl Display for ChannelChange {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChannelChange::Status { left, right } => {
+                write!(f, "Status: {left} -> {right}")
+            }
+
+            ChannelChange::CurrentBalance { left, right } => {
+                write!(f, "Balance: {left} -> {right}")
+            }
+
+            ChannelChange::Epoch { left, right } => {
+                write!(f, "Epoch: {left} -> {right}")
+            }
+
+            ChannelChange::TicketIndex { left, right } => {
+                write!(f, "TicketIndex: {left} -> {right}")
+            }
+        }
+    }
+}
+
+impl ChannelChange {
+    /// Compares the two given channels and returns a vector of `ChannelChange`s
+    /// Both channels must have the same ID (source,destination and direction) to be comparable using this function.
+    /// The function panics if `left` and `right` do not have equal ids.
+    /// Note that only some fields are tracked for changes, and therefore an empty vector returned
+    /// does not imply the two `ChannelEntry` instances are equal.
+    pub fn diff_channels(left: &ChannelEntry, right: &ChannelEntry) -> Vec<Self> {
+        assert_eq!(left.id, right.id, "must have equal ids"); // misuse
+        let mut ret = Vec::with_capacity(4);
+        if left.status != right.status {
+            ret.push(ChannelChange::Status {
+                left: left.status,
+                right: right.status,
+            });
+        }
+
+        if left.balance != right.balance {
+            ret.push(ChannelChange::CurrentBalance {
+                left: left.balance,
+                right: right.balance,
+            });
+        }
+
+        if left.channel_epoch != right.channel_epoch {
+            ret.push(ChannelChange::Epoch {
+                left: left.channel_epoch.as_u32(),
+                right: right.channel_epoch.as_u32(),
+            });
+        }
+
+        if left.ticket_index != right.ticket_index {
+            ret.push(ChannelChange::TicketIndex {
+                left: left.ticket_index.as_u64(),
+                right: right.ticket_index.as_u64(),
+            })
+        }
+
+        ret
+    }
 }
 
 /// Contains the overall description of a ticket with a signature
@@ -623,7 +694,7 @@ impl Ticket {
         // Add + 1 to "round to next integer"
         let win_prob = (u64::from_be_bytes(win_prob) >> 4) + 1 + 1;
 
-        (*self.amount.value() * win_prob.into()) >> U256::from(52u64)
+        (*self.amount.value() * U256::from(win_prob)) >> U256::from(52u64)
     }
 
     /// Recovers the signer public key from the embedded ticket signature.
@@ -734,7 +805,7 @@ pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
 
 /// Encodes [0.0f64, 1.0f64] to [0x00000000000000, 0xffffffffffffff]
 pub fn f64_to_win_prob(win_prob: f64) -> Result<EncodedWinProb> {
-    if win_prob > 1.0 || win_prob < 0.0 {
+    if !(0.0..=1.0).contains(&win_prob) {
         return Err(CoreTypesError::InvalidInputData(
             "Winning probability must be in [0.0, 1.0]".into(),
         ));
@@ -806,6 +877,30 @@ pub mod tests {
 
         assert!(ChannelStatus::from_byte(231).is_none());
         assert_eq!(cs1, cs2, "channel status does not match");
+    }
+
+    #[test]
+    pub fn channel_entry_closure_time() {
+        let mut ce = ChannelEntry::new(
+            *ADDRESS_1,
+            *ADDRESS_2,
+            Balance::new(10u64.into(), BalanceType::HOPR),
+            23u64.into(),
+            ChannelStatus::Open,
+            3u64.into(),
+            0u64.into(),
+        );
+
+        assert!(!ce.closure_time_passed(10));
+        assert!(ce.remaining_closure_time(10).is_none());
+
+        ce.closure_time = 12_u32.into();
+
+        assert!(!ce.closure_time_passed(10000));
+        assert_eq!(2, ce.remaining_closure_time(10000).expect("must have closure time"));
+
+        assert!(ce.closure_time_passed(14000));
+        assert_eq!(0, ce.remaining_closure_time(14000).expect("must have closure time"));
     }
 
     #[test]

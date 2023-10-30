@@ -82,17 +82,42 @@ impl BinarySerializable for Acknowledgement {
     }
 }
 
+/// Status of the acknowledged ticket.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AcknowledgedTicketStatus {
+    /// The ticket is available for redeeming or aggregating
     #[default]
     Untouched,
-    BeingRedeemed {
-        tx_hash: Hash,
-    },
-    BeingAggregated {
-        start: u64,
-        end: u64,
-    },
+    /// Ticket is currently being redeemed in and on-going redemption process
+    BeingRedeemed { tx_hash: Hash },
+    /// Ticket is currently being aggregated in and on-going aggregation process
+    BeingAggregated { start: u64, end: u64 },
+}
+
+impl AcknowledgedTicketStatus {
+    /// Short-hand to check if the ticket is `BeingAggregated`
+    pub fn is_being_redeemed(&self) -> bool {
+        match self {
+            AcknowledgedTicketStatus::BeingRedeemed { .. } => true,
+            _ => false,
+        }
+    }
+
+    /// Short-hand to check if the ticket is `BeingRedeemed`
+    pub fn is_being_aggregated(&self) -> bool {
+        match self {
+            AcknowledgedTicketStatus::BeingAggregated { .. } => true,
+            _ => false,
+        }
+    }
+
+    /// Short-hand to check if the ticket is `Untouched`
+    pub fn is_untouched(&self) -> bool {
+        match self {
+            AcknowledgedTicketStatus::Untouched { .. } => true,
+            _ => false,
+        }
+    }
 }
 
 impl Display for AcknowledgedTicketStatus {
@@ -450,7 +475,7 @@ pub mod test {
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * path_pos.into(),
+                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(path_pos),
                 BalanceType::HOPR,
             ),
             U256::zero(),
@@ -680,13 +705,10 @@ pub mod wasm {
         #[wasm_bindgen]
         pub fn set_redeem_tx_hash(&mut self, tx_hash_str: &str) {
             if let Ok(tx_hash) = Hash::from_hex(tx_hash_str) {
-                match self.w.status {
-                    BeingRedeemed { .. } => {
-                        if !tx_hash.eq(&Hash::default()) {
-                            self.w.status = BeingRedeemed { tx_hash }
-                        }
+                if let BeingRedeemed { .. } = self.w.status {
+                    if !tx_hash.eq(&Hash::default()) {
+                        self.w.status = BeingRedeemed { tx_hash }
                     }
-                    _ => {}
                 }
             }
         }

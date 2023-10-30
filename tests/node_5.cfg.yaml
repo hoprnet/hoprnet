@@ -24,6 +24,7 @@ api:
 strategy:
   on_fail_continue: true
   allow_recursive: false
+  finalize_channel_closure: false
   strategies: []
 heartbeat:
   variance: 1000

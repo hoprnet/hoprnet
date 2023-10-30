@@ -27,7 +27,7 @@ pub type HeartbeatGetPongRx =
     futures::channel::mpsc::UnboundedReceiver<(PeerId, std::result::Result<(ControlMessage, String), ()>)>;
 
 #[cfg_attr(test, mockall::automock)]
-#[async_trait]
+#[async_trait(? Send)]
 pub trait PingExternalAPI {
     async fn on_finished_ping(&self, peer: &PeerId, result: crate::types::Result, version: String);
 }

@@ -1,4 +1,5 @@
 ---
+# Child pipeline to build Hoprd docker image (europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd)
 name: Build Hoprd
 
 on:
@@ -8,11 +9,6 @@ on:
         required: true
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY:
         required: true
-      K8S_SSH_SERVICE_HOST:
-        required: true
-      K8S_SSH_SERVICE_USERNAME:
-        required: true
-      K8S_SSH_SERVICE_PASSWORD:
 
 concurrency:
   group: ${{ github.head_ref }}-hoprd
@@ -49,15 +45,16 @@ jobs:
           driver: kubernetes
 
       - name: "Update version"
+        id: update
         run: |
           if ${{ contains(github.event.pull_request.labels.*.name, 'release') }}; then
             docker_tag=$(jq -r '.version' packages/hoprd/package.json | sed 's/+/-/')
-            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
           else
             next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
             ./scripts/bump-version.sh ${next_version}
             docker_tag=$(echo "${next_version}" | sed 's/+/-/')
-            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV            
+            echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push docker image
@@ -65,11 +62,11 @@ jobs:
         with:
           push: true
           file: packages/hoprd/Dockerfile
-          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}-cache
-          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}-cache,mode=max
-          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ env.DOCKER_TAG }}
+          cache-from: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ steps.update.outputs.DOCKER_TAG }}-cache
+          cache-to: type=registry,ref=europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ steps.update.outputs.DOCKER_TAG }}-cache,mode=max
+          tags: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hoprd:${{ steps.update.outputs.DOCKER_TAG }}
           build-args: |
-            TOOLCHAIN_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ env.DOCKER_TAG }}
+            TOOLCHAIN_IMAGE: europe-west3-docker.pkg.dev/${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}/docker-images/hopr-toolchain:${{ steps.update.outputs.DOCKER_TAG }}
 
   restart_deployment:
     name: Restart deployment

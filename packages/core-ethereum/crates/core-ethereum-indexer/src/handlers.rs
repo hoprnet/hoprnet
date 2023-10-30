@@ -319,7 +319,7 @@ where
                     // set all channel fields like we do on-chain on close
                     channel.status = ChannelStatus::Open;
                     channel.ticket_index = 0u64.into();
-                    channel.channel_epoch = channel.channel_epoch + 1u64.into();
+                    channel.channel_epoch = channel.channel_epoch + U256::from(1u64);
 
                     db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
 

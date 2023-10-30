@@ -1,10 +1,19 @@
+---
+#################################################################################
+# Pipeline triggered on every merged pull request to:
+# 1. Cleanup the pull request cache
+# 2. Update the latest docker tag and the release docker tag if it is part of a release 
+# 3. Deploy the pull request in rotsee network
+# 4. Create the github release with changelog if it is labeled with 'release'. Close the associated milestone and notify in Element
+# 5. Create the new release pull request
+#################################################################################
 name: Merge
 
 on:
   pull_request:
     types:
       - closed
-      #- synchronize
+      # - synchronize
 
 concurrency:
   group: merge
@@ -261,13 +270,23 @@ jobs:
           MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
 
   new_release:
-    name: Open release
+    name: Open new release
     if: contains(github.event.pull_request.labels.*.name, 'release')
     needs: 
       - create_release
     uses: ./.github/workflows/open-release.yaml
     with:
       release_type: ${{ vars.NEXT_RELEASE_TYPE }}
-      release_name: ${{ vars.NEXT_RELEASE_NAME }}
+      base_branch: ${{ github.event.pull_request.base.ref }}
     secrets:
       GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+  build_dappnode:
+    name: Build dappNode
+    if: contains(github.event.pull_request.labels.*.name, 'release')
+    needs: 
+      - create_release
+    uses: ./.github/workflows/build-dappnode.yaml
+    with:
+      base_branch: ${{ github.event.pull_request.base.ref }}
+    secrets: inherit

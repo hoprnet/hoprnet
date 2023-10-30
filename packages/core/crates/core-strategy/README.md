@@ -34,6 +34,9 @@ The constant `k` can be also set to a value > 1, which will make the strategy to
 but it would keep the same asymptotic properties.
 Per default `k` = 1.
 
+The strategy starts acting only after at least 10 network size samples were gathered, which means
+it does not start opening/closing channels earlier than 10 minutes after the node start.
+
 ### Default parameters
 
 - `network_quality_threshold`: 0.5
@@ -110,10 +113,15 @@ A Multi Strategy can also contain another Multi Strategy as a sub-strategy if `a
 However, this recursion is always allowed up to 2 levels only.
 Along with the `on_fail_continue` value, the recursive feature allows constructing more complex logical strategy chains.
 
+The MultiStrategy can also observe channels being `PendingToClose` and running out of closure grace period,
+and if this happens, it will issue automatically the final close transaction, which transitions the state to `Closed`.
+This can be controlled by the `finalize_channel_closure` parameter.
+
 ### Default parameters
 
 - `on_fail_continue`: true
 - `allow_recursive`: true
+- `finalize_channel_closure`: false
 - `strategies`: none (the Multi strategy behaves as Passive strategy per default)
 
 ## Configuring strategies in HOPRd

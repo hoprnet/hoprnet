@@ -1,4 +1,7 @@
 ---
+#################################################################################
+# Pipeline triggered when a new pull request is created to convert it into draft to avoid building docker images at the beginning
+#################################################################################
 name: New PR
 
 on:

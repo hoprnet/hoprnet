@@ -1,5 +1,7 @@
-# See docs: https://github.com/actions/stale
-
+---
+#################################################################################
+# Cron daily pipeline to clean cache contents (stale issues and docker images)
+#################################################################################
 name: Cleanup
 
 on:
@@ -12,6 +14,7 @@ jobs:
     runs-on: ubuntu-2-core
     timeout-minutes: 10
     steps:
+        # See docs: https://github.com/actions/stale
       - uses: actions/stale@v8
         with:
           stale-issue-message: 'This issue is stale because it has been open 60 days with no activity. Remove stale label or comment or this will be closed in 30 days.'
@@ -33,6 +36,12 @@ jobs:
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+          install_components: beta
 
       - name: Login Google Container Registry
         uses: docker/login-action@v3

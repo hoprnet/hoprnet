@@ -22,7 +22,6 @@ import {
   ChannelDirection,
   ChannelEntry,
   ChannelStatus,
-  close_channel,
   compareAddressesLocalMode,
   compareAddressesPublicMode,
   create_counter,
@@ -32,7 +31,6 @@ import {
   Database,
   debug,
   durations,
-  fund_channel,
   getBackoffRetries,
   getBackoffRetryTimeout,
   HalfKeyChallenge,
@@ -45,15 +43,10 @@ import {
   MIN_NATIVE_BALANCE,
   OffchainKeypair,
   OffchainPublicKey,
-  open_channel,
   PacketInteractionConfig,
-  Path,
   PeerOrigin,
   PeerStatus,
   PingConfig,
-  redeem_all_tickets,
-  redeem_tickets_in_channel,
-  redeem_tickets_with_counterparty,
   retimer as intervalTimer,
   retryWithBackoffThenThrow,
   Snapshot,
@@ -63,12 +56,11 @@ import {
   WasmNetwork,
   WasmPing,
   WasmTxExecutor,
-  withdraw
+  legacy_path_select,
+  TransportPath
 } from '@hoprnet/hopr-utils'
 
-import { INTERMEDIATE_HOPS, MAX_HOPS, MAX_PARALLEL_PINGS, PACKET_SIZE, VERSION } from './constants.js'
-
-import { findPath } from './path/index.js'
+import { MAX_HOPS, MAX_PARALLEL_PINGS, PACKET_SIZE, VERSION } from './constants.js'
 
 import HoprCoreEthereum, {
   type Indexer,
@@ -450,7 +442,8 @@ export class Hopr extends EventEmitter {
   private async onTicketRedeemed(channel: ChannelEntry, ticketAmount: Balance): Promise<void> {
     // We are only interested in channels where we are the source, since only
     // then we track the pending balance.
-    if (channel.source.eq(this.getEthereumAddress())) {
+    let selfAddr = this.getEthereumAddress()
+    if (channel.source.eq(selfAddr)) {
       await this.db.resolve_pending(channel.destination, ticketAmount)
     }
   }
@@ -661,7 +654,7 @@ export class Hopr extends EventEmitter {
       throw new Error('No tickets found in channel')
     }
 
-    await this.tools.aggregate_tickets(channel, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
+    await this.tools.aggregate_tickets(this.db, channel, TICKET_AGGREGATION_TIMEOUT_MILLISECONDS)
   }
 
   /**
@@ -689,12 +682,12 @@ export class Hopr extends EventEmitter {
       throw Error(`Message does not fit into one packet. Please split message into chunks of ${PACKET_SIZE} bytes`)
     }
 
-    let path: Path
+    let path: TransportPath
     if (intermediatePath != undefined) {
       // Validate the manually specified intermediate path
       let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
       try {
-        path = await Path.validated(withDestination, this.chainKeypair.to_address(), true, this.db)
+        path = await TransportPath.validated(withDestination, this.db, this.tools.channel_graph())
       } catch (e) {
         metric_sentMessageFailCount.increment()
         throw e
@@ -702,15 +695,9 @@ export class Hopr extends EventEmitter {
     } else {
       let chain_key = await this.peerIdToChainKey(destination)
       if (chain_key) {
-        intermediatePath = await this.getIntermediateNodes(chain_key, hops)
-
-        if (intermediatePath == null || !intermediatePath.length) {
-          metric_sentMessageFailCount.increment()
-          throw Error(`Failed to find automatic path`)
-        }
-
-        let withDestination = [...intermediatePath.map((pk) => pk.to_peerid_str()), destination.toString()]
-        path = new Path(withDestination)
+        let graph = this.tools.channel_graph()
+        path = await legacy_path_select(graph, this.db, chain_key, hops ?? MAX_HOPS)
+        log(`found auto-path to ${chain_key.to_string()}: ${path.to_string()}`)
       } else {
         throw Error(`Failed to obtain chain key for peer id ${destination}`)
       }
@@ -718,9 +705,8 @@ export class Hopr extends EventEmitter {
 
     metric_pathLength.observe(path.length())
 
-    return (
-      await this.tools.send_message(new ApplicationData(applicationTag, msg), path, PACKET_QUEUE_TIMEOUT_MILLISECONDS)
-    ).to_hex()
+    let appData = new ApplicationData(applicationTag, msg)
+    return (await this.tools.send_message(appData, path, PACKET_QUEUE_TIMEOUT_MILLISECONDS)).to_hex()
   }
 
   /**
@@ -898,7 +884,8 @@ export class Hopr extends EventEmitter {
     }
 
     // Check if there was a previous announcement from us
-    const ownAccount = await connector.getAccount(this.getEthereumAddress())
+    let selfAddr = this.getEthereumAddress()
+    const ownAccount = await connector.getAccount(selfAddr)
 
     // Do not announce if our last is equal to what we intend to announce
     log('known own multiaddr from previous announcement %s', ownAccount?.get_multiaddr_str())
@@ -957,7 +944,8 @@ export class Hopr extends EventEmitter {
 
   public async getNativeBalance(): Promise<Balance> {
     verbose('Requesting native balance for node')
-    return await HoprCoreEthereum.getInstance().getNativeBalance(this.getEthereumAddress().to_string(), true)
+    let selfAddr = this.getEthereumAddress()
+    return await HoprCoreEthereum.getInstance().getNativeBalance(selfAddr.to_string(), true)
   }
 
   public async getSafeBalance(): Promise<Balance> {
@@ -1005,11 +993,10 @@ export class Hopr extends EventEmitter {
     if (!this.isReady) {
       log('openChannel: Node is not ready for on-chain operations')
     }
-    let self_addr = this.getEthereumAddress()
     let amount = new Balance(amountToFund.toString(10), BalanceType.HOPR)
-    let tx_sender = this.tools.get_tx_sender()
+    let actions = this.tools.chain_actions()
     try {
-      let res = await open_channel(this.db, counterparty, self_addr, amount, tx_sender)
+      let res = await actions.open_channel(counterparty, amount)
       return { channelId: res.channel_id, receipt: res.tx_hash.to_hex() }
     } catch (err) {
       log('failed to open channel', err)
@@ -1031,8 +1018,8 @@ export class Hopr extends EventEmitter {
 
     try {
       let newAmount = new Balance(amount.toString(10), BalanceType.HOPR)
-      let tx_sender = this.tools.get_tx_sender()
-      let res = await fund_channel(this.db, channelId, newAmount, tx_sender)
+      let actions = this.tools.chain_actions()
+      let res = await actions.fund_channel(channelId, newAmount)
       return res.to_hex()
     } catch (err) {
       log('failed to fund channel', err)
@@ -1050,9 +1037,8 @@ export class Hopr extends EventEmitter {
     }
 
     try {
-      let self_addr = this.getEthereumAddress()
-      let tx_sender = this.tools.get_tx_sender()
-      let res = await close_channel(this.db, counterparty, self_addr, direction, false, tx_sender)
+      let actions = this.tools.chain_actions()
+      let res = await actions.close_channel(counterparty, direction, false)
       return { receipt: res.tx_hash.to_hex(), status: res.status }
     } catch (err) {
       log('failed to close channel', err)
@@ -1074,7 +1060,8 @@ export class Hopr extends EventEmitter {
     log(`looking for tickets in channel ${channelId.to_hex()}`)
     const channel = await this.db.get_channel(channelId)
     // return no tickets if channel does not exist or is not an incoming channel
-    if (!channel || !channel.destination.eq(this.getEthereumAddress())) {
+    let selfAddr = this.getEthereumAddress()
+    if (!channel || !channel.destination.eq(selfAddr)) {
       return []
     }
 
@@ -1126,8 +1113,8 @@ export class Hopr extends EventEmitter {
       log('redeemAllTickets: Node is not ready for on-chain operations')
     }
     try {
-      let tx_sender = this.tools.get_tx_sender()
-      await redeem_all_tickets(this.db, onlyAggregated, tx_sender)
+      let actions = this.tools.chain_actions()
+      await actions.redeem_all_tickets(onlyAggregated)
     } catch (err) {
       log(`error during all tickets redemption: ${err}`)
     }
@@ -1140,9 +1127,10 @@ export class Hopr extends EventEmitter {
     try {
       log(`trying to redeem tickets in channel ${channelId.to_hex()}`)
       const channel = await this.db.get_channel(channelId)
-      let tx_sender = this.tools.get_tx_sender()
-      if (channel?.destination.eq(this.getEthereumAddress())) {
-        await redeem_tickets_in_channel(this.db, channel, onlyAggregated, tx_sender)
+      let actions = this.tools.chain_actions()
+      let selfAddr = this.getEthereumAddress()
+      if (channel?.destination.eq(selfAddr)) {
+        await actions.redeem_tickets_in_channel(channel, onlyAggregated)
       } else {
         log(`cannot redeem tickets in channel ${channelId.to_hex()}`)
       }
@@ -1157,8 +1145,8 @@ export class Hopr extends EventEmitter {
     }
 
     try {
-      let tx_sender = this.tools.get_tx_sender()
-      await redeem_tickets_with_counterparty(this.db, counterparty, onlyAggregated, tx_sender)
+      let actions = this.tools.chain_actions()
+      await actions.redeem_tickets_with_counterparty(counterparty, onlyAggregated)
     } catch (err) {
       log(`error during ticket redemption with counterparty ${counterparty.to_hex()}: ${err}`)
     }
@@ -1229,7 +1217,6 @@ export class Hopr extends EventEmitter {
 
   /**
    * Withdraw on-chain assets to a given address
-   * @param currency either native currency or HOPR tokens
    * @param recipient the account where the assets should be transferred to
    * @param amount how many tokens to be transferred
    * @returns
@@ -1239,8 +1226,8 @@ export class Hopr extends EventEmitter {
       log('withdraw: Node is not ready for on-chain operations')
     }
     try {
-      let tx_sender = this.tools.get_tx_sender()
-      let result = await withdraw(recipient, amount, tx_sender)
+      let actions = this.tools.chain_actions()
+      let result = await actions.withdraw(recipient, amount)
       return result.to_hex()
     } catch (err) {
       this.maybeEmitFundsEmptyEvent(err)
@@ -1259,8 +1246,9 @@ export class Hopr extends EventEmitter {
    */
   public async isAllowedAccessToNetwork(id: PeerId): Promise<boolean> {
     // Don't wait for key binding and local linking if identity is the local node
+    let selfAddr = this.getEthereumAddress()
     if (this.id.equals(id)) {
-      return await this.db.is_allowed_to_access_network(this.getEthereumAddress())
+      return await this.db.is_allowed_to_access_network(selfAddr)
     }
     let chain_key: Address = await this.peerIdToChainKey(id)
     // Only check if we found a chain key, otherwise peer is not allowed
@@ -1268,39 +1256,6 @@ export class Hopr extends EventEmitter {
       return await this.db.is_allowed_to_access_network(chain_key)
     }
     return false
-  }
-
-  /**
-   * Takes a destination, and optionally the desired number of hops,
-   * and samples randomly intermediate nodes
-   * that will relay that message before it reaches its destination.
-   *
-   * @param destination ethereum address of the destination node
-   * @param hops optional number of required intermediate nodes (must be an integer 1,2,...MAX_HOPS inclusive)
-   */
-  private async getIntermediateNodes(destination: Address, hops?: number): Promise<OffchainPublicKey[]> {
-    if (!hops) {
-      hops = INTERMEDIATE_HOPS
-    } else if (![...Array(MAX_HOPS).keys()].map((i) => i + 1).includes(hops)) {
-      throw new Error(`the number of intermediate nodes must be an integer between 1 and ${MAX_HOPS} inclusive`)
-    }
-    const path = await findPath(
-      this.getEthereumAddress(),
-      destination,
-      hops,
-      async (address: Address) => {
-        try {
-          const pk = await HoprCoreEthereum.getInstance().getPacketKeyOf(address)
-          return await this.networkPeers.quality_of(pk.to_peerid_str())
-        } catch (e) {
-          log(`error while looking up the packet key of ${address}`)
-          return 0
-        }
-      },
-      HoprCoreEthereum.getInstance().getOpenChannelsFrom.bind(HoprCoreEthereum.getInstance())
-    )
-
-    return await Promise.all(path.map((x) => HoprCoreEthereum.getInstance().getPacketKeyOf(x)))
   }
 
   /**
@@ -1366,5 +1321,5 @@ export class Hopr extends EventEmitter {
 
 export { PEER_METADATA_PROTOCOL_VERSION } from './constants.js'
 export { createHoprNode } from './main.js'
-export { findPath, PeerOrigin, PeerStatus, Health }
+export { PeerOrigin, PeerStatus, Health }
 export { resolveNetwork, supportedNetworks, type ResolvedNetwork } from './network.js'

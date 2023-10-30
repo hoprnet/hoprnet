@@ -185,12 +185,13 @@ pub(crate) async fn p2p_loop(
                     swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
                 },
                 Inputs::ManualPing(api::ManualPingChallenge(peer, challenge)) => {
-                    debug!("Executing manual ping to peer '{}'", peer);
+                    debug!("Executing manual ping to peer '{peer}'");
                     let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(challenge));
                     active_manual_pings.insert(req_id);
                 },
                 Inputs::NetworkUpdate(event) => match event {
                     NetworkEvent::CloseConnection(peer) => {
+                        debug!("Network event: closing connection to peer '{peer}' based on network quality");
                         if swarm.is_connected(&peer) {
                             let _ = swarm.disconnect_peer_id(peer);
                         }
@@ -199,10 +200,12 @@ pub(crate) async fn p2p_loop(
                         // NOTE: this functionality is not needed after swtich to rust-libp2p
                     },
                     NetworkEvent::Register(peer, origin, metadata) => {
+                        debug!("Network event: registering peer '{peer}'");
                         let mut writer = network.write().await;
                         (*writer).add_with_metadata(&peer, origin, metadata)
                     },
                     NetworkEvent::Unregister(peer) => {
+                        debug!("Network event: unregistering peer '{peer}'");
                         let mut writer = network.write().await;
                         (*writer).remove(&peer)
                     },
@@ -227,24 +230,27 @@ pub(crate) async fn p2p_loop(
                         }
                     },
                     AckProcessed::Send(peer, ack) => {
+                        debug!("Sending an acknowledgement to  {peer}");
                         let _request_id = swarm.behaviour_mut().ack.send_request(&peer, ack);
                     }
                 }
                 Inputs::Message(task) => match task {
                     MsgProcessed::Receive(peer, data, ack) => {
-                        debug!("Received packet from peer: {peer}");
+                        debug!("Msg: Received packet from peer: {peer}");
                         if let Err(e) = on_final_packet.try_send(data) {
-                            error!("Failed to store a received message in the inbox: {}", e);
+                            error!("Msg: Failed to store a received message in the inbox: {}", e);
                         }
 
                         if let Err(e) = ack_writer.send_acknowledgement(peer, ack) {
-                            error!("Failed to acknowledge the received final packet: {e}");
+                            error!("Msg: Failed to acknowledge the received final packet: {e}");
                         }
                     },
                     MsgProcessed::Send(peer, octets) => {
+                        debug!("Msg: Sending packet as source to peer: {peer}");
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
                     },
                     MsgProcessed::Forward(peer, octets, previous_peer, ack) => {
+                        debug!("Msg: Forwarding packet from peer '{previous_peer}' to peer: {peer}");
                         let _request_id = swarm.behaviour_mut().msg.send_request(&peer, octets);
                         if let Err(e) = ack_writer.send_acknowledgement(previous_peer, ack) {
                             error!("failed to acknowledge relayed packet: {e}");
@@ -254,17 +260,18 @@ pub(crate) async fn p2p_loop(
                 Inputs::TicketAggregation(task) => match task {
                     TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
                         let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
-                        error!("Ticket aggregation: Sent request (#{}) to {}", request_id, peer);
+                        info!("Ticket aggregation: Sent request (#{request_id}) to {peer}");
                         active_aggregation_requests.insert(request_id, finalizer);
                     },
                     TicketAggregationProcessed::Reply(peer, ticket, response) => {
+                        info!("Ticket aggregation: serving request from {peer}");
                         if let Err(_) = swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket) {
-                            error!("Ticket aggregation: Failed send reply to {}", peer);
+                            error!("Ticket aggregation: Failed to send reply to {peer}");
                         }
                     },
                     TicketAggregationProcessed::Receive(_peer, acked_ticket, request) => {
                         if let Err(e) = on_acknowledged_ticket.unbounded_send(acked_ticket) {
-                             error!("Ticket aggregation: failed to emit acknowledged aggregated ticket: {e}");
+                            error!("Ticket aggregation: failed to emit acknowledged aggregated ticket: {e}");
                         }
 
                         match active_aggregation_requests.remove(&request) {
@@ -277,9 +284,11 @@ pub(crate) async fn p2p_loop(
                 },
                 Inputs::Indexer(task) => match task {
                     IndexerProcessed::Allow(peer) => {
+                        debug!("Indexer: Allowing peer {peer}");
                         let _ = allowed_peers.insert(peer);
                     }
                     IndexerProcessed::Ban(peer) => {
+                        debug!("Indexer: Banning peer {peer}");
                         allowed_peers.remove(&peer);
 
                         if swarm.is_connected(&peer) {
@@ -290,6 +299,7 @@ pub(crate) async fn p2p_loop(
                         }
                     },
                     IndexerProcessed::Announce(peer, multiaddresses) => {
+                        debug!("Indexer: Announcing peer {peer} with multiaddresses {:?}", &multiaddresses);
                         for multiaddress in multiaddresses.iter() {
                             if !swarm.is_connected(&peer) {
                                 match swarm.dial(multiaddress.clone()) {
@@ -314,7 +324,6 @@ pub(crate) async fn p2p_loop(
                                 net.add(&peer, PeerOrigin::Initialization)
                             }
                         }
-
                     }
                 }
             },

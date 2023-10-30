@@ -1062,10 +1062,9 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "core-crypto"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "aes 0.8.3",
- "async-std",
  "blake2",
  "chacha20 0.9.1",
  "console_error_panic_hook",
@@ -1074,7 +1073,6 @@ dependencies = [
  "digest 0.10.7",
  "ed25519-dalek 1.0.1",
  "elliptic-curve",
- "futures",
  "generic-array",
  "getrandom 0.2.10",
  "hex",
@@ -1096,13 +1094,12 @@ dependencies = [
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
- "wasm-bindgen-futures",
  "zeroize",
 ]
 
 [[package]]
 name = "core-ethereum-actions"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1147,7 +1144,6 @@ dependencies = [
  "lazy_static",
  "serde",
  "serde-wasm-bindgen",
- "stdext",
  "utils-db",
  "utils-log",
  "utils-misc",
@@ -1202,7 +1198,6 @@ dependencies = [
  "core-types",
  "env_logger",
  "ethers",
- "futures",
  "hex",
  "hex-literal",
  "js-sys",
@@ -1244,7 +1239,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "core-hopr"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1296,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "core-network"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1397,17 +1392,21 @@ dependencies = [
 
 [[package]]
 name = "core-path"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-std",
+ "async-trait",
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
  "core-types",
+ "futures",
  "hex",
  "hex-literal",
  "js-sys",
+ "lazy_static",
  "libp2p-identity",
+ "mockall",
  "petgraph",
  "serde",
  "tempfile",
@@ -1425,7 +1424,7 @@ dependencies = [
 
 [[package]]
 name = "core-protocol"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1468,7 +1467,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.4.2"
+version = "0.5.3"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1496,10 +1495,10 @@ dependencies = [
  "thiserror",
  "utils-db",
  "utils-log",
+ "utils-metrics",
  "utils-misc",
  "utils-types",
  "validator",
- "vector_assertions",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-opt",
@@ -1510,6 +1509,7 @@ dependencies = [
 name = "core-types"
 version = "0.4.1"
 dependencies = [
+ "async-trait",
  "bincode",
  "bindings",
  "bloomfilter",
@@ -5941,12 +5941,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "stdext"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f3b6b32ae82412fb897ef134867d53a294f57ba5b758f06d71e865352c3e207"
-
-[[package]]
 name = "string_cache"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6549,14 +6543,12 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 name = "utils-db"
 version = "0.2.3"
 dependencies = [
- "async-lock",
  "async-std",
  "async-trait",
  "bincode",
  "console_error_panic_hook",
  "futures-lite",
  "getrandom 0.2.10",
- "gloo-timers 0.3.0",
  "hex",
  "hex-literal",
  "js-sys",
@@ -6606,15 +6598,11 @@ name = "utils-misc"
 version = "0.2.1"
 dependencies = [
  "console_error_panic_hook",
- "futures",
  "js-sys",
  "real-base",
  "serde",
- "serde-wasm-bindgen",
- "serde_bytes",
  "serde_json",
  "wasm-bindgen",
- "wasm-bindgen-futures",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -6625,7 +6613,6 @@ version = "0.2.8"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
- "enum-iterator",
  "ethnum",
  "getrandom 0.2.10",
  "hex",
@@ -6647,12 +6634,7 @@ dependencies = [
 name = "utils-validation"
 version = "0.1.0"
 dependencies = [
- "console_error_panic_hook",
  "proc-macro-regex",
- "real-base",
- "serde",
- "serde_json",
- "utils-types",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -6725,12 +6707,6 @@ name = "value-bag"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d92ccd67fb88503048c01b59152a04effd0782d035a83a6d256ce6085f08f4a3"
-
-[[package]]
-name = "vector_assertions"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e88c1aa999bb527615bd34ef503bedecf0dd890a11879a0eded47db881d8c619"
 
 [[package]]
 name = "version_check"

@@ -1,20 +1,27 @@
-use crate::strategy::SingularStrategy;
-use crate::Strategy;
-use async_std::sync::RwLock;
 use async_trait::async_trait;
-use core_ethereum_actions::channels::fund_channel;
-use core_ethereum_actions::transaction_queue::TransactionSender;
+use core_ethereum_actions::channels::ChannelActions;
+use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_path::channel_graph::ChannelChange;
 use core_types::channels::ChannelDirection::Outgoing;
-use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
+use core_types::channels::{ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
 use utils_log::info;
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
+
+use crate::strategy::SingularStrategy;
+use crate::Strategy;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_COUNT_AUTO_FUNDINGS: SimpleCounter =
+        SimpleCounter::new("core_counter_strategy_auto_funding_fundings", "Count of initiated automatic fundings").unwrap();
+}
 
 /// Configuration for `AutoFundingStrategy`
 #[serde_as]
@@ -42,32 +49,31 @@ impl Default for AutoFundingStrategyConfig {
 
 /// The `AutoFundingStrategy` automatically funds channel that
 /// dropped it's staked balance below the configured threshold.
-pub struct AutoFundingStrategy<Db: HoprCoreEthereumDbActions> {
-    tx_sender: TransactionSender,
-    db: Arc<RwLock<Db>>,
+pub struct AutoFundingStrategy<Db: HoprCoreEthereumDbActions + Clone> {
+    chain_actions: CoreEthereumActions<Db>,
     cfg: AutoFundingStrategyConfig,
 }
 
-impl<Db: HoprCoreEthereumDbActions> AutoFundingStrategy<Db> {
-    pub fn new(cfg: AutoFundingStrategyConfig, db: Arc<RwLock<Db>>, tx_sender: TransactionSender) -> Self {
-        Self { cfg, tx_sender, db }
+impl<Db: HoprCoreEthereumDbActions + Clone> AutoFundingStrategy<Db> {
+    pub fn new(cfg: AutoFundingStrategyConfig, chain_actions: CoreEthereumActions<Db>) -> Self {
+        Self { cfg, chain_actions }
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions> Debug for AutoFundingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> Debug for AutoFundingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoFunding(self.cfg))
     }
 }
 
-impl<Db: HoprCoreEthereumDbActions> Display for AutoFundingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> Display for AutoFundingStrategy<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoFunding(self.cfg))
     }
 }
 
 #[async_trait(? Send)]
-impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db> {
+impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for AutoFundingStrategy<Db> {
     async fn on_own_channel_changed(
         &self,
         channel: &ChannelEntry,
@@ -79,25 +85,22 @@ impl<Db: HoprCoreEthereumDbActions> SingularStrategy for AutoFundingStrategy<Db>
             return Ok(());
         }
 
-        if let ChannelChange::CurrentBalance { new, .. } = change {
+        if let ChannelChange::CurrentBalance { right: new, .. } = change {
             if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
                 info!(
-                    "{self} strategy: stake on {channel} is below threshold {} < {}",
+                    "stake on {channel} is below threshold {} < {}",
                     channel.balance, self.cfg.min_stake_threshold
                 );
 
-                let rx = fund_channel(
-                    self.db.clone(),
-                    self.tx_sender.clone(),
-                    channel.get_id(),
-                    self.cfg.funding_amount,
-                )
-                .await?;
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_COUNT_AUTO_FUNDINGS.increment();
+
+                let rx = self
+                    .chain_actions
+                    .fund_channel(channel.get_id(), self.cfg.funding_amount)
+                    .await?;
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
-                info!(
-                    "{self} strategy: issued re-staking of {channel} with {}",
-                    self.cfg.funding_amount
-                );
+                info!("issued re-staking of {channel} with {}", self.cfg.funding_amount);
             }
         }
 
@@ -113,10 +116,11 @@ mod tests {
     use async_trait::async_trait;
     use core_crypto::types::Hash;
     use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
+    use core_ethereum_actions::CoreEthereumActions;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-    use core_path::channel_graph::ChannelChange::CurrentBalance;
     use core_types::acknowledgement::AcknowledgedTicket;
+    use core_types::channels::ChannelChange::CurrentBalance;
     use core_types::channels::ChannelDirection::Outgoing;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use mockall::mock;
@@ -140,9 +144,10 @@ mod tests {
 
     #[async_std::test]
     async fn test_auto_funding_strategy() {
+        let self_addr = Address::random();
         let db = Arc::new(RwLock::new(CoreEthereumDb::new(
             DB::new(RustyLevelDbShim::new_in_memory()),
-            Address::random(),
+            self_addr,
         )));
 
         let stake_limit = Balance::new(7_u32.into(), BalanceType::HOPR);
@@ -204,6 +209,12 @@ mod tests {
 
         db.write()
             .await
+            .set_hopr_balance(&Balance::new(5_000_000u64.into(), BalanceType::HOPR))
+            .await
+            .unwrap();
+
+        db.write()
+            .await
             .set_channels_domain_separator(&Hash::default(), &Snapshot::default())
             .await
             .unwrap();
@@ -236,33 +247,35 @@ mod tests {
             funding_amount: fund_amount,
         };
 
-        let ars = AutoFundingStrategy::new(cfg, db.clone(), tx_sender);
-        ars.on_own_channel_changed(
+        let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender);
+
+        let afs = AutoFundingStrategy::new(cfg, actions);
+        afs.on_own_channel_changed(
             &c1,
             Outgoing,
             CurrentBalance {
-                old: Balance::zero(BalanceType::HOPR),
-                new: c1.balance,
+                left: Balance::zero(BalanceType::HOPR),
+                right: c1.balance,
             },
         )
         .await
         .unwrap();
-        ars.on_own_channel_changed(
+        afs.on_own_channel_changed(
             &c2,
             Outgoing,
             CurrentBalance {
-                old: Balance::zero(BalanceType::HOPR),
-                new: c2.balance,
+                left: Balance::zero(BalanceType::HOPR),
+                right: c2.balance,
             },
         )
         .await
         .unwrap();
-        ars.on_own_channel_changed(
+        afs.on_own_channel_changed(
             &c3,
             Outgoing,
             CurrentBalance {
-                old: Balance::zero(BalanceType::HOPR),
-                new: c3.balance,
+                left: Balance::zero(BalanceType::HOPR),
+                right: c3.balance,
             },
         )
         .await
