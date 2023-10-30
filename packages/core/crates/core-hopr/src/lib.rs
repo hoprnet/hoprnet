@@ -203,16 +203,23 @@ pub mod wasm_impls {
 
         pub async fn aggregate_tickets(
             &mut self,
+            db: &Database,
             channel: &ChannelEntry,
             timeout_in_millis: u64,
         ) -> Result<(), JsValue> {
-            ok_or_jserr!(
-                ok_or_jserr!(self
-                    .ticket_aggregate_actions
-                    .aggregate_tickets(AggregationList::WholeChannel(channel.clone())))?
+            let list = AggregationList::WholeChannel(channel.clone());
+
+            let agg_result = self
+                .ticket_aggregate_actions
+                .aggregate_tickets(list.clone())?
                 .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
-                .await
-            )
+                .await;
+            if let Err(e) = agg_result {
+                list.rollback(db.as_ref_counted()).await?;
+                Err(e.into())
+            } else {
+                Ok(())
+            }
         }
 
         pub fn chain_actions(&self) -> core_ethereum_actions::wasm::WasmCoreEthereumActions {
