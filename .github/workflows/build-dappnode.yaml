@@ -31,6 +31,7 @@ jobs:
         id: auth
         uses: google-github-actions/auth@v1
         with:
+          token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
       - name: Set up Google Cloud SDK
