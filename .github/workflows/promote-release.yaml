@@ -21,45 +21,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # promote_release:
-  #   name: Promote Release
-  #   runs-on: ubuntu-2-core
-  #   steps:
+  promote_release:
+    name: Promote Release
+    runs-on: ubuntu-2-core
+    steps:
 
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         ref: master
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
 
-  #     - name: Promote release
-  #       run: |
-  #         git fetch --all
-  #         # Checkout to tag revision
-  #         if ! git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }};
-  #         then 
-  #           echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
-  #           exit 1
-  #         fi
+      - name: Promote release
+        run: |
+          git fetch --all
+          # Checkout to tag revision
+          if ! git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }};
+          then 
+            echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
+            exit 1
+          fi
 
-  #         # Create new branch or reuse an existing branch
-  #         release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
-  #         if git branch -al release/${release_name} | grep ${release_name};
-  #         then
-  #           echo "Branch release/${release_name} already exists"
-  #           exit 1
-  #         else
-  #           git checkout ${{ github.event.inputs.tag_name }}
-  #           git checkout -b release/${release_name}
-  #           git push --set-upstream origin release/${release_name}
-  #         fi
-  #         gh variable set BRANCH_RELEASE_RELEASE_NAME --body "${release_name}"
-  #         gh variable set BRANCH_MASTER_RELEASE_NAME --body "${{ github.event.inputs.new_release_name }}"
-  #       env:
-  #         GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+          # Create new branch or reuse an existing branch
+          release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
+          if git branch -al release/${release_name} | grep ${release_name};
+          then
+            echo "Branch release/${release_name} already exists"
+            exit 1
+          else
+            git checkout ${{ github.event.inputs.tag_name }}
+            git checkout -b release/${release_name}
+            git push --set-upstream origin release/${release_name}
+          fi
+          gh variable set BRANCH_RELEASE_RELEASE_NAME --body "${release_name}"
+          gh variable set BRANCH_MASTER_RELEASE_NAME --body "${{ github.event.inputs.new_release_name }}"
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
   new_release:
     name: Open new release
-    # needs: 
-    #   - promote_release
+    needs: 
+      - promote_release
     uses: ./.github/workflows/open-release.yaml
     with:
       release_type: Patch
