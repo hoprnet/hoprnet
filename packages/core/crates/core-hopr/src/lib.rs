@@ -388,6 +388,7 @@ pub mod wasm_impls {
         let heartbeat_network_clone = network.clone();
         let ping_network_clone = network.clone();
         let swarm_network_clone = network.clone();
+        let db_clone = db.clone();
         let tbf_clone = tbf.clone();
         let multistrategy_clone = multi_strategy.clone();
         let cg_clone = channel_graph.clone();
@@ -453,8 +454,15 @@ pub mod wasm_impls {
                             js_sys::Uint8Array::from(bloom.to_bytes().as_ref()).as_ref(),
                         ) {
                             error!("failed to call save tbf closure");
+                        } else {
+                            info!("tag bloom filter saved");
                         }
-                        info!("tag bloom filter saved");
+
+                        if let Err(e) = db_clone.write().await.db.flush().await {
+                            error!("failed to flush db: {e}");
+                        } else {
+                            info!("db flushed");
+                        }
                     })
                     .map(|_| HoprLoopComponents::Timer)
                     .await

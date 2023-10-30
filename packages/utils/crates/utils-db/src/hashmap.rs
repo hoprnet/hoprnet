@@ -129,6 +129,10 @@ impl AsyncKVStorage for BinaryHashMapStorage {
         }
         Ok(())
     }
+
+    async fn flush(&mut self) -> crate::errors::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
