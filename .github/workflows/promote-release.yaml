@@ -10,11 +10,11 @@ on:
       new_release_name:
         type: string
         required: true
-        description: 'New release name ( bali | saint-luis )'
+        description: 'New release name ( saint-luis )'
       tag_name:
         type: string
         required: true
-        description: 'Git tag name which the release will be branched (v2.0.0-rc.6)'
+        description: 'Git tag name which the release will be branched (v2.0.0)'
 
 concurrency:
   group: promote-release
@@ -31,20 +31,6 @@ jobs:
         with:
           ref: master
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Login Google Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: europe-west3-docker.pkg.dev
-          username: oauth2accesstoken
-          password: ${{ steps.auth.outputs.access_token }}
-
       - name: Promote release
         run: |
           git fetch --all
@@ -59,12 +45,12 @@ jobs:
           release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
           if git branch -al release/${release_name} | grep ${release_name};
           then
+            echo "Branch release/${release_name} already exists"
+            exit 1
+          else
             git checkout ${{ github.event.inputs.tag_name }}
             git checkout -b release/${release_name}
             git push --set-upstream origin release/${release_name}
-          else
-            echo "Branch release/${release_name} already exists"
-            exit 1
           fi
           gh variable set BRANCH_RELEASE_RELEASE_NAME --body "${release_name}"
           gh variable set BRANCH_MASTER_RELEASE_NAME --body "${{ github.event.inputs.new_release_name }}"
