@@ -34,8 +34,11 @@ read -a current_version_splitted <<< "$current_version"
 current_version_prefix=${current_version_splitted[0]}
 if [ "${#current_version_splitted[*]}" == "2" ] 
 then
-    # Get Release Candidate Number
-    pre_release=${current_version_splitted[1]/rc\.}
+  # Get Release Candidate Number
+  pre_release=${current_version_splitted[1]/rc\.}
+else 
+  # Reset the release candidate for new release name
+  pre_release=0
 fi
 
 # Set dot as the delimiter to read parts of the version format
