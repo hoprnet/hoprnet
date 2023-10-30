@@ -269,16 +269,16 @@ jobs:
   #         MATRIX_SERVER: ${{ secrets.MATRIX_SERVER }}
   #         MATRIX_ACCESS_TOKEN: ${{ secrets.MATRIX_ACCESS_TOKEN }}
 
-  new_release:
-    name: Open new release
-    # if: contains(github.event.pull_request.labels.*.name, 'release')
-    # needs: 
-    #   - create_release
-    uses: ./.github/workflows/open-release.yaml
-    with:
-      release_type: ${{ vars.NEXT_RELEASE_TYPE }}
-      base_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
+  # new_release:
+  #   name: Open new release
+  #   if: contains(github.event.pull_request.labels.*.name, 'release')
+  #   needs: 
+  #     - create_release
+  #   uses: ./.github/workflows/open-release.yaml
+  #   with:
+  #     release_type: ${{ vars.NEXT_RELEASE_TYPE }}
+  #     base_branch: ${{ github.event.pull_request.base.ref }}
+  #   secrets: inherit
 
   build_dappnode:
     name: Build dappNode
