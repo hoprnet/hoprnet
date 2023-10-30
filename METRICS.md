@@ -77,6 +77,9 @@ The following sections document the metrics per package:
 | `core_ethereum_gauge_indexer_channel_status`                 | multi gauge   | Status of different channels                | 0 = closed, 1 = waiting for commitment, 2 = open, 3 = pending close |
 | `core_ethereum_counter_indexer_tickets_redeemed`             | counter       | Number of redeemed tickets                  |                                                                     |
 | `core_ethereum_counter_num_send_transactions`                | counter       | The number of sendTransaction calls         |                                                                     |
+| `core_ethereum_counter_successful_transactions`              | counter       | Number of successful transactions           |                                                                     |
+| `core_ethereum_counter_failed_transactions`                  | counter       | Number of failed transactions               |                                                                     |
+| `core_ethereum_counter_timeout_transactions`                 | counter       | Number of timed out transactions            |                                                                     |
 
 ### ethereum
 

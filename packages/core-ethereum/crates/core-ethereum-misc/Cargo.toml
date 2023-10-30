@@ -27,14 +27,13 @@ ethers = { workspace = true, default-features = false, features = ["ethers-solc"
 serde = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen = { workspace = true }
 
-core-crypto = { workspace = true, default-features = false }
-core-ethereum-db = { workspace = true, default-features = false }
-core-types = { workspace = true, default-features = false }
-bindings = { workspace = true, default-features = false }
-utils-db = { workspace = true, default-features = false }
-utils-misc = { workspace = true, default-features = false }
-utils-log = { workspace = true, default-features = false }
-utils-types = { workspace = true, default-features = false }
+core-crypto = { workspace = true }
+core-ethereum-db = { workspace = true }
+core-types = { workspace = true }
+utils-db = { workspace = true }
+utils-misc = { workspace = true }
+utils-log = { workspace = true }
+utils-types = { workspace = true }
 
 [dev-dependencies]
 async-std = "1.12.0"
@@ -43,9 +42,6 @@ mockall = "0.11.4"
 hex-literal = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio = "1"
-svm-rs = "0.2.23"
-semver = "1.0"
 hex = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]

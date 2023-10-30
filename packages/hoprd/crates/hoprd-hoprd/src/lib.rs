@@ -7,15 +7,10 @@ pub mod wasm {
     // Temporarily re-export crates
 
     #[allow(unused_imports)]
-    //use core_misc::constants::wasm::*;
-    #[allow(unused_imports)]
     use core_network::network::wasm::*;
 
     #[allow(unused_imports)]
     use core_ethereum_db::db::wasm::*;
-
-    #[allow(unused_imports)]
-    use core_ethereum_misc::chain::wasm::*;
 
     #[allow(unused_imports)]
     use core_ethereum_misc::constants::wasm::*;
@@ -44,9 +39,7 @@ pub mod wasm {
     use utils_metrics::metrics::wasm::*;
 
     use wasm_bindgen::prelude::wasm_bindgen;
-
     static LOGGER: JsLogger = JsLogger {};
-
     #[allow(dead_code)]
     #[wasm_bindgen]
     pub fn hoprd_hoprd_initialize_crate() {

@@ -1,6 +1,7 @@
 pub mod channels;
 pub mod errors;
 pub mod node;
+pub mod payload;
 pub mod redeem;
 pub mod transaction_queue;
 
@@ -37,11 +38,14 @@ pub mod wasm {
     use crate::redeem::TicketRedeemActions;
     use crate::transaction_queue::{TransactionResult, TransactionSender};
     use crate::CoreEthereumActions;
+    use core_crypto::keypairs::OffchainKeypair;
     use core_crypto::types::Hash;
     use core_ethereum_db::db::wasm::Database;
     use core_ethereum_db::db::CoreEthereumDb;
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
-    use core_types::channels::{ChannelDirection, ChannelEntry, ChannelStatus};
+    use core_types::channels::{generate_channel_id, ChannelDirection, ChannelEntry, ChannelStatus};
+    use multiaddr::Multiaddr;
+    use std::str::FromStr;
     use utils_db::rusty::RustyLevelDbShim;
     use utils_misc::utils::wasm::JsResult;
     use utils_types::primitives::{Address, Balance};
@@ -87,11 +91,12 @@ pub mod wasm {
 
         pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> JsResult<OpenChannelResult> {
             let awaiter = self.w.open_channel(*destination, *amount).await?;
+            let channel_id = generate_channel_id(&self.w.me, destination);
             match awaiter
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
             {
-                TransactionResult::OpenChannel { tx_hash, channel_id } => Ok(OpenChannelResult { tx_hash, channel_id }),
+                TransactionResult::ChannelFunded { tx_hash } => Ok(OpenChannelResult { tx_hash, channel_id }),
                 _ => Err(JsValue::from("open channel transaction failed".to_string())),
             }
         }
@@ -102,7 +107,7 @@ pub mod wasm {
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
             {
-                TransactionResult::FundChannel { tx_hash } => Ok(tx_hash),
+                TransactionResult::ChannelFunded { tx_hash } => Ok(tx_hash),
                 _ => Err(JsValue::from("fund channel transaction failed".to_string())),
             }
         }
@@ -121,7 +126,14 @@ pub mod wasm {
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
             {
-                TransactionResult::CloseChannel { tx_hash, status } => Ok(CloseChannelResult { tx_hash, status }),
+                TransactionResult::ChannelClosureInitiated { tx_hash } => Ok(CloseChannelResult {
+                    tx_hash,
+                    status: ChannelStatus::PendingToClose,
+                }),
+                TransactionResult::ChannelClosed { tx_hash } => Ok(CloseChannelResult {
+                    tx_hash,
+                    status: ChannelStatus::Closed,
+                }),
                 _ => Err(JsValue::from("close channel transaction failed".to_string())),
             }
         }
@@ -132,7 +144,7 @@ pub mod wasm {
                 .await
                 .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
             {
-                TransactionResult::Withdraw { tx_hash } => Ok(tx_hash),
+                TransactionResult::Withdrawn { tx_hash } => Ok(tx_hash),
                 _ => Err(JsValue::from("withdraw transaction failed".to_string())),
             }
         }
@@ -165,6 +177,44 @@ pub mod wasm {
             // We do not await the on-chain confirmation
             let _ = self.w.redeem_ticket(ack_ticket.into()).await?;
             Ok(())
+        }
+
+        pub async fn announce(
+            &self,
+            multiaddr: &str,
+            offchain_key: &OffchainKeypair,
+            use_safe: bool,
+        ) -> JsResult<Hash> {
+            // Here we need to await the TX completion
+            let ma = Multiaddr::from_str(multiaddr).map_err(|e| JsValue::from(e.to_string()))?;
+            match self
+                .w
+                .announce(&ma, offchain_key, use_safe)
+                .await?
+                .await
+                .map_err(|_| JsValue::from("announce tx has been cancelled".to_string()))?
+            {
+                TransactionResult::Announced { tx_hash } => Ok(tx_hash),
+                TransactionResult::Failure(msg) => Err(JsValue::from(format!("failed to announce node: {msg}"))),
+                _ => Err(JsValue::from("failed to announce node".to_string())),
+            }
+        }
+
+        pub async fn register_node_with_safe(&self, safe_address: &Address) -> JsResult<Hash> {
+            // Here we need to await the TX completion
+            match self
+                .w
+                .register_safe_by_node(*safe_address)
+                .await?
+                .await
+                .map_err(|_| JsValue::from("register safe tx has been cancelled".to_string()))?
+            {
+                TransactionResult::SafeRegistered { tx_hash } => Ok(tx_hash),
+                TransactionResult::Failure(msg) => {
+                    Err(JsValue::from(format!("failed to register node with safe: {msg}")))
+                }
+                _ => Err(JsValue::from("failed to register node with safe".to_string())),
+            }
         }
     }
 }

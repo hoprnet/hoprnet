@@ -12,7 +12,7 @@ use utils_log::debug;
 use utils_types::{
     errors::GeneralError::{self, InvalidInput, NonSpecificError},
     primitives::Address,
-    traits::{BinarySerializable, PeerIdLike, ToHex},
+    traits::{BinarySerializable, PeerIdLike},
 };
 
 /// Holds the signed binding of the chain key and the packet key.
@@ -71,11 +71,7 @@ impl KeyBinding {
 
 impl Display for KeyBinding {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("KeyBinding")
-            .field("ChainKey", &self.chain_key.to_hex())
-            .field("PacketKey", &self.packet_key.to_hex())
-            .field("Signature", &self.signature.to_hex())
-            .finish()
+        write!(f, "keybinding {} <-> {}", self.chain_key, self.packet_key)
     }
 }
 
@@ -144,10 +140,11 @@ impl AnnouncementData {
 
 impl Display for AnnouncementData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AnnouncementData")
-            .field("Multiaddress", &self.multiaddress)
-            .field("Keybinding", &self.key_binding)
-            .finish()
+        if let Some(binding) = &self.key_binding {
+            write!(f, "announcement of {} with {binding}", self.multiaddress)
+        } else {
+            write!(f, "announcement of {}", self.multiaddress)
+        }
     }
 }
 

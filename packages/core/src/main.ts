@@ -57,7 +57,6 @@ export async function createHoprNode(
 
   await HoprCoreEthereum.createInstance(
     db,
-    packetKeypair,
     chainKeypair,
     {
       chainId: network.chain.chain_id,

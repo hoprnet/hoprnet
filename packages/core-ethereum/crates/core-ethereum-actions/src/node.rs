@@ -1,9 +1,13 @@
-use crate::errors::Result;
+use crate::errors::{CoreEthereumActionsError, Result};
 use crate::transaction_queue::{Transaction, TransactionCompleted};
 use crate::CoreEthereumActions;
 use async_trait::async_trait;
+use core_crypto::keypairs::OffchainKeypair;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
+use core_types::announcement::{AnnouncementData, KeyBinding};
+use multiaddr::Multiaddr;
+use utils_log::info;
 use utils_types::primitives::{Address, Balance};
 
 /// Contains all on-chain calls specific to HOPR node itself.
@@ -12,7 +16,15 @@ pub trait NodeActions {
     /// Withdraws the specified `amount` of tokens to the given `recipient`.
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<TransactionCompleted>;
 
-    // TODO: add announce and register safe actions in this trait
+    /// Announces node on-chain with key binding
+    async fn announce(
+        &self,
+        multiaddr: &Multiaddr,
+        offchain_key: &OffchainKeypair,
+        use_safe: bool,
+    ) -> Result<TransactionCompleted>;
+
+    async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted>;
 }
 
 #[async_trait(? Send)]
@@ -24,7 +36,28 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
 
         // TODO: should we check native/token balance here before withdrawing ?
 
+        info!("initiating withdrawal of {amount} to {recipient}");
         self.tx_sender.send(Transaction::Withdraw(recipient, amount)).await
+    }
+
+    async fn announce(
+        &self,
+        multiaddr: &Multiaddr,
+        offchain_key: &OffchainKeypair,
+        use_safe: bool,
+    ) -> Result<TransactionCompleted> {
+        let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))
+            .map_err(|e| CoreEthereumActionsError::OtherError(e.into()))?;
+
+        info!("initiating annoucement {announcement_data}");
+        self.tx_sender
+            .send(Transaction::Announce(announcement_data, use_safe))
+            .await
+    }
+
+    async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted> {
+        info!("initiating safe address registration of {safe_address}");
+        self.tx_sender.send(Transaction::RegisterSafe(safe_address)).await
     }
 }
 
@@ -63,7 +96,7 @@ mod tests {
             .expect_withdraw()
             .times(1)
             .withf(move |dst, balance| bob.eq(dst) && stake.eq(balance))
-            .returning(move |_, _| TransactionResult::Withdraw { tx_hash: random_hash });
+            .returning(move |_, _| TransactionResult::Withdrawn { tx_hash: random_hash });
 
         let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_exec));
         let tx_sender = tx_queue.new_sender();
@@ -76,7 +109,7 @@ mod tests {
         let tx_res = actions.withdraw(bob, stake).await.unwrap().await.unwrap();
 
         match tx_res {
-            TransactionResult::Withdraw { tx_hash } => {
+            TransactionResult::Withdrawn { tx_hash } => {
                 assert_eq!(random_hash, tx_hash, "tx hash must be equal");
             }
             _ => panic!("invalid or failed tx result"),

@@ -502,15 +502,13 @@ impl Hash {
     }
 }
 
-impl TryFrom<[u8; 32]> for Hash {
-    type Error = GeneralError;
-
-    fn try_from(value: [u8; 32]) -> std::result::Result<Self, Self::Error> {
-        Hash::from_bytes(&value)
+impl From<[u8; Self::SIZE]> for Hash {
+    fn from(hash: [u8; Self::SIZE]) -> Self {
+        Hash { hash }
     }
 }
 
-impl From<Hash> for [u8; 32] {
+impl From<Hash> for [u8; Hash::SIZE] {
     fn from(value: Hash) -> Self {
         value.hash
     }

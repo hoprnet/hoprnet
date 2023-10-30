@@ -391,6 +391,7 @@ mod tests {
         PeerId,
     };
     use core_types::acknowledgement::AcknowledgedTicket;
+    use core_types::announcement::AnnouncementData;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::future::join_all;
     use mockall::mock;
@@ -403,11 +404,13 @@ mod tests {
         #[async_trait(? Send)]
         impl TransactionExecutor for TxExec {
             async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
-            async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
             async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult;
-            async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
-            async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
+            async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
+            async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
+            async fn close_incoming_channel(&self, src: Address) -> TransactionResult;
             async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
+            async fn announce(&self, data: AnnouncementData, use_safe: bool) -> TransactionResult;
+            async fn register_safe(&self, safe_address: Address) -> TransactionResult;
         }
     }
 

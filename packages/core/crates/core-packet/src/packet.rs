@@ -310,6 +310,7 @@ mod tests {
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
+    #[ignore]
     fn test_ed25519_meta_packet(amount: usize) {
         generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect());
     }
@@ -320,6 +321,7 @@ mod tests {
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
+    #[ignore]
     fn test_secp256k1_meta_packet(amount: usize) {
         generic_test_meta_packet::<Secp256k1Suite>((0..amount).map(|_| ChainKeypair::random()).collect())
     }

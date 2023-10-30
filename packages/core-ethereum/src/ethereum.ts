@@ -6,14 +6,10 @@ import {
   Balance,
   BalanceType,
   durations,
-  AcknowledgedTicket,
   type DeferType,
   create_counter,
-  OffchainKeypair,
-  u8aToHex,
   ChainKeypair,
-  CORE_ETHEREUM_CONSTANTS,
-  ChainCalls
+  CORE_ETHEREUM_CONSTANTS
 } from '@hoprnet/hopr-utils'
 
 import NonceTracker from './nonce-tracker.js'
@@ -33,7 +29,6 @@ import {
 } from './utils/index.js'
 
 import { SafeModuleOptions } from './index.js'
-import { Multiaddr } from '@multiformats/multiaddr'
 
 // Exported from Rust
 const constants = CORE_ETHEREUM_CONSTANTS()
@@ -83,9 +78,7 @@ export async function createChainWrapper(
     chain: string
     network: string
   },
-  offchainKeypair: OffchainKeypair,
   keypair: ChainKeypair,
-  checkDuplicate: Boolean = true,
   txTimeout = constants.TX_CONFIRMATION_WAIT
 ) {
   log(`[DEBUG] networkInfo.provider ${JSON.stringify(networkInfo.provider, null, 2)}`)
@@ -112,15 +105,6 @@ export async function createChainWrapper(
   const token = new ethers.Contract(deploymentExtract.hoprTokenAddress, HOPR_TOKEN_ABI, provider)
 
   const channels = new ethers.Contract(deploymentExtract.hoprChannelsAddress, HOPR_CHANNELS_ABI, provider)
-
-  const chainCalls = new ChainCalls(
-    keypair,
-    Address.from_string(deploymentExtract.hoprChannelsAddress),
-    Address.from_string(deploymentExtract.hoprAnnouncementsAddress)
-  )
-
-  // Use safe variants of SC calls from the start.
-  await chainCalls.set_use_safe(true)
 
   const networkRegistry = new ethers.Contract(
     deploymentExtract.hoprNetworkRegistryAddress,
@@ -403,7 +387,7 @@ export async function createChainWrapper(
       throw new Error(`Failed in publishing transaction. ${error}`)
     }
 
-    log('Transaction with nonce %d successfully sent %s, waiting for confimation', populatedTx.nonce, transaction.hash)
+    log('Transaction with nonce %d successfully sent %s, waiting for confirmation', populatedTx.nonce, transaction.hash)
     metric_countSendTransaction.increment()
     nonceLock.releaseLock()
 
@@ -422,325 +406,6 @@ export async function createChainWrapper(
       log('error: transaction with nonce %d and hash failed to send: %s', populatedTx.nonce, transaction.hash, error)
       throw error
     }
-  }
-
-  /**
-   * Initiates a transaction that announces nodes on-chain.
-   * @param multiaddr Multiaddress to announce
-   * @param useSafe use Safe-variant for call if true
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves with the transaction hash
-   */
-  const announce = async (
-    multiaddr: Multiaddr,
-    useSafe: boolean,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<string> => {
-    let to = deploymentExtract.hoprAnnouncementsAddress
-    let data = u8aToHex(await chainCalls.get_announce_payload(multiaddr.toString(), offchainKeypair, useSafe))
-    if (useSafe) {
-      to = safeModuleOptions.moduleAddress.to_hex()
-    }
-
-    let confirmationEssentialTxPayload: TransactionPayload = {
-      data,
-      to,
-      value: BigNumber.from(0)
-    }
-    // @ts-ignore fixme: treat result
-    let sendResult: SendTransactionReturn
-
-    try {
-      sendResult = await sendTransaction(checkDuplicate, confirmationEssentialTxPayload, txHandler)
-    } catch (error) {
-      throw new Error(`Failed in sending announce transaction due to ${error}`)
-    }
-
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending announce transaction because transaction is a duplicate`)
-    }
-  }
-
-  /**
-   * Initiates a transaction that withdraws funds of the node
-   * @param currency either native token or Hopr token
-   * @param recipient recipeint of the token transfer
-   * @param amount amount of tokens to send
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves with the transaction hash
-   */
-  const withdraw = async (
-    currency: 'NATIVE' | 'HOPR',
-    recipient: string,
-    amount: string,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<string> => {
-    log('Withdrawing %s %s tokens', amount, currency)
-    let sendResult: SendTransactionReturn
-    let withdrawEssentialTxPayload: TransactionPayload
-    try {
-      switch (currency) {
-        case 'NATIVE':
-          withdrawEssentialTxPayload = {
-            data: '0x',
-            to: recipient,
-            value: BigNumber.from(amount)
-          }
-          sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
-          break
-        case 'HOPR':
-          withdrawEssentialTxPayload = {
-            data: u8aToHex(
-              await chainCalls.get_transfer_payload(
-                Address.from_string(recipient),
-                new Balance(amount, BalanceType.HOPR)
-              )
-            ),
-            to: token.address,
-            value: BigNumber.from(0)
-          }
-          sendResult = await sendTransaction(checkDuplicate, withdrawEssentialTxPayload, txHandler)
-          break
-      }
-    } catch (error) {
-      throw new Error(`Failed in sending withdraw transaction due to ${error}`)
-    }
-
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending withdraw transaction because transaction is a duplicate`)
-    }
-  }
-
-  /**
-   * Initiates a transaction that funds a payment channel
-   * @param partyA first participant of the channel
-   * @param partyB second participant of the channel
-   * @param fundsA stake of first party
-   * @param fundsB stake of second party
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves wiht the transaction hash
-   */
-  const fundChannel = async (
-    destination: Address,
-    amount: Balance,
-    // txHandlerApprove: (tx: string) => DeferType<string>,
-    txHandlerFundChannel: (tx: string) => DeferType<string>
-  ): Promise<[Receipt, Receipt]> => {
-    let receipts: [Receipt, Receipt] = [undefined, undefined]
-    // do approve, then fundChannel to easily interoperate with Safe
-
-    // TODO: try to approve when the allowance is not enough and if permission allows
-    // // first: approve
-    // let approveError: unknown
-    // let approveResult: SendTransactionReturn
-
-    // const approveTxPayload: TransactionPayload = {
-    //   data: u8aToHex(
-    //     await chainCalls.get_approve_payload(
-    //       amount
-    //     )
-    //   ),
-    //   to: token.address,
-    //   value: BigNumber.from(0)
-    // }
-    // try {
-    //   approveResult = await sendTransaction(checkDuplicate, approveTxPayload, txHandlerApprove)
-    // } catch (err) {
-    //   approveError = err
-    // }
-
-    // switch (approveResult.code) {
-    //   case SendTransactionStatus.SUCCESS:
-    //     receipts[0] = approveResult.tx.hash
-    //     break
-    //   case SendTransactionStatus.DUPLICATE:
-    //     throw new Error(`Failed in approving token transfer because transaction is a duplicate`)
-    //   default:
-    //     throw new Error(`Failed in approving token transfer due to ${approveError}`)
-    // }
-
-    // second: fundChannel
-    let fundChannelError: unknown
-    let fundChannelResult: SendTransactionReturn
-
-    let is_safe_set = await chainCalls.get_use_safe()
-    const fundChannelPayload: TransactionPayload = {
-      data: u8aToHex(await chainCalls.get_fund_channel_payload(destination, amount)),
-      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
-      value: BigNumber.from(0)
-    }
-
-    try {
-      fundChannelResult = await sendTransaction(checkDuplicate, fundChannelPayload, txHandlerFundChannel)
-    } catch (err) {
-      fundChannelError = err
-    }
-
-    switch (fundChannelResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        receipts[1] = fundChannelResult.tx.hash
-        return receipts
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending fundChannel transaction because transaction is a duplicate`)
-      default:
-        throw new Error(`Failed in sending fundChannel transaction due to ${fundChannelError}`)
-    }
-  }
-
-  /**
-   * Initiates a transaction that initiates the settlement of a payment channel
-   * @param counterparty second participant of the channel
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves with the transaction hash
-   */
-  const initiateOutgoingChannelClosure = async (
-    counterparty: Address,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    log('Initiating channel closure to %s', counterparty.to_hex())
-    let sendResult: SendTransactionReturn
-
-    let is_safe_set = await chainCalls.get_use_safe()
-    const initiateOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(await chainCalls.get_intiate_outgoing_channel_closure_payload(counterparty)),
-      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
-      value: BigNumber.from(0)
-    }
-
-    try {
-      sendResult = await sendTransaction(checkDuplicate, initiateOutgoingChannelClosureEssentialTxPayload, txHandler)
-    } catch (error) {
-      throw new Error(`Failed in sending initiateOutgoingChannelClosure transaction due to ${error}`)
-    }
-
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(
-          `Failed in sending initiateOutgoingChannelClosure transaction because transaction is a duplicate`
-        )
-    }
-
-    // TODO: catch race-condition
-  }
-
-  /**
-   * Initiates a transaction that performs the second step to settle
-   * a payment channel.
-   * @param counterparty second participant of the payment channel
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves with the transaction hash
-   */
-  const finalizeOutgoingChannelClosure = async (
-    counterparty: Address,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    log('Finalizing channel closure to %s', counterparty.to_hex())
-    let sendResult: SendTransactionReturn
-
-    let is_safe_set = await chainCalls.get_use_safe()
-    const finalizeOutgoingChannelClosureEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(await chainCalls.get_finalize_outgoing_channel_closure_payload(counterparty)),
-      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
-      value: BigNumber.from(0)
-    }
-
-    try {
-      sendResult = await sendTransaction(checkDuplicate, finalizeOutgoingChannelClosureEssentialTxPayload, txHandler)
-    } catch (error) {
-      throw new Error(`Failed in sending finalizeOutgoingChannelClosure transaction due to ${error}`)
-    }
-
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(
-          `Failed in sending finalizeOutgoingChannelClosure transaction because transaction is a duplicate`
-        )
-    }
-    // TODO: catch race-condition
-  }
-
-  /**
-   * Initiates a transaction that redeems an acknowledged ticket
-   * @param counterparty second participant
-   * @param ackTicket the acknowledged ticket to reedeem
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolve with the transaction hash
-   */
-  const redeemTicket = async (
-    ackTicket: AcknowledgedTicket,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    log(`Redeeming ${ackTicket.to_string()} on-chain for challenge ${ackTicket.ticket.challenge.to_hex()}`)
-
-    let sendResult: SendTransactionReturn
-    let is_safe_set = await chainCalls.get_use_safe()
-
-    const redeemTicketEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(await chainCalls.get_redeem_ticket_payload(ackTicket)),
-      to: is_safe_set ? safeModuleOptions.moduleAddress.to_hex() : channels.address,
-      value: BigNumber.from(0)
-    }
-
-    try {
-      sendResult = await sendTransaction(checkDuplicate, redeemTicketEssentialTxPayload, txHandler)
-    } catch (error) {
-      throw new Error(`Failed in sending redeem ${ackTicket.to_string()} transaction due to ${error}`)
-    }
-
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        log(`On-chain TX for ticket redemption of ${ackTicket.to_string()} was successful`)
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(
-          `Failed in sending redeem ${ackTicket.to_string()} transaction because transaction is a duplicate`
-        )
-    }
-  }
-
-  /**
-   * Initiates a transaction that registers a safe address
-   * This function should not be called through safe/module
-   * @param safeAddress address of safe
-   * @param txHandler handler to call once the transaction has been published
-   * @returns a Promise that resolves with the transaction hash
-   */
-  const registerSafeByNode = async (
-    safeAddress: Address,
-    txHandler: (tx: string) => DeferType<string>
-  ): Promise<Receipt> => {
-    log('Register a node to safe %s globally', safeAddress.to_hex())
-    let sendResult: SendTransactionReturn
-
-    const registerSafeByNodeEssentialTxPayload: TransactionPayload = {
-      data: u8aToHex(await chainCalls.get_register_safe_by_node_payload(safeAddress)),
-      to: nodeSafeRegistry.address,
-      value: BigNumber.from(0)
-    }
-
-    try {
-      sendResult = await sendTransaction(checkDuplicate, registerSafeByNodeEssentialTxPayload, txHandler)
-    } catch (err) {
-      throw new Error(`Failed in sending registerSafeByNode transaction due to ${err}`)
-    }
-
-    switch (sendResult.code) {
-      case SendTransactionStatus.SUCCESS:
-        return sendResult.tx.hash
-      case SendTransactionStatus.DUPLICATE:
-        throw new Error(`Failed in sending registerSafeByNode transaction because transaction is a duplicate`)
-    }
-    // TODO: catch race-condition
   }
 
   /**
@@ -930,13 +595,6 @@ export async function createChainWrapper(
     getNodeManagementModuleTargetInfo,
     getSafeFromNodeSafeRegistry,
     getModuleTargetAddress,
-    announce,
-    withdraw,
-    fundChannel,
-    finalizeOutgoingChannelClosure,
-    initiateOutgoingChannelClosure,
-    redeemTicket,
-    registerSafeByNode,
     getGenesisBlock: () => genesisBlock,
     sendTransaction, //: provider.sendTransaction.bind(provider) as typeof provider['sendTransaction'],
     waitUntilReady: async () => await provider.ready,
