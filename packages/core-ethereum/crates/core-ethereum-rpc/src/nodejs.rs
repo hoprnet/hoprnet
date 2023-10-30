@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use ethers_providers::{JsonRpcClient, JsonRpcError, ProviderError};
-use serde::de::DeserializeOwned;
+use ethers_providers::{JsonRpcClient, JsonRpcError, ProviderError, PubsubClient};
 use std::fmt::Debug;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
@@ -9,11 +8,14 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use serde::{
-    de::{self, MapAccess, Unexpected, Visitor},
+    de::{self, DeserializeOwned, MapAccess, Unexpected, Visitor},
     Deserialize, Serialize,
 };
 use serde_json::{value::RawValue};
 use std::fmt;
+use std::future::Future;
+use std::pin::Pin;
+use primitive_types::U256;
 use thiserror::Error;
 
 
@@ -188,7 +190,7 @@ pub enum ClientError {
     /// Thrown if the response could not be parsed
     JsonRpcError(#[from] JsonRpcError),
 
-    #[error("Deserialization Error: {err}. Response: {text}")]
+    #[error("deserialization error: {err}, response: {text}")]
     /// Serde JSON Error
     SerdeJson {
         /// Underlying error
@@ -281,5 +283,17 @@ impl JsonRpcClient for NodeJsRpcClient {
             .map_err(|err| ClientError::SerdeJson { err, text: raw.to_string() })?;
 
         Ok(res)
+    }
+}
+
+impl PubsubClient for NodeJsRpcClient {
+    type NotificationStream = ();
+
+    fn subscribe<T: Into<U256>>(&self, id: T) -> Result<Self::NotificationStream, Self::Error> {
+        todo!()
+    }
+
+    fn unsubscribe<T: Into<U256>>(&self, id: T) -> Result<(), Self::Error> {
+        todo!()
     }
 }

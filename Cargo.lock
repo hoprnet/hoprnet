@@ -1238,6 +1238,7 @@ dependencies = [
  "ethers",
  "ethers-providers",
  "ethnum",
+ "futures",
  "hex",
  "hex-literal",
  "js-sys",

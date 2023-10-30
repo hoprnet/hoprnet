@@ -7,7 +7,9 @@ use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::prelude::*;
 use ethers_providers::{JsonRpcClient, Middleware, Provider};
 use serde::{Deserialize, Serialize};
+use futures::StreamExt;
 use std::sync::Arc;
+use async_std::prelude::Stream;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
@@ -29,11 +31,11 @@ pub struct RpcOperationsConfig {
     pub node_module: Address,
 }
 
-type HoprMiddleware<P> = SignerMiddleware<Provider<P>, Wallet<SigningKey>>;
+type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
 
 pub struct RpcOperations<P: JsonRpcClient> {
     me: Address,
-    signer: Arc<HoprMiddleware<P>>,
+    provider: Arc<HoprMiddleware<P>>,
     channels: HoprChannels<HoprMiddleware<P>>,
     announcements: HoprAnnouncements<HoprMiddleware<P>>,
     safe_registry: HoprNodeSafeRegistry<HoprMiddleware<P>>,
@@ -43,45 +45,46 @@ pub struct RpcOperations<P: JsonRpcClient> {
     cfg: RpcOperationsConfig,
 }
 
-impl<P: JsonRpcClient> RpcOperations<P> {
-    pub fn new(json_rpc: P, chain_key: ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
+impl<P: JsonRpcClient + 'static> RpcOperations<P> {
+    pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?;
-        let signer = Arc::new(SignerMiddleware::new(
-            Provider::new(json_rpc),
-            wallet.with_chain_id(cfg.chain_id),
-        ));
+        let provider = Arc::new(
+            Provider::new(json_rpc)
+                .with_signer(wallet.with_chain_id(cfg.chain_id))
+                .nonce_manager(chain_key.public().to_address().into())
+        );
 
         Ok(Self {
             me: chain_key.public().to_address(),
-            channels: HoprChannels::new::<H160>(cfg.contract_addrs.channels.into(), signer.clone()),
-            announcements: HoprAnnouncements::new::<H160>(cfg.contract_addrs.announcements.into(), signer.clone()),
-            safe_registry: HoprNodeSafeRegistry::new::<H160>(cfg.contract_addrs.safe_registry.into(), signer.clone()),
+            channels: HoprChannels::new::<H160>(cfg.contract_addrs.channels.into(), provider.clone()),
+            announcements: HoprAnnouncements::new::<H160>(cfg.contract_addrs.announcements.into(), provider.clone()),
+            safe_registry: HoprNodeSafeRegistry::new::<H160>(cfg.contract_addrs.safe_registry.into(), provider.clone()),
             network_registry: HoprNetworkRegistry::new::<H160>(
                 cfg.contract_addrs.network_registry.into(),
-                signer.clone(),
+                provider.clone(),
             ),
-            node_module: HoprNodeManagementModule::new::<H160>(cfg.node_module.into(), signer.clone()),
-            token: HoprToken::new::<H160>(cfg.contract_addrs.token.into(), signer.clone()),
+            node_module: HoprNodeManagementModule::new::<H160>(cfg.node_module.into(), provider.clone()),
+            token: HoprToken::new::<H160>(cfg.contract_addrs.token.into(), provider.clone()),
             cfg,
-            signer,
+            provider,
         })
     }
 
     async fn get_block(&self, block_number: u64) -> Result<Option<Block<H256>>> {
         let block_id: BlockId = block_number.into();
-        Ok(self.signer.get_block(block_id).await?)
+        Ok(self.provider.get_block(block_id).await?)
     }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<P: JsonRpcClient> HoprRpcOperations for RpcOperations<P> {
+impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     async fn genesis_block(&self) -> Result<u64> {
         Ok(self.cfg.indexer_start_block_number)
     }
 
     async fn block_number(&self) -> Result<u64> {
-        let r = self.signer.get_block_number().await?;
+        let r = self.provider.get_block_number().await?;
         Ok(r.as_u64())
     }
 
@@ -93,7 +96,7 @@ impl<P: JsonRpcClient> HoprRpcOperations for RpcOperations<P> {
         match balance_type {
             BalanceType::Native => {
                 let addr: H160 = self.me.into();
-                let native = self.signer.get_balance(addr, None).await?;
+                let native = self.provider.get_balance(addr, None).await?;
                 Ok(Balance::new(native.into(), BalanceType::Native))
             }
             BalanceType::HOPR => {
@@ -127,7 +130,8 @@ impl<P: JsonRpcClient> HoprRpcOperations for RpcOperations<P> {
     }
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash> {
-        let sent_tx = self.signer.send_transaction(tx, None).await?;
+        let sent_tx = self.provider.send_transaction(tx, None).await?;
         Ok(sent_tx.0.into())
     }
+
 }
