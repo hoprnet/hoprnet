@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use ethers::types::transaction::eip2718::TypedTransaction;
+use futures::Stream;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::Result;
@@ -8,7 +9,7 @@ use crate::errors::Result;
 pub mod errors;
 pub mod rpc;
 
-#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
+//#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub mod nodejs;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -31,4 +32,6 @@ pub trait HoprRpcOperations {
     async fn get_module_target_address(&self) -> Result<Address>;
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
+
+    //async fn subscribe_blocks<Tx: Stream<Item = Hash>>(&self) -> Result<Tx>;
 }

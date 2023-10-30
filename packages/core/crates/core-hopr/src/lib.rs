@@ -101,6 +101,7 @@ impl std::fmt::Display for HoprLoopComponents {
 pub mod wasm_impls {
     use futures::stream::FuturesUnordered;
     use std::str::FromStr;
+    use async_lock::Mutex;
 
     use super::*;
     use core_crypto::keypairs::Keypair;
@@ -120,6 +121,8 @@ pub mod wasm_impls {
     use utils_db::rusty::RustyLevelDbShim;
     use utils_misc::ok_or_jserr;
     use wasm_bindgen::prelude::*;
+    use core_ethereum_actions::rpc_executor::RpcTransactionExecutor;
+    use core_ethereum_rpc::rpc::RpcOperations;
 
     #[wasm_bindgen]
     #[derive(Clone)]
@@ -262,7 +265,11 @@ pub mod wasm_impls {
 
         let ticket_aggregation = TicketAggregationInteraction::new(db.clone(), &me_onchain.clone());
 
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
+        let rpc = Arc::new(Mutex::new(RpcOperations::new(provider, me_onchain.clone(), rpc_cfg)));
+
+        let rpc_executor = RpcTransactionExecutor::new(rpc.clone(), &me_onchain, addrs, node_module);
+
+        let tx_queue = TransactionQueue::new(db.clone(), Box::new(rpc_executor));
 
         let chain_actions =
             CoreEthereumActions::new(me_onchain.public().to_address(), db.clone(), tx_queue.new_sender());
@@ -551,7 +558,6 @@ pub mod wasm_impls {
                 on_final_packet,
                 tbf,
                 save_tbf,
-                tx_executor,
                 my_multiaddresses
                     .into_iter()
                     .map(|ma| {
