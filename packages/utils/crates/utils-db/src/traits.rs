@@ -72,6 +72,9 @@ pub trait AsyncKVStorage {
         operations: Vec<BatchOperation<Self::Key, Self::Value>>,
         wait_for_write: bool,
     ) -> Result<()>;
+
+    /// Flushes data to disk
+    async fn flush(&mut self) -> Result<()>;
 }
 
 pub trait KVStorage {

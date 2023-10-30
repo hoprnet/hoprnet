@@ -135,16 +135,14 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<
 
         info!("will aggregate {} tickets in {channel}", tickets_to_agg.len());
 
-        match self
-            .ticket_aggregator
-            .lock()
-            .await
-            .aggregate_tickets(AggregationList::TicketList(tickets_to_agg))
-        {
+        let list = AggregationList::TicketList(tickets_to_agg);
+
+        match self.ticket_aggregator.lock().await.aggregate_tickets(list.clone()) {
             Ok(mut awaiter) => {
                 // Spawn waiting for the aggregation as a separate task
                 let agg_timeout = self.cfg.aggregation_timeout;
                 let actions_clone = self.chain_actions.clone();
+                let db_clone = self.db.clone();
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_AGGREGATIONS.increment();
@@ -158,14 +156,20 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<
                         }
                         Err(e) => {
                             warn!("could not aggregate tickets: {e}");
-                            if redeem_if_failed {
-                                info!("initiating redemption of all tickets in {channel} after aggregation failure");
+                            if let Err(e) = list.rollback(db_clone).await {
+                                error!("could not rollback failed aggregation: {e}")
+                            } else {
+                                if redeem_if_failed {
+                                    info!(
+                                        "initiating redemption of all tickets in {channel} after aggregation failure"
+                                    );
 
-                                if let Err(e) = actions_clone.redeem_tickets_in_channel(&channel, false).await {
-                                    error!("failed to issue redeeming of all tickets in {channel}: {e}");
+                                    if let Err(e) = actions_clone.redeem_tickets_in_channel(&channel, false).await {
+                                        error!("failed to issue redeeming of all tickets in {channel}: {e}");
+                                    }
+
+                                    // We do not need to await the redemption completion of all the tickets
                                 }
-
-                                // We do not need to await the redemption completion of all the tickets
                             }
                         }
                     }

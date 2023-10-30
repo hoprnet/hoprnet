@@ -199,16 +199,23 @@ pub mod wasm_impls {
 
         pub async fn aggregate_tickets(
             &mut self,
+            db: &Database,
             channel: &ChannelEntry,
             timeout_in_millis: u64,
         ) -> Result<(), JsValue> {
-            ok_or_jserr!(
-                ok_or_jserr!(self
-                    .ticket_aggregate_actions
-                    .aggregate_tickets(AggregationList::WholeChannel(channel.clone())))?
+            let list = AggregationList::WholeChannel(channel.clone());
+
+            let agg_result = self
+                .ticket_aggregate_actions
+                .aggregate_tickets(list.clone())?
                 .consume_and_wait(std::time::Duration::from_millis(timeout_in_millis))
-                .await
-            )
+                .await;
+            if let Err(e) = agg_result {
+                list.rollback(db.as_ref_counted()).await?;
+                Err(e.into())
+            } else {
+                Ok(())
+            }
         }
     }
 
@@ -371,6 +378,7 @@ pub mod wasm_impls {
         let heartbeat_network_clone = network.clone();
         let ping_network_clone = network.clone();
         let swarm_network_clone = network.clone();
+        let db_clone = db.clone();
         let tbf_clone = tbf.clone();
         let multistrategy_clone = multi_strategy.clone();
         let cg_clone = channel_graph.clone();
@@ -436,8 +444,15 @@ pub mod wasm_impls {
                             js_sys::Uint8Array::from(bloom.to_bytes().as_ref()).as_ref(),
                         ) {
                             error!("failed to call save tbf closure");
+                        } else {
+                            info!("tag bloom filter saved");
                         }
-                        info!("tag bloom filter saved");
+
+                        if let Err(e) = db_clone.write().await.db.flush().await {
+                            error!("failed to flush db: {e}");
+                        } else {
+                            info!("db flushed");
+                        }
                     })
                     .map(|_| HoprLoopComponents::Timer)
                     .await
