@@ -27,6 +27,7 @@ use async_std::task::spawn_local;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
+use crate::errors::StrategyError::CriteriaNotSatisfied;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 
@@ -159,18 +160,14 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> AggregatingStrategy<
                             warn!("could not aggregate tickets: {e}");
                             if let Err(e) = list.rollback(db_clone).await {
                                 error!("could not rollback failed aggregation: {e}")
-                            } else {
-                                if redeem_if_failed {
-                                    info!(
-                                        "initiating redemption of all tickets in {channel} after aggregation failure"
-                                    );
+                            } else if redeem_if_failed {
+                                info!("initiating redemption of all tickets in {channel} after aggregation failure");
 
-                                    if let Err(e) = actions_clone.redeem_tickets_in_channel(&channel, false).await {
-                                        error!("failed to issue redeeming of all tickets in {channel}: {e}");
-                                    }
-
-                                    // We do not need to await the redemption completion of all the tickets
+                                if let Err(e) = actions_clone.redeem_tickets_in_channel(&channel, false).await {
+                                    error!("failed to issue redeeming of all tickets in {channel}: {e}");
                                 }
+
+                                // We do not need to await the redemption completion of all the tickets
                             }
                         }
                     }
@@ -255,7 +252,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
             self.start_aggregation(channel, false).await
         } else {
             debug!("channel {channel_id} has not met the criteria for aggregation");
-            Ok(())
+            Err(CriteriaNotSatisfied)
         }
     }
 
@@ -652,6 +649,69 @@ mod tests {
             1,
             "there should be a single aggregated ticket"
         );
+    }
+
+    #[async_std::test]
+    async fn test_strategy_aggregation_on_ack_should_not_agg_when_unrealized_balance_exceeded_via_aggregated_tickets() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        // db_0: Alice (channel source)
+        // db_1: Bob (channel destination)
+        let mut inner_dbs = (0..2)
+            .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
+            .collect::<Vec<_>>();
+
+        let mut acked_tickets = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
+
+        let dbs = init_dbs(inner_dbs).await;
+
+        // Make this ticket aggregated
+        acked_tickets[0].ticket.index_offset = 2;
+        dbs[1]
+            .write()
+            .await
+            .update_acknowledged_ticket(&acked_tickets[0])
+            .await
+            .unwrap();
+
+        let channel = ChannelEntry::new(
+            (&PEERS_CHAIN[0]).into(),
+            (&PEERS_CHAIN[1]).into(),
+            Balance::new(100u64.into(), BalanceType::HOPR),
+            6u64.into(),
+            ChannelStatus::Open,
+            1u32.into(),
+            0u64.into(),
+        );
+
+        dbs[1]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        let tx_sender = spawn_tx_queue(dbs[1].clone(), MockTxExec::new());
+        let (bob_aggregator, _) =
+            spawn_aggregation_interaction(dbs[0].clone(), dbs[1].clone(), &PEERS_CHAIN[0], &PEERS_CHAIN[1]);
+
+        let cfg = super::AggregatingStrategyConfig {
+            aggregation_threshold: None,
+            unrealized_balance_ratio: Some(0.75),
+            aggregation_timeout: Duration::from_secs(5),
+            aggregate_on_channel_close: false,
+        };
+
+        let actions = CoreEthereumActions::new(PEERS_CHAIN[1].public().to_address(), dbs[1].clone(), tx_sender.clone());
+
+        let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
+
+        let threshold_ticket = acked_tickets.last().unwrap();
+
+        aggregation_strategy
+            .on_acknowledged_winning_ticket(&threshold_ticket)
+            .await
+            .expect_err("strategy call should not satisfy the criteria");
     }
 
     #[async_std::test]

@@ -14,6 +14,7 @@ use validator::Validate;
 use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
+use crate::errors::StrategyError::CriteriaNotSatisfied;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 
@@ -102,9 +103,10 @@ impl<Db: HoprCoreEthereumDbActions + Clone> SingularStrategy for AutoFundingStra
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
                 info!("issued re-staking of {channel} with {}", self.cfg.funding_amount);
             }
+            Ok(())
+        } else {
+            Err(CriteriaNotSatisfied)
         }
-
-        Ok(())
     }
 }
 

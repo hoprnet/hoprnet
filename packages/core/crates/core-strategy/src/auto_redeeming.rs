@@ -11,6 +11,7 @@ use validator::Validate;
 use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
+use crate::errors::StrategyError::CriteriaNotSatisfied;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 
@@ -73,8 +74,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone> SingularStrategy for AutoR
 
             let rx = self.chain_actions.redeem_ticket(ack.clone()).await?;
             std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+            Ok(())
+        } else {
+            Err(CriteriaNotSatisfied)
         }
-        Ok(())
     }
 }
 

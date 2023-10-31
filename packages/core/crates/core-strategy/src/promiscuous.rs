@@ -26,6 +26,7 @@ use crate::strategy::SingularStrategy;
 use crate::{decision::ChannelDecision, Strategy};
 use utils_types::traits::PeerIdLike;
 
+use crate::errors::StrategyError::CriteriaNotSatisfied;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 
@@ -142,7 +143,7 @@ where
             .await
             .all_peers_with_quality()
             .iter()
-            .filter_map(|(peer, q)| match OffchainPublicKey::from_peerid(&peer) {
+            .filter_map(|(peer, q)| match OffchainPublicKey::from_peerid(peer) {
                 Ok(offchain_key) => Some((offchain_key, q)),
                 Err(_) => {
                     error!("encountered invalid peer id: {peer}");
@@ -191,7 +192,7 @@ where
         let peers_with_quality = self.get_peers_with_quality().await;
         let current_average_network_size = match self.sample_size_and_evaluate_avg(peers_with_quality.len()).await {
             Some(avg) => avg,
-            None => return Ok(tick_decision), // not enough samples yet
+            None => return Err(CriteriaNotSatisfied), // not enough samples yet
         };
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
