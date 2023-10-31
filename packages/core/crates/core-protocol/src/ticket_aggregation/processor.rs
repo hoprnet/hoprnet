@@ -848,14 +848,21 @@ mod tests {
         let channel_alice_bob = ChannelEntry::new(
             alice_addr,
             bob_addr,
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            1u64.into(),
+            agg_balance.imul(10),
+            NUM_TICKETS.into(),
             ChannelStatus::Open,
             1u32.into(),
             0u64.into(),
         );
 
         dbs[1]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel_id_alice_bob, &channel_alice_bob, &Snapshot::default())
+            .await
+            .unwrap();
+
+        dbs[0]
             .write()
             .await
             .update_channel_and_snapshot(&channel_id_alice_bob, &channel_alice_bob, &Snapshot::default())

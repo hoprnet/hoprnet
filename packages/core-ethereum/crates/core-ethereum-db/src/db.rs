@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use core_crypto::types::{HalfKeyChallenge, Hash, OffchainPublicKey};
+use core_types::channels::ChannelDirection;
 use core_types::{
     account::AccountEntry,
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
 use utils_db::errors::DbError;
-use utils_db::errors::DbError::NotFound;
 use utils_db::{
     constants::*,
     db::{Batch, DB},
@@ -257,6 +257,34 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         index_start: u64,
         index_end: u64,
     ) -> Result<Vec<AcknowledgedTicket>> {
+        assert!(index_start < index_end, "aggregation indices must be valid");
+
+        let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
+        let channel = self
+            .db
+            .get_or_none::<ChannelEntry>(channel_key)
+            .await?
+            .expect("must aggregate tickets on an existing channel");
+
+        // Perform sanity checks on the arguments
+        assert_eq!(
+            ChannelDirection::Incoming,
+            channel.direction(&self.me).expect("must be own channel"),
+            "aggregation request can happen on incoming channels only"
+        );
+        assert_ne!(
+            ChannelStatus::Closed,
+            channel.status,
+            "must not aggregate tickets on a closed channel"
+        );
+        assert_eq!(channel.channel_epoch.as_u32(), epoch, "channel epoch must be valid");
+        assert!(
+            index_start < channel.ticket_index.as_u64(),
+            "aggregation start index must be less than current channel ticket index"
+        );
+
+        let channel_balance = channel.balance;
+
         let mut tickets = self
             .get_acknowledged_tickets_range(channel_id, epoch, index_start, index_end)
             .await?;
@@ -279,14 +307,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
         let mut agg_tickets = Vec::new();
         let mut batch_ops = Batch::default();
-
-        let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
-        let channel_balance = self
-            .db
-            .get_or_none::<ChannelEntry>(channel_key)
-            .await?
-            .ok_or(NotFound)?
-            .balance;
 
         // Set all the tickets to `BeingAggregated`
         let mut total_value = Balance::zero(BalanceType::HOPR);
@@ -595,12 +615,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
             .unwrap_or(Balance::zero(BalanceType::HOPR)))
     }
 
-    async fn get_pending_tickets_count(&self) -> Result<usize> {
-        let key = utils_db::db::Key::new_from_str(PENDING_TICKETS_COUNT)?;
-
-        Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
-    }
-
     async fn get_losing_tickets_count(&self) -> Result<usize> {
         let key = utils_db::db::Key::new_from_str(LOSING_TICKET_COUNT)?;
 
@@ -634,40 +648,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         let new_redeemed_balance = balance.add(&acked_ticket.ticket.amount);
         self.db.set(key, &new_redeemed_balance).await?;
         debug!("updated redeemed tickets value to {new_redeemed_balance}");
-        self.db.flush().await?;
-
-        if let Some(counterparty) = self.get_channel(&acked_ticket.ticket.channel_id).await?.map(|c| {
-            if c.source == self.me {
-                c.destination
-            } else {
-                c.source
-            }
-        }) {
-            let key = utils_db::db::Key::new_with_prefix(&counterparty, PENDING_TICKETS_COUNT)?;
-            let pending_balance = self
-                .db
-                .get_or_none::<Balance>(key.clone())
-                .await?
-                .unwrap_or(Balance::zero(BalanceType::HOPR));
-
-            let new_pending_balance = pending_balance.sub(&acked_ticket.ticket.amount);
-            self.db.set(key, &new_pending_balance).await?;
-
-            self.db.flush().await?;
-            debug!("updated pending balance with {counterparty} to: {new_pending_balance}");
-
-            Ok(())
-        } else {
-            error!(
-                "could not update pending balance: unable to find channel with id {}",
-                acked_ticket.ticket.channel_id
-            );
-
-            Err(DbError::GenericError(format!(
-                "channel {} not found",
-                acked_ticket.ticket.channel_id
-            )))
-        }
+        self.db.flush().await
     }
 
     async fn mark_losing_acked_ticket(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
@@ -689,7 +670,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
                 c.source
             }
         }) {
-            let key = utils_db::db::Key::new_with_prefix(&counterparty, PENDING_TICKETS_COUNT)?;
+            let key = utils_db::db::Key::new_with_prefix(&counterparty, LOSING_TICKET_COUNT)?;
             let balance = self
                 .db
                 .get_or_none::<Balance>(key.clone())
@@ -1428,15 +1409,6 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_pending_tickets_count(&self) -> Result<usize, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_pending_tickets_count().await)
-            //}
-        }
-
-        #[wasm_bindgen]
         pub async fn get_losing_tickets_count(&self) -> Result<usize, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
@@ -1719,6 +1691,9 @@ mod tests {
         static ref BOB_KEYPAIR: ChainKeypair = ChainKeypair::from_secret(&BOB).unwrap();
     }
 
+    const PRICE_PER_PACKET: u128 = 10000000000000000_u128;
+    const PATH_POS: u64 = 5_u64;
+
     fn mock_ticket(
         pk: &ChainKeypair,
         counterparty: &Address,
@@ -1729,13 +1704,12 @@ mod tests {
         challenge: Option<EthereumChallenge>,
     ) -> Ticket {
         let win_prob = 1.0f64; // 100 %
-        let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
-        let path_pos = 5u64;
+        let price_per_packet: U256 = PRICE_PER_PACKET.into(); // 0.01 HOPR
 
         Ticket::new(
             counterparty,
             &Balance::new(
-                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(path_pos),
+                price_per_packet.divide_f64(win_prob).unwrap() * U256::from(PATH_POS),
                 BalanceType::HOPR,
             ),
             index.unwrap_or(U256::one()),
@@ -2015,64 +1989,154 @@ mod tests {
         assert_eq!(acked_tickets_range.len(), 1);
     }
 
+    async fn generate_ack_tickets(
+        db: &mut DB<RustyLevelDbShim>,
+        amount: u32,
+    ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
+        let mut challenge_seed: [u8; 32] = hex!("c04824c574e562b3b96725c8aa6e5b0426a3900cd9efbe48ddf7e754a552abdf");
+        let domain_separator = Hash::default();
+
+        let mut total_balance = Balance::zero(BalanceType::HOPR);
+        let mut acked_tickets = Vec::new();
+        for i in 0..amount {
+            let challenge =
+                Challenge::from(CurvePoint::from_exponent(&challenge_seed).unwrap()).to_ethereum_challenge();
+
+            let ticket = mock_ticket(
+                &ALICE_KEYPAIR,
+                &(&*BOB_KEYPAIR).into(),
+                Some(domain_separator),
+                Some(i.into()),
+                Some(1_u64.into()),
+                Some(1_u64.into()),
+                Some(challenge),
+            );
+
+            challenge_seed = Hash::create(&[&challenge_seed]).into();
+
+            total_balance = total_balance.add(&ticket.amount);
+
+            let ack = AcknowledgedTicket::new(
+                ticket,
+                Response::from_bytes(&challenge_seed.clone()).unwrap(),
+                (&*ALICE_KEYPAIR).into(),
+                &BOB_KEYPAIR,
+                &domain_separator,
+            )
+            .unwrap();
+
+            acked_tickets.push(ack);
+        }
+
+        let channel = ChannelEntry::new(
+            ALICE_KEYPAIR.public().to_address(),
+            BOB_KEYPAIR.public().to_address(),
+            total_balance,
+            amount.into(),
+            ChannelStatus::Open,
+            1_u32.into(),
+            0_u32.into(),
+        );
+
+        let channel_key = utils_db::db::Key::new_with_prefix(&channel.get_id(), CHANNEL_PREFIX).unwrap();
+        db.set(channel_key, &channel).await.unwrap();
+
+        (acked_tickets, channel)
+    }
+
     #[async_std::test]
-    async fn test_acknowledged_ticket_status() {
+    async fn test_should_prepare_all_acknowledged_tickets() {
         let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
 
-        let mut challenge_seed: [u8; 32] = hex!("c04824c574e562b3b96725c8aa6e5b0426a3900cd9efbe48ddf7e754a552abdf");
-
-        let amount_tickets = 29u64;
-        let domain_separator = Hash::default();
-        let mut acked_tickets = (0..amount_tickets)
-            .map(|i| {
-                let challenge =
-                    Challenge::from(CurvePoint::from_exponent(&challenge_seed).unwrap()).to_ethereum_challenge();
-
-                let ticket = mock_ticket(
-                    &ALICE_KEYPAIR,
-                    &(&*BOB_KEYPAIR).into(),
-                    Some(domain_separator),
-                    Some(i.into()),
-                    Some(1u64.into()),
-                    Some(1u64.into()),
-                    Some(challenge),
-                );
-
-                challenge_seed = Hash::create(&[&challenge_seed]).into();
-
-                AcknowledgedTicket::new(
-                    ticket,
-                    Response::from_bytes(&challenge_seed.clone()).unwrap(),
-                    (&*ALICE_KEYPAIR).into(),
-                    &BOB_KEYPAIR,
-                    &domain_separator,
-                )
-                .unwrap()
-            })
-            .collect::<Vec<AcknowledgedTicket>>();
-
-        // Add some being redeemed tickets
-        acked_tickets[12].status(AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        });
-        acked_tickets[17].status(AcknowledgedTicketStatus::BeingRedeemed {
-            tx_hash: Hash::default(),
-        });
+        let amount_tickets = 29;
+        let (ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
 
         // Store ack tickets
-        for ack in acked_tickets.iter() {
+        for ack in ack_tickets.iter() {
             inner_db
                 .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
                 .await
                 .unwrap();
         }
 
-        let mut db = CoreEthereumDb::new(inner_db, Address::random());
-
-        let channel_id = generate_channel_id(&(&*ALICE_KEYPAIR).into(), &(&*BOB_KEYPAIR).into());
-
+        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
         let stored_acked_tickets = db
-            .prepare_aggregatable_tickets(&channel_id, 1u32, 0u64, u64::MAX)
+            .prepare_aggregatable_tickets(&channel.get_id(), 1u32, 0u64, u64::MAX)
+            .await
+            .unwrap();
+
+        assert_eq!(stored_acked_tickets.len(), amount_tickets as usize);
+
+        assert!(stored_acked_tickets
+            .iter()
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
+                start: 0u64,
+                end: u64::MAX,
+            } == acked_ticket.status));
+    }
+
+    #[async_std::test]
+    async fn test_should_prepare_acknowledged_tickets_skip_redeemed() {
+        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+
+        let amount_tickets = 29;
+        let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
+
+        // Add some being redeemed tickets
+        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed {
+            tx_hash: Hash::default(),
+        };
+
+        // Store ack tickets
+        for ack in ack_tickets.iter() {
+            inner_db
+                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .await
+                .unwrap();
+        }
+
+        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let stored_acked_tickets = db
+            .prepare_aggregatable_tickets(&channel.get_id(), 1u32, 0u64, u64::MAX)
+            .await
+            .unwrap();
+
+        assert_eq!(stored_acked_tickets.len(), 16);
+
+        assert!(stored_acked_tickets
+            .iter()
+            .all(|acked_ticket| AcknowledgedTicketStatus::BeingAggregated {
+                start: 0u64,
+                end: u64::MAX,
+            } == acked_ticket.status));
+    }
+
+    #[async_std::test]
+    async fn test_should_prepare_acknowledged_tickets_after_last_redeemed() {
+        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+
+        let amount_tickets = 29;
+        let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
+
+        // Add some being redeemed tickets
+        ack_tickets[12].status = AcknowledgedTicketStatus::BeingRedeemed {
+            tx_hash: Hash::default(),
+        };
+        ack_tickets[17].status = AcknowledgedTicketStatus::BeingRedeemed {
+            tx_hash: Hash::default(),
+        };
+
+        // Store ack tickets
+        for ack in ack_tickets.iter() {
+            inner_db
+                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .await
+                .unwrap();
+        }
+
+        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let stored_acked_tickets = db
+            .prepare_aggregatable_tickets(&channel.get_id(), 1u32, 0u64, u64::MAX)
             .await
             .unwrap();
 
@@ -2084,5 +2148,34 @@ mod tests {
                 start: 0u64,
                 end: u64::MAX,
             } == acked_ticket.status));
+    }
+
+    #[async_std::test]
+    async fn test_should_not_prepare_when_last_being_redeemed() {
+        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+
+        let amount_tickets = 29;
+        let (mut ack_tickets, channel) = generate_ack_tickets(&mut inner_db, amount_tickets).await;
+
+        // Add some being redeemed tickets
+        ack_tickets[28].status = AcknowledgedTicketStatus::BeingRedeemed {
+            tx_hash: Hash::default(),
+        };
+
+        // Store ack tickets
+        for ack in ack_tickets.iter() {
+            inner_db
+                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .await
+                .unwrap();
+        }
+
+        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let stored_acked_tickets = db
+            .prepare_aggregatable_tickets(&channel.get_id(), 1u32, 0u64, u64::MAX)
+            .await
+            .unwrap();
+
+        assert!(stored_acked_tickets.is_empty());
     }
 }

@@ -413,17 +413,33 @@ mod tests {
         utils_db::db::Key::new_bytes_with_prefix(&ack_key, ACKNOWLEDGED_TICKETS_PREFIX).unwrap()
     }
 
-    async fn populate_db_with_ack_tickets(db: &mut DB<RustyLevelDbShim>, amount: usize) -> Vec<AcknowledgedTicket> {
+    async fn populate_db_with_ack_tickets(
+        db: &mut DB<RustyLevelDbShim>,
+        amount: usize,
+    ) -> (Vec<AcknowledgedTicket>, ChannelEntry) {
         let mut acked_tickets = Vec::new();
+        let mut total_value = Balance::zero(BalanceType::HOPR);
         for i in 0..amount {
             let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64);
             db.set(to_acknowledged_ticket_key(&acked_ticket), &acked_ticket)
                 .await
                 .unwrap();
 
+            total_value = total_value.add(&acked_ticket.ticket.amount);
             acked_tickets.push(acked_ticket);
         }
-        acked_tickets
+
+        let channel = ChannelEntry::new(
+            (&PEERS_CHAIN[0]).into(),
+            (&PEERS_CHAIN[1]).into(),
+            total_value,
+            (amount as u32).into(),
+            ChannelStatus::Open,
+            1u32.into(),
+            0u64.into(),
+        );
+
+        (acked_tickets, channel)
     }
 
     async fn init_dbs(inner_dbs: Vec<DB<RustyLevelDbShim>>) -> Vec<Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>> {
@@ -520,19 +536,16 @@ mod tests {
             .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
             .collect::<Vec<_>>();
 
-        let acked_tickets = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
+        let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 
         let dbs = init_dbs(inner_dbs).await;
 
-        let channel = ChannelEntry::new(
-            (&PEERS_CHAIN[0]).into(),
-            (&PEERS_CHAIN[1]).into(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            6u64.into(),
-            ChannelStatus::Open,
-            1u32.into(),
-            0u64.into(),
-        );
+        dbs[0]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
 
         dbs[1]
             .write()
@@ -590,19 +603,16 @@ mod tests {
             .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
             .collect::<Vec<_>>();
 
-        let acked_tickets = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
+        let (acked_tickets, channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
 
         let dbs = init_dbs(inner_dbs).await;
 
-        let channel = ChannelEntry::new(
-            (&PEERS_CHAIN[0]).into(),
-            (&PEERS_CHAIN[1]).into(),
-            Balance::new(100u64.into(), BalanceType::HOPR),
-            6u64.into(),
-            ChannelStatus::Open,
-            1u32.into(),
-            0u64.into(),
-        );
+        dbs[0]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
 
         dbs[1]
             .write()
@@ -661,7 +671,7 @@ mod tests {
             .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
             .collect::<Vec<_>>();
 
-        populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
+        let (_, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 5).await;
 
         let cfg = super::AggregatingStrategyConfig {
             aggregation_threshold: None,
@@ -672,15 +682,12 @@ mod tests {
 
         let dbs = init_dbs(inner_dbs).await;
 
-        let mut channel = ChannelEntry::new(
-            (&PEERS_CHAIN[0]).into(),
-            (&PEERS_CHAIN[1]).into(),
-            Balance::new(1u64.into(), BalanceType::HOPR),
-            6u64.into(),
-            ChannelStatus::Open,
-            1u32.into(),
-            0u64.into(),
-        );
+        dbs[0]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
 
         dbs[1]
             .write()
@@ -698,6 +705,14 @@ mod tests {
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, dbs[1].clone(), actions, bob_aggregator);
 
         channel.status = ChannelStatus::PendingToClose;
+
+        dbs[0]
+            .write()
+            .await
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
         dbs[1]
             .write()
             .await
