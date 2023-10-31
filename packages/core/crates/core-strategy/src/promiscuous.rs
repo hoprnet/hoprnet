@@ -19,14 +19,14 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
+use utils_types::traits::PeerIdLike;
 use validator::Validate;
 
 use crate::errors::Result;
+use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::strategy::SingularStrategy;
 use crate::{decision::ChannelDecision, Strategy};
-use utils_types::traits::PeerIdLike;
 
-use crate::errors::StrategyError::CriteriaNotSatisfied;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 

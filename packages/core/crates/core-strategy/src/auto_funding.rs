@@ -11,10 +11,10 @@ use utils_log::info;
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
+use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
-use crate::errors::StrategyError::CriteriaNotSatisfied;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 

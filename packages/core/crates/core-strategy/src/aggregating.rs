@@ -1,4 +1,3 @@
-use crate::{strategy::SingularStrategy, Strategy};
 use async_std::sync::{Mutex, RwLock};
 use async_trait::async_trait;
 use core_ethereum_actions::errors::CoreEthereumActionsError::ChannelDoesNotExist;
@@ -21,13 +20,15 @@ use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Balance, BalanceType};
 use validator::Validate;
 
+use crate::errors::StrategyError::CriteriaNotSatisfied;
+use crate::{strategy::SingularStrategy, Strategy};
+
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::spawn_local;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
-use crate::errors::StrategyError::CriteriaNotSatisfied;
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
 
@@ -205,6 +206,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
             match ticket.status {
                 AcknowledgedTicketStatus::Untouched => {
                     aggregatable_tickets += 1;
+                    // Do not account aggregated tickets into the unrealized balance calculation
                     if !ticket.ticket.is_aggregated() {
                         unredeemed_value = unredeemed_value.add(&ticket.ticket.amount);
                     }
