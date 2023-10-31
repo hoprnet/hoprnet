@@ -19,6 +19,16 @@ use utils_types::primitives::{Address, Balance};
 
 use crate::errors::HoprChainError;
 
+#[async_trait::async_trait]
+pub trait ChainQueries {
+    async fn is_node_safe_registered(&self) -> errors::Result<bool>;
+
+    async fn can_register_with_safe(&self) -> errors::Result<bool>;
+
+    async fn wait_for_funds(&self) -> errors::Result<()>;
+
+    async fn clone(&self) -> Self;
+}
 
 /// This is used by the indexer to emit events when a change on channel entry is detected.
 #[derive(Clone)]
@@ -32,8 +42,6 @@ impl ChannelEventEmitter {
         let _ = sender.send(channel.clone()).await;
     }
 }
-
-
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone)]

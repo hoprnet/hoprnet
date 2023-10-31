@@ -152,6 +152,7 @@ export class WasmChainQuery {
 
   public smartContractInfo(): {
     chain: string
+    hoprAnnouncementsAddress: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
     hoprNetworkRegistryAddress: string
@@ -245,14 +246,16 @@ export async function createHoprNode(
     resolvedContractAddresses,
     false
   )
-  
+
   let chain_query = new WasmChainQuery(chainKeypair.public().to_address())
-  
+
   let connector = HoprCoreEthereum.getInstance()
 
   log(`${chainKeypair.public().to_hex(false)}: ${resolvedContractAddresses.hopr_channels_address},
     ${resolvedContractAddresses.hopr_announcements_address}, ${resolvedContractAddresses.hopr_announcements_address},
-    ${cfg.safe_module.module_address}, ${resolvedContractAddresses.hopr_node_safe_registry_address}, ${resolvedContractAddresses.hopr_token_address}`)
+    ${cfg.safe_module.module_address}, ${resolvedContractAddresses.hopr_node_safe_registry_address}, ${
+    resolvedContractAddresses.hopr_token_address
+  }`)
   let tx_executor = new WasmTxExecutor(
     connector.sendTransaction.bind(connector),
     chainKeypair,

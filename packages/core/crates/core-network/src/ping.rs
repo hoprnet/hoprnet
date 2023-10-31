@@ -101,10 +101,7 @@ impl<T: PingExternalAPI> Ping<T> {
         }
     }
 
-    fn initiate_peer_ping(
-        &mut self,
-        peer: &PeerId,
-    ) -> Result<(u64, ControlMessage), ()> {
+    fn initiate_peer_ping(&mut self, peer: &PeerId) -> Result<(u64, ControlMessage), ()> {
         info!("Pinging peer '{}'", peer);
 
         let ping_challenge: ControlMessage = ControlMessage::generate_ping_request();

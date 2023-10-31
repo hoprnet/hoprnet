@@ -91,7 +91,6 @@ pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     pinger: T,
     external_api: API,
     rng: rand::rngs::ThreadRng,
-    
 }
 
 impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {

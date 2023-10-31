@@ -52,6 +52,7 @@ use libp2p::request_response::{RequestId, ResponseChannel};
 use std::pin::Pin;
 use std::sync::Arc;
 use utils_log::{error, info};
+use utils_types::primitives::Address;
 
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::channels::ChannelEntry;
@@ -239,6 +240,12 @@ pub struct TicketStatistics {
     pub rejected_value: utils_types::primitives::Balance,
 }
 
+pub struct PublicNodesResult {
+    pub id: String,
+    pub address: Address,
+    pub multiaddrs: Vec<Multiaddr>,
+}
+
 #[cfg(feature = "wasm")]
 pub mod wasm_impls {
     use crate::processes::indexer::IndexerToProcess;
@@ -269,6 +276,20 @@ pub mod wasm_impls {
         pub id: JsString,
         pub address: Address,
         pub multiaddrs: Vec<JsString>,
+    }
+
+    impl From<super::PublicNodesResult> for PublicNodesResult {
+        fn from(value: super::PublicNodesResult) -> Self {
+            Self {
+                id: JsString::from(value.id),
+                address: value.address,
+                multiaddrs: value
+                    .multiaddrs
+                    .into_iter()
+                    .map(|v| JsString::from(v.to_string()))
+                    .collect(),
+            }
+        }
     }
 
     #[wasm_bindgen]

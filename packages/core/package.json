@@ -35,6 +35,8 @@
     "@hoprnet/hopr-utils": "workspace:packages/utils"
   },
   "devDependencies": {
+    "@types/mocha": "10.0.2",
+    "mocha": "10.2.0",
     "typedoc": "0.24.8",
     "typedoc-plugin-markdown": "3.15.4",
     "typescript": "5.2.2"

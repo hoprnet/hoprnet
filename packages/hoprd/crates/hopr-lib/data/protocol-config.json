@@ -55,9 +55,7 @@
         "announcements": "0x619eabE23FD0E2291B50a507719aa633fE6069b8"
       },
       "confirmations": 8,
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     },
     "rotsee": {
       "chain": "xdai",
@@ -76,9 +74,7 @@
         "announcements": "0xf1c143B1bA20C7606d56aA2FA94502D25744b982"
       },
       "confirmations": 8,
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     },
     "debug-staging": {
       "chain": "xdai",
@@ -97,9 +93,7 @@
         "announcements": "0xD78BCa8452B8Ea281a659f380E0eF710C64EB85b"
       },
       "confirmations": 8,
-      "tags": [
-        "development"
-      ]
+      "tags": ["development"]
     },
     "monte_rosa": {
       "chain": "xdai",
@@ -118,9 +112,7 @@
         "announcements": "0x0000000000000000000000000000000000000000"
       },
       "confirmations": 8,
-      "tags": [
-        "etherscan"
-      ]
+      "tags": ["etherscan"]
     }
   },
   "chains": {

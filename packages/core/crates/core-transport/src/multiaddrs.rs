@@ -35,7 +35,11 @@ pub(crate) fn is_supported(ma: &Multiaddr) -> bool {
     ma.iter()
         .next()
         .map(|proto| match proto {
-            multiaddr::Protocol::Ip4(_) | multiaddr::Protocol::Ip6(_) | multiaddr::Protocol::Dns(_) => true,
+            multiaddr::Protocol::Ip4(_)
+            | multiaddr::Protocol::Ip6(_)
+            | multiaddr::Protocol::Dns(_)
+            | multiaddr::Protocol::Dns4(_)
+            | multiaddr::Protocol::Dns6(_) => true,
             _ => false,
         })
         .unwrap_or(false)
@@ -56,5 +60,10 @@ mod tests {
         assert!(is_private(
             &Multiaddr::from_str("/ip4/192.168.1.23/udp/9090/quic").unwrap()
         ));
+    }
+
+    #[test]
+    fn test_domain_dns4_multiaddresses_should_be_supported() {
+        assert!(is_supported(&Multiaddr::from_str("/dns4/localhost/tcp/5543").unwrap()));
     }
 }

@@ -1,10 +1,7 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_std::sync::RwLock;
-use core_ethereum_actions::{
-    transaction_queue::TransactionQueue,
-    CoreEthereumActions,
-};
+use core_ethereum_actions::{transaction_queue::TransactionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::ChainKeypair;
@@ -14,10 +11,7 @@ use utils_types::primitives::Address;
 
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "wasm")]
-use {
-    core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor,
-    wasm_bindgen::prelude::*
-};
+use {core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, wasm_bindgen::prelude::*};
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
@@ -62,6 +56,7 @@ pub struct ChainOptions {
     pub max_priority_fee_per_gas: String,
     pub native_token_name: String,
     pub hopr_token_name: String,
+    // TODO: why would this be needed in the non-wasm setup?
     /// number of follow-on blocks required until a block is considered confirmed on-chain
     pub confirmations: u32,
     pub tags: Option<Vec<String>>,
@@ -130,8 +125,6 @@ pub struct Network {
     pub version_range: String,
     /// block number to start the indexer from
     pub indexer_start_block_number: u32,
-    #[wasm_bindgen(skip)] // no tags in Typescript
-    pub tags: Vec<String>,
     /// contract addresses used by the network
     pub addresses: Addresses,
     /// Number of blockchain block to wait until an on-chain state-change is considered to be final
@@ -140,6 +133,8 @@ pub struct Network {
     /// block reorganizations increases exponentially in the number of confirmations, e.g.
     /// after one block it is `0.5` whereas after two blocks it is `0.25 = 0.5^2`  etc.
     pub confirmations: u32,
+    #[wasm_bindgen(skip)] // no tags in Typescript
+    pub tags: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -294,8 +289,8 @@ impl FromStr for ProtocolConfig {
 
     /// Reads the protocol config JSON file and returns it
     fn from_str(data: &str) -> Result<Self, Self::Err> {
-        let mut protocol_config = (serde_json::from_slice::<ProtocolConfig>(data.as_bytes()))
-            .map_err(|e| e.to_string())?;
+        let mut protocol_config =
+            (serde_json::from_slice::<ProtocolConfig>(data.as_bytes())).map_err(|e| e.to_string())?;
 
         for (id, env) in protocol_config.networks.iter_mut() {
             env.id = id.to_owned();
@@ -326,6 +321,7 @@ impl ProtocolConfig {
     }
 }
 
+#[cfg(feature = "wasm")]
 pub fn build_chain_components<Db>(
     me: Address,
     db: Arc<RwLock<Db>>,
@@ -368,6 +364,8 @@ pub mod wasm {
     #[derive(Debug, Clone)]
     pub struct ChainConfiguration {
         pub chain: String,
+        #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprAnnouncementsAddress)]
+        pub hopr_announcement_address: String,
         #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprTokenAddress)]
         pub hopr_token_address: String,
         #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprChannelsAddress)]

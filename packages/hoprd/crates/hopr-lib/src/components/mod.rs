@@ -3,14 +3,14 @@ use std::{pin::Pin, sync::Arc, time::Duration};
 use async_std::sync::RwLock;
 use futures::{channel::mpsc::unbounded, FutureExt};
 
-use core_ethereum_db::db::CoreEthereumDb;
 use core_ethereum_api::HoprChain;
+use core_ethereum_db::db::CoreEthereumDb;
 use core_path::{channel_graph::ChannelGraph, DbPeerAddressResolver};
 use core_strategy::strategy::{MultiStrategy, SingularStrategy};
 use core_transport::{
     build_heartbeat, build_index_updater, build_manual_ping, build_network, build_packet_actions,
-    build_ticket_aggregation, libp2p_identity, p2p_loop, ApplicationData, ChainKeypair,
-    HalfKeyChallenge, Keypair, Multiaddr, OffchainKeypair, TransportOutput, UniversalTimer,
+    build_ticket_aggregation, libp2p_identity, p2p_loop, ApplicationData, ChainKeypair, HalfKeyChallenge, Keypair,
+    Multiaddr, OffchainKeypair, TransportOutput, UniversalTimer,
 };
 use core_types::protocol::TagBloomFilter;
 use utils_db::rusty::RustyLevelDbShim;
@@ -20,11 +20,7 @@ use utils_types::traits::BinarySerializable;
 use crate::{config::HoprLibConfig, constants};
 
 #[cfg(feature = "wasm")]
-use {
-    core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor,
-    core_transport::wasm_impls::HoprTransport
-};
-
+use {core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_transport::wasm_impls::HoprTransport};
 
 /// Enum differentiator for loop component futures.
 ///
@@ -70,6 +66,7 @@ impl std::fmt::Display for HoprLoopComponents {
 }
 
 /// Main builder of the hopr lib components
+#[cfg(feature = "wasm")]
 pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
     cfg: HoprLibConfig,
     me: OffchainKeypair,

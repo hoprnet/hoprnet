@@ -83,11 +83,14 @@ describe('POST /channels/{channelid}/fund', function () {
   })
 
   it('should succeed if channel is open', async function () {
-    node.fundChannel = sinon.fake.resolves('myreceipt')
+    let receipt = sinon.fake()
+    const expected: string = '0xabcdef0123456789'
+    receipt.to_hex = sinon.fake.returns('0xabcdef0123456789')
+    node.fundChannel = sinon.fake.resolves(receipt)
     let channelId = generate_channel_id(ALICE_ETHEREUM_ADDR, BOB_ETHEREUM_ADDR)
     const res = await request(service).post(`/api/v3/channels/${channelId.to_hex()}/fund`).send({ amount: '1' })
     expect(res).to.satisfyApiSpec
     expect(res.status).to.equal(200)
-    expect(res.body.receipt).to.equal('myreceipt')
+    expect(res.body.receipt).to.equal(expected)
   })
 })

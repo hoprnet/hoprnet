@@ -10,8 +10,7 @@ export const getInfo = async (node: Hopr) => {
     const scInfo: ChainConfiguration = node.smartContractInfo()
 
     return {
-      // TODO: add node network here
-      // network: node.network.id,
+      network: node.chainConfig().id,
       announcedAddress: await node.getMultiaddressesAnnouncedToDHT(node.peerId()),
       listeningAddress: await node.getListeningMultiaddresses(),
       chain: scInfo.chain,

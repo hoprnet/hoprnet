@@ -11,7 +11,6 @@ import {
   create_counter,
   ChainKeypair,
   CORE_ETHEREUM_CONSTANTS,
-
   SmartContractConfig
 } from '@hoprnet/hopr-utils'
 

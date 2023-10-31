@@ -480,15 +480,8 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
-    "@libp2p/interface-peer-id": 1.0.5
-    "@libp2p/peer-id": 1.1.16
-    "@multiformats/multiaddr": 10.3.3
     "@types/mocha": 10.0.2
-    bn.js: 5.2.1
-    debug: 4.3.4
-    heap-js: 2.3.0
     mocha: 10.2.0
-    retimer: 4.0.0
     typedoc: 0.24.8
     typedoc-plugin-markdown: 3.15.4
     typescript: 5.2.2
@@ -532,6 +525,7 @@ __metadata:
   resolution: "@hoprnet/hoprd@workspace:packages/hoprd"
   dependencies:
     "@hoprnet/hopr-core": "workspace:packages/core"
+    "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum"
     "@hoprnet/hopr-real": "workspace:packages/real"
     "@hoprnet/hopr-utils": "workspace:packages/utils"
     "@libp2p/interface-peer-id": 1.0.5
@@ -2908,13 +2902,6 @@ __metadata:
   bin:
     he: bin/he
   checksum: 3d4d6babccccd79c5c5a3f929a68af33360d6445587d628087f39a965079d84f18ce9c3d3f917ee1e3978916fc833bb8b29377c3b403f919426f91bc6965e7a7
-  languageName: node
-  linkType: hard
-
-"heap-js@npm:2.3.0":
-  version: 2.3.0
-  resolution: "heap-js@npm:2.3.0"
-  checksum: 04ba26c68ab6f5f8ef8726b806648bd433a5db1eba95510b09ddb46c4c915da944078582f2c136b6aafaf1b07e69a1d9fad5b8e24143aba00b6fd403876a1b46
   languageName: node
   linkType: hard
 

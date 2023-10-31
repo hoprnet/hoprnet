@@ -31,7 +31,7 @@ where
 {
     let (on_channel_event_tx, mut rx) = unbounded::<ChannelEntry>();
 
-    wasm_bindgen_futures::spawn_local(async move {
+    spawn_local(async move {
         while let Some(channel) = poll_fn(|cx| Pin::new(&mut rx).poll_next(cx)).await {
             let maybe_direction = channel.direction(&me);
             let change = channel_graph.write().await.update_channel(channel);

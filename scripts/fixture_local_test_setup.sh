@@ -384,6 +384,8 @@ reuse_pregenerated_identities
 # create safe and modules for all the ids, store them in args files
 create_local_safes
 
+
+log "Setting up nodes"
 #  --- Run nodes --- {{{
 setup_node 13301 ${default_api_token} 19091 "${node1_dir}" "${node1_log}" "${node1_id}" "localhost" "--announce"
 # use empty auth token to be able to test this in the security tests
