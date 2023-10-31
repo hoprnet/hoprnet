@@ -6,6 +6,7 @@ use core_types::{
     channels::{generate_channel_id, ChannelEntry, ChannelStatus, Ticket},
 };
 use utils_db::errors::DbError;
+use utils_db::errors::DbError::NotFound;
 use utils_db::{
     constants::*,
     db::{Batch, DB},
@@ -260,44 +261,68 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
             .get_acknowledged_tickets_range(channel_id, epoch, index_start, index_end)
             .await?;
 
-        let mut batch_ops = utils_db::db::Batch::default();
+        // We start aggregating from the first ticket that is not in `BeingRedeemed` state, after the last one that is `BeingRedeemed`, for the given range
+        let last_redeemed_idx = tickets
+            .iter()
+            .enumerate()
+            .rfind(|(_, t)| t.status.is_being_redeemed())
+            .map(|(idx, _)| idx);
 
-        let mut should_continue = true;
-        while !tickets.is_empty() && should_continue {
-            let tickets_len = tickets.len();
-            for (index, ticket) in tickets.iter_mut().enumerate() {
-                if let AcknowledgedTicketStatus::BeingRedeemed { .. } = ticket.status {
-                    if index + 1 > tickets_len {
-                        tickets = vec![];
-                        should_continue = false;
-                    } else {
-                        tickets = tickets.split_at_mut(index + 1).1.to_vec();
-                    }
-                    batch_ops = utils_db::db::Batch::default();
-                    break;
-                }
-                ticket.status(AcknowledgedTicketStatus::BeingAggregated {
-                    start: index_start,
-                    end: index_end,
-                });
-                batch_ops.put(
-                    to_acknowledged_ticket_key(
-                        &ticket.ticket.channel_id,
-                        ticket.ticket.channel_epoch,
-                        ticket.ticket.index,
-                    )?,
-                    ticket,
-                );
+        // If no `BeingRedeemed` tickets are in that range, take the entire range
+        let agg_start = last_redeemed_idx.map(|idx| idx + 1).unwrap_or(0);
 
-                if index == tickets_len - 1 {
-                    should_continue = false;
-                }
+        // Check if there's nothing to aggregate in the given range (= last ticket is `BeingRedeemed`)
+        if agg_start > tickets.len() {
+            debug!("no tickets to aggregate in {channel_id} ({epoch}) range {index_start}-{index_end}");
+            return Ok(vec![]);
+        }
+
+        let mut agg_tickets = Vec::new();
+        let mut batch_ops = Batch::default();
+
+        let channel_key = utils_db::db::Key::new_with_prefix(channel_id, CHANNEL_PREFIX)?;
+        let channel_balance = self
+            .db
+            .get_or_none::<ChannelEntry>(channel_key)
+            .await?
+            .ok_or(NotFound)?
+            .balance;
+
+        // Set all the tickets to `BeingAggregated`
+        let mut total_value = Balance::zero(BalanceType::HOPR);
+        for ticket in &mut tickets[agg_start..] {
+            // Check if we did not exceed the total balance on the channel
+            total_value = total_value.add(&ticket.ticket.amount);
+            if total_value.gt(&channel_balance) {
+                debug!("no more tickets to aggregate in {channel_id} ({epoch}) range {index_start}-{index_end}: channel balance exceeded {channel_balance}");
+                break;
             }
+
+            ticket.status = AcknowledgedTicketStatus::BeingAggregated {
+                start: index_start,
+                end: index_end,
+            };
+
+            batch_ops.put(
+                to_acknowledged_ticket_key(
+                    &ticket.ticket.channel_id,
+                    ticket.ticket.channel_epoch,
+                    ticket.ticket.index,
+                )?,
+                ticket.clone(),
+            );
+
+            // Collect just the tickets to be aggregated
+            agg_tickets.push(ticket.clone());
         }
 
         self.db.batch(batch_ops, true).await?;
 
-        Ok(tickets)
+        debug!(
+            "prepared {} tickets to aggregate in {channel_id} ({epoch}) range {index_start}-{index_end}",
+            agg_tickets.len()
+        );
+        Ok(agg_tickets)
     }
 
     async fn get_acknowledged_tickets_range(
@@ -379,37 +404,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         } else {
             Err(DbError::NotFound)
         }
-    }
-
-    async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> Result<()> {
-        let prefixed_key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
-        let balance = self
-            .db
-            .get_or_none::<Balance>(prefixed_key.clone())
-            .await?
-            .unwrap_or(Balance::zero(ticket.amount.balance_type()));
-
-        let _result = self.db.set(prefixed_key, &balance.add(&ticket.amount)).await?;
-        self.db.flush().await?;
-        Ok(())
-    }
-
-    async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance> {
-        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
-
-        self.db
-            .get_or_none::<Balance>(key)
-            .await
-            .map(|v| v.unwrap_or(Balance::zero(BalanceType::HOPR)))
-    }
-
-    // Delete the pending balance for the particular counterparty. This is a no-op for incoming
-    // channels since no pending balance will accumulate.
-    async fn reset_pending_balance_to(&mut self, counterparty: &Address) -> Result<()> {
-        let key = utils_db::db::Key::new_with_prefix(counterparty, PENDING_TICKETS_COUNT)?;
-
-        let _ = self.db.remove::<Balance>(key).await?;
-        Ok(())
     }
 
     async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>> {
@@ -613,19 +607,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         Ok(self.db.get_or_none::<usize>(key).await?.unwrap_or(0))
     }
 
-    async fn resolve_pending(&mut self, address: &Address, balance: &Balance) -> Result<()> {
-        let key = utils_db::db::Key::new_with_prefix(address, PENDING_TICKETS_COUNT)?;
-        let current_balance = self
-            .db
-            .get_or_none(key.clone())
-            .await?
-            .unwrap_or(Balance::zero(BalanceType::HOPR));
-
-        self.db.set(key.clone(), &current_balance.sub(balance)).await?;
-        self.db.flush().await?;
-        Ok(())
-    }
-
     async fn mark_redeemed(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
         // TODO: for debugging purposes this operation has been un-batched
         // Note that if any of the un-batched operations fail, the stats of redeemed
@@ -634,7 +615,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
         debug!("start marking {acked_ticket} as redeemed");
 
-        let key = get_acknowledged_ticket_key(&acked_ticket)?;
+        let key = get_acknowledged_ticket_key(acked_ticket)?;
         self.db.remove::<AcknowledgedTicket>(key).await?;
         debug!("removed {acked_ticket} from the DB");
 
@@ -1465,15 +1446,6 @@ pub mod wasm {
         }
 
         #[wasm_bindgen]
-        pub async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.get_pending_balance_to(counterparty).await)
-            //}
-        }
-
-        #[wasm_bindgen]
         pub async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
@@ -1502,24 +1474,6 @@ pub mod wasm {
             //check_lock_write! {
             let mut db = data.write().await;
             utils_misc::ok_or_jserr!(db.link_chain_and_packet_keys(chain_key, packet_key, snapshot).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn mark_pending(&self, counterparty: &Address, ticket: &Ticket) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.mark_pending(counterparty, &ticket.into()).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn resolve_pending(&self, address: &Address, balance: &Balance) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.resolve_pending(address, balance).await)
             //}
         }
 

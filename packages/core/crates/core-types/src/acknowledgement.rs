@@ -97,26 +97,17 @@ pub enum AcknowledgedTicketStatus {
 impl AcknowledgedTicketStatus {
     /// Short-hand to check if the ticket is `BeingAggregated`
     pub fn is_being_redeemed(&self) -> bool {
-        match self {
-            AcknowledgedTicketStatus::BeingRedeemed { .. } => true,
-            _ => false,
-        }
+        matches!(self, AcknowledgedTicketStatus::BeingRedeemed { .. })
     }
 
     /// Short-hand to check if the ticket is `BeingRedeemed`
     pub fn is_being_aggregated(&self) -> bool {
-        match self {
-            AcknowledgedTicketStatus::BeingAggregated { .. } => true,
-            _ => false,
-        }
+        matches!(self, AcknowledgedTicketStatus::BeingAggregated { .. })
     }
 
     /// Short-hand to check if the ticket is `Untouched`
     pub fn is_untouched(&self) -> bool {
-        match self {
-            AcknowledgedTicketStatus::Untouched { .. } => true,
-            _ => false,
-        }
+        matches!(self, AcknowledgedTicketStatus::Untouched { .. })
     }
 }
 
@@ -215,10 +206,6 @@ impl AcknowledgedTicket {
         }
 
         Ok(())
-    }
-
-    pub fn status(&mut self, new_status: AcknowledgedTicketStatus) {
-        self.status = new_status;
     }
 
     pub fn get_luck(&self, domain_separator: &Hash) -> CoreTypesResult<[u8; 7]> {

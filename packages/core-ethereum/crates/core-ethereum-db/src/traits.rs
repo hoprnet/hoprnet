@@ -72,15 +72,6 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn update_acknowledged_ticket(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
 
-    /// Mark the ticket as pending.
-    async fn mark_pending(&mut self, counterparty: &Address, ticket: &Ticket) -> Result<()>;
-
-    /// Get pending balance to a counter party's address.
-    async fn get_pending_balance_to(&self, counterparty: &Address) -> Result<Balance>;
-
-    /// Reset pending balance to a counter party's address.
-    async fn reset_pending_balance_to(&mut self, counterparty: &Address) -> Result<()>;
-
     async fn get_packet_key(&self, chain_key: &Address) -> Result<Option<OffchainPublicKey>>;
 
     async fn get_chain_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<Address>>;
@@ -156,9 +147,6 @@ pub trait HoprCoreEthereumDbActions {
 
     /// Get the total number of losing tickets.
     async fn get_losing_tickets_count(&self) -> Result<usize>;
-
-    /// Resolve pending tickets.
-    async fn resolve_pending(&mut self, ticket: &Address, balance: &Balance) -> Result<()>;
 
     /// Mark the ticket as redeemed.
     async fn mark_redeemed(&mut self, ticket: &AcknowledgedTicket) -> Result<()>;
