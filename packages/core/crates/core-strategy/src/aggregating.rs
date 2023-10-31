@@ -47,8 +47,9 @@ pub struct AggregatingStrategyConfig {
     #[validate(range(min = 2))]
     pub aggregation_threshold: Option<u32>,
 
-    /// Percentage of unrealized balance in a channel (relative to , that triggers the ticket aggregation
-    /// in that channel when exceeded.
+    /// Percentage of unrealized balance in unaggregated tickets in a channel
+    /// that triggers the ticket aggregation when exceeded.
+    /// The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
     /// This condition is independent of `aggregation_threshold`.
     /// Default is 0.9
     #[validate(range(min = 0_f32, max = 1.0_f32))]
@@ -207,7 +208,9 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone, T, U> SingularStrategy for
             match ticket.status {
                 AcknowledgedTicketStatus::Untouched => {
                     aggregatable_tickets += 1;
-                    unredeemed_value = unredeemed_value.add(&ticket.ticket.amount);
+                    if !ticket.ticket.is_aggregated() {
+                        unredeemed_value = unredeemed_value.add(&ticket.ticket.amount);
+                    }
                 }
                 AcknowledgedTicketStatus::BeingAggregated { .. } => {
                     debug!("{channel} already has ticket aggregation in progress, not aggregating yet");
