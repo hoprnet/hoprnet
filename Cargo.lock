@@ -1467,7 +1467,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "async-std",
  "async-trait",
