@@ -98,7 +98,7 @@ mod tests {
     use futures::future::Either;
     use hex_literal::hex;
     use mockall::mock;
-      use std::pin::pin;
+    use std::pin::pin;
     use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
