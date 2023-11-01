@@ -79,7 +79,7 @@ This strategy listens for two distinct channel events and triggers the interacti
 
 This strategy listens to newly added acknowledged winning tickets and once the amount of tickets in a certain channel reaches
 an `aggregation_threshold`, the strategy will initiate ticket aggregation in that channel.
-The strategy can independently also check if the unrealized balance (current balance _minus_ unredeemed tickets value) in a certain channel
+The strategy can independently also check if the unrealized balance (current balance _minus_ total unredeemed unaggregated tickets value) in a certain channel
 has not gone over `unrelalized_balance_ratio` percent of the current balance in that channel. If that happens, the strategy will also initiate
 ticket aggregation.
 

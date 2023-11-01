@@ -8,6 +8,7 @@ use std::fmt::{Debug, Display, Formatter};
 use utils_log::info;
 use validator::Validate;
 
+use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::strategy::SingularStrategy;
 use crate::Strategy;
 
@@ -73,8 +74,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static + Clone> SingularStrategy for AutoR
 
             let rx = self.chain_actions.redeem_ticket(ack.clone()).await?;
             std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+            Ok(())
+        } else {
+            Err(CriteriaNotSatisfied)
         }
-        Ok(())
     }
 }
 
@@ -92,8 +95,12 @@ mod tests {
     use core_ethereum_db::traits::HoprCoreEthereumDbActions;
     use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
     use core_types::channels::Ticket;
+    use futures::channel::oneshot::{Canceled, Receiver};
+    use futures::future::Either;
     use hex_literal::hex;
     use mockall::mock;
+    use std::future::Future;
+    use std::pin::{pin, Pin};
     use std::sync::Arc;
     use utils_db::constants::ACKNOWLEDGED_TICKETS_PREFIX;
     use utils_db::db::DB;
@@ -261,9 +268,18 @@ mod tests {
         let actions = CoreEthereumActions::new(ALICE.public().to_address(), db.clone(), tx_sender);
 
         let ars = AutoRedeemingStrategy::new(cfg, actions);
-        ars.on_acknowledged_winning_ticket(&ack_ticket_unagg).await.unwrap();
-        ars.on_acknowledged_winning_ticket(&ack_ticket_agg).await.unwrap();
+        ars.on_acknowledged_winning_ticket(&ack_ticket_unagg)
+            .await
+            .expect_err("non-agg ticket should not satisfy");
+        ars.on_acknowledged_winning_ticket(&ack_ticket_agg)
+            .await
+            .expect("agg ticket should satisfy");
 
-        awaiter.await.unwrap();
+        let f1 = pin!(awaiter);
+        let f2 = pin!(async_std::task::sleep(std::time::Duration::from_secs(5)));
+        match futures::future::select(f1, f2).await {
+            Either::Left(_) => {}
+            Either::Right(_) => panic!("timeout"),
+        }
     }
 }
