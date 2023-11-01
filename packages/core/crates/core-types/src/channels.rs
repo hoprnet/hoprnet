@@ -392,8 +392,8 @@ impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ticket #{}, epoch {} in channel {}",
-            self.index, self.channel_epoch, self.channel_id
+            "ticket #{}, offset {}, epoch {} in channel {}",
+            self.index, self.index_offset, self.channel_epoch, self.channel_id
         )
     }
 }

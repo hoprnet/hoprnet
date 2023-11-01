@@ -315,7 +315,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             &destination,
             &Balance::new(final_value, BalanceType::HOPR),
             first_acked_ticket.ticket.index.into(),
-            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index).into(),
+            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
             1.0,
             channel_epoch.into(),
             first_acked_ticket.ticket.challenge.clone(),
