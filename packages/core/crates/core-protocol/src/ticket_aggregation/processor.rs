@@ -345,7 +345,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             &destination,
             &final_value,
             first_acked_ticket.ticket.index.into(),
-            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index).into(),
+            (last_acked_ticket.ticket.index - first_acked_ticket.ticket.index + 1).into(),
             1.0, // Aggregated tickets have always 100% winning probability
             channel_epoch.into(),
             first_acked_ticket.ticket.challenge.clone(),
@@ -922,6 +922,10 @@ mod tests {
             },
             stored_acked_tickets[0].status,
             "first ticket must being redeemed"
+        );
+        assert!(
+            stored_acked_tickets[1].ticket.is_aggregated(),
+            "aggregated balance invalid"
         );
         assert_eq!(
             Untouched, stored_acked_tickets[1].status,
