@@ -673,33 +673,32 @@ mod tests {
             .map(|_| DB::new(RustyLevelDbShim::new_in_memory()))
             .collect::<Vec<_>>();
 
-        let mut acked_tickets = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
+        let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(&mut inner_dbs[1], 4).await;
 
         let dbs = init_dbs(inner_dbs).await;
 
         // Make this ticket aggregated
         acked_tickets[0].ticket.index_offset = 2;
-        dbs[1]
+        channel.balance = Balance::new(100_u32.into(), BalanceType::HOPR);
+
+        dbs[0]
             .write()
             .await
-            .update_acknowledged_ticket(&acked_tickets[0])
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
             .await
             .unwrap();
-
-        let channel = ChannelEntry::new(
-            (&PEERS_CHAIN[0]).into(),
-            (&PEERS_CHAIN[1]).into(),
-            Balance::new(100u64.into(), BalanceType::HOPR),
-            6u64.into(),
-            ChannelStatus::Open,
-            1u32.into(),
-            0u64.into(),
-        );
 
         dbs[1]
             .write()
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
+
+        dbs[1]
+            .write()
+            .await
+            .update_acknowledged_ticket(&acked_tickets[0])
             .await
             .unwrap();
 
