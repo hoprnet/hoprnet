@@ -287,7 +287,7 @@ where
 
                 debug!("price per packet is {price_per_packet}");
 
-                if let Err(e) = validate_unacknowledged_ticket::<Db>(
+                let validation_res = validate_unacknowledged_ticket::<Db>(
                     &*self.db.read().await,
                     &ticket,
                     &channel,
@@ -297,8 +297,9 @@ where
                     self.cfg.check_unrealized_balance,
                     &domain_separator,
                 )
-                .await
-                {
+                .await;
+
+                if let Err(e) = validation_res {
                     // Mark as reject and passthrough the error
                     self.db.write().await.mark_rejected(&ticket).await?;
                     return Err(e);
