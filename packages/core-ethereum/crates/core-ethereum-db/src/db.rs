@@ -279,8 +279,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         );
         assert_eq!(channel.channel_epoch.as_u32(), epoch, "channel epoch must be valid");
         assert!(
-            index_start < channel.ticket_index.as_u64(),
-            "aggregation start index must be less than current channel ticket index"
+            index_start <= channel.ticket_index.as_u64(),
+            "aggregation start index must be less or equal to te current channel ticket index"
         );
 
         let channel_balance = channel.balance;
