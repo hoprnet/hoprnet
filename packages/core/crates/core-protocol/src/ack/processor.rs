@@ -152,7 +152,7 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
                     return Err(AcknowledgementValidation(
-                        "acknowledgement received for channel that does not exist or has a newer epoch".to_owned(),
+                        "acknowledgement received for channel that does not exist or has a newer epoch".into(),
                     ));
                 }
 

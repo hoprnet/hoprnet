@@ -285,6 +285,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
         let channel_balance = channel.balance;
 
+        // We store only winning tickets
         let mut tickets = self
             .get_acknowledged_tickets_range(channel_id, epoch, index_start, index_end)
             .await?;
