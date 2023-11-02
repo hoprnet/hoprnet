@@ -356,32 +356,25 @@ pub fn build_chain_api(
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use super::SmartContractConfig;
+    use serde::Deserialize;
+    use serde::Serialize;
     use utils_misc::{ok_or_jserr, utils::wasm::JsResult};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
     #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct ChainConfiguration {
         pub chain: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprAnnouncementsAddress)]
-        pub hopr_announcement_address: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprTokenAddress)]
-        pub hopr_token_address: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprChannelsAddress)]
-        pub hopr_channels_address: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprNetworkRegistryAddress)]
-        pub hopr_network_registry_address: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprNodeSafeRegistryAddress)]
-        pub hopr_node_safe_registry_address: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = hoprTicketPriceOracleAddress)]
-        pub hopr_ticket_price_oracle_address: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = moduleAddress)]
-        pub module_address: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = safeAddress)]
-        pub safe_address: String,
-        #[wasm_bindgen::prelude::wasm_bindgen(js_name = noticePeriodChannelClosure)]
-        pub notice_period_channel_closure: u32,
+        pub hoprAnnouncementsAddress: String,
+        pub hoprTokenAddress: String,
+        pub hoprChannelsAddress: String,
+        pub hoprNetworkRegistryAddress: String,
+        pub hoprNodeSafeRegistryAddress: String,
+        pub hoprTicketPriceOracleAddress: String,
+        pub moduleAddress: String,
+        pub safeAddress: String,
+        pub noticePeriodChannelClosure: u32,
     }
 
     #[wasm_bindgen]
@@ -437,7 +430,7 @@ pub mod wasm {
         pub async fn getSafeNativeBalance(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
 
         #[wasm_bindgen(method, catch)]
-        pub fn smartContractInfo(this: &WasmChainQuery) -> Result<ChainConfiguration, JsValue>;
+        pub fn smartContractInfo(this: &WasmChainQuery) -> Result<JsValue, JsValue>;
 
         #[wasm_bindgen(method)]
         pub fn on(this: &WasmChainQuery, event: js_sys::JsString, callback: js_sys::Function);

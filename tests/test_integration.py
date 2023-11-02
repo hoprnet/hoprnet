@@ -559,7 +559,9 @@ async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, 
         async def aggregate_and_redeem_tickets():
             while True:
                 statistics_after = await swarm7[route[1]]["api"].get_tickets_statistics()
-                redeemed_value = balance_str_to_int(statistics_after.redeemed_value) - balance_str_to_int(statistics_before.redeemed_value)
+                redeemed_value = balance_str_to_int(statistics_after.redeemed_value) - balance_str_to_int(
+                    statistics_before.redeemed_value
+                )
                 redeemed_ticket_count = statistics_after.redeemed - statistics_before.redeemed
 
                 if redeemed_value >= AGGREGATED_TICKET_PRICE:

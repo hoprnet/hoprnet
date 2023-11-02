@@ -612,8 +612,8 @@ mod native {
         ///
         /// @param channel object
         /// @param ticket amount
-        pub async fn on_ticket_redeemed(&self, channel: ChannelEntry, value: &Balance) {
-            self.chain_api.on_ticket_redeemed(&channel, &value).await
+        pub async fn on_ticket_redeemed(&self, channel: &ChannelEntry, value: &Balance) {
+            self.chain_api.on_ticket_redeemed(channel, value).await
         }
 
         pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> errors::Result<OpenChannelResult> {
@@ -760,13 +760,13 @@ mod native {
             Ok(self.chain_api.db().read().await.get_chain_key(&pk).await?)
         }
 
-        pub async fn chain_key_to_peerid(&self, address: Address) -> errors::Result<Option<PeerId>> {
+        pub async fn chain_key_to_peerid(&self, address: &Address) -> errors::Result<Option<PeerId>> {
             Ok(self
                 .chain_api
                 .db()
                 .read()
                 .await
-                .get_packet_key(&address)
+                .get_packet_key(address)
                 .await
                 .map(|pk| pk.map(|v| v.to_peerid()))?)
         }
@@ -1077,8 +1077,8 @@ pub mod wasm_impl {
         /// Attempts to aggregate all tickets in the given channel
         /// @param channelId id of the channel
         #[wasm_bindgen(js_name = aggregateTickets)]
-        pub async fn _aggregate_tickets(&mut self, channel: Hash) -> Result<(), JsError> {
-            self.hopr.aggregate_tickets(&channel).await.map_err(JsError::from)
+        pub async fn _aggregate_tickets(&mut self, channel: &Hash) -> Result<(), JsError> {
+            self.hopr.aggregate_tickets(channel).await.map_err(JsError::from)
         }
 
         /// List all multiaddresses announced
@@ -1205,8 +1205,8 @@ pub mod wasm_impl {
 
         /// Called whenever the network registry changes
         #[wasm_bindgen(js_name = onNetworkRegistryUpdate)]
-        pub async fn _on_network_registry_update(&self, address: Address, allowed: bool) {
-            self.hopr.on_network_registry_update(&address, allowed).await
+        pub async fn _on_network_registry_update(&self, address: &Address, allowed: bool) {
+            self.hopr.on_network_registry_update(address, allowed).await
         }
 
         /// List all peers connected to this
@@ -1241,14 +1241,15 @@ pub mod wasm_impl {
         // Ticket ========
         /// Get all tickets in a channel specified by Hash
         #[wasm_bindgen(js_name = getTickets)]
-        pub async fn _tickets_in_channel(&self, channel: Hash) -> Result<Array, JsError> {
+        pub async fn _tickets_in_channel(&self, channel: &Hash) -> Result<Array, JsError> {
             self.hopr
-                .tickets_in_channel(&channel)
+                .tickets_in_channel(channel)
                 .await
                 .map(|tickets| {
                     tickets
                         .into_iter()
                         .map(core_types::acknowledgement::wasm::AcknowledgedTicket::from)
+                        .map(|at| at.ticket())
                         .map(JsValue::from)
                         .collect()
                 })
@@ -1305,15 +1306,15 @@ pub mod wasm_impl {
         /// @param dest Address
         /// @returns the channel entry of those two nodes
         #[wasm_bindgen(js_name = getChannel)]
-        pub async fn _channel(&self, src: Address, dest: Address) -> Result<ChannelEntry, JsError> {
-            self.hopr.channel(&src, &dest).await.map_err(JsError::from)
+        pub async fn _channel(&self, src: &Address, dest: &Address) -> Result<ChannelEntry, JsError> {
+            self.hopr.channel(src, dest).await.map_err(JsError::from)
         }
 
         /// List all channels open from a specified Address
         #[wasm_bindgen(js_name = getChannelsFrom)]
-        pub async fn _channels_from(&self, src: Address) -> Result<Array, JsError> {
+        pub async fn _channels_from(&self, src: &Address) -> Result<Array, JsError> {
             self.hopr
-                .channels_from(&src)
+                .channels_from(src)
                 .await
                 .map_err(JsError::from)
                 .map(|channels| channels.into_iter().map(JsValue::from).collect())
@@ -1321,9 +1322,9 @@ pub mod wasm_impl {
 
         /// List all channels open to a specified address
         #[wasm_bindgen(js_name = getChannelsTo)]
-        pub async fn _channels_to(&self, dest: Address) -> Result<Array, JsError> {
+        pub async fn _channels_to(&self, dest: &Address) -> Result<Array, JsError> {
             self.hopr
-                .channels_to(&dest)
+                .channels_to(dest)
                 .await
                 .map_err(JsError::from)
                 .map(|channels| channels.into_iter().map(JsValue::from).collect())
@@ -1346,17 +1347,20 @@ pub mod wasm_impl {
         }
 
         #[wasm_bindgen]
-        pub async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<Hash, JsError> {
-            self.hopr.withdraw(recipient, amount).await.map_err(JsError::from)
+        pub async fn withdraw(&self, recipient: &Address, amount: &Balance) -> Result<Hash, JsError> {
+            self.hopr
+                .withdraw(recipient.clone(), amount.clone())
+                .await
+                .map_err(JsError::from)
         }
 
         #[wasm_bindgen(js_name = onOwnChannelUpdated)]
-        pub async fn _on_own_channel_updated(&self, channel: ChannelEntry) {
-            self.hopr.on_own_channel_updated(&channel).await
+        pub async fn _on_own_channel_updated(&self, channel: &ChannelEntry) {
+            self.hopr.on_own_channel_updated(channel).await
         }
 
         #[wasm_bindgen(js_name = onTicketRedeemed)]
-        pub async fn _on_ticket_redeemed(&self, channel: ChannelEntry, value: Balance) {
+        pub async fn _on_ticket_redeemed(&self, channel: &ChannelEntry, value: &Balance) {
             self.hopr.on_ticket_redeemed(channel, &value).await
         }
 
@@ -1425,6 +1429,10 @@ pub mod wasm_impl {
             self.chain_query
                 .smartContractInfo()
                 .map_err(|e| JsError::new(&format!("Fail on calling smartContractInfo: {:?}", e)))
+                .and_then(|v| {
+                    serde_wasm_bindgen::from_value::<ChainConfiguration>(v)
+                        .map_err(|e| JsError::new(&format!("Fail on calling smartContractInfo: {:?}", e)))
+                })
         }
 
         #[wasm_bindgen(js_name = getBalance)]
@@ -1472,7 +1480,7 @@ pub mod wasm_impl {
         }
 
         #[wasm_bindgen(js_name = chainKeyToPeerId)]
-        pub async fn _chain_key_to_peerid(&self, address: Address) -> Result<Option<String>, JsError> {
+        pub async fn _chain_key_to_peerid(&self, address: &Address) -> Result<Option<String>, JsError> {
             Ok(self
                 .hopr
                 .chain_key_to_peerid(address)
