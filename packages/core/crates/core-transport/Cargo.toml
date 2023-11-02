@@ -13,9 +13,9 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = [
-    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:gloo-timers",
-    "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-ethereum-actions/wasm",
-    "core-crypto/wasm", "core-network/wasm", "core-strategy/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm", "core-protocol/wasm", "core-types/wasm",
+    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:gloo-timers",
+    "core-ethereum-db/wasm", "core-crypto/wasm", "core-network/wasm", "core-packet/wasm", "core-path/wasm", "core-p2p/wasm",
+    "core-protocol/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm", "utils-validation/wasm"
 ]
 prometheus = [
@@ -36,7 +36,6 @@ libp2p = { workspace = true, features = ["request-response"] }
 multiaddr = { workspace = true }
 js-sys = { workspace = true, optional = true }
 serde = { workspace = true }
-serde-wasm-bindgen = { workspace = true, optional = true}
 thiserror = { workspace = true }
 validator = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
@@ -44,14 +43,11 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 
 core-network = { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
-core-ethereum-actions = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
-core-ethereum-misc = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false }
 core-p2p = { workspace = true, default-features = false }
 core-packet = { workspace = true, default-features = false }
 core-protocol = { workspace = true, default-features = false }
-core-strategy = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }

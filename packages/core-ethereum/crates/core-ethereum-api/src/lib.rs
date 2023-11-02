@@ -50,8 +50,6 @@ pub struct HoprChain {
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
     channel_events: ChannelEventEmitter,
-    // TODO: change this object for non-wasm and extract API
-    // channel_graph: core_path::channel_graph::wasm::ChannelGraph,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
 

@@ -15,7 +15,6 @@ crate-type = ["cdylib", "rlib"]
 async-trait = { workspace = true }
 async-std = { workspace = true }
 futures = { workspace = true }
-hex = { workspace = true }
 js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
