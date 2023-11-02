@@ -127,7 +127,7 @@ impl ChannelGraph {
                                 &[channel.source.to_hex().as_str(), "out"],
                                 channel
                                     .balance
-                                    .to_formatted_string()
+                                    .amount_base_units()
                                     .parse::<f64>()
                                     .expect("Formatted balance must be convertible to float"),
                             );
@@ -146,7 +146,7 @@ impl ChannelGraph {
                                 &[channel.source.to_hex().as_str(), "in"],
                                 channel
                                     .balance
-                                    .to_formatted_string()
+                                    .amount_base_units()
                                     .parse::<f64>()
                                     .expect("Formatted balance must be convertible to float"),
                             );

@@ -127,6 +127,7 @@ impl HoprChain {
     }
 
     pub async fn on_channel_event(&self, entry: &ChannelEntry) {
+        //utils_log::debug!("Received a channel event {:?}", entry);
         self.channel_events.send_event(entry).await;
     }
 

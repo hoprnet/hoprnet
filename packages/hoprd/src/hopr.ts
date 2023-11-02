@@ -38,6 +38,7 @@ import path from 'path'
 import { rmSync, readFileSync, writeFileSync } from 'fs'
 import { Multiaddr } from '@multiformats/multiaddr'
 import { PeerId } from '@libp2p/interface-peer-id'
+import { HoprProcesses } from '../lib/hoprd_hoprd.js'
 
 const log = debug(`hopr-lib:create-components`)
 
@@ -200,7 +201,7 @@ export async function createHoprNode(
   chainKeypair: ChainKeypair,
   packetKeypair: OffchainKeypair,
   cfg: HoprLibConfig
-): Promise<Hopr> {
+): Promise<{ node: Hopr; loops: HoprProcesses }> {
   // pre-flight checks
   if (!cfg.chain.announce) {
     throw new Error('Announce option should be turned ON in Providence, only public nodes are supported')
@@ -253,7 +254,7 @@ export async function createHoprNode(
 
   log(`${chainKeypair.public().to_hex(false)}: ${resolvedContractAddresses.hopr_channels_address},
     ${resolvedContractAddresses.hopr_announcements_address}, ${resolvedContractAddresses.hopr_announcements_address},
-    ${cfg.safe_module.module_address}, ${resolvedContractAddresses.hopr_node_safe_registry_address}, ${
+    ${cfg.safe_module.module_address.to_hex()}, ${resolvedContractAddresses.hopr_node_safe_registry_address}, ${
     resolvedContractAddresses.hopr_token_address
   }`)
   let tx_executor = new WasmTxExecutor(
@@ -348,6 +349,7 @@ export async function createHoprNode(
 
   // subscribe so we can process channel close events
   indexer.on(ChannelUpdateEventNames, async (channel: ChannelEntry) => {
+    log(`Connector calling onOwnChannelUpdated with: ${channel.to_string()}`)
     await hopr.onOwnChannelUpdated(channel)
   })
 
@@ -369,5 +371,10 @@ export async function createHoprNode(
 
   await continueStartup.promise
 
-  return hopr
+  let processes = await hopr.run()
+
+  // start the indexer
+  await hc.start()
+
+  return { node: hopr, loops: processes }
 }

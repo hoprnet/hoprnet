@@ -106,12 +106,16 @@ async def check_all_tickets_redeemed(src):
 
 
 async def check_unredeemed_tickets_value(src, value):
-    while int((await src["api"].get_tickets_statistics()).unredeemed_value) < value:
+    while balance_str_to_int((await src["api"].get_tickets_statistics()).unredeemed_value) < value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
+
+
+def balance_str_to_int(balance: str):
+    return int(balance.split(" ", 1)[0])
 
 
 # NOTE: this test is first, ensuring that all tests following it have ensured connectivity
@@ -237,7 +241,7 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_re
 async def test_hoprd_should_not_have_unredeemed_tickets_without_sending_messages(peer, swarm7):
     statistics = await swarm7[peer]["api"].get_tickets_statistics()
 
-    assert int(statistics.unredeemed_value) == 0
+    assert balance_str_to_int(statistics.unredeemed_value) == 0
     assert int(statistics.unredeemed) == 0
 
 
@@ -269,9 +273,13 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 
         balance_after = await swarm7[src]["api"].balances()
 
-        assert int(balance_before.safe_hopr) - int(balance_after.safe_hopr) == int(hopr_amount)
-        assert int(balance_before.safe_hopr_allowance) - int(balance_after.safe_hopr_allowance) == int(hopr_amount)
-        assert int(balance_after.native) < int(balance_before.native)
+        assert balance_str_to_int(balance_before.safe_hopr) - balance_str_to_int(
+            balance_after.safe_hopr
+        ) == balance_str_to_int(hopr_amount)
+        assert balance_str_to_int(balance_before.safe_hopr_allowance) - balance_str_to_int(
+            balance_after.safe_hopr_allowance
+        ) == balance_str_to_int(hopr_amount)
+        assert balance_str_to_int(balance_after.native) < balance_str_to_int(balance_before.native)
 
 
 @pytest.mark.asyncio
@@ -551,7 +559,7 @@ async def test_hoprd_strategy_automatic_ticket_aggregation_and_redeeming(route, 
         async def aggregate_and_redeem_tickets():
             while True:
                 statistics_after = await swarm7[route[1]]["api"].get_tickets_statistics()
-                redeemed_value = int(statistics_after.redeemed_value) - int(statistics_before.redeemed_value)
+                redeemed_value = balance_str_to_int(statistics_after.redeemed_value) - balance_str_to_int(statistics_before.redeemed_value)
                 redeemed_ticket_count = statistics_after.redeemed - statistics_before.redeemed
 
                 if redeemed_value >= AGGREGATED_TICKET_PRICE:

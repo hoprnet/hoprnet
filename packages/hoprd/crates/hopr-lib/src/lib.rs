@@ -14,10 +14,9 @@ use std::sync::Arc;
 use std::{pin::Pin, str::FromStr};
 
 use async_std::sync::RwLock;
-use futures::{Future, FutureExt, StreamExt};
+use futures::{Future, StreamExt};
 
 use crate::chain::ChainNetworkConfig;
-use crate::components::HoprLoopComponents;
 use core_ethereum_api::HoprChain;
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_transport::libp2p_identity::PeerId;
@@ -259,8 +258,6 @@ mod native {
                 ));
             }
 
-            self.state = State::Initializing;
-
             info!("Linking chain and packet keys");
             self.chain_api
                 .db()
@@ -319,19 +316,11 @@ mod native {
             // fully migrating the rest of the hopr-lib packages
             // self.state = State::Indexing;
 
-            let ck = self.chain_query.clone();
-            if let Some(processes) = &mut self.processes {
-                processes.push(Box::pin(
-                    async move {
-                        // wait for the indexer sync
-                        info!("Starting chain interaction, which will trigger the indexer");
-                        if let Err(_) = ck.startChainSync().await {
-                            panic!("Failed to start the chain operations");
-                        }
-                    }
-                    .map(|_| HoprLoopComponents::Indexing),
-                ));
-            }
+            // wait for the indexer sync
+            // info!("Starting chain interaction, which will trigger the indexer");
+            // if let Err(_) = ck.startChainSync().await {
+            //     panic!("Failed to start the chain operations");
+            // }
 
             if self.is_public {
                 // If this is the first time the node starts up it has not registered a safe
@@ -377,7 +366,7 @@ mod native {
                 if let Ok(_) = self
                     .chain_api
                     .actions_ref()
-                    .register_safe_by_node(self.chain_api.me_onchain())
+                    .register_safe_by_node(self.staking_safe_address)
                     .await
                 {
                     let db = self.chain_api.db().clone();
@@ -562,15 +551,8 @@ mod native {
 
         /// Get the channel entry from Hash.
         /// @returns the channel entry of those two nodes
-        pub async fn channel_from_hash(&self, channel: &Hash) -> errors::Result<ChannelEntry> {
-            Ok(self
-                .chain_api
-                .db()
-                .read()
-                .await
-                .get_channel(channel)
-                .await
-                .and_then(|c| c.ok_or_else(|| utils_db::errors::DbError::NotFound))?)
+        pub async fn channel_from_hash(&self, channel: &Hash) -> errors::Result<Option<ChannelEntry>> {
+            Ok(self.chain_api.db().read().await.get_channel(channel).await?)
         }
 
         /// Get the channel entry between source and destination node.
@@ -1314,8 +1296,8 @@ pub mod wasm_impl {
         /// Get the channel entry from Hash.
         /// @returns the channel entry of those two nodes
         #[wasm_bindgen(js_name = getChannelFromHash)]
-        pub async fn _channel_from_hash(&self, channel: Hash) -> Result<ChannelEntry, JsError> {
-            self.hopr.channel_from_hash(&channel).await.map_err(JsError::from)
+        pub async fn _channel_from_hash(&self, channel: &Hash) -> Result<Option<ChannelEntry>, JsError> {
+            self.hopr.channel_from_hash(channel).await.map_err(JsError::from)
         }
 
         /// Get the channel entry between source and destination node.

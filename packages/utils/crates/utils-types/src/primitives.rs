@@ -304,29 +304,24 @@ impl Balance {
         self.value
     }
 
-    pub fn to_formatted_string(&self) -> String {
+    pub fn amount_base_units(&self) -> String {
         let val = self.value.to_string();
 
         match val.len().cmp(&Self::SCALE) {
             Ordering::Greater => {
                 let (l, r) = val.split_at(val.len() - Self::SCALE + 1);
-                format!(
-                    "{l}.{} {}",
-                    &r[..r.len() - (val.len() - Self::SCALE)],
-                    self.balance_type
-                )
+                format!("{l}.{}", &r[..r.len() - (val.len() - Self::SCALE)],)
             }
-            Ordering::Less => format!(
-                "0.{empty:0>width$} {currency}",
-                empty = &val,
-                width = Self::SCALE - 1,
-                currency = self.balance_type
-            ),
+            Ordering::Less => format!("0.{empty:0>width$}", empty = &val, width = Self::SCALE - 1,),
             Ordering::Equal => {
                 let (l, r) = val.split_at(1);
-                format!("{l}.{r} {}", self.balance_type)
+                format!("{l}.{r}")
             }
         }
+    }
+
+    pub fn to_formatted_string(&self) -> String {
+        format!("{} {}", self.amount_base_units(), self.balance_type)
     }
 }
 

@@ -120,7 +120,6 @@ async function main() {
   // Increase the default maximum number of event listeners
   ;(await import('events')).EventEmitter.defaultMaxListeners = 20
 
-  let node: Hopr
   let inbox: MessageInbox
   let state: State = {
     settings: {
@@ -218,8 +217,7 @@ async function main() {
     // TODO: originally (DAPPNODE support) the safe and module address could have been undefined to allow safe setup
     // if safe address or module address is not provided, replace with values stored in the db
     const hoprlib_cfg: HoprLibConfig = to_hoprlib_config(cfg)
-    node = await createHoprNode(keypair.chain_key, keypair.packet_key, hoprlib_cfg)
-    let loop_executor = await node.run()
+    let { node, loops } = await createHoprNode(keypair.chain_key, keypair.packet_key, hoprlib_cfg)
 
     // Subscribe to node events
     log('Subscribing incoming messages to inbox')
@@ -259,7 +257,7 @@ async function main() {
     log('ID {}', node.peerId())
     log('Protocol version', node.getVersionCoerced())
 
-    await loop_executor.execute()
+    await loops.execute()
   } catch (e) {
     log('Node failed to start: ' + e)
     process.exit(1)
