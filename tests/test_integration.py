@@ -105,6 +105,11 @@ async def check_all_tickets_redeemed(src):
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
+async def check_rejected_tickets(src, count):
+    while int((await src["api"].get_tickets_statistics()).rejected) < count:
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
 async def check_unredeemed_tickets_value(src, value):
     while int((await src["api"].get_tickets_statistics()).unredeemed_value) < value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
@@ -366,10 +371,13 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
         packets.sort()
         await asyncio.wait_for(check_received_packets(swarm7[src], packets, sort=True), 30.0)
 
-        # this message has no funding in the channel, so it should fail
-        assert await swarm7[src]["api"].send_message(swarm7[src]["peer_id"], packet, [swarm7[dest]["peer_id"]]) is False
+        # this message has no funding in the channel, but it still should be sent
+        await swarm7[src]["api"].send_message(swarm7[src]["peer_id"], packet, [swarm7[dest]["peer_id"]])
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
+
+        # we should see last the message as rejected
+        await asyncio.wait_for(check_rejected_tickets(swarm7[dest], 1), 120.0)
 
         await asyncio.sleep(10)  # wait for aggregation to finish
         assert await swarm7[dest]["api"].tickets_redeem()
