@@ -41,7 +41,7 @@
     "dufour": {
       "chain": "xdai",
       "environment_type": "production",
-      "version_range": "2.0",
+      "version_range": "2.*",
       "indexer_start_block_number": 29706814,
       "addresses": {
         "channels": "0x693Bac5ce61c720dDC68533991Ceb41199D8F8ae",
@@ -60,7 +60,7 @@
     "rotsee": {
       "chain": "xdai",
       "environment_type": "staging",
-      "version_range": "2.0",
+      "version_range": "2.*",
       "indexer_start_block_number": 29690361,
       "addresses": {
         "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
