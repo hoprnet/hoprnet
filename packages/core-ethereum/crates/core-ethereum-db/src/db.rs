@@ -13,7 +13,7 @@ use utils_db::{
 };
 use utils_log::{debug, error};
 use utils_types::{
-    primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
+    primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
 };
 
@@ -1109,13 +1109,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         Ok(registered_nodes)
     }
 
-    async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()> {
-        let tid = Hash::create(&[token.id().as_bytes()]);
-        let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
-        let _ = self.db.set(key, &token).await?;
-        Ok(())
-    }
-
     async fn is_mfa_protected(&self) -> Result<Option<Address>> {
         let key = utils_db::db::Key::new_from_str(MFA_MODULE_PREFIX)?;
         self.db.get_or_none::<Address>(key).await
@@ -1146,19 +1139,6 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
             }
         }
     }
-
-    async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>> {
-        let tid = Hash::create(&[id.as_bytes()]);
-        let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
-        self.db.get_or_none::<AuthorizationToken>(key).await
-    }
-
-    async fn delete_authorization(&mut self, id: String) -> Result<()> {
-        let tid = Hash::create(&[id.as_bytes()]);
-        let key = utils_db::db::Key::new_with_prefix(&tid, API_AUTHORIZATION_TOKEN_KEY_PREFIX)?;
-        let _ = self.db.remove::<AuthorizationToken>(key).await?;
-        Ok(())
-    }
 }
 
 #[cfg(feature = "wasm")]
@@ -1172,7 +1152,7 @@ pub mod wasm {
         channels::{wasm::Ticket, ChannelEntry},
     };
     use std::sync::Arc;
-    use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
+    use utils_types::primitives::{Address, Balance, Snapshot, U256};
     use wasm_bindgen::prelude::*;
 
     macro_rules! to_iterable {
@@ -1383,8 +1363,8 @@ pub mod wasm {
             //}
         }
 
-        #[wasm_bindgen]
-        pub async fn get_accounts(&self) -> Result<WasmVecAccountEntry, JsValue> {
+        #[wasm_bindgen(js_name = get_accounts)]
+        pub async fn _get_accounts(&self) -> Result<WasmVecAccountEntry, JsValue> {
             let data = self.core_ethereum_db.clone();
             //check_lock_read! {
             let db = data.read().await;
@@ -1710,33 +1690,6 @@ pub mod wasm {
             utils_misc::ok_or_jserr!(db.set_staking_safe_allowance(balance, snapshot).await)
             //}
         }
-
-        #[wasm_bindgen]
-        pub async fn store_authorization(&self, token: AuthorizationToken) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.store_authorization(token).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>, JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_read! {
-            let db = data.read().await;
-            utils_misc::ok_or_jserr!(db.retrieve_authorization(id).await)
-            //}
-        }
-
-        #[wasm_bindgen]
-        pub async fn delete_authorization(&self, id: String) -> Result<(), JsValue> {
-            let data = self.core_ethereum_db.clone();
-            //check_lock_write! {
-            let mut db = data.write().await;
-            utils_misc::ok_or_jserr!(db.delete_authorization(id).await)
-            //}
-        }
     }
 }
 
@@ -1887,30 +1840,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(db.is_allowed_to_access_network(&test_address).await.unwrap(), false);
-    }
-
-    #[async_std::test]
-    async fn test_token_storage() {
-        let mut db = CoreEthereumDb::new(DB::new(RustyLevelDbShim::new_in_memory()), Address::random());
-
-        let token_id = "test";
-
-        let token = AuthorizationToken::new(token_id.to_string(), &[0xffu8; 100]);
-        db.store_authorization(token.clone()).await.unwrap();
-
-        let token_2 = db
-            .retrieve_authorization(token_id.to_string())
-            .await
-            .unwrap()
-            .expect("db should contain a token");
-        assert_eq!(token, token_2, "retrieved token should be equal to the stored one");
-
-        db.delete_authorization(token_id.to_string())
-            .await
-            .expect("db should remove token");
-
-        let nonexistent = db.retrieve_authorization(token_id.to_string()).await.unwrap();
-        assert!(nonexistent.is_none(), "token should be removed from the db");
     }
 
     #[async_std::test]

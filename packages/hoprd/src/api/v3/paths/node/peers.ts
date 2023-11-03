@@ -1,6 +1,4 @@
-import { peerIdFromString } from '@libp2p/peer-id'
-import { PEER_METADATA_PROTOCOL_VERSION, PeerStatus, type Hopr } from '@hoprnet/hopr-core'
-import { debug, AccountEntry, Address } from '@hoprnet/hopr-utils'
+import { debug, Address, peer_metadata_protocol_version_name, PeerStatus, Hopr } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 import { Multiaddr } from '@multiformats/multiaddr'
 
@@ -42,7 +40,7 @@ export function toPeerInfoFormat(address: Address | undefined, info: PeerStatus,
     quality: info.quality,
     backoff: info.backoff,
     isNew: info.heartbeats_sent === BigInt(0),
-    reportedVersion: info.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
+    reportedVersion: info.metadata().get(peer_metadata_protocol_version_name()) ?? 'unknown'
   }
 }
 
@@ -65,10 +63,10 @@ export async function getPeers(
   try {
     const announcedMap = new Map<string, PeerInfo>()
 
-    let accounts: AsyncGenerator<AccountEntry, void, void> = node.getAccountsAnnouncedOnChain()
-    for await (const acc of accounts) {
-      const peerId = peerIdFromString(acc.public_key.to_peerid_str())
-      const info = await node.getConnectionInfo(peerId)
+    let accounts = await node.getAccountsAnnouncedOnChain()
+    for (const acc of accounts) {
+      const peerId = acc.public_key.to_peerid_str()
+      const info = await node.getPeerInfo(peerId)
       // exclude if quality is lesser than the one wanted
       if (info === undefined || info.quality < quality) {
         continue
@@ -85,17 +83,13 @@ export async function getPeers(
 
     for (const peerId of connected_peers) {
       const peerIdStr = peerId.toString()
-      let chainKey: Address
-      try {
-        chainKey = await node.peerIdToChainKey(peerId)
-      } catch {
-        // chain key might not be available if key binding is missing
-      }
+      let chainKey: Address | undefined = await node.peerIdToChainKey(peerId)
+
       // already exists in announced, we use this because it contains multiaddr already
       if (announcedMap.has(peerIdStr)) {
         connected.push(announcedMap.get(peerIdStr))
       } else {
-        const info = await node.getConnectionInfo(peerId)
+        const info = await node.getPeerInfo(peerIdStr)
         // exclude if quality is less than the one wanted
         if (info === undefined || info.quality < quality) {
           continue

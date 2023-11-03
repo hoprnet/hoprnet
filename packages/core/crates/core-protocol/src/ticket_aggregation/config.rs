@@ -6,7 +6,7 @@ use validator::Validate;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
-#[derive(Debug, Validate, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Validate, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TicketAggregationProtocolConfig {
     /// Maximum duration before the request times out
     #[serde_as(as = "DurationSeconds<u64>")]

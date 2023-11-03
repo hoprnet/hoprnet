@@ -44,7 +44,7 @@ disk_name() {
 # $1=network id
 get_network() {
   local network="${1}"
-  jq -r ".networks.\"${network}\".chain" "${mydir}/../packages/core/protocol-config.json"
+  jq -r ".networks.\"${network}\".chain" "${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
 }
 
 # $1=network id
@@ -59,7 +59,7 @@ get_rpc() {
   local chain
   chain="$(get_network "${1}")"
 
-  jq -r ".chains.\"${chain}\".default_provider" "${mydir}/../packages/core/protocol-config.json" | envsubst
+  jq -r ".chains.\"${chain}\".default_provider" "${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json" | envsubst
 }
 
 # $1 = network id

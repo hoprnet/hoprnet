@@ -8,7 +8,7 @@ hoprd_hoprd_initialize_crate()
 
 import { createTestApiInstance } from '../../fixtures.js'
 
-import type { Hopr } from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-utils'
 
 describe('GET /messages/size', function () {
   let node: Hopr

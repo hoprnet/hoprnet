@@ -8,7 +8,7 @@ use core_types::{
     acknowledgement::{AcknowledgedTicket, PendingAcknowledgement, UnacknowledgedTicket},
     channels::{ChannelEntry, Ticket},
 };
-use utils_types::primitives::{Address, AuthorizationToken, Balance, Snapshot, U256};
+use utils_types::primitives::{Address, Balance, Snapshot, U256};
 
 #[async_trait(? Send)] // not placing the `Send` trait limitations on the trait
 pub trait HoprCoreEthereumDbActions {
@@ -287,13 +287,4 @@ pub trait HoprCoreEthereumDbActions {
         maybe_mfa_address: Option<Address>,
         snapshot: &Snapshot,
     ) -> Result<()>;
-
-    /// Stores the REST API token.
-    async fn store_authorization(&mut self, token: AuthorizationToken) -> Result<()>;
-
-    /// Retrieves the REST API token given its ID.
-    async fn retrieve_authorization(&self, id: String) -> Result<Option<AuthorizationToken>>;
-
-    /// Deletes the REST API token given its ID.
-    async fn delete_authorization(&mut self, id: String) -> Result<()>;
 }

@@ -1,5 +1,3 @@
-import type { PeerId } from '@libp2p/interface-peer-id'
-
 export enum SettingKey {
   //  STRATEGY = 'strategy',
   INCLUDE_RECIPIENT = 'includeRecipient'
@@ -13,7 +11,6 @@ export enum SettingKey {
  * HOPRd specific state used by the daemon.
  */
 export type State = {
-  aliases: Map<string, PeerId>
   settings: {
     //[SettingKey.STRATEGY]: Strategy
     [SettingKey.INCLUDE_RECIPIENT]: boolean

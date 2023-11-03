@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod config;
 pub mod errors;
+pub mod token;
 
 #[cfg(feature = "wasm")]
 pub mod wasm {
@@ -19,10 +20,7 @@ pub mod wasm {
     use core_ethereum_indexer::handlers::wasm::*;
 
     #[allow(unused_imports)]
-    use core_misc::environment::wasm::*;
-
-    #[allow(unused_imports)]
-    use core_hopr::wasm::*;
+    use core_transport::wasm::*;
 
     #[allow(unused_imports)]
     use hoprd_inbox::inbox::wasm::*;

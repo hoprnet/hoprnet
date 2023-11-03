@@ -85,7 +85,7 @@ while (( "$#" )); do
 done
 
 declare tmp_dir node_prefix password anvil_rpc_log env_file
-declare node_api_base_port node_p2p_base_port node_healthcheck_base_port
+declare node_api_base_port node_p2p_base_port
 declare api_endpoints cluster_size
 declare -a id_files
 
@@ -98,7 +98,6 @@ anvil_rpc_log="${tmp_dir}/hopr-local-anvil-rpc.log"
 env_file="${tmp_dir}/local-cluster.env"
 node_api_base_port=13301
 node_p2p_base_port=19091
-node_healthcheck_base_port=18081
 cluster_size=5
 
 function cleanup {
@@ -134,14 +133,13 @@ function setup_node() {
   local host=${2?"setup_node required host"}
   local additional_args=${3:-""}
 
-  local api_port p2p_port healthcheck_port dir log id_file safe_args
+  local api_port p2p_port dir log id_file safe_args
 
   dir="${tmp_dir}/${node_prefix}_${node_id}"
   log="${dir}.log"
   id_file="${dir}.id"
   api_port=$(( node_api_base_port + node_id ))
   p2p_port=$(( node_p2p_base_port + node_id ))
-  healthcheck_port=$(( node_healthcheck_base_port + node_id ))
   safe_args="$(<${dir}.safe.args)"
 
   api_endpoints+="${listen_host}:${api_port} "
@@ -181,9 +179,6 @@ function setup_node() {
       --testAnnounceLocalAddresses \
       --testPreferLocalAddresses \
       --testUseWeakCrypto \
-      --healthCheck \
-      --healthCheckHost "${host}" \
-      --healthCheckPort "${healthcheck_port}" \
       ${additional_args} \
       > "${log}" 2>&1 &
 }
@@ -259,7 +254,7 @@ ensure_port_is_free 19094
 ensure_port_is_free 19095
 # }}}
 
-declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare protocol_config="${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 
 # --- Running Mock Blockchain --- {{{
@@ -343,6 +338,7 @@ fi
 # }}}
 
 # --- Get peer ids for reporting --- {{{
+log "Getting peer ids of running nodes"
 declare -a peers
 for endpoint in ${api_endpoints}; do
   declare peer
@@ -351,6 +347,7 @@ for endpoint in ${api_endpoints}; do
 done
 # }}}
 # --- Get node addresses for reporting --- {{{
+log "Getting node addresses of running nodes"
 declare -a node_addrs
 for endpoint in ${api_endpoints}; do
   declare node_addr
@@ -382,7 +379,6 @@ for node_id in ${!id_files[@]}; do
   log "\t\tAddress:\t${node_addrs[$node_id]}"
   log "\t\tRest API:\thttp://${listen_host}:${api_port}/api/v3/_swagger"
   log "\t\tAdmin UI:\thttp://${listen_host}:3000/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
-  log "\t\tHealthcheck:\thttp://${listen_host}:$(( node_healthcheck_base_port + node_id ))/"
   log "\t\tWebSocket:\tws://${listen_host}:${api_port}/api/v3/messages/websocket?apiToken=${api_token}"
   log "\t\tMyne Chat:\t${myne_chat_url}/?apiEndpoint=http://${listen_host}:${api_port}&apiToken=${api_token}"
 

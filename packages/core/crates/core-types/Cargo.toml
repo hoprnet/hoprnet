@@ -15,7 +15,6 @@ crate-type = ["cdylib", "rlib"]
 async-trait = { workspace = true }
 bloomfilter = { version = "1.0.12", features = ["serde"] }
 enum-iterator = "1.4.1"
-js-sys = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 multiaddr = "0.18"
 serde = { version = "1.0", features = ["derive"] }
@@ -44,5 +43,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["wasm", "console_error_panic_hook"]
-wasm = ["dep:js-sys", "dep:wasm-bindgen", "core-crypto/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = ["dep:wasm-bindgen", "core-crypto/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 console_error_panic_hook = ["dep:console_error_panic_hook"]

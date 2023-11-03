@@ -1,23 +1,22 @@
-import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
-import { debug } from '@hoprnet/hopr-utils'
+import { debug, Hopr } from '@hoprnet/hopr-utils'
 
 export const getTicketsStatistics = async (node: Hopr) => {
   const stats = await node.getTicketStatistics()
 
   return {
+    winProportion: stats.win_proportion,
     pending: stats.pending,
     unredeemed: stats.unredeemed,
-    unredeemedValue: stats.unredeemedValue.to_string(),
+    unredeemedValue: stats.unredeemed_value.to_string(),
     redeemed: stats.redeemed,
-    redeemedValue: stats.redeemedValue.to_string(),
+    redeemedValue: stats.redeemed_value.to_string(),
     losingTickets: stats.losing,
-    winProportion: stats.winProportion,
     neglected: stats.neglected,
-    neglectedValue: stats.neglectedValue.to_string(),
+    neglectedValue: stats.neglected_value.to_string(),
     rejected: stats.rejected,
-    rejectedValue: stats.rejectedValue.to_string()
+    rejectedValue: stats.rejected_value.to_string()
   }
 }
 

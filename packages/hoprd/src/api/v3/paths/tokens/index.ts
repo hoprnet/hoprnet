@@ -5,11 +5,11 @@ import type { Operation } from 'express-openapi'
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { node, token } = req.context
+    const { token, db } = req.context
     const { description, capabilities } = req.body
 
-    const newToken = await createToken(node.db, token, capabilities, description)
-    await storeToken(node.db, newToken)
+    const newToken = await createToken(db, token, capabilities, description)
+    await storeToken(db, newToken)
     res.status(201).send({ token: newToken.id })
   }
 ]

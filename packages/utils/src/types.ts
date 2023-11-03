@@ -68,7 +68,6 @@ export {
   is_allowed_to_access_network,
   KeyBinding,
   KeyPair,
-  legacy_path_select,
   merge_encoded_metrics,
   MessageInbox,
   MessageInboxConfiguration,
@@ -105,13 +104,7 @@ export {
   WasmVecAcknowledgedTicket,
   WasmVecAddress,
   WasmVecChannelEntry,
-  CoreApp,
-  get_peers_with_quality,
-  HoprTools,
-  WasmNetwork,
-  WasmPing,
-  WasmIndexerInteractions,
+  HoprTransport,
   PingConfig,
-  WasmCoreEthereumActions,
   WasmTxExecutor
 } from '../../hoprd/lib/hoprd_hoprd.js'

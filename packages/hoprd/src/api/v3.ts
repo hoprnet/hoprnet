@@ -10,7 +10,16 @@ import { initialize } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
 import BN from 'bn.js'
 
-import { Hash, debug, stringToU8a, Address, OffchainPublicKey } from '@hoprnet/hopr-utils'
+import {
+  Hash,
+  debug,
+  stringToU8a,
+  Address,
+  Hopr,
+  ApplicationData,
+  MessageInbox,
+  HoprdPersistentDatabase
+} from '@hoprnet/hopr-utils'
 import {
   authenticateWsConnection,
   getStatusCodeForInvalidInputInRequest,
@@ -24,10 +33,8 @@ import { STATUS_CODES } from './v3/utils.js'
 import type { Server } from 'http'
 import type { Application, Request } from 'express'
 import type { WebSocket, WebSocketServer } from 'ws'
-import type { Hopr } from '@hoprnet/hopr-core'
 import { SettingKey, type StateOps } from '../types.js'
 import type { Token } from './token.js'
-import type { Database, ApplicationData, MessageInbox } from '../../../hoprd/lib/hoprd_hoprd.js'
 
 const debugLog = debug('hoprd:api:v3')
 
@@ -46,18 +53,11 @@ async function handleWebsocketMessage(node: Hopr, data: string) {
   switch (cmd) {
     case 'sendmsg':
       const body = encodeMessage(args['body'])
-      const recipient = peerIdFromString(args['peerId'])
+      const recipient = peerIdFromString(args['peerId']).toString()
       const hops = args['hops']
 
-      // only set path if given, otherwise a path will be chosen by hopr core
-      let path: OffchainPublicKey[]
-      if (args['path'] != undefined) {
-        path = args['path'].map((peer: string) => OffchainPublicKey.from_peerid_str(peer))
-      }
-
       // send message and return ack challenge over websocket
-      let ackChallenge = await node.sendMessage(body, recipient, path, hops)
-      node.emit('hopr:message-ack-challenge', ackChallenge)
+      await node.sendMessage(body, recipient, args['path'], hops)
 
       break
     default:
@@ -66,7 +66,7 @@ async function handleWebsocketMessage(node: Hopr, data: string) {
 }
 
 async function authenticateAndAuthorize(
-  db: Database,
+  db: HoprdPersistentDatabase,
   req: Request,
   reqToken: string,
   superuserToken: string
@@ -109,9 +109,11 @@ export async function setupRestApi(
   options: {
     apiToken?: string
     disableApiAuthentication?: boolean
-  }
+  },
+  db: HoprdPersistentDatabase
 ): Promise<ReturnType<typeof initialize>> {
   // log request and responses
+
   service.use(
     urlPath,
     morgan('[:date[clf]] ":method :url" :status :res[content-length] :response-time ":referrer" ":user-agent"')
@@ -128,12 +130,12 @@ export async function setupRestApi(
   service.use(
     urlPath,
     function addNodeContext(req, _res, next) {
-      req.context = { node, inbox, stateOps }
+      req.context = { node, db, inbox, stateOps }
       next()
     }
       // Need to explicitly bind the instances to the function
       // to make sure the right instances are present
-      .bind({ node, inbox, stateOps })
+      .bind({ node, db, inbox, stateOps })
   )
   // because express-openapi uses relative paths we need to figure out where
   // we are exactly
@@ -231,7 +233,7 @@ export async function setupRestApi(
         // Applying multiple URI encoding is an identity
         let apiTokenFromUser = encodeURIComponent(req.get('x-auth-token') || '')
 
-        req.context.authResult = await authenticateAndAuthorize(node.db, req, apiTokenFromUser, encodedApiToken)
+        req.context.authResult = await authenticateAndAuthorize(db, req, apiTokenFromUser, encodedApiToken)
         return req.context.authResult === AuthResult.Authorized
       }.bind({ options }),
       passwordScheme: async function (req: Request, _scopes, _securityDefinition) {
@@ -242,7 +244,7 @@ export async function setupRestApi(
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
         const apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
 
-        const result = await authenticateAndAuthorize(node.db, req, apiTokenFromUser, encodedApiToken)
+        const result = await authenticateAndAuthorize(db, req, apiTokenFromUser, encodedApiToken)
         if (result === AuthResult.Authorized) {
           return true
         }
@@ -290,7 +292,13 @@ const WS_PATHS = {
   MESSAGES: '/api/v3/messages/websocket'
 }
 
-export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, options: { apiToken?: string }) {
+export function setupWsApi(
+  server: Server,
+  wss: WebSocketServer,
+  node: Hopr,
+  options: { apiToken?: string },
+  _db: HoprdPersistentDatabase
+) {
   // before upgrade to WS, we perform various checks
   server.on('upgrade', function upgrade(req, socket, head) {
     debugLog('WS client attempt to upgrade')
@@ -358,6 +366,7 @@ export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, opt
     })
 
     if (path === WS_PATHS.MESSAGES) {
+      // TODO: moved the event emitter logic out as functions
       node.on('hopr:message', (data: ApplicationData) => {
         // We send the message and its application tag in JSON format.
         let decodedMsg = decodeMessage(data.plain_text)
@@ -365,13 +374,6 @@ export function setupWsApi(server: Server, wss: WebSocketServer, node: Hopr, opt
           type: 'message',
           tag: data.application_tag ?? 0,
           body: decodedMsg.msg
-        }
-        socket.send(JSON.stringify(msg))
-      })
-      node.on('hopr:message-ack-challenge', (ackChallenge: string) => {
-        const msg = {
-          type: 'message-ack-challenge',
-          id: ackChallenge
         }
         socket.send(JSON.stringify(msg))
       })
@@ -395,7 +397,12 @@ export class Context {
   public token: Token
   public authResult: AuthResult
 
-  constructor(public node: Hopr, public inbox: MessageInbox, public stateOps: StateOps) {}
+  constructor(
+    public node: Hopr,
+    public db: HoprdPersistentDatabase,
+    public inbox: MessageInbox,
+    public stateOps: StateOps
+  ) {}
 }
 
 declare global {
@@ -403,6 +410,7 @@ declare global {
     interface Request {
       context: {
         node: Hopr
+        db: HoprdPersistentDatabase
         stateOps: StateOps
         token: Token
         authResult: AuthResult

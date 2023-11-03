@@ -12,24 +12,23 @@ import {
   BOB_ETHEREUM_ADDR
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
-import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Hopr } from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-utils'
 
 const ALICE_ENTRY_INFO = {
-  id: ALICE_PEER_ID,
+  id: ALICE_PEER_ID.toString(),
   address: ALICE_ETHEREUM_ADDR,
-  multiaddrs: [ALICE_MULTI_ADDR]
+  multiaddrs: [ALICE_MULTI_ADDR.toString()]
 }
 
 const BOB_ENTRY_INFO = {
-  id: BOB_PEER_ID,
+  id: BOB_PEER_ID.toString(),
   address: BOB_ETHEREUM_ADDR,
-  multiaddrs: [BOB_MULTI_ADDR]
+  multiaddrs: [BOB_MULTI_ADDR.toString()]
 }
 
 let node = sinon.fake() as any as Hopr
-node.isAllowedAccessToNetwork = (peer: PeerId) => {
-  switch (peer.toString()) {
+node.isAllowedToAccessNetwork = (peer: string) => {
+  switch (peer) {
     case ALICE_PEER_ID.toString():
       return Promise.resolve(false)
     case BOB_PEER_ID.toString():

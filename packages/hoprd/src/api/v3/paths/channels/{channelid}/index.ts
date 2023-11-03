@@ -6,13 +6,13 @@ import {
   defer,
   type DeferType,
   Hash,
-  stringToU8a
+  stringToU8a,
+  Hopr
 } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 import { formatChannelTopologyInfo } from '../index.js'
 
-import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 
 const closingRequests = new Map<string, DeferType<void>>()
@@ -39,7 +39,7 @@ export async function closeChannel(
 
   const channelIdHash = Hash.deserialize(stringToU8a(channelIdStr))
 
-  const channel = await node.db.get_channel(channelIdHash)
+  const channel = await node.getChannelFromHash(channelIdHash)
 
   if (!channel) {
     return { success: false, reason: STATUS_CODES.CHANNEL_NOT_FOUND }
@@ -75,8 +75,8 @@ export async function closeChannel(
   }
 
   try {
-    const { status: channelStatus, receipt } = await node.closeChannel(counterpartyAddress, direction)
-    return { success: true, channelStatus, receipt }
+    let { status, tx_hash } = await node.closeChannel(counterpartyAddress, direction, false)
+    return { success: true, channelStatus: status, receipt: tx_hash.to_hex() }
   } catch (err) {
     log(`close channel error: ${err}`)
 
@@ -190,7 +190,7 @@ const GET: Operation = [
 
     try {
       const channelIdHash = Hash.deserialize(stringToU8a(channelid))
-      const channel = await node.db.get_channel(channelIdHash)
+      const channel = await node.getChannelFromHash(channelIdHash)
       if (!channel) {
         return res.status(404).send()
       }

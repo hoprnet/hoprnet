@@ -1,10 +1,9 @@
 import BN from 'bn.js'
 
-import { debug, Hash, stringToU8a } from '@hoprnet/hopr-utils'
+import { Balance, BalanceType, debug, Hash, stringToU8a, Hopr } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 
-import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 
 const log = debug('hoprd:api:v3:channel-fund')
@@ -22,8 +21,9 @@ const POST: Operation = [
 
     try {
       const channelIdHash = Hash.deserialize(stringToU8a(channelid))
-      const receipt = await node.fundChannel(channelIdHash, new BN(amount))
-      res.status(200).send({ receipt })
+      let value = new Balance(new BN(amount).toString(10), BalanceType.HOPR)
+      const receipt: Hash = await node.fundChannel(channelIdHash, value)
+      res.status(200).send({ receipt: receipt.to_hex() })
     } catch (err) {
       log(`${err}`)
       const error = err instanceof Error ? err.message : err?.toString?.() ?? 'Unknown error'

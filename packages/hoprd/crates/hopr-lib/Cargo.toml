@@ -1,0 +1,81 @@
+[package]
+name = "hopr-lib"
+version = "2.1.0-rc.1"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+# TODO: change this to a binary crate once the migration is complete
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+async-std = { workspace = true }
+const_format = "0.2.32"
+futures = { workspace = true }
+lazy_static = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+thiserror = "1.0"
+validator = { workspace = true }
+
+console_error_panic_hook = { version = "0.1.7", optional = true }
+js-sys = { workspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+
+core-path = { workspace = true }
+core-transport = { workspace = true }
+core-types = { workspace = true }
+core-strategy = { workspace = true }        # TODO: better organize and cleanup, due to StrategyConfig
+core-ethereum-actions = { workspace = true }
+core-ethereum-api = { workspace = true }
+core-ethereum-db = { workspace = true, default-features = false }
+real-base = { workspace = true, default-features = false }
+utils-db = { workspace = true, default-features = false }
+utils-log = { workspace = true }
+utils-metrics = { workspace = true, optional = true }
+utils-misc = { workspace = true, optional = true }
+utils-types = { workspace = true }
+
+[dev-dependencies]
+serde_yaml = { version = "0.9" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm", "prometheus"]
+wasm = [
+    "dep:js-sys",
+    "dep:serde-wasm-bindgen",
+    "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+    "core-path/wasm",
+    "core-transport/wasm",
+    "core-types/wasm",
+    "core-strategy/wasm",
+    "core-ethereum-actions/wasm",
+    "core-ethereum-api/wasm",
+    "core-ethereum-db/wasm",
+    "real-base/wasm",
+    "utils-db/wasm",
+    "utils-log/wasm",
+    "utils-metrics?/wasm",
+    "utils-misc/wasm",
+    "utils-types/wasm",
+]
+prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "dep:utils-metrics"]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]

@@ -3,12 +3,10 @@ import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
 
-import { ApplicationData, MessageInbox, hoprd_hoprd_initialize_crate } from '../../../../../lib/hoprd_hoprd.js'
+import { ApplicationData, MessageInbox, hoprd_hoprd_initialize_crate, Hopr } from '../../../../../lib/hoprd_hoprd.js'
 hoprd_hoprd_initialize_crate()
 
 import { createTestApiInstance, ALICE_PEER_ID } from '../../fixtures.js'
-
-import type { Hopr } from '@hoprnet/hopr-core'
 
 describe('DELETE /messages', function () {
   let node: Hopr
