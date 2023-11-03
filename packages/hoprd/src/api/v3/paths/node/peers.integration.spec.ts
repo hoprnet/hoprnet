@@ -70,7 +70,7 @@ function toJsonDict(account: AccountEntry, peer: PeerStatus, isNew: boolean, mul
       success: Number(peer.heartbeats_succeeded)
     },
     lastSeen: Number(peer.last_seen),
-    quality: peer.quality,
+    quality: peer.quality(),
     backoff: peer.backoff,
     isNew: isNew,
     reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'

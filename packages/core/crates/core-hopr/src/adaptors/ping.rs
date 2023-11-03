@@ -65,7 +65,7 @@ impl<R: PeerAddressResolver> PingExternalAPI for PingExternalInteractions<R> {
                 if let Some(chain_key) = maybe_chain_key {
                     let mut g = self.channel_graph.write().await;
                     let self_addr = g.my_address();
-                    g.update_channel_quality(self_addr, chain_key, status.quality)
+                    g.update_channel_quality(self_addr, chain_key, status.get_quality())
                 } else {
                     error!("could not resolve chain key for peer {peer}");
                 }

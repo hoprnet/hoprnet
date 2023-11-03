@@ -131,7 +131,7 @@ pub trait NetworkExternalActions {
     fn create_timestamp(&self) -> u64;
 }
 
-pub const PEER_QUALITY_AVG_WINDOW: usize = 50;
+pub const PEER_QUALITY_AVG_WINDOW: u32 = 50;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq)]
@@ -160,7 +160,7 @@ impl PeerStatus {
             backoff,
             quality: 0.0,
             metadata: HashMap::new(),
-            quality_avg: SMA::new(PEER_QUALITY_AVG_WINDOW)
+            quality_avg: SMA::new(PEER_QUALITY_AVG_WINDOW),
         }
     }
 
@@ -174,9 +174,14 @@ impl PeerStatus {
         &self.metadata
     }
 
-    /// Gets the current average quality of this peer
+    /// Gets the average quality of this peer
     pub fn get_average_quality(&self) -> f64 {
         self.quality_avg.get_average()
+    }
+
+    // Gets the
+    pub fn get_quality(&self) -> f64 {
+        self.quality
     }
 }
 
@@ -347,7 +352,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
             if ping_result.is_err() {
                 entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
-                entry.quality = 0.0_f64.max(entry.quality - self.cfg.quality_step);
+                entry.update_quality(0.0_f64.max(entry.quality - self.cfg.quality_step));
 
                 if entry.quality < (self.cfg.quality_step / 2.0) {
                     self.network_actions_api
@@ -366,7 +371,7 @@ impl<T: NetworkExternalActions> Network<T> {
                 entry.last_seen = self.network_actions_api.create_timestamp();
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
                 entry.backoff = self.cfg.backoff_min;
-                entry.quality = 1.0_f64.min(entry.quality + self.cfg.quality_step);
+                entry.update_quality(1.0_f64.min(entry.quality + self.cfg.quality_step));
             }
 
             self.refresh_network_status(&entry);
@@ -476,7 +481,14 @@ impl<T: NetworkExternalActions> Network<T> {
     pub fn all_peers_with_quality(&self) -> Vec<(PeerId, f64)> {
         self.entries
             .values()
-            .map(|status: &PeerStatus| (status.id, status.quality))
+            .map(|status: &PeerStatus| (status.id, status.get_quality()))
+            .collect::<Vec<_>>()
+    }
+
+    pub fn all_peers_with_avg_quality(&self) -> Vec<(PeerId, f64)> {
+        self.entries
+            .values()
+            .map(|status: &PeerStatus| (status.id, status.get_average_quality()))
             .collect::<Vec<_>>()
     }
 
@@ -543,6 +555,11 @@ pub mod wasm {
             self.id.to_base58()
         }
 
+        #[wasm_bindgen(js_name = "quality")]
+        pub fn _quality(&self) -> f64 {
+            self.quality
+        }
+
         #[wasm_bindgen(js_name = "metadata")]
         pub fn _metadata(&self) -> js_sys::Map {
             let ret = js_sys::Map::new();
@@ -551,10 +568,7 @@ pub mod wasm {
             });
             ret
         }
-    }
 
-    #[wasm_bindgen]
-    impl PeerStatus {
         #[wasm_bindgen]
         pub fn build(
             peer: JsString,
@@ -584,6 +598,7 @@ pub mod wasm {
                 heartbeats_succeeded,
                 backoff,
                 metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
+                quality_avg: SMA::new_with_samples(PEER_QUALITY_AVG_WINDOW, &[quality]),
             }
         }
     }

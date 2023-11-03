@@ -10,6 +10,8 @@ use core_types::channels::{ChannelEntry, ChannelStatus};
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
 use std::fmt::{Display, Formatter};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
@@ -91,7 +93,7 @@ pub enum TransactionResult {
 }
 
 /// Notifies about completion of a transaction (success or failure).
-pub type TransactionCompleted = futures::channel::oneshot::Receiver<TransactionResult>;
+pub type TransactionCompleted = Pin<Box<dyn Future<Output = TransactionResult> + Send>>;
 
 type TransactionFinisher = futures::channel::oneshot::Sender<TransactionResult>;
 
@@ -107,7 +109,12 @@ impl TransactionSender {
         self.0
             .send((transaction, completer.0))
             .await
-            .map(|_| completer.1)
+            .map(|_| {
+                completer
+                    .1
+                    .map(|r| r.unwrap_or(TransactionResult::Failure("channel cancelled".into())))
+                    .boxed()
+            })
             .map_err(|_| TransactionSubmissionFailed("ethereum tx queue is closed".into()))
     }
 }

@@ -39,7 +39,7 @@ export function toPeerInfoFormat(address: Address | undefined, info: PeerStatus,
       success: Number(info.heartbeats_succeeded)
     },
     lastSeen: Number(info.last_seen),
-    quality: info.quality,
+    quality: info.quality(),
     backoff: info.backoff,
     isNew: info.heartbeats_sent === BigInt(0),
     reportedVersion: info.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
@@ -70,7 +70,7 @@ export async function getPeers(
       const peerId = peerIdFromString(acc.public_key.to_peerid_str())
       const info = await node.getConnectionInfo(peerId)
       // exclude if quality is lesser than the one wanted
-      if (info === undefined || info.quality < quality) {
+      if (info === undefined || info.quality() < quality) {
         continue
       }
       announcedMap.set(
@@ -97,7 +97,7 @@ export async function getPeers(
       } else {
         const info = await node.getConnectionInfo(peerId)
         // exclude if quality is less than the one wanted
-        if (info === undefined || info.quality < quality) {
+        if (info === undefined || info.quality() < quality) {
           continue
         }
         connected.push(toPeerInfoFormat(chainKey, info))
