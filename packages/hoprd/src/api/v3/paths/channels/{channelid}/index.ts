@@ -64,12 +64,14 @@ export async function closeChannel(
   let direction: ChannelDirection
   let counterpartyAddress
 
-  if (channel.source.to_string() == node.getEthereumAddress().to_string()) {
+  let selfAddr = node.getEthereumAddress()
+
+  if (channel.source.eq(selfAddr)) {
     direction = ChannelDirection.Outgoing
-    counterpartyAddress = channel.destination
-  } else if (channel.destination.to_string() == node.getEthereumAddress().to_string()) {
+    counterpartyAddress = channel.destination.clone()
+  } else if (channel.destination.eq(selfAddr)) {
     direction = ChannelDirection.Incoming
-    counterpartyAddress = channel.source
+    counterpartyAddress = channel.source.clone()
   } else {
     return { success: false, reason: STATUS_CODES.UNSUPPORTED_FEATURE }
   }

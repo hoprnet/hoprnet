@@ -380,9 +380,6 @@ export class Hopr extends EventEmitter {
     // subscribe so we can process channel close events
     connector.indexer.on('own-channel-updated', this.onOwnChannelUpdated.bind(this))
 
-    // subscribe so we can process channel ticket redeemed events
-    connector.indexer.on('ticket-redeemed', this.onTicketRedeemed.bind(this))
-
     log('announcing done, strategy interval')
     this.startPeriodicStrategyCheck()
 
@@ -430,21 +427,6 @@ export class Hopr extends EventEmitter {
       await this.tools.channel_events().send_event(channel)
     } catch (e) {
       log(`failed to emit channel closure event`)
-    }
-  }
-
-  /*
-   * Callback function used to react to on-chain channel ticket redeem events.
-   * Specifically we resolve the pending balance of the ticket.
-   * @param channel object
-   * @param ticket amount
-   */
-  private async onTicketRedeemed(channel: ChannelEntry, ticketAmount: Balance): Promise<void> {
-    // We are only interested in channels where we are the source, since only
-    // then we track the pending balance.
-    let selfAddr = this.getEthereumAddress()
-    if (channel.source.eq(selfAddr)) {
-      await this.db.resolve_pending(channel.destination, ticketAmount)
     }
   }
 
@@ -1085,7 +1067,6 @@ export class Hopr extends EventEmitter {
 
   public async getTicketStatistics() {
     const acked_tickets = await this.db.get_acknowledged_tickets()
-    const pending = await this.db.get_pending_tickets_count()
     const losing = await this.db.get_losing_tickets_count()
 
     let totalValue = Balance.zero(BalanceType.HOPR)
@@ -1094,7 +1075,6 @@ export class Hopr extends EventEmitter {
     }
 
     return {
-      pending,
       losing,
       winProportion: acked_tickets.len() / (acked_tickets.len() + losing) || 0,
       unredeemed: acked_tickets.len(),
