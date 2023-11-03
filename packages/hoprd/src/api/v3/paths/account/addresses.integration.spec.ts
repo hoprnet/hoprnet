@@ -19,7 +19,7 @@ describe('GET /account/addresses', () => {
   })
 
   it('should return addresses', async () => {
-    node.getId = sinon.fake.returns(ALICE_PEER_ID)
+    node.peerId = sinon.fake.returns(ALICE_PEER_ID)
     node.getEthereumAddress = sinon.fake.returns(ALICE_ETHEREUM_ADDR)
 
     const res = await request(service).get('/api/v3/account/addresses')

@@ -117,9 +117,7 @@ mod tests {
     use mockall::mock;
     use utils_db::db::DB;
     use utils_db::rusty::RustyLevelDbShim;
-    use utils_types::primitives::{
-        Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256,
-    };
+    use utils_types::primitives::{Address, Balance, BalanceType, EthereumChallenge, Snapshot, U256};
     use utils_types::traits::BinarySerializable;
 
     const SENDER_PRIV_BYTES: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
@@ -235,9 +233,6 @@ mod tests {
             async fn is_network_registry_enabled(&self) -> core_ethereum_db::errors::Result<bool>;
             async fn set_network_registry(&mut self, enabled: bool, snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn is_eligible(&self, account: &Address) -> core_ethereum_db::errors::Result<bool>;
-            async fn store_authorization(&mut self, token: AuthorizationToken) -> core_ethereum_db::errors::Result<()>;
-            async fn retrieve_authorization(&self, id: String) -> core_ethereum_db::errors::Result<Option<AuthorizationToken>>;
-            async fn delete_authorization(&mut self, id: String) -> core_ethereum_db::errors::Result<()>;
             async fn is_mfa_protected(&self) -> core_ethereum_db::errors::Result<Option<Address>>;
             async fn set_mfa_protected_and_update_snapshot(&mut self,maybe_mfa_address: Option<Address>,snapshot: &Snapshot) -> core_ethereum_db::errors::Result<()>;
             async fn is_allowed_to_access_network(&self, node: &Address) -> core_ethereum_db::errors::Result<bool>;

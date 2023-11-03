@@ -4,22 +4,23 @@ resolver = "2"
 
 members = [
     "packages/core/crates/core-crypto",
-    "packages/core/crates/core-hopr",
-    "packages/core/crates/core-misc",
     "packages/core/crates/core-network",
     "packages/core/crates/core-path",
     "packages/core/crates/core-packet",
     "packages/core/crates/core-protocol",
     "packages/core/crates/core-p2p",
     "packages/core/crates/core-strategy",
+    "packages/core/crates/core-transport",
     "packages/core/crates/core-types",
     "packages/core-ethereum/crates/core-ethereum-actions",
+    "packages/core-ethereum/crates/core-ethereum-api",
     "packages/core-ethereum/crates/core-ethereum-db",
     "packages/core-ethereum/crates/core-ethereum-indexer",
     "packages/core-ethereum/crates/core-ethereum-misc",
     "packages/ethereum/crates/bindings",
     "packages/hopli",
     "packages/real/crates/real-base",
+    "packages/hoprd/crates/hopr-lib",
     "packages/hoprd/crates/hoprd-hoprd",
     "packages/hoprd/crates/hoprd-inbox",
     "packages/hoprd/crates/hoprd-keypair",
@@ -63,11 +64,11 @@ wasm-bindgen-futures = "0.4.36"
 
 bindings = { path = "packages/ethereum/crates/bindings", default-features = false }
 core-ethereum-actions = { path = "packages/core-ethereum/crates/core-ethereum-actions", default-features = false }
+core-ethereum-api = { path = "packages/core-ethereum/crates/core-ethereum-api", default-features = false }
 core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
 core-ethereum-misc = { path = "packages/core-ethereum/crates/core-ethereum-misc", default-features = false }
 core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }
 core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
-core-hopr = { path = "packages/core/crates/core-hopr", default-features = false }
 core-misc = { path = "packages/core/crates/core-misc", default-features = false }
 core-network = { path = "packages/core/crates/core-network", default-features = false }
 core-packet = { path = "packages/core/crates/core-packet", default-features = false }
@@ -75,7 +76,9 @@ core-path = { path = "packages/core/crates/core-path", default-features = false 
 core-protocol = { path = "packages/core/crates/core-protocol", default-features = false }
 core-p2p = { path = "packages/core/crates/core-p2p", default-features = false }
 core-strategy = { path = "packages/core/crates/core-strategy", default-features = false }
+core-transport = { path = "packages/core/crates/core-transport", default-features = false }
 core-types = { path = "packages/core/crates/core-types", default-features = false }
+hopr-lib = { path = "packages/hoprd/crates/hopr-lib", default-features = false }
 hoprd-inbox = { path = "packages/hoprd/crates/hoprd-inbox", default-features = false }
 hoprd-keypair = { path = "packages/hoprd/crates/hoprd-keypair", default-features = false }
 real-base = { path = "packages/real/crates/real-base", default-features = false }

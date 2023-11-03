@@ -3,12 +3,12 @@ import { authenticateToken, deleteToken } from '../../../token.js'
 
 const DELETE: Operation = [
   async (req, res, _next) => {
-    const { node } = req.context
+    const { db } = req.context
     const { id } = req.params
 
-    const token = await authenticateToken(node.db, id)
+    const token = await authenticateToken(db, id)
     if (token) {
-      await deleteToken(node.db, id)
+      await deleteToken(db, id)
       return res.status(204).send()
     }
     return res.status(404).send()

@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = [
-    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom", "dep:gloo-timers",
+    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom", "dep:gloo-timers",
     "core-crypto/wasm", "core-ethereum-db/wasm", "core-packet/wasm", "core-path/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-types/wasm", "utils-metrics?/wasm",
 ]
@@ -24,7 +24,6 @@ async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-lock = { workspace = true }
 futures = { workspace = true }
 futures-lite = { workspace = true }
-hex = { workspace = true }
 hex-literal = "0.4"
 lazy_static = { workspace = true }
 rand = "0.8.5"
@@ -37,7 +36,6 @@ validator = { workspace = true }
 # wasm
 getrandom = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { version = "0.3.63", optional = true }
 libp2p-identity = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 gloo-timers = { workspace = true, optional = true}

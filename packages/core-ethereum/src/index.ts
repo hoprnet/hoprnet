@@ -1,5 +1,5 @@
 import type { PeerId } from '@libp2p/interface-peer-id'
-import { ChainWrapper, createChainWrapper, type DeploymentExtract, SendTransactionStatus } from './ethereum.js'
+import { ChainWrapper, createChainWrapper, SendTransactionStatus } from './ethereum.js'
 import { BigNumber } from 'ethers'
 import {
   AccountEntry,
@@ -16,7 +16,8 @@ import {
   Hash,
   OffchainPublicKey,
   PublicKey,
-  WasmTransactionPayload
+  WasmTransactionPayload,
+  SmartContractConfig
 } from '@hoprnet/hopr-utils'
 
 import { TransactionPayload } from './transaction-manager.js'
@@ -33,10 +34,18 @@ export {
   NetworkRegistryEligibilityChangedEventName,
   NetworkRegistryStatusChangedEventName,
   NetworkRegistryNodeAllowedEventName,
-  NetworkRegistryNodeNotAllowedEventName
+  NetworkRegistryNodeNotAllowedEventName,
+  ChannelUpdateEventNames,
+  TicketRedeemedEventNames
 } from './indexer/types.js'
 
 const log = debug('hopr-core-ethereum')
+
+const MONO_REPO_PATH = new URL('../../../', import.meta.url).pathname
+
+export function get_monorepo_path(): string {
+  return MONO_REPO_PATH
+}
 
 export type ChainOptions = {
   provider: string
@@ -62,7 +71,7 @@ export default class HoprCoreEthereum extends EventEmitter {
 
   public indexer: Indexer
   private chain: ChainWrapper
-  private started: Promise<HoprCoreEthereum> | undefined
+  private started: boolean
   // Used to store ongoing operations to prevent duplicate redemption attempts
 
   private constructor(
@@ -89,7 +98,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     chainKeypair: ChainKeypair,
     options: ChainOptions,
     safeModuleOptions: SafeModuleOptions,
-    deploymentAddresses: DeploymentExtract,
+    deploymentAddresses: SmartContractConfig,
     automaticChainCreation = true
   ) {
     HoprCoreEthereum._instance = new HoprCoreEthereum(
@@ -109,7 +118,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     return HoprCoreEthereum._instance
   }
 
-  async initializeChainWrapper(deploymentAddresses: DeploymentExtract) {
+  async initializeChainWrapper(deploymentAddresses: SmartContractConfig) {
     // In some cases, we want to make sure the chain within the connector is not triggered
     // automatically but instead via an event. This is the case for `hoprd`, where we need
     // to get notified after ther chain was properly created, and we can't get setup the
@@ -122,7 +131,7 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  private async createChain(deploymentAddresses: DeploymentExtract): Promise<void> {
+  private async createChain(deploymentAddresses: SmartContractConfig): Promise<void> {
     try {
       log(
         `[DEBUG] createChain createChainWrapper starting with deploymentAddresses... ${JSON.stringify(
@@ -154,12 +163,8 @@ export default class HoprCoreEthereum extends EventEmitter {
     this.emit('hopr:connector:created')
   }
 
-  async start(): Promise<HoprCoreEthereum> {
-    if (this.started) {
-      return this.started
-    }
-
-    const _start = async (): Promise<HoprCoreEthereum> => {
+  async start() {
+    if (!this.started) {
       try {
         await this.chain.waitUntilReady()
 
@@ -169,13 +174,11 @@ export default class HoprCoreEthereum extends EventEmitter {
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.chainKeypair.to_address().to_hex()}`)
         log('Connector started')
+        this.started = true
       } catch (err) {
         log('error: failed to start the indexer', err)
       }
-      return this
     }
-    this.started = _start()
-    return this.started
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -412,4 +415,4 @@ export default class HoprCoreEthereum extends EventEmitter {
 // export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
-export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper, DeploymentExtract, Hash }
+export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper, SmartContractConfig, Hash }

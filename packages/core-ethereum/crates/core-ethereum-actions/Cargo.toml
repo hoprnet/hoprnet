@@ -52,7 +52,7 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:gloo-timers", "dep:serde-wasm-bindgen",
     "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 prometheus = [ "dep:utils-metrics" ]

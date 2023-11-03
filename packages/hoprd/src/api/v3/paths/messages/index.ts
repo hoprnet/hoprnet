@@ -1,6 +1,6 @@
 import type { Operation } from 'express-openapi'
 import { peerIdFromString } from '@libp2p/peer-id'
-import { create_counter, OffchainPublicKey, debug } from '@hoprnet/hopr-utils'
+import { create_counter, debug } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../utils.js'
 import { encodeMessage } from '../../../utils.js'
@@ -32,18 +32,12 @@ const DELETE: Operation = [
 const POST: Operation = [
   async (req, res, _next) => {
     const message = encodeMessage(req.body.body)
-    const recipient = peerIdFromString(req.body.peerId)
+    const recipient = peerIdFromString(req.body.peerId).toString()
     const hops = req.body.hops
     const tag = req.body.tag
 
-    // only set path if given, otherwise a path will be chosen by hopr core
-    let path: OffchainPublicKey[]
-    if (req.body.path != undefined) {
-      path = req.body.path.map((peer: string) => OffchainPublicKey.from_peerid_str(peer))
-    }
-
     try {
-      let ackChallenge = await req.context.node.sendMessage(message, recipient, path, hops, tag)
+      let ackChallenge = await req.context.node.sendMessage(message, recipient, req.body.path, hops, tag)
       metric_successfulSendApiCalls.increment()
       return res.status(202).json(ackChallenge)
     } catch (err) {

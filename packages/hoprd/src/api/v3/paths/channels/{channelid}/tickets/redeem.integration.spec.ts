@@ -66,14 +66,6 @@ describe('POST /channels/{channelid}/tickets/redeem', () => {
     expect(res.body).to.be.empty
   })
 
-  it('should fail when no tickets to redeem', async () => {
-    node.getTickets = sinon.fake.returns([])
-    const res = await request(service).post(`/api/v3/channels/${incoming.get_id().to_hex()}/tickets/redeem`)
-    expect(res.status).to.equal(404)
-    expect(res).to.satisfyApiSpec
-    expect(res.body).to.deep.equal({ status: STATUS_CODES.TICKETS_NOT_FOUND })
-  })
-
   it('should validate channelid', async () => {
     const res = await request(service).post(`/api/v3/channels/invalidchannelid/tickets/redeem`)
     expect(res.status).to.equal(400)

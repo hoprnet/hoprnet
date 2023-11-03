@@ -1,10 +1,9 @@
-import { Hash, stringToU8a, debug } from '@hoprnet/hopr-utils'
+import { Hash, stringToU8a, debug, Ticket, Hopr } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../../utils.js'
 import { formatTicket } from '../../tickets/index.js'
 
 import type { Operation } from 'express-openapi'
-import type { Hopr } from '@hoprnet/hopr-core'
 
 const log = debug('hoprd:api:v3:channel-tickets')
 
@@ -15,7 +14,7 @@ const GET: Operation = [
 
     try {
       const channelIdHash = Hash.deserialize(stringToU8a(channelid))
-      const tickets = await node.getTickets(channelIdHash)
+      const tickets: Ticket[] = await node.getTickets(channelIdHash)
       if (tickets.length <= 0) {
         return res.status(404).send({ status: STATUS_CODES.TICKETS_NOT_FOUND })
       }

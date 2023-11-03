@@ -30,6 +30,5 @@ pub const NETWORK_REGISTRY_ADDRESS_ELIGIBLE_PREFIX: &str = "networkRegistry:addr
 pub const NETWORK_REGISTRY_ADDRESS_CHAIN_KEY_PREFIX: &str = "networkRegistry:addressPublicKey-";
 /// some Multi-Factor Authorization module, e.g. Gnosis Safe
 pub const MFA_MODULE_PREFIX: &str = "mfaModule:enabled";
-pub const API_AUTHORIZATION_TOKEN_KEY_PREFIX: &str = "api:authenticationTokens";
 pub const CHAIN_KEY_PREFIX: &str = "keys:chain-";
 pub const PACKET_KEY_PREFIX: &str = "keys:packet-";

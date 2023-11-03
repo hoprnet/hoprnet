@@ -59,7 +59,7 @@ rm -f "${spec_file_path}"
 make -C "${mydir}/../" run-anvil
 
 # need to mirror contract data because of anvil-deploy node only writing to localhost {{{
-declare protocol_config="${mydir}/../packages/core/protocol-config.json"
+declare protocol_config="${mydir}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
 declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-addresses.json"
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost"
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "anvil-localhost" "anvil-localhost2"

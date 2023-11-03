@@ -2,25 +2,25 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { Database } from '@hoprnet/hopr-utils'
+import { Hopr, HoprdPersistentDatabase } from '@hoprnet/hopr-utils'
 
 import { authenticateToken, createToken, storeToken } from '../../../token.js'
 
-import { createAuthenticatedTestApiInstance, ALICE_ETHEREUM_ADDR } from '../../fixtures.js'
-import type { Hopr } from '@hoprnet/hopr-core'
+import { createAuthenticatedTestApiInstance } from '../../fixtures.js'
 import type { Token } from './../../../token.js'
 
 describe('DELETE /tokens/{id}', function () {
   let node: Hopr
   let service: any
+  let db: HoprdPersistentDatabase
   let token: Token
 
   before(async function () {
     node = sinon.fake() as any
-    node.db = Database.new_in_memory(ALICE_ETHEREUM_ADDR.clone())
 
     const loaded = await createAuthenticatedTestApiInstance(node)
     service = loaded.service
+    db = loaded.db
 
     // @ts-ignore ESM / CommonJS compatibility issue
     chai.use(chaiResponseValidator.default(loaded.api.apiDoc))
@@ -29,8 +29,8 @@ describe('DELETE /tokens/{id}', function () {
   beforeEach(async function () {
     // test token which should be deleted
     const caps = [{ endpoint: 'tokensCreate' }]
-    token = await createToken(node.db, undefined, caps)
-    await storeToken(node.db, token)
+    token = await createToken(db, undefined, caps)
+    await storeToken(db, token)
   })
 
   it('should fail with not found error when using superuser token but incorrect token id', async function () {
@@ -44,7 +44,7 @@ describe('DELETE /tokens/{id}', function () {
     expect(res.status).to.equal(204)
     expect(res).to.satisfyApiSpec
 
-    const tokenInDb = await authenticateToken(node.db, token.id)
+    const tokenInDb = await authenticateToken(db, token.id)
     expect(tokenInDb).to.be.undefined
   })
 
@@ -57,8 +57,8 @@ describe('DELETE /tokens/{id}', function () {
   it('should fail with unauthenticated error when using token with missing capability', async function () {
     // create token with wrong capability
     const caps = [{ endpoint: 'tokensCreate' }]
-    const wrongToken = await createToken(node.db, undefined, caps)
-    await storeToken(node.db, wrongToken)
+    const wrongToken = await createToken(db, undefined, caps)
+    await storeToken(db, wrongToken)
 
     const res = await request(service).delete(`/api/v3/tokens/${token.id}`).set('x-auth-token', wrongToken.id)
     expect(res.status).to.equal(403)
@@ -68,14 +68,14 @@ describe('DELETE /tokens/{id}', function () {
   it('should succeed when using token with correct capability', async function () {
     // create token with correct capability
     const caps = [{ endpoint: 'tokensDelete' }]
-    const correctToken = await createToken(node.db, undefined, caps)
-    await storeToken(node.db, correctToken)
+    const correctToken = await createToken(db, undefined, caps)
+    await storeToken(db, correctToken)
 
     const res = await request(service).delete(`/api/v3/tokens/${token.id}`).set('x-auth-token', correctToken.id)
     expect(res.status).to.equal(204)
     expect(res).to.satisfyApiSpec
 
-    const tokenInDb = await authenticateToken(node.db, token.id)
+    const tokenInDb = await authenticateToken(db, token.id)
     expect(tokenInDb).to.be.undefined
   })
 })

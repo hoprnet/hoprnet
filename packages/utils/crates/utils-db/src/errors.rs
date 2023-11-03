@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DbError {
     #[error("failed to dump database into file: {0}")]
     DumpError(String),

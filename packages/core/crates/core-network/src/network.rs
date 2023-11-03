@@ -12,7 +12,32 @@ use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use utils_log::{info, warn};
-use utils_metrics::metrics::{MultiGauge, SimpleGauge};
+
+#[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
+use utils_misc::time::native::current_timestamp;
+
+#[cfg(all(feature = "prometheus", not(test), feature = "wasm"))]
+use utils_misc::time::wasm::current_timestamp;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use utils_metrics::metrics::{MultiGauge, SimpleGauge, SimpleHistogram};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_NETWORK_HEALTH: SimpleGauge =
+        SimpleGauge::new("core_gauge_network_health", "Connectivity health indicator").unwrap();
+    static ref METRIC_PEERS_BY_QUALITY: MultiGauge =
+        MultiGauge::new("core_mgauge_peers_by_quality", "Number different peer types by quality",
+            &["type", "quality"],
+        ).unwrap();
+    static ref METRIC_PEER_COUNT: SimpleGauge =
+        SimpleGauge::new("core_gauge_num_peers", "Number of all peers").unwrap();
+    static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN: SimpleHistogram = SimpleHistogram::new(
+        "hoprd_histogram_time_to_green_seconds",
+        "Time it takes for a node to transition to the GREEN network state",
+        vec![30.0, 60.0, 90.0, 120.0, 180.0, 240.0, 300.0, 420.0, 600.0, 900.0, 1200.0]
+    ).unwrap();
+}
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
@@ -187,9 +212,8 @@ pub struct Network<T: NetworkExternalActions> {
     bad_quality_non_public: HashSet<PeerId>,
     last_health: Health,
     network_actions_api: T,
-    metric_network_health: Option<SimpleGauge>,
-    metric_peers_by_quality: Option<MultiGauge>,
-    metric_peer_count: Option<SimpleGauge>,
+    #[cfg(all(feature = "prometheus", not(test)))]
+    started_at: Option<u64>,
 }
 
 impl<T: NetworkExternalActions> Network<T> {
@@ -218,14 +242,8 @@ impl<T: NetworkExternalActions> Network<T> {
             bad_quality_non_public: HashSet::new(),
             last_health: Health::Unknown,
             network_actions_api,
-            metric_network_health: SimpleGauge::new("core_gauge_network_health", "Connectivity health indicator").ok(),
-            metric_peers_by_quality: MultiGauge::new(
-                "core_mgauge_peers_by_quality",
-                "Number different peer types by quality",
-                &["type", "quality"],
-            )
-            .ok(),
-            metric_peer_count: SimpleGauge::new("core_gauge_num_peers", "Number of all peers").ok(),
+            #[cfg(all(feature = "prometheus", not(test)))]
+            started_at: Some(current_timestamp()),
         };
 
         instance
@@ -385,7 +403,10 @@ impl<T: NetworkExternalActions> Network<T> {
         let good_public = self.good_quality_public.len();
         let good_non_public = self.good_quality_non_public.len();
         let bad_public = self.bad_quality_public.len();
+
+        #[cfg(all(feature = "prometheus", not(test)))]
         let bad_non_public = self.bad_quality_non_public.len();
+
         let mut health = Health::Red;
 
         if bad_public > 0 {
@@ -404,23 +425,23 @@ impl<T: NetworkExternalActions> Network<T> {
             info!("Network health indicator changed {} -> {}", self.last_health, health);
             info!("NETWORK HEALTH: {}", health);
 
+            #[cfg(all(feature = "prometheus", not(test)))]
+            if self.started_at.is_some() {
+                METRIC_NETWORK_HEALTH_TIME_TO_GREEN
+                    .observe(((current_timestamp() - self.started_at.take().unwrap()) / 1000) as f64);
+            }
+
             self.last_health = health;
         }
 
-        // metrics
-        if let Some(metric_peer_count) = &self.metric_peer_count {
-            metric_peer_count.set((good_public + good_non_public + bad_public + bad_non_public) as f64);
-        }
-
-        if let Some(metric_peers_by_quality) = &self.metric_peers_by_quality {
-            metric_peers_by_quality.set(&["public", "high"], good_public as f64);
-            metric_peers_by_quality.set(&["public", "low"], bad_public as f64);
-            metric_peers_by_quality.set(&["nonPublic", "high"], good_non_public as f64);
-            metric_peers_by_quality.set(&["nonPublic", "low"], bad_non_public as f64);
-        }
-
-        if let Some(metric_network_health) = &self.metric_network_health {
-            metric_network_health.set((health as i32).into());
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_PEER_COUNT.set((good_public + good_non_public + bad_public + bad_non_public) as f64);
+            METRIC_PEERS_BY_QUALITY.set(&["public", "high"], good_public as f64);
+            METRIC_PEERS_BY_QUALITY.set(&["public", "low"], bad_public as f64);
+            METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "high"], good_non_public as f64);
+            METRIC_PEERS_BY_QUALITY.set(&["nonPublic", "low"], bad_non_public as f64);
+            METRIC_NETWORK_HEALTH.set((health as i32).into());
         }
     }
 

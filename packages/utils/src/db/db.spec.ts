@@ -61,7 +61,7 @@ describe('db functional tests', function () {
     assert((await db.get_hopr_balance()).eq(Balance.zero(BalanceType.HOPR)))
 
     await db.set_hopr_balance(new Balance('10', BalanceType.HOPR))
-    assert.equal((await db.get_hopr_balance()).to_string(), '10')
+    assert.equal((await db.get_hopr_balance()).to_string(), '10 HOPR')
   })
 
   it('should store rejected tickets statistics', async function () {

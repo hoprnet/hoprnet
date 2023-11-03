@@ -11,9 +11,9 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = ["console_error_panic_hook", "wasm"]
 wasm = [
-    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:getrandom",
+    "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:getrandom",
     "libp2p/wasm-bindgen", "dep:libp2p-wasm-ext",
-    "core-network/wasm", "utils-log/wasm", "utils-misc/wasm"
+    "core-network/wasm", "utils-log/wasm"
 ]
 
 [dependencies]
@@ -30,7 +30,6 @@ void = "1"          # needed for Behavior implementations from libp2p
 libp2p-wasm-ext = { workspace = true, features = ["tcp"], optional = true }
 getrandom = { version = "0.2.8", features = ["js"], optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { version = "0.3.63", optional = true }
 thiserror = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4.36", optional = true }
@@ -40,7 +39,6 @@ core-network = { workspace = true }
 core-protocol = { workspace = true }
 core-types = { workspace = true }
 utils-log = { workspace = true }
-utils-misc = { workspace = true }
 
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }

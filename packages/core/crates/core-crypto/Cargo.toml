@@ -25,7 +25,6 @@ generic-array = { version = "0.14.7", features = ["zeroize"] }
 getrandom = { workspace = true, features = ["js"] }
 hex = { workspace = true }
 hkdf = "0.12"
-hmac = "0.12"
 js-sys = { workspace = true, optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
 libp2p-identity = { workspace = true }

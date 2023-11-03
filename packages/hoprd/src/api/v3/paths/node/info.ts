@@ -1,38 +1,28 @@
-import type { Hopr } from '@hoprnet/hopr-core'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
-import { health_to_string } from '@hoprnet/hopr-utils'
+import { ChainConfiguration, health_to_string, Hopr } from '@hoprnet/hopr-utils'
 
 /**
  * @returns Information about the HOPR Node, including any options it started with.
  */
 export const getInfo = async (node: Hopr) => {
   try {
-    const {
-      chain,
-      hoprTokenAddress,
-      hoprChannelsAddress,
-      noticePeriodChannelClosure,
-      hoprNetworkRegistryAddress,
-      hoprNodeSafeRegistryAddress,
-      moduleAddress,
-      safeAddress
-    } = node.smartContractInfo()
+    const scInfo: ChainConfiguration = node.smartContractInfo()
 
     return {
-      network: node.network.id,
-      announcedAddress: (await node.getAddressesAnnouncedToDHT()).map((ma) => ma.toString()),
-      listeningAddress: (await node.getListeningAddresses()).map((ma) => ma.toString()),
-      chain: chain,
-      hoprToken: hoprTokenAddress,
-      hoprChannels: hoprChannelsAddress,
-      hoprNetworkRegistry: hoprNetworkRegistryAddress,
-      hoprNodeSafeRegistry: hoprNodeSafeRegistryAddress,
-      nodeManagementModule: moduleAddress,
-      nodeSafe: safeAddress,
-      isEligible: await node.isAllowedAccessToNetwork(node.getId()),
-      connectivityStatus: health_to_string(await node.getConnectivityHealth()),
-      channelClosurePeriod: Math.ceil(noticePeriodChannelClosure / 60)
+      network: node.chainConfig().id,
+      announcedAddress: await node.getMultiaddressesAnnouncedToDHT(node.peerId()),
+      listeningAddress: await node.getListeningMultiaddresses(),
+      chain: scInfo.chain,
+      hoprToken: scInfo.hoprTokenAddress,
+      hoprChannels: scInfo.hoprChannelsAddress,
+      hoprNetworkRegistry: scInfo.hoprNetworkRegistryAddress,
+      hoprNodeSafeRegistry: scInfo.hoprNodeSafeRegistryAddress,
+      nodeManagementModule: scInfo.moduleAddress,
+      nodeSafe: scInfo.safeAddress,
+      isEligible: await node.isAllowedToAccessNetwork(node.peerId()),
+      connectivityStatus: health_to_string((await node.networkHealth()).unwrap()),
+      channelClosurePeriod: Math.ceil(scInfo.noticePeriodChannelClosure / 60)
     }
   } catch (error) {
     // Make sure this doesn't throw

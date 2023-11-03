@@ -1,12 +1,12 @@
-import type { Hopr } from '@hoprnet/hopr-core'
+import type { Hopr } from '@hoprnet/hopr-utils'
 import type { Operation } from 'express-openapi'
 import type { PeerId } from '@libp2p/interface-peer-id'
 import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../../utils.js'
 
 export const getPeerInfo = async (node: Hopr, peerId: PeerId) => {
-  const announced = await node.getAddressesAnnouncedToDHT(peerId)
-  const observed = await node.getObservedAddresses(peerId)
+  const announced = await node.getMultiaddressesAnnouncedToDHT(peerId.toString())
+  const observed = await node.getObservedMultiaddresses(peerId.toString())
 
   return {
     announced: announced.map((v) => v.toString()),
