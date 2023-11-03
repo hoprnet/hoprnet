@@ -13,6 +13,7 @@ use validator::Validate;
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use utils_log::{info, warn};
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};
+use utils_types::sma::SMA;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
@@ -130,6 +131,8 @@ pub trait NetworkExternalActions {
     fn create_timestamp(&self) -> u64;
 }
 
+pub const PEER_QUALITY_AVG_WINDOW: usize = 50;
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
@@ -137,10 +140,11 @@ pub struct PeerStatus {
     pub origin: PeerOrigin,
     pub is_public: bool,
     pub last_seen: u64, // timestamp
-    pub quality: f64,
+    quality: f64,
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
+    quality_avg: SMA<f64>,
     metadata: HashMap<String, String>,
 }
 
@@ -156,12 +160,23 @@ impl PeerStatus {
             backoff,
             quality: 0.0,
             metadata: HashMap::new(),
+            quality_avg: SMA::new(PEER_QUALITY_AVG_WINDOW)
         }
+    }
+
+    pub fn update_quality(&mut self, new_value: f64) {
+        self.quality = new_value;
+        self.quality_avg.add_sample(new_value);
     }
 
     /// Gets metadata associated with the peer
     pub fn metadata(&self) -> &HashMap<String, String> {
         &self.metadata
+    }
+
+    /// Gets the current average quality of this peer
+    pub fn get_average_quality(&self) -> f64 {
+        self.quality_avg.get_average()
     }
 }
 

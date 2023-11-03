@@ -6621,6 +6621,7 @@ dependencies = [
  "libp2p-identity",
  "primitive-types",
  "regex",
+ "ringbuffer",
  "serde",
  "thiserror",
  "utils-log",
