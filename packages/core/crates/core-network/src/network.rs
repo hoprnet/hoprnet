@@ -179,7 +179,7 @@ impl PeerStatus {
         self.quality_avg.get_average()
     }
 
-    // Gets the
+    /// Gets the immediate node quality
     pub fn get_quality(&self) -> f64 {
         self.quality
     }

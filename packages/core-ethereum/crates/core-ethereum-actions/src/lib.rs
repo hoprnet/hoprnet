@@ -87,22 +87,18 @@ pub mod wasm {
 
         pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> JsResult<OpenChannelResult> {
             let awaiter = self.w.open_channel(*destination, *amount).await?;
-            match awaiter
-                .await
-                .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
-            {
+            match awaiter.await {
                 TransactionResult::OpenChannel { tx_hash, channel_id } => Ok(OpenChannelResult { tx_hash, channel_id }),
+                TransactionResult::Failure(e) => Err(JsValue::from(format!("open channel failed with error: {e}"))),
                 _ => Err(JsValue::from("open channel transaction failed".to_string())),
             }
         }
 
         pub async fn fund_channel(&self, channel_id: &Hash, amount: &Balance) -> JsResult<Hash> {
             let awaiter = self.w.fund_channel(*channel_id, *amount).await?;
-            match awaiter
-                .await
-                .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
-            {
+            match awaiter.await {
                 TransactionResult::FundChannel { tx_hash } => Ok(tx_hash),
+                TransactionResult::Failure(e) => Err(JsValue::from(format!("fund channel failed with error: {e}"))),
                 _ => Err(JsValue::from("fund channel transaction failed".to_string())),
             }
         }
@@ -117,22 +113,20 @@ pub mod wasm {
                 .w
                 .close_channel(*counterparty, direction, redeem_before_close)
                 .await?;
-            match awaiter
-                .await
-                .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
-            {
+            match awaiter.await {
                 TransactionResult::CloseChannel { tx_hash, status } => Ok(CloseChannelResult { tx_hash, status }),
+                TransactionResult::Failure(e) => Err(JsValue::from(format!("close channel failed with error: {e}"))),
                 _ => Err(JsValue::from("close channel transaction failed".to_string())),
             }
         }
 
         pub async fn withdraw(&self, recipient: &Address, amount: &Balance) -> JsResult<Hash> {
             let awaiter = self.w.withdraw(*recipient, *amount).await?;
-            match awaiter
-                .await
-                .map_err(|_| JsValue::from("transaction has been cancelled".to_string()))?
-            {
+            match awaiter.await {
                 TransactionResult::Withdraw { tx_hash } => Ok(tx_hash),
+                TransactionResult::Failure(e) => {
+                    Err(JsValue::from(format!("withdraw transaction failed with error: {e}")))
+                }
                 _ => Err(JsValue::from("withdraw transaction failed".to_string())),
             }
         }
