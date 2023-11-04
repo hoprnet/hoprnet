@@ -22,18 +22,29 @@ pub struct NetworkConfig {
     /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
     #[serde_as(as = "DurationSeconds<u64>")]
     min_delay: Duration,
+
     /// Maximum delay
     #[serde_as(as = "DurationSeconds<u64>")]
     max_delay: Duration,
+
     #[validate(range(min = 0.0, max = 1.0))]
     quality_bad_threshold: f64,
+
     #[validate(range(min = 0.0, max = 1.0))]
     pub quality_offline_threshold: f64,
     quality_step: f64,
+
+    /// Size of the window for quality moving average
+    #[validate(range(min = 1_u32))]
+    pub quality_avg_window_size: u32,
+
     #[serde_as(as = "DurationSeconds<u64>")]
     ignore_timeframe: Duration,
+
     backoff_exponent: f64,
+
     backoff_min: f64,
+
     backoff_max: f64,
 }
 
@@ -48,6 +59,7 @@ impl Default for NetworkConfig {
             quality_bad_threshold: 0.2,
             quality_offline_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
             quality_step: 0.1,
+            quality_avg_window_size: 25, // TODO: think about some reasonable default
             ignore_timeframe: Duration::from_secs(600), // 10 minutes
             backoff_exponent: 1.5,
             backoff_min: 2.0,
@@ -131,8 +143,6 @@ pub trait NetworkExternalActions {
     fn create_timestamp(&self) -> u64;
 }
 
-pub const PEER_QUALITY_AVG_WINDOW: u32 = 50;
-
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct PeerStatus {
@@ -149,7 +159,7 @@ pub struct PeerStatus {
 }
 
 impl PeerStatus {
-    fn new(id: PeerId, origin: PeerOrigin, backoff: f64) -> PeerStatus {
+    fn new(id: PeerId, origin: PeerOrigin, backoff: f64, quality_window: u32) -> PeerStatus {
         PeerStatus {
             id,
             origin,
@@ -160,7 +170,7 @@ impl PeerStatus {
             backoff,
             quality: 0.0,
             metadata: HashMap::new(),
-            quality_avg: SMA::new(PEER_QUALITY_AVG_WINDOW),
+            quality_avg: SMA::new(quality_window),
         }
     }
 
@@ -301,7 +311,12 @@ impl<T: NetworkExternalActions> Network<T> {
             };
 
             if !has_entry && !is_ignored {
-                let mut entry = PeerStatus::new(peer.clone(), origin, self.cfg.backoff_min);
+                let mut entry = PeerStatus::new(
+                    peer.clone(),
+                    origin,
+                    self.cfg.backoff_min,
+                    self.cfg.quality_avg_window_size,
+                );
                 entry.is_public = self.network_actions_api.is_public(&peer);
                 if let Some(m) = metadata {
                     entry.metadata.extend(m);
@@ -580,6 +595,7 @@ pub mod wasm {
             heartbeats_succeeded: u64,
             backoff: f64,
             peer_metadata: &js_sys::Map,
+            quality_window: u32,
         ) -> Self {
             let peer = peer
                 .as_string()
@@ -598,7 +614,7 @@ pub mod wasm {
                 heartbeats_succeeded,
                 backoff,
                 metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
-                quality_avg: SMA::new_with_samples(PEER_QUALITY_AVG_WINDOW, &[quality]),
+                quality_avg: SMA::new_with_samples(quality_window, &[quality]),
             }
         }
     }

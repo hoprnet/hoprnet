@@ -55,14 +55,11 @@ pub mod wasm {
     use std::{pin::Pin, str::FromStr};
 
     use super::*;
-    use core_crypto::types::OffchainPublicKey;
-    use core_ethereum_db::{db::wasm::Database, traits::HoprCoreEthereumDbActions};
     use core_network::network::{Health, PeerOrigin};
-    use futures::{future::poll_fn, StreamExt};
+    use futures::future::poll_fn;
     use js_sys::JsString;
     use utils_misc::utils::wasm::js_map_to_hash_map;
     use utils_types::primitives::Address;
-    use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
 
     /// Object needed only to simplify the iteration over the address and quality pair until
