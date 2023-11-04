@@ -13,7 +13,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-async-lock = { workspace = "true" }
+async-lock = { workspace = true }
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
 hex = { workspace = true }
 proc-macro-regex = "~1.1.0"

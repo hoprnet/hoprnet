@@ -10,9 +10,9 @@ use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
 
 use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "wasm")]
 use {core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, wasm_bindgen::prelude::*};
-
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -362,19 +362,28 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+    #[wasm_bindgen(getter_with_clone)]
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct ChainConfiguration {
         pub chain: String,
-        pub hoprAnnouncementsAddress: String,
-        pub hoprTokenAddress: String,
-        pub hoprChannelsAddress: String,
-        pub hoprNetworkRegistryAddress: String,
-        pub hoprNodeSafeRegistryAddress: String,
-        pub hoprTicketPriceOracleAddress: String,
-        pub moduleAddress: String,
-        pub safeAddress: String,
-        pub noticePeriodChannelClosure: u32,
+        #[wasm_bindgen(js_name = "hoprAnnouncementsAddress")]
+        pub hopr_announcements_address: String,
+        #[wasm_bindgen(js_name = "hoprTokenAddress")]
+        pub hopr_token_address: String,
+        #[wasm_bindgen(js_name = "hoprChannelsAddress")]
+        pub hopr_channels_address: String,
+        #[wasm_bindgen(js_name = "hoprNetworkRegistryAddress")]
+        pub hopr_network_registry_address: String,
+        #[wasm_bindgen(js_name = "hoprNodeSafeRegistryAddress")]
+        pub hopr_node_safe_registry_address: String,
+        #[wasm_bindgen(js_name = "hoprTicketPriceOracleAddress")]
+        pub hopr_ticket_price_oracle_address: String,
+        #[wasm_bindgen(js_name = "moduleAddress")]
+        pub module_address: String,
+        #[wasm_bindgen(js_name = "safeAddress")]
+        pub safe_address: String,
+        #[wasm_bindgen(js_name = "noticePeriodChannelClosure")]
+        pub notice_period_channel_closure: u32,
     }
 
     #[wasm_bindgen]
