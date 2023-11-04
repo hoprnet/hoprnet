@@ -13,7 +13,7 @@ use validator::Validate;
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use utils_log::{info, warn};
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};
-use utils_types::sma::SMA;
+use utils_types::sma::{NoSumSMA, SMA};
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
@@ -154,7 +154,7 @@ pub struct PeerStatus {
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
-    quality_avg: SMA<f64>,
+    quality_avg: NoSumSMA<f64>,
     metadata: HashMap<String, String>,
 }
 
@@ -170,7 +170,7 @@ impl PeerStatus {
             backoff,
             quality: 0.0,
             metadata: HashMap::new(),
-            quality_avg: SMA::new(quality_window),
+            quality_avg: NoSumSMA::new(quality_window),
         }
     }
 
