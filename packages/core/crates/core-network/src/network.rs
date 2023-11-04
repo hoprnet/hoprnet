@@ -614,7 +614,7 @@ pub mod wasm {
                 heartbeats_succeeded,
                 backoff,
                 metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
-                quality_avg: SMA::new_with_samples(quality_window, &[quality]),
+                quality_avg: NoSumSMA::new_with_samples(quality_window, &[quality]),
             }
         }
     }
