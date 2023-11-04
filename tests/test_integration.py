@@ -101,11 +101,6 @@ async def check_received_packets(receiver, expected_packets, tag=None, sort=True
     assert received == expected_packets
 
 
-async def check_all_tickets_redeemed(src):
-    while int((await src["api"].get_tickets_statistics()).unredeemed) > 0:
-        await asyncio.sleep(CHECK_RETRY_INTERVAL)
-
-
 async def check_rejected_tickets(src, count):
     while int((await src["api"].get_tickets_statistics()).rejected) < count:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
