@@ -55,14 +55,11 @@ pub mod wasm {
     use std::{pin::Pin, str::FromStr};
 
     use super::*;
-    use core_crypto::types::OffchainPublicKey;
-    use core_ethereum_db::{db::wasm::Database, traits::HoprCoreEthereumDbActions};
     use core_network::network::{Health, PeerOrigin};
-    use futures::{future::poll_fn, StreamExt};
+    use futures::future::poll_fn;
     use js_sys::JsString;
     use utils_misc::utils::wasm::js_map_to_hash_map;
     use utils_types::primitives::Address;
-    use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
 
     /// Object needed only to simplify the iteration over the address and quality pair until
@@ -107,52 +104,6 @@ pub mod wasm {
         pub fn as_counted_ref(&self) -> Arc<RwLock<Network<ExternalNetworkInteractions>>> {
             self.network.clone()
         }
-    }
-
-    #[wasm_bindgen]
-    pub async fn get_peers_with_quality(network: &WasmNetwork, db: &Database) -> PeerQuality {
-        let peer_stream = futures::stream::iter(
-            network
-                .as_counted_ref()
-                .read()
-                .await
-                .all_peers_with_quality()
-                .into_iter(),
-        );
-
-        PeerQuality::new(
-            peer_stream
-                .filter_map(|(p, q)| async move { OffchainPublicKey::from_peerid(&p).map(|key| (key, q)).ok() })
-                .then(move |(key, quality)| {
-                    let db_clone = db.as_ref_counted();
-
-                    async move {
-                        db_clone
-                            .read()
-                            .await
-                            .get_chain_key(&key)
-                            .await
-                            .map(|address| (address, quality))
-                    }
-                })
-                .filter_map(|v| async move {
-                    match v {
-                        Ok((a, q)) => {
-                            if a.is_some() {
-                                Some((a.unwrap(), q))
-                            } else {
-                                None
-                            }
-                        }
-                        Err(e) => {
-                            error!("Failed to get the address mapping for peer: {}", e);
-                            None
-                        }
-                    }
-                })
-                .collect::<Vec<_>>()
-                .await,
-        )
     }
 
     #[wasm_bindgen]
@@ -212,7 +163,7 @@ pub mod wasm {
             let peer: String = peer.into();
             match PeerId::from_str(&peer) {
                 Ok(p) => match (*self.network.read().await).get_peer_status(&p) {
-                    Some(v) => v.quality,
+                    Some(v) => v.get_quality(),
                     _ => 0.0f64,
                 },
                 Err(err) => {

@@ -13,6 +13,7 @@ use validator::Validate;
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use utils_log::{info, warn};
 use utils_metrics::metrics::{MultiGauge, SimpleGauge};
+use utils_types::sma::{NoSumSMA, SMA};
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 #[serde_as]
@@ -21,18 +22,29 @@ pub struct NetworkConfig {
     /// Minimum delay will be multiplied by backoff, it will be half the actual minimum value
     #[serde_as(as = "DurationSeconds<u64>")]
     min_delay: Duration,
+
     /// Maximum delay
     #[serde_as(as = "DurationSeconds<u64>")]
     max_delay: Duration,
+
     #[validate(range(min = 0.0, max = 1.0))]
     quality_bad_threshold: f64,
+
     #[validate(range(min = 0.0, max = 1.0))]
     pub quality_offline_threshold: f64,
     quality_step: f64,
+
+    /// Size of the window for quality moving average
+    #[validate(range(min = 1_u32))]
+    pub quality_avg_window_size: u32,
+
     #[serde_as(as = "DurationSeconds<u64>")]
     ignore_timeframe: Duration,
+
     backoff_exponent: f64,
+
     backoff_min: f64,
+
     backoff_max: f64,
 }
 
@@ -47,6 +59,7 @@ impl Default for NetworkConfig {
             quality_bad_threshold: 0.2,
             quality_offline_threshold: DEFAULT_NETWORK_QUALITY_THRESHOLD,
             quality_step: 0.1,
+            quality_avg_window_size: 25, // TODO: think about some reasonable default
             ignore_timeframe: Duration::from_secs(600), // 10 minutes
             backoff_exponent: 1.5,
             backoff_min: 2.0,
@@ -137,15 +150,16 @@ pub struct PeerStatus {
     pub origin: PeerOrigin,
     pub is_public: bool,
     pub last_seen: u64, // timestamp
-    pub quality: f64,
+    quality: f64,
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
+    quality_avg: NoSumSMA<f64>,
     metadata: HashMap<String, String>,
 }
 
 impl PeerStatus {
-    fn new(id: PeerId, origin: PeerOrigin, backoff: f64) -> PeerStatus {
+    fn new(id: PeerId, origin: PeerOrigin, backoff: f64, quality_window: u32) -> PeerStatus {
         PeerStatus {
             id,
             origin,
@@ -156,12 +170,28 @@ impl PeerStatus {
             backoff,
             quality: 0.0,
             metadata: HashMap::new(),
+            quality_avg: NoSumSMA::new(quality_window),
         }
+    }
+
+    pub fn update_quality(&mut self, new_value: f64) {
+        self.quality = new_value;
+        self.quality_avg.add_sample(new_value);
     }
 
     /// Gets metadata associated with the peer
     pub fn metadata(&self) -> &HashMap<String, String> {
         &self.metadata
+    }
+
+    /// Gets the average quality of this peer
+    pub fn get_average_quality(&self) -> f64 {
+        self.quality_avg.get_average()
+    }
+
+    /// Gets the immediate node quality
+    pub fn get_quality(&self) -> f64 {
+        self.quality
     }
 }
 
@@ -281,7 +311,12 @@ impl<T: NetworkExternalActions> Network<T> {
             };
 
             if !has_entry && !is_ignored {
-                let mut entry = PeerStatus::new(peer.clone(), origin, self.cfg.backoff_min);
+                let mut entry = PeerStatus::new(
+                    peer.clone(),
+                    origin,
+                    self.cfg.backoff_min,
+                    self.cfg.quality_avg_window_size,
+                );
                 entry.is_public = self.network_actions_api.is_public(&peer);
                 if let Some(m) = metadata {
                     entry.metadata.extend(m);
@@ -332,7 +367,7 @@ impl<T: NetworkExternalActions> Network<T> {
 
             if ping_result.is_err() {
                 entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
-                entry.quality = 0.0_f64.max(entry.quality - self.cfg.quality_step);
+                entry.update_quality(0.0_f64.max(entry.quality - self.cfg.quality_step));
 
                 if entry.quality < (self.cfg.quality_step / 2.0) {
                     self.network_actions_api
@@ -351,7 +386,7 @@ impl<T: NetworkExternalActions> Network<T> {
                 entry.last_seen = self.network_actions_api.create_timestamp();
                 entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
                 entry.backoff = self.cfg.backoff_min;
-                entry.quality = 1.0_f64.min(entry.quality + self.cfg.quality_step);
+                entry.update_quality(1.0_f64.min(entry.quality + self.cfg.quality_step));
             }
 
             self.refresh_network_status(&entry);
@@ -461,7 +496,14 @@ impl<T: NetworkExternalActions> Network<T> {
     pub fn all_peers_with_quality(&self) -> Vec<(PeerId, f64)> {
         self.entries
             .values()
-            .map(|status: &PeerStatus| (status.id, status.quality))
+            .map(|status: &PeerStatus| (status.id, status.get_quality()))
+            .collect::<Vec<_>>()
+    }
+
+    pub fn all_peers_with_avg_quality(&self) -> Vec<(PeerId, f64)> {
+        self.entries
+            .values()
+            .map(|status: &PeerStatus| (status.id, status.get_average_quality()))
             .collect::<Vec<_>>()
     }
 
@@ -528,6 +570,11 @@ pub mod wasm {
             self.id.to_base58()
         }
 
+        #[wasm_bindgen(js_name = "quality")]
+        pub fn _quality(&self) -> f64 {
+            self.quality
+        }
+
         #[wasm_bindgen(js_name = "metadata")]
         pub fn _metadata(&self) -> js_sys::Map {
             let ret = js_sys::Map::new();
@@ -536,10 +583,7 @@ pub mod wasm {
             });
             ret
         }
-    }
 
-    #[wasm_bindgen]
-    impl PeerStatus {
         #[wasm_bindgen]
         pub fn build(
             peer: JsString,
@@ -551,6 +595,7 @@ pub mod wasm {
             heartbeats_succeeded: u64,
             backoff: f64,
             peer_metadata: &js_sys::Map,
+            quality_window: u32,
         ) -> Self {
             let peer = peer
                 .as_string()
@@ -569,6 +614,7 @@ pub mod wasm {
                 heartbeats_succeeded,
                 backoff,
                 metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
+                quality_avg: NoSumSMA::new_with_samples(quality_window, &[quality]),
             }
         }
     }

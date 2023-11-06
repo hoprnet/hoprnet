@@ -1099,7 +1099,7 @@ dependencies = [
 
 [[package]]
 name = "core-ethereum-actions"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-lock",
  "async-std",
@@ -1291,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "core-network"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1467,7 +1467,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1490,7 +1490,6 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_with",
- "simple_moving_average",
  "strum 0.25.0",
  "thiserror",
  "utils-db",
@@ -5806,15 +5805,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "simple_moving_average"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdd19d3808aad2604c824399fd270260d634678b010328c9d96851bb0fb63121"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "siphasher"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6609,7 +6599,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.8"
+version = "0.3.0"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
@@ -6621,6 +6611,7 @@ dependencies = [
  "libp2p-identity",
  "primitive-types",
  "regex",
+ "ringbuffer",
  "serde",
  "thiserror",
  "utils-log",

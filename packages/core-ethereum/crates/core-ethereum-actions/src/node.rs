@@ -73,7 +73,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.withdraw(bob, stake).await.unwrap().await.unwrap();
+        let tx_res = actions.withdraw(bob, stake).await.unwrap().await;
 
         match tx_res {
             TransactionResult::Withdraw { tx_hash } => {

@@ -105,7 +105,6 @@ export {
   WasmVecAddress,
   WasmVecChannelEntry,
   CoreApp,
-  get_peers_with_quality,
   HoprTools,
   WasmNetwork,
   WasmPing,

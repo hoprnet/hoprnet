@@ -2,7 +2,6 @@ use core_crypto::types::OffchainPublicKey;
 use core_types::channels::{ChannelDirection, ChannelStatus};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
-use simple_moving_average::{SumTreeSMA, SMA};
 use std::collections::HashMap;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance, BalanceType};
@@ -10,7 +9,6 @@ use utils_types::primitives::{Address, Balance, BalanceType};
 use async_std::sync::RwLock;
 use async_trait::async_trait;
 use core_ethereum_actions::channels::ChannelActions;
-use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_network::network::{Network, NetworkExternalActions};
 use futures::stream::FuturesUnordered;
@@ -19,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
+use utils_types::sma::{NoSumSMA, SMA};
 use utils_types::traits::PeerIdLike;
 use validator::Validate;
 
@@ -38,11 +37,6 @@ lazy_static::lazy_static! {
         SimpleCounter::new("core_counter_strategy_promiscuous_closed_channels", "Count of close channel decisions").unwrap();
 }
 
-/// Size of the simple moving average window used to smoothen the number of registered peers.
-pub const SMA_WINDOW_SIZE: usize = 10;
-
-type SimpleMovingAvg = SumTreeSMA<usize, usize, SMA_WINDOW_SIZE>;
-
 /// Config of promiscuous strategy.
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Validate, Serialize, Deserialize)]
@@ -51,6 +45,11 @@ pub struct PromiscuousStrategyConfig {
     /// Defaults to 0.5
     #[validate(range(min = 0_f32, max = 1.0_f32))]
     pub network_quality_threshold: f64,
+
+    /// Minimum number of network quality samples before the strategy can start making decisions.
+    /// Defaults to 10
+    #[validate(range(min = 1_u32))]
+    pub min_network_size_samples: u32,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
     /// Defaults to 10 HOPR
@@ -78,6 +77,7 @@ impl Default for PromiscuousStrategyConfig {
     fn default() -> Self {
         PromiscuousStrategyConfig {
             network_quality_threshold: 0.5,
+            min_network_size_samples: 10,
             new_channel_stake: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             minimum_node_balance: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             max_channels: None,
@@ -88,50 +88,52 @@ impl Default for PromiscuousStrategyConfig {
 
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
-pub struct PromiscuousStrategy<Db, Net>
+pub struct PromiscuousStrategy<Db, Net, A>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
+    A: ChannelActions,
 {
     db: Arc<RwLock<Db>>,
     network: Arc<RwLock<Network<Net>>>,
-    chain_actions: CoreEthereumActions<Db>,
+    chain_actions: A,
     cfg: PromiscuousStrategyConfig,
-    sma: RwLock<SimpleMovingAvg>,
+    sma: RwLock<NoSumSMA<u32>>,
 }
 
-impl<Db, Net> PromiscuousStrategy<Db, Net>
+impl<Db, Net, A> PromiscuousStrategy<Db, Net, A>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
+    A: ChannelActions,
 {
     pub fn new(
         cfg: PromiscuousStrategyConfig,
         db: Arc<RwLock<Db>>,
         network: Arc<RwLock<Network<Net>>>,
-        chain_actions: CoreEthereumActions<Db>,
+        chain_actions: A,
     ) -> Self {
         Self {
             db,
             network,
             chain_actions,
+            sma: RwLock::new(NoSumSMA::new(cfg.min_network_size_samples)),
             cfg,
-            sma: RwLock::new(SimpleMovingAvg::new()),
         }
     }
 
-    async fn sample_size_and_evaluate_avg(&self, sample: usize) -> Option<usize> {
+    async fn sample_size_and_evaluate_avg(&self, sample: u32) -> Option<u32> {
         self.sma.write().await.add_sample(sample);
         info!("evaluated qualities of {sample} peers seen in the network");
 
         let sma = self.sma.read().await;
-        if sma.get_num_samples() >= sma.get_sample_window_size() {
+        if sma.len() >= sma.window_size() {
             Some(sma.get_average())
         } else {
             info!(
                 "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",
-                sma.get_num_samples(),
-                sma.get_sample_window_size()
+                sma.len(),
+                sma.window_size()
             );
             None
         }
@@ -141,7 +143,7 @@ where
         self.network
             .read()
             .await
-            .all_peers_with_quality()
+            .all_peers_with_avg_quality()
             .iter()
             .filter_map(|(peer, q)| match OffchainPublicKey::from_peerid(peer) {
                 Ok(offchain_key) => Some((offchain_key, q)),
@@ -190,10 +192,11 @@ where
 
         // Check if we have enough network size samples before proceeding quality-based evaluation
         let peers_with_quality = self.get_peers_with_quality().await;
-        let current_average_network_size = match self.sample_size_and_evaluate_avg(peers_with_quality.len()).await {
-            Some(avg) => avg,
-            None => return Err(CriteriaNotSatisfied), // not enough samples yet
-        };
+        let current_average_network_size =
+            match self.sample_size_and_evaluate_avg(peers_with_quality.len() as u32).await {
+                Some(avg) => avg,
+                None => return Err(CriteriaNotSatisfied), // not enough samples yet
+            };
 
         // Go through all the peer ids we know, get their qualities and find out which channels should be closed and
         // which peer ids should become candidates for a new channel
@@ -204,6 +207,10 @@ where
             if let Some(channel) = channel_with_peer {
                 if *quality <= self.cfg.network_quality_threshold {
                     // Need to close the channel, because quality has dropped
+                    debug!(
+                        "closure of channel to {}: {quality} <= {}",
+                        channel.destination, self.cfg.network_quality_threshold
+                    );
                     tick_decision.add_to_close(*channel);
                 }
             } else if *quality >= self.cfg.network_quality_threshold {
@@ -302,20 +309,22 @@ where
     }
 }
 
-impl<Db, Net> Debug for PromiscuousStrategy<Db, Net>
+impl<Db, Net, A> Debug for PromiscuousStrategy<Db, Net, A>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
+    A: ChannelActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Promiscuous(self.cfg))
     }
 }
 
-impl<Db, Net> Display for PromiscuousStrategy<Db, Net>
+impl<Db, Net, A> Display for PromiscuousStrategy<Db, Net, A>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
+    A: ChannelActions,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Promiscuous(self.cfg))
@@ -323,10 +332,11 @@ where
 }
 
 #[async_trait(? Send)]
-impl<Db, Net> SingularStrategy for PromiscuousStrategy<Db, Net>
+impl<Db, Net, A> SingularStrategy for PromiscuousStrategy<Db, Net, A>
 where
     Db: HoprCoreEthereumDbActions + Clone,
     Net: NetworkExternalActions,
+    A: ChannelActions,
 {
     async fn on_tick(&self) -> Result<()> {
         let tick_decision = self.collect_tick_decision().await?;
@@ -385,30 +395,40 @@ where
 mod tests {
     use super::*;
     use core_crypto::keypairs::{Keypair, OffchainKeypair};
-    use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionQueue, TransactionResult};
+    use core_crypto::types::Hash;
+    use core_ethereum_actions::transaction_queue::{TransactionCompleted, TransactionResult};
     use core_ethereum_db::db::CoreEthereumDb;
     use core_network::{
         network::{NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin},
         PeerId,
     };
-    use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::channels::{ChannelEntry, ChannelStatus};
-    use futures::future::join_all;
+    use futures::{future::ready, FutureExt};
+    use lazy_static::lazy_static;
     use mockall::mock;
     use utils_db::{db::DB, rusty::RustyLevelDbShim};
     use utils_misc::time::native::current_timestamp;
     use utils_types::primitives::{Snapshot, U256};
 
+    lazy_static! {
+        static ref PEERS: Vec<(Address, PeerId)> = (0..10)
+            .into_iter()
+            .map(|_| (Address::random(), OffchainKeypair::random().public().to_peerid()))
+            .collect();
+    }
+
     mock! {
-        TxExec { }
+        ChannelAct { }
         #[async_trait(? Send)]
-        impl TransactionExecutor for TxExec {
-            async fn redeem_ticket(&self, ticket: AcknowledgedTicket) -> TransactionResult;
-            async fn open_channel(&self, destination: Address, balance: Balance) -> TransactionResult;
-            async fn fund_channel(&self, destination: Address, amount: Balance) -> TransactionResult;
-            async fn close_channel_initialize(&self, src: Address, dst: Address) -> TransactionResult;
-            async fn close_channel_finalize(&self, src: Address, dst: Address) -> TransactionResult;
-            async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
+        impl ChannelActions for ChannelAct {
+            async fn open_channel(&self, destination: Address, amount: Balance) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
+            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
+            async fn close_channel(
+                &self,
+                counterparty: Address,
+                direction: ChannelDirection,
+                redeem_before_close: bool,
+            ) -> core_ethereum_actions::errors::Result<TransactionCompleted>;
         }
     }
 
@@ -417,202 +437,148 @@ mod tests {
         fn is_public(&self, _: &PeerId) -> bool {
             false
         }
-
         fn emit(&self, _: NetworkEvent) {}
-
         fn create_timestamp(&self) -> u64 {
             current_timestamp()
         }
     }
 
-    fn generate_random_address_and_peer_id_pairs(num: u32) -> Vec<(Address, PeerId)> {
-        (0..num)
-            .map(|_| (Address::random(), OffchainKeypair::random().public().to_peerid()))
-            .collect()
-    }
-
-    async fn add_peer_and_bump_its_network_quality_many_times<Db, Net>(
-        strategy: &PromiscuousStrategy<Db, Net>,
-        peer: &PeerId,
-        steps: u32,
-    ) where
-        Db: HoprCoreEthereumDbActions + Clone,
-        Net: NetworkExternalActions,
-    {
-        strategy.network.write().await.add(peer, PeerOrigin::Initialization);
-
-        assert_eq!(
-            strategy.network.read().await.get_peer_status(peer).unwrap().quality,
-            0f64
+    async fn mock_channel(
+        db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
+        dst: Address,
+        balance: Balance,
+    ) -> ChannelEntry {
+        let channel = ChannelEntry::new(
+            PEERS[0].0,
+            dst,
+            balance,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+            U256::zero(),
         );
-        join_all((0..steps).map(|_| async { strategy.network.write().await.update(peer, Ok(current_timestamp())) }))
-            .await;
-        assert_eq!(
-            (strategy.network.read().await.get_peer_status(peer).unwrap().quality / 0.1f64).round() as u32,
-            steps
-        );
-    }
-
-    async fn mock_promiscuous_strategy() -> (
-        PromiscuousStrategy<CoreEthereumDb<RustyLevelDbShim>, MockNetworkExternalActions>,
-        Vec<(Address, PeerId)>,
-    ) {
-        let address_peer_id_pairs = generate_random_address_and_peer_id_pairs(10);
-        let (alice_address, alice_peer_id) = address_peer_id_pairs[0];
-        let (bob_address, bob_peer_id) = address_peer_id_pairs[1];
-        let (charlie_address, charlie_peer_id) = address_peer_id_pairs[2];
-        let (_eugene_address, eugene_peer_id) = address_peer_id_pairs[3];
-        let (gustave_address, gustave_peer_id) = address_peer_id_pairs[4];
-
-        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
-            DB::new(RustyLevelDbShim::new_in_memory()),
-            alice_address,
-        )));
-
-        let network = Arc::new(RwLock::new(Network::new(
-            alice_peer_id,
-            NetworkConfig::default(),
-            MockNetworkExternalActions {},
-        )));
-
-        // Start the TransactionQueue with the mock TransactionExecutor
-        let tx_queue = TransactionQueue::new(db.clone(), Box::new(MockTxExec::new()));
-        let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn_local(async move {
-            tx_queue.transaction_loop().await;
-        });
-
-        let actions = CoreEthereumActions::new(alice_address, db.clone(), tx_sender);
-
-        let strat_cfg = PromiscuousStrategyConfig::default();
-
-        let strat = PromiscuousStrategy::new(strat_cfg, db, network, actions);
-
-        // create a network with:
-        let peers: Vec<(PeerId, u32)> = vec![
-            (bob_peer_id.clone(), 7),        // - bob: 0.7
-            (charlie_peer_id.clone(), 9),    // - charlie: 0.9
-            (eugene_peer_id.clone(), 10),    // - eugene: 0.8
-            (gustave_peer_id.clone(), 2),    // - gustave: 1.0
-            (address_peer_id_pairs[5].1, 1), // - random_peer: 0.1
-            (address_peer_id_pairs[6].1, 3), // - random_peer: 0.3
-            (address_peer_id_pairs[7].1, 1), // - random_peer: 0.1
-            (address_peer_id_pairs[8].1, 2), // - random_peer: 0.2
-            (address_peer_id_pairs[9].1, 3), // - random_peer: 0.3
-        ];
-
-        join_all(peers.iter().map(|(peer_id, step)| async {
-            add_peer_and_bump_its_network_quality_many_times(&strat, peer_id, *step).await;
-        }))
-        .await;
-
-        let balance = Balance::new_from_str("11000000000000000000", BalanceType::HOPR); // 11 HOPR
-        let low_balance = Balance::new_from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
-                                                                                        // set HOPR balance in DB
-        strat.db.write().await.set_hopr_balance(&balance).await.unwrap();
-        // link chain key and packet key
-        join_all(address_peer_id_pairs.iter().map(|pair| async {
-            strat
-                .db
-                .write()
-                .await
-                .link_chain_and_packet_keys(
-                    &pair.0,
-                    &OffchainPublicKey::from_peerid(&pair.1).unwrap(),
-                    &Snapshot::default(),
-                )
-                .await
-                .unwrap();
-        }))
-        .await;
-        // add some channels in DB
-        let outgoing_channels = vec![
-            ChannelEntry::new(
-                alice_address.clone(),
-                bob_address.clone(),
-                balance.clone(),
-                U256::zero(),
-                ChannelStatus::Open,
-                U256::zero(),
-                U256::zero(),
-            ),
-            ChannelEntry::new(
-                alice_address.clone(),
-                charlie_address.clone(),
-                balance.clone(),
-                U256::zero(),
-                ChannelStatus::Open,
-                U256::zero(),
-                U256::zero(),
-            ),
-            ChannelEntry::new(
-                alice_address.clone(),
-                gustave_address.clone(),
-                low_balance.clone(),
-                U256::zero(),
-                ChannelStatus::Open,
-                U256::zero(),
-                U256::zero(),
-            ),
-        ];
-        join_all(outgoing_channels.iter().map(|channel| async {
-            strat
-                .db
-                .write()
-                .await
-                .update_channel_and_snapshot(&channel.get_id(), channel, &Snapshot::default())
-                .await
-                .unwrap()
-        }))
-        .await;
-        // set allowance
-        strat
-            .db
-            .write()
+        db.write()
             .await
-            .set_staking_safe_allowance(&balance, &Snapshot::default())
+            .update_channel_and_snapshot(&channel.get_id(), &channel, &Default::default())
+            .await
+            .unwrap();
+        channel
+    }
+
+    async fn prepare_network(network: Arc<RwLock<Network<MockNetworkExternalActions>>>, qualities: Vec<f64>) {
+        assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
+
+        let mut net = network.write().await;
+        for (i, quality) in qualities.into_iter().enumerate() {
+            let peer = &PEERS[i + 1].1;
+
+            net.add(peer, PeerOrigin::Initialization);
+
+            while net.get_peer_status(peer).unwrap().get_average_quality() < quality {
+                net.update(peer, Ok(current_timestamp()));
+            }
+            debug!(
+                "peer {peer} ({}) has avg quality: {}",
+                PEERS[i + 1].0,
+                net.get_peer_status(peer).unwrap().get_average_quality()
+            );
+        }
+    }
+
+    async fn init_db(db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>, node_balance: Balance) {
+        let mut d = db.write().await;
+
+        d.set_hopr_balance(&node_balance).await.unwrap();
+        d.set_staking_safe_allowance(&node_balance, &Snapshot::default())
             .await
             .unwrap();
 
-        // Add fake samples to allow the test to run
-        for _ in 0..SMA_WINDOW_SIZE - 1 {
-            strat.sma.write().await.add_sample(peers.len());
+        for (chain_key, peer_id) in PEERS.iter() {
+            d.link_chain_and_packet_keys(
+                chain_key,
+                &OffchainPublicKey::from_peerid(peer_id).unwrap(),
+                &Snapshot::default(),
+            )
+            .await
+            .unwrap();
         }
-        (strat, address_peer_id_pairs)
-    }
-
-    #[async_std::test]
-    async fn test_promiscuous_strategy_config() {
-        let (strat, _) = mock_promiscuous_strategy().await;
-        assert_eq!(strat.to_string(), "promiscuous");
     }
 
     #[async_std::test]
     async fn test_promiscuous_strategy_tick_decisions() {
-        let (strat, address_peer_pairs) = mock_promiscuous_strategy().await;
-        let tick_decision = strat.collect_tick_decision().await.unwrap();
+        let _ = env_logger::builder().is_test(true).try_init();
 
-        // let (to_close, to_open) = strat.on_tick().await.unwrap();
+        let db = Arc::new(RwLock::new(CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            PEERS[0].0,
+        )));
 
-        // assert that there's 0 channel closed and 1 opened (eugene, at index 3).
-        assert_eq!(tick_decision.get_to_close().len(), 1usize, "should close 1 channel");
-        assert_eq!(tick_decision.get_to_open().len(), 1usize, "should open 1 channel");
-        assert_eq!(
-            tick_decision.get_to_close()[0].destination,
-            address_peer_pairs[4].0,
-            "should close channel to gustave"
-        );
-        assert_eq!(
-            tick_decision.get_to_open()[0].0,
-            address_peer_pairs[3].0,
-            "should open channel to eugene"
-        );
-    }
+        let network = Arc::new(RwLock::new(Network::new(
+            PEERS[0].1,
+            NetworkConfig::default(),
+            MockNetworkExternalActions {},
+        )));
 
-    #[async_std::test]
-    async fn test_promiscuous_strategy_on_tick() {
-        let (strat, _) = mock_promiscuous_strategy().await;
+        let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 1.0, 0.1, 0.3, 0.1, 0.2, 0.3];
 
-        strat.on_tick().await.unwrap();
+        let balance = Balance::new_from_str("100000000000000000000", BalanceType::HOPR); // 11 HOPR
+                                                                                         //let low_balance = Balance::new_from_str("1000000000000000", BalanceType::HOPR); // 0.001 HOPR
+
+        init_db(db.clone(), balance).await;
+        prepare_network(network.clone(), qualities_that_alice_sees).await;
+
+        mock_channel(db.clone(), PEERS[1].0, balance).await;
+        mock_channel(db.clone(), PEERS[2].0, balance).await;
+        mock_channel(db.clone(), PEERS[5].0, balance).await;
+
+        let mut strat_cfg = PromiscuousStrategyConfig::default();
+        strat_cfg.max_channels = Some(3); // Allow max 3 channels
+        strat_cfg.network_quality_threshold = 0.5;
+
+        /*
+            Situation:
+            - There are max 3 channels.
+            - Strategy will close channel to peer 5, because it has quality 0.1
+            - Because of the closure, this means there can be 1 additional channel opened
+                - Strategy can open channel either to peer 3 or 4 (quality 0.8 and 1.0 respectively)
+                - It will prefer peer 4 because it has higher quality
+        */
+
+        let mut actions = MockChannelAct::new();
+        actions
+            .expect_close_channel()
+            .times(1)
+            .withf(|dst, dir, _| PEERS[5].0.eq(dst) && ChannelDirection::Outgoing.eq(dir))
+            .return_once(|_, _, _| {
+                Ok(ready(TransactionResult::CloseChannel {
+                    status: ChannelStatus::PendingToClose,
+                    tx_hash: Default::default(),
+                })
+                .boxed())
+            });
+
+        let new_stake = strat_cfg.new_channel_stake;
+        actions
+            .expect_open_channel()
+            .times(1)
+            .withf(move |dst, b| PEERS[4].0.eq(dst) && new_stake.eq(b))
+            .return_once(|_, _| {
+                Ok(ready(TransactionResult::OpenChannel {
+                    channel_id: Default::default(),
+                    tx_hash: Default::default(),
+                })
+                .boxed())
+            });
+
+        let strat = PromiscuousStrategy::new(strat_cfg, db, network, actions);
+
+        for _ in 0..strat_cfg.min_network_size_samples - 1 {
+            strat
+                .on_tick()
+                .await
+                .expect_err("on tick should fail when criteria are not met");
+        }
+
+        strat.on_tick().await.expect("on tick should not fail");
     }
 }
