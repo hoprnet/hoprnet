@@ -12,7 +12,7 @@ use core_network::{
 };
 use core_path::channel_graph::ChannelGraph;
 use core_types::protocol::PeerAddressResolver;
-use utils_log::error;
+use utils_log::{debug, error};
 use utils_types::traits::PeerIdLike;
 
 use crate::{adaptors::network::ExternalNetworkInteractions, constants::PEER_METADATA_PROTOCOL_VERSION};
@@ -60,6 +60,11 @@ impl<R: PeerAddressResolver> PingExternalAPI for PingExternalInteractions<R> {
         let updated = self.network.write().await.update_with_metadata(peer, result, metadata);
 
         if let Some(status) = updated {
+            debug!(
+                "peer {peer} has q = {}, avg_q = {}",
+                status.get_quality(),
+                status.get_average_quality()
+            );
             if let Ok(pk) = OffchainPublicKey::from_peerid(&peer) {
                 let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                 if let Some(chain_key) = maybe_chain_key {
