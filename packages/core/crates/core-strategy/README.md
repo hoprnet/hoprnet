@@ -34,14 +34,15 @@ The constant `k` can be also set to a value > 1, which will make the strategy to
 but it would keep the same asymptotic properties.
 Per default `k` = 1.
 
-The strategy starts acting only after at least 10 network size samples were gathered, which means
-it does not start opening/closing channels earlier than 10 minutes after the node start.
+The strategy starts acting only after at least `min_network_size_samples` network size samples were gathered, which means
+it does not start opening/closing channels earlier than `min_network_size_samples` number of minutes after the node has started.
 
 ### Default parameters
 
 - `network_quality_threshold`: 0.5
 - `new_channel_stake`: 10 HOPR
 - `minimum_node_balance`: 10 HOPR
+- `min_network_size_samples`: 10
 - `max_channels:` None (defaults to square root of network size)
 - `enforce_max_channels`: true (when set, indicates whether the `max_channels` limit is enforced)
 

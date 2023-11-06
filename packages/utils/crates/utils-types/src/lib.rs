@@ -3,6 +3,7 @@ extern crate core;
 pub mod chain;
 pub mod errors;
 pub mod primitives;
+pub mod sma;
 pub mod traits;
 
 #[cfg(feature = "wasm")]

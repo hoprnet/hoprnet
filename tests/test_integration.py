@@ -380,7 +380,9 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
         await send_and_receive_packets(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest]["peer_id"]])
 
         # this message has no funding in the channel, but it still should be sent
-        await swarm7[src]["api"].send_message(swarm7[src]["peer_id"], "THIS MSG IS NOT COVERED", [swarm7[dest]["peer_id"]])
+        assert await swarm7[src]["api"].send_message(
+            swarm7[src]["peer_id"], "THIS MSG IS NOT COVERED", [swarm7[dest]["peer_id"]]
+        )
 
         await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
