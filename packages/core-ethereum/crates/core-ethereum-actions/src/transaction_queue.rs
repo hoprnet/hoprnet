@@ -14,11 +14,11 @@ use core_types::{
 };
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
+use std::fmt::{Display, Formatter};
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
-use std::{
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
+use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
@@ -140,7 +140,7 @@ pub enum TransactionResult {
 }
 
 /// Notifies about completion of a transaction (success or failure).
-pub type TransactionCompleted = futures::channel::oneshot::Receiver<TransactionResult>;
+pub type TransactionCompleted = Pin<Box<dyn Future<Output = TransactionResult> + Send>>;
 
 /// Future that resolves once the transaction has been confirmed by the Indexer.
 type TransactionFinisher = futures::channel::oneshot::Sender<TransactionResult>;
@@ -157,7 +157,12 @@ impl TransactionSender {
         self.0
             .send((transaction, completer.0))
             .await
-            .map(|_| completer.1)
+            .map(|_| {
+                completer
+                    .1
+                    .map(|r| r.unwrap_or(TransactionResult::Failure("channel cancelled".into())))
+                    .boxed()
+            })
             .map_err(|_| TransactionSubmissionFailed("ethereum tx queue is closed".into()))
     }
 }
@@ -250,17 +255,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 ChannelDirection::Outgoing => match channel.status {
                     Open => {
                         debug!("initiating closure of {channel}");
-                        let res = tx_exec.initiate_outgoing_channel_closure(channel.destination).await;
-                        if let TransactionResult::ChannelClosureInitiated { .. } = res {
-                            debug!("deleting pending balance of {channel} after initiating closure");
-                            if let Err(e) = db.write().await.reset_pending_balance_to(&channel.destination).await {
-                                error!(
-                                    "failed to reset pending balance to {} in channel {channel}: {e}",
-                                    channel.destination
-                                );
-                            }
-                        }
-                        res
+                        tx_exec.initiate_outgoing_channel_closure(channel.destination).await
                     }
 
                     PendingToClose => {

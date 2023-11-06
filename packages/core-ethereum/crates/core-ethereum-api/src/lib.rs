@@ -6,7 +6,7 @@ use core_ethereum_db::db::CoreEthereumDb;
 use futures::channel::mpsc::UnboundedSender;
 use futures::SinkExt;
 use std::sync::Arc;
-use utils_log::error;
+use utils_log::info;
 
 pub use core_types::channels::ChannelEntry;
 
@@ -111,17 +111,7 @@ impl HoprChain {
     }
 
     pub async fn on_ticket_redeemed(&self, channel: &ChannelEntry, ticket_amount: &Balance) {
-        if channel.source.eq(&self.me_onchain()) {
-            if let Err(e) = self
-                .db
-                .write()
-                .await
-                .resolve_pending(&channel.destination, &ticket_amount)
-                .await
-            {
-                error!("on_ticket_redeemed failed with: {}", e);
-            }
-        }
+        info!("redeemed ticket worth {ticket_amount} in {channel}");
     }
 
     pub async fn on_channel_event(&self, entry: &ChannelEntry) {

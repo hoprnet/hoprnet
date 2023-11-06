@@ -152,9 +152,9 @@ impl<Db: HoprCoreEthereumDbActions> AcknowledgementProcessor<Db> {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_RECEIVED_FAILED_ACKS.increment();
 
-                    return Err(AcknowledgementValidation(format!(
-                        "acknowledgement received for channel that does not exist or has a newer epoch"
-                    )));
+                    return Err(AcknowledgementValidation(
+                        "acknowledgement received for channel that does not exist or has a newer epoch".into(),
+                    ));
                 }
 
                 let domain_separator = self
@@ -301,11 +301,7 @@ impl AcknowledgementInteraction {
         });
 
         spawn_local(async move {
-            processing_stream
-                .map(|x| Ok(x))
-                .forward(futures::sink::drain())
-                .await
-                .unwrap();
+            processing_stream.map(Ok).forward(futures::sink::drain()).await.unwrap();
         });
 
         Self {

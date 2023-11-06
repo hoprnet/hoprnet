@@ -519,6 +519,7 @@ pub const EXAMPLE_YAML: &'static str = r#"hopr:
     quality_bad_threshold: 0.2
     quality_offline_threshold: 0.0
     quality_step: 0.1
+    quality_avg_window_size: 25
     ignore_timeframe: 600
     backoff_exponent: 1.5
     backoff_min: 2.0

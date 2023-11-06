@@ -10,9 +10,9 @@ use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
 
 use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "wasm")]
 use {core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, wasm_bindgen::prelude::*};
-
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -362,7 +362,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
-    #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
+    #[wasm_bindgen(getter_with_clone)]
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct ChainConfiguration {
         pub chain: String,

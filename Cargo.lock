@@ -1275,7 +1275,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "core-network"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1438,7 +1438,7 @@ dependencies = [
 
 [[package]]
 name = "core-strategy"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "async-std",
  "async-trait",
@@ -1457,7 +1457,6 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_with",
- "simple_moving_average",
  "strum 0.25.0",
  "thiserror",
  "utils-db",
@@ -5789,15 +5788,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "simple_moving_average"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdd19d3808aad2604c824399fd270260d634678b010328c9d96851bb0fb63121"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "siphasher"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6555,7 +6545,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.2.8"
+version = "0.3.0"
 dependencies = [
  "bincode",
  "console_error_panic_hook",
@@ -6567,6 +6557,7 @@ dependencies = [
  "libp2p-identity",
  "primitive-types",
  "regex",
+ "ringbuffer",
  "serde",
  "thiserror",
  "utils-log",
