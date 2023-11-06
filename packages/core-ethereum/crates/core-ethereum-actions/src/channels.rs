@@ -727,7 +727,11 @@ mod tests {
 
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.close_channel(*BOB, ChannelDirection::Outgoing, false).await.unwrap().await;
+        let tx_res = actions
+            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .await
+            .unwrap()
+            .await;
 
         match tx_res {
             TransactionResult::ChannelClosureInitiated { tx_hash } => {
@@ -751,7 +755,11 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_res = actions.close_channel(*BOB, ChannelDirection::Outgoing, false).await.unwrap().await;
+        let tx_res = actions
+            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .await
+            .unwrap()
+            .await;
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {
@@ -808,8 +816,7 @@ mod tests {
             .close_channel(*BOB, ChannelDirection::Incoming, false)
             .await
             .unwrap()
-            .await
-            .unwrap();
+            .await;
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {

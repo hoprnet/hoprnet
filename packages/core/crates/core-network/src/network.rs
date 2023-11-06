@@ -12,7 +12,6 @@ use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use utils_log::{info, warn};
-use utils_metrics::metrics::{MultiGauge, SimpleGauge};
 use utils_types::sma::{NoSumSMA, SMA};
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]

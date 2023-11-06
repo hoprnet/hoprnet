@@ -89,7 +89,6 @@ mod tests {
     use core_ethereum_actions::redeem::TicketRedeemActions;
     use core_ethereum_actions::transaction_queue::{TransactionCompleted, TransactionResult};
     use core_types::acknowledgement::{AcknowledgedTicket, UnacknowledgedTicket};
-    use core_types::announcement::AnnouncementData;
     use core_types::channels::{ChannelEntry, Ticket};
     use futures::{future::ready, FutureExt};
     use hex_literal::hex;

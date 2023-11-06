@@ -343,7 +343,6 @@ mod tests {
     use core_types::channels::{ChannelChange, ChannelStatus};
     use core_types::{
         acknowledgement::AcknowledgedTicket,
-        announcement::AnnouncementData,
         channels::{generate_channel_id, ChannelEntry, Ticket},
     };
     use futures::channel::oneshot::Receiver;

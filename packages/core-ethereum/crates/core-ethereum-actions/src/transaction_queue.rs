@@ -17,6 +17,7 @@ use futures::{pin_mut, FutureExt};
 use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::sync::Arc;
 use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
@@ -254,9 +255,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 ChannelDirection::Outgoing => match channel.status {
                     Open => {
                         debug!("initiating closure of {channel}");
-                        tx_exec
-                            .initiate_outgoing_channel_closure(channel.destination)
-                            .await
+                        tx_exec.initiate_outgoing_channel_closure(channel.destination).await
                     }
 
                     PendingToClose => {

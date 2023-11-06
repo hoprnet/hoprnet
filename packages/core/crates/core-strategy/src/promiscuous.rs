@@ -402,8 +402,6 @@ mod tests {
         network::{NetworkConfig, NetworkEvent, NetworkExternalActions, PeerOrigin},
         PeerId,
     };
-    use core_types::acknowledgement::AcknowledgedTicket;
-    use core_types::announcement::AnnouncementData;
     use core_types::channels::{ChannelEntry, ChannelStatus};
     use futures::{future::ready, FutureExt};
     use lazy_static::lazy_static;
@@ -552,8 +550,7 @@ mod tests {
             .times(1)
             .withf(|dst, dir, _| PEERS[5].0.eq(dst) && ChannelDirection::Outgoing.eq(dir))
             .return_once(|_, _, _| {
-                Ok(ready(TransactionResult::CloseChannel {
-                    status: ChannelStatus::PendingToClose,
+                Ok(ready(TransactionResult::ChannelClosureInitiated {
                     tx_hash: Default::default(),
                 })
                 .boxed())
@@ -565,8 +562,7 @@ mod tests {
             .times(1)
             .withf(move |dst, b| PEERS[4].0.eq(dst) && new_stake.eq(b))
             .return_once(|_, _| {
-                Ok(ready(TransactionResult::OpenChannel {
-                    channel_id: Default::default(),
+                Ok(ready(TransactionResult::ChannelFunded {
                     tx_hash: Default::default(),
                 })
                 .boxed())
