@@ -5,6 +5,9 @@ use utils_types::errors::GeneralError;
 
 #[derive(Debug, Error)]
 pub enum StrategyError {
+    #[error("criteria to trigger the strategy were not satisfied")]
+    CriteriaNotSatisfied,
+
     #[error("non-specific strategy error: {0}")]
     Other(String),
 

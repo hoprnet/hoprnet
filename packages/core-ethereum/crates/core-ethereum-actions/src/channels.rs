@@ -238,7 +238,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.open_channel(*BOB, stake).await.unwrap().await.unwrap();
+        let tx_res = actions.open_channel(*BOB, stake).await.unwrap().await;
 
         match tx_res {
             TransactionResult::ChannelFunded { tx_hash } => {
@@ -511,12 +511,7 @@ mod tests {
 
         let actions = CoreEthereumActions::new(self_addr, db.clone(), tx_sender.clone());
 
-        let tx_res = actions
-            .fund_channel(channel.get_id(), stake)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+        let tx_res = actions.fund_channel(channel.get_id(), stake).await.unwrap().await;
 
         match tx_res {
             TransactionResult::ChannelFunded { tx_hash } => {
@@ -736,8 +731,7 @@ mod tests {
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
-            .await
-            .unwrap();
+            .await;
 
         match tx_res {
             TransactionResult::ChannelClosureInitiated { tx_hash } => {
@@ -765,8 +759,7 @@ mod tests {
             .close_channel(*BOB, ChannelDirection::Outgoing, false)
             .await
             .unwrap()
-            .await
-            .unwrap();
+            .await;
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {
@@ -823,8 +816,7 @@ mod tests {
             .close_channel(*BOB, ChannelDirection::Incoming, false)
             .await
             .unwrap()
-            .await
-            .unwrap();
+            .await;
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {
