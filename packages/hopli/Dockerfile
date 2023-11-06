@@ -49,7 +49,7 @@ COPY --from=builder /app/hoprnet/packages/hopli/target/release/hopli /bin/hopli
 RUN apt-get update && \
     apt install --no-install-recommends -y git curl ca-certificates make && \
     make install-foundry && \
-    echo "export PATH=${PATH}:/root/.foundry/bin/" >> /root/.bashrc && \
+    echo "export PATH=${PATH}:/app/hoprnet/.foundry/bin/" >> /root/.bashrc && \
     rm -rf /var/lib/apt/lists/* && \
     apt remove -y make && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \

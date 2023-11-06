@@ -3,40 +3,13 @@ import { peerIdFromString } from '@libp2p/peer-id'
 import { STATUS_CODES } from '../../utils.js'
 
 import type { Operation } from 'express-openapi'
-import type { State, StateOps } from '../../../../types.js'
-
-/**
- * Sets an alias and assigns the PeerId to it.
- * Updates HOPRd's state.
- * @returns new state
- */
-export const setAlias = (stateOps: StateOps, alias: string, peerId: string): State => {
-  try {
-    const state = stateOps.getState()
-    state.aliases.set(alias, peerIdFromString(peerId))
-    stateOps.setState(state)
-    return state
-  } catch {
-    throw Error(STATUS_CODES.INVALID_PEERID)
-  }
-}
-
-/**
- * @returns All PeerIds keyed by their aliases.
- */
-export const getAliases = (state: Readonly<State>): { [alias: string]: string } => {
-  return Array.from(state.aliases).reduce((result, [alias, peerId]) => {
-    result[alias] = peerId.toString()
-    return result
-  }, {})
-}
 
 const GET: Operation = [
   async (req, res, _next) => {
-    const { stateOps } = req.context
+    const { node } = req.context
 
     try {
-      const aliases = getAliases(stateOps.getState())
+      const aliases: Map<string, string> = await node.getAliases()
       return res.status(200).send(aliases)
     } catch (err) {
       return res
@@ -89,11 +62,11 @@ GET.apiDoc = {
 
 const POST: Operation = [
   async (req, res, _next) => {
-    const { stateOps }: { stateOps: StateOps } = req.context
+    const { node } = req.context
     const { peerId, alias } = req.body
 
     try {
-      setAlias(stateOps, alias, peerId)
+      await node.setAlias(alias, peerIdFromString(peerId).toString())
       return res.status(201).send()
     } catch (err) {
       return res

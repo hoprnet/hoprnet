@@ -5,6 +5,7 @@ use std::fmt::Debug;
 
 use core_protocol::{
     ack::config::AckProtocolConfig,
+    config::ProtocolConfig,
     constants::{
         HOPR_ACKNOWLEDGEMENT_CONNECTION_KEEPALIVE, HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0,
         HOPR_HEARTBEAT_CONNECTION_KEEPALIVE, HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_MESSAGE_CONNECTION_KEEPALIVE,
@@ -216,10 +217,7 @@ fn build_swarm<T: NetworkBehaviour>(
 /// @return A built `Swarm` object implementing the HoprNetworkBehavior functionality
 pub fn build_p2p_network(
     me: libp2p_identity::Keypair,
-    ack_proto_cfg: AckProtocolConfig,
-    heartbeat_proto_cfg: HeartbeatProtocolConfig,
-    msg_proto_cfg: MsgProtocolConfig,
-    ticket_aggregation_proto_cfg: TicketAggregationProtocolConfig,
+    protocol_cfg: ProtocolConfig,
 ) -> libp2p_swarm::Swarm<HoprNetworkBehavior> {
     let transport = build_basic_transport()
         .upgrade(upgrade::Version::V1)
@@ -229,10 +227,10 @@ pub fn build_p2p_network(
         .boxed();
 
     let behavior = HoprNetworkBehavior::new(
-        msg_proto_cfg,
-        ack_proto_cfg,
-        heartbeat_proto_cfg,
-        ticket_aggregation_proto_cfg,
+        protocol_cfg.msg,
+        protocol_cfg.ack,
+        protocol_cfg.heartbeat,
+        protocol_cfg.ticket_aggregation,
     );
 
     build_swarm(transport, behavior, PeerId::from(me.public()))

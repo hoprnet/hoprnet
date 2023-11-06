@@ -58,3 +58,8 @@ jobs:
     secrets:
       GOOGLE_HOPRASSOCIATION_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+  docs:
+    name: Docs
+    uses: ./.github/workflows/build-docs.yaml
+    secrets: inherit

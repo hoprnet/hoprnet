@@ -1,6 +1,5 @@
 import type { Operation } from 'express-openapi'
-import type { Hopr } from '@hoprnet/hopr-core'
-import { Address, Balance, BalanceType } from '@hoprnet/hopr-utils'
+import { Address, Balance, BalanceType, Hopr } from '@hoprnet/hopr-utils'
 import { STATUS_CODES } from '../../utils.js'
 
 /**

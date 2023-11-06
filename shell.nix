@@ -59,6 +59,9 @@ with pkgs;
 mkShell {
   buildInputs = hoprdPkgs ++ devPkgs;
   shellHook = ''
+    echo "Install cargo utils (dependency pruning...)"
+    cargo install cargo-machete
+
     echo "Installing dependencies"
     make deps
 

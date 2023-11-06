@@ -17,7 +17,6 @@ ctr = "0.9"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 getrandom = { workspace = true }
 hex = { workspace = true }
-js-sys = { workspace = true, optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 scrypt = { version = "0.11.0", default-features = false }
@@ -48,5 +47,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "core-crypto/wasm", "real-base/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-log/wasm", "getrandom/js", "uuid/js" ]
+wasm = [ "dep:wasm-bindgen", "core-crypto/wasm", "real-base/wasm", "utils-misc/wasm", "utils-types/wasm", "utils-log/wasm", "getrandom/js", "uuid/js" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

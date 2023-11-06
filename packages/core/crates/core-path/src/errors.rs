@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use utils_db::errors::DbError;
 use utils_types::errors::GeneralError;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Serialize, Deserialize)]
 pub enum PathError {
     #[error("path is not valid")]
     PathNotValid,

@@ -5,14 +5,17 @@ import {
   Address,
   generate_channel_id,
   channel_status_to_string,
-  ChannelStatus
+  ChannelStatus,
+  Balance,
+  BalanceType,
+  ChannelEntry,
+  DeferType,
+  Hopr
 } from '@hoprnet/hopr-utils'
 
 import { STATUS_CODES } from '../../utils.js'
 
 import type { Operation } from 'express-openapi'
-import type { Hopr } from '@hoprnet/hopr-core'
-import type { ChannelEntry, DeferType } from '@hoprnet/hopr-utils'
 
 const log = debug('hoprd:api:v3:channels')
 
@@ -45,15 +48,15 @@ export interface ChannelTopologyInfo {
 export const formatChannelTopologyInfo = async (node: Hopr, channel: ChannelEntry): Promise<ChannelTopologyInfo> => {
   let sourcePeerId = ''
   let destinationPeerId = ''
-  const sourceAccount = await node.db.get_account(channel.source)
-  const destinationAccount = await node.db.get_account(channel.destination)
+  const sourceAccount = await node.chainKeyToPeerId(channel.source)
+  const destinationAccount = await node.chainKeyToPeerId(channel.destination)
   if (sourceAccount) {
-    sourcePeerId = sourceAccount.public_key.to_peerid_str()
+    sourcePeerId = sourceAccount
   } else {
     log(`Error while formatting information of channel ${channel.get_id().to_hex()}: source not found in db`)
   }
   if (destinationAccount) {
-    destinationPeerId = destinationAccount.public_key.to_peerid_str()
+    destinationPeerId = destinationAccount
   } else {
     log(`Error while formatting information of channel ${channel.get_id().to_hex()}: destination not found in db`)
   }
@@ -288,7 +291,7 @@ export async function openChannel(
 
   const channelId = generate_channel_id(node.getEthereumAddress(), validationResult.counterparty)
 
-  const existingChannel = await node.db.get_channel(channelId)
+  const existingChannel = await node.getChannelFromHash(channelId)
   if (existingChannel?.status == ChannelStatus.Open) {
     log(`channel ${channelId.to_hex()} is already opened`)
     return { success: false, reason: STATUS_CODES.CHANNEL_ALREADY_OPEN }
@@ -304,8 +307,9 @@ export async function openChannel(
   }
 
   try {
-    const { channelId, receipt } = await node.openChannel(validationResult.counterparty, validationResult.amount)
-    return { success: true, channelId: channelId.to_hex(), receipt }
+    let amount = new Balance(validationResult.amount.toString(10), BalanceType.HOPR)
+    const { channel_id, tx_hash } = await node.openChannel(validationResult.counterparty, amount)
+    return { success: true, channelId: channel_id.to_hex(), receipt: tx_hash.to_hex() }
   } catch (err) {
     log(`open channel error: ${err}`)
     const errString = err instanceof Error ? err.message : err?.toString?.() ?? STATUS_CODES.UNKNOWN_FAILURE

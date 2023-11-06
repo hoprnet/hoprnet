@@ -3,12 +3,12 @@ use std::ffi::OsString;
 use std::str::FromStr;
 
 use clap::builder::{PossibleValuesParser, ValueParser};
-use clap::{Arg, ArgAction, ArgMatches, Args, Command, FromArgMatches as _};
-use core_misc::environment::{FromJsonFile, Network, PackageJsonFile, ProtocolConfig};
+use clap::{ArgAction, Args, Command, FromArgMatches as _};
 use core_strategy::Strategy;
+use core_transport::config::HostConfig;
 use hex;
+use hopr_lib::ProtocolConfig;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use strum::VariantNames;
 use utils_misc::ok_or_str;
 
@@ -16,11 +16,6 @@ use utils_misc::ok_or_str;
 use utils_validation::network::native::is_dns_address;
 #[cfg(feature = "wasm")]
 use utils_validation::network::wasm::is_dns_address;
-
-#[cfg(any(not(feature = "wasm"), test))]
-use real_base::file::native::read_file;
-#[cfg(all(feature = "wasm", not(test)))]
-use real_base::file::wasm::read_file;
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -33,7 +28,7 @@ pub const DEFAULT_HEALTH_CHECK_PORT: u16 = 8080;
 
 pub const MINIMAL_API_TOKEN_LENGTH: usize = 8;
 
-fn parse_host(s: &str) -> Result<crate::config::Host, String> {
+fn parse_host(s: &str) -> Result<HostConfig, String> {
     let host = s.split_once(":").map_or(s, |(h, _)| h);
     if !(validator::validate_ip_v4(host) || is_dns_address(host)) {
         return Err(format!(
@@ -44,7 +39,7 @@ fn parse_host(s: &str) -> Result<crate::config::Host, String> {
         ));
     }
 
-    crate::config::Host::from_str(s)
+    HostConfig::from_str(s)
 }
 
 /// Parse a hex string private key to a boxed u8 slice
@@ -98,18 +93,33 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 #[command(about = "HOPRd")]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(getter_with_clone))]
 pub struct CliArgs {
-    /// network
-    // Filled by Builder API at runtime
-    #[arg(skip)]
-    pub network: String,
+    /// Network the node will operate in
+    #[arg(
+        long,
+        env = "HOPRD_NETWORK",
+        help = "ID of the network the node will attempt to connect to",
+        required = false,
+        value_parser = PossibleValuesParser::new(ProtocolConfig::default().supported_networks().iter().map(|e| e.id.clone()))
+    )]
+    pub network: Option<String>,
 
-    // Filled by Builder API at runtime
-    #[arg(skip)]
-    pub identity: String,
+    // Identitiy details
+    #[arg(
+        long,
+        env = "HOPRD_IDENTITY",
+        help = "The path to the identity file",
+        required = false
+    )]
+    pub identity: Option<String>,
 
-    // Filled by Builder API at runtime
-    #[arg(skip)]
-    pub data: String,
+    // Identity details
+    #[arg(
+        long,
+        env = "HOPRD_DATA",
+        help = "Specifies the directory to hold all the data",
+        required = false
+    )]
+    pub data: Option<String>,
 
     #[arg(
         long,
@@ -117,14 +127,14 @@ pub struct CliArgs {
         help = "Host to listen on for P2P connections",
         value_parser = ValueParser::new(parse_host),
     )]
-    pub host: Option<crate::config::Host>,
+    pub host: Option<HostConfig>,
 
     #[arg(
         long,
         env = "HOPRD_ANNOUNCE",
         help = "Announce the node on chain with a public address",
         action = ArgAction::SetTrue,
-        default_value_t = crate::config::Chain::default().announce
+        default_value_t = hopr_lib::config::Chain::default().announce
     )]
     pub announce: bool,
 
@@ -240,7 +250,7 @@ pub struct CliArgs {
         env = "HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK",
         help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
         action = ArgAction::SetFalse,
-        default_value_t = crate::config::Chain::default().check_unrealized_balance
+        default_value_t = hopr_lib::config::Chain::default().check_unrealized_balance
     )]
     pub check_unrealized_balance: bool,
 
@@ -266,7 +276,7 @@ pub struct CliArgs {
         help = "initialize a database if it doesn't already exist",
         action = ArgAction::SetTrue,
         env = "HOPRD_INIT",
-        default_value_t = crate::config::Db::default().initialize
+        default_value_t = hopr_lib::config::Db::default().initialize
     )]
     pub init: bool,
 
@@ -275,7 +285,7 @@ pub struct CliArgs {
         help = "initialize a database, even if it already exists",
         action = ArgAction::SetTrue,
         env = "HOPRD_FORCE_INIT",
-        default_value_t = crate::config::Db::default().force_initialize
+        default_value_t = hopr_lib::config::Db::default().force_initialize
     )]
     pub force_init: bool,
 
@@ -302,7 +312,7 @@ pub struct CliArgs {
         env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
         action = ArgAction::SetTrue,
-        default_value_t = crate::config::Testing::default().announce_local_addresses
+        default_value_t = hopr_lib::config::TransportConfig::default().announce_local_addresses
     )]
     pub test_announce_local_addresses: bool,
 
@@ -312,7 +322,7 @@ pub struct CliArgs {
         action = ArgAction::SetTrue,
         help = "For testing local testnets. Prefer local peers to remote",
         hide = true,
-        default_value_t = crate::config::Testing::default().prefer_local_addresses
+        default_value_t = hopr_lib::config::TransportConfig::default().prefer_local_addresses
     )]
     pub test_prefer_local_addresses: bool,
 
@@ -398,101 +408,22 @@ pub struct CliArgs {
 }
 
 impl CliArgs {
-    /// Add values of those CLI arguments whose structure is known at runtime
-    #[cfg(feature = "wasm")]
-    fn augment_runtime_args(&mut self, m: &ArgMatches) {
-        self.network = m.get_one::<String>("network").unwrap().to_owned();
-        self.data = m.get_one::<String>("data").unwrap().to_owned();
-        self.identity = m.get_one::<String>("identity").unwrap().to_owned();
-    }
-
     /// Creates a new instance using custom cli_args and custom network variables
     #[cfg(feature = "wasm")]
-    fn new_from(
-        cli_args: Vec<&str>,
-        env_vars: HashMap<OsString, OsString>,
-        mono_repo_path: &str,
-        home_path: &str,
-    ) -> Result<Self, String> {
-        let envs: Vec<Network> =
-            ProtocolConfig::from_json_file(mono_repo_path).and_then(|c| c.supported_networks(mono_repo_path))?;
-
-        let version = PackageJsonFile::from_json_file(mono_repo_path).and_then(|p| p.coerced_version())?;
-
-        let maybe_default_network = get_default_network(mono_repo_path);
-
-        let mut env_arg = Arg::new("network")
-            .long("network")
-            .required(true)
-            .env("HOPRD_NETWORK")
-            .value_name("NETWORK")
-            .help("Network id which the node shall run on")
-            .value_parser(PossibleValuesParser::new(envs.iter().map(|e| e.id.to_owned())));
-
-        if let Some(default_network) = &maybe_default_network {
-            // Add default value if we got one
-            env_arg = env_arg.default_value(default_network);
-        }
-
+    fn new_from(cli_args: Vec<&str>, env_vars: HashMap<OsString, OsString>) -> Result<Self, String> {
         let mut cmd = Command::new("hoprd")
             .about("HOPRd")
             .bin_name("index.cjs")
             .after_help("All CLI options can be configured through environment variables as well. CLI parameters have precedence over environment variables.")
-            .version(&version)
-            .arg(env_arg)
-            .arg(Arg::new("identity")
-                .long("identity")
-                .help("The path to the identity file")
-                .env("HOPRD_IDENTITY")
-                .default_value(format!("{}/.hopr-identity", home_path)))
-            .arg(Arg::new("data")
-                .long("data")
-                .help("manually specify the data directory to use")
-                .env("HOPRD_DATA")
-                .default_value(get_data_path(mono_repo_path, maybe_default_network)));
+            .version(&hopr_lib::constants::APP_VERSION_COERCED);
 
-        // Add compile args to runtime-time args
         cmd = Self::augment_args(cmd);
 
         cmd.update_env_from(env_vars);
 
         let derived_matches = cmd.try_get_matches_from(cli_args).map_err(|e| e.to_string())?;
 
-        let mut args = ok_or_str!(Self::from_arg_matches(&derived_matches))?;
-
-        args.augment_runtime_args(&derived_matches);
-
-        Ok(args)
-    }
-}
-
-#[derive(Deserialize)]
-struct DefaultNetworkFile {
-    id: String,
-}
-
-impl FromJsonFile for DefaultNetworkFile {
-    fn from_json_file(mono_repo_path: &str) -> Result<Self, String> {
-        let default_environment_json_path: String = format!("{}/default-network.json", mono_repo_path);
-        let data = ok_or_str!(read_file(default_environment_json_path.as_str()))?;
-
-        ok_or_str!(serde_json::from_slice::<DefaultNetworkFile>(&data))
-    }
-}
-
-/// Checks for `default_network.json` file and, if present, returns their network id
-fn get_default_network(mono_repo_path: &str) -> Option<String> {
-    match DefaultNetworkFile::from_json_file(mono_repo_path) {
-        Ok(json) => Some(json.id),
-        Err(_) => None,
-    }
-}
-
-/// Gets the default path where the database is stored at
-fn get_data_path(mono_repo_path: &str, maybe_default_network: Option<String>) -> String {
-    match maybe_default_network {
-        Some(default_network) => format!("{}/packages/hoprd/hoprd-db/{}", mono_repo_path, default_network),
-        None => format!("{}/packages/hoprd/hoprd-db", mono_repo_path),
+        Ok(ok_or_str!(Self::from_arg_matches(&derived_matches))?)
     }
 }
 
@@ -566,19 +497,13 @@ pub mod wasm {
     use std::collections::HashMap;
     use std::ffi::OsString;
     use std::str::FromStr;
-    use utils_misc::{clean_mono_repo_path, convert_from_jstrvec, ok_or_jserr};
+    use utils_misc::{convert_from_jstrvec, ok_or_jserr};
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
     #[wasm_bindgen]
-    pub fn parse_cli_arguments(
-        cli_args: Vec<JsString>,
-        envs: &JsValue,
-        mono_repo_path: &str,
-        home_path: &str,
-    ) -> Result<JsValue, JsValue> {
+    pub fn parse_cli_arguments(cli_args: Vec<JsString>, envs: &JsValue) -> Result<JsValue, JsValue> {
         convert_from_jstrvec!(cli_args, cli_str_args);
-        clean_mono_repo_path!(mono_repo_path, cleaned_mono_repo_path);
 
         // wasm_bindgen receives Strings but to
         // comply with Rust standard, turn them into OsStrings
@@ -594,12 +519,7 @@ pub mod wasm {
             env_map.insert(key, value);
         }
 
-        let args = ok_or_jserr!(super::CliArgs::new_from(
-            cli_str_args,
-            env_map,
-            cleaned_mono_repo_path,
-            home_path
-        ))?;
+        let args = ok_or_jserr!(super::CliArgs::new_from(cli_str_args, env_map,))?;
 
         ok_or_jserr!(serde_wasm_bindgen::to_value(&args))
     }

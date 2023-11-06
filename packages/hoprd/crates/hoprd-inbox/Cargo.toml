@@ -16,7 +16,6 @@ async-lock = "2.7.0"
 async-trait = "0.1"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 gloo-timers = { workspace = true, optional = true }
-hex = { workspace = true }
 ringbuffer = "0.15.0"
 serde_with = { workspace = true }
 validator = { workspace = true }

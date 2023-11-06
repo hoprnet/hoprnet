@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "2.0.0-rc.1",
+  "version": "2.1.0-rc.1",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -32,14 +32,7 @@
   ],
   "dependencies": {
     "@hoprnet/hopr-core-ethereum": "workspace:packages/core-ethereum",
-    "@hoprnet/hopr-utils": "workspace:packages/utils",
-    "@libp2p/interface-peer-id": "1.0.5",
-    "@libp2p/peer-id": "1.1.16",
-    "@multiformats/multiaddr": "10.3.3",
-    "bn.js": "5.2.1",
-    "debug": "4.3.4",
-    "heap-js": "2.3.0",
-    "retimer": "4.0.0"
+    "@hoprnet/hopr-utils": "workspace:packages/utils"
   },
   "devDependencies": {
     "@types/mocha": "10.0.2",

@@ -125,15 +125,15 @@ The `hoprd` provides various command-line switches to configure its behaviour. F
 
 ```sh
 $ hoprd --help
-Usage: hoprd [OPTIONS] --network <NETWORK>
+Usage: hoprd [OPTIONS]
 
 Options:
       --network <NETWORK>
-          Network id which the node shall run on [env: HOPRD_NETWORK=] [possible values: anvil-localhost2, anvil-localhost, rotsee, dufour, debug-staging]
-      --identity <identity>
-          The path to the identity file [env: HOPRD_IDENTITY=] [default: /Users/teebor/.hopr-identity]
-      --data <data>
-          manually specify the data directory to use [env: HOPRD_DATA=] [default: /Users/teebor/dev/hoprnet.org/hoprnet/packages/hoprd/hoprd-db]
+          ID of the network the node will attempt to connect to [env: HOPRD_NETWORK=] [possible values: debug-staging, anvil-localhost, dufour, rotsee, anvil-localhost2]
+      --identity <IDENTITY>
+          The path to the identity file [env: HOPRD_IDENTITY=]
+      --data <DATA>
+          Specifies the directory to hold all the data [env: HOPRD_DATA=]
       --host <HOST>
           Host to listen on for P2P connections [env: HOPRD_HOST=]
       --announce

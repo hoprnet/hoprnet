@@ -6,14 +6,11 @@ name: "Build docs"
 
 # yamllint disable-line rule:truthy
 on:
-  pull_request:
-    types:
-      - synchronize
-      - ready_for_review
   push:
     branches:
       - master
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: ${{ github.head_ref }}-docs

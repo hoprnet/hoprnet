@@ -11,10 +11,9 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
 async-trait = "0.1"
-bincode = "1.3.3"
-blake2 = "0.10.4"
 futures = { workspace = true }
 futures-lite = { workspace = true }
+lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
 multiaddr = { workspace = true }
 rand = { version = "0.8.5", features = ["std_rng"] }
@@ -26,13 +25,12 @@ gloo-timers = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 getrandom = { workspace = true }
 js-sys = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.36", optional = true, features = ["futures-core-03-stream"] }
 wasm-bindgen = { workspace = true, optional = true }
 
 core-crypto = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
 utils-misc = { workspace = true, default-features = false }
-utils-metrics = { workspace = true, default-features = false }
+utils-metrics = { workspace = true, default-features = false, optional = true}
 utils-types = { workspace = true, default-features = false }
 
 [dev-dependencies]
@@ -47,7 +45,7 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm", "compat-ping"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:gloo-timers", "getrandom/js", "core-crypto/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics/wasm", "utils-types/wasm"]
+wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:gloo-timers", "getrandom/js", "core-crypto/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-metrics/wasm", "utils-types/wasm"]
 compat-ping = []
 console_error_panic_hook = ["dep:console_error_panic_hook"]
-
+prometheus = ["dep:utils-metrics"]

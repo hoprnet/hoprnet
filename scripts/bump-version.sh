@@ -34,6 +34,5 @@ for package in "${versioned_packages[@]}"; do
   cd "${mydir}/.."
 done
 
-# Update Rust constant
-sed -i'.original' 's/const APP_VERSION.*/const APP_VERSION: \&str = "'${new_version}'";/' ${mydir}/../packages/core/crates/core-hopr/src/constants.rs 
-rm ${mydir}/../packages/core/crates/core-hopr/src/constants.rs.original
+# Update hopr-lib Rust manifest
+sed -i 's/^version = ".*"$/version = : \&str = "'${new_version}'";/' ${mydir}/../packages/hoprd/crates/hopr-lib/Cargo.toml 

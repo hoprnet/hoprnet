@@ -2,9 +2,7 @@ import request from 'supertest'
 import sinon from 'sinon'
 import chaiResponseValidator from 'chai-openapi-response-validator'
 import chai, { expect } from 'chai'
-import { PeerOrigin, PeerStatus, PEER_METADATA_PROTOCOL_VERSION } from '@hoprnet/hopr-core'
-
-import { AccountEntry } from '@hoprnet/hopr-utils'
+import { AccountEntry, PeerOrigin, PeerStatus, peer_metadata_protocol_version_name, Hopr } from '@hoprnet/hopr-utils'
 
 import {
   createTestApiInstance,
@@ -19,10 +17,7 @@ import {
 } from '../../fixtures.js'
 import { STATUS_CODES } from '../../utils.js'
 
-import type { PeerId } from '@libp2p/interface-peer-id'
-import type { Hopr } from '@hoprnet/hopr-core'
-
-const meta: Map<string, string> = new Map([[PEER_METADATA_PROTOCOL_VERSION, '1.2.3']])
+const meta: Map<string, string> = new Map([[peer_metadata_protocol_version_name(), '1.2.3']])
 
 const ALICE_ENTRY = PeerStatus.build(
   ALICE_PEER_ID.toString(),
@@ -73,7 +68,7 @@ function toJsonDict(account: AccountEntry, peer: PeerStatus, isNew: boolean, mul
     quality: peer.quality,
     backoff: peer.backoff,
     isNew: isNew,
-    reportedVersion: peer.metadata().get(PEER_METADATA_PROTOCOL_VERSION) ?? 'unknown'
+    reportedVersion: peer.metadata().get(peer_metadata_protocol_version_name()) ?? 'unknown'
   }
 }
 
@@ -87,14 +82,17 @@ const BOB_PEER_INFO = toJsonDict(BOB_ACCOUNT_ENTRY, BOB_ENTRY, true, BOB_MULTI_A
 const CHARLIE_PEER_INFO = toJsonDict(CHARLIE_ACCOUNT_ENTRY, CHARLIE_ENTRY, false, undefined)
 
 let node = sinon.fake() as any as Hopr
-node.getConnectedPeers = sinon.fake.resolves([ALICE_PEER_ID, BOB_PEER_ID, CHARLIE_PEER_ID])
-node.getAccountsAnnouncedOnChain = async function* () {
-  yield ALICE_ACCOUNT_ENTRY
-  yield BOB_ACCOUNT_ENTRY
+node.getConnectedPeers = sinon.fake.resolves([
+  ALICE_PEER_ID.toString(),
+  BOB_PEER_ID.toString(),
+  CHARLIE_PEER_ID.toString()
+])
+node.getAccountsAnnouncedOnChain = async () => {
+  return [ALICE_ACCOUNT_ENTRY, BOB_ACCOUNT_ENTRY]
 }
 
-node.getConnectionInfo = async (peer: PeerId) => {
-  switch (peer.toString()) {
+node.getPeerInfo = async (peer: string) => {
+  switch (peer) {
     case ALICE_PEER_ID.toString():
       return ALICE_ENTRY
     case BOB_PEER_ID.toString():
@@ -104,8 +102,8 @@ node.getConnectionInfo = async (peer: PeerId) => {
   }
 }
 
-node.peerIdToChainKey = async (peer: PeerId) => {
-  switch (peer.toString()) {
+node.peerIdToChainKey = async (peer: string) => {
+  switch (peer) {
     case ALICE_PEER_ID.toString():
       return ALICE_ACCOUNT_ENTRY.chain_addr
     case BOB_PEER_ID.toString():

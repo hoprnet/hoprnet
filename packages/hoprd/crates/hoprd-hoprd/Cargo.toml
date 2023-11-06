@@ -13,6 +13,7 @@ license = "GPL-3.0-only"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+async-lock = { workspace = "true" }
 clap = { git = "https://github.com/hoprnet/clap", branch = "robertkiel/update-env-from", features = ["derive", "env", "string"] }
 hex = { workspace = true }
 proc-macro-regex = "~1.1.0"
@@ -27,22 +28,19 @@ validator = { workspace = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
 
-core-hopr = { workspace = true }
-core-misc = { workspace = true }
+core-transport = { workspace = true }
 core-network = { workspace = true }
-core-packet = { workspace = true }
-core-path = { workspace = true }
-core-protocol = { workspace = true }
 core-strategy = { workspace = true }
-core-types = { workspace = true }
-core-ethereum-actions = { workspace = true }
 core-ethereum-db = { workspace = true }
 core-ethereum-indexer = { workspace = true }
 core-ethereum-misc = { workspace = true }
+hopr-lib = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 real-base = { workspace = true }
+utils-db = { workspace = true }
 utils-log = { workspace = true }
 utils-misc = { workspace = true }
 utils-metrics = { workspace = true, optional = true }
@@ -50,6 +48,7 @@ utils-types = { workspace = true }
 utils-validation = { workspace = true }
 
 [dev-dependencies]
+async-std = { workspace = true, features = ["attributes"] }
 tempfile = "3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
@@ -66,26 +65,24 @@ wasm-opt = ['-O', '--enable-reference-types']
 default = ["console_error_panic_hook", "wasm", "prometheus"]
 wasm = [
     "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
     "dep:serde-wasm-bindgen",
     "dep:js-sys",
-    "core-hopr/wasm",
-    "core-misc/wasm",
+    "core-transport/wasm",
     "core-network/wasm",
-    "core-packet/wasm",
-    "core-path/wasm",
     "core-strategy/wasm",
-    "core-protocol/wasm",
-    "core-types/wasm",
     "core-ethereum-db/wasm",
     "core-ethereum-indexer/wasm",
     "core-ethereum-misc/wasm",
+    "hopr-lib/wasm",
     "hoprd-inbox/wasm",
     "hoprd-keypair/wasm",
+    "utils-db/wasm",
     "utils-log/wasm",
     "utils-misc/wasm",
     "utils-metrics?/wasm",
     "utils-types/wasm",
     "utils-validation/wasm",
 ]
-prometheus = ["core-hopr/prometheus", "dep:utils-metrics"]
+prometheus = ["hopr-lib/prometheus", "core-transport/prometheus", "dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

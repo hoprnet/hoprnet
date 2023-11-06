@@ -394,35 +394,3 @@ mod tests {
             .expect_err("should not find a path");
     }
 }
-
-#[cfg(feature = "wasm")]
-pub mod wasm {
-    use crate::channel_graph::wasm::ChannelGraph;
-    use crate::path::TransportPath;
-    use crate::selectors::legacy::LegacyPathSelector;
-    use crate::selectors::PathSelector;
-    use crate::DbPeerAddressResolver;
-    use core_ethereum_db::db::wasm::Database;
-    use utils_misc::utils::wasm::JsResult;
-    use utils_types::primitives::Address;
-    use wasm_bindgen::prelude::wasm_bindgen;
-
-    #[wasm_bindgen]
-    pub async fn legacy_path_select(
-        graph: &ChannelGraph,
-        database: &Database,
-        destination: &Address,
-        max_hops: u32,
-    ) -> JsResult<TransportPath> {
-        let selector = LegacyPathSelector::default();
-        let cp = {
-            let cgraph = graph.as_ref_counted();
-            let cg = cgraph.read().await;
-            selector.select_path(&cg, cg.my_address(), *destination, max_hops as usize)?
-        };
-
-        Ok(cp
-            .to_path(&DbPeerAddressResolver(database.as_ref_counted()), *destination)
-            .await?)
-    }
-}

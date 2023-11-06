@@ -12,7 +12,6 @@ export * from './ethereum/index.js'
 export * from './http.js'
 
 export {
-  app_version,
   create_counter,
   SimpleCounter,
   create_multi_counter,
@@ -31,7 +30,21 @@ export {
   merge_encoded_metrics,
   gather_all_metrics,
   get_package_version,
-  HoprdConfig
+  HoprLibConfig,
+  HoprdConfig,
+  HoprTransport,
+  SmartContractConfig,
+  TagBloomFilter,
+  TicketStatistics,
+  WasmVecAccountEntry,
+  get_contract_data,
+  resolve_network,
+  ChainNetworkConfig,
+  Hopr,
+  peer_metadata_protocol_version_name,
+  WasmHealth,
+  HoprdPersistentDatabase,
+  ChainConfiguration
 } from '../../hoprd/lib/hoprd_hoprd.js'
 
 export type MetricCollector = () => string

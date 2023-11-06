@@ -1,5 +1,4 @@
-import type { Hopr } from '@hoprnet/hopr-core'
-import type { Ticket } from '@hoprnet/hopr-utils'
+import type { Ticket, Hopr } from '@hoprnet/hopr-utils'
 import type { Operation } from 'express-openapi'
 import { STATUS_CODES } from '../../utils.js'
 
@@ -16,7 +15,7 @@ export function formatTicket(ticket: Ticket) {
 }
 
 export async function getAllTickets(node: Hopr) {
-  const tickets = await node.getAllTickets()
+  const tickets: Ticket[] = await node.getAllTickets()
   return tickets.map(formatTicket)
 }
 
