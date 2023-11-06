@@ -28,7 +28,8 @@ const ALICE_ENTRY = PeerStatus.build(
   BigInt(10),
   BigInt(10),
   0,
-  meta
+  meta,
+  10
 )
 
 const BOB_ENTRY = PeerStatus.build(
@@ -40,7 +41,8 @@ const BOB_ENTRY = PeerStatus.build(
   BigInt(0),
   BigInt(0),
   0,
-  meta
+  meta,
+  10
 )
 
 const CHARLIE_ENTRY = PeerStatus.build(
@@ -52,7 +54,8 @@ const CHARLIE_ENTRY = PeerStatus.build(
   BigInt(10),
   BigInt(8),
   0,
-  meta
+  meta,
+  10
 )
 
 function toJsonDict(account: AccountEntry, peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
@@ -65,7 +68,7 @@ function toJsonDict(account: AccountEntry, peer: PeerStatus, isNew: boolean, mul
       success: Number(peer.heartbeats_succeeded)
     },
     lastSeen: Number(peer.last_seen),
-    quality: peer.quality,
+    quality: peer.quality(),
     backoff: peer.backoff,
     isNew: isNew,
     reportedVersion: peer.metadata().get(peer_metadata_protocol_version_name()) ?? 'unknown'

@@ -221,25 +221,23 @@ impl MultiStrategy {
         for strategy in cfg.strategies.iter() {
             match strategy {
                 Strategy::Promiscuous(sub_cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
-                    sub_cfg.clone(),
+                    *sub_cfg,
                     db.clone(),
                     network.clone(),
                     chain_actions.clone(),
                 ))),
                 Strategy::Aggregating(sub_cfg) => strategies.push(Box::new(AggregatingStrategy::new(
-                    sub_cfg.clone(),
+                    *sub_cfg,
                     db.clone(),
                     chain_actions.clone(),
                     ticket_aggregator.clone(),
                 ))),
-                Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
-                    sub_cfg.clone(),
-                    chain_actions.clone(),
-                ))),
-                Strategy::AutoFunding(sub_cfg) => strategies.push(Box::new(AutoFundingStrategy::new(
-                    sub_cfg.clone(),
-                    chain_actions.clone(),
-                ))),
+                Strategy::AutoRedeeming(sub_cfg) => {
+                    strategies.push(Box::new(AutoRedeemingStrategy::new(*sub_cfg, chain_actions.clone())))
+                }
+                Strategy::AutoFunding(sub_cfg) => {
+                    strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, chain_actions.clone())))
+                }
                 Strategy::Multi(sub_cfg) => {
                     if cfg.allow_recursive {
                         let mut cfg_clone = sub_cfg.clone();

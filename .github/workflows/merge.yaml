@@ -278,8 +278,7 @@ jobs:
     with:
       release_type: ${{ vars.NEXT_RELEASE_TYPE }}
       base_branch: ${{ github.event.pull_request.base.ref }}
-    secrets:
-      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+    secrets: inherit
 
   build_dappnode:
     name: Build dappNode

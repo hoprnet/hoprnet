@@ -24,7 +24,7 @@ use core_types::acknowledgement::{Acknowledgement, PendingAcknowledgement, Unack
 use core_types::channels::Ticket;
 use core_types::protocol::{ApplicationData, TagBloomFilter, TICKET_WIN_PROB};
 
-use utils_log::{debug, error, info, warn};
+use utils_log::{debug, error, warn};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use utils_types::traits::{BinarySerializable, PeerIdLike};
 
@@ -144,7 +144,7 @@ where
 
         match ChainPacketComponents::into_outgoing(
             &data.to_bytes(),
-            &path,
+            path,
             &self.cfg.chain_keypair,
             next_ticket,
             &domain_separator,
@@ -287,7 +287,7 @@ where
 
                 debug!("price per packet is {price_per_packet}");
 
-                if let Err(e) = validate_unacknowledged_ticket::<Db>(
+                let validation_res = validate_unacknowledged_ticket::<Db>(
                     &*self.db.read().await,
                     &ticket,
                     &channel,
@@ -297,8 +297,9 @@ where
                     self.cfg.check_unrealized_balance,
                     &domain_separator,
                 )
-                .await
-                {
+                .await;
+
+                if let Err(e) = validation_res {
                     // Mark as reject and passthrough the error
                     self.db.write().await.mark_rejected(&ticket).await?;
                     return Err(e);
@@ -423,17 +424,7 @@ where
                 BalanceType::HOPR,
             );
 
-            debug!("retrieving pending balance to {destination}");
-            let outstanding_balance = db.get_pending_balance_to(&destination).await?;
-
-            let channel_balance = channel.balance.sub(&outstanding_balance);
-
-            info!(
-                "balances {} - {outstanding_balance} = {channel_balance} should >= {amount} in channel open to {}",
-                channel.balance, channel.destination
-            );
-
-            if channel_balance.lt(&amount) {
+            if channel.balance.lt(&amount) {
                 return Err(OutOfFunds(format!("{channel_id} with counterparty {destination}")));
             }
 
@@ -447,8 +438,6 @@ where
                 channel.channel_epoch,
             )
         }?;
-
-        self.db.write().await.mark_pending(&destination, &ticket).await?;
 
         debug!("Creating ticket in channel {channel_id}.",);
 
@@ -674,9 +663,9 @@ impl PacketInteraction {
                             METRIC_PACKETS_COUNT.increment();
 
                             if let Some(finalizer) = finalizer {
-                                finalizer.finalize(ack_challenge.clone());
+                                finalizer.finalize(ack_challenge);
                             }
-                            return Ok(MsgProcessed::Send(next_hop, data));
+                            Ok(MsgProcessed::Send(next_hop, data))
                         }
 
                         TransportPacket::Final {
@@ -689,9 +678,9 @@ impl PacketInteraction {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 METRIC_RECV_MESSAGE_COUNT.increment();
 
-                                return Ok(MsgProcessed::Receive(previous_hop, app_data, ack));
+                                Ok(MsgProcessed::Receive(previous_hop, app_data, ack))
                             }
-                            Err(e) => return Err(e.into()),
+                            Err(e) => Err(e.into()),
                         },
 
                         TransportPacket::Forwarded {
