@@ -10,7 +10,7 @@ on:
       new_release_name:
         type: string
         required: true
-        description: 'New release name ( bali | saint-luis )'
+        description: 'New release name ( saint-louis )'
       tag_name:
         type: string
         required: true

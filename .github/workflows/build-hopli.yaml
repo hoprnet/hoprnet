@@ -24,7 +24,6 @@ jobs:
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
-        timeout-minutes: 10
 
       - name: Set up Google Cloud Credentials
         id: auth

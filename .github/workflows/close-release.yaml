@@ -23,7 +23,7 @@ on:
         description: 'Name of the release'
         options:
           - providence
-          - saint-luis
+          - saint-louis
 concurrency:
   group: close-release
   cancel-in-progress: true
