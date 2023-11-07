@@ -590,6 +590,7 @@ generate-python-sdk: build-docs-api			# not using the official swagger-codegen-c
 	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
 		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
 		-c /local/scripts/python-sdk-config.json
+	patch ./hoprd-sdk-python/ ./scripts/sdk-python.patch
 
 .PHONY: help
 help:
