@@ -12,13 +12,11 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::future::Future;
-use primitive_types::U256;
 use thiserror::Error;
 
 use crate::nodejs::helper::{Request, Response};
 
 mod helper;
-mod pubsub;
 
 #[wasm_bindgen(module = "@hoprnet/hopr-utils")]
 extern "C" {

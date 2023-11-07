@@ -134,4 +134,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         Ok(sent_tx.0.into())
     }
 
+    async fn subscribe_blocks<Tx: Stream<Item=crate::Block>>(&self) -> Result<Tx> {
+        todo!()
+    }
 }

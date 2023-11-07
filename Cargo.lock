@@ -1055,6 +1055,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28c122c3980598d243d63d9a704629a2d748d101f278052ff068be5a4423ab6f"
 
 [[package]]
+name = "const_format"
+version = "0.2.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a214c7af3d04997541b18d432afaff4c455e79e2029079647e72fc2bd27673"
+dependencies = [
+ "const_format_proc_macros",
+]
+
+[[package]]
+name = "const_format_proc_macros"
+version = "0.2.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7f6ff08fd20f4f299298a28e2dfa8a8ba1036e6cd2460ac1de7b425d76f2500"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-xid",
+]
+
+[[package]]
 name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1078,7 +1098,6 @@ dependencies = [
  "hex",
  "hex-literal",
  "hkdf",
- "hmac",
  "js-sys",
  "k256",
  "libp2p-identity",
@@ -1125,6 +1144,30 @@ dependencies = [
  "serde-wasm-bindgen",
  "thiserror",
  "tokio",
+ "utils-db",
+ "utils-log",
+ "utils-metrics",
+ "utils-misc",
+ "utils-types",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "core-ethereum-api"
+version = "0.1.0"
+dependencies = [
+ "async-lock",
+ "async-trait",
+ "console_error_panic_hook",
+ "core-crypto",
+ "core-ethereum-actions",
+ "core-ethereum-db",
+ "core-path",
+ "core-types",
+ "futures",
+ "gloo-timers 0.3.0",
+ "thiserror",
  "utils-db",
  "utils-log",
  "utils-metrics",
@@ -1194,24 +1237,17 @@ dependencies = [
 name = "core-ethereum-misc"
 version = "0.6.0"
 dependencies = [
- "async-lock",
  "async-std",
- "async-trait",
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
- "core-types",
  "env_logger",
  "ethers",
  "hex",
  "hex-literal",
- "js-sys",
- "lazy_static",
- "libp2p-identity",
  "mockall",
  "multiaddr",
  "serde",
- "serde-wasm-bindgen",
  "thiserror",
  "utils-db",
  "utils-log",
@@ -1274,66 +1310,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
-name = "core-hopr"
-version = "0.3.1"
-dependencies = [
- "async-lock",
- "async-std",
- "async-trait",
- "console_error_panic_hook",
- "core-crypto",
- "core-ethereum-actions",
- "core-ethereum-db",
- "core-ethereum-misc",
- "core-ethereum-rpc",
- "core-network",
- "core-p2p",
- "core-packet",
- "core-path",
- "core-protocol",
- "core-strategy",
- "core-types",
- "futures",
- "futures-concurrency",
- "gloo-timers 0.3.0",
- "js-sys",
- "libp2p",
- "multiaddr",
- "serde-wasm-bindgen",
- "thiserror",
- "utils-db",
- "utils-log",
- "utils-metrics",
- "utils-misc",
- "utils-types",
- "wasm-bindgen",
- "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "core-misc"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "js-sys",
- "real-base",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "utils-misc",
- "wasm-bindgen",
- "wasm-opt",
- "wasm-pack",
-]
-
-[[package]]
 name = "core-network"
 version = "0.4.0"
 dependencies = [
  "async-std",
  "async-trait",
- "bincode",
- "blake2",
  "console_error_panic_hook",
  "core-crypto",
  "futures",
@@ -1341,6 +1322,7 @@ dependencies = [
  "getrandom 0.2.10",
  "gloo-timers 0.3.0",
  "js-sys",
+ "lazy_static",
  "libp2p-identity",
  "mockall",
  "more-asserts",
@@ -1355,7 +1337,6 @@ dependencies = [
  "utils-types",
  "validator",
  "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -1371,7 +1352,6 @@ dependencies = [
  "futures",
  "futures-lite",
  "getrandom 0.2.10",
- "js-sys",
  "libp2p",
  "libp2p-mplex",
  "libp2p-wasm-ext",
@@ -1380,7 +1360,6 @@ dependencies = [
  "syn 2.0.29",
  "thiserror",
  "utils-log",
- "utils-misc",
  "void",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1391,7 +1370,6 @@ dependencies = [
 name = "core-packet"
 version = "0.7.0"
 dependencies = [
- "async-lock",
  "async-process",
  "async-std",
  "async-trait",
@@ -1402,19 +1380,13 @@ dependencies = [
  "core-path",
  "core-types",
  "env_logger",
- "futures",
- "futures-concurrency",
- "futures-lite",
  "gloo-timers 0.3.0",
  "hex",
  "hex-literal",
  "js-sys",
  "lazy_static",
- "libp2p-identity",
  "mockall",
  "parameterized",
- "serde",
- "serde-wasm-bindgen",
  "serial_test",
  "thiserror",
  "typenum",
@@ -1438,7 +1410,6 @@ dependencies = [
  "core-ethereum-db",
  "core-types",
  "futures",
- "hex",
  "hex-literal",
  "js-sys",
  "lazy_static",
@@ -1450,6 +1421,7 @@ dependencies = [
  "thiserror",
  "utils-db",
  "utils-log",
+ "utils-metrics",
  "utils-misc",
  "utils-types",
  "wasm-bindgen",
@@ -1477,9 +1449,7 @@ dependencies = [
  "futures-lite",
  "getrandom 0.2.10",
  "gloo-timers 0.3.0",
- "hex",
  "hex-literal",
- "js-sys",
  "lazy_static",
  "libp2p",
  "libp2p-identity",
@@ -1511,21 +1481,17 @@ dependencies = [
  "core-crypto",
  "core-ethereum-actions",
  "core-ethereum-db",
- "core-ethereum-misc",
  "core-network",
- "core-path",
  "core-protocol",
  "core-types",
  "env_logger",
  "futures",
  "getrandom 0.2.10",
  "hex-literal",
- "js-sys",
  "lazy_static",
  "mockall",
  "rand 0.8.5",
  "serde",
- "serde-wasm-bindgen",
  "serde_with",
  "strum 0.25.0",
  "thiserror",
@@ -1542,6 +1508,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-transport"
+version = "0.4.0"
+dependencies = [
+ "async-lock",
+ "async-std",
+ "async-trait",
+ "console_error_panic_hook",
+ "core-crypto",
+ "core-ethereum-db",
+ "core-ethereum-misc",
+ "core-ethereum-rpc",
+ "core-network",
+ "core-p2p",
+ "core-packet",
+ "core-path",
+ "core-protocol",
+ "core-types",
+ "futures",
+ "futures-concurrency",
+ "gloo-timers 0.3.0",
+ "js-sys",
+ "lazy_static",
+ "libp2p",
+ "multiaddr",
+ "serde",
+ "thiserror",
+ "utils-db",
+ "utils-log",
+ "utils-metrics",
+ "utils-misc",
+ "utils-types",
+ "utils-validation",
+ "validator",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "core-types"
 version = "0.4.1"
 dependencies = [
@@ -1554,7 +1558,6 @@ dependencies = [
  "enum-iterator",
  "ethers",
  "hex-literal",
- "js-sys",
  "lazy_static",
  "multiaddr",
  "serde",
@@ -3057,24 +3060,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-lib"
+version = "2.1.0-rc.1"
+dependencies = [
+ "async-std",
+ "console_error_panic_hook",
+ "const_format",
+ "core-ethereum-actions",
+ "core-ethereum-api",
+ "core-ethereum-db",
+ "core-path",
+ "core-strategy",
+ "core-transport",
+ "core-types",
+ "futures",
+ "js-sys",
+ "lazy_static",
+ "real-base",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "thiserror",
+ "utils-db",
+ "utils-log",
+ "utils-metrics",
+ "utils-misc",
+ "utils-types",
+ "validator",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-opt",
+ "wasm-pack",
+]
+
+[[package]]
 name = "hoprd-hoprd"
 version = "0.2.0"
 dependencies = [
+ "async-lock",
+ "async-std",
  "clap 4.0.32",
  "console_error_panic_hook",
- "core-ethereum-actions",
  "core-ethereum-db",
  "core-ethereum-indexer",
  "core-ethereum-misc",
- "core-hopr",
- "core-misc",
  "core-network",
- "core-packet",
- "core-path",
- "core-protocol",
  "core-strategy",
- "core-types",
+ "core-transport",
  "hex",
+ "hopr-lib",
  "hoprd-inbox",
  "hoprd-keypair",
  "js-sys",
@@ -3087,6 +3123,7 @@ dependencies = [
  "strum 0.25.0",
  "tempfile",
  "thiserror",
+ "utils-db",
  "utils-log",
  "utils-metrics",
  "utils-misc",
@@ -3094,6 +3131,7 @@ dependencies = [
  "utils-validation",
  "validator",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-opt",
  "wasm-pack",
 ]
@@ -3108,7 +3146,6 @@ dependencies = [
  "console_error_panic_hook",
  "core-types",
  "gloo-timers 0.3.0",
- "hex",
  "js-sys",
  "ringbuffer",
  "serde",
@@ -3134,7 +3171,6 @@ dependencies = [
  "ctr 0.9.2",
  "getrandom 0.2.10",
  "hex",
- "js-sys",
  "real-base",
  "scrypt 0.11.0",
  "serde",
