@@ -1258,6 +1258,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-ethereum-rpc"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "bindings",
+ "console_error_panic_hook",
+ "core-crypto",
+ "core-ethereum-db",
+ "core-ethereum-misc",
+ "core-types",
+ "ethers",
+ "ethers-providers",
+ "ethnum",
+ "futures",
+ "hex",
+ "hex-literal",
+ "js-sys",
+ "lazy_static",
+ "primitive-types",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "thiserror",
+ "utils-db",
+ "utils-log",
+ "utils-misc",
+ "utils-types",
+ "validator",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
