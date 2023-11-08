@@ -7,6 +7,7 @@ import "./utils/NetworkConfig.s.sol";
 import "./utils/BoostUtilsLib.sol";
 import "../src/utils/TargetUtils.sol";
 import { HoprNetworkRegistry } from "../src/NetworkRegistry.sol";
+import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 
 abstract contract Enum {
     enum Operation {
@@ -108,6 +109,65 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         msgSender = vm.addr(privateKey);
         emit log_named_address("msgSender address", msgSender);
         vm.startBroadcast(privateKey);
+    }
+
+    /**
+     * @dev Move nodes that are associated to an old safe to a new safe
+     * Use admin key (of the old Safe) to
+     * - Deregister node from Node-safe registry
+     * 
+     * Use admin key (of the new Safe) to
+     * - Include node to module
+     * 
+     * Use manager to 
+     * - Deregister nodes from Network Registry
+     * - Re-register nodes with the new safe in Network Registry
+     *
+     * @notice Assume the private keys of the admin of old & new safes are the same
+     *
+     * @param nodeAddresses array of node addresses
+     * @param safeAddress new safe addresses that nodes attach to
+     * @param moduleAddress new module addresses that nodes attach to
+     */
+    function moveNodesToSafeModule(
+        address[] memory nodeAddresses,
+        address safeAddress,
+        address moduleAddress
+    )
+        external
+    {
+        // 1. get environment and msg.sender
+        getNetworkAndMsgSender();
+
+        // 2. include nodes to the module, as an owner of safe
+        includeNodesToModuleBySafe(nodeAddresses, safeAddress, moduleAddress);
+
+        // 3. deregister nodes from the nodes-safe registry
+        deregisterNodesFromNodeSafeRegistry(nodeAddresses);
+        // addition will be done by nodes on-start
+
+        vm.stopBroadcast();
+
+        // prepare data paylaods for manager
+        address[] memory stakingSafeAddresses = new address[](nodeAddresses.length);
+        bool[] memory eligibilities = new bool[](nodeAddresses.length);
+        for (uint256 m = 0; m < nodeAddresses.length; m++) {
+            stakingSafeAddresses[m] = safeAddress;
+            eligibilities[m] = true;
+        }
+
+        _helperGetDeployerInternalKey();
+
+        // 3. remove nodes and safe from network registry, as a manager of network registry
+        _deregisterNodes(nodeAddresses);
+
+        // 4. add nodes and safe to network registry, as a manager of network registry
+        _registerNodes(stakingSafeAddresses, nodeAddresses);
+
+        // 8. set node eligibilities to network registry, as a manager of network registry
+        _forceSyncEligibility(stakingSafeAddresses, eligibilities);
+
+        vm.stopBroadcast();
     }
 
     /**
@@ -421,6 +481,30 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         );
     }
 
+    function deregisterNodesFromNodeSafeRegistry(address[] memory nodeAddresses) public {
+        // 1. get the msgSender if not set. This msgSender should be the owner of safe to execute the tx
+        if (msgSender == address(0)) {
+            // get environment and msg.sender
+            getNetworkAndMsgSender();
+        }
+
+        // 2. prepare data payload for the deregistration
+        for (uint256 i = 0; i < nodeAddresses.length; i++) {
+            address safe = HoprNodeSafeRegistry(currentNetworkDetail.addresses.nodeSafeRegistryAddress).nodeToSafe(nodeAddresses[i]);
+
+            bytes memory safeTxData = abi.encodeWithSelector(
+                HoprNodeSafeRegistry.deregisterNodeBySafe.selector, nodeAddresses[i]
+            );
+
+            _helperSignSafeTxAsOwner(
+                ISafe(payable(safe)), 
+                currentNetworkDetail.addresses.nodeSafeRegistryAddress, 
+                ISafe(payable(safe)).nonce(),
+                safeTxData
+            );
+        }
+    }
+
     /**
      * add an ALL_ALLOWED target to the module, by the safe
      * Abuse TOKEN type
@@ -624,6 +708,24 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     }
 
     /**
+     * @dev On network registry contract, deregister nodes
+     * This function should only be called by a manager
+     */
+    function _deregisterNodes(address[] memory nodeAddresses) private {
+        address nrContractAddress = currentNetworkDetail.addresses.networkRegistryContractAddress;
+
+        // 2. deregister nodes
+        if (nodes.length > 0) {
+            try HoprNetworkRegistry(nrContractAddress).managerDeregister(nodeAddresses) {
+                emit log_string("Nodes deregistered from Network Registry");
+            } catch (bytes memory lowlevelData) {
+                emit log_named_bytes("deregsiter nodes from network registry error", lowlevelData);
+                revert("Cannot deregister nodes as a manager");
+            }
+        }
+    }
+
+    /**
      * @dev On network registry contract, deregister nodes from a set of addresses. This function should only be
      * called by a manager
      */
@@ -647,12 +749,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 2. deregister nodes
         if (nodes.length > 0) {
-            try HoprNetworkRegistry(nrContractAddress).managerDeregister(nodes) {
-                emit log_string("Nodes deregistered from Network Registry");
-            } catch (bytes memory lowlevelData) {
-                emit log_named_bytes("deregsiter nodes from network registry error", lowlevelData);
-                revert("Cannot deregister nodes as a manager");
-            }
+            _deregisterNodes(nodes);
         }
 
         // reset
@@ -1184,5 +1281,27 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                 )
             );
         }
+    }
+
+    /**
+     * @dev helper function to build multisend tx
+     */
+    function _helperBuildMultiSendTx(
+        uint8[] memory txOperations,
+        address[] memory txTos,
+        uint256[] memory txValues,
+        uint256[] memory dataLengths,
+        bytes[] memory data
+    )
+        private
+        pure
+        returns (bytes memory)
+    {
+        bytes memory encodePacked;
+        for (uint256 i = 0; i < txOperations.length; i++) {
+            encodePacked =
+                abi.encodePacked(encodePacked, txOperations[i], txTos[i], txValues[i], dataLengths[i], data[i]);
+        }
+        return abi.encodeWithSignature("multiSend(bytes)", encodePacked);
     }
 }
