@@ -37,21 +37,26 @@ def passive_node():
 
 
 @asynccontextmanager
-async def create_channel(src, dest, funding: int):
+async def create_channel(src, dest, funding: int, close_from_dest=False):
     channel = await src["api"].open_channel(dest["address"], str(int(funding)))
     assert channel is not None
     await asyncio.wait_for(check_channel_status(src, dest, status="Open"), 10.0)
     try:
         yield channel
     finally:
-        assert await src["api"].close_channel(channel)
-        await asyncio.wait_for(check_channel_status(src, dest, status="PendingToClose"), 10.0)
+        if close_from_dest:
+            assert await dest["api"].close_channel(channel)
+            await asyncio.wait_for(check_channel_status(src, dest, status="Closed"), 10.0)
+        else:
+            assert await src["api"].close_channel(channel)
+            await asyncio.wait_for(check_channel_status(src, dest, status="PendingToClose"), 10.0)
 
-        # need to wait some more time until closure time has passed
-        await asyncio.sleep(15)
+            # need to wait some more time until closure time has passed and the
+            # closure may be finalized
+            await asyncio.sleep(15)
 
-        assert await src["api"].close_channel(channel)
-        await asyncio.wait_for(check_channel_status(src, dest, status="Closed"), 10.0)
+            assert await src["api"].close_channel(channel)
+            await asyncio.wait_for(check_channel_status(src, dest, status="Closed"), 10.0)
 
 
 async def get_channel(src, dest, include_closed=False):
@@ -371,7 +376,8 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
 async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(src, dest, swarm7):
     message_count = 2
 
-    async with create_channel(swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP) as channel:
+    async with create_channel(swarm7[src], swarm7[dest], funding=message_count *
+                              TICKET_PRICE_PER_HOP, close_from_dest=True) as channel:
         packets = [f"Channel redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
 
         await send_and_receive_packets_with_pop(
@@ -440,7 +446,9 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
         await asyncio.gather(
             *[
                 channels.enter_async_context(
-                    create_channel(swarm7[i[0]], swarm7[i[1]], funding=message_count * TICKET_PRICE_PER_HOP)
+                    create_channel(swarm7[i[0]], swarm7[i[1]],
+                                   funding=message_count * TICKET_PRICE_PER_HOP,
+                                   close_from_dest=True)
                 )
                 for i in [[src, dest], [dest, src]]
             ]
@@ -475,7 +483,8 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
     # send 90% of messages before ticket aggregation would kick in
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10 * 9)
 
-    async with create_channel(swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP) as channel_id:
+    async with create_channel(swarm7[src], swarm7[dest], funding=message_count *
+                              TICKET_PRICE_PER_HOP, close_from_dest=True) as channel_id:
         # ensure ticket stats are what we expect before starting
         statistics_before = await swarm7[dest]["api"].get_tickets_statistics()
         tickets_before = await swarm7[dest]["api"].channel_get_tickets(channel_id)

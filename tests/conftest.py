@@ -61,58 +61,103 @@ def cmd_line_args(request):
 FIXTURE_FILES_DIR = "/tmp/"
 FIXTURE_FILES_PREFIX = "hopr-smoke-test"
 
+NODE_NAME_PREFIX = "hopr-smoke-test-node"
+
 
 DEFAULT_API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
 NODES = {
     "1": {
-        "p2p_port": 19091,
-        "api_port": 13301,
-        "peer_id": "12D3KooWKSzQgdszZzipRVGSRwBcC3etYwjSmqqTqcySn97EGWTm",
-        "address": "0x7d1e530e9c82c21b75644a2c23402aa858ae4a69",
+        "api_port": 19091,
+        "p2p_port": 13301,
+        "api_token": DEFAULT_API_TOKEN,
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_1",
+        "host_addr": "localhost",
     },
     "2": {
-        "p2p_port": 19092,
-        "api_port": 13302,
-        "peer_id": "12D3KooWLWoHJjaS1z9cXn19DE9gPrSbYHkf7CHMbUtLUqbZKDby",
-        "address": "0x1b482420afa04aec1ef0e4a00c18451e84466c75",
+        "api_port": 19092,
+        "p2p_port": 13302,
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_2",
+        "host_addr": "127.0.0.1",
     },
     "3": {
-        "p2p_port": 19093,
-        "api_port": 13303,
-        "peer_id": "12D3KooWJ4E4q6wr8nzXyRKnAofQSeoGoRFRRtQJK3jCpLtLNVZj",
-        "address": "0x05b17e37fd43c18741877fca80846ad8c84aa750",
+        "api_port": 19093,
+        "p2p_port": 13303,
+        "api_token": DEFAULT_API_TOKEN,
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_3",
+        "host_addr": "localhost",
     },
     "4": {
-        "p2p_port": 19094,
-        "api_port": 13304,
-        "peer_id": "12D3KooWA494BRhXs2DpMm5e2DWkPZcot3WpYwB4KBj2udP9xvPC",
-        "address": "0xcc70a22331998454160472f097acb43ca9b1e646",
+        "api_port": 19094,
+        "p2p_port": 13304,
+        "api_token": DEFAULT_API_TOKEN,
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_4",
+        "host_addr": "127.0.0.1",
     },
     "5": {
-        "p2p_port": 19095,
-        "api_port": 13305,
-        "peer_id": "12D3KooWQCHVYhdnLT76rhHoFUu3b4L2aUiY8o1y8erhAwg8evFx",
-        "address": "0xe4bb1970e6c9e5689c5ef68ee2545b4366c49be4",
+        "api_port": 19095,
+        "p2p_port": 13305,
+        "api_token": DEFAULT_API_TOKEN,
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5",
+        "host_addr": "localhost",
     },
     "6": {
-        "p2p_port": 19096,
-        "api_port": 13306,
-        "peer_id": "12D3KooWHc2LPyvYGLJbHoQeJUBXBjDRfMY7msobsPoWj8rCAGHr",
-        "address": "0xf90c1eb2557a443c2b27d399afac075fa752cd92",
+        "api_port": 19096,
+        "p2p_port": 13306,
+        "api_token": DEFAULT_API_TOKEN,
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_6",
+        "host_addr": "127.0.0.1",
+        "network": "anvil-localhost2"
     },
     "7": {
-        "p2p_port": 19097,
-        "api_port": 13307,
-        "peer_id": "12D3KooWGPUAcSaJhKBmmwP2Bz3PbZyrErosBmCbZKgPPt7XHwqh",
-        "address": "0xe63ececd80c503548516e9e23ebb44d95c4d5ac2",
+        "api_port": 19097,
+        "p2p_port": 13307,
+        "api_token": DEFAULT_API_TOKEN,
+        "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_7",
+        "host_addr": "localhost",
     },
 }
 
 
-def setup_node(*args, **kwargs):
-    logging.info(f"Setting up a node with configuration: {args} and {kwargs}")
-    pass
+def cleanup_node(args):
+    proc = args.proc
+    proc.kill()
+def setup_node(args):
+    logging.info(f"Setting up a node with configuration: {args}")
+    log_file = open(f"{args.dir}.log", 'w')
+    network = args.network if args.network else "anvil-localhost"
+    api_token_param = f"--api-token={args.api_token}" if args.api_token else "--disableApiAuthentication"
+    env = {**os.environ,
+           'DEBUG': "hopr*",
+           'NODE_ENV'="development",
+           'HOPRD_HEARTBEAT_INTERVAL'="2500",
+           'HOPRD_HEARTBEAT_THRESHOLD'="2500",
+           'HOPRD_HEARTBEAT_VARIANCE'="1000",
+           'HOPRD_NETWORK_QUALITY_THRESHOLD'="0.3",
+           'NODE_OPTIONS'="--experimental-wasm-modules"}
+    cmd = [
+    "node packages/hoprd/lib/main.cjs",
+     f"--network={network}",
+     f"--data="{args.dir}",
+     f"--host="{args.host_addr}:{args.p2p_port}",
+     "--identity="{args.dir}.id",
+     "--init",
+     "--password="{args.password}",
+     "--api",
+     "--apiPort="{args.api_port}"",
+     "--testAnnounceLocalAddresses",
+     "--disableTicketAutoRedeem",
+     "--testPreferLocalAddresses",
+     "--testUseWeakCrypto",
+     "--announce",
+    api_token_param
+    ]
+    if args.cfg_file:
+        cmd + f"--configurationFilePath={args.cfg_file}"
+
+    logging.info(f"Starting up a node with cmd: {cmd} and env {env}")
+    proc = Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
+    return proc
 
 
 def test_sanity():
@@ -133,7 +178,6 @@ def check_socket(address, port):
     finally:
         s.close()
 
-
 @pytest.fixture(scope="module")
 def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
@@ -143,28 +187,28 @@ def swarm7(request):
     for f in ["node_5.cfg.yaml"]:
         shutil.copyfile(f"./tests/{f}", f"{FIXTURE_FILES_DIR}/{FIXTURE_FILES_PREFIX}-{f}")
 
+    # TODO: start anvil
+    # TODO: update protocol config
+    # TODO: reuse identities
+    # TODO: create local safes
+    # TODO: start nodes
     try:
-        logging.debug("Creating a 7 node cluster from bash")
-        res = subprocess.run(
-            f"./scripts/fixture_local_test_setup.sh --setup 2>&1 | tee {log_file_path}",
-            shell=True,
-            capture_output=True,
-            check=True,
-        )
-        res.check_returncode()
-        nodes = NODES.copy()
-        for key in NODES.keys():
-            port = NODES[key]["api_port"]
-            nodes[key]["api"] = HoprdAPI(f"http://localhost:{port}", DEFAULT_API_TOKEN)
-        yield nodes
+    nodes = NODES.copy()
+    for node_id, node_args in NODES.items():
+        proc = setup_node(node_args)
+        nodes[node_id]["proc"] = proc
+        nodes[node_id]["api"] = HoprdAPI(f"http://localhost:{node_args.api_port}", node_args.api_token)
+
+    # TODO: wait for nodes
+    # TODO: fund nodes
+    # TODO: wait for port bindings
+    # TODO: restart node 1 and wait
+
+    yield nodes
     except Exception:
-        logging.error("Creating a 7 node cluster from bash - FAILED")
+        logging.error("Creating a 7 node cluster - FAILED")
     finally:
-        logging.debug("Tearing down the 7 node cluster from bash")
-        subprocess.run(
-            f"./scripts/fixture_local_test_setup.sh --teardown 2>&1 | tee --append {log_file_path}",
-            shell=True,
-            capture_output=True,
-            check=False,
-        )
+        logging.debug("Tearing down the 7 node cluster")
+        for node_id, node_args in nodes.items():
+            cleanup_node(node_args)
         pass
