@@ -84,7 +84,12 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+type PinBoxFut<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
+#[cfg(not(target_arch = "wasm32"))]
 type PinBoxFut<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
 type HoprMiddlewareResult<T, P> = std::result::Result<T, <HoprMiddleware<P> as Middleware>::Error>;
 
 #[must_use = "streams do nothing unless polled"]
@@ -155,7 +160,7 @@ where
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     type BlockStream<'a> = BlockStream<'a, P, FilterWatcher<'a, P, H256>>;
-    type LogStream<'a> = Pin<Box<dyn Stream<Item = Log> + Send + 'a>>;
+    type LogStream<'a> = Pin<Box<dyn Stream<Item = Log> + 'a>>;
 
     async fn genesis_block(&self) -> Result<u64> {
         Ok(self.cfg.indexer_start_block_number)
@@ -217,12 +222,12 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     }
 
     async fn subscribe_logs<'a>(&'a self, query: EventsQuery) -> Result<Self::LogStream<'a>> {
-        Ok(self
+        Ok(Box::pin(self
             .provider
             .watch(&query.into())
             .await?
             .map(|log| crate::Log::from(log))
-            .boxed())
+        ))
     }
 }
 

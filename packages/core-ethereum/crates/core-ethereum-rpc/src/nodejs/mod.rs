@@ -1,6 +1,7 @@
+use std::error::Error;
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError, ProviderError, PubsubClient};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use utils_misc::utils::wasm::js_value_to_error_msg;
