@@ -304,13 +304,13 @@ Running one node in test mode, with safe and module attached (in anvil-localhost
 make -j deps && make -j build
 
 # starting network
-make run-anvil
+make run-anvil args="-p"
 
 # update protocol-config
 scripts/update-protocol-config.sh -n anvil-localhost
 
 # create identity files
-make create-local-identity
+make create-local-identity id_count=1
 
 # create a safe and a node management module instance,
 # and passing the created safe and module as argument to
@@ -318,7 +318,7 @@ make create-local-identity
 # It also register the created pairs in network registry, and
 # approve tokens for channels to move token.
 # fund safe with 2k token and 1 native token
-make run-local-with-safe
+make run-local-with-safe id_file_path=/tmp
 # or to restart a node and use the same id, safe and module
 # run:
 # make run-local id_path=$(find `pwd` -name ".identity-local*.id" | sort -r | head -n 1)

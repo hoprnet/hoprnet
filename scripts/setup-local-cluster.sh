@@ -259,7 +259,7 @@ declare deployments_summary="${mydir}/../packages/ethereum/contracts/contracts-a
 
 # --- Running Mock Blockchain --- {{{
 log "Running anvil local node"
-make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log}"
+make -C "${mydir}/../" run-anvil args="-l ${anvil_rpc_log} -p"
 
 log "Wait for anvil local node to complete startup"
 wait_for_regex "${anvil_rpc_log}" "Listening on 0.0.0.0:8545"

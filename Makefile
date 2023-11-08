@@ -325,16 +325,17 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 create-local-identity: id_dir=/tmp/
 create-local-identity: id_password=local
 create-local-identity: id_prefix=.identity-local_
+create-local-identity: id_count=1
 create-local-identity: ## run HOPRd from local repo
 	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" \
 		hopli identity \
 		--action create \
 		--identity-directory "${id_dir}" \
 		--identity-prefix "${id_prefix}" \
-		--number 1
+		--number ${id_count}
 
 .PHONY: run-local
-run-local: id_path=`pwd`/.identity-local.id
+run-local: id_path=$$(pwd)/.identity-local.id
 run-local: network=anvil-localhost
 run-local: args=
 run-local: ## run HOPRd from local repo
@@ -348,8 +349,9 @@ run-local: ## run HOPRd from local repo
 
 .PHONY: run-local-with-safe
 run-local-with-safe: network=anvil-localhost
+run-local-with-safe: id_file_path=$$(pwd)
 run-local-with-safe: ## run HOPRd from local repo. use the most recently created id file as node. create a safe and a module for the said node
-	id_path=$$(find $$(pwd) -name ".identity-local*.id" | sort -r | head -n 1) && \
+	id_path=$$(find "${id_file_path}" -name ".identity-local*.id" | sort -r | head -n 1) && \
     	args=$$(make create-safe-module id_path="$$id_path" | grep -oE "(\-\-safeAddress.*)") && \
     	make run-local id_path="$$id_path" network="${network}" args="$$args"
 
