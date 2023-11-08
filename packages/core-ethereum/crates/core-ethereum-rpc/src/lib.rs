@@ -79,6 +79,10 @@ pub struct EventsQuery {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprRpcOperations {
+    type BlockStream: Stream<Item = Block>;
+
+    type LogStream: Stream<Item = Log>;
+
     async fn genesis_block(&self) -> Result<u64>;
 
     async fn block_number(&self) -> Result<u64>;
@@ -97,7 +101,7 @@ pub trait HoprRpcOperations {
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
 
-    async fn subscribe_blocks<Tx: Stream<Item = Block>>(&self) -> Result<Tx>;
+    async fn subscribe_blocks(&self) -> Result<Self::BlockStream>;
 
-    async fn get_events(&self, query: EventsQuery) -> Result<Vec<Log>>;
+    async fn subscribe_logs(&self, query: EventsQuery) -> Result<Self::LogStream>;
 }
