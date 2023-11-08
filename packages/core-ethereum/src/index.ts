@@ -355,7 +355,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       log('Node is not associated with a Safe in NodeSafeRegistry yet')
       return true
     } else if (!registeredAddress.eq(safeAddress)) {
-      throw Error('Node is associated with a different Safe in NodeSafeRegistry')
+      log('Node is associated with a different Safe in NodeSafeRegistry. Attempt to re-register. If re-registration fails, the node will node start')
     } else {
       log('Node is associated with correct Safe in NodeSafeRegistry')
     }
