@@ -81,9 +81,6 @@ jobs:
       - name: Install dependencies
         run: nix develop -c make -j deps-ci
 
-      - name: Build
-        run: nix develop -c make -j build
-
       - name: Test
         run: nix develop -c make -j test
         env:
