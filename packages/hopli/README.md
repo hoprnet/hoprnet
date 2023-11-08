@@ -142,6 +142,18 @@ hopli migrate-safe-module --network anvil-localhost \
     --contracts-root "../ethereum/contracts"
 ```
 
+Move a registered node to a new pair of safe and module
+
+```
+PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
+hopli move-node-to-safe-module --network anvil-localhost \
+    --identity-directory "./test" \
+    --password-path "./test/.pwd" \
+    --safe-address <safe_address> \
+    --module-address <module_address> \
+    --contracts-root "../ethereum/contracts"
+```
+
 Sync or Force sync eligibility on Network Registry. Provide a comma-separated string of safe adresses in `safe-addresses`.
 If `sync-type` sets to `normal-sync`, it will update the eligibility according to the actual eligibility of the staking account
 
@@ -258,6 +270,18 @@ Migrate an exising set of node(d) with safe and module to a new network
 ```
 PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
     cargo run -- migrate-safe-module --network anvil-localhost \
+    --identity-directory "./test" \
+    --password-path "./test/.pwd" \
+    --safe-address <safe_address> \
+    --module-address <module_address> \
+    --contracts-root "../ethereum/contracts"
+```
+
+Move a registered node to a new pair of safe and module
+
+```
+PRIVATE_KEY=<safe_owner_private_key> DEPLOYER_PRIVATE_KEY=<network_registry_manager_key> \
+    cargo run -- move-node-to-safe-module --network anvil-localhost \
     --identity-directory "./test" \
     --password-path "./test/.pwd" \
     --safe-address <safe_address> \

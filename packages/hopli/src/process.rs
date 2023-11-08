@@ -142,6 +142,36 @@ pub fn child_process_call_foundry_migrate_safe_module(
     child_process_call_foundry(network, &self_register_args)
 }
 
+/// Launch a child process to call foundry move-nodes-to-safe-module command
+///
+/// # Arguments
+///
+/// * `network` - Name of the network that nodes run in
+/// * `environment_type` - Type of the environment that nodes run in
+/// * `node_address` - Addresses of HOPR nodes to be included in the module
+/// * `safe_address` - New safe address
+/// * `module_address` - New module address
+pub fn child_process_call_foundry_move_node_to_safe_module(
+    network: &str,
+    ethereum_address: &String,
+    safe_address: &str,
+    module_address: &str,
+) -> Result<(), HelperErrors> {
+    // add brackets to around the string
+    let move_node_args = vec![
+        "script",
+        "script/SingleAction.s.sol:SingleActionFromPrivateKeyScript",
+        "--broadcast",
+        "--sig",
+        "moveNodesToSafeModule(address[],address,address)",
+        &ethereum_address,
+        &safe_address,
+        &module_address,
+    ];
+
+    child_process_call_foundry(network, &move_node_args)
+}
+
 /// Launch a child process to call foundry express-setup-safe-module command
 ///
 /// # Arguments
