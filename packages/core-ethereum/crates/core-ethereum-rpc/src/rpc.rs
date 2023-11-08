@@ -7,9 +7,10 @@ use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::prelude::*;
 use ethers_providers::{JsonRpcClient, Middleware, Provider};
 use serde::{Deserialize, Serialize};
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use std::sync::Arc;
 use async_std::prelude::Stream;
+use futures::stream::IntoStream;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
@@ -21,7 +22,7 @@ use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
 use bindings::hopr_token::HoprToken;
 
 use crate::errors::Result;
-use crate::HoprRpcOperations;
+use crate::{EventsQuery, HoprRpcOperations};
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
@@ -79,6 +80,9 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
+    type BlockStream = ();
+    type LogStream = ();
+
     async fn genesis_block(&self) -> Result<u64> {
         Ok(self.cfg.indexer_start_block_number)
     }
@@ -134,7 +138,15 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         Ok(sent_tx.0.into())
     }
 
-    async fn subscribe_blocks<Tx: Stream<Item=crate::Block>>(&self) -> Result<Tx> {
+    async fn subscribe_blocks(&self) -> Result<Self::BlockStream> {
+        Ok(self.provider.watch_blocks().await?
+            .map(|b| async {
+                crate::Block::from(self.provider.get_block(b.into()).await.unwrap().unwrap())
+            }).into_stream()
+        )
+    }
+
+    async fn subscribe_logs(&self, query: EventsQuery) -> Result<Self::LogStream> {
         todo!()
     }
 }
