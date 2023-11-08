@@ -77,6 +77,22 @@ pub struct EventsQuery {
     pub to: u64
 }
 
+impl From<EventsQuery> for ethers::types::Filter {
+    fn from(value: EventsQuery) -> Self {
+        let addr: ethers::types::H160 = value.address.into();
+        let mut ret = ethers::types::Filter::new()
+            .address::<ethers::types::H160>(addr.into())
+            .from_block(value.from)
+            .to_block(value.to);
+
+        for i in 0..4.min(value.topics.len()) {
+           ret.topics[i] = Some(value.topics[i].into())
+        }
+
+        ret
+    }
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprRpcOperations {
