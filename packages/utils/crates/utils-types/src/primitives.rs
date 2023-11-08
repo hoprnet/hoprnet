@@ -351,8 +351,10 @@ impl FromStr for Balance {
         let regex = Regex::new(r"^\s*(\d+)\s*([A-z]+)\s*$").unwrap();
         let cap = regex.captures(s).ok_or(ParseError)?;
 
+        let wei_exponent = 18;
+
         if cap.len() == 3 {
-            Ok(Self::new_from_str(&cap[1], BalanceType::from_str(&cap[2])?))
+            Ok(Self::new_from_str(format!("{:0<1$}", &cap[1], wei_exponent + 1).as_str(), BalanceType::from_str(&cap[2])?))
         } else {
             Err(ParseError)
         }
@@ -911,6 +913,16 @@ mod tests {
 
         assert!(b3.lt(&b4) && b4.gt(&b3), "lte or lt test failed");
         assert!(b3.lte(&b3) && b4.gte(&b4), "gte or gt test failed");
+    }
+
+    #[test]
+    fn test_balance_read_from_string_properly_multiplies_to_get_wei_base() {
+        let expected = Balance::new(1_000_000_000_000_000_000i64.as_u256().into(), BalanceType::HOPR);
+    
+        let parsed = Balance::from_str("1 HOPR");
+
+        assert!(parsed.is_ok());
+        assert_eq!(parsed.unwrap(), expected);
     }
 
     #[test]
