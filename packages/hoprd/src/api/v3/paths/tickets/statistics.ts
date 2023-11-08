@@ -7,6 +7,7 @@ export const getTicketsStatistics = async (node: Hopr) => {
   const stats = await node.getTicketStatistics()
 
   return {
+    pending: 0,
     unredeemed: stats.unredeemed,
     unredeemedValue: stats.unredeemedValue.to_string(),
     redeemed: stats.redeemed,
