@@ -53,6 +53,7 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
+              pending: { type: 'number', description: 'Not used. Always 0.' },
               unredeemed: {
                 type: 'number',
                 description: 'Number of tickets that wait to be redeemed as for Hopr tokens.'
