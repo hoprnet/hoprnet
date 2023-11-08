@@ -26,7 +26,7 @@ pub struct Block {
     /// Block timestamp
     pub timestamp: U256,
     /// Transaction hashes within this block
-    pub transactions: Vec<Hash>
+    pub transactions: Vec<Hash>,
 }
 
 impl From<ethers::types::Block<H256>> for Block {
@@ -35,7 +35,7 @@ impl From<ethers::types::Block<H256>> for Block {
             number: value.number.map(|u| u.as_u64()),
             hash: value.hash.map(|h| h.0.into()),
             timestamp: value.timestamp.into(),
-            transactions: value.transactions.into_iter().map(|h| Hash::from(h.0)).collect()
+            transactions: value.transactions.into_iter().map(|h| Hash::from(h.0)).collect(),
         }
     }
 }
@@ -48,7 +48,7 @@ pub struct Log {
     pub data: Box<[u8]>,
     pub tx_index: Option<u64>,
     pub block_number: Option<u64>,
-    pub log_index: Option<U256>
+    pub log_index: Option<U256>,
 }
 
 impl From<ethers::types::Log> for Log {
@@ -59,7 +59,7 @@ impl From<ethers::types::Log> for Log {
             data: Box::from(value.data.as_ref()),
             tx_index: value.transaction_index.map(|u| u.as_u64()),
             block_number: value.block_number.map(|u| u.as_u64()),
-            log_index: value.log_index.map(|u| u.into())
+            log_index: value.log_index.map(|u| u.into()),
         }
     }
 }
@@ -74,7 +74,7 @@ pub struct EventsQuery {
     /// Start block number
     pub from: u64,
     /// End block number
-    pub to: u64
+    pub to: u64,
 }
 
 impl From<EventsQuery> for ethers::types::Filter {
@@ -86,7 +86,7 @@ impl From<EventsQuery> for ethers::types::Filter {
             .to_block(value.to);
 
         for i in 0..4.min(value.topics.len()) {
-           ret.topics[i] = Some(value.topics[i].into())
+            ret.topics[i] = Some(value.topics[i].into())
         }
 
         ret
@@ -96,9 +96,12 @@ impl From<EventsQuery> for ethers::types::Filter {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprRpcOperations {
-    type BlockStream: Stream<Item = Block>;
-
-    type LogStream: Stream<Item = Log>;
+    type BlockStream<'a>: Stream<Item = Block>
+    where
+        Self: 'a;
+    type LogStream<'a>: Stream<Item = Log>
+    where
+        Self: 'a;
 
     async fn genesis_block(&self) -> Result<u64>;
 
@@ -118,7 +121,7 @@ pub trait HoprRpcOperations {
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
 
-    async fn subscribe_blocks(&self) -> Result<Self::BlockStream>;
+    async fn subscribe_blocks<'a>(&'a self) -> Result<Self::BlockStream<'a>>;
 
-    async fn subscribe_logs(&self, query: EventsQuery) -> Result<Self::LogStream>;
+    async fn subscribe_logs<'a>(&'a self, query: EventsQuery) -> Result<Self::LogStream<'a>>;
 }

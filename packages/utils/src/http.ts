@@ -6,8 +6,8 @@ export async function post(url: string, json_data: string): Promise<string> {
     maxRedirects: 3
   })
   if (response.status >= 400) {
-  throw new Error(`http return error code: ${response.status}`)
-}
+    throw new Error(`http return error code: ${response.status}`)
+  }
 
-return response.data.toString()
+  return response.data.toString()
 }

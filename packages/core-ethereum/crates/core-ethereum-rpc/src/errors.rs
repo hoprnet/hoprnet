@@ -1,6 +1,6 @@
+use ethers::prelude::nonce_manager::NonceManagerError;
 use ethers::prelude::signer::SignerMiddlewareError;
 use ethers::prelude::ContractError;
-use ethers::prelude::nonce_manager::NonceManagerError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -21,7 +21,9 @@ pub enum RpcError {
 pub type Result<T> = std::result::Result<T, RpcError>;
 
 impl<M> From<NonceManagerError<M>> for RpcError
-where M: ethers::middleware::Middleware {
+where
+    M: ethers::middleware::Middleware,
+{
     fn from(value: NonceManagerError<M>) -> Self {
         Self::MiddlewareError(value.to_string())
     }

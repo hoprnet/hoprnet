@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use serde::{
-    de::{DeserializeOwned, MapAccess,Visitor},
+    de::{DeserializeOwned, MapAccess, Visitor},
     Deserialize, Serialize,
 };
 use std::future::Future;
@@ -98,12 +98,20 @@ impl JsonRpcClient for NodeJsRpcClient {
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
 
-        let json_data = serde_json::to_string(&payload).
-            map_err(|err| ClientError::SerdeJson { err, text: "failed to serialized request".into() })?;
+        let json_data = serde_json::to_string(&payload).map_err(|err| ClientError::SerdeJson {
+            err,
+            text: "failed to serialized request".into(),
+        })?;
 
         let body = match http_post(self.url.as_str(), &json_data).await {
-            Ok(value) => value.as_string().ok_or(ClientError::JsError("not a string response".into()))?,
-            Err(err) => return Err(ClientError::JsError(js_value_to_error_msg(err).unwrap_or("missing error message".into()))),
+            Ok(value) => value
+                .as_string()
+                .ok_or(ClientError::JsError("not a string response".into()))?,
+            Err(err) => {
+                return Err(ClientError::JsError(
+                    js_value_to_error_msg(err).unwrap_or("missing error message".into()),
+                ))
+            }
         };
 
         let raw = match serde_json::from_str(&body) {
@@ -114,18 +122,15 @@ impl JsonRpcClient for NodeJsRpcClient {
                     err: serde::de::Error::custom("unexpected notification over HTTP transport"),
                     text: body,
                 };
-                return Err(err)
+                return Err(err);
             }
-            Err(err) => {
-                return Err(ClientError::SerdeJson {
-                    err,
-                    text: body,
-                })
-            }
+            Err(err) => return Err(ClientError::SerdeJson { err, text: body }),
         };
 
-        let res = serde_json::from_str(raw.get())
-            .map_err(|err| ClientError::SerdeJson { err, text: raw.to_string() })?;
+        let res = serde_json::from_str(raw.get()).map_err(|err| ClientError::SerdeJson {
+            err,
+            text: raw.to_string(),
+        })?;
 
         Ok(res)
     }

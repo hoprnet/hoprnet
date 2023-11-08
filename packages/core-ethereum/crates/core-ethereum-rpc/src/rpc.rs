@@ -1,16 +1,22 @@
+use async_std::prelude::Stream;
 use async_trait::async_trait;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_crypto::types::Hash;
 use core_ethereum_misc::ContractAddresses;
+use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
-use ethers::prelude::*;
-use ethers_providers::{JsonRpcClient, Middleware, Provider};
+use ethers::signers::{LocalWallet, Signer, Wallet};
+use ethers::types::BlockId;
+use ethers_providers::{FilterWatcher, JsonRpcClient, Middleware, Provider};
+use futures::StreamExt;
+use pin_project::pin_project;
+use primitive_types::{H160, H256};
 use serde::{Deserialize, Serialize};
-use futures::{StreamExt, TryStreamExt};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
-use async_std::prelude::Stream;
-use futures::stream::IntoStream;
+use std::task::{Context, Poll};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
@@ -20,9 +26,10 @@ use bindings::hopr_network_registry::HoprNetworkRegistry;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
 use bindings::hopr_token::HoprToken;
+use utils_log::error;
 
 use crate::errors::Result;
-use crate::{EventsQuery, HoprRpcOperations};
+use crate::{Block, EventsQuery, HoprRpcOperations, Log};
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
@@ -52,7 +59,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         let provider = Arc::new(
             Provider::new(json_rpc)
                 .with_signer(wallet.with_chain_id(cfg.chain_id))
-                .nonce_manager(chain_key.public().to_address().into())
+                .nonce_manager(chain_key.public().to_address().into()),
         );
 
         Ok(Self {
@@ -71,17 +78,84 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         })
     }
 
-    async fn get_block(&self, block_number: u64) -> Result<Option<Block<H256>>> {
+    async fn get_block(&self, block_number: u64) -> Result<Option<ethers::types::Block<H256>>> {
         let block_id: BlockId = block_number.into();
         Ok(self.provider.get_block(block_id).await?)
+    }
+}
+
+type PinBoxFut<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+type HoprMiddlewareResult<T, P> = std::result::Result<T, <HoprMiddleware<P> as Middleware>::Error>;
+
+#[must_use = "streams do nothing unless polled"]
+#[pin_project]
+pub struct BlockStream<'a, P, S>
+where
+    P: JsonRpcClient,
+    S: Stream<Item = H256>,
+{
+    rpc: &'a RpcOperations<P>,
+    #[pin]
+    inner: S,
+    #[pin]
+    future: Option<PinBoxFut<'a, HoprMiddlewareResult<Option<ethers::types::Block<H256>>, P>>>,
+}
+
+impl<'a, P, S> BlockStream<'a, P, S>
+where
+    P: JsonRpcClient,
+    S: Stream<Item = H256>,
+{
+    fn new(rpc: &'a RpcOperations<P>, inner: S) -> Self {
+        Self {
+            rpc,
+            inner,
+            future: None,
+        }
+    }
+}
+
+impl<'a, P, S> Stream for BlockStream<'a, P, S>
+where
+    P: JsonRpcClient,
+    S: Stream<Item = H256>,
+{
+    type Item = Block;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        Poll::Ready(loop {
+            if let Some(fut) = this.future.as_mut().as_pin_mut() {
+                let ready = futures::ready!(fut.poll(cx));
+                this.future.set(None);
+
+                match ready {
+                    Ok(Some(item)) => {
+                        break Some(crate::Block::from(item));
+                    }
+                    Ok(None) => {
+                        error!("encountered non-existing block id");
+                    }
+                    Err(e) => {
+                        error!("failed to retrieve block: {e}");
+                    }
+                };
+            } else if let Some(item) = futures::ready!(this.inner.as_mut().poll_next(cx)) {
+                let f = this.rpc.provider.get_block(BlockId::Hash(item));
+                this.future.set(Some(f));
+            } else {
+                break None;
+            }
+        })
     }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
-    type BlockStream = ();
-    type LogStream = ();
+    type BlockStream<'a> = BlockStream<'a, P, FilterWatcher<'a, P, H256>>;
+    type LogStream<'a> = Pin<Box<dyn Stream<Item = Log> + Send + 'a>>;
 
     async fn genesis_block(&self) -> Result<u64> {
         Ok(self.cfg.indexer_start_block_number)
@@ -138,15 +212,19 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         Ok(sent_tx.0.into())
     }
 
-    async fn subscribe_blocks(&self) -> Result<Self::BlockStream> {
-        Ok(self.provider.watch_blocks().await?
-            .map(|b| async {
-                crate::Block::from(self.provider.get_block(b.into()).await.unwrap().unwrap())
-            }).into_stream()
-        )
+    async fn subscribe_blocks<'a>(&'a self) -> Result<Self::BlockStream<'a>> {
+        Ok(BlockStream::new(self, self.provider.watch_blocks().await?))
     }
 
-    async fn subscribe_logs(&self, query: EventsQuery) -> Result<Self::LogStream> {
-        todo!()
+    async fn subscribe_logs<'a>(&'a self, query: EventsQuery) -> Result<Self::LogStream<'a>> {
+        Ok(self
+            .provider
+            .watch(&query.into())
+            .await?
+            .map(|log| crate::Log::from(log))
+            .boxed())
     }
 }
+
+#[cfg(test)]
+mod tests {}

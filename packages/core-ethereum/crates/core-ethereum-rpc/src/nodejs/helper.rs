@@ -1,9 +1,9 @@
+use ethers_providers::JsonRpcError;
+use serde::de::{MapAccess, Unexpected, Visitor};
+use serde::{de, Deserialize, Serialize};
+use serde_json::value::RawValue;
 use std::fmt;
 use std::fmt::Write;
-use ethers_providers::JsonRpcError;
-use serde::{de, Deserialize, Serialize};
-use serde::de::{MapAccess, Unexpected, Visitor};
-use serde_json::value::RawValue;
 
 fn is_zst<T>(_t: &T) -> bool {
     std::mem::size_of::<T>() == 0
@@ -22,7 +22,12 @@ pub struct Request<'a, T> {
 impl<'a, T> Request<'a, T> {
     /// Creates a new JSON RPC request
     pub fn new(id: u64, method: &'a str, params: T) -> Self {
-        Self { id, jsonrpc: "2.0", method, params }
+        Self {
+            id,
+            jsonrpc: "2.0",
+            method,
+            params,
+        }
     }
 }
 
@@ -45,8 +50,8 @@ pub struct Params<'a> {
 // https://github.com/serde-rs/serde/issues/1183 this currently fails
 impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
+    where
+        D: serde::Deserializer<'de>,
     {
         struct ResponseVisitor<'a>(&'a ());
         impl<'de: 'a, 'a> Visitor<'de> for ResponseVisitor<'a> {
@@ -57,8 +62,8 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-                where
-                    A: MapAccess<'de>,
+            where
+                A: MapAccess<'de>,
             {
                 let mut jsonrpc = false;
 
@@ -76,19 +81,19 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
                     match key {
                         "jsonrpc" => {
                             if jsonrpc {
-                                return Err(de::Error::duplicate_field("jsonrpc"))
+                                return Err(de::Error::duplicate_field("jsonrpc"));
                             }
 
                             let value = map.next_value()?;
                             if value != "2.0" {
-                                return Err(de::Error::invalid_value(Unexpected::Str(value), &"2.0"))
+                                return Err(de::Error::invalid_value(Unexpected::Str(value), &"2.0"));
                             }
 
                             jsonrpc = true;
                         }
                         "id" => {
                             if id.is_some() {
-                                return Err(de::Error::duplicate_field("id"))
+                                return Err(de::Error::duplicate_field("id"));
                             }
 
                             let value: u64 = map.next_value()?;
@@ -96,7 +101,7 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
                         }
                         "result" => {
                             if result.is_some() {
-                                return Err(de::Error::duplicate_field("result"))
+                                return Err(de::Error::duplicate_field("result"));
                             }
 
                             let value: &RawValue = map.next_value()?;
@@ -104,7 +109,7 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
                         }
                         "error" => {
                             if error.is_some() {
-                                return Err(de::Error::duplicate_field("error"))
+                                return Err(de::Error::duplicate_field("error"));
                             }
 
                             let value: JsonRpcError = map.next_value()?;
@@ -112,7 +117,7 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
                         }
                         "method" => {
                             if method.is_some() {
-                                return Err(de::Error::duplicate_field("method"))
+                                return Err(de::Error::duplicate_field("method"));
                             }
 
                             let value: &str = map.next_value()?;
@@ -120,7 +125,7 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
                         }
                         "params" => {
                             if params.is_some() {
-                                return Err(de::Error::duplicate_field("params"))
+                                return Err(de::Error::duplicate_field("params"));
                             }
 
                             let value: Params = map.next_value()?;
@@ -137,17 +142,13 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
 
                 // jsonrpc version must be present in all responses
                 if !jsonrpc {
-                    return Err(de::Error::missing_field("jsonrpc"))
+                    return Err(de::Error::missing_field("jsonrpc"));
                 }
 
                 match (id, result, error, method, params) {
-                    (Some(id), Some(result), None, None, None) => {
-                        Ok(Response::Success { id, result })
-                    }
+                    (Some(id), Some(result), None, None, None) => Ok(Response::Success { id, result }),
                     (Some(id), None, Some(error), None, None) => Ok(Response::Error { id, error }),
-                    (None, None, None, Some(method), Some(params)) => {
-                        Ok(Response::Notification { method, params })
-                    }
+                    (None, None, None, Some(method), Some(params)) => Ok(Response::Notification { method, params }),
                     _ => Err(de::Error::custom(
                         "response must be either a success/error or notification object",
                     )),

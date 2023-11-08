@@ -1279,6 +1279,7 @@ dependencies = [
  "hex-literal",
  "js-sys",
  "lazy_static",
+ "pin-project",
  "primitive-types",
  "serde",
  "serde-wasm-bindgen",
