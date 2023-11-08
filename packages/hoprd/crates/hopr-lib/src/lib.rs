@@ -349,6 +349,7 @@ mod native {
                     db.set_staking_safe_address(&self.staking_safe_address).await?;
                     db.set_staking_module_address(&self.staking_module_address).await?;
                 } else {
+                    // DB_ONLY
                     // Intentionally ignoring the errored state
                     error!("Failed to register node with safe")
                 }

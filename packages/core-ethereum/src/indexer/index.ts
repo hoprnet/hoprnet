@@ -19,7 +19,6 @@ import {
   create_multi_counter,
   create_gauge,
   Database,
-  Handlers,
   random_integer,
   OffchainPublicKey,
   U256
@@ -29,13 +28,12 @@ import type { ChainWrapper } from '../ethereum.js'
 import { type IndexerEventEmitter, IndexerStatus, type IndexerEventsType } from './types.js'
 import { isConfirmedBlock, snapshotComparator, type IndexerSnapshot } from './utils.js'
 import { BigNumber, errors } from 'ethers'
-import { Filter, Log } from '@ethersproject/abstract-provider'
+import { Log } from '@ethersproject/abstract-provider'
 
 // @ts-ignore untyped library
 import retimer from 'retimer'
 
 const log = debug('hopr-core-ethereum:indexer')
-const error = debug('hopr-core-ethereum:indexer:error')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
@@ -92,8 +90,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
   private unsubscribeErrors: () => void
   private unsubscribeBlock: () => void
 
-  private handlers: Handlers
-
   constructor(
     private address: Address,
     private db: Database,
@@ -115,27 +111,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
     this.status = IndexerStatus.STARTING
     const contractAddresses = chain.getInfo()
     log(`[DEBUG]contractAddresses...${JSON.stringify(contractAddresses, null, 2)}`)
-
-    this.handlers = Handlers.init(
-      safeAddress.to_string(),
-      chain.getPublicKey().to_address().to_string(),
-      {
-        channels: contractAddresses.hoprChannelsAddress,
-        token: contractAddresses.hoprTokenAddress,
-        network_registry: contractAddresses.hoprNetworkRegistryAddress,
-        announcements: contractAddresses.hoprAnnouncementsAddress,
-        node_safe_registry: contractAddresses.hoprNodeSafeRegistryAddress,
-        node_management_module: contractAddresses.moduleAddress,
-        ticket_price_oracle: contractAddresses.hoprTicketPriceOracleAddress
-      },
-      {
-        newAnnouncement: this.onAnnouncementUpdate.bind(this),
-        ownChannelUpdated: this.onOwnChannelUpdated.bind(this),
-        ticketRedeemed: this.onTicketRedeemed.bind(this),
-        nodeNotAllowedToAccessNetwork: this.onNodeNotAllowedToAccessNetwork.bind(this),
-        nodeAllowedToAccessNetwork: this.onNodeAllowedToAccessNetwork.bind(this)
-      }
-    )
 
     log(`Starting indexer...`)
     this.chain = chain
@@ -265,9 +240,9 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
    * @returns all relevant events in the specified block range
    */
   private async getEvents(
-    fromBlock: number,
-    toBlock: number,
-    fetchTokenTransactions = false
+    _fromBlock: number,
+    _toBlock: number,
+    _fetchTokenTransactions = false
   ): Promise<
     | {
         success: true
@@ -278,65 +253,6 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
       }
   > {
     let rawEvents: Log[] = []
-
-    const provider = this.chain.getProvider()
-    const contractAddresses = this.chain.getInfo()
-
-    let queries: Filter[] = [
-      {
-        address: contractAddresses.hoprAnnouncementsAddress,
-        topics: [this.handlers.get_announcement_topics()],
-        fromBlock,
-        toBlock
-      },
-      {
-        address: contractAddresses.hoprChannelsAddress,
-        topics: [this.handlers.get_channel_topics()],
-        fromBlock,
-        toBlock
-      },
-      {
-        address: contractAddresses.hoprNodeSafeRegistryAddress,
-        topics: [this.handlers.get_node_safe_registry_topics()],
-        fromBlock,
-        toBlock
-      },
-      {
-        address: contractAddresses.hoprNetworkRegistryAddress,
-        topics: [this.handlers.get_network_registry_topics()],
-        fromBlock,
-        toBlock
-      },
-      {
-        address: contractAddresses.hoprTicketPriceOracleAddress,
-        topics: [this.handlers.get_ticket_price_oracle_topics()],
-        fromBlock,
-        toBlock
-      }
-    ]
-
-    // Token events
-    // Actively query for logs to prevent polling done by Ethers.js
-    // that don't retry on failed attempts and thus makes the indexer
-    // handle errors produced by internal Ethers.js provider calls
-    if (fetchTokenTransactions) {
-      queries.push({
-        address: contractAddresses.hoprTokenAddress,
-        topics: [this.handlers.get_token_topics()],
-        fromBlock,
-        toBlock
-      })
-    }
-
-    for (const query of queries) {
-      try {
-        rawEvents.push(...(await provider.getLogs(query)))
-      } catch {
-        return {
-          success: false
-        }
-      }
-    }
 
     // sort in-place
     rawEvents.sort(snapshotComparator)
@@ -719,6 +635,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
         }
       }
 
+      // TODO: log index + block no should be sufficient, just leaving it here for now
       // @TODO: fix type clash
       lastDatabaseSnapshot = new Snapshot(
         new U256(event.blockNumber.toString()),
@@ -728,18 +645,18 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
 
       log('indexer on_event callback for transaction hash: ', event.transactionHash)
 
-      try {
-        await this.handlers.on_event(
-          this.db,
-          event.address.replace('0x', ''),
-          event.topics.map((t) => t.replace('0x', '')),
-          event.data.replace('0x', ''),
-          blockNumber.toString(),
-          lastDatabaseSnapshot
-        )
-      } catch (err) {
-        error('Error during indexer on_event callback: ', err, event)
-      }
+      // try {
+      //   await this.handlers.on_event(
+      //     this.db,
+      //     event.address.replace('0x', ''),
+      //     event.topics.map((t) => t.replace('0x', '')),
+      //     event.data.replace('0x', ''),
+      //     blockNumber.toString(),
+      //     lastDatabaseSnapshot
+      //   )
+      // } catch (err) {
+      //   error('Error during indexer on_event callback: ', err, event)
+      // }
     }
   }
 
