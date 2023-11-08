@@ -232,4 +232,46 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use ethers::prelude::U64;
+    use ethers_providers::MockProvider;
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use core_ethereum_misc::ContractAddresses;
+    use utils_types::primitives::Address;
+    use crate::HoprRpcOperations;
+    use crate::rpc::{RpcOperations, RpcOperationsConfig};
+
+    fn mock_config() -> RpcOperationsConfig {
+        RpcOperationsConfig {
+            indexer_start_block_number: 0,
+            chain_id: 4,
+            contract_addrs: ContractAddresses {
+                channels: Address::random(),
+                announcements: Address::random(),
+                token: Address::random(),
+                safe_registry: Address::random(),
+                network_registry: Address::random(),
+                price_oracle: Address::random(),
+            },
+            node_module: Address::random()
+        }
+    }
+
+    #[async_std::test]
+    async fn test_get_block_number() {
+        let prov = MockProvider::new();
+        let block_num_1 = U64::from(1);
+        let block_num_2 = U64::from(2);
+
+        prov.push(block_num_1).unwrap();
+        prov.push(block_num_2).unwrap();
+
+        let chain_key = ChainKeypair::random();
+        let cfg = mock_config();
+
+        let rpc = RpcOperations::new(prov, &chain_key, cfg).unwrap();
+
+        let bn = rpc.block_number().await.unwrap();
+        assert_eq!(block_num_2.as_u64(), bn);
+    }
+}
