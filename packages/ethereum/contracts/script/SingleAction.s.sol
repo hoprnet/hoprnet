@@ -115,11 +115,11 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
      * @dev Move nodes that are associated to an old safe to a new safe
      * Use admin key (of the old Safe) to
      * - Deregister node from Node-safe registry
-     * 
+     *
      * Use admin key (of the new Safe) to
      * - Include node to module
-     * 
-     * Use manager to 
+     *
+     * Use manager to
      * - Deregister nodes from Network Registry
      * - Re-register nodes with the new safe in Network Registry
      *
@@ -490,15 +490,16 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
 
         // 2. prepare data payload for the deregistration
         for (uint256 i = 0; i < nodeAddresses.length; i++) {
-            address safe = HoprNodeSafeRegistry(currentNetworkDetail.addresses.nodeSafeRegistryAddress).nodeToSafe(nodeAddresses[i]);
-
-            bytes memory safeTxData = abi.encodeWithSelector(
-                HoprNodeSafeRegistry.deregisterNodeBySafe.selector, nodeAddresses[i]
+            address safe = HoprNodeSafeRegistry(currentNetworkDetail.addresses.nodeSafeRegistryAddress).nodeToSafe(
+                nodeAddresses[i]
             );
 
+            bytes memory safeTxData =
+                abi.encodeWithSelector(HoprNodeSafeRegistry.deregisterNodeBySafe.selector, nodeAddresses[i]);
+
             _helperSignSafeTxAsOwner(
-                ISafe(payable(safe)), 
-                currentNetworkDetail.addresses.nodeSafeRegistryAddress, 
+                ISafe(payable(safe)),
+                currentNetworkDetail.addresses.nodeSafeRegistryAddress,
                 ISafe(payable(safe)).nonce(),
                 safeTxData
             );
