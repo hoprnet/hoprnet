@@ -323,6 +323,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_txs_in_block() {
+        let (prov, chain_key, _instance) = anvil_provider();
+
+        let cfg = mock_config();
+        let rpc = RpcOperations::new(prov, &chain_key, cfg).expect("failed to construct rpc");
+
+        // Send 1 ETH to some random address
+        let tx_hash = rpc
+            .send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
+            .await
+            .expect("failed to send tx");
+
+        let block = wait_until_tx(tx_hash, &rpc).await;
+
+        assert!(rpc.get_transactions_in_block(block.number.unwrap()).await.unwrap().contains(&tx_hash), "must contain tx");
+    }
+
+    #[tokio::test]
     async fn test_get_balance_native() {
         let (prov, chain_key, _instance) = anvil_provider();
 
