@@ -7,6 +7,7 @@ export const getTicketsStatistics = async (node: Hopr) => {
   const stats = await node.getTicketStatistics()
 
   return {
+    pending: 0,
     unredeemed: stats.unredeemed,
     unredeemedValue: stats.unredeemedValue.to_string(),
     redeemed: stats.redeemed,
@@ -52,6 +53,7 @@ GET.apiDoc = {
           schema: {
             type: 'object',
             properties: {
+              pending: { type: 'number', description: 'Not used. Always 0.' },
               unredeemed: {
                 type: 'number',
                 description: 'Number of tickets that wait to be redeemed as for Hopr tokens.'
