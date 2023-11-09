@@ -1285,6 +1285,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "thiserror",
+ "tokio",
  "utils-db",
  "utils-log",
  "utils-misc",

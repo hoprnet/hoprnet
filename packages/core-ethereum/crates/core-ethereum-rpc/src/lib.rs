@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use futures::Stream;
@@ -8,6 +9,7 @@ use crate::errors::Result;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 pub use ethers::types::TxHash;
+use utils_types::traits::BinarySerializable;
 
 pub mod errors;
 pub mod rpc;
@@ -27,6 +29,16 @@ pub struct Block {
     pub timestamp: U256,
     /// Transaction hashes within this block
     pub transactions: Vec<Hash>,
+}
+
+impl Display for Block {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "block {} ({}) with {} txs",
+               self.number.map(|i| i.to_string()).unwrap_or("pending".into()),
+               self.timestamp.as_u64(),
+               self.transactions.len()
+        )
+    }
 }
 
 impl From<ethers::types::Block<H256>> for Block {
@@ -60,6 +72,15 @@ impl From<ethers::types::Log> for Log {
             tx_index: value.transaction_index.map(|u| u.as_u64()),
             block_number: value.block_number.map(|u| u.as_u64()),
             log_index: value.log_index.map(|u| u.into()),
+        }
+    }
+}
+
+impl From<Log> for ethers::abi::RawLog {
+    fn from(value: Log) -> Self {
+        ethers::abi::RawLog {
+            topics: value.topics.iter().map(|h| H256::from_slice(&h.to_bytes())).collect(),
+            data: value.data.into()
         }
     }
 }

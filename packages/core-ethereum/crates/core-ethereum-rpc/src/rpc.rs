@@ -17,6 +17,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
@@ -37,6 +38,7 @@ pub struct RpcOperationsConfig {
     pub chain_id: u64,
     pub contract_addrs: ContractAddresses,
     pub node_module: Address,
+    pub polling_interval: Duration,
 }
 
 type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
@@ -58,6 +60,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?;
         let provider = Arc::new(
             Provider::new(json_rpc)
+                .interval(cfg.polling_interval)
                 .with_signer(wallet.with_chain_id(cfg.chain_id))
                 .nonce_manager(chain_key.public().to_address().into()),
         );
@@ -233,18 +236,45 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 
 #[cfg(test)]
 mod tests {
+    use std::future::Future;
+    use std::path::PathBuf;
+    use std::pin::{pin, Pin};
+    use std::str::FromStr;
+    use std::time::Duration;
     use ethers::prelude::U64;
-    use ethers_providers::MockProvider;
+    use ethers::types::Eip1559TransactionRequest;
+    use ethers::utils::{Anvil, AnvilInstance};
+    use ethers_providers::{FilterWatcher, Http, Middleware, MockProvider, Provider};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_ethereum_misc::ContractAddresses;
-    use utils_types::primitives::Address;
-    use crate::HoprRpcOperations;
-    use crate::rpc::{RpcOperations, RpcOperationsConfig};
+    use utils_types::primitives::{Address, Balance, BalanceType, U256};
+    use futures::{stream, StreamExt};
+    use futures::future::Either;
+    use futures::stream::Any;
+    use primitive_types::{H160, H256};
+    use tokio::time::Sleep;
+    use core_crypto::types::Hash;
+    use crate::{Block, HoprRpcOperations, TypedTransaction};
+    use crate::rpc::{BlockStream, RpcOperations, RpcOperationsConfig};
+
+    fn anvil_provider() -> (Http, ChainKeypair, AnvilInstance) {
+        let anvil: AnvilInstance = Anvil::new()
+            .path(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"))
+            .block_time(1_u64)
+            .spawn();
+
+        (
+            Http::from_str(&anvil.endpoint()).unwrap(),
+            ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap(),
+            anvil,
+        )
+    }
 
     fn mock_config() -> RpcOperationsConfig {
         RpcOperationsConfig {
             indexer_start_block_number: 0,
-            chain_id: 4,
+            polling_interval: Duration::from_millis(100),
+            chain_id: 31337, // Anvil default chain id
             contract_addrs: ContractAddresses {
                 channels: Address::random(),
                 announcements: Address::random(),
@@ -257,14 +287,35 @@ mod tests {
         }
     }
 
+    fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {
+        let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
+        tx.set_to(H160::from(to));
+        tx.set_value(ethers::types::U256(primitive_types::U256::from(amount).0));
+        tx
+    }
+
+    async fn wait_until_tx<Rpc: HoprRpcOperations>(tx_hash: Hash, rpc: &Rpc) -> Block {
+        let stream = rpc.subscribe_blocks().await.expect("failed to get block stream");
+
+        let timeout = pin!(tokio::time::sleep(Duration::from_secs(8)));
+        let block = pin!(stream
+            .filter(|block| futures::future::ready(block.transactions.contains(&tx_hash)))
+            .take(1)
+            .collect::<Vec<Block>>()
+        );
+
+        match futures::future::select(block, timeout).await {
+            Either::Left((mut vec,_)) => vec.pop().unwrap(),
+            Either::Right(_) => panic!("timeout")
+        }
+    }
+
     #[async_std::test]
     async fn test_get_block_number() {
         let prov = MockProvider::new();
-        let block_num_1 = U64::from(1);
-        let block_num_2 = U64::from(2);
+        let block_num = U64::from(2);
 
-        prov.push(block_num_1).unwrap();
-        prov.push(block_num_2).unwrap();
+        prov.push(block_num).unwrap();
 
         let chain_key = ChainKeypair::random();
         let cfg = mock_config();
@@ -272,6 +323,52 @@ mod tests {
         let rpc = RpcOperations::new(prov, &chain_key, cfg).unwrap();
 
         let bn = rpc.block_number().await.unwrap();
-        assert_eq!(block_num_2.as_u64(), bn);
+        assert_eq!(block_num.as_u64(), bn);
+    }
+
+    #[tokio::test]
+    async fn test_get_balance_native() {
+        let (prov, chain_key, _instance) = anvil_provider();
+
+        let cfg = mock_config();
+        let rpc = RpcOperations::new(prov, &chain_key, cfg)
+            .expect("failed to construct rpc");
+
+        let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
+        assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
+
+        // Send 1 ETH to some random address
+        let tx_hash = rpc.send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
+            .await
+            .expect("failed to send tx");
+
+        let _ = wait_until_tx(tx_hash, &rpc).await;
+
+        let balance_2 = rpc.get_balance(BalanceType::Native).await.unwrap();
+        assert!(balance_2.lt(&balance_1), "balance must be diminished");
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_blocks() {
+        let (prov, chain_key, _instance) = anvil_provider();
+
+        let cfg = mock_config();
+        let rpc = RpcOperations::new(prov, &chain_key, cfg)
+            .expect("failed to construct rpc");
+
+        // Send 1 ETH to some random address
+        let tx_hash = rpc.send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
+            .await
+            .expect("failed to send tx");
+
+        let stream = rpc.subscribe_blocks().await.expect("failed to get block stream");
+
+        let timeout = pin!(tokio::time::sleep(Duration::from_secs(8)));
+        let hash = pin!(stream.any(|block| async move { block.transactions.contains(&tx_hash) }));
+
+        match futures::future::select(hash, timeout).await {
+            Either::Left(_) => {}
+            Either::Right(_) => panic!("timeout")
+        };
     }
 }
