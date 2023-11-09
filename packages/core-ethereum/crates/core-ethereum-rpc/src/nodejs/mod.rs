@@ -1,6 +1,6 @@
-use std::error::Error;
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError, ProviderError, PubsubClient};
+use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;

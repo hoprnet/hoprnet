@@ -1,8 +1,8 @@
-use std::fmt::{Display, Formatter};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use futures::Stream;
 use primitive_types::H256;
+use std::fmt::{Display, Formatter};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::Result;
@@ -33,10 +33,12 @@ pub struct Block {
 
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "block {} ({}) with {} txs",
-               self.number.map(|i| i.to_string()).unwrap_or("pending".into()),
-               self.timestamp.as_u64(),
-               self.transactions.len()
+        write!(
+            f,
+            "block {} ({}) with {} txs",
+            self.number.map(|i| i.to_string()).unwrap_or("pending".into()),
+            self.timestamp.as_u64(),
+            self.transactions.len()
         )
     }
 }
@@ -80,7 +82,7 @@ impl From<Log> for ethers::abi::RawLog {
     fn from(value: Log) -> Self {
         ethers::abi::RawLog {
             topics: value.topics.iter().map(|h| H256::from_slice(&h.to_bytes())).collect(),
-            data: value.data.into()
+            data: value.data.into(),
         }
     }
 }

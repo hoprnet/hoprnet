@@ -225,37 +225,34 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     }
 
     async fn subscribe_logs<'a>(&'a self, query: EventsQuery) -> Result<Self::LogStream<'a>> {
-        Ok(Box::pin(self
-            .provider
-            .watch(&query.into())
-            .await?
-            .map(|log| crate::Log::from(log))
+        Ok(Box::pin(
+            self.provider
+                .watch(&query.into())
+                .await?
+                .map(|log| crate::Log::from(log)),
         ))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::future::Future;
-    use std::path::PathBuf;
-    use std::pin::{pin, Pin};
-    use std::str::FromStr;
-    use std::time::Duration;
+    use crate::rpc::{RpcOperations, RpcOperationsConfig};
+    use crate::{Block, HoprRpcOperations, TypedTransaction};
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use core_crypto::types::Hash;
+    use core_ethereum_misc::ContractAddresses;
     use ethers::prelude::U64;
     use ethers::types::Eip1559TransactionRequest;
     use ethers::utils::{Anvil, AnvilInstance};
-    use ethers_providers::{FilterWatcher, Http, Middleware, MockProvider, Provider};
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_ethereum_misc::ContractAddresses;
-    use utils_types::primitives::{Address, Balance, BalanceType, U256};
-    use futures::{stream, StreamExt};
+    use ethers_providers::{Http, MockProvider};
     use futures::future::Either;
-    use futures::stream::Any;
-    use primitive_types::{H160, H256};
-    use tokio::time::Sleep;
-    use core_crypto::types::Hash;
-    use crate::{Block, HoprRpcOperations, TypedTransaction};
-    use crate::rpc::{BlockStream, RpcOperations, RpcOperationsConfig};
+    use futures::StreamExt;
+    use primitive_types::H160;
+    use std::path::PathBuf;
+    use std::pin::pin;
+    use std::str::FromStr;
+    use std::time::Duration;
+    use utils_types::primitives::{Address, BalanceType, U256};
 
     fn anvil_provider() -> (Http, ChainKeypair, AnvilInstance) {
         let anvil: AnvilInstance = Anvil::new()
@@ -283,7 +280,7 @@ mod tests {
                 network_registry: Address::random(),
                 price_oracle: Address::random(),
             },
-            node_module: Address::random()
+            node_module: Address::random(),
         }
     }
 
@@ -301,12 +298,11 @@ mod tests {
         let block = pin!(stream
             .filter(|block| futures::future::ready(block.transactions.contains(&tx_hash)))
             .take(1)
-            .collect::<Vec<Block>>()
-        );
+            .collect::<Vec<Block>>());
 
         match futures::future::select(block, timeout).await {
-            Either::Left((mut vec,_)) => vec.pop().unwrap(),
-            Either::Right(_) => panic!("timeout")
+            Either::Left((mut vec, _)) => vec.pop().unwrap(),
+            Either::Right(_) => panic!("timeout"),
         }
     }
 
@@ -331,14 +327,14 @@ mod tests {
         let (prov, chain_key, _instance) = anvil_provider();
 
         let cfg = mock_config();
-        let rpc = RpcOperations::new(prov, &chain_key, cfg)
-            .expect("failed to construct rpc");
+        let rpc = RpcOperations::new(prov, &chain_key, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
 
         // Send 1 ETH to some random address
-        let tx_hash = rpc.send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
+        let tx_hash = rpc
+            .send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
             .await
             .expect("failed to send tx");
 
@@ -353,11 +349,11 @@ mod tests {
         let (prov, chain_key, _instance) = anvil_provider();
 
         let cfg = mock_config();
-        let rpc = RpcOperations::new(prov, &chain_key, cfg)
-            .expect("failed to construct rpc");
+        let rpc = RpcOperations::new(prov, &chain_key, cfg).expect("failed to construct rpc");
 
         // Send 1 ETH to some random address
-        let tx_hash = rpc.send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
+        let tx_hash = rpc
+            .send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
             .await
             .expect("failed to send tx");
 
@@ -368,7 +364,7 @@ mod tests {
 
         match futures::future::select(hash, timeout).await {
             Either::Left(_) => {}
-            Either::Right(_) => panic!("timeout")
+            Either::Right(_) => panic!("timeout"),
         };
     }
 }
