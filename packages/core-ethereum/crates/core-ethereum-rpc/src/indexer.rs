@@ -4,10 +4,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, Middleware};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use core_crypto::types::Hash;
 
 use futures::future::poll_fn;
-use futures::{Sink, SinkExt};
 use utils_log::{debug, error, info, warn};
 
 use crate::{BlockWithLogs, EventsQuery, HoprIndexerRpcOperations, Log};
@@ -25,16 +23,6 @@ use gloo_timers::future::sleep;
 use wasm_bindgen_futures::spawn_local;
 use utils_types::sma::{NoSumSMA, SMA};
 
-impl<P: JsonRpcClient + 'static> RpcOperations<P> {
-    async fn get_transactions_in_block(&self, block_number: u64) -> Result<Vec<Hash>> {
-        Ok(self
-            .get_block(block_number)
-            .await?
-            .map(|block| block.transactions.iter().map(|h| Hash::from(h.0)).collect::<Vec<_>>())
-            .unwrap_or_default())
-    }
-}
-
 async fn send_block_with_logs(tx: &mut UnboundedSender<BlockWithLogs>, block: BlockWithLogs) -> Result<()> {
     match poll_fn(|cx| Pin::new(&tx).poll_ready(cx)).await {
         Ok(_) => {
@@ -47,7 +35,7 @@ async fn send_block_with_logs(tx: &mut UnboundedSender<BlockWithLogs>, block: Bl
     }
 }
 
-async fn get_block_with_logs_from_provider<P: JsonRpcClient>(block_number: u64, filter: EventsQuery, provider: Arc<HoprMiddleware<P>>) -> Result<BlockWithLogs> {
+async fn get_block_with_logs_from_provider<P: JsonRpcClient + 'static>(block_number: u64, filter: EventsQuery, provider: Arc<HoprMiddleware<P>>) -> Result<BlockWithLogs> {
     debug!("getting block {block_number} with logs");
     match provider.get_block(block_number).await? {
         Some(block) => {
@@ -84,7 +72,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             let mut current = start_block;
             let mut latest = latest_block;
 
-            let mut block_time_sma = NoSumSMA::<Duration>::new(10);
+            let mut block_time_sma = NoSumSMA::<Duration, u32>::new(10);
             let mut prev_block = None;
 
             while current < latest_block {
@@ -141,7 +129,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
                             prev_block = Some(block_ts);
                             current = new_current;
-                            current_backoff = initial_poll_backoff;
+                            current_backoff = block_time_sma.get_average().unwrap_or(initial_poll_backoff);
                         }
                         Err(NoSuchBlock) => {
                             sleep(current_backoff.min(Duration::from_millis(100))).await;

@@ -1,18 +1,17 @@
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::fmt::{Display, Formatter};
+use std::marker::PhantomData;
 use std::ops::{Add, Div};
 
 /// Simple Moving Average trait.
 /// The second-most useful filter type, bested only by coffee filters.
-pub trait SMA<T>
-where
-    T: for<'a> Add<&'a T, Output = T> + Div<T, Output = T> + Clone + From<u32> + Display + Default,
-{
+pub trait SMA<T> {
     /// Adds a sample.
     fn add_sample(&mut self, sample: T);
 
     /// Calculates the moving average value.
-    fn get_average(&self) -> T;
+    /// Returns `None` if no samples were added.
+    fn get_average(&self) -> Option<T>;
 
     /// Returns the window size.
     fn window_size(&self) -> usize;
@@ -20,6 +19,12 @@ where
     /// Returns the number of elements in the window.
     /// This value is always between 0 and `window_size()`.
     fn len(&self) -> usize;
+
+    /// Indicates whether the window is fully occupied
+    /// with samples.
+    fn is_window_full(&self) -> bool {
+        self.len() == self.window_size()
+    }
 }
 
 /// Basic implementation of Simple Moving Average (SMA).
@@ -27,16 +32,18 @@ where
 /// Useful mainly for floating-point types, as it does not accumulate floating point error with each sample,
 /// but requires `O(N)` of memory and `O(N)` for average computation, `N` being window size.
 #[derive(Clone, Debug, PartialEq)]
-pub struct NoSumSMA<T>
+pub struct NoSumSMA<T, D>
 where
     T: Clone,
 {
     window: AllocRingBuffer<T>,
+    _div: PhantomData<D>
 }
 
-impl<T> SMA<T> for NoSumSMA<T>
+impl<T, D> SMA<T> for NoSumSMA<T, D>
 where
-    T: Add<T, Output = T> + Div<T, Output = T> + Clone + From<u32>,
+    T: Add<T, Output = T> + Div<D, Output = T> + Clone,
+    D: From<u32>
 {
     fn add_sample(&mut self, sample: T) {
         self.window.push(sample);
@@ -48,7 +55,7 @@ where
             for v in self.window.iter().skip(1).cloned() {
                 ret = ret + v;
             }
-            Some(ret / (self.window.len() as u32).into())
+            Some(ret / D::from(self.window.len() as u32))
         } else {
             None
         }
@@ -63,38 +70,10 @@ where
     }
 }
 
-impl<T> SMA<T> for NoSumSMA<T>
-    where
-        T: Add<T, Output = T> + Div<u32, Output = T> + Clone,
-{
-    fn add_sample(&mut self, sample: T) {
-        self.window.push(sample);
-    }
-
-    fn get_average(&self) -> Option<T> {
-        if !self.window.is_empty() {
-            let mut ret = self.window[0].clone();
-            for v in self.window.iter().skip(1).cloned() {
-                ret = ret + v;
-            }
-            Some(ret / (self.window.len() as u32))
-        } else {
-            None
-        }
-    }
-
-    fn window_size(&self) -> usize {
-        self.window.capacity()
-    }
-
-    fn len(&self) -> usize {
-        self.window.len()
-    }
-}
-
-impl<T> NoSumSMA<T>
+impl<T, D> NoSumSMA<T, D>
 where
-    T: Clone,
+    T: Add<T, Output = T> + Div<D, Output = T> + Clone,
+    D: From<u32>
 {
     /// Creates an empty SMA instance with the given window size.
     /// The maximum window size is u32::MAX and must be greater than 1.
@@ -102,6 +81,7 @@ where
         assert!(window_size > 1, "window size must be greater than 1");
         Self {
             window: AllocRingBuffer::new(window_size as usize),
+            _div: PhantomData
         }
     }
 
@@ -113,9 +93,10 @@ where
     }
 }
 
-impl<T> Display for NoSumSMA<T>
+impl<T, D> Display for NoSumSMA<T, D>
 where
-    T: Display + Default
+    T: Add<T, Output = T> + Div<D, Output = T> + Clone + Default + Display,
+    D: From<u32>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.get_average().unwrap_or_default())
@@ -128,20 +109,20 @@ mod tests {
 
     #[test]
     fn test_nosum_sma_empty() {
-        let sma = NoSumSMA::<u32>::new(3);
+        let sma = NoSumSMA::<u32, u32>::new(3);
         assert_eq!(3, sma.window_size(), "invalid windows size");
-        assert_eq!(0, sma.get_average(), "invalid empty average");
+        assert!(sma.get_average().is_none(), "invalid empty average");
     }
 
     #[test]
     fn test_nosum_sma_should_calculate_avg_correctly() {
-        let mut sma = NoSumSMA::<u32>::new(3);
+        let mut sma = NoSumSMA::<u32, u32>::new(3);
         sma.add_sample(0);
         sma.add_sample(1);
         sma.add_sample(2);
         sma.add_sample(3);
 
-        assert_eq!(2, sma.get_average(), "invalid average");
+        assert_eq!(2, sma.get_average().unwrap(), "invalid average");
         assert_eq!(3, sma.window_size(), "window size is invalid");
     }
 }

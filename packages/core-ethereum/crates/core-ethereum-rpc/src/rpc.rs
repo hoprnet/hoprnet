@@ -1,4 +1,3 @@
-use async_std::prelude::Stream;
 use async_trait::async_trait;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_crypto::types::Hash;
@@ -8,17 +7,11 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::BlockId;
-use ethers_providers::{FilterWatcher, JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder};
-use futures::StreamExt;
-use pin_project::pin_project;
-use primitive_types::{H160, H256};
+use ethers_providers::{HttpRateLimitRetryPolicy, JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy};
+use primitive_types::H160;
 use serde::{Deserialize, Serialize};
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use std::time::Duration;
-use futures::stream::FusedStream;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
@@ -28,22 +21,21 @@ use bindings::hopr_network_registry::HoprNetworkRegistry;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
 use bindings::hopr_token::HoprToken;
-use utils_log::error;
 
 use crate::errors::Result;
-use crate::{Block, EventsQuery, HoprRpcOperations, Log};
+use crate::HoprRpcOperations;
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
     pub chain_id: u64,
     pub contract_addrs: ContractAddresses,
     pub node_module: Address,
-    pub max_retries: u32,
+    pub max_http_retries: u32,
 }
 
 pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
 
-pub struct RpcOperations<P: JsonRpcClient> {
+pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
     pub(crate) provider: Arc<HoprMiddleware<P>>,
     channels: HoprChannels<HoprMiddleware<P>>,
@@ -55,13 +47,14 @@ pub struct RpcOperations<P: JsonRpcClient> {
     cfg: RpcOperationsConfig,
 }
 
-impl<P: JsonRpcClient + 'static> RpcOperations<P> {
+impl<P: JsonRpcClient + 'static> RpcOperations<P>
+where HttpRateLimitRetryPolicy: RetryPolicy<<P as JsonRpcClient>::Error> {
     pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let provider_client = RetryClientBuilder::default()
             .rate_limit_retries(5)
-            .timeout_retries(cfg.max_retries)
+            .timeout_retries(cfg.max_http_retries)
             .initial_backoff(Duration::from_millis(500))
-            .build(json_rpc, Box::<ethers::providers::HttpRateLimitRetryPolicy>::default());
+            .build(json_rpc, Box::<HttpRateLimitRetryPolicy>::default());
 
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?;
         let provider = Arc::new(
@@ -85,11 +78,6 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
             provider,
         })
     }
-
-    pub(crate) async fn get_block(&self, block_number: u64) -> Result<Option<ethers::types::Block<H256>>> {
-        let block_id: BlockId = block_number.into();
-        Ok(self.provider.get_block(block_id).await?)
-    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -97,7 +85,10 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
-        Ok(self.get_block(block_number).await?.map(|b| b.timestamp.as_u64()))
+        Ok(self.provider
+            .get_block(BlockId::Number(block_number.into()))
+            .await?
+            .map(|b| b.timestamp.as_u64()))
     }
 
     async fn get_balance(&self, balance_type: BalanceType) -> Result<Balance> {

@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use core_crypto::types::Hash;
-use futures::Stream;
 use primitive_types::H256;
 use std::fmt::{Display, Formatter};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
@@ -9,7 +8,7 @@ use crate::errors::Result;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 pub use ethers::types::TxHash;
-use futures::channel::mpsc::{Receiver, UnboundedReceiver};
+use futures::channel::mpsc::UnboundedReceiver;
 use utils_types::traits::BinarySerializable;
 
 pub mod errors;
