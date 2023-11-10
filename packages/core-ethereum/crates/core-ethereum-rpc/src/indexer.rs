@@ -36,7 +36,7 @@ async fn send_block_with_logs(tx: &mut UnboundedSender<BlockWithLogs>, block: Bl
 }
 
 async fn get_block_with_logs_from_provider<P: JsonRpcClient + 'static>(block_number: u64, filter: EventsQuery, provider: Arc<HoprMiddleware<P>>) -> Result<BlockWithLogs> {
-    debug!("getting block {block_number} with logs");
+    debug!("getting block #{block_number} with logs");
     match provider.get_block(block_number).await? {
         Some(block) => {
             let filter: ethers::types::Filter = filter.into();
@@ -66,7 +66,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         let provider = self.provider.clone();
         let latest_block = self.block_number().await?;
         let start_block = start_block_number.unwrap_or(latest_block);
-        let initial_poll_backoff = Duration::from_secs(4);
+        let initial_poll_backoff = self.cfg.expected_block_time;
 
         spawn_local(async move {
             let mut current = start_block;
@@ -80,7 +80,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                     Ok(block_with_logs) => {
                         let new_current = block_with_logs.block.number.expect("past block must not be pending");
                         let block_ts = Duration::from_secs(block_with_logs.block.timestamp.as_u64());
-                        info!("got past block {new_current}");
+                        info!("got past block #{new_current}");
 
                         if let Err(e) = send_block_with_logs(&mut tx, block_with_logs).await {
                             error!("failed to dispatch past block: {e}");

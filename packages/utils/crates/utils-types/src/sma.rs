@@ -31,8 +31,9 @@ pub trait SMA<T> {
 /// The maximum window size is bound by 2^32 - 1.
 /// Useful mainly for floating-point types, as it does not accumulate floating point error with each sample,
 /// but requires `O(N)` of memory and `O(N)` for average computation, `N` being window size.
+/// The divisor argument `D` is used only for such types `T` that do not implement `From<u32>` (such as `Duration`,...).
 #[derive(Clone, Debug, PartialEq)]
-pub struct NoSumSMA<T, D>
+pub struct NoSumSMA<T, D = T>
 where
     T: Clone,
 {

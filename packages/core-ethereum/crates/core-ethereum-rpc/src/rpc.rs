@@ -31,6 +31,7 @@ pub struct RpcOperationsConfig {
     pub contract_addrs: ContractAddresses,
     pub node_module: Address,
     pub max_http_retries: u32,
+    pub expected_block_time: Duration,
 }
 
 pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
@@ -38,13 +39,13 @@ pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Prov
 pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
     pub(crate) provider: Arc<HoprMiddleware<P>>,
+    pub(crate) cfg: RpcOperationsConfig,
     channels: HoprChannels<HoprMiddleware<P>>,
     announcements: HoprAnnouncements<HoprMiddleware<P>>,
     safe_registry: HoprNodeSafeRegistry<HoprMiddleware<P>>,
     network_registry: HoprNetworkRegistry<HoprMiddleware<P>>,
     node_module: HoprNodeManagementModule<HoprMiddleware<P>>,
     token: HoprToken<HoprMiddleware<P>>,
-    cfg: RpcOperationsConfig,
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P>

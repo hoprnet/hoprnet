@@ -3,20 +3,20 @@ use core_crypto::types::Hash;
 use primitive_types::H256;
 use std::fmt::{Display, Formatter};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
+use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 pub use ethers::types::TxHash;
-use futures::channel::mpsc::UnboundedReceiver;
-use utils_types::traits::BinarySerializable;
+pub use futures::channel::mpsc::UnboundedReceiver;
 
 pub mod errors;
 pub mod rpc;
+pub mod indexer;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub mod nodejs;
-mod indexer;
 
 /// A type containing selected fields from  the `eth_getBlockByHash`/`eth_getBlockByNumber` RPC
 /// calls.
@@ -36,8 +36,8 @@ impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "block {} ({}) with {} txs",
-            self.number.map(|i| i.to_string()).unwrap_or("pending".into()),
+            "{} (@ {}) with {} txs",
+            self.number.map(|i| format!("block #{i}")).unwrap_or("pending block".into()),
             self.timestamp.as_u64(),
             self.transactions.len()
         )
@@ -58,11 +58,17 @@ impl From<ethers::types::Block<H256>> for Block {
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 #[derive(Debug, Clone)]
 pub struct Log {
+    /// Contract address
     pub address: Address,
+    /// Topics
     pub topics: Vec<Hash>,
+    /// Raw log data
     pub data: Box<[u8]>,
+    /// Transaction index
     pub tx_index: Option<u64>,
+    /// Corresponding block number
     pub block_number: Option<u64>,
+    /// Log index
     pub log_index: Option<U256>,
 }
 
@@ -90,14 +96,23 @@ impl From<Log> for ethers::abi::RawLog {
 
 impl Display for Log {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "log of contract address {} with {} topics", self.address, self.topics.len())
+        write!(f, "log of {} with {} topics", self.address, self.topics.len())
     }
 }
 
+/// Represents a mined block with also corresponding logs fetched (according to some `EventsQuery` filter).
 #[derive(Debug, Clone)]
 pub struct BlockWithLogs {
+    /// Block with TX hashes.
     pub block: Block,
+    /// Logs of interest corresponding to the block.
     pub logs: Vec<Log>
+}
+
+impl Display for BlockWithLogs {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} and {} logs", self.block, self.logs.len())
+    }
 }
 
 /// Represents a query to extract logs containing specific contract events.
@@ -105,7 +120,7 @@ pub struct BlockWithLogs {
 pub struct EventsQuery {
     /// Contract address
     pub address: Address,
-    /// Event topics
+    /// Event topics (maximum 4)
     pub topics: Vec<TxHash>,
 }
 
@@ -123,27 +138,40 @@ impl From<EventsQuery> for ethers::types::Filter {
     }
 }
 
+/// Trait defining general set of operations an RPC provider
+/// must provide to the HOPR node.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprRpcOperations {
+    /// Retrieves the timestamp from the given block number.
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
 
+    /// Retrieves the node's account balance of the given type.
     async fn get_balance(&self, balance_type: BalanceType) -> Result<Balance>;
 
+    /// Retrieves info of the given node module's target.
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
 
+    /// Retrieves safe address of the given node address from the registry.
     async fn get_safe_from_node_safe_registry(&self, node: Address) -> Result<Address>;
 
+    /// Retrieves target address of the node module.
     async fn get_module_target_address(&self) -> Result<Address>;
 
+    /// Sends transaction to the RPC provider.
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
 }
 
+/// Extension of `HoprRpcOperations` trait with functionality required by the Indexer.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprIndexerRpcOperations: HoprRpcOperations {
+    /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
+    /// Starts streaming the blocks with logs from the given `start_block_number`.
+    /// If no `start_block_number` is given, the stream starts from the latest block.
+    /// The given `filter` is applied to retrieve the logs for each retrieved block.
+    /// The streaming stops only when the corresponding channel is closed by the returned receiver.
     async fn poll_blocks_with_logs(&self, start_block_number: Option<u64>, filter: EventsQuery) -> Result<UnboundedReceiver<BlockWithLogs>>;
-
 }
