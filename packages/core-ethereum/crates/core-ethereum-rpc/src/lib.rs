@@ -9,6 +9,7 @@ use crate::errors::Result;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 pub use ethers::types::TxHash;
+use futures::channel::mpsc::{Receiver, UnboundedReceiver};
 use utils_types::traits::BinarySerializable;
 
 pub mod errors;
@@ -16,14 +17,15 @@ pub mod rpc;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub mod nodejs;
+mod indexer;
 
 /// A type containing selected fields from  the `eth_getBlockByHash`/`eth_getBlockByNumber` RPC
 /// calls.
 #[derive(Debug, Clone)]
 pub struct Block {
-    /// Block number or `None` if pending.
+    /// Block number
     pub number: Option<u64>,
-    /// Block hash or `None` if pending.
+    /// Block hash if any.
     pub hash: Option<Hash>,
     /// Block timestamp
     pub timestamp: U256,
@@ -87,6 +89,18 @@ impl From<Log> for ethers::abi::RawLog {
     }
 }
 
+impl Display for Log {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "log of contract address {} with {} topics", self.address, self.topics.len())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockWithLogs {
+    pub block: Block,
+    pub logs: Vec<Log>
+}
+
 /// Represents a query to extract logs containing specific contract events.
 #[derive(Debug, Clone)]
 pub struct EventsQuery {
@@ -94,19 +108,13 @@ pub struct EventsQuery {
     pub address: Address,
     /// Event topics
     pub topics: Vec<TxHash>,
-    /// Start block number
-    pub from: u64,
-    /// End block number
-    pub to: u64,
 }
 
 impl From<EventsQuery> for ethers::types::Filter {
     fn from(value: EventsQuery) -> Self {
         let addr: ethers::types::H160 = value.address.into();
         let mut ret = ethers::types::Filter::new()
-            .address::<ethers::types::H160>(addr.into())
-            .from_block(value.from)
-            .to_block(value.to);
+            .address::<ethers::types::H160>(addr.into());
 
         for i in 0..4.min(value.topics.len()) {
             ret.topics[i] = Some(value.topics[i].into())
@@ -119,22 +127,9 @@ impl From<EventsQuery> for ethers::types::Filter {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprRpcOperations {
-    type BlockStream<'a>: Stream<Item = Block>
-    where
-        Self: 'a;
-    type LogStream<'a>: Stream<Item = Log>
-    where
-        Self: 'a;
-
-    async fn genesis_block(&self) -> Result<u64>;
-
-    async fn block_number(&self) -> Result<u64>;
-
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
 
     async fn get_balance(&self, balance_type: BalanceType) -> Result<Balance>;
-
-    async fn get_transactions_in_block(&self, block_number: u64) -> Result<Vec<Hash>>;
 
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
 
@@ -143,8 +138,13 @@ pub trait HoprRpcOperations {
     async fn get_module_target_address(&self) -> Result<Address>;
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
+}
 
-    async fn subscribe_blocks<'a>(&'a self) -> Result<Self::BlockStream<'a>>;
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+pub trait HoprIndexerRpcOperations: HoprRpcOperations {
+    async fn block_number(&self) -> Result<u64>;
 
-    async fn subscribe_logs<'a>(&'a self, query: EventsQuery) -> Result<Self::LogStream<'a>>;
+    async fn poll_blocks_with_logs(&self, start_block_number: Option<u64>, filter: EventsQuery) -> Result<UnboundedReceiver<BlockWithLogs>>;
+
 }

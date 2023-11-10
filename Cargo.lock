@@ -1275,6 +1275,7 @@ dependencies = [
  "ethers-providers",
  "ethnum",
  "futures",
+ "gloo-timers 0.3.0",
  "hex",
  "hex-literal",
  "js-sys",

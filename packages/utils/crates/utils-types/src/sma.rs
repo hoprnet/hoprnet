@@ -29,28 +29,57 @@ where
 #[derive(Clone, Debug, PartialEq)]
 pub struct NoSumSMA<T>
 where
-    T: for<'a> Add<&'a T, Output = T> + Div<T, Output = T> + Clone + From<u32> + Display + Default,
+    T: Clone,
 {
     window: AllocRingBuffer<T>,
 }
 
 impl<T> SMA<T> for NoSumSMA<T>
 where
-    T: for<'a> Add<&'a T, Output = T> + Div<T, Output = T> + Clone + From<u32> + Display + Default,
+    T: Add<T, Output = T> + Div<T, Output = T> + Clone + From<u32>,
 {
     fn add_sample(&mut self, sample: T) {
         self.window.push(sample);
     }
 
-    fn get_average(&self) -> T {
+    fn get_average(&self) -> Option<T> {
         if !self.window.is_empty() {
-            let mut ret = T::default();
-            for v in self.window.iter() {
+            let mut ret = self.window[0].clone();
+            for v in self.window.iter().skip(1).cloned() {
                 ret = ret + v;
             }
-            ret / (self.window.len() as u32).into()
+            Some(ret / (self.window.len() as u32).into())
         } else {
-            Default::default()
+            None
+        }
+    }
+
+    fn window_size(&self) -> usize {
+        self.window.capacity()
+    }
+
+    fn len(&self) -> usize {
+        self.window.len()
+    }
+}
+
+impl<T> SMA<T> for NoSumSMA<T>
+    where
+        T: Add<T, Output = T> + Div<u32, Output = T> + Clone,
+{
+    fn add_sample(&mut self, sample: T) {
+        self.window.push(sample);
+    }
+
+    fn get_average(&self) -> Option<T> {
+        if !self.window.is_empty() {
+            let mut ret = self.window[0].clone();
+            for v in self.window.iter().skip(1).cloned() {
+                ret = ret + v;
+            }
+            Some(ret / (self.window.len() as u32))
+        } else {
+            None
         }
     }
 
@@ -65,7 +94,7 @@ where
 
 impl<T> NoSumSMA<T>
 where
-    T: for<'a> Add<&'a T, Output = T> + Div<T, Output = T> + Clone + From<u32> + Display + Default,
+    T: Clone,
 {
     /// Creates an empty SMA instance with the given window size.
     /// The maximum window size is u32::MAX and must be greater than 1.
@@ -79,17 +108,17 @@ where
     /// Creates SMA instance given window size and some initial samples.
     pub fn new_with_samples(window_size: u32, initial_samples: &[T]) -> Self {
         let mut ret = Self::new(window_size);
-        initial_samples.iter().for_each(|s| ret.add_sample(s.clone()));
+        initial_samples.iter().cloned().for_each(|s| ret.add_sample(s));
         ret
     }
 }
 
 impl<T> Display for NoSumSMA<T>
 where
-    T: for<'a> Add<&'a T, Output = T> + Div<T, Output = T> + Clone + From<u32> + Display + Default,
+    T: Display + Default
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_average())
+        write!(f, "{}", self.get_average().unwrap_or_default())
     }
 }
 

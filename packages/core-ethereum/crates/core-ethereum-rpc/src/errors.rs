@@ -11,6 +11,12 @@ pub enum RpcError {
     #[error("middleware error: {0}")]
     MiddlewareError(String),
 
+    #[error("block with such id does not (yet) exist")]
+    NoSuchBlock,
+
+    #[error("non-specific RPC error occurred: {0}")]
+    GeneralError(String),
+
     #[error(transparent)]
     KeypairError(#[from] ethers::signers::WalletError),
 
