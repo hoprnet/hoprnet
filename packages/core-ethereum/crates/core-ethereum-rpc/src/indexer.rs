@@ -7,7 +7,7 @@ use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use core_crypto::types::Hash;
 
 use futures::future::poll_fn;
-use futures::Sink;
+use futures::{Sink, SinkExt};
 use utils_log::{debug, error, info, warn};
 
 use crate::{BlockWithLogs, EventsQuery, HoprIndexerRpcOperations, Log};
@@ -74,6 +74,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     async fn poll_blocks_with_logs(&self, start_block_number: Option<u64>, filter: EventsQuery) -> crate::errors::Result<UnboundedReceiver<BlockWithLogs>> {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
 
+        // The provider internally performs retries on timeouts and errors.
         let provider = self.provider.clone();
         let latest_block = self.block_number().await?;
         let start_block = start_block_number.unwrap_or(latest_block);
@@ -95,7 +96,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
                         if let Err(e) = send_block_with_logs(&mut tx, block_with_logs).await {
                             error!("failed to dispatch past block: {e}");
-                            break;
+                            break; // Only fail if the receiver has closed
                         }
 
                         if let Some(prev_block_ts) = prev_block {
@@ -111,13 +112,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             },
                             Err(e) => {
                                 error!("failed to get latest block number: {e}");
-                                break;
                             }
                         }
                     },
                     Err(e) => {
                         error!("failed to obtain block {current} with logs: {e}");
-                        break;
                     }
                 }
             }
@@ -133,7 +132,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
                             if let Err(e) = send_block_with_logs(&mut tx, block_with_logs).await {
                                 error!("failed to dispatch new block: {e}");
-                                break;
+                                break; // Only fail if the receiver has closed
                             }
 
                             if let Some(prev_block_ts) = prev_block {
@@ -150,7 +149,6 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         }
                         Err(e) => {
                             error!("failed to obtain block {} with logs: {e}", current + 1);
-                            break;
                         }
                     }
                 }
@@ -159,6 +157,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             }
 
             warn!("block processing done");
+            tx.close_channel();
         });
 
         Ok(rx)
