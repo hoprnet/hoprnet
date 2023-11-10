@@ -8,9 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       new_release_name:
-        type: string
+        type: choice
         required: true
-        description: 'New release name ( saint-louis )'
+        description: 'New release name'
+        options:
+          - singapore
       tag_name:
         type: string
         required: true
