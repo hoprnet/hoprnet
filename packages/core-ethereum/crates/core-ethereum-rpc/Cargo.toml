@@ -45,6 +45,7 @@ utils-types = { workspace = true, default-features = false }
 
 [dev-dependencies]
 hex-literal = "0.4"
+async-std = { version = "1.12.0", features = ["attributes", "unstable"] }
 tokio = { version = "1", features = ["macros"] }
 
 [package.metadata.wasm-pack.profile.release]

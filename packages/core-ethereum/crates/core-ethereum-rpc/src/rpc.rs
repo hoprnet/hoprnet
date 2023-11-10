@@ -126,7 +126,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         Ok(sent_tx.0.into())
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
@@ -134,13 +134,13 @@ mod tests {
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::Hash;
     use core_ethereum_misc::ContractAddresses;
-    use ethers::prelude::U64;
+    use ethers::prelude::{BlockId};
     use ethers::types::Eip1559TransactionRequest;
     use ethers::utils::{Anvil, AnvilInstance};
-    use ethers_providers::{Http, MockProvider};
+    use ethers_providers::{Http, JsonRpcClient, Middleware};
     use futures::future::Either;
     use futures::StreamExt;
-    use primitive_types::H160;
+    use primitive_types::{H160};
     use std::path::PathBuf;
     use std::pin::pin;
     use std::str::FromStr;
@@ -162,8 +162,6 @@ mod tests {
 
     fn mock_config() -> RpcOperationsConfig {
         RpcOperationsConfig {
-            indexer_start_block_number: 0,
-            polling_interval: Duration::from_millis(100),
             chain_id: 31337, // Anvil default chain id
             contract_addrs: ContractAddresses {
                 channels: Address::random(),
@@ -174,6 +172,8 @@ mod tests {
                 price_oracle: Address::random(),
             },
             node_module: Address::random(),
+            max_http_retries: 5,
+            expected_block_time: Duration::from_secs(1),
         }
     }
 
@@ -184,43 +184,36 @@ mod tests {
         tx
     }
 
-    async fn wait_until_tx<Rpc: HoprRpcOperations>(tx_hash: Hash, rpc: &Rpc) -> Block {
-        let stream = rpc.subscribe_blocks().await.expect("failed to get block stream");
+    async fn wait_until_tx<P: JsonRpcClient + 'static>(tx_hash: Hash, rpc: &RpcOperations<P>, timeout: Duration) -> Block {
+        let mut stream = rpc.provider.watch_blocks().await.unwrap();
 
-        let timeout = pin!(tokio::time::sleep(Duration::from_secs(8)));
-        let block = pin!(stream
-            .filter(|block| futures::future::ready(block.transactions.contains(&tx_hash)))
-            .take(1)
-            .collect::<Vec<Block>>());
+        let timeout_fut = pin!(tokio::time::sleep(timeout));
+        let prov_clone = rpc.provider.clone();
+        let block_fut = pin!( async move {
+            while let Some(hash) = stream.next().await {
+                let block = prov_clone.get_block(BlockId::Hash(hash.into())).await.unwrap().unwrap();
+                if block.transactions.iter().map(|tx| Hash::from(tx.0)).any(|h| h.eq(&tx_hash)) {
+                    return Some(Block::from(block));
+                }
+            }
+            None
+        });
 
-        match futures::future::select(block, timeout).await {
-            Either::Left((mut vec, _)) => vec.pop().unwrap(),
-            Either::Right(_) => panic!("timeout"),
+        match futures::future::select(block_fut, timeout_fut).await {
+            Either::Left((block, _)) => block.expect("expected a block"),
+            Either::Right(_) => panic!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()),
         }
     }
 
-    #[async_std::test]
-    async fn test_get_block_number() {
-        let prov = MockProvider::new();
-        let block_num = U64::from(2);
-
-        prov.push(block_num).unwrap();
-
-        let chain_key = ChainKeypair::random();
-        let cfg = mock_config();
-
-        let rpc = RpcOperations::new(prov, &chain_key, cfg).unwrap();
-
-        let bn = rpc.block_number().await.unwrap();
-        assert_eq!(block_num.as_u64(), bn);
-    }
-
     #[tokio::test]
-    async fn test_get_txs_in_block() {
+    async fn test_should_send_tx() {
         let (prov, chain_key, _instance) = anvil_provider();
 
         let cfg = mock_config();
         let rpc = RpcOperations::new(prov, &chain_key, cfg).expect("failed to construct rpc");
+
+        let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
+        assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
@@ -228,9 +221,7 @@ mod tests {
             .await
             .expect("failed to send tx");
 
-        let block = wait_until_tx(tx_hash, &rpc).await;
-
-        assert!(rpc.get_transactions_in_block(block.number.unwrap()).await.unwrap().contains(&tx_hash), "must contain tx");
+        let _ = wait_until_tx(tx_hash, &rpc, Duration::from_secs(8)).await;
     }
 
     #[tokio::test]
@@ -249,34 +240,9 @@ mod tests {
             .await
             .expect("failed to send tx");
 
-        let _ = wait_until_tx(tx_hash, &rpc).await;
+        let _ = wait_until_tx(tx_hash, &rpc, Duration::from_secs(8)).await;
 
         let balance_2 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_2.lt(&balance_1), "balance must be diminished");
     }
-
-    #[tokio::test]
-    async fn test_subscribe_blocks() {
-        let (prov, chain_key, _instance) = anvil_provider();
-
-        let cfg = mock_config();
-        let rpc = RpcOperations::new(prov, &chain_key, cfg).expect("failed to construct rpc");
-
-        // Send 1 ETH to some random address
-        let tx_hash = rpc
-            .send_transaction(transfer_eth_tx(Address::random(), 1_u32.into()))
-            .await
-            .expect("failed to send tx");
-
-        let stream = rpc.subscribe_blocks().await.expect("failed to get block stream");
-
-        let timeout = pin!(tokio::time::sleep(Duration::from_secs(8)));
-        let hash = pin!(stream.any(|block| async move { block.transactions.contains(&tx_hash) }));
-
-        match futures::future::select(hash, timeout).await {
-            Either::Left(_) => {}
-            Either::Right(_) => panic!("timeout"),
-        };
-    }
 }
-*/
