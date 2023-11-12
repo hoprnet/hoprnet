@@ -1271,6 +1271,7 @@ dependencies = [
  "core-ethereum-db",
  "core-ethereum-misc",
  "core-types",
+ "env_logger",
  "ethers",
  "ethers-providers",
  "ethnum",

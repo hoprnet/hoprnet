@@ -40,12 +40,12 @@ pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
     pub(crate) provider: Arc<HoprMiddleware<P>>,
     pub(crate) cfg: RpcOperationsConfig,
-    channels: HoprChannels<HoprMiddleware<P>>,
+    pub(crate) channels: HoprChannels<HoprMiddleware<P>>,
     announcements: HoprAnnouncements<HoprMiddleware<P>>,
     safe_registry: HoprNodeSafeRegistry<HoprMiddleware<P>>,
     network_registry: HoprNetworkRegistry<HoprMiddleware<P>>,
     node_module: HoprNodeManagementModule<HoprMiddleware<P>>,
-    token: HoprToken<HoprMiddleware<P>>,
+    pub(crate) token: HoprToken<HoprMiddleware<P>>,
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P>
@@ -128,7 +128,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{Block, HoprRpcOperations, TypedTransaction};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
@@ -137,30 +137,42 @@ mod tests {
     use ethers::prelude::{BlockId};
     use ethers::types::Eip1559TransactionRequest;
     use ethers::utils::{Anvil, AnvilInstance};
-    use ethers_providers::{Http, JsonRpcClient, Middleware};
+    use ethers_providers::{Http, JsonRpcClient, Middleware, Provider};
     use futures::future::Either;
     use futures::StreamExt;
     use primitive_types::{H160};
     use std::path::PathBuf;
     use std::pin::pin;
     use std::str::FromStr;
+    use std::sync::Arc;
     use std::time::Duration;
+    use ethers::core::k256::ecdsa::SigningKey;
+    use ethers::middleware::SignerMiddleware;
+    use ethers::signers::{LocalWallet, Signer, Wallet};
     use utils_types::primitives::{Address, BalanceType, U256};
 
-    fn anvil_provider() -> (Http, ChainKeypair, AnvilInstance) {
+    pub fn anvil_provider() -> (Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, ChainKeypair, AnvilInstance) {
         let anvil: AnvilInstance = Anvil::new()
             .path(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"))
             .block_time(1_u64)
             .spawn();
 
+        let wallet: LocalWallet = anvil.keys()[0].clone().into();
+
+        let provider = Provider::<Http>::try_from(anvil.endpoint())
+            .unwrap()
+            .interval(Duration::from_millis(10u64));
+
+        let client = SignerMiddleware::new(provider, wallet.with_chain_id(anvil.chain_id()));
+
         (
-            Http::from_str(&anvil.endpoint()).unwrap(),
+            Arc::new(client),
             ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap(),
             anvil,
         )
     }
 
-    fn mock_config() -> RpcOperationsConfig {
+    pub fn mock_config() -> RpcOperationsConfig {
         RpcOperationsConfig {
             chain_id: 31337, // Anvil default chain id
             contract_addrs: ContractAddresses {
@@ -184,12 +196,13 @@ mod tests {
         tx
     }
 
-    async fn wait_until_tx<P: JsonRpcClient + 'static>(tx_hash: Hash, rpc: &RpcOperations<P>, timeout: Duration) -> Block {
+    pub async fn wait_until_tx<P: JsonRpcClient + 'static>(tx_hash: Hash, rpc: &RpcOperations<P>, timeout: Duration) -> Block {
         let mut stream = rpc.provider.watch_blocks().await.unwrap();
 
-        let timeout_fut = pin!(tokio::time::sleep(timeout));
         let prov_clone = rpc.provider.clone();
-        let block_fut = pin!( async move {
+
+        let timeout_fut = pin!(tokio::time::sleep(timeout));
+        let block_fut = pin!(async move {
             while let Some(hash) = stream.next().await {
                 let block = prov_clone.get_block(BlockId::Hash(hash.into())).await.unwrap().unwrap();
                 if block.transactions.iter().map(|tx| Hash::from(tx.0)).any(|h| h.eq(&tx_hash)) {
@@ -207,10 +220,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_send_tx() {
-        let (prov, chain_key, _instance) = anvil_provider();
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let (_, chain_key, anvil) = anvil_provider();
 
         let cfg = mock_config();
-        let rpc = RpcOperations::new(prov, &chain_key, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
@@ -226,10 +241,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_balance_native() {
-        let (prov, chain_key, _instance) = anvil_provider();
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let (_, chain_key, anvil) = anvil_provider();
 
         let cfg = mock_config();
-        let rpc = RpcOperations::new(prov, &chain_key, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key, cfg).expect("failed to construct rpc");
 
         let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");

@@ -105,8 +105,8 @@ impl Display for Log {
 pub struct BlockWithLogs {
     /// Block with TX hashes.
     pub block: Block,
-    /// Logs of interest corresponding to the block.
-    pub logs: Vec<Log>
+    /// Logs of interest corresponding to the block, categorized by contract addresses.
+    pub logs: Vec<(Address, Vec<Log>)>
 }
 
 impl Display for BlockWithLogs {
@@ -120,19 +120,31 @@ impl Display for BlockWithLogs {
 pub struct EventsQuery {
     /// Contract address
     pub address: Address,
-    /// Event topics (maximum 4)
+    /// Event topics
     pub topics: Vec<TxHash>,
 }
 
-impl From<EventsQuery> for ethers::types::Filter {
-    fn from(value: EventsQuery) -> Self {
-        let addr: ethers::types::H160 = value.address.into();
-        let mut ret = ethers::types::Filter::new()
-            .address::<ethers::types::H160>(addr.into());
+impl Display for EventsQuery {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "filter of {} with {} topics", self.address, self.topics.len())
+    }
+}
 
-        for i in 0..4.min(value.topics.len()) {
-            ret.topics[i] = Some(value.topics[i].into())
+impl From<EventsQuery> for Vec<ethers::types::Filter> {
+    fn from(value: EventsQuery) -> Self {
+        let mut ret = Vec::new();
+        let addr: ethers::types::H160 = value.address.into();
+
+        let mut filter = ethers::types::Filter::new()
+            .address::<ethers::types::H160>(addr.into());
+        for (i, topic) in value.topics.into_iter().enumerate() {
+            if i > 0 && i % 4 == 0 {
+                ret.push(filter);
+                filter = ethers::types::Filter::new().address::<ethers::types::H160>(addr.into());
+            }
+            filter.topics[i % 4] = Some(topic.into());
         }
+        ret.push(filter);
 
         ret
     }
@@ -171,7 +183,7 @@ pub trait HoprIndexerRpcOperations: HoprRpcOperations {
 
     /// Starts streaming the blocks with logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.
-    /// The given `filter` is applied to retrieve the logs for each retrieved block.
+    /// The given `filters` are applied to retrieve the logs for each retrieved block.
     /// The streaming stops only when the corresponding channel is closed by the returned receiver.
-    async fn poll_blocks_with_logs(&self, start_block_number: Option<u64>, filter: EventsQuery) -> Result<UnboundedReceiver<BlockWithLogs>>;
+    async fn poll_blocks_with_logs(&self, start_block_number: Option<u64>, filters: Vec<EventsQuery>) -> Result<UnboundedReceiver<BlockWithLogs>>;
 }
