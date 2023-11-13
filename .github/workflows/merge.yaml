@@ -156,6 +156,7 @@ jobs:
 
       - name: "Restart deployments"
         run: |
+          set -x
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
