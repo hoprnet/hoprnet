@@ -160,7 +160,7 @@ jobs:
           # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
             namespace=rotsee
-            identity_pool=core-rotsee
+            identity_pool=core-staging
           elif [[ "${base_branch}" =~ ^"release" ]]; then
             namespace=dufour
             identity_pool="core-dufour-${base_branch/release\/}"

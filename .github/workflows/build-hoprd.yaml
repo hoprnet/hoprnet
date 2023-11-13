@@ -77,7 +77,7 @@ jobs:
             identity_pool="core-dufour-${base_branch/release\/}"
           else
             namespace=rotsee
-            identity_pool=core-rotsee
+            identity_pool=core-staging
           fi
           cluster_name=pr-${{ github.event.pull_request.number }}
           echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
