@@ -64,8 +64,7 @@ jobs:
 
       - name: Bump version
         run: |
-          set -x
-          docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --limit=300 --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
+          docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
           dappnode_patch_version=$(jq -r '.version' dappnode_package.json | sed 's/.*\.//')
           dappnode_minor_version=$(jq -r '.version' dappnode_package.json | sed 's/\.'${dappnode_patch_version}'//')
           dappnode_patch_bumped_patch_version=$((dappnode_patch_version + 1))
@@ -75,8 +74,6 @@ jobs:
           cat <<< $(jq --arg dappnode_bumped_version ${dappnode_bumped_version} ' . |= .+ { "version": $dappnode_bumped_version}' dappnode_package.json) > dappnode_package.json
           yq -i e ".services.node.image |= \"node.hopr.public.dappnode.eth:${dappnode_bumped_version}\"" docker-compose.yml
           yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" docker-compose.yml
-          echo "Good bye"
-          exit 1
         working-directory: "./DAppNodePackage-Hopr"
 
       - name: Create Pull Request
