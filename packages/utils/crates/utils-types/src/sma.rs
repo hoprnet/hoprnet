@@ -38,13 +38,13 @@ where
     T: Clone,
 {
     window: AllocRingBuffer<T>,
-    _div: PhantomData<D>
+    _div: PhantomData<D>,
 }
 
 impl<T, D> SMA<T> for NoSumSMA<T, D>
 where
     T: Add<T, Output = T> + Div<D, Output = T> + Clone,
-    D: From<u32>
+    D: From<u32>,
 {
     fn add_sample(&mut self, sample: T) {
         self.window.push(sample);
@@ -74,7 +74,7 @@ where
 impl<T, D> NoSumSMA<T, D>
 where
     T: Add<T, Output = T> + Div<D, Output = T> + Clone,
-    D: From<u32>
+    D: From<u32>,
 {
     /// Creates an empty SMA instance with the given window size.
     /// The maximum window size is u32::MAX and must be greater than 1.
@@ -82,7 +82,7 @@ where
         assert!(window_size > 1, "window size must be greater than 1");
         Self {
             window: AllocRingBuffer::new(window_size as usize),
-            _div: PhantomData
+            _div: PhantomData,
         }
     }
 
@@ -97,7 +97,7 @@ where
 impl<T, D> Display for NoSumSMA<T, D>
 where
     T: Add<T, Output = T> + Div<D, Output = T> + Clone + Default + Display,
-    D: From<u32>
+    D: From<u32>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.get_average().unwrap_or_default())

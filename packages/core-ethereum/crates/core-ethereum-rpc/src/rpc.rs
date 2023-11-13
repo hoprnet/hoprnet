@@ -7,7 +7,9 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::BlockId;
-use ethers_providers::{HttpRateLimitRetryPolicy, JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy};
+use ethers_providers::{
+    HttpRateLimitRetryPolicy, JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy,
+};
 use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -34,7 +36,8 @@ pub struct RpcOperationsConfig {
     pub expected_block_time: Duration,
 }
 
-pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
+pub(crate) type HoprMiddleware<P> =
+    NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
 
 pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
@@ -49,7 +52,9 @@ pub struct RpcOperations<P: JsonRpcClient + 'static> {
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P>
-where HttpRateLimitRetryPolicy: RetryPolicy<<P as JsonRpcClient>::Error> {
+where
+    HttpRateLimitRetryPolicy: RetryPolicy<<P as JsonRpcClient>::Error>,
+{
     pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let provider_client = RetryClientBuilder::default()
             .rate_limit_retries(5)
@@ -84,9 +89,9 @@ where HttpRateLimitRetryPolicy: RetryPolicy<<P as JsonRpcClient>::Error> {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
-
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
-        Ok(self.provider
+        Ok(self
+            .provider
             .get_block(BlockId::Number(block_number.into()))
             .await?
             .map(|b| b.timestamp.as_u64()))
@@ -134,24 +139,28 @@ pub mod tests {
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::Hash;
     use core_ethereum_misc::ContractAddresses;
-    use ethers::prelude::{BlockId};
+    use ethers::core::k256::ecdsa::SigningKey;
+    use ethers::middleware::SignerMiddleware;
+    use ethers::prelude::BlockId;
+    use ethers::signers::{LocalWallet, Signer, Wallet};
     use ethers::types::Eip1559TransactionRequest;
     use ethers::utils::{Anvil, AnvilInstance};
     use ethers_providers::{Http, JsonRpcClient, Middleware, Provider};
     use futures::future::Either;
     use futures::StreamExt;
-    use primitive_types::{H160};
+    use primitive_types::H160;
     use std::path::PathBuf;
     use std::pin::pin;
     use std::str::FromStr;
     use std::sync::Arc;
     use std::time::Duration;
-    use ethers::core::k256::ecdsa::SigningKey;
-    use ethers::middleware::SignerMiddleware;
-    use ethers::signers::{LocalWallet, Signer, Wallet};
     use utils_types::primitives::{Address, BalanceType, U256};
 
-    pub fn anvil_provider() -> (Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, ChainKeypair, AnvilInstance) {
+    pub fn anvil_provider() -> (
+        Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+        ChainKeypair,
+        AnvilInstance,
+    ) {
         let anvil: AnvilInstance = Anvil::new()
             .path(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"))
             .block_time(1_u64)
@@ -196,7 +205,11 @@ pub mod tests {
         tx
     }
 
-    pub async fn wait_until_tx<P: JsonRpcClient + 'static>(tx_hash: Hash, rpc: &RpcOperations<P>, timeout: Duration) -> Block {
+    pub async fn wait_until_tx<P: JsonRpcClient + 'static>(
+        tx_hash: Hash,
+        rpc: &RpcOperations<P>,
+        timeout: Duration,
+    ) -> Block {
         let mut stream = rpc.provider.watch_blocks().await.unwrap();
 
         let prov_clone = rpc.provider.clone();
@@ -205,7 +218,12 @@ pub mod tests {
         let block_fut = pin!(async move {
             while let Some(hash) = stream.next().await {
                 let block = prov_clone.get_block(BlockId::Hash(hash.into())).await.unwrap().unwrap();
-                if block.transactions.iter().map(|tx| Hash::from(tx.0)).any(|h| h.eq(&tx_hash)) {
+                if block
+                    .transactions
+                    .iter()
+                    .map(|tx| Hash::from(tx.0))
+                    .any(|h| h.eq(&tx_hash))
+                {
                     return Some(Block::from(block));
                 }
             }
@@ -225,7 +243,8 @@ pub mod tests {
         let (_, chain_key, anvil) = anvil_provider();
 
         let cfg = mock_config();
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key, cfg)
+            .expect("failed to construct rpc");
 
         let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
@@ -246,7 +265,8 @@ pub mod tests {
         let (_, chain_key, anvil) = anvil_provider();
 
         let cfg = mock_config();
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key, cfg)
+            .expect("failed to construct rpc");
 
         let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");

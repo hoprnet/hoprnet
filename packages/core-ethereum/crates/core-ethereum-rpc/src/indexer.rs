@@ -1,20 +1,22 @@
-use std::pin::Pin;
-use std::sync::Arc;
-use std::time::Duration;
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, Middleware};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::future::poll_fn;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::time::Duration;
 use utils_log::{debug, error, info, warn};
 use utils_types::sma::{NoSumSMA, SMA};
 
-use crate::{BlockWithLogs, EventsQuery, HoprIndexerRpcOperations, Log};
-use crate::rpc::{HoprMiddleware, RpcOperations};
-use crate::errors::RpcError::{GeneralError, NoSuchBlock};
 use crate::errors::Result;
+use crate::errors::RpcError::{GeneralError, NoSuchBlock};
+use crate::rpc::{HoprMiddleware, RpcOperations};
+use crate::{BlockWithLogs, EventsQuery, HoprIndexerRpcOperations, Log};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
+use futures::stream::FuturesUnordered;
+use futures::{FutureExt, TryStreamExt};
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
@@ -22,46 +24,50 @@ use gloo_timers::future::sleep;
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
 
-
 async fn send_block_with_logs(tx: &mut UnboundedSender<BlockWithLogs>, block: BlockWithLogs) -> Result<()> {
     match poll_fn(|cx| Pin::new(&tx).poll_ready(cx)).await {
-        Ok(_) => {
-            match tx.start_send(block) {
-                Ok(_) => Ok(()),
-                Err(_) => Err(GeneralError("failed to pass block with logs to the receiver".into()))
-            }
-        }
-        Err(_) => Err(GeneralError("receiver has been closed".into()))
+        Ok(_) => match tx.start_send(block) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(GeneralError("failed to pass block with logs to the receiver".into())),
+        },
+        Err(_) => Err(GeneralError("receiver has been closed".into())),
     }
 }
 
-async fn get_block_with_logs_from_provider<P: JsonRpcClient + 'static>(block_number: u64, filters: &Vec<EventsQuery>, provider: Arc<HoprMiddleware<P>>) -> Result<BlockWithLogs> {
+async fn get_block_with_logs_from_provider<P: JsonRpcClient + 'static>(
+    block_number: u64,
+    queries: &Vec<EventsQuery>,
+    provider: Arc<HoprMiddleware<P>>,
+) -> Result<BlockWithLogs> {
     debug!("getting block #{block_number} with logs");
     match provider.get_block(block_number).await? {
         Some(block) => {
-            let mut logs = Vec::new();
-            for filter in filters {
-                debug!("getting logs from #{block_number} for {filter}");
-
-                let mut contract_logs = Vec::new();
-                for mut query in Vec::<ethers::types::Filter>::from(filter.clone()) {
-                    provider.get_logs(&query.from_block(block_number).to_block(block_number))
-                        .await?
-                        .into_iter()
-                        .map(crate::Log::from)
-                        .for_each(|log| contract_logs.push(log));
-                }
-
-                debug!("retrieved {} logs of {filter}", contract_logs.len());
-                logs.push((filter.address, contract_logs));
+            let fetch_logs = FuturesUnordered::new();
+            for filter in queries
+                .iter()
+                .flat_map(|q| Vec::<ethers::types::Filter>::from(q.clone()))
+            {
+                let prov = provider.clone();
+                let complete_filter = filter.from_block(block_number).to_block(block_number);
+                fetch_logs.push(async move {
+                    debug!("getting logs from #{block_number} using filter");
+                    prov.get_logs(&complete_filter)
+                        .map(|maybe_logs| maybe_logs.map(|logs| logs.into_iter().map(Log::from).collect::<Vec<_>>()))
+                        .await
+                });
             }
 
             Ok(BlockWithLogs {
                 block: block.into(),
-                logs
+                logs: fetch_logs
+                    .try_collect::<Vec<_>>()
+                    .await?
+                    .into_iter()
+                    .flatten()
+                    .collect(),
             })
-        },
-        None => Err(NoSuchBlock)
+        }
+        None => Err(NoSuchBlock),
     }
 }
 
@@ -73,7 +79,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         Ok(r.as_u64())
     }
 
-    async fn poll_blocks_with_logs(&self, start_block_number: Option<u64>, filters: Vec<EventsQuery>) -> Result<UnboundedReceiver<BlockWithLogs>> {
+    async fn poll_blocks_with_logs(
+        &self,
+        start_block_number: Option<u64>,
+        filters: Vec<EventsQuery>,
+    ) -> Result<UnboundedReceiver<BlockWithLogs>> {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
 
         // The provider internally performs retries on timeouts and errors.
@@ -84,12 +94,12 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
         spawn_local(async move {
             let mut current = start_block;
-            let mut latest  = latest_block;
+            let mut latest = latest_block;
 
             let mut block_time_sma = NoSumSMA::<Duration, u32>::new(10);
             let mut prev_block = None;
 
-            while current < latest_block {
+            while current < latest {
                 match get_block_with_logs_from_provider(current, &filters, provider.clone()).await {
                     Ok(block_with_logs) => {
                         let new_current = block_with_logs.block.number.expect("past block must not be pending");
@@ -98,11 +108,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
                         if let Err(e) = send_block_with_logs(&mut tx, block_with_logs).await {
                             error!("failed to dispatch past block: {e}");
-                            break;  // Receiver is closed, terminate the stream
+                            break; // Receiver is closed, terminate the stream
                         }
 
                         if let Some(prev_block_ts) = prev_block {
-                            block_time_sma.add_sample( block_ts - prev_block_ts);
+                            block_time_sma.add_sample(block_ts - prev_block_ts);
                         }
 
                         prev_block = Some(block_ts);
@@ -111,12 +121,12 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         match provider.get_block_number().await.map(|u| u.as_u64()) {
                             Ok(block_number) => {
                                 latest = block_number;
-                            },
+                            }
                             Err(e) => {
                                 error!("failed to get latest block number: {e}");
                             }
                         }
-                    },
+                    }
                     Err(e) => {
                         error!("failed to obtain block #{current} with logs: {e}");
                     }
@@ -138,7 +148,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             }
 
                             if let Some(prev_block_ts) = prev_block {
-                                block_time_sma.add_sample( block_ts - prev_block_ts);
+                                block_time_sma.add_sample(block_ts - prev_block_ts);
                             }
 
                             prev_block = Some(block_ts);
@@ -171,9 +181,15 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
-    use std::str::FromStr;
-    use std::sync::Arc;
+    use crate::rpc::tests::mock_config;
+    use crate::rpc::RpcOperations;
+    use crate::{EventsQuery, HoprIndexerRpcOperations};
+    use bindings::hopr_announcements::HoprAnnouncements;
+    use bindings::hopr_channels::{ChannelOpenedFilter, HoprChannels};
+    use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
+    use bindings::hopr_token::HoprToken;
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use core_ethereum_misc::ContractAddresses;
     use ethers::abi::Token;
     use ethers::contract::EthEvent;
     use ethers::core::k256::ecdsa::SigningKey;
@@ -185,17 +201,11 @@ mod test {
     use futures::StreamExt;
     use hex_literal::hex;
     use primitive_types::H160;
-    use bindings::hopr_announcements::HoprAnnouncements;
-    use bindings::hopr_channels::{ChannelOpenedFilter, HoprChannels};
-    use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
-    use bindings::hopr_token::HoprToken;
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_ethereum_misc::ContractAddresses;
+    use std::path::PathBuf;
+    use std::str::FromStr;
+    use std::sync::Arc;
     use utils_types::primitives::Address;
     use utils_types::traits::BinarySerializable;
-    use crate::{EventsQuery, HoprIndexerRpcOperations};
-    use crate::rpc::{RpcOperations};
-    use crate::rpc::tests::{mock_config};
 
     fn get_provider() -> (AnvilInstance, Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>) {
         let anvil: AnvilInstance = Anvil::new()
@@ -213,9 +223,16 @@ mod test {
         (anvil, client)
     }
 
-    pub async fn deploy_contracts(client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, self_addr: Address) -> ContractAddresses {
+    pub async fn deploy_contracts(
+        client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+        self_addr: Address,
+    ) -> ContractAddresses {
         // Node safe registry
-        let node_safe_registry = HoprNodeSafeRegistry::deploy(client.clone(), ()).unwrap().send().await.unwrap();
+        let node_safe_registry = HoprNodeSafeRegistry::deploy(client.clone(), ())
+            .unwrap()
+            .send()
+            .await
+            .unwrap();
 
         let mut tx = Eip1559TransactionRequest::new();
         tx = tx.to(H160::from_str("a990077c3205cbDf861e17Fa532eeB069cE9fF96").unwrap());
@@ -245,7 +262,9 @@ mod test {
             .unwrap();
 
         // Deploy channels contract
-        let hopr_channels = HoprChannels::deploy(client.clone(), Token::Tuple(vec![
+        let hopr_channels = HoprChannels::deploy(
+            client.clone(),
+            Token::Tuple(vec![
                 Token::Address(hopr_token.address()),
                 Token::Uint(1_u32.into()),
                 Token::Address(node_safe_registry.address()),
@@ -256,11 +275,12 @@ mod test {
         .await
         .unwrap();
 
-        let hopr_announcements = HoprAnnouncements::deploy(client.clone(), Token::Address(node_safe_registry.address()))
-            .unwrap()
-            .send()
-            .await
-            .unwrap();
+        let hopr_announcements =
+            HoprAnnouncements::deploy(client.clone(), Token::Address(node_safe_registry.address()))
+                .unwrap()
+                .send()
+                .await
+                .unwrap();
 
         ContractAddresses {
             token: hopr_token.address().0.into(),
@@ -313,33 +333,37 @@ mod test {
         let mut cfg = mock_config();
         cfg.contract_addrs = addrs;
 
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_1, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_1, cfg)
+            .expect("failed to construct rpc");
 
         /*rpc.token
-            .approve(rpc.channels.address(), 1u128.into())
-            .send()
-            .await
-            .unwrap()
-            .await
-            .unwrap();
+                    .approve(rpc.channels.address(), 1u128.into())
+                    .send()
+                    .await
+                    .unwrap()
+                    .await
+                    .unwrap();
 
-        rpc.channels
-            .fund_channel(chain_key_2.public().to_address().into(), 1u128)
-            .send()
+                rpc.channels
+                    .fund_channel(chain_key_2.public().to_address().into(), 1u128)
+                    .send()
+                    .await
+                    .unwrap()
+                    .await
+                    .unwrap();
+        */
+        let blocks = rpc
+            .poll_blocks_with_logs(
+                Some(1),
+                vec![EventsQuery {
+                    address: addrs.channels,
+                    topics: vec![ChannelOpenedFilter::signature()],
+                }],
+            )
             .await
             .unwrap()
-            .await
-            .unwrap();
-*/
-        let blocks = rpc.poll_blocks_with_logs(Some(1), vec![EventsQuery {
-            address: addrs.channels,
-            topics: vec![ChannelOpenedFilter::signature()],
-        }])
-        .await
-        .unwrap()
-        .take(3)
-        .collect::<Vec<_>>()
-        .await;
+            .take(3)
+            .collect::<Vec<_>>()
+            .await;
     }
-
 }

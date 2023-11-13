@@ -12,8 +12,8 @@ pub use ethers::types::TxHash;
 pub use futures::channel::mpsc::UnboundedReceiver;
 
 pub mod errors;
-pub mod rpc;
 pub mod indexer;
+pub mod rpc;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 pub mod nodejs;
@@ -37,7 +37,9 @@ impl Display for Block {
         write!(
             f,
             "{} (@ {}) with {} txs",
-            self.number.map(|i| format!("block #{i}")).unwrap_or("pending block".into()),
+            self.number
+                .map(|i| format!("block #{i}"))
+                .unwrap_or("pending block".into()),
             self.timestamp.as_u64(),
             self.transactions.len()
         )
@@ -105,8 +107,8 @@ impl Display for Log {
 pub struct BlockWithLogs {
     /// Block with TX hashes.
     pub block: Block,
-    /// Logs of interest corresponding to the block, categorized by contract addresses.
-    pub logs: Vec<(Address, Vec<Log>)>
+    /// Logs of interest corresponding to the block
+    pub logs: Vec<Log>,
 }
 
 impl Display for BlockWithLogs {
@@ -135,8 +137,7 @@ impl From<EventsQuery> for Vec<ethers::types::Filter> {
         let mut ret = Vec::new();
         let addr: ethers::types::H160 = value.address.into();
 
-        let mut filter = ethers::types::Filter::new()
-            .address::<ethers::types::H160>(addr.into());
+        let mut filter = ethers::types::Filter::new().address::<ethers::types::H160>(addr.into());
         for (i, topic) in value.topics.into_iter().enumerate() {
             if i > 0 && i % 4 == 0 {
                 ret.push(filter);
@@ -185,5 +186,9 @@ pub trait HoprIndexerRpcOperations: HoprRpcOperations {
     /// If no `start_block_number` is given, the stream starts from the latest block.
     /// The given `filters` are applied to retrieve the logs for each retrieved block.
     /// The streaming stops only when the corresponding channel is closed by the returned receiver.
-    async fn poll_blocks_with_logs(&self, start_block_number: Option<u64>, filters: Vec<EventsQuery>) -> Result<UnboundedReceiver<BlockWithLogs>>;
+    async fn poll_blocks_with_logs(
+        &self,
+        start_block_number: Option<u64>,
+        filters: Vec<EventsQuery>,
+    ) -> Result<UnboundedReceiver<BlockWithLogs>>;
 }
