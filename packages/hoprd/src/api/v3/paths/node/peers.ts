@@ -15,6 +15,7 @@ export type PeerInfo = {
     success: number
   }
   lastSeen: number
+  lastSeenLatency: number
   quality: number
   backoff: number
   isNew: boolean
@@ -37,6 +38,7 @@ export function toPeerInfoFormat(address: Address | undefined, info: PeerStatus,
       success: Number(info.heartbeats_succeeded)
     },
     lastSeen: Number(info.last_seen),
+    lastSeenLatency: Number(info.last_seen_latency),
     quality: info.quality(),
     backoff: info.backoff,
     isNew: info.heartbeats_sent === BigInt(0),
@@ -162,6 +164,11 @@ const PEER_INFO_DOC: any = {
       type: 'number',
       description: 'Timestamp on when the node was last seen (in milliseconds)',
       example: 1646410980793
+    },
+    lastSeenLatency: {
+      type: 'number',
+      description: 'Latency recorded the last time a node was measured when seen (in milliseconds)',
+      example: 124
     },
     quality: {
       type: 'number',

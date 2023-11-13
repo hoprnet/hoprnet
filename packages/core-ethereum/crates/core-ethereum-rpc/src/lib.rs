@@ -181,7 +181,7 @@ pub trait HoprRpcOperations {
 /// Extension of `HoprRpcOperations` trait with functionality required by the Indexer.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-pub trait HoprIndexerRpcOperations: HoprRpcOperations {
+pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
