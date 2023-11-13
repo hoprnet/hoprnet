@@ -12,6 +12,7 @@ on:
         required: true
         description: 'New release name'
         options:
+          - saint-louis
           - singapore
       tag_name:
         type: string
