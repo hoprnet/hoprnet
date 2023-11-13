@@ -65,7 +65,7 @@ jobs:
       - name: Bump version
         run: |
           set -x
-          docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" 2&> /dev/null | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
+          docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --limit=300 --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
           dappnode_patch_version=$(jq -r '.version' dappnode_package.json | sed 's/.*\.//')
           dappnode_minor_version=$(jq -r '.version' dappnode_package.json | sed 's/\.'${dappnode_patch_version}'//')
           dappnode_patch_bumped_patch_version=$((dappnode_patch_version + 1))
