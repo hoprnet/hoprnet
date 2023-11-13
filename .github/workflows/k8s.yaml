@@ -43,10 +43,10 @@ jobs:
           # Identify parameters depending on branch
           if [[ "${base_branch}" =~ ^"release" ]]; then
             namespace=dufour
-            identity_pool="core-dufour-${base_branch/release\/}"
+            identity_pool=pull-requests-dufour
           else
             namespace=rotsee
-            identity_pool=identity-pool-pull-requests
+            identity_pool=pull-requests-rotsee
           fi
           cd ./hoprd-nodes
           pip install -r ./scripts/requirements.txt
