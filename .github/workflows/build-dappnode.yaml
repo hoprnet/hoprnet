@@ -61,6 +61,13 @@ jobs:
           current_version=$(jq -r '.version' packages/hoprd/package.json)
           echo "current_version=${current_version}" >> $GITHUB_OUTPUT
 
+      - name: Debug
+        run: |
+          set -x
+          gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)"
+          exit 1
+
+
       - name: Bump version
         run: |
           docker_tag=$(gcloud artifacts docker tags list europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" 2&> /dev/null | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
