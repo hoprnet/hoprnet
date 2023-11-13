@@ -24,11 +24,13 @@ const ALICE_ENTRY = PeerStatus.build(
   PeerOrigin.Initialization,
   false,
   BigInt(1646410980793),
+  BigInt(125),
   1.0,
   BigInt(10),
   BigInt(10),
   0,
-  meta
+  meta,
+  10
 )
 
 const BOB_ENTRY = PeerStatus.build(
@@ -36,11 +38,13 @@ const BOB_ENTRY = PeerStatus.build(
   PeerOrigin.Initialization,
   false,
   BigInt(1646410680793),
+  BigInt(125),
   0.2,
   BigInt(0),
   BigInt(0),
   0,
-  meta
+  meta,
+  10
 )
 
 const CHARLIE_ENTRY = PeerStatus.build(
@@ -48,11 +52,13 @@ const CHARLIE_ENTRY = PeerStatus.build(
   PeerOrigin.Initialization,
   false,
   BigInt(1646410980993),
+  BigInt(125),
   0.8,
   BigInt(10),
   BigInt(8),
   0,
-  meta
+  meta,
+  10
 )
 
 function toJsonDict(account: AccountEntry, peer: PeerStatus, isNew: boolean, multiaddr: string | undefined) {
@@ -65,7 +71,8 @@ function toJsonDict(account: AccountEntry, peer: PeerStatus, isNew: boolean, mul
       success: Number(peer.heartbeats_succeeded)
     },
     lastSeen: Number(peer.last_seen),
-    quality: peer.quality,
+    lastSeenLatency: Number(peer.last_seen_latency),
+    quality: peer.quality(),
     backoff: peer.backoff,
     isNew: isNew,
     reportedVersion: peer.metadata().get(peer_metadata_protocol_version_name()) ?? 'unknown'

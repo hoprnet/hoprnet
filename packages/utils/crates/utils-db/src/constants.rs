@@ -7,7 +7,6 @@ pub const CHANNELS_LEDGER_DOMAIN_SEPARATOR_KEY: &str = "channels:ledgerDomainSep
 pub const COMMITMENT_PREFIX: &str = "commitment-";
 pub const CURRENT_COMMITMENT_PREFIX: &str = "commitment:current-";
 pub const TICKET_INDEX_PREFIX: &str = "ticketIndex-";
-pub const PENDING_TICKETS_COUNT: &str = "statistics:pending:value-";
 pub const REJECTED_TICKETS_COUNT: &str = "statistics:rejected:count";
 pub const REJECTED_TICKETS_VALUE: &str = "statistics:rejected:value";
 pub const REDEEMED_TICKETS_COUNT: &str = "statistics:redeemed:count";

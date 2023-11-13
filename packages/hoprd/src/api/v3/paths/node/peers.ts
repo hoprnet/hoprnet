@@ -15,6 +15,7 @@ export type PeerInfo = {
     success: number
   }
   lastSeen: number
+  lastSeenLatency: number
   quality: number
   backoff: number
   isNew: boolean
@@ -37,7 +38,8 @@ export function toPeerInfoFormat(address: Address | undefined, info: PeerStatus,
       success: Number(info.heartbeats_succeeded)
     },
     lastSeen: Number(info.last_seen),
-    quality: info.quality,
+    lastSeenLatency: Number(info.last_seen_latency),
+    quality: info.quality(),
     backoff: info.backoff,
     isNew: info.heartbeats_sent === BigInt(0),
     reportedVersion: info.metadata().get(peer_metadata_protocol_version_name()) ?? 'unknown'
@@ -68,7 +70,7 @@ export async function getPeers(
       const peerId = acc.public_key.to_peerid_str()
       const info = await node.getPeerInfo(peerId)
       // exclude if quality is lesser than the one wanted
-      if (info === undefined || info.quality < quality) {
+      if (info === undefined || info.quality() < quality) {
         continue
       }
       announcedMap.set(
@@ -91,7 +93,7 @@ export async function getPeers(
       } else {
         const info = await node.getPeerInfo(peerIdStr)
         // exclude if quality is less than the one wanted
-        if (info === undefined || info.quality < quality) {
+        if (info === undefined || info.quality() < quality) {
           continue
         }
         connected.push(toPeerInfoFormat(chainKey, info))
@@ -162,6 +164,11 @@ const PEER_INFO_DOC: any = {
       type: 'number',
       description: 'Timestamp on when the node was last seen (in milliseconds)',
       example: 1646410980793
+    },
+    lastSeenLatency: {
+      type: 'number',
+      description: 'Latency recorded the last time a node was measured when seen (in milliseconds)',
+      example: 124
     },
     quality: {
       type: 'number',

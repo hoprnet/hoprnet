@@ -596,7 +596,7 @@ mod native {
 
             let awaiter = self.chain_api.actions_ref().withdraw(recipient, amount).await?;
             match awaiter.await {
-                Ok(TransactionResult::Withdrawn { tx_hash }) => Ok(tx_hash),
+                TransactionResult::Withdrawn { tx_hash } => Ok(tx_hash),
                 _ => Err(errors::HoprLibError::GeneralError("withdraw transaction failed".into())),
             }
         }
@@ -631,7 +631,7 @@ mod native {
 
             let channel_id = generate_channel_id(&self.chain_api.me_onchain(), destination);
             match awaiter.await {
-                Ok(TransactionResult::ChannelFunded { tx_hash }) => Ok(OpenChannelResult { tx_hash, channel_id }),
+                TransactionResult::ChannelFunded { tx_hash } => Ok(OpenChannelResult { tx_hash, channel_id }),
                 _ => Err(errors::HoprLibError::GeneralError(
                     "open channel transaction failed".into(),
                 )),
@@ -647,7 +647,7 @@ mod native {
 
             let awaiter = self.chain_api.actions_ref().fund_channel(*channel_id, *amount).await?;
             match awaiter.await {
-                Ok(TransactionResult::ChannelFunded { tx_hash }) => Ok(tx_hash),
+                TransactionResult::ChannelFunded { tx_hash } => Ok(tx_hash),
                 _ => Err(errors::HoprLibError::GeneralError(
                     "fund channel transaction failed".into(),
                 )),
@@ -672,11 +672,11 @@ mod native {
                 .close_channel(*counterparty, direction, redeem_before_close)
                 .await?;
             match awaiter.await {
-                Ok(TransactionResult::ChannelClosureInitiated { tx_hash }) => Ok(CloseChannelResult {
+                TransactionResult::ChannelClosureInitiated { tx_hash } => Ok(CloseChannelResult {
                     tx_hash,
                     status: ChannelStatus::PendingToClose,
                 }),
-                Ok(TransactionResult::ChannelClosed { tx_hash }) => Ok(CloseChannelResult {
+                TransactionResult::ChannelClosed { tx_hash } => Ok(CloseChannelResult {
                     tx_hash,
                     status: ChannelStatus::Closed,
                 }),

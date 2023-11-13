@@ -227,7 +227,6 @@ impl ChannelEventEmitter {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
-    pub pending: u32,
     pub losing: u32,
     pub win_proportion: f64,
     pub unredeemed: u32,
@@ -617,7 +616,7 @@ pub mod wasm_impls {
                 .get_acknowledged_tickets(None)
                 .await
                 .map(|v| v.into_iter().map(|at| at.ticket.amount).collect::<Vec<_>>())?;
-            let pending = db.get_pending_tickets_count().await?;
+
             let losing = db.get_losing_tickets_count().await?;
 
             let total_value = acked_ticket_amounts
@@ -630,7 +629,6 @@ pub mod wasm_impls {
                 } else {
                     0f64
                 },
-                pending: pending as u32,
                 losing: losing as u32,
                 unredeemed: acked_ticket_amounts.len() as u32,
                 unredeemed_value: total_value,
