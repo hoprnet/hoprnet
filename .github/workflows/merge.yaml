@@ -154,7 +154,7 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-       - name: "Restart deployments"
+      - name: "Restart deployments"
         run: |
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
@@ -168,6 +168,7 @@ jobs:
             echo "Skipping deployment"
             exit 0
           fi
+          identity_pool=pull-requests-rotsee
           echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
           # Get list of deployments to restart
           export deployments=($(kubectl get deployments -n ${namespace/-.*} -l app.kubernetes.io/name=hoprd-operator,hoprds.hoprnet.org/identitypool=${identity_pool} -o jsonpath="{.items[*].metadata.name}"))
