@@ -11,7 +11,7 @@ on:
       - unlabeled
 
 env:
-  GITOPS_BRANCH: ausias/hoprd-operator-2.0
+  GITOPS_BRANCH: master
 jobs:
   deploy:
     name: deploy
