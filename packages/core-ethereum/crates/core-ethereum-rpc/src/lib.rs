@@ -196,3 +196,16 @@ pub trait HoprIndexerRpcOperations {
         filter: LogFilter,
     ) -> Result<UnboundedReceiver<BlockWithLogs>>;
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use ethers::core::k256::ecdsa::SigningKey;
+    use ethers::prelude::*;
+    use ethers::utils::AnvilInstance;
+    use core_ethereum_misc::ContractAddresses;
+
+    pub async fn deploy_contracts(client: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, anvil: &AnvilInstance) -> ContractAddresses {
+        todo!()
+    }
+}
