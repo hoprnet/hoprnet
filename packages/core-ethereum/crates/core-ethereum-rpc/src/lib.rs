@@ -102,12 +102,13 @@ impl Display for Log {
     }
 }
 
-/// Represents a mined block with also corresponding logs fetched (according to some `EventsQuery` filter).
+/// Represents a mined block optionally with filtered logs (according to some `LogFilter`)
+/// corresponding to the block.
 #[derive(Debug, Clone)]
 pub struct BlockWithLogs {
     /// Block with TX hashes.
     pub block: Block,
-    /// Logs of interest corresponding to the block
+    /// Filtered logs of interest corresponding to the block, if any filtering was requested.
     pub logs: Vec<Log>,
 }
 
@@ -117,37 +118,39 @@ impl Display for BlockWithLogs {
     }
 }
 
-/// Represents a query to extract logs containing specific contract events.
+/// Represents a filter to extract logs containing specific contract events from a block.
 #[derive(Debug, Clone)]
-pub struct EventsQuery {
-    /// Contract address
-    pub address: Address,
+pub struct LogFilter {
+    /// Contract addresses
+    pub address: Vec<Address>,
     /// Event topics
     pub topics: Vec<TxHash>,
 }
 
-impl Display for EventsQuery {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "filter of {} with {} topics", self.address, self.topics.len())
+impl LogFilter {
+    /// Indicates if this filter filters anything.
+    pub fn is_empty(&self) -> bool {
+        self.address.is_empty() && self.topics.is_empty()
     }
 }
 
-impl From<EventsQuery> for Vec<ethers::types::Filter> {
-    fn from(value: EventsQuery) -> Self {
-        let mut ret = Vec::new();
-        let addr: ethers::types::H160 = value.address.into();
+impl Display for LogFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "filter of {} with {} topics", self.address.len(), self.topics.len())
+    }
+}
 
-        let mut filter = ethers::types::Filter::new().address::<ethers::types::H160>(addr.into());
-        for (i, topic) in value.topics.into_iter().enumerate() {
-            if i > 0 && i % 4 == 0 {
-                ret.push(filter);
-                filter = ethers::types::Filter::new().address::<ethers::types::H160>(addr.into());
-            }
-            filter.topics[i % 4] = Some(topic.into());
-        }
-        ret.push(filter);
-
-        ret
+impl From<LogFilter> for ethers::types::Filter {
+    fn from(value: LogFilter) -> Self {
+        ethers::types::Filter::new()
+            .address(
+                value
+                    .address
+                    .into_iter()
+                    .map(ethers::types::Address::from)
+                    .collect::<Vec<_>>(),
+            )
+            .topic0(value.topics)
     }
 }
 
@@ -184,11 +187,12 @@ pub trait HoprIndexerRpcOperations: HoprRpcOperations {
 
     /// Starts streaming the blocks with logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.
-    /// The given `filters` are applied to retrieve the logs for each retrieved block.
+    /// The given `filter` are applied to retrieve the logs for each retrieved block.
+    /// If the filter `is_empty()`, no logs are fetched, only blocks.
     /// The streaming stops only when the corresponding channel is closed by the returned receiver.
-    async fn poll_blocks_with_logs(
+    async fn try_block_with_logs_stream(
         &self,
         start_block_number: Option<u64>,
-        filters: Vec<EventsQuery>,
+        filter: LogFilter,
     ) -> Result<UnboundedReceiver<BlockWithLogs>>;
 }

@@ -11,18 +11,18 @@ use utils_types::sma::{NoSumSMA, SMA};
 use crate::errors::Result;
 use crate::errors::RpcError::{GeneralError, NoSuchBlock};
 use crate::rpc::{HoprMiddleware, RpcOperations};
-use crate::{BlockWithLogs, EventsQuery, HoprIndexerRpcOperations, Log};
+use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
 #[cfg(any(not(feature = "wasm"), test))]
 use async_std::task::{sleep, spawn_local};
-use futures::stream::FuturesUnordered;
-use futures::{FutureExt, TryStreamExt};
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
+
+const BLOCK_TIME_AVG_WINDOW_SIZE: u32 = 10;
 
 async fn send_block_with_logs(tx: &mut UnboundedSender<BlockWithLogs>, block: BlockWithLogs) -> Result<()> {
     match poll_fn(|cx| Pin::new(&tx).poll_ready(cx)).await {
@@ -36,35 +36,27 @@ async fn send_block_with_logs(tx: &mut UnboundedSender<BlockWithLogs>, block: Bl
 
 async fn get_block_with_logs_from_provider<P: JsonRpcClient + 'static>(
     block_number: u64,
-    queries: &Vec<EventsQuery>,
+    query: &LogFilter,
     provider: Arc<HoprMiddleware<P>>,
 ) -> Result<BlockWithLogs> {
     debug!("getting block #{block_number} with logs");
     match provider.get_block(block_number).await? {
         Some(block) => {
-            let fetch_logs = FuturesUnordered::new();
-            for filter in queries
-                .iter()
-                .flat_map(|q| Vec::<ethers::types::Filter>::from(q.clone()))
-            {
-                let prov = provider.clone();
-                let complete_filter = filter.from_block(block_number).to_block(block_number);
-                fetch_logs.push(async move {
-                    debug!("getting logs from #{block_number} using filter");
-                    prov.get_logs(&complete_filter)
-                        .map(|maybe_logs| maybe_logs.map(|logs| logs.into_iter().map(Log::from).collect::<Vec<_>>()))
-                        .await
-                });
-            }
+            let logs = if !query.is_empty() {
+                debug!("getting logs from #{block_number} using {query}");
+                let filter = ethers::types::Filter::from(query.clone())
+                    .from_block(block_number)
+                    .to_block(block_number);
+
+                provider.get_logs(&filter).await?.into_iter().map(Log::from).collect()
+            } else {
+                debug!("empty log filter for block #{block_number}");
+                Vec::new()
+            };
 
             Ok(BlockWithLogs {
                 block: block.into(),
-                logs: fetch_logs
-                    .try_collect::<Vec<_>>()
-                    .await?
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+                logs,
             })
         }
         None => Err(NoSuchBlock),
@@ -79,10 +71,10 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         Ok(r.as_u64())
     }
 
-    async fn poll_blocks_with_logs(
+    async fn try_block_with_logs_stream(
         &self,
         start_block_number: Option<u64>,
-        filters: Vec<EventsQuery>,
+        filter: LogFilter,
     ) -> Result<UnboundedReceiver<BlockWithLogs>> {
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
 
@@ -96,11 +88,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             let mut current = start_block;
             let mut latest = latest_block;
 
-            let mut block_time_sma = NoSumSMA::<Duration, u32>::new(10);
+            let mut block_time_sma = NoSumSMA::<Duration, u32>::new(BLOCK_TIME_AVG_WINDOW_SIZE);
             let mut prev_block = None;
 
             while current < latest {
-                match get_block_with_logs_from_provider(current, &filters, provider.clone()).await {
+                match get_block_with_logs_from_provider(current, &filter, provider.clone()).await {
                     Ok(block_with_logs) => {
                         let new_current = block_with_logs.block.number.expect("past block must not be pending");
                         let block_ts = Duration::from_secs(block_with_logs.block.timestamp.as_u64());
@@ -136,7 +128,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                 let mut current_backoff = block_time_sma.get_average().unwrap_or(initial_poll_backoff);
                 debug!("done receiving past blocks {start_block}-{latest}, polling for new blocks > {current} with initial backoff {} ms", current_backoff.as_millis());
                 loop {
-                    match get_block_with_logs_from_provider(current + 1, &filters, provider.clone()).await {
+                    match get_block_with_logs_from_provider(current + 1, &filter, provider.clone()).await {
                         Ok(block_with_logs) => {
                             let new_current = block_with_logs.block.number.expect("new block must not be pending");
                             let block_ts = Duration::from_secs(block_with_logs.block.timestamp.as_u64());
@@ -183,7 +175,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 mod test {
     use crate::rpc::tests::mock_config;
     use crate::rpc::RpcOperations;
-    use crate::{EventsQuery, HoprIndexerRpcOperations};
+    use crate::{HoprIndexerRpcOperations, LogFilter};
     use bindings::hopr_announcements::HoprAnnouncements;
     use bindings::hopr_channels::{ChannelOpenedFilter, HoprChannels};
     use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
@@ -353,9 +345,9 @@ mod test {
                     .unwrap();
         */
         let blocks = rpc
-            .poll_blocks_with_logs(
+            .try_block_with_logs_stream(
                 Some(1),
-                vec![EventsQuery {
+                vec![LogFilter {
                     address: addrs.channels,
                     topics: vec![ChannelOpenedFilter::signature()],
                 }],
