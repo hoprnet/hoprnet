@@ -136,7 +136,7 @@ impl LogFilter {
 
 impl Display for LogFilter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "filter of {} with {} topics", self.address.len(), self.topics.len())
+        write!(f, "filter of {} contracts with {} topics", self.address.len(), self.topics.len())
     }
 }
 
@@ -178,7 +178,7 @@ pub trait HoprRpcOperations {
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
 }
 
-/// Extension of `HoprRpcOperations` trait with functionality required by the Indexer.
+/// Trait with RPC provider functionality required by the Indexer.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprIndexerRpcOperations {

@@ -34,6 +34,7 @@ pub struct RpcOperationsConfig {
     pub node_module: Address,
     pub max_http_retries: u32,
     pub expected_block_time: Duration,
+    pub tx_polling_interval: Duration,
 }
 
 pub(crate) type HoprMiddleware<P> =
@@ -65,6 +66,7 @@ where
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?;
         let provider = Arc::new(
             Provider::new(provider_client)
+                .interval(cfg.tx_polling_interval)
                 .with_signer(wallet.with_chain_id(cfg.chain_id))
                 .nonce_manager(chain_key.public().to_address().into()),
         );
@@ -184,6 +186,7 @@ pub mod tests {
     pub fn mock_config() -> RpcOperationsConfig {
         RpcOperationsConfig {
             chain_id: 31337, // Anvil default chain id
+            tx_polling_interval: Duration::from_secs(1),
             contract_addrs: ContractAddresses {
                 channels: Address::random(),
                 announcements: Address::random(),
