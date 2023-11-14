@@ -36,4 +36,4 @@ done
 
 # Update hopr-lib Rust manifest
 sed -i'.original' 's/^version = ".*"$/version = "'${new_version}'"/' ${mydir}/../packages/hoprd/crates/hopr-lib/Cargo.toml
-rm ${mydir}/../packages/core/crates/core-hopr/src/constants.rs.original
+rm ${mydir}/../packages/hoprd/crates/hopr-lib/Cargo.toml.original
