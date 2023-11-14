@@ -54,7 +54,7 @@ jobs:
   tag:
     name: Tag images
     runs-on: ubuntu-2-core
-    if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
+    # if: github.event.pull_request.merged == true && (github.event.pull_request.base.ref == 'master' || contains(github.event.pull_request.base.ref,'release/'))
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
