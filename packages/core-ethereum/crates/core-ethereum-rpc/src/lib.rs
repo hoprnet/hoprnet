@@ -260,10 +260,6 @@ mod tests {
             .send()
             .await
             .unwrap();
-        debug!(
-            "node_stake_factory contracts deployed {:?}",
-            node_stake_factory.address().0
-        );
 
         // Deploy node management module implementation contract
         let node_management_module = HoprNodeManagementModule::deploy(client.clone(), ())
@@ -271,10 +267,6 @@ mod tests {
             .send()
             .await
             .unwrap();
-        debug!(
-            "node_management_module contracts deployed {:?}",
-            node_management_module.address().0
-        );
 
         // Deploy node-safe registry contract
         let node_safe_registry = HoprNodeSafeRegistry::deploy(client.clone(), ())
@@ -358,8 +350,11 @@ mod tests {
             channels: hopr_channels.address().0.into(),
             announcements: hopr_announcements.address().0.into(),
             network_registry: network_registry.address().0.into(),
+            network_registry_proxy: network_registry_proxy.address().0.into(),
             safe_registry: node_safe_registry.address().0.into(),
             price_oracle: ticket_price_oracle.address().0.into(),
+            stake_factory: node_stake_factory.address().0.into(),
+            module_implementation: node_management_module.address().0.into(),
         }
     }
 
