@@ -20,7 +20,6 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 new_version="${1}"
 
-
 # define packages for versioning
 # does not include ethereum, which isn't a real package anymore, just a folder
 declare -a versioned_packages=( utils core-ethereum core real hoprd )
