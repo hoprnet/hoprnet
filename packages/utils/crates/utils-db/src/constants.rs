@@ -16,7 +16,6 @@ pub const NEGLECTED_TICKETS_VALUE: &str = "statistics:neglected:value";
 pub const LOSING_TICKET_COUNT: &str = "statistics:losing:count";
 pub const LATEST_CONFIRMED_SNAPSHOT_KEY: &str = "latestConfirmedSnapshot";
 pub const PENDING_ACKNOWLEDGEMENTS_PREFIX: &str = "tickets:pending-acknowledgement-";
-pub const TICKETS_CHANNEL_UNREALIZED_BALANCE_PREFIX: &str = "tickets:channel-unrealized-balance-";
 pub const ACKNOWLEDGED_TICKETS_PREFIX: &str = "tickets:acknowledged-";
 pub const HOPR_BALANCE_KEY: &str = "hopr-balance";
 pub const TICKET_PRICE_KEY: &str = "ticket-price";
