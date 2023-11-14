@@ -25,7 +25,7 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 release_type=${1} # Can be any of these values Build | ReleaseCandidate | Patch | Minor | Major
 build=${2:-}
-current_version=$(jq -r '.version' "${mydir}/../packages/hoprd/package.json")
+current_version=$(sed -n "s/^version = //p" ${mydir}/..//packages/hoprd/crates/hopr-lib/Cargo.toml | tr -d '"')
 
 # Set dash as the delimiter to read current_version to get release candidate
 IFS='-'
@@ -36,7 +36,8 @@ if [ "${#current_version_splitted[*]}" == "2" ]
 then
   # Get Release Candidate Number
   pre_release=${current_version_splitted[1]/rc\.}
-else 
+elif [ "${release_type}" == "ReleaseCandidate" ]
+then
   # Reset the release candidate for new release name
   pre_release=0
 fi
@@ -61,12 +62,10 @@ case "$release_type" in
     unset pre_release
     ;;
   Minor)
-    unset pre_release
     patch_version=0
     minor_version=$((minor_version+1))
     ;;
   Major)
-    unset pre_release
     patch_version=0
     minor_version=0
     major_version=$((major_version+1))
