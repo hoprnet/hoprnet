@@ -17,5 +17,3 @@ pub const INDEXER_TIMEOUT: u32 = 900_000; // 15 minutes
 /// Submitting a transaction get retried using an exponential backoff
 /// The last try should not take longer than `MAX_TRANSACTION_BACKOFF`
 pub const MAX_TRANSACTION_BACKOFF: u32 = 1_800_000; // 30 minutes
-
-

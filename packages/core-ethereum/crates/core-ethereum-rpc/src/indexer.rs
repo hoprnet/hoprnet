@@ -175,18 +175,18 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
 #[cfg(test)]
 mod test {
-    use crate::rpc::tests::{mint_tokens, mock_config};
-    use crate::rpc::RpcOperations;
+    use crate::rpc::tests::mint_tokens;
+    use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprIndexerRpcOperations, LogFilter};
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use core_ethereum_misc::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
     use ethers::contract::EthEvent;
     use ethers_providers::{Http, Middleware};
     use futures::StreamExt;
     use std::str::FromStr;
     use std::time::Duration;
-    use core_ethereum_misc::{ContractAddresses, ContractInstances, create_anvil, create_rpc_client_to_anvil};
     use utils_types::primitives::Address;
     use utils_types::traits::BinarySerializable;
 
@@ -216,6 +216,14 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_try_stream_with_logs_should_not_stream_past_blocks() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+    }
+
+    #[tokio::test]
     async fn test_try_stream_with_logs_should_contain_all_logs_when_opening_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -226,13 +234,18 @@ mod test {
         // Deploy contracts
         let contract_instances = {
             let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
-            ContractInstances::deploy_for_testing(client, &chain_key_0).await.expect("could not deploy contracts")
+            ContractInstances::deploy_for_testing(client, &chain_key_0)
+                .await
+                .expect("could not deploy contracts")
         };
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
 
-        let mut cfg = mock_config();
-        cfg.contract_addrs = contract_addrs.clone();
+        let cfg = RpcOperationsConfig {
+            tx_polling_interval: Duration::from_millis(10),
+            contract_addrs: contract_addrs.clone(),
+            ..RpcOperationsConfig::default()
+        };
 
         let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
             .expect("failed to construct rpc");
@@ -252,7 +265,13 @@ mod test {
         // Spawn channel funding
         local.spawn_local(async move {
             tokio::time::sleep(Duration::from_secs(1)).await;
-            fund_channel(chain_key_0.public().to_address(), chain_key_1.public().to_address(), contract_instances.token, contract_instances.channels).await;
+            fund_channel(
+                chain_key_0.public().to_address(),
+                chain_key_1.public().to_address(),
+                contract_instances.token,
+                contract_instances.channels,
+            )
+            .await;
         });
 
         // Spawn stream

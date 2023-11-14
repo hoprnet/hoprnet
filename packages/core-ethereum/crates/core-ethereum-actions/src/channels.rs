@@ -6,7 +6,7 @@ use utils_log::{debug, error, info};
 use utils_types::primitives::{Address, Balance, BalanceType};
 
 use crate::errors::CoreEthereumActionsError::{
-    BalanceTooLow, ClosureTimeHasNotElapsed, NotEnoughAllowance, PeerAccessDenied, InvalidArguments, InvalidState
+    BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
 use crate::errors::{
     CoreEthereumActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},

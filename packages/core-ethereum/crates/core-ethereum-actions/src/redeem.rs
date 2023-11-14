@@ -14,7 +14,7 @@ use utils_types::primitives::Address;
 
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use crate::errors::{
-    CoreEthereumActionsError::{NotAWinningTicket, WrongTicketState, InvalidArguments},
+    CoreEthereumActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
     Result,
 };
 use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};

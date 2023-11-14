@@ -1,4 +1,4 @@
-use crate::errors::{CoreEthereumActionsError, Result, CoreEthereumActionsError::InvalidArguments};
+use crate::errors::{CoreEthereumActionsError, CoreEthereumActionsError::InvalidArguments, Result};
 use crate::transaction_queue::{Transaction, TransactionCompleted};
 use crate::CoreEthereumActions;
 use async_trait::async_trait;

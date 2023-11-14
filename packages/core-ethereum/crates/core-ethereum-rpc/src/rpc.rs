@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_crypto::types::Hash;
-use core_ethereum_misc::ContractAddresses;
+use core_ethereum_misc::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
@@ -17,10 +17,6 @@ use std::time::Duration;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
-use bindings::hopr_node_management_module::HoprNodeManagementModule;
-use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
-use bindings::hopr_token::HoprToken;
-
 use crate::errors::Result;
 use crate::HoprRpcOperations;
 
@@ -28,10 +24,21 @@ use crate::HoprRpcOperations;
 pub struct RpcOperationsConfig {
     pub chain_id: u64,
     pub contract_addrs: ContractAddresses,
-    pub node_module: Address,
     pub max_http_retries: u32,
     pub expected_block_time: Duration,
     pub tx_polling_interval: Duration,
+}
+
+impl Default for RpcOperationsConfig {
+    fn default() -> Self {
+        Self {
+            chain_id: 100,
+            contract_addrs: Default::default(),
+            max_http_retries: 3,
+            expected_block_time: Duration::from_secs(5),
+            tx_polling_interval: Duration::from_secs(7),
+        }
+    }
 }
 
 pub(crate) type HoprMiddleware<P> =
@@ -41,9 +48,7 @@ pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
     pub(crate) provider: Arc<HoprMiddleware<P>>,
     pub(crate) cfg: RpcOperationsConfig,
-    safe_registry: HoprNodeSafeRegistry<HoprMiddleware<P>>,
-    node_module: HoprNodeManagementModule<HoprMiddleware<P>>,
-    token: HoprToken<HoprMiddleware<P>>,
+    contract_instances: ContractInstances<HoprMiddleware<P>>,
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P>
@@ -67,9 +72,7 @@ where
 
         Ok(Self {
             me: chain_key.public().to_address(),
-            safe_registry: HoprNodeSafeRegistry::new::<H160>(cfg.contract_addrs.safe_registry.into(), provider.clone()),
-            node_module: HoprNodeManagementModule::new::<H160>(cfg.node_module.into(), provider.clone()),
-            token: HoprToken::new::<H160>(cfg.contract_addrs.token.into(), provider.clone()),
+            contract_instances: ContractInstances::new(&cfg.contract_addrs, provider.clone(), cfg!(test)),
             cfg,
             provider,
         })
@@ -95,24 +98,34 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                 Ok(Balance::new(native.into(), BalanceType::Native))
             }
             BalanceType::HOPR => {
-                let token_balance = self.token.balance_of(self.me.into()).call().await?;
+                let token_balance = self.contract_instances.token.balance_of(self.me.into()).call().await?;
                 Ok(Balance::new(token_balance.into(), BalanceType::HOPR))
             }
         }
     }
 
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>> {
-        let (exists, target) = self.node_module.try_get_target(target.into()).call().await?;
+        let (exists, target) = self
+            .contract_instances
+            .module_implementation
+            .try_get_target(target.into())
+            .call()
+            .await?;
         Ok(exists.then_some(target.into()))
     }
 
     async fn get_safe_from_node_safe_registry(&self, node_address: Address) -> Result<Address> {
-        let addr = self.safe_registry.node_to_safe(node_address.into()).call().await?;
+        let addr = self
+            .contract_instances
+            .safe_registry
+            .node_to_safe(node_address.into())
+            .call()
+            .await?;
         Ok(addr.into())
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
-        let owner = self.node_module.owner().call().await?;
+        let owner = self.contract_instances.module_implementation.owner().call().await?;
         Ok(owner.into())
     }
 
@@ -126,9 +139,10 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{Block, HoprRpcOperations, TypedTransaction};
+    use bindings::hopr_token::HoprToken;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::Hash;
-    use core_ethereum_misc::{ContractAddresses, create_anvil};
+    use core_ethereum_misc::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
     use ethers::prelude::BlockId;
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::{Http, JsonRpcClient, Middleware};
@@ -136,29 +150,7 @@ pub mod tests {
     use primitive_types::H160;
     use std::str::FromStr;
     use std::time::Duration;
-    use bindings::hopr_token::HoprToken;
     use utils_types::primitives::{Address, BalanceType, U256};
-
-    pub fn mock_config() -> RpcOperationsConfig {
-        RpcOperationsConfig {
-            chain_id: 31337, // Anvil default chain id
-            tx_polling_interval: Duration::from_secs(1),
-            contract_addrs: ContractAddresses {
-                channels: Address::random(),
-                announcements: Address::random(),
-                token: Address::random(),
-                safe_registry: Address::random(),
-                network_registry: Address::random(),
-                network_registry_proxy: Address::random(),
-                price_oracle: Address::random(),
-                stake_factory: Address::random(),
-                module_implementation: Address::random(),
-            },
-            node_module: Address::random(),
-            max_http_retries: 5,
-            expected_block_time: Duration::from_secs(1),
-        }
-    }
 
     pub async fn mint_tokens<M: Middleware + 'static>(hopr_token: HoprToken<M>, amount: u128, deployer: Address) {
         hopr_token
@@ -170,13 +162,17 @@ pub mod tests {
             .unwrap();
 
         hopr_token
-            .mint(deployer.into(), amount.into(), ethers::types::Bytes::new(), ethers::types::Bytes::new())
+            .mint(
+                deployer.into(),
+                amount.into(),
+                ethers::types::Bytes::new(),
+                ethers::types::Bytes::new(),
+            )
             .send()
             .await
             .unwrap()
             .await
             .unwrap();
-
     }
 
     fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {
@@ -209,7 +205,10 @@ pub mod tests {
             None
         })
         .await
-        .expect(&format!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()))
+        .expect(&format!(
+            "timeout awaiting tx hash {tx_hash} after {} seconds",
+            timeout.as_secs()
+        ))
         .expect("expected block")
     }
 
@@ -220,7 +219,11 @@ pub mod tests {
         let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let cfg = mock_config();
+        let cfg = RpcOperationsConfig {
+            chain_id: anvil.chain_id(),
+            tx_polling_interval: Duration::from_millis(10),
+            ..RpcOperationsConfig::default()
+        };
         let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
             .expect("failed to construct rpc");
 
@@ -243,7 +246,11 @@ pub mod tests {
         let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let cfg = mock_config();
+        let cfg = RpcOperationsConfig {
+            chain_id: anvil.chain_id(),
+            tx_polling_interval: Duration::from_millis(10),
+            ..RpcOperationsConfig::default()
+        };
         let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
             .expect("failed to construct rpc");
 
@@ -260,5 +267,42 @@ pub mod tests {
 
         let balance_2 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_2.lt(&balance_1), "balance must be diminished");
+    }
+
+    #[tokio::test]
+    async fn test_get_balance_token() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let anvil = create_anvil(None);
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+
+        // Deploy contracts
+        let contract_instances = {
+            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+            ContractInstances::deploy_for_testing(client, &chain_key_0)
+                .await
+                .expect("could not deploy contracts")
+        };
+
+        let cfg = RpcOperationsConfig {
+            chain_id: anvil.chain_id(),
+            tx_polling_interval: Duration::from_millis(10),
+            contract_addrs: ContractAddresses::from(&contract_instances),
+            ..RpcOperationsConfig::default()
+        };
+
+        let amount = 1024_u64;
+        mint_tokens(
+            contract_instances.token,
+            amount as u128,
+            chain_key_0.public().to_address(),
+        )
+        .await;
+
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
+            .expect("failed to construct rpc");
+
+        let balance = rpc.get_balance(BalanceType::HOPR).await.unwrap();
+        assert_eq!(amount, balance.value().as_u64(), "invalid balance");
     }
 }
