@@ -35,4 +35,5 @@ for package in "${versioned_packages[@]}"; do
 done
 
 # Update hopr-lib Rust manifest
-sed -i 's/^version = ".*"$/version = : \&str = "'${new_version}'";/' ${mydir}/../packages/hoprd/crates/hopr-lib/Cargo.toml 
+sed -i'.original' 's/^version = ".*"$/version = "'${new_version}'"/' ${mydir}/../packages/hoprd/crates/hopr-lib/Cargo.toml
+rm ${mydir}/../packages/core/crates/core-hopr/src/constants.rs.original
