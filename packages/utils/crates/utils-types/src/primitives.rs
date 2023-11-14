@@ -97,7 +97,7 @@ impl From<H160> for Address {
 
 impl From<Address> for H160 {
     fn from(value: Address) -> Self {
-        H160::from_slice(&value.to_bytes())
+        H160::from_slice(&value.addr)
     }
 }
 

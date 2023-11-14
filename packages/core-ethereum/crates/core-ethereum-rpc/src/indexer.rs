@@ -178,14 +178,14 @@ mod test {
     use crate::rpc::tests::mock_config;
     use crate::rpc::RpcOperations;
     use crate::{HoprIndexerRpcOperations, LogFilter};
-    use bindings::hopr_channels::HoprChannels;
+    use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use ethers::contract::EthEvent;
     use ethers_providers::{Http, Middleware};
-    use futures::{future, StreamExt};
+    use futures::StreamExt;
     use std::str::FromStr;
-    use utils_log::debug;
+    use std::time::Duration;
     use utils_types::primitives::Address;
     use utils_types::traits::BinarySerializable;
 
@@ -211,60 +211,94 @@ mod test {
             .unwrap();
     }
 
-
     #[tokio::test]
-    async fn test_try_stream_with_logs() {
+    async fn test_try_stream_with_logs_should_contain_all_logs_when_opening_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        // TODO: instantiate this once for all tests (via custom test runner?)
-        let anvil = crate::tests::create_anvil_with_provider(std::time::Duration::from_secs(2));
+        let anvil = crate::tests::create_anvil(std::time::Duration::from_secs(1));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
-        let cfg = mock_config();
-        let mut rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
+        // Deploy contracts
+        let contract_addrs = {
+            let client = crate::tests::create_rpc_client_to_anvil(&anvil, &chain_key_0);
+            crate::tests::deploy_contracts(client, &chain_key_0).await
+        };
+
+        let mut cfg = mock_config();
+        cfg.contract_addrs = contract_addrs.clone();
+
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
             .expect("failed to construct rpc");
 
-        let contract_addrs = crate::tests::deploy_contracts(rpc.provider.clone(), &anvil).await;
-
-        rpc.cfg.contract_addrs = contract_addrs.clone();
-
-        let channels= rpc.channels.clone();
-        let token = rpc.token.clone();
-
-        let (tx, rx) = futures::channel::oneshot::channel();
+        let log_filter = LogFilter {
+            address: vec![contract_addrs.token, contract_addrs.channels],
+            topics: vec![
+                TransferFilter::signature(),
+                ApprovalFilter::signature(),
+                ChannelOpenedFilter::signature(),
+                ChannelBalanceIncreasedFilter::signature(),
+            ],
+        };
 
         let local = tokio::task::LocalSet::new();
+
+        // Spawn channel funding
+        let channels = rpc.channels.clone();
+        let token = rpc.token.clone();
+        local.spawn_local(async move {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            fund_channel(chain_key_1.public().to_address(), token, channels).await;
+        });
+
+        // Spawn stream
+        let (tx, rx) = futures::channel::oneshot::channel();
+        let filter_clone = log_filter.clone();
         local.spawn_local(async move {
             let mut blocks = rpc
-                .try_block_with_logs_stream(
-                    Some(1),
-                    LogFilter {
-                        address: vec![rpc.cfg.contract_addrs.token],
-                        topics: vec![TransferFilter::signature(), ApprovalFilter::signature()],
-                    },
-                )
+                .try_block_with_logs_stream(Some(1), filter_clone)
                 .await
                 .unwrap()
-                .skip_while(|l| future::ready(l.logs.is_empty()))
+                .skip_while(|block| futures::future::ready(block.logs.len() != 4))
                 .take(1)
                 .collect::<Vec<_>>()
                 .await;
 
-            let _ = tx.send(blocks.pop().unwrap());
+            let _ = tx.send(blocks.pop().unwrap().logs);
         });
 
-        local.spawn_local(async move {
-            fund_channel(chain_key_1.public().to_address(), token, channels).await;
-            debug!("channel funded");
-        });
+        // Everything must complete within 30 seconds
+        tokio::time::timeout(Duration::from_secs(30), local)
+            .await
+            .expect("timeout");
 
-        local.await;
-        let block = rx.await.unwrap();
-
-        assert!(block.logs.iter().any(|l|
-            l.address == contract_addrs.token &&
-            l.topics.contains(&TransferFilter::signature().0.into())
-        ), "must contain token events with topics");
+        // The logs within the single block must contain all 4 events
+        let retrieved_logs = rx.await.expect("failed to retrieve logs");
+        assert!(
+            retrieved_logs.iter().any(|log| log.address == contract_addrs.channels
+                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            "must contain channel open"
+        );
+        assert!(
+            retrieved_logs.iter().any(|log| log.address == contract_addrs.channels
+                && log
+                    .topics
+                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            "must contain channel balance increase"
+        );
+        assert!(
+            retrieved_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.token
+                    && log.topics.contains(&ApprovalFilter::signature().0.into())),
+            "must contain token approval"
+        );
+        assert!(
+            retrieved_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.token
+                    && log.topics.contains(&TransferFilter::signature().0.into())),
+            "must contain token transfer"
+        );
     }
 }

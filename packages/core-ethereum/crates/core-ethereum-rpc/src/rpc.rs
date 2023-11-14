@@ -143,7 +143,6 @@ pub mod tests {
     use core_ethereum_misc::ContractAddresses;
     use ethers::prelude::BlockId;
     use ethers::types::Eip1559TransactionRequest;
-    use ethers::utils::AnvilInstance;
     use ethers_providers::{Http, JsonRpcClient, Middleware};
     use futures::future::Either;
     use futures::StreamExt;
@@ -216,7 +215,7 @@ pub mod tests {
     async fn test_should_send_tx() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = crate::tests::create_anvil_with_provider(std::time::Duration::from_secs(2));
+        let anvil = crate::tests::create_anvil(std::time::Duration::from_secs(2));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = mock_config();
@@ -225,8 +224,6 @@ pub mod tests {
 
         let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
-
-        tokio::time::sleep(Duration::from_secs(4)).await;
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
@@ -241,7 +238,7 @@ pub mod tests {
     async fn test_get_balance_native() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = crate::tests::create_anvil_with_provider(std::time::Duration::from_secs(2));
+        let anvil = crate::tests::create_anvil(std::time::Duration::from_secs(2));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = mock_config();

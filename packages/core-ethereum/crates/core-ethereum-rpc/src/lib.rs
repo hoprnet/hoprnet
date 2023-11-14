@@ -212,8 +212,8 @@ mod tests {
         hopr_ticket_price_oracle::HoprTicketPriceOracle, hopr_token::HoprToken,
     };
     use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_crypto::types::PublicKey;
     use core_ethereum_misc::ContractAddresses;
+    use ethers::core::k256::ecdsa::SigningKey;
     use ethers::prelude::*;
     use ethers::{
         abi::Token,
@@ -226,12 +226,11 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use utils_log::debug;
-    use utils_types::traits::BinarySerializable;
 
-    use crate::rpc::tests::mock_config;
-    use crate::rpc::RpcOperations;
-
-    pub async fn deploy_contracts<M: Middleware + 'static>(client: Arc<M>, anvil: &AnvilInstance) -> ContractAddresses {
+    pub async fn deploy_contracts<M: Middleware + 'static>(
+        client: Arc<M>,
+        deployer: &ChainKeypair,
+    ) -> ContractAddresses {
         debug!("deploying contracts...");
 
         // Fund 1820 deployer and deploy ERC1820Registry
@@ -247,12 +246,7 @@ mod tests {
                 .into()).await.unwrap().await.unwrap();
 
         // Get deployer address
-        let self_address = ethers::types::Address::from_slice(
-            &PublicKey::from_privkey(anvil.keys()[0].to_bytes().as_ref())
-                .unwrap()
-                .to_address()
-                .to_bytes(),
-        );
+        let self_address: ethers::types::Address = deployer.public().to_address().into();
 
         // Deploy node-stake factory contract
         let node_stake_factory = HoprNodeStakeFactory::deploy(client.clone(), ())
@@ -358,23 +352,35 @@ mod tests {
         }
     }
 
-    pub fn create_anvil_with_provider(block_time: Duration) -> AnvilInstance {
+    pub fn create_anvil(block_time: Duration) -> AnvilInstance {
         Anvil::new()
             .path(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"))
             .block_time(block_time.as_secs())
             .spawn()
     }
 
+    pub fn create_rpc_client_to_anvil(
+        anvil: &AnvilInstance,
+        signer: &ChainKeypair,
+    ) -> Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>> {
+        let wallet: LocalWallet =
+            LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
+
+        let provider = Provider::<Http>::try_from(anvil.endpoint())
+            .unwrap()
+            .interval(Duration::from_millis(10u64));
+
+        Arc::new(SignerMiddleware::new(provider, wallet.with_chain_id(anvil.chain_id())))
+    }
+
     #[tokio::test]
     async fn test_deploy_contracts() {
-        let anvil = create_anvil_with_provider(std::time::Duration::from_secs(2));
+        let anvil = create_anvil(std::time::Duration::from_secs(2));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let cfg = mock_config();
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
-            .expect("failed to construct rpc");
+        let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
 
-        let contract_addrs = deploy_contracts(rpc.provider.clone(), &anvil).await;
+        let contract_addrs = deploy_contracts(client.clone(), &chain_key_0).await;
 
         assert_ne!(contract_addrs.token, Address::zero().into());
         assert_ne!(contract_addrs.channels, Address::zero().into());
