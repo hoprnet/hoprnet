@@ -45,7 +45,7 @@ where
     T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone,
 {
     pub db: DB<T>,
-    cache_unrealized_balances: HashMap<Hash, Balance>,
+    cached_unrealized_value: HashMap<Hash, Balance>,
     pub me: Address,
 }
 
@@ -53,9 +53,33 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> CoreEthereum
     pub fn new(db: DB<T>, me: Address) -> Self {
         Self {
             db,
-            cache_unrealized_balances: HashMap::new(),
+            cached_unrealized_value: HashMap::new(),
             me,
         }
+    }
+
+    pub async fn init_cache(&mut self) -> Result<()> {
+        for channel in self.get_channels().await?.into_iter() {
+            self.cleanup_invalid_channel_tickets(&channel).await?
+        }
+
+        for ticket in self.get_tickets(None).await?.into_iter() {
+            let unrealized_balance = self
+                .cached_unrealized_value
+                .get(&ticket.channel_id)
+                .map(|b| b.clone())
+                .unwrap_or(Balance::zero(BalanceType::HOPR))
+                .add(&ticket.amount);
+            error!(
+                "===> channel: {} adding unrealized balance {}",
+                ticket.channel_id, unrealized_balance
+            );
+
+            self.cached_unrealized_value
+                .insert(ticket.channel_id, unrealized_balance);
+        }
+
+        Ok(())
     }
 }
 
@@ -123,7 +147,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
             .map(|c| c.balance);
 
         Ok(if let Some(balance) = channel_balance {
-            if let Some(unrealized_balance) = self.cache_unrealized_balances.get(channel) {
+            if let Some(unrealized_balance) = self.cached_unrealized_value.get(channel) {
                 balance.sub(unrealized_balance)
             } else {
                 balance
@@ -234,12 +258,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
         if let PendingAcknowledgement::WaitingAsRelayer(v) = pending_acknowledgment {
             let current_unrealized_value = self
-                .cache_unrealized_balances
+                .cached_unrealized_value
                 .get(&v.ticket.channel_id)
                 .map(|v| v.clone())
                 .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-            self.cache_unrealized_balances
+            self.cached_unrealized_value
                 .insert(v.ticket.channel_id, current_unrealized_value.add(&v.ticket.amount));
         }
 
@@ -533,7 +557,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
                     // if redeeming, current < previous, resulting balance > 0 and can be subtracted from the cached one
                     let updated_balance_difference = previous_channel_entry.balance.sub(&channel.balance);
 
-                    self.cache_unrealized_balances
+                    self.cached_unrealized_value
                         .get(&channel_id)
                         .map(|v| v.sub(&updated_balance_difference))
                         .unwrap_or(Balance::zero(BalanceType::HOPR))
@@ -544,7 +568,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
                 Balance::zero(BalanceType::HOPR)
             }
         };
-        self.cache_unrealized_balances.insert(*channel_id, unrealized_balance);
+        self.cached_unrealized_value.insert(*channel_id, unrealized_balance);
 
         let mut batch_ops = utils_db::db::Batch::default();
 
@@ -720,7 +744,7 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
         debug!("stopped marking {acked_ticket} as redeemed");
 
-        self.db.flush().await
+        Ok(())
     }
 
     async fn mark_losing_acked_ticket(&mut self, acked_ticket: &AcknowledgedTicket) -> Result<()> {
@@ -762,12 +786,12 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         }
 
         let current_unrealized_value = self
-            .cache_unrealized_balances
+            .cached_unrealized_value
             .get(&acked_ticket.ticket.channel_id)
             .map(|v| v.sub(&acked_ticket.ticket.amount))
             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
-        self.cache_unrealized_balances
+        self.cached_unrealized_value
             .insert(acked_ticket.ticket.channel_id, current_unrealized_value);
 
         self.db.batch(ops, true).await
@@ -1300,6 +1324,16 @@ pub mod wasm {
         #[wasm_bindgen(js_name = "clone")]
         pub fn _clone(&self) -> Self {
             self.clone()
+        }
+
+        #[wasm_bindgen(js_name = "init_cache")]
+        pub async fn _init_cache(&mut self) -> Result<(), JsError> {
+            self.core_ethereum_db
+                .write()
+                .await
+                .init_cache()
+                .await
+                .map_err(JsError::from)
         }
     }
 
@@ -2554,5 +2588,37 @@ mod tests {
             .fold(Balance::zero(BalanceType::HOPR), |acc, n| acc.add(&n.ticket.amount));
 
         assert_eq!(unrealized_balance.unwrap(), expected_balance.sub(&ticket_balance));
+    }
+
+    #[async_std::test]
+    async fn test_db_should_initialize_catch_when_explicitly_triggered() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let (tickets, channel) = generate_ack_tickets(&mut inner_db, 1).await;
+
+        // Store ack tickets
+        for ack in tickets.iter() {
+            inner_db
+                .set(get_acknowledged_ticket_key(ack).unwrap(), ack)
+                .await
+                .unwrap();
+        }
+
+        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+
+        let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
+        assert_eq!(unrealized_balance, Ok(channel.balance));
+
+        db.init_cache()
+            .await
+            .expect("should initialize cache without any issues");
+
+        let ticket_balance = tickets
+            .iter()
+            .fold(Balance::zero(BalanceType::HOPR), |acc, n| acc.add(&n.ticket.amount));
+
+        let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
+        assert_eq!(unrealized_balance, Ok(channel.balance.sub(&ticket_balance)));
     }
 }
