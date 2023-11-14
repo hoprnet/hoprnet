@@ -119,7 +119,7 @@ impl Display for BlockWithLogs {
 }
 
 /// Represents a filter to extract logs containing specific contract events from a block.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LogFilter {
     /// Contract addresses
     pub address: Vec<Address>,

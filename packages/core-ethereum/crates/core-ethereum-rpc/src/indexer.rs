@@ -39,15 +39,15 @@ async fn send_block_with_logs(tx: &mut UnboundedSender<BlockWithLogs>, block: Bl
 
 async fn get_block_with_logs_from_provider<P: JsonRpcClient + 'static>(
     block_number: u64,
-    query: &LogFilter,
+    log_filter: &LogFilter,
     provider: Arc<HoprMiddleware<P>>,
 ) -> Result<BlockWithLogs> {
     debug!("getting block #{block_number} with logs");
     match provider.get_block(block_number).await? {
         Some(block) => {
-            let logs = if !query.is_empty() {
-                debug!("getting logs from #{block_number} using {query}");
-                let filter = ethers::types::Filter::from(query.clone())
+            let logs = if !log_filter.is_empty() {
+                debug!("getting logs from #{block_number} using {log_filter}");
+                let filter = ethers::types::Filter::from(log_filter.clone())
                     .at_block_hash(block.hash.expect("block must have block hash"));
 
                 provider.get_logs(&filter).await?.into_iter().map(Log::from).collect()
@@ -177,7 +177,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 mod test {
     use crate::rpc::tests::mint_tokens;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{HoprIndexerRpcOperations, LogFilter};
+    use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
@@ -216,11 +216,73 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_try_stream_with_logs_should_not_stream_past_blocks() {
+    async fn test_try_stream_with_logs_should_not_stream_past_blocks_if_needed() {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+
+        tokio::time::sleep(Duration::from_secs(2)).await; // wait two blocks
+
+        let cfg = RpcOperationsConfig::default();
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
+            .expect("failed to construct rpc");
+
+        let stream_start = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+
+        let local = tokio::task::LocalSet::new();
+        let blocks = local
+            .run_until(async move {
+                rpc.try_block_with_logs_stream(None, Default::default())
+                    .await
+                    .unwrap()
+                    .take(2)
+                    .collect::<Vec<BlockWithLogs>>()
+                    .await
+            })
+            .await;
+
+        assert!(blocks.iter().all(|b| b.logs.is_empty()), "must not contain logs");
+        assert!(
+            blocks
+                .into_iter()
+                .all(|b| stream_start.as_secs() <= b.block.timestamp.as_u64()),
+            "must not fetch past blocks"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_try_stream_with_logs_should_not_stream_older_blocks() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+
+        tokio::time::sleep(Duration::from_secs(2)).await; // wait two blocks
+
+        let cfg = RpcOperationsConfig::default();
+        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
+            .expect("failed to construct rpc");
+
+        let local = tokio::task::LocalSet::new();
+        let blocks = local
+            .run_until(async move {
+                rpc.try_block_with_logs_stream(Some(2), Default::default())
+                    .await
+                    .unwrap()
+                    .take(2)
+                    .collect::<Vec<BlockWithLogs>>()
+                    .await
+            })
+            .await;
+
+        assert!(blocks.iter().all(|b| b.logs.is_empty()), "must not contain logs");
+        assert!(
+            blocks.into_iter().all(|b| b.block.number.unwrap() >= 2),
+            "must not blocks before #2"
+        );
     }
 
     #[tokio::test]
