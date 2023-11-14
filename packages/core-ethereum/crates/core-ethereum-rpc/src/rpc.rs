@@ -17,9 +17,6 @@ use std::time::Duration;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 use validator::Validate;
 
-use bindings::hopr_announcements::HoprAnnouncements;
-use bindings::hopr_channels::HoprChannels;
-use bindings::hopr_network_registry::HoprNetworkRegistry;
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
 use bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
 use bindings::hopr_token::HoprToken;
@@ -44,12 +41,9 @@ pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
     pub(crate) provider: Arc<HoprMiddleware<P>>,
     pub(crate) cfg: RpcOperationsConfig,
-    pub(crate) channels: HoprChannels<HoprMiddleware<P>>,
-    announcements: HoprAnnouncements<HoprMiddleware<P>>,
     safe_registry: HoprNodeSafeRegistry<HoprMiddleware<P>>,
-    network_registry: HoprNetworkRegistry<HoprMiddleware<P>>,
     node_module: HoprNodeManagementModule<HoprMiddleware<P>>,
-    pub(crate) token: HoprToken<HoprMiddleware<P>>,
+    token: HoprToken<HoprMiddleware<P>>,
 }
 
 impl<P: JsonRpcClient + 'static> RpcOperations<P>
@@ -73,13 +67,7 @@ where
 
         Ok(Self {
             me: chain_key.public().to_address(),
-            channels: HoprChannels::new::<H160>(cfg.contract_addrs.channels.into(), provider.clone()),
-            announcements: HoprAnnouncements::new::<H160>(cfg.contract_addrs.announcements.into(), provider.clone()),
             safe_registry: HoprNodeSafeRegistry::new::<H160>(cfg.contract_addrs.safe_registry.into(), provider.clone()),
-            network_registry: HoprNetworkRegistry::new::<H160>(
-                cfg.contract_addrs.network_registry.into(),
-                provider.clone(),
-            ),
             node_module: HoprNodeManagementModule::new::<H160>(cfg.node_module.into(), provider.clone()),
             token: HoprToken::new::<H160>(cfg.contract_addrs.token.into(), provider.clone()),
             cfg,
@@ -140,16 +128,15 @@ pub mod tests {
     use crate::{Block, HoprRpcOperations, TypedTransaction};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::Hash;
-    use core_ethereum_misc::ContractAddresses;
+    use core_ethereum_misc::{ContractAddresses, create_anvil};
     use ethers::prelude::BlockId;
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::{Http, JsonRpcClient, Middleware};
-    use futures::future::Either;
     use futures::StreamExt;
     use primitive_types::H160;
-    use std::pin::pin;
     use std::str::FromStr;
     use std::time::Duration;
+    use bindings::hopr_token::HoprToken;
     use utils_types::primitives::{Address, BalanceType, U256};
 
     pub fn mock_config() -> RpcOperationsConfig {
@@ -173,6 +160,25 @@ pub mod tests {
         }
     }
 
+    pub async fn mint_tokens<M: Middleware + 'static>(hopr_token: HoprToken<M>, amount: u128, deployer: Address) {
+        hopr_token
+            .grant_role(hopr_token.minter_role().await.unwrap(), deployer.into())
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+
+        hopr_token
+            .mint(deployer.into(), amount.into(), ethers::types::Bytes::new(), ethers::types::Bytes::new())
+            .send()
+            .await
+            .unwrap()
+            .await
+            .unwrap();
+
+    }
+
     fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {
         let mut tx = TypedTransaction::Eip1559(Eip1559TransactionRequest::new());
         tx.set_to(H160::from(to));
@@ -186,11 +192,9 @@ pub mod tests {
         timeout: Duration,
     ) -> Block {
         let mut stream = rpc.provider.watch_blocks().await.unwrap();
-
         let prov_clone = rpc.provider.clone();
 
-        let timeout_fut = pin!(tokio::time::sleep(timeout));
-        let block_fut = pin!(async move {
+        tokio::time::timeout(timeout, async move {
             while let Some(hash) = stream.next().await {
                 let block = prov_clone.get_block(BlockId::Hash(hash.into())).await.unwrap().unwrap();
                 if block
@@ -203,19 +207,17 @@ pub mod tests {
                 }
             }
             None
-        });
-
-        match futures::future::select(block_fut, timeout_fut).await {
-            Either::Left((block, _)) => block.expect("expected a block"),
-            Either::Right(_) => panic!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()),
-        }
+        })
+        .await
+        .expect(&format!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()))
+        .expect("expected block")
     }
 
     #[tokio::test]
     async fn test_should_send_tx() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = crate::tests::create_anvil(std::time::Duration::from_secs(2));
+        let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = mock_config();
@@ -238,7 +240,7 @@ pub mod tests {
     async fn test_get_balance_native() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = crate::tests::create_anvil(std::time::Duration::from_secs(2));
+        let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
         let cfg = mock_config();

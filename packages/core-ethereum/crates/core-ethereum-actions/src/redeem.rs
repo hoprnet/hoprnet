@@ -3,7 +3,6 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use core_types::channels::{generate_channel_id, ChannelEntry};
@@ -15,7 +14,7 @@ use utils_types::primitives::Address;
 
 use crate::errors::CoreEthereumActionsError::ChannelDoesNotExist;
 use crate::errors::{
-    CoreEthereumActionsError::{NotAWinningTicket, WrongTicketState},
+    CoreEthereumActionsError::{NotAWinningTicket, WrongTicketState, InvalidArguments},
     Result,
 };
 use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};

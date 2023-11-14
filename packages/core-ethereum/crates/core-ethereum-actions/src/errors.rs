@@ -1,4 +1,3 @@
-use core_ethereum_misc::errors::CoreEthereumError;
 use core_ethereum_rpc::errors::RpcError;
 use thiserror::Error;
 use utils_db::errors::DbError;
@@ -35,20 +34,17 @@ pub enum CoreEthereumActionsError {
     #[error("on-chain submission of transaction failed: {0}")]
     TransactionSubmissionFailed(String),
 
+    #[error("invalid argument: {0}")]
+    InvalidArguments(String),
+
+    #[error("invalid state: {0}")]
+    InvalidState(String),
+
     #[error(transparent)]
     DbError(#[from] DbError),
 
     #[error(transparent)]
     RpcError(#[from] RpcError),
-
-    #[error(transparent)]
-    OtherError(#[from] CoreEthereumError),
-
-    #[error("{0}")]
-    InvalidArguments(String),
-
-    #[error("{0}")]
-    InvalidState(String),
 }
 
 pub type Result<T> = std::result::Result<T, CoreEthereumActionsError>;

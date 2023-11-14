@@ -1,10 +1,9 @@
-use crate::errors::{CoreEthereumActionsError, Result};
+use crate::errors::{CoreEthereumActionsError, Result, CoreEthereumActionsError::InvalidArguments};
 use crate::transaction_queue::{Transaction, TransactionCompleted};
 use crate::CoreEthereumActions;
 use async_trait::async_trait;
 use core_crypto::keypairs::OffchainKeypair;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
 use core_types::announcement::{AnnouncementData, KeyBinding};
 use multiaddr::Multiaddr;
 use utils_log::info;

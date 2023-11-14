@@ -175,7 +175,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
 #[cfg(test)]
 mod test {
-    use crate::rpc::tests::mock_config;
+    use crate::rpc::tests::{mint_tokens, mock_config};
     use crate::rpc::RpcOperations;
     use crate::{HoprIndexerRpcOperations, LogFilter};
     use bindings::hopr_channels::*;
@@ -186,14 +186,18 @@ mod test {
     use futures::StreamExt;
     use std::str::FromStr;
     use std::time::Duration;
+    use core_ethereum_misc::{ContractAddresses, ContractInstances, create_anvil, create_rpc_client_to_anvil};
     use utils_types::primitives::Address;
     use utils_types::traits::BinarySerializable;
 
     async fn fund_channel<M: Middleware + 'static>(
+        sender: Address,
         counterparty: Address,
         hopr_token: HoprToken<M>,
         hopr_channels: HoprChannels<M>,
     ) {
+        mint_tokens(hopr_token.clone(), 1000_u128, sender).await;
+
         hopr_token
             .approve(hopr_channels.address(), 1u128.into())
             .send()
@@ -215,15 +219,17 @@ mod test {
     async fn test_try_stream_with_logs_should_contain_all_logs_when_opening_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = crate::tests::create_anvil(std::time::Duration::from_secs(1));
+        let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
         // Deploy contracts
-        let contract_addrs = {
-            let client = crate::tests::create_rpc_client_to_anvil(&anvil, &chain_key_0);
-            crate::tests::deploy_contracts(client, &chain_key_0).await
+        let contract_instances = {
+            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+            ContractInstances::deploy_for_testing(client, &chain_key_0).await.expect("could not deploy contracts")
         };
+
+        let contract_addrs = ContractAddresses::from(&contract_instances);
 
         let mut cfg = mock_config();
         cfg.contract_addrs = contract_addrs.clone();
@@ -244,11 +250,9 @@ mod test {
         let local = tokio::task::LocalSet::new();
 
         // Spawn channel funding
-        let channels = rpc.channels.clone();
-        let token = rpc.token.clone();
         local.spawn_local(async move {
             tokio::time::sleep(Duration::from_secs(1)).await;
-            fund_channel(chain_key_1.public().to_address(), token, channels).await;
+            fund_channel(chain_key_0.public().to_address(), chain_key_1.public().to_address(), contract_instances.token, contract_instances.channels).await;
         });
 
         // Spawn stream
