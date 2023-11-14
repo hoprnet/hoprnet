@@ -11,8 +11,11 @@ pub struct ContractAddresses {
     pub channels: Address,
     pub announcements: Address,
     pub network_registry: Address,
+    pub network_registry_proxy: Address,
     pub safe_registry: Address,
     pub price_oracle: Address,
+    pub stake_factory: Address,
+    pub module_implementation: Address,
 }
 
 #[cfg(feature = "wasm")]
