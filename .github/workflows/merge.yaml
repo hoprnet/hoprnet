@@ -115,63 +115,28 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-          install_components: beta
-
-      - name: Deploy on GCP
+      - name: "Restart deployments"
         run: |
-          mkdir -p ~/.ssh/
-          echo "${{ secrets.GCP_SA_DOCKER_SSH_PRIVATE_KEY }}" > ~/.ssh/google_compute_engine
-          echo "${{ secrets.GCP_SA_DOCKER_SSH_PUBLIC_KEY }}" > ~/.ssh/google_compute_engine.pub
-          chmod 400 ~/.ssh/google_compute_engine
-          chmod 644 ~/.ssh/google_compute_engine.pub
-          declare base_branch=${{ github.event.pull_request.base.ref }}
+          set -x
+          base_branch="${{ github.event.pull_request.base.ref }}"
+          # Identify parameters depending on branch
           if [[ "${base_branch}" == "master" ]]; then
-            ./scripts/deploy.sh rotsee
+            namespace=rotsee
+            identity_pool=core-staging
           elif [[ "${base_branch}" =~ ^"release" ]]; then
-            ./scripts/deploy.sh "dufour-${base_branch/release\/}"
+            namespace=dufour
+            identity_pool="core-dufour-${base_branch/release\/}"
           else
             echo "Skipping deployment"
+            exit 0
           fi
-          rm ~/.ssh/google_compute_engine*
-
-# FIXME: Disabled until hoprd nodes can work in Kubernetes
-#  deploy_natted_nodes:
-#    name: Deploy Natted nodes
-#    runs-on: ubuntu-2-core
-#    if: needs.tag.result == 'success'
-#    needs:
-#      - tag
-#    steps:
-#      - name: Checkout hoprnet repository
-#        uses: actions/checkout@v3
-
-#       - name: "Restart deployments"
-#        run: |
-#          prBase="${{ github.event.pull_request.base.ref }}"
-#          # Identify the network to deploy nodes
-#          network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" packages/hoprd/releases.json | sed 's/_/-/')
-#          # In case the base PR is pointing to an unknown branch/release, we deploy to the default network "rotsee"
-#          if [ -z $network ]; then
-#            echo "No network selected"
-#            exit 1;
-#          fi
-#          echo "[INFO] Restarting deployments on ${network} from pr-${{ github.event.pull_request.number }}"
-#          # Get list of deployments to restart
-#          export deployments=($(kubectl get deployments -n ${network} -l hoprds.hoprnet.org/cluster=hoprd-${network} -o jsonpath="{.items[*].metadata.name}"))
-#          for deployment in "${deployments[@]}"; do
-#            echo "[INFO] Restarting hoprd node ${deployments}"
-#            kubectl rollout restart deployments -n ${network} $deployment;
-#          done
+          echo "[INFO] Restarting deployments on ${namespace} from pr-${{ github.event.pull_request.number }}"
+          # Get list of deployments to restart
+          export deployments=($(kubectl get deployments -n ${namespace/-.*} -l app.kubernetes.io/name=hoprd-operator,hoprds.hoprnet.org/identitypool=${identity_pool} -o jsonpath="{.items[*].metadata.name}"))
+          for deployment in "${deployments[@]}"; do
+            echo "[INFO] Restarting hoprd node ${namespace}/${deployments}"
+            kubectl rollout restart deployments -n ${namespace} $deployment;
+          done
 
   create_release:
     name: Create Release

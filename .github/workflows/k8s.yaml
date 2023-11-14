@@ -11,7 +11,6 @@ on:
       - unlabeled
 
 env:
-  GITOPS_ENVIRONMENT: prod
   GITOPS_BRANCH: master
 jobs:
   deploy:
@@ -28,40 +27,38 @@ jobs:
       - name: Checkout hoprnet
         uses: actions/checkout@v4
 
-      - name: Get version
-        run: |
-          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
-          docker_tag=$(echo "${next_version}" | sed 's/+/-/')
-          echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
-
-      - name: Checkout gitops
+      - name: Checkout hoprd-nodes
         uses: actions/checkout@v4
         with:
-          repository: hoprnet/gitops
-          path: "./gitops"
+          repository: hoprnet/hoprd-nodes
+          path: "./hoprd-nodes"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: ${{ env.GITOPS_BRANCH }}
 
       - name: Set up environment
+        id: setup
         run: |
-          prBase="${{ github.event.pull_request.base.ref }}"
-          network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" ../packages/hoprd/releases.json)
-          # In case the base PR is pointing to an unknown branch/release, we deploy to the default network "rotsee"
-          if [ -z $network ]; then 
-            network="rotsee"  
+          docker_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
+          base_branch="${{ github.event.pull_request.base.ref }}"
+          # Identify parameters depending on branch
+          if [[ "${base_branch}" =~ ^"release" ]]; then
+            namespace=dufour
+            identity_pool=pull-requests-dufour
+          else
+            namespace=rotsee
+            identity_pool=pull-requests-rotsee
           fi
-          echo "NETWORK=${network}" >> $GITHUB_ENV
-          echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
+          cd ./hoprd-nodes
           pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deployment.py -a deploy -e ${{ env.GITOPS_ENVIRONMENT }} -n ${network} -v ${{ env.DOCKER_TAG }}
-        working-directory: "./gitops"
+          python3 ./scripts/sync-deployment.py -a deploy -n ${namespace} -i ${identity_pool} -v ${docker_tag}
+
       - name: Create Deploy Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          path: "./gitops"
+          path: "./hoprd-nodes"
           commit-message: "Creating ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
-          branch: "deployments/${{ env.NETWORK_DASH }}-pr-${{ github.event.pull_request.number }}"
+          branch: "deployments/pr-${{ github.event.pull_request.number }}"
           title: "[Deployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
           body: "This pull request contains the creation of a ClusterHoprd in Kubernetes for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
           labels: ClusterHoprd
@@ -82,40 +79,34 @@ jobs:
       - name: Checkout hoprnet
         uses: actions/checkout@v4
 
-      - name: Get version
-        run: |
-          next_version=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }})
-          docker_tag=$(echo "${next_version}" | sed 's/+/-/')
-          echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_ENV
-
-      - name: Checkout gitops
+      - name: Checkout hoprd-nodes
         uses: actions/checkout@v4
         with:
-          repository: hoprnet/gitops
-          path: "./gitops"
+          repository: hoprnet/hoprd-nodes
+          path: "./hoprd-nodes"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: ${{ env.GITOPS_BRANCH }}
 
       - name: Set up environment
         run: |
-          prBase="${{ github.event.pull_request.base.ref }}"
-          network=$(jq -r "to_entries[] | select(.value.git_ref | test(\"${prBase/*\/}\")).value.network" ../packages/hoprd/releases.json)
-          # In case the base PR is pointing to an unknown branch/release, we deploy to the default network "rotsee"
-          if [ -z $network ]; then 
-            network="rotsee"  
+          docker_tag=$(./scripts/get-next-version.sh Build ${{ github.event.pull_request.number }} | sed 's/+/-/')
+          base_branch="${{ github.event.pull_request.base.ref }}"
+          # Identify parameters depending on branch
+          if [[ "${base_branch}" =~ ^"release" ]]; then
+            namespace=dufour
+          else
+            namespace=rotsee
           fi
-          echo "NETWORK=${network}" >> $GITHUB_ENV
-          echo "NETWORK_DASH=${network/_/-}" >> $GITHUB_ENV
+          cd ./hoprd-nodes
           pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deployment.py -a undeploy -e ${{ env.GITOPS_ENVIRONMENT }} -v ${{ env.DOCKER_TAG }}
-        working-directory: "./gitops"
+          python3 ./scripts/sync-deployment.py -a undeploy -n ${namespace} -v ${docker_tag}
       - name: Create Undeploy Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          path: "./gitops"
+          path: "./hoprd-nodes"
           commit-message: "Deleting ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
-          branch: "undeployments/${{ env.NETWORK_DASH }}-pr-${{ github.event.pull_request.number }}"
+          branch: "undeployments/pr-${{ github.event.pull_request.number }}"
           title: "[Undeployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
           body: "This pull request contains the deletion of a ClusterHoprd in Kubernetes used for testing PR https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }}"
           labels: ClusterHoprd
