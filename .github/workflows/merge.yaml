@@ -15,6 +15,7 @@ on:
       - closed
       - synchronize
 
+
 concurrency:
   group: merge
   cancel-in-progress: false
