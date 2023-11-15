@@ -1,8 +1,13 @@
 import logging
 import os
+from time import sleep
+import fnmatch
+import json
 import random
+from pathlib import Path
 import shutil
 import subprocess
+import http.client
 
 import pytest
 from hopr import HoprdAPI
@@ -58,11 +63,20 @@ def cmd_line_args(request):
     return args
 
 
+MYDIR = os.path.dirname(os.path.realpath(__file__))
+
 FIXTURE_FILES_DIR = "/tmp/"
 FIXTURE_FILES_PREFIX = "hopr-smoke-test"
 
 NODE_NAME_PREFIX = "hopr-smoke-test-node"
 
+ANVIL_CFG_FILE = f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-anvil.cfg"
+ANVIL_LOG_FILE = f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}-anvil.log"
+
+PROTOCOL_CONFIG_FILE = f"{MYDIR}/../packages/hoprd/crates/hopr-lib/data/protocol-config.json"
+DEPLOYMENTS_SUMMARY_FILE = f"{MYDIR}/../packages/ethereum/contracts/contracts-addresses.json"
+
+PREGENERATED_IDENTITIES_DIR = f"{MYDIR}/identities"
 
 DEFAULT_API_TOKEN = "e2e-API-token^^"
 PASSWORD = "e2e-test"
@@ -107,7 +121,7 @@ NODES = {
         "api_token": DEFAULT_API_TOKEN,
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_6",
         "host_addr": "127.0.0.1",
-        "network": "anvil-localhost2"
+        "network": "anvil-localhost2",
     },
     "7": {
         "api_port": 19097,
@@ -120,44 +134,54 @@ NODES = {
 
 
 def cleanup_node(args):
-    proc = args.proc
-    proc.kill()
+    try:
+        proc = args["proc"]
+        proc.kill()
+    except:
+        pass
+
+
 def setup_node(args):
     logging.info(f"Setting up a node with configuration: {args}")
-    log_file = open(f"{args.dir}.log", 'w')
-    network = args.network if args.network else "anvil-localhost"
-    api_token_param = f"--api-token={args.api_token}" if args.api_token else "--disableApiAuthentication"
-    env = {**os.environ,
-           'DEBUG': "hopr*",
-           'NODE_ENV'="development",
-           'HOPRD_HEARTBEAT_INTERVAL'="2500",
-           'HOPRD_HEARTBEAT_THRESHOLD'="2500",
-           'HOPRD_HEARTBEAT_VARIANCE'="1000",
-           'HOPRD_NETWORK_QUALITY_THRESHOLD'="0.3",
-           'NODE_OPTIONS'="--experimental-wasm-modules"}
+    log_file = open(f"{args['dir']}.log", "w")
+    network = args["network"] if "network" in args else "anvil-localhost"
+    api_token_param = f"--api-token={args['api_token']}" if "api_token" in args else "--disableApiAuthentication"
+    custom_env = {
+        "DEBUG": "hopr*",
+        "NODE_ENV": "development",
+        "HOPRD_HEARTBEAT_INTERVAL": "2500",
+        "HOPRD_HEARTBEAT_THRESHOLD": "2500",
+        "HOPRD_HEARTBEAT_VARIANCE": "1000",
+        "HOPRD_NETWORK_QUALITY_THRESHOLD": "0.3",
+        "NODE_OPTIONS": "--experimental-wasm-modules",
+    }
     cmd = [
-    "node packages/hoprd/lib/main.cjs",
-     f"--network={network}",
-     f"--data="{args.dir}",
-     f"--host="{args.host_addr}:{args.p2p_port}",
-     "--identity="{args.dir}.id",
-     "--init",
-     "--password="{args.password}",
-     "--api",
-     "--apiPort="{args.api_port}"",
-     "--testAnnounceLocalAddresses",
-     "--disableTicketAutoRedeem",
-     "--testPreferLocalAddresses",
-     "--testUseWeakCrypto",
-     "--announce",
-    api_token_param
+        "node",
+        "packages/hoprd/lib/main.cjs",
+        f"--network={network}",
+        f"--data={args['dir']}",
+        f"--host={args['host_addr']}:{args['p2p_port']}",
+        f"--identity={args['dir']}.id",
+        "--init",
+        f"--password={PASSWORD}",
+        "--api",
+        f"--apiPort={args['api_port']}",
+        "--testAnnounceLocalAddresses",
+        "--disableTicketAutoRedeem",
+        "--testPreferLocalAddresses",
+        "--testUseWeakCrypto",
+        "--announce",
+        api_token_param,
     ]
-    if args.cfg_file:
-        cmd + f"--configurationFilePath={args.cfg_file}"
+    if "cfg_file" in args:
+        cmd = cmd + [f"--configurationFilePath={args['cfg_file']}"]
 
-    logging.info(f"Starting up a node with cmd: {cmd} and env {env}")
-    proc = Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT, env=env)
-    return proc
+    logging.info(f"Starting up a node with cmd: {cmd} and env {custom_env}")
+    proc = subprocess.Popen(cmd, stdout=log_file,
+                            stderr=subprocess.STDOUT, env=os.environ | custom_env, cwd=f"{MYDIR}/../")
+    api = HoprdAPI(f"http://localhost:{args['api_port']}", args["api_token"] if "api_token" in args else "")
+
+    return (proc, api)
 
 
 def test_sanity():
@@ -178,35 +202,182 @@ def check_socket(address, port):
     finally:
         s.close()
 
+
+def mirror_contract_data(dest_file_path, src_file_path, src_network, dest_network):
+    dest_data = ""
+
+    with open(src_file_path, "r") as src_file, open(dest_file_path, "r") as dest_file:
+        src_data = json.load(src_file)
+        dest_data = json.load(dest_file)
+        network_data = src_data["networks"][src_network]
+        partial_network_data = {
+            "environment_type": network_data["environment_type"],
+            "indexer_start_block_number": network_data["indexer_start_block_number"],
+            "addresses": network_data["addresses"],
+        }
+        new_network_data = dest_data["networks"][dest_network] | partial_network_data
+        dest_data["networks"][dest_network] = new_network_data
+
+    with open(dest_file_path, "w") as dest_file:
+        json.dump(dest_data, dest_file)
+
+
+def reuse_pregenerated_identities():
+    # remove existing identity files in tmp folder, .safe.args
+    for f in os.listdir(FIXTURE_FILES_DIR):
+        if fnmatch.fnmatch(f, f"{FIXTURE_FILES_PREFIX}_*.safe.args") or fnmatch.fnmatch(
+            f, f"{FIXTURE_FILES_PREFIX}_*.id"
+        ):
+            os.remove(f"{FIXTURE_FILES_DIR}/{f}")
+
+    # we copy and rename the files according to the expected file name format and destination folder
+    node_nr = 0
+    id_files = sorted(os.listdir(PREGENERATED_IDENTITIES_DIR))
+    for f in id_files:
+        if fnmatch.fnmatch(f, f"*.id"):
+            shutil.copyfile(
+                f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}_{node_nr}.id"
+            )
+
+
+def create_local_safes(private_key):
+    custom_env = {
+        "ETHERSCAN_API_KEY": "anykey",
+        "IDENTITY_PASSWORD": PASSWORD,
+        "DEPLOYER_PRIVATE_KEY": private_key,
+        "PRIVATE_KEY": private_key,
+        "PATH": f"{MYDIR}/../.foundry/bin:{os.environ['PATH']}",
+    }
+    id_files = sorted(os.listdir(FIXTURE_FILES_DIR))
+    for f in id_files:
+        if fnmatch.fnmatch(f, f"{FIXTURE_FILES_PREFIX}_*.id"):
+            # store the returned `--safeAddress <safe_address> --moduleAddress <module_address>` to `safe_i.log` for each id
+            # `hopli create-safe-module` will also add nodes to network registry and approve token transfers for safe
+            subprocess.run(
+                [
+                    "hopli",
+                    "create-safe-module",
+                    "--network",
+                    "anvil-localhost",
+                    "--identity-from-path",
+                    f"{FIXTURE_FILES_DIR}/{f}",
+                    "--contracts-root",
+                    "./packages/ethereum/contracts",
+                    "--hopr-amount",
+                    "20000.0",
+                ],
+                env=os.environ | custom_env,
+                check=True,
+                capture_output=True,
+            )
+
+
+def funding_nodes(private_key):
+    custom_env = {
+        "ETHERSCAN_API_KEY": "anykey",
+        "IDENTITY_PASSWORD": PASSWORD,
+        "PRIVATE_KEY": private_key,
+        "PATH": f"{MYDIR}/../.foundry/bin:{os.environ['PATH']}",
+    }
+    subprocess.run(
+        [
+            "hopli",
+            "faucet",
+            "--network",
+            "anvil-localhost",
+            "--identity-prefix",
+            FIXTURE_FILES_PREFIX,
+            "--identity-directory",
+            FIXTURE_FILES_DIR,
+            "--contracts-root",
+            "./packages/ethereum/contracts",
+            "--hopr-amount",
+            "0.0",
+        ],
+        env=os.environ | custom_env,
+        check=True,
+        capture_output=True,
+    )
+
+def collect_node_information(node_args):
+    conn = http.client.HTTPConnection("localhost", node_args['api_port'])
+    conn.request("GET", "/api/v3/account/addresses")
+    resp = conn.getresponse()
+    assert(resp.status == 200)
+    data = json.loads(resp.read())
+    return (data['hopr'], data['native'])
+
 @pytest.fixture(scope="module")
 def swarm7(request):
     logging.info(f"Using the random seed: {SEED}")
 
-    log_file_path = f"/tmp/hopr-smoke-{request.module.__name__}-setup.log"
-
     for f in ["node_5.cfg.yaml"]:
         shutil.copyfile(f"./tests/{f}", f"{FIXTURE_FILES_DIR}/{FIXTURE_FILES_PREFIX}-{f}")
 
-    # TODO: start anvil
-    # TODO: update protocol config
-    # TODO: reuse identities
-    # TODO: create local safes
-    # TODO: start nodes
-    try:
+    logging.info("Ensure local anvil server is not running")
+    subprocess.run(["make", "kill-anvil"], cwd=f"{MYDIR}/../", check=True)
+
+    logging.info("Starting local anvil server")
+    subprocess.run(
+        ["./run-local-anvil.sh", "-l", ANVIL_LOG_FILE, "-c", ANVIL_CFG_FILE],
+        check=True,
+        capture_output=True,
+        cwd=f"{MYDIR}/../scripts",
+    )
+
+    # read auto-generated private key from anvil configuration
+    with open(ANVIL_CFG_FILE, "r") as anvil_cfg_file:
+        data = json.load(anvil_cfg_file)
+        private_key = data["private_keys"][0]
+
+    logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
+    mirror_contract_data(PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, "anvil-localhost", "anvil-localhost")
+    mirror_contract_data(PROTOCOL_CONFIG_FILE, DEPLOYMENTS_SUMMARY_FILE, "anvil-localhost", "anvil-localhost2")
+
+    logging.info("Reuse pre-generated identities")
+    reuse_pregenerated_identities()
+
+    logging.info("Create safe and modules for all the ids, store them in args files")
+    create_local_safes(private_key)
+
     nodes = NODES.copy()
-    for node_id, node_args in NODES.items():
-        proc = setup_node(node_args)
-        nodes[node_id]["proc"] = proc
-        nodes[node_id]["api"] = HoprdAPI(f"http://localhost:{node_args.api_port}", node_args.api_token)
 
-    # TODO: wait for nodes
-    # TODO: fund nodes
-    # TODO: wait for port bindings
-    # TODO: restart node 1 and wait
+    try:
+        for node_id, node_args in nodes.items():
+            (proc, api) = setup_node(node_args)
+            nodes[node_id]["proc"] = proc
+            nodes[node_id]["api"] = api
 
-    yield nodes
-    except Exception:
-        logging.error("Creating a 7 node cluster - FAILED")
+        logging.info("Wait for all nodes to start up")
+        for node_id, node_args in nodes.items():
+            while True:
+                with open(f"{node_args['dir']}.log", "r") as f:
+                    logs = f.read()
+                    if "waitforfunds: still unfunded" in logs:
+                        break
+                sleep(0.1)
+
+        logging.info("Funding nodes")
+        funding_nodes(private_key)
+
+        logging.info("Waiting for port bindings")
+        for node_id, node_args in nodes.items():
+            while True:
+                with open(f"{node_args['dir']}.log", "r") as f:
+                    logs = f.read()
+                    if "STARTED NODE" in logs:
+                        break
+                sleep(0.1)
+
+        logging.info("Collect node information")
+        for node_id, node_args in nodes.items():
+            (peer_id, address) = collect_node_information(node_args)
+            nodes[node_id]["peer_id"] = peer_id
+            nodes[node_id]["address"] = address
+
+        yield nodes
+    except Exception as e:
+        logging.error(f"Creating a 7 node cluster - FAILED: {e}")
     finally:
         logging.debug("Tearing down the 7 node cluster")
         for node_id, node_args in nodes.items():
