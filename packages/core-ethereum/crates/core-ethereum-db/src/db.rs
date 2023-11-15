@@ -14,7 +14,7 @@ use utils_db::{
     db::{Batch, DB},
     traits::AsyncKVStorage,
 };
-use utils_log::{debug, error};
+use utils_log::{debug, error, info};
 use utils_types::{
     primitives::{Address, AuthorizationToken, Balance, BalanceType, EthereumChallenge, Snapshot, U256},
     traits::BinarySerializable,
@@ -59,21 +59,22 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> CoreEthereum
     }
 
     pub async fn init_cache(&mut self) -> Result<()> {
-        for channel in self.get_channels().await?.into_iter() {
-            self.cleanup_invalid_channel_tickets(&channel).await?
-        }
+        // let channels = self.get_channels().await?;
+        // info!("Cleaning up invalid tickets from {} tracked channels...", channels.len());
+        // for channel in channels.iter() {
+        //     self.cleanup_invalid_channel_tickets(channel).await?
+        // }
 
-        for ticket in self.get_tickets(None).await?.into_iter() {
+        debug!("Fetching all tickets to calculate the unrealized value in tracked channels...");
+        let tickets = self.get_tickets(None).await?;
+        info!("Calculating unrealized balance for {} tickets...", tickets.len());
+        for ticket in tickets.into_iter() {
             let unrealized_balance = self
                 .cached_unrealized_value
                 .get(&ticket.channel_id)
                 .map(|b| b.clone())
                 .unwrap_or(Balance::zero(BalanceType::HOPR))
                 .add(&ticket.amount);
-            error!(
-                "===> channel: {} adding unrealized balance {}",
-                ticket.channel_id, unrealized_balance
-            );
 
             self.cached_unrealized_value
                 .insert(ticket.channel_id, unrealized_balance);
