@@ -29,6 +29,8 @@ export async function createHoprNode(
     cfg.db.initialize = true
   }
   let db = new Database(dbPath.toString(), cfg.db.initialize, chainKeypair.public().to_address())
+  log(`Initializing DB caches...`)
+  await db.init_cache()
 
   // if safe address or module address is not provided, replace with values stored in the db
   let safeAddress = cfg.safe_module.safe_address
