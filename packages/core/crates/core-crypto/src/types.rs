@@ -514,6 +514,20 @@ impl From<Hash> for [u8; Hash::SIZE] {
     }
 }
 
+impl From<Hash> for primitive_types::H256 {
+    fn from(value: Hash) -> Self {
+        value.hash.into()
+    }
+}
+
+impl From<primitive_types::H256> for Hash {
+    fn from(value: primitive_types::H256) -> Self {
+        Self {
+            hash: value.0
+        }
+    }
+}
+
 /// Represents an Ed25519 public key.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]

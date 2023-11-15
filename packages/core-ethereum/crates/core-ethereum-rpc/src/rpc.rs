@@ -130,6 +130,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     }
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash> {
+        // Also fills the transaction including the EIP1559 fee estimates from the provider
         let sent_tx = self.provider.send_transaction(tx, None).await?;
         Ok(sent_tx.0.into())
     }

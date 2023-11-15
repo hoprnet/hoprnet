@@ -4,12 +4,12 @@ use std::sync::Arc;
 use utils_types::primitives::Address;
 
 use crate::transaction_queue::TransactionSender;
+
 pub mod channels;
 pub mod errors;
 pub mod node;
 pub mod payload;
 pub mod redeem;
-pub mod rpc_executor;
 pub mod transaction_queue;
 
 /// Contains all actions that a node can execute on-chain.

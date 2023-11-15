@@ -1,4 +1,4 @@
-use crate::errors::{CoreEthereumActionsError, CoreEthereumActionsError::InvalidArguments, Result};
+use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
 use crate::transaction_queue::{Transaction, TransactionCompleted};
 use crate::CoreEthereumActions;
 use async_trait::async_trait;
@@ -20,7 +20,6 @@ pub trait NodeActions {
         &self,
         multiaddr: &Multiaddr,
         offchain_key: &OffchainKeypair,
-        use_node_module: Option<Address>,
     ) -> Result<TransactionCompleted>;
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted>;
@@ -43,14 +42,12 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
         &self,
         multiaddr: &Multiaddr,
         offchain_key: &OffchainKeypair,
-        use_node_module: Option<Address>,
     ) -> Result<TransactionCompleted> {
-        let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))
-            .map_err(|e| CoreEthereumActionsError::OtherError(e.into()))?;
+        let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))?;
 
         info!("initiating announcement {announcement_data}");
         self.tx_sender
-            .send(Transaction::Announce(announcement_data, use_node_module))
+            .send(Transaction::Announce(announcement_data))
             .await
     }
 

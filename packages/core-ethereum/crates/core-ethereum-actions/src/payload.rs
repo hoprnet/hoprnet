@@ -24,6 +24,7 @@ use ethers::{
     abi::AbiEncode,
     types::{Address as EthereumAddress, H160, H256, U256},
 };
+use core_ethereum_rpc::{create_eip1559_transaction, TypedTransaction};
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
     traits::BinarySerializable,
@@ -37,65 +38,43 @@ pub enum Operation {
 }
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.
-pub trait PayloadGenerator {
+pub trait PayloadGenerator<T: Into<TypedTransaction>> {
     /// Create a ERC20 approve transaction payload. Pre-requisite to open payment channels.
     /// The `spender` address is typically the HOPR Channels contract address.
-    fn approve(&self, spender: Address, amount: &Balance) -> Result<Vec<u8>> {
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments(
-                "Invalid balance type. Expected a HOPR balance.".into(),
-            ));
-        }
-
-        Ok(ApproveCall {
-            spender: H160::from_slice(&spender.to_bytes()),
-            value: U256::from_big_endian(&amount.value().to_bytes()),
-        }
-        .encode())
-    }
+    fn approve(&self, spender: Address, amount: Balance) -> Result<T>;
 
     /// Create a ERC20 transfer transaction payload
-    fn transfer(&self, destination: &Address, amount: &Balance) -> Result<Vec<u8>> {
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments("Token transfer must have balance type HOPR".into()));
-        }
-
-        Ok(TransferCall {
-            recipient: H160::from_slice(&destination.to_bytes()),
-            amount: U256::from_big_endian(&amount.amount().to_bytes()),
-        }
-        .encode())
-    }
+    fn transfer(&self, destination: Address, amount: Balance) -> Result<T>;
 
     /// Creates the transaction payload to announce a node on-chain.
-    fn announce(&self, announcement: &AnnouncementData) -> Result<Vec<u8>>;
+    fn announce(&self, announcement: AnnouncementData) -> Result<T>;
 
     /// Creates the transaction payload to open a payment channel
-    fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>>;
+    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<T>;
 
     /// Creates the transaction payload to immediately close an incoming payment channel
-    fn close_incoming_channel(&self, source: &Address) -> Result<Vec<u8>>;
+    fn close_incoming_channel(&self, source: Address) -> Result<T>;
 
     /// Creates the transaction payload that initiates the closure of a payment channel.
     /// Once the notice period is due, the funds can be withdrawn using a
     /// finalizeChannelClosure transaction.
-    fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>>;
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
     /// Creates a transaction payload that withdraws funds from
     /// an outgoing payment channel. This will succeed once the closure
     /// notice period is due.
-    fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>>;
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
     /// Used to create the payload to claim incentives for relaying a mixnet packet.
-    fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket) -> Result<Vec<u8>>;
+    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> Result<T>;
 
     /// Creates a transaction payload to register a Safe instance which is used
     /// to manage the node's funds
-    fn register_safe_by_node(&self, safe_addr: &Address) -> Result<Vec<u8>>;
+    fn register_safe_by_node(&self, safe_addr: Address) -> Result<T>;
 
     /// Creates a transaction payload to remove the Safe instance. Once succeeded,
     /// the funds are no longer managed by the node.
-    fn deregister_node_by_safe(&self) -> Result<Vec<u8>>;
+    fn deregister_node_by_safe(&self) -> Result<T>;
 }
 
 fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
@@ -108,22 +87,77 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
     .encode()
 }
 
+fn approve_tx(spender: Address, amount: Balance) -> TypedTransaction {
+    let mut tx = create_eip1559_transaction();
+    tx.set_data(ApproveCall {
+        spender: H160::from_slice(&spender.to_bytes()),
+        value: U256::from_big_endian(&amount.value().to_bytes()),
+    }.encode().into());
+    tx
+}
+
+fn transfer_tx(destination: Address, amount: Balance) -> TypedTransaction {
+    let mut tx = create_eip1559_transaction();
+    match amount.balance_type() {
+        BalanceType::HOPR => {
+            tx.set_data(TransferCall {
+                recipient: H160::from_slice(&destination.to_bytes()),
+                amount: U256::from_big_endian(&amount.amount().to_bytes()),
+            }.encode().into());
+        }
+        BalanceType::Native => {
+            tx.set_value(primitive_types::U256::from(amount.value()));
+        }
+    }
+    tx
+}
+
+fn register_safe_tx(safe_addr: Address) -> TypedTransaction {
+    let mut tx = create_eip1559_transaction();
+    tx.set_data(RegisterSafeByNodeCall {
+        safe_addr: safe_addr.into(),
+    }.encode().into());
+    tx
+}
+
 /// Generates transaction payloads that do not use Safe-compliant ABI
 #[derive(Debug, Clone)]
 pub struct BasicPayloadGenerator {
     me: Address,
+    contract_addrs: ContractAddresses
 }
 
 impl BasicPayloadGenerator {
-    pub fn new(me: Address) -> Self {
-        Self { me }
+    pub fn new(me: Address, contract_addrs: ContractAddresses) -> Self {
+        Self { me, contract_addrs }
     }
 }
 
-impl PayloadGenerator for BasicPayloadGenerator {
-    fn announce(&self, announcement: &AnnouncementData) -> Result<Vec<u8>> {
-        Ok(match announcement.key_binding {
-            Some(ref binding) => {
+impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
+    fn approve(&self, spender: Address, amount: Balance) -> Result<TypedTransaction> {
+        if amount.balance_type() != BalanceType::HOPR {
+            return Err(InvalidArguments(
+                "Invalid balance type. Expected a HOPR balance.".into(),
+            ));
+        }
+        let mut tx = approve_tx(spender, amount);
+        tx.set_to(H160::from(self.contract_addrs.token));
+        Ok(tx)
+    }
+
+    fn transfer(&self, destination: Address, amount: Balance) -> Result<TypedTransaction> {
+        let mut tx = transfer_tx(destination, amount);
+        tx.set_to(H160::from(match amount.balance_type() {
+            BalanceType::Native => destination,
+            BalanceType::HOPR => self.contract_addrs.channels,
+        }));
+        Ok(tx)
+    }
+
+    fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(match &announcement.key_binding {
+            Some(binding) => {
                 let serialized_signature = binding.signature.to_bytes();
 
                 BindKeysAnnounceCall {
@@ -138,10 +172,12 @@ impl PayloadGenerator for BasicPayloadGenerator {
                 base_multiaddr: announcement.to_multiaddress_str(),
             }
             .encode(),
-        })
+        }.into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.announcements));
+        Ok(tx)
     }
 
-    fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>> {
+    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TypedTransaction> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
         }
@@ -152,69 +188,80 @@ impl PayloadGenerator for BasicPayloadGenerator {
             ));
         }
 
-        Ok(FundChannelCall {
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(FundChannelCall {
             account: EthereumAddress::from_slice(&dest.to_bytes()),
             amount: amount.value().as_u128(),
-        }
-        .encode())
+        }.encode().into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
+
+        Ok(tx)
     }
 
-    fn close_incoming_channel(&self, source: &Address) -> Result<Vec<u8>> {
+    fn close_incoming_channel(&self, source: Address) -> Result<TypedTransaction> {
         if source.eq(&self.me) {
-            return Err(InvalidArguments("Cannot close incoming channe from self".into()));
+            return Err(InvalidArguments("Cannot close incoming channel from self".into()));
         }
 
-        Ok(CloseIncomingChannelCall {
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(CloseIncomingChannelCall {
             source: EthereumAddress::from_slice(&source.to_bytes()),
-        }
-        .encode())
+        }.encode().into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
+
+        Ok(tx)
     }
 
-    fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
             ));
         }
 
-        Ok(InitiateOutgoingChannelClosureCall {
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(InitiateOutgoingChannelClosureCall {
             destination: EthereumAddress::from_slice(&destination.to_bytes()),
         }
-        .encode())
+        .encode().into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
+
+        Ok(tx)
     }
 
-    fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
             ));
         }
 
-        Ok(FinalizeOutgoingChannelClosureCall {
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(FinalizeOutgoingChannelClosureCall {
             destination: H160::from_slice(&destination.to_bytes()),
         }
-        .encode())
+        .encode().into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
+        Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket) -> Result<Vec<u8>> {
-        let redeemable = convert_acknowledged_ticket(acked_ticket)?;
+    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> Result<TypedTransaction> {
+        let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
         let params = convert_vrf_parameters(&acked_ticket.vrf_params);
 
-        Ok(RedeemTicketCall { redeemable, params }.encode())
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
+        Ok(tx)
     }
 
-    fn register_safe_by_node(&self, safe_addr: &Address) -> Result<Vec<u8>> {
-        if safe_addr.eq(&self.me) {
-            return Err(InvalidArguments("Safe address must be different from node addr".into()));
-        }
-
-        Ok(RegisterSafeByNodeCall {
-            safe_addr: H160::from_slice(&safe_addr.to_bytes()),
-        }
-        .encode())
+    fn register_safe_by_node(&self, safe_addr: Address) -> Result<TypedTransaction> {
+        let mut tx = register_safe_tx(safe_addr);
+        tx.set_to(H160::from(self.contract_addrs.safe_registry));
+        Ok(tx)
     }
 
-    fn deregister_node_by_safe(&self) -> Result<Vec<u8>> {
+    fn deregister_node_by_safe(&self) -> Result<TypedTransaction> {
         return Err(InvalidState(
             "Can only deregister an address if Safe is activated".into(),
         ));
@@ -237,10 +284,30 @@ impl SafePayloadGenerator {
     }
 }
 
-impl PayloadGenerator for SafePayloadGenerator {
-    fn announce(&self, announcement: &AnnouncementData) -> Result<Vec<u8>> {
-        let call_data = match announcement.key_binding {
-            Some(ref binding) => {
+impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
+    fn approve(&self, spender: Address, amount: Balance) -> Result<TypedTransaction> {
+        if amount.balance_type() != BalanceType::HOPR {
+            return Err(InvalidArguments(
+                "Invalid balance type. Expected a HOPR balance.".into(),
+            ));
+        }
+        let mut tx = approve_tx(spender, amount);
+        tx.set_to(H160::from(self.contract_addrs.token));
+        Ok(tx)
+    }
+
+    fn transfer(&self, destination: Address, amount: Balance) -> Result<TypedTransaction> {
+        let mut tx = transfer_tx(destination, amount);
+        tx.set_to(H160::from(match amount.balance_type() {
+            BalanceType::Native => destination,
+            BalanceType::HOPR => self.contract_addrs.channels,
+        }));
+        Ok(tx)
+    }
+
+    fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
+        let call_data = match &announcement.key_binding {
+            Some(binding) => {
                 let serialized_signature = binding.signature.to_bytes();
 
                 BindKeysAnnounceSafeCall {
@@ -259,16 +326,19 @@ impl PayloadGenerator for SafePayloadGenerator {
             .encode(),
         };
 
-        Ok(ExecTransactionFromModuleCall {
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(ExecTransactionFromModuleCall {
             to: H160::from_slice(&self.contract_addrs.announcements.to_bytes()),
             value: U256::zero(),
             data: call_data.into(),
             operation: Operation::Call as u8,
         }
-        .encode())
+        .encode().into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        Ok(tx)
     }
 
-    fn fund_channel(&self, dest: &Address, amount: &Balance) -> Result<Vec<u8>> {
+    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TypedTransaction> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
         }
@@ -286,22 +356,28 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
         .encode();
 
-        Ok(channels_payload(self.contract_addrs.channels, call_data))
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        Ok(tx)
     }
 
-    fn close_incoming_channel(&self, source: &Address) -> Result<Vec<u8>> {
+    fn close_incoming_channel(&self, source: Address) -> Result<TypedTransaction> {
         if source.eq(&self.me) {
             return Err(InvalidArguments("Cannot close incoming channe from self".into()));
         }
 
-        Ok(CloseIncomingChannelSafeCall {
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(CloseIncomingChannelSafeCall {
             self_: H160::from_slice(&self.me.to_bytes()),
             source: EthereumAddress::from_slice(&source.to_bytes()),
         }
-        .encode())
+        .encode().into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        Ok(tx)
     }
 
-    fn initiate_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
@@ -314,10 +390,13 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
         .encode();
 
-        Ok(channels_payload(self.contract_addrs.channels, call_data))
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        Ok(tx)
     }
 
-    fn finalize_outgoing_channel_closure(&self, destination: &Address) -> Result<Vec<u8>> {
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
@@ -330,11 +409,15 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
         .encode();
 
-        Ok(channels_payload(self.contract_addrs.channels, call_data))
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        Ok(tx)
+
     }
 
-    fn redeem_ticket(&self, acked_ticket: &AcknowledgedTicket) -> Result<Vec<u8>> {
-        let redeemable = convert_acknowledged_ticket(acked_ticket)?;
+    fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> Result<TypedTransaction> {
+        let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
         let params = convert_vrf_parameters(&acked_ticket.vrf_params);
 
         let call_data = RedeemTicketSafeCall {
@@ -344,20 +427,27 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
         .encode();
 
-        Ok(channels_payload(self.contract_addrs.channels, call_data))
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        Ok(tx)
     }
 
-    fn register_safe_by_node(&self, _safe_addr: &Address) -> Result<Vec<u8>> {
-        return Err(InvalidState(
-            "Can only register an address if Safe is not yet activated".into(),
-        ));
+    fn register_safe_by_node(&self, safe_addr: Address) -> Result<TypedTransaction> {
+        let mut tx = register_safe_tx(safe_addr);
+        tx.set_to(H160::from(self.contract_addrs.safe_registry));
+        Ok(tx)
     }
 
-    fn deregister_node_by_safe(&self) -> Result<Vec<u8>> {
-        Ok(DeregisterNodeBySafeCall {
+    fn deregister_node_by_safe(&self) -> Result<TypedTransaction> {
+        let mut tx = create_eip1559_transaction();
+        tx.set_data(DeregisterNodeBySafeCall {
             node_addr: H160::from_slice(&self.me.to_bytes()),
         }
-        .encode())
+        .encode().into());
+        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+
+        Ok(tx)
     }
 }
 

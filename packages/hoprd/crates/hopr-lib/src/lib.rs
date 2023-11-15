@@ -29,7 +29,7 @@ use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 #[cfg(feature = "wasm")]
 use {
-    core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_ethereum_db::db::wasm::Database,
+    core_ethereum_db::db::wasm::Database,
     core_transport::wasm_impls::HoprTransport,
 };
 
@@ -80,6 +80,7 @@ mod native {
     use core_ethereum_actions::{
         channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
     };
+    use core_ethereum_actions::transaction_queue::TransactionExecutor;
     use core_ethereum_api::ChannelEntry;
     use core_transport::{wasm_impls::PublicNodesResult, TicketStatistics};
     use core_types::{
@@ -113,7 +114,7 @@ mod native {
     }
 
     impl Hopr {
-        pub fn new<FOnReceived, FOnSent, FSaveTbf>(
+        pub fn new<FOnReceived, FOnSent, FSaveTbf, TxExec>(
             cfg: crate::config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
@@ -122,8 +123,8 @@ mod native {
             tbf: core_types::protocol::TagBloomFilter,
             save_tbf: FSaveTbf,
             chain_config: ChainNetworkConfig,
-            tx_executor: WasmTxExecutor,
-            #[cfg(feature = "wasm")] chain_query: chain::wasm::WasmChainQuery, // chain operatios currently only in JS
+            tx_executor: TxExec,
+            #[cfg(feature = "wasm")] chain_query: chain::wasm::WasmChainQuery, // chain operations currently only in JS
             on_received: FOnReceived, // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: FOnSent,         // passed emit on the WasmHoprMessageEmitter on packet sent
         ) -> Self
@@ -131,6 +132,7 @@ mod native {
             FOnReceived: Fn(ApplicationData) + 'static,
             FOnSent: Fn(HalfKeyChallenge) + 'static,
             FSaveTbf: Fn(Box<[u8]>) + 'static,
+            TxExec: TransactionExecutor + 'static,
         {
             // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
             // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
@@ -322,36 +324,6 @@ mod native {
             //     panic!("Failed to start the chain operations");
             // }
 
-            if self.is_public {
-                // If this is the first time the node starts up it has not registered a safe
-                // yet, therefore it may announce directly. Trying that to get the first
-                // announcement through.
-                //
-                // Otherwise, it may announce with the safe variant.
-                let is_not_registered = self
-                    .chain_query
-                    .isNodeSafeNotRegistered()
-                    .await
-                    .map(|v| v.as_bool().unwrap_or(false));
-
-                let should_use_safe = !is_not_registered.unwrap_or(false);
-
-                // TODO: allow announcing all addresses once that option is supported
-                let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
-                info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]);
-                if let Err(_) = self
-                    .chain_api
-                    .actions_ref()
-                    .announce(&multiaddresses_to_announce[0], &self.me, should_use_safe)
-                    .await
-                {
-                    // If the announcement fails we keep going to prevent the node from retrying
-                    // after restart. Functionality is limited and users must check the logs for
-                    // errors.
-                    error!("Failed to announce a node")
-                }
-            }
-
             // Possibly register node-safe pair to NodeSafeRegistry. Following that the
             // connector is set to use safe tx variants.
             if self
@@ -362,6 +334,10 @@ mod native {
                 .unwrap_or(false)
             {
                 info!("Registering safe by node");
+
+                if self.me_onchain() == self.staking_safe_address {
+                    return Err(errors::HoprLibError::GeneralError("cannot self as staking safe address".into()));
+                }
 
                 if let Ok(_) = self
                     .chain_api
@@ -376,6 +352,26 @@ mod native {
                 } else {
                     // Intentionally ignoring the errored state
                     error!("Failed to register node with safe")
+                }
+            }
+
+            if self.is_public {
+                // At this point the node is already registered with Safe, so
+                // we can announce via Safe-compliant TX
+
+                // TODO: allow announcing all addresses once that option is supported
+                let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
+                info!("Announcing node on chain: {:?}", &multiaddresses_to_announce[0]);
+                if let Err(_) = self
+                    .chain_api
+                    .actions_ref()
+                    .announce(&multiaddresses_to_announce[0], &self.me)
+                    .await
+                {
+                    // If the announcement fails we keep going to prevent the node from retrying
+                    // after restart. Functionality is limited and users must check the logs for
+                    // errors.
+                    error!("Failed to announce a node")
                 }
             }
 
@@ -781,9 +777,11 @@ pub mod wasm_impl {
     use js_sys::{Array, JsString};
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
+    use core_ethereum_actions::payload::SafePayloadGenerator;
 
-    use core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor;
     use core_ethereum_api::ChannelEntry;
+    use core_ethereum_api::executors::wasm::{WasmEthereumClient, WasmEthereumTransactionExecutor, WasmTaggingPayloadGenerator};
+    use core_ethereum_misc::ContractAddresses;
     use core_transport::{Hash, TicketStatistics};
     use utils_log::{debug, warn};
     use utils_types::{
@@ -848,9 +846,9 @@ pub mod wasm_impl {
             db: Database,
             tbf: core_types::protocol::TagBloomFilter,
             save_tbf: js_sys::Function,
-            tx_executor: WasmTxExecutor,
+            send_eth_tx: js_sys::Function,
             msg_emitter: WasmHoprMessageEmitter, // emitter api delegating the 'on' operation for WSS
-            chain_query: chain::wasm::WasmChainQuery, // chain operatios currently only in JS
+            chain_query: chain::wasm::WasmChainQuery, // chain operations currently only in JS
             on_received: js_sys::Function,       // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: js_sys::Function,           // passed emit on the WasmHoprMessageEmitter on packet sent
         ) -> Self {
@@ -868,6 +866,18 @@ pub mod wasm_impl {
                 cfg.chain.provider.clone().as_ref().map(|v| v.as_str()),
             )
             .expect("Valid configuration leads to valid network");
+
+            let contract_addrs = ContractAddresses {
+                announcements: Address::from_str(&chain_config.announcements).unwrap(),
+                channels: Address::from_str(&chain_config.channels).unwrap(),
+                token: Address::from_str(&chain_config.token).unwrap(),
+                price_oracle: Address::from_str(&chain_config.ticket_price_oracle).unwrap(),
+                network_registry: Address::from_str(&chain_config.network_registry).unwrap(),
+                network_registry_proxy: Address::from_str(&chain_config.network_registry_proxy).unwrap(),
+                stake_factory: Address::from_str(&chain_config.node_stake_v2_factory).unwrap(),
+                safe_registry: Address::from_str(&chain_config.node_safe_registry).unwrap(),
+                module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
+            };
 
             Self {
                 hopr: super::native::Hopr::new(
@@ -888,7 +898,10 @@ pub mod wasm_impl {
                         }
                     },
                     chain_config,
-                    tx_executor,
+                    WasmEthereumTransactionExecutor::new(
+                        WasmEthereumClient::new(send_eth_tx),
+                        WasmTaggingPayloadGenerator(SafePayloadGenerator::new(&me_onchain, contract_addrs))
+                    ),
                     chain_query.clone(),
                     move |data: ApplicationData| {
                         if let Err(e) = on_received.call1(&JsValue::null(), &data.into()) {

@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 async-trait = { workspace = true }
-async-std = { version = "1.12.0", features = ["attributes"] }
+async-std = { workspace = true, features = ["unstable"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 ethers = { workspace = true }
 ethers-providers = { version = "2", default-features = false }

@@ -1,4 +1,7 @@
 pub mod errors;
+pub mod executors;
+
+pub use core_types::channels::ChannelEntry;
 
 use async_lock::RwLock;
 use core_ethereum_db::db::CoreEthereumDb;
@@ -7,8 +10,6 @@ use futures::channel::mpsc::UnboundedSender;
 use futures::SinkExt;
 use std::sync::Arc;
 use utils_log::info;
-
-pub use core_types::channels::ChannelEntry;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_actions::CoreEthereumActions;

@@ -22,7 +22,6 @@ import {
   Handlers,
   random_integer,
   OffchainPublicKey,
-  CORE_ETHEREUM_CONSTANTS,
   U256
 } from '@hoprnet/hopr-utils'
 
@@ -35,16 +34,13 @@ import { Filter, Log } from '@ethersproject/abstract-provider'
 // @ts-ignore untyped library
 import retimer from 'retimer'
 
-// Exported from Rust
-const constants = CORE_ETHEREUM_CONSTANTS()
-
 const log = debug('hopr-core-ethereum:indexer')
 const error = debug('hopr-core-ethereum:indexer:error')
 const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
-const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: constants.MAX_TRANSACTION_BACKOFF }
+const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: 1_800_000 /*constants.MAX_TRANSACTION_BACKOFF*/ }
 
 // Metrics
 const metric_indexerErrors = create_multi_counter(
@@ -868,7 +864,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           log('listener %s on %s timed out and thus removed', eventType, tx)
           setImmediate(reject, tx)
         },
-        constants.INDEXER_TIMEOUT,
+        900_000, /*constants.INDEXER_TIMEOUT,*/
         `Timeout while indexer waiting for confirming transaction ${tx}`
       )
 

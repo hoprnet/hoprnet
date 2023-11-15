@@ -137,7 +137,7 @@
       "hopr_token_name": "wxHOPR"
     },
     "goerli": {
-      "description": "Görli Testnet is the first proof-of-authority cross-client testnet, syncing Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
+      "description": "Görli Testnet is the first proof-of-authority cross-client testnet, synching Parity Ethereum, Geth, Nethermind, Hyperledger Besu (formerly Pantheon), and EthereumJS",
       "chain_id": 5,
       "live": true,
       "max_fee_per_gas": "200 gwei",

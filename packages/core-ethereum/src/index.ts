@@ -9,7 +9,6 @@ import {
   cacheNoArgAsyncFunction,
   ChainKeypair,
   ChannelEntry,
-  CORE_ETHEREUM_CONSTANTS,
   Database,
   debug,
   type DeferType,
@@ -63,9 +62,6 @@ export type SafeModuleOptions = {
   moduleAddress: Address
 }
 
-// Exported from Rust
-const constants = CORE_ETHEREUM_CONSTANTS()
-
 export default class HoprCoreEthereum extends EventEmitter {
   private static _instance: HoprCoreEthereum
 
@@ -89,7 +85,7 @@ export default class HoprCoreEthereum extends EventEmitter {
       this.chainKeypair.public().to_address(),
       this.db,
       this.options.confirmations,
-      constants.INDEXER_BLOCK_RANGE
+      2000 // constants.INDEXER_BLOCK_RANGE
     )
   }
 
@@ -281,7 +277,7 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   private cachedGetNativeBalance = (address: string) =>
-    cacheNoArgAsyncFunction<Balance>(() => this.uncachedGetNativeBalance(address), constants.PROVIDER_CACHE_TTL)
+    cacheNoArgAsyncFunction<Balance>(() => this.uncachedGetNativeBalance(address), 30_000 /*constants.PROVIDER_CACHE_TTL*/)
 
   public async getNativeBalance(address: string, useCache: boolean = false): Promise<Balance> {
     return useCache ? this.cachedGetNativeBalance(address)() : this.uncachedGetNativeBalance(address)

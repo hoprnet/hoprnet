@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use ethers_providers::{JsonRpcClient, JsonRpcError, ProviderError, PubsubClient};
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
+use ethers_providers::{JsonRpcClient, JsonRpcError, ProviderError};
+use std::fmt::Debug;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use utils_misc::utils::wasm::js_value_to_error_msg;
@@ -9,10 +8,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use serde::{
-    de::{DeserializeOwned, MapAccess, Visitor},
-    Deserialize, Serialize,
+    de::{DeserializeOwned},
+    Serialize,
 };
-use std::future::Future;
 use thiserror::Error;
 
 use crate::nodejs::helper::{Request, Response};
@@ -32,12 +30,12 @@ pub enum ClientError {
     #[error("js error: {0}")]
     JsError(String),
 
-    #[error(transparent)]
     /// Thrown if the response could not be parsed
+    #[error(transparent)]
     JsonRpcError(#[from] JsonRpcError),
 
-    #[error("deserialization error: {err}, response: {text}")]
     /// Serde JSON Error
+    #[error("deserialization error: {err}, response: {text}")]
     SerdeJson {
         /// Underlying error
         err: serde_json::Error,

@@ -1,6 +1,5 @@
 use ethnum::{u256, AsU256};
 use getrandom::getrandom;
-use primitive_types::{H160, U256 as EthereumU256};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -26,6 +25,7 @@ impl Display for Address {
 }
 
 impl Default for Address {
+    /// Defaults to all zeroes.
     fn default() -> Self {
         Self {
             addr: [0u8; Self::SIZE],
@@ -43,10 +43,6 @@ impl Address {
         ret
     }
 
-    pub fn is_null(&self) -> bool {
-        self.addr == [0u8; Self::SIZE]
-    }
-
     pub fn to_bytes32(&self) -> Box<[u8]> {
         let mut ret = Vec::with_capacity(12 + Self::SIZE);
         ret.extend_from_slice(&[0u8; 12]);
@@ -56,10 +52,16 @@ impl Address {
 
     /// Creates a random Ethereum address, mostly used for testing
     pub fn random() -> Self {
+        // Uses getrandom, because it cannot bring in dependency on core-crypto
         let mut addr = [0u8; Self::SIZE];
         getrandom(&mut addr[..]).unwrap();
 
         Self { addr }
+    }
+
+    /// Checks if the address is all zeroes.
+    pub fn is_zero(&self) -> bool {
+        self.addr == [0u8; Self::SIZE]
     }
 }
 
@@ -89,15 +91,15 @@ impl From<[u8; Address::SIZE]> for Address {
     }
 }
 
-impl From<H160> for Address {
-    fn from(value: H160) -> Self {
+impl From<primitive_types::H160> for Address {
+    fn from(value: primitive_types::H160) -> Self {
         Address { addr: value.0 }
     }
 }
 
-impl From<Address> for H160 {
+impl From<Address> for primitive_types::H160 {
     fn from(value: Address) -> Self {
-        H160::from_slice(&value.addr)
+        primitive_types::H160::from_slice(&value.addr)
     }
 }
 
@@ -736,14 +738,14 @@ impl From<u8> for U256 {
     }
 }
 
-impl From<EthereumU256> for U256 {
-    fn from(value: EthereumU256) -> Self {
+impl From<primitive_types::U256> for U256 {
+    fn from(value: primitive_types::U256) -> Self {
         U256::from(&value)
     }
 }
 
-impl From<&EthereumU256> for U256 {
-    fn from(value: &EthereumU256) -> Self {
+impl From<&primitive_types::U256> for U256 {
+    fn from(value: &primitive_types::U256) -> Self {
         let mut tmp = [0u8; 32];
         value.to_big_endian(&mut tmp);
 
@@ -753,15 +755,15 @@ impl From<&EthereumU256> for U256 {
     }
 }
 
-impl From<U256> for EthereumU256 {
+impl From<U256> for primitive_types::U256 {
     fn from(value: U256) -> Self {
-        EthereumU256::from(&value)
+        primitive_types::U256::from(&value)
     }
 }
 
-impl From<&U256> for EthereumU256 {
+impl From<&U256> for primitive_types::U256 {
     fn from(value: &U256) -> Self {
-        EthereumU256::from_big_endian(&value.value.to_be_bytes())
+        primitive_types::U256::from_big_endian(&value.value.to_be_bytes())
     }
 }
 
@@ -826,7 +828,7 @@ impl AuthorizationToken {
 mod tests {
     use super::*;
     use hex_literal::hex;
-    use primitive_types::U256 as EthereumU256;
+    use primitive_types::U256;
     use std::cmp::Ordering;
     use std::str::FromStr;
 
@@ -985,7 +987,7 @@ mod tests {
     #[test]
     fn u256_conversions() {
         let u256_ethereum =
-            EthereumU256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap();
+            primitive_types::U256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap();
 
         assert_eq!(
             U256::from(u256_ethereum),
@@ -995,8 +997,8 @@ mod tests {
         let u256 = U256::from_hex("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap();
 
         assert_eq!(
-            EthereumU256::from(u256),
-            EthereumU256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap()
+            primitive_types::U256::from(u256),
+            primitive_types::U256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap()
         );
     }
 }

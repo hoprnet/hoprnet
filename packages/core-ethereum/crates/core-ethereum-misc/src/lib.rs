@@ -10,11 +10,9 @@ use bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
 use bindings::hopr_token::HoprToken;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use ethers::abi::Token;
-use ethers::prelude::{k256::ecdsa::SigningKey, *};
-use ethers::utils::{Anvil, AnvilInstance};
+use ethers::prelude::*;
 use hex_literal::hex;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use utils_types::primitives::Address;
@@ -24,14 +22,23 @@ pub mod constants;
 /// Holds addresses of all smart contracts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ContractAddresses {
+    /// Token contract
     pub token: Address,
+    /// Channels contract
     pub channels: Address,
+    /// Announcements contract
     pub announcements: Address,
+    /// Network registry contract
     pub network_registry: Address,
+    /// Network registry proxy contract
     pub network_registry_proxy: Address,
+    /// Safe registry contract
     pub safe_registry: Address,
+    /// Price oracle contract
     pub price_oracle: Address,
+    /// Stake factory contract
     pub stake_factory: Address,
+    /// Node management module contract (can be zero if safe is not used)
     pub module_implementation: Address,
 }
 
@@ -187,8 +194,9 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
 /// Used for testing. Creates local Anvil instance.
 /// When block time is given, new blocks is mined periodically.
 /// Otherwise, a new block is mined per transaction.
-pub fn create_anvil(block_time: Option<std::time::Duration>) -> AnvilInstance {
-    let mut anvil = Anvil::new().path(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"));
+#[cfg(not(target_arch = "wasm32"))]
+pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
+    let mut anvil = ethers::utils::Anvil::new().path(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"));
 
     if let Some(bt) = block_time {
         anvil = anvil.block_time(bt.as_secs());
@@ -198,10 +206,11 @@ pub fn create_anvil(block_time: Option<std::time::Duration>) -> AnvilInstance {
 }
 
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil(
-    anvil: &AnvilInstance,
+    anvil: &ethers::utils::AnvilInstance,
     signer: &ChainKeypair,
-) -> Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>> {
+) -> Arc<SignerMiddleware<Provider<Http>, Wallet<ethers::core::k256::ecdsa::SigningKey>>> {
     let wallet: LocalWallet = LocalWallet::from_bytes(signer.secret().as_ref()).expect("failed to construct wallet");
 
     let provider = Provider::<Http>::try_from(anvil.endpoint())

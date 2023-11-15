@@ -3,12 +3,10 @@ use core_crypto::types::Hash;
 use primitive_types::H256;
 use std::fmt::{Display, Formatter};
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
-use utils_types::traits::BinarySerializable;
 
 use crate::errors::Result;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
-pub use ethers::types::TxHash;
 pub use futures::channel::mpsc::UnboundedReceiver;
 
 pub mod errors;
@@ -16,7 +14,13 @@ pub mod indexer;
 pub mod rpc;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-pub mod nodejs;
+mod nodejs;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type NativeRpcClient = ethers::providers::Http;
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
+pub type NodeJsRpcClient = nodejs::NodeJsRpcClient;
 
 /// A type containing selected fields from  the `eth_getBlockByHash`/`eth_getBlockByNumber` RPC
 /// calls.
@@ -78,7 +82,7 @@ impl From<ethers::types::Log> for Log {
     fn from(value: ethers::prelude::Log) -> Self {
         Self {
             address: value.address.into(),
-            topics: value.topics.into_iter().map(|h| Hash::from(h.0)).collect(),
+            topics: value.topics.into_iter().map(Hash::from).collect(),
             data: Box::from(value.data.as_ref()),
             tx_index: value.transaction_index.map(|u| u.as_u64()),
             block_number: value.block_number.map(|u| u.as_u64()),
@@ -90,7 +94,7 @@ impl From<ethers::types::Log> for Log {
 impl From<Log> for ethers::abi::RawLog {
     fn from(value: Log) -> Self {
         ethers::abi::RawLog {
-            topics: value.topics.iter().map(|h| H256::from_slice(&h.to_bytes())).collect(),
+            topics: value.topics.into_iter().map(H256::from).collect(),
             data: value.data.into(),
         }
     }
@@ -124,7 +128,7 @@ pub struct LogFilter {
     /// Contract addresses
     pub address: Vec<Address>,
     /// Event topics
-    pub topics: Vec<TxHash>,
+    pub topics: Vec<Hash>,
 }
 
 impl LogFilter {
@@ -157,6 +161,11 @@ impl From<LogFilter> for ethers::types::Filter {
             )
             .topic0(value.topics)
     }
+}
+
+/// Short-hand for creating new EIP1559 transaction object.
+pub fn create_eip1559_transaction() -> TypedTransaction {
+    TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
 }
 
 /// Trait defining general set of operations an RPC provider

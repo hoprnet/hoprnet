@@ -23,7 +23,7 @@ use utils_log::{debug, error, info, warn};
 use utils_types::primitives::{Address, Balance};
 
 use crate::errors::CoreEthereumActionsError::TransactionSubmissionFailed;
-use crate::errors::Result;
+use crate::errors::{CoreEthereumActionsError, Result};
 use crate::transaction_queue::TransactionResult::{Failure, TicketRedeemed};
 
 #[cfg(any(not(feature = "wasm"), test))]
@@ -76,7 +76,7 @@ pub enum Transaction {
     Withdraw(Address, Balance),
 
     /// Announce node on-chain
-    Announce(AnnouncementData, Option<Address>),
+    Announce(AnnouncementData),
 
     /// Register safe address with this node
     RegisterSafe(Address),
@@ -98,13 +98,7 @@ impl Display for Transaction {
                 direction, channel.source, channel.destination
             ),
             Transaction::Withdraw(destination, amount) => write!(f, "withdraw tx of {amount} to {destination}"),
-            Transaction::Announce(data, safe) => {
-                if safe.is_some() {
-                    write!(f, "announce tx via safe of {}", data.to_multiaddress_str())
-                } else {
-                    write!(f, "announce tx of {}", data.to_multiaddress_str())
-                }
-            }
+            Transaction::Announce(data) => write!(f, "announce tx of {}", data.to_multiaddress_str()),
             Transaction::RegisterSafe(safe_address) => write!(f, "register safe tx {safe_address}"),
         }
     }
@@ -121,7 +115,7 @@ pub trait TransactionExecutor {
     async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult;
     async fn close_incoming_channel(&self, src: Address) -> TransactionResult;
     async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult;
-    async fn announce(&self, data: AnnouncementData, use_node_module: Option<Address>) -> TransactionResult;
+    async fn announce(&self, data: AnnouncementData) -> TransactionResult;
     async fn register_safe(&self, safe_address: Address) -> TransactionResult;
 }
 
@@ -137,6 +131,12 @@ pub enum TransactionResult {
     Announced { tx_hash: Hash },
     SafeRegistered { tx_hash: Hash },
     Failure(String),
+}
+
+impl From<CoreEthereumActionsError> for TransactionResult {
+    fn from(value: CoreEthereumActionsError) -> Self {
+        Failure(format!("tx failed with local error: {value}"))
+    }
 }
 
 /// Notifies about completion of a transaction (success or failure).
@@ -273,7 +273,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
             },
 
             Transaction::Withdraw(recipient, amount) => tx_exec.withdraw(recipient, amount).await,
-            Transaction::Announce(data, use_node_module) => tx_exec.announce(data, use_node_module).await,
+            Transaction::Announce(data) => tx_exec.announce(data).await,
             Transaction::RegisterSafe(safe_address) => tx_exec.register_safe(safe_address).await,
         }
     }

@@ -1,6 +1,7 @@
 use core_ethereum_rpc::errors::RpcError;
 use thiserror::Error;
 use utils_db::errors::DbError;
+use utils_types::errors::GeneralError;
 
 #[derive(Debug, Error)]
 pub enum CoreEthereumActionsError {
@@ -45,6 +46,9 @@ pub enum CoreEthereumActionsError {
 
     #[error(transparent)]
     RpcError(#[from] RpcError),
+
+    #[error(transparent)]
+    GeneralError(#[from] GeneralError)
 }
 
 pub type Result<T> = std::result::Result<T, CoreEthereumActionsError>;

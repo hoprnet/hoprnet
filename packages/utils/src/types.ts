@@ -33,8 +33,6 @@ export {
   ChannelDirection,
   OpenChannelResult,
   CloseChannelResult,
-  CoreEthereumConstants,
-  CORE_ETHEREUM_CONSTANTS,
   core_network_gather_metrics,
   core_packet_gather_metrics,
   core_protocol_gather_metrics,
@@ -65,7 +63,6 @@ export {
   hoprd_hoprd_gather_metrics,
   HoprKeys,
   IdentityOptions,
-  is_allowed_to_access_network,
   KeyBinding,
   KeyPair,
   merge_encoded_metrics,
@@ -106,5 +103,4 @@ export {
   WasmVecChannelEntry,
   HoprTransport,
   PingConfig,
-  WasmTxExecutor
 } from '../../hoprd/lib/hoprd_hoprd.js'

@@ -20,7 +20,8 @@ use utils_types::traits::BinarySerializable;
 use crate::{config::HoprLibConfig, constants};
 
 #[cfg(feature = "wasm")]
-use {core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, core_transport::wasm_impls::HoprTransport};
+use core_transport::wasm_impls::HoprTransport;
+use core_ethereum_actions::transaction_queue::TransactionExecutor;
 
 /// Enum differentiator for loop component futures.
 ///
@@ -67,7 +68,7 @@ impl std::fmt::Display for HoprLoopComponents {
 
 /// Main builder of the hopr lib components
 #[cfg(feature = "wasm")]
-pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
+pub fn build_components<FOnReceived, FOnSent, FSaveTbf, TxExec>(
     cfg: HoprLibConfig,
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
@@ -76,7 +77,7 @@ pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
     on_final_packet: FOnReceived,
     tbf: TagBloomFilter,
     save_tbf: FSaveTbf,
-    tx_executor: WasmTxExecutor,
+    tx_executor: TxExec,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (
     HoprTransport,
@@ -87,6 +88,7 @@ where
     FOnReceived: Fn(ApplicationData) + 'static,
     FOnSent: Fn(HalfKeyChallenge) + 'static,
     FSaveTbf: Fn(Box<[u8]>) + 'static,
+    TxExec: TransactionExecutor + 'static,
 {
     let identity: libp2p_identity::Keypair = (&me).into();
 

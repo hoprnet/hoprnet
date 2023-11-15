@@ -3,7 +3,6 @@ use serde::de::{MapAccess, Unexpected, Visitor};
 use serde::{de, Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::fmt;
-use std::fmt::Write;
 
 fn is_zst<T>(_t: &T) -> bool {
     std::mem::size_of::<T>() == 0
