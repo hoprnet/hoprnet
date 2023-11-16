@@ -293,6 +293,9 @@ where
                     db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
 
+                    // Reset the current_ticket_index to zero
+                    db.set_current_ticket_index(&channel_closed.channel_id.try_into()?, U256::zero()).await?;
+
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
                     }
@@ -314,6 +317,9 @@ where
                     channel_id.to_string(),
                     maybe_channel.is_some()
                 );
+
+                // Reset the current_ticket_index to zero
+                db.set_current_ticket_index(&channel_id, U256::zero()).await?;
 
                 if let Some(mut channel) = maybe_channel {
                     // set all channel fields like we do on-chain on close
@@ -353,6 +359,8 @@ where
 
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
+                    // compare the ticket index from the redeemed ticket with the current_ticket_index. Ensure that the current_ticket_index is not smaller than the value from redeemed ticket.
+                    db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.try_into()?, channel.ticket_index).await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);
@@ -1432,11 +1440,13 @@ pub mod tests {
             .unwrap();
 
         let closed_channel = db.get_channel(&channel_id).await.unwrap().unwrap();
+        let current_ticket_index = db.get_current_ticket_index(&channel_id).await.unwrap().unwrap();
 
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
         assert_eq!(closed_channel.ticket_index, 0u64.into());
 
         assert!(closed_channel.balance.value().eq(&U256::zero()));
+        assert!(current_ticket_index.eq(&U256::zero()));
     }
 
     #[async_std::test]
@@ -1471,6 +1481,9 @@ pub mod tests {
         assert_eq!(channel.status, ChannelStatus::Open);
         assert_eq!(channel.channel_epoch, 1u64.into());
         assert_eq!(channel.ticket_index, 0u64.into());
+
+        let current_ticket_index = db.get_current_ticket_index(&channel_id).await.unwrap().unwrap();
+        assert!(current_ticket_index.eq(&U256::zero()));
     }
 
     #[async_std::test]
@@ -1521,6 +1534,10 @@ pub mod tests {
         assert_eq!(channel.status, ChannelStatus::Open);
         assert_eq!(channel.channel_epoch, 4u64.into());
         assert_eq!(channel.ticket_index, 0u64.into());
+
+        // after the channel epoch is bumped, the ticket index gets reset to zero
+        let current_ticket_index = db.get_current_ticket_index(&channel_id).await.unwrap().unwrap();
+        assert!(current_ticket_index.eq(&U256::zero()));
     }
 
     #[async_std::test]
@@ -1570,6 +1587,10 @@ pub mod tests {
         let channel = db.get_channel(&channel_id).await.unwrap().unwrap();
 
         assert_eq!(channel.ticket_index, ticket_index);
+
+        // check the current_ticket_index is not smaller than the new ticket index
+        let current_ticket_index = db.get_current_ticket_index(&channel_id).await.unwrap().unwrap();
+        assert!(current_ticket_index.ge(&ticket_index));
     }
 
     #[async_std::test]
