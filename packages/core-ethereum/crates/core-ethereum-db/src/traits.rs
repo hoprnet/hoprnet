@@ -20,6 +20,10 @@ pub trait HoprCoreEthereumDbActions {
 
     async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>>;
 
+    async fn get_unrealized_balance(&self, channel: &Hash) -> Result<Balance>;
+
+    async fn get_channel_epoch(&self, channel: &Hash) -> Result<Option<U256>>;
+
     async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> Result<()>;
 
     async fn mark_rejected(&mut self, ticket: &Ticket) -> Result<()>;
