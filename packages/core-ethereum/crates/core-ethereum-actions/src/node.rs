@@ -123,7 +123,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow to withdraw 0"
         );

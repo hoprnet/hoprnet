@@ -835,7 +835,6 @@ impl AuthorizationToken {
 mod tests {
     use super::*;
     use hex_literal::hex;
-    use primitive_types::U256;
     use std::cmp::Ordering;
     use std::str::FromStr;
 

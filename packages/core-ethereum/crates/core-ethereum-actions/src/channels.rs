@@ -332,7 +332,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(*ALICE, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not create channel to self"
         );
@@ -365,7 +365,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -375,7 +375,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -588,7 +588,7 @@ mod tests {
         assert!(
             matches!(
                 actions.open_channel(bob, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
@@ -597,7 +597,7 @@ mod tests {
         assert!(
             matches!(
                 actions.fund_channel(channel_id, stake).await.err().unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow invalid balance"
         );
