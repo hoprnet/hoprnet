@@ -339,6 +339,7 @@ const POST: Operation = [
     if (openingResult.success == true) {
       res.status(201).send({ channelId: openingResult.channelId, transactionReceipt: openingResult.receipt })
     } else {
+      log(`Error: opening channel failed due to ${openingResult.reason}`)
       switch (openingResult.reason) {
         case STATUS_CODES.NOT_ENOUGH_BALANCE:
           res.status(403).send({ status: STATUS_CODES.NOT_ENOUGH_BALANCE })

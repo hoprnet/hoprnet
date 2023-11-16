@@ -4,7 +4,6 @@ from time import sleep
 import fnmatch
 import json
 import random
-from pathlib import Path
 import shutil
 import subprocess
 import http.client
@@ -145,7 +144,8 @@ def setup_node(args):
     logging.info(f"Setting up a node with configuration: {args}")
     log_file = open(f"{args['dir']}.log", "w")
     network = args["network"] if "network" in args else "anvil-localhost"
-    api_token_param = f"--api-token={args['api_token']}" if "api_token" in args else "--disableApiAuthentication"
+    api_token = args["api_token"] if "api_token" in args else ""
+    api_token_param = f"--api-token={api_token}" if "api_token" in args else "--disableApiAuthentication"
     custom_env = {
         "DEBUG": "hopr*",
         "NODE_ENV": "development",
@@ -177,9 +177,10 @@ def setup_node(args):
         cmd = cmd + [f"--configurationFilePath={args['cfg_file']}"]
 
     logging.info(f"Starting up a node with cmd: {cmd} and env {custom_env}")
-    proc = subprocess.Popen(cmd, stdout=log_file,
-                            stderr=subprocess.STDOUT, env=os.environ | custom_env, cwd=f"{MYDIR}/../")
-    api = HoprdAPI(f"http://localhost:{args['api_port']}", args["api_token"] if "api_token" in args else "")
+    proc = subprocess.Popen(
+        cmd, stdout=log_file, stderr=subprocess.STDOUT, env=os.environ | custom_env, cwd=f"{MYDIR}/../"
+    )
+    api = HoprdAPI(f"http://localhost:{args['api_port']}", api_token)
 
     return (proc, api)
 
@@ -234,7 +235,7 @@ def reuse_pregenerated_identities():
     node_nr = 0
     id_files = sorted(os.listdir(PREGENERATED_IDENTITIES_DIR))
     for f in id_files:
-        if fnmatch.fnmatch(f, f"*.id"):
+        if fnmatch.fnmatch(f, "*.id"):
             shutil.copyfile(
                 f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}_{node_nr}.id"
             )
@@ -299,13 +300,18 @@ def funding_nodes(private_key):
         capture_output=True,
     )
 
+
 def collect_node_information(node_args):
-    conn = http.client.HTTPConnection("localhost", node_args['api_port'])
-    conn.request("GET", "/api/v3/account/addresses")
+    headers = {"Accept": "application/json"}
+    if "api_token" in node_args:
+        headers = headers | {"x-auth-token": node_args["api_token"]}
+    conn = http.client.HTTPConnection("localhost", node_args["api_port"])
+    conn.request("GET", "/api/v3/account/addresses", headers=headers)
     resp = conn.getresponse()
-    assert(resp.status == 200)
+    assert resp.status == 200
     data = json.loads(resp.read())
-    return (data['hopr'], data['native'])
+    return (data["hopr"], data["native"])
+
 
 @pytest.fixture(scope="module")
 def swarm7(request):

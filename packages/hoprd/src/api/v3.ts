@@ -73,6 +73,7 @@ async function authenticateAndAuthorize(
 ): Promise<AuthResult> {
   // 1. check superuser token
   const isSuperuserAuthenticated = reqToken === superuserToken
+  console.log('AUTH SUPERUSER CHECK:', isSuperuserAuthenticated, reqToken, superuserToken)
 
   // continue early if superuser is authenticated, no authorization checks needed
   if (isSuperuserAuthenticated) {
@@ -233,6 +234,7 @@ export async function setupRestApi(
         // Applying multiple URI encoding is an identity
         let apiTokenFromUser = encodeURIComponent(req.get('x-auth-token') || '')
 
+        console.log('AUTH TOKEN: ', apiTokenFromUser, encodedApiToken)
         req.context.authResult = await authenticateAndAuthorize(db, req, apiTokenFromUser, encodedApiToken)
         return req.context.authResult === AuthResult.Authorized
       }.bind({ options }),
@@ -244,6 +246,7 @@ export async function setupRestApi(
         // We only expect a single value here, instead of the usual user:password, so we take the user part as token
         const apiTokenFromUser = encodeURIComponent(Buffer.from(authEncoded, 'base64').toString('binary').split(':')[0])
 
+        console.log('AUTH BASIC TOKEN:', apiTokenFromUser, encodedApiToken)
         const result = await authenticateAndAuthorize(db, req, apiTokenFromUser, encodedApiToken)
         if (result === AuthResult.Authorized) {
           return true
