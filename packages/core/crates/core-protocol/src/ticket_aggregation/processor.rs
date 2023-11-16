@@ -24,7 +24,7 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::{pin::Pin, sync::Arc, task::Poll};
 use utils_log::{debug, error, info, warn};
 use utils_types::{
-    primitives::{Balance, BalanceType},
+    primitives::{Balance, BalanceType, U256},
     traits::PeerIdLike,
 };
 
@@ -271,7 +271,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             })?;
 
         let channel_id = generate_channel_id(&(&self.chain_key).into(), &destination);
-        let channel_balance = self
+        let channel_entry = self
             .db
             .read()
             .await
@@ -279,8 +279,8 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .await?
             .ok_or(ProtocolTicketAggregation(format!(
                 "channel {channel_id} does not exist"
-            )))?
-            .balance;
+            )))?;
+        let channel_balance = channel_entry.balance;
 
         acked_tickets.sort();
         acked_tickets.dedup();
@@ -340,6 +340,12 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_AGGREGATION_COUNT.increment();
+
+        info!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
+        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
+        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).addn(1);
+        let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
+        self.db.write().await.ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte).await?;
 
         Ticket::new(
             &destination,
