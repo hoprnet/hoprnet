@@ -425,6 +425,9 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
                 ProtocolTicketAggregation("Missing domain separator".into())
             })?;
 
+        // calculate the new current ticket index
+        let current_ticket_index_from_aggregated_ticket = U256::from(aggregated_ticket.index).addn(aggregated_ticket.index_offset);
+        
         let acked_aggregated_ticket = AcknowledgedTicket::new(
             aggregated_ticket,
             first_stored_ticket.response.clone(),
@@ -462,6 +465,9 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
             .await?;
 
+        info!("ensure the current ticket index is not smaller than the the aggregated ticket index + offset");
+        self.db.write().await.ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket).await?;
+    
         Ok(acked_aggregated_ticket)
     }
 
