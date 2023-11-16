@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, JsonRpcError, ProviderError, RpcError};
+use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
-use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
 use crate::wasm::helper::{Request, Response};
@@ -52,7 +52,11 @@ pub enum ClientError {
 impl From<ClientError> for ProviderError {
     fn from(src: ClientError) -> Self {
         match src {
-            ClientError::RequestorError(err) => /*ProviderError::HTTPError(err.into())*/ unimplemented!(),
+            ClientError::RequestorError(err) =>
+            /*ProviderError::HTTPError(err.into())*/
+            {
+                unimplemented!()
+            }
             _ => ProviderError::JsonRpcClientError(Box::new(src)),
         }
     }
@@ -79,7 +83,7 @@ impl RpcError for ClientError {
 pub struct HttpRequestorRpcClient<Req: HttpPostRequestor + Debug> {
     id: AtomicU64,
     url: String,
-    requestor: Req
+    requestor: Req,
 }
 
 impl<Req: HttpPostRequestor + Debug> HttpRequestorRpcClient<Req> {
@@ -87,7 +91,7 @@ impl<Req: HttpPostRequestor + Debug> HttpRequestorRpcClient<Req> {
         Self {
             id: AtomicU64::new(1),
             url: base_url.to_owned(),
-            requestor
+            requestor,
         }
     }
 }
@@ -104,9 +108,12 @@ impl<Req: HttpPostRequestor + Debug> JsonRpcClient for HttpRequestorRpcClient<Re
     ) -> Result<R, ClientError> {
         let next_id = self.id.fetch_add(1, Ordering::SeqCst);
         let payload = Request::new(next_id, method, params);
-        let serialized_payload = serde_json::to_string(&payload).map_err(|err| ClientError::SerdeJson {err, text: "cannot serialize payload".into()})?;
+        let serialized_payload = serde_json::to_string(&payload).map_err(|err| ClientError::SerdeJson {
+            err,
+            text: "cannot serialize payload".into(),
+        })?;
 
-        let body = self.requestor.http_post(self.url.as_ref(),&serialized_payload).await?;
+        let body = self.requestor.http_post(self.url.as_ref(), &serialized_payload).await?;
 
         let raw = match serde_json::from_str(&body) {
             Ok(Response::Success { result, .. }) => result.to_owned(),
@@ -116,18 +123,15 @@ impl<Req: HttpPostRequestor + Debug> JsonRpcClient for HttpRequestorRpcClient<Re
                     err: serde::de::Error::custom("unexpected notification over HTTP transport"),
                     text: body,
                 };
-                return Err(err)
+                return Err(err);
             }
-            Err(err) => {
-                return Err(ClientError::SerdeJson {
-                    err,
-                    text: body,
-                })
-            }
+            Err(err) => return Err(ClientError::SerdeJson { err, text: body }),
         };
 
-        let res = serde_json::from_str(raw.get())
-            .map_err(|err| ClientError::SerdeJson { err, text: raw.to_string() })?;
+        let res = serde_json::from_str(raw.get()).map_err(|err| ClientError::SerdeJson {
+            err,
+            text: raw.to_string(),
+        })?;
 
         Ok(res)
     }

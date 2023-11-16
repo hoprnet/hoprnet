@@ -16,7 +16,6 @@ pub mod rpc;
 //#[cfg(target_arch = "wasm32")]
 mod wasm;
 
-
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 /// This is further restritect to already mined blocks.
 #[derive(Debug, Clone)]
@@ -59,7 +58,13 @@ impl From<Log> for ethers::abi::RawLog {
 
 impl Display for Log {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "log in block #{} of {} with {} topics", self.block_number, self.address, self.topics.len())
+        write!(
+            f,
+            "log in block #{} of {} with {} topics",
+            self.block_number,
+            self.address,
+            self.topics.len()
+        )
     }
 }
 

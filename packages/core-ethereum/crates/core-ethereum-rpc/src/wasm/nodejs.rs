@@ -1,8 +1,8 @@
-use async_trait::async_trait;
 use crate::wasm::{HttpPostRequestor, HttpRequestError};
+use async_trait::async_trait;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-use wasm_bindgen::{JsCast, prelude::wasm_bindgen};
+use wasm_bindgen::{prelude::wasm_bindgen, JsCast};
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 #[wasm_bindgen(module = "@hoprnet/hopr-utils")]
@@ -22,10 +22,10 @@ impl HttpPostRequestor for NodeJsHttpPostRequestor {
             Ok(s) => {
                 match s.dyn_ref::<js_sys::JsString>() {
                     Some(s) => Ok(format!("{}", s)), // cannot call to_string() here
-                    None => Err(HttpRequestError::InterfaceError("cannot cast result to string".into()))
+                    None => Err(HttpRequestError::InterfaceError("cannot cast result to string".into())),
                 }
-            },
-            Err(_) => Err(HttpRequestError::InterfaceError("...".into())) // TODO: properly distinguish errors
+            }
+            Err(_) => Err(HttpRequestError::InterfaceError("...".into())), // TODO: properly distinguish errors
         }
     }
 

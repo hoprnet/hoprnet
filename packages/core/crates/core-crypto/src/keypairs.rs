@@ -143,6 +143,7 @@ impl Keypair for ChainKeypair {
 
 impl Debug for ChainKeypair {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Do not expose the private key
         f.debug_tuple("ChainKeypair").field(&self.1).finish()
     }
 }

@@ -14,10 +14,7 @@ use bindings::{
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
     hopr_token::{ApproveCall, TransferCall},
 };
-use core_crypto::{
-    keypairs::{ChainKeypair, Keypair},
-    types::VrfParameters,
-};
+use core_crypto::{keypairs::ChainKeypair, types::VrfParameters};
 use core_ethereum_misc::ContractAddresses;
 use core_ethereum_rpc::{create_eip1559_transaction, TypedTransaction};
 use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
@@ -307,7 +304,7 @@ pub struct SafePayloadGenerator {
 impl SafePayloadGenerator {
     pub fn new(chain_keypair: &ChainKeypair, contract_addrs: ContractAddresses) -> Self {
         Self {
-            me: chain_keypair.public().to_address(),
+            me: chain_keypair.into(),
             contract_addrs,
         }
     }
@@ -738,12 +735,12 @@ pub mod tests {
 
         let chain_key = ChainKeypair::from_secret(&anvil.keys()[0].clone().to_bytes().as_slice()).unwrap();
 
-        let chain = BasicPayloadGenerator::new(chain_key.public().to_address());
+        let chain = BasicPayloadGenerator::new((&chain_key).into());
 
         let ad = AnnouncementData::new(
             &test_multiaddr,
             Some(KeyBinding::new(
-                chain_key.public().to_address(),
+                (&chain_key).into(),
                 &OffchainKeypair::from_secret(&PRIVATE_KEY).unwrap(),
             )),
         )

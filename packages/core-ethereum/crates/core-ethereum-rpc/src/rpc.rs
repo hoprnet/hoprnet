@@ -73,7 +73,7 @@ where
         );
 
         Ok(Self {
-            me: chain_key.public().to_address(),
+            me: chain_key.into(),
             contract_instances: ContractInstances::new(&cfg.contract_addrs, provider.clone(), cfg!(test)),
             cfg,
             provider,
@@ -155,7 +155,11 @@ pub mod tests {
     use std::time::Duration;
     use utils_types::primitives::{Address, BalanceType, U256};
 
-    pub async fn mint_tokens<M: Middleware + 'static>(hopr_token: HoprToken<M>, amount: u128, deployer: Address) {
+    pub async fn mint_tokens<M: Middleware + 'static>(
+        hopr_token: HoprToken<M>,
+        amount: u128,
+        deployer: Address,
+    ) -> u64 {
         hopr_token
             .grant_role(hopr_token.minter_role().await.unwrap(), deployer.into())
             .send()
@@ -175,7 +179,11 @@ pub mod tests {
             .await
             .unwrap()
             .await
-            .unwrap();
+            .unwrap()
+            .unwrap()
+            .block_number
+            .unwrap()
+            .as_u64()
     }
 
     fn transfer_eth_tx(to: Address, amount: U256) -> TypedTransaction {

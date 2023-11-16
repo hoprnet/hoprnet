@@ -25,12 +25,12 @@ use k256::{
 
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::{
     fmt::{Display, Formatter},
     ops::Add,
     str::FromStr,
 };
-use std::fmt::Debug;
 
 use crate::{
     errors::{
