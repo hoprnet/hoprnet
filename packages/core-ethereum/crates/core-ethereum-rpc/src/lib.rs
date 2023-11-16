@@ -13,14 +13,9 @@ pub mod errors;
 pub mod indexer;
 pub mod rpc;
 
-#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-mod nodejs;
+//#[cfg(target_arch = "wasm32")]
+mod wasm;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub type NativeRpcClient = ethers::providers::Http;
-
-#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-pub type NodeJsRpcClient = nodejs::NodeJsRpcClient;
 
 /// A type containing selected fields from  the `eth_getBlockByHash`/`eth_getBlockByNumber` RPC
 /// calls.

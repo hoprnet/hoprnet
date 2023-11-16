@@ -315,10 +315,10 @@ mod test {
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
             topics: vec![
-                TransferFilter::signature(),
-                ApprovalFilter::signature(),
-                ChannelOpenedFilter::signature(),
-                ChannelBalanceIncreasedFilter::signature(),
+                TransferFilter::signature().into(),
+                ApprovalFilter::signature().into(),
+                ChannelOpenedFilter::signature().into(),
+                ChannelBalanceIncreasedFilter::signature().into(),
             ],
         };
 
