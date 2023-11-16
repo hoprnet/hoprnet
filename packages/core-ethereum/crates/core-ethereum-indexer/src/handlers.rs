@@ -292,10 +292,11 @@ where
 
                     db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
-                    
+
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         // Reset the current_ticket_index to zero
-                        db.set_current_ticket_index(&channel_closed.channel_id.try_into()?, U256::zero()).await?;
+                        db.set_current_ticket_index(&channel_closed.channel_id.try_into()?, U256::zero())
+                            .await?;
                         self.cbs.own_channel_updated(&channel);
                     }
                 } else {
@@ -360,7 +361,8 @@ where
                     db.update_channel_and_snapshot(&ticket_redeemed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
                     // compare the ticket index from the redeemed ticket with the current_ticket_index. Ensure that the current_ticket_index is not smaller than the value from redeemed ticket.
-                    db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.try_into()?, channel.ticket_index).await?;
+                    db.ensure_current_ticket_index_gte(&ticket_redeemed.channel_id.try_into()?, channel.ticket_index)
+                        .await?;
 
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
                         self.cbs.own_channel_updated(&channel);

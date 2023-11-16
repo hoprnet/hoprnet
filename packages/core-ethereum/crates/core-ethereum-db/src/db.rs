@@ -70,7 +70,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     // combine the two function above to increase the current ticket index of a channel
     async fn increase_current_ticket_index(&mut self, channel_id: &Hash) -> Result<()> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
-        let current_index = self.db.get_or_none::<U256>(prefixed_key.clone()).await?.unwrap_or(U256::zero());
+        let current_index = self
+            .db
+            .get_or_none::<U256>(prefixed_key.clone())
+            .await?
+            .unwrap_or(U256::zero());
         let _evicted = self.db.set(prefixed_key, &current_index.addn(1_u32)).await?;
         // Ignoring evicted value
         Ok(())
@@ -79,7 +83,11 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
     // ensure the current ticket index is not smaller than the given value. If it's samller, set to the given value
     async fn ensure_current_ticket_index_gte(&mut self, channel_id: &Hash, index: U256) -> Result<()> {
         let prefixed_key = utils_db::db::Key::new_with_prefix(channel_id, TICKET_INDEX_PREFIX)?;
-        let current_index = self.db.get_or_none::<U256>(prefixed_key.clone()).await?.unwrap_or(U256::zero());
+        let current_index = self
+            .db
+            .get_or_none::<U256>(prefixed_key.clone())
+            .await?
+            .unwrap_or(U256::zero());
         // compare the current_index with index, if current_index is smaller than index, set to index
         if current_index < index {
             let _evicted = self.db.set(prefixed_key, &index).await?;

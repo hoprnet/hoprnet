@@ -659,8 +659,8 @@ mod tests {
             .await
             .unwrap()
             .expect("db must contain ticket index");
-        assert_eq!(idx,  U256::one(), "ticket index mismatch. Expecting 1");
-    
+        assert_eq!(idx, U256::one(), "ticket index mismatch. Expecting 1");
+
         // increase current ticket index of an existing channel where previous value is 1, the result should be 2
         db.increase_current_ticket_index(&dummy_channel).await.unwrap();
         let idx = db
@@ -668,7 +668,7 @@ mod tests {
             .await
             .unwrap()
             .expect("db must contain ticket index");
-        assert_eq!(idx,  U256::new("2"), "ticket index mismatch. Expecting 2");
+        assert_eq!(idx, U256::new("2"), "ticket index mismatch. Expecting 2");
     }
 
     #[async_std::test]
@@ -680,14 +680,16 @@ mod tests {
 
         let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
         let dummy_index = U256::new("123");
-    
+
         // the ticket index should be equal or greater than the given dummy index
-        db.ensure_current_ticket_index_gte(&dummy_channel, dummy_index).await.unwrap();
+        db.ensure_current_ticket_index_gte(&dummy_channel, dummy_index)
+            .await
+            .unwrap();
         let idx = db
             .get_current_ticket_index(&dummy_channel)
             .await
             .unwrap()
             .expect("db must contain ticket index");
-        assert_eq!(idx,  dummy_index, "ticket index mismatch. Expecting 2");
+        assert_eq!(idx, dummy_index, "ticket index mismatch. Expecting 2");
     }
 }
