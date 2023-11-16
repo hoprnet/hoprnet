@@ -17,46 +17,8 @@ pub mod rpc;
 mod wasm;
 
 
-/// A type containing selected fields from  the `eth_getBlockByHash`/`eth_getBlockByNumber` RPC
-/// calls.
-#[derive(Debug, Clone)]
-pub struct Block {
-    /// Block number
-    pub number: Option<u64>,
-    /// Block hash if any.
-    pub hash: Option<Hash>,
-    /// Block timestamp
-    pub timestamp: U256,
-    /// Transaction hashes within this block
-    pub transactions: Vec<Hash>,
-}
-
-impl Display for Block {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} (@ {}) with {} txs",
-            self.number
-                .map(|i| format!("block #{i}"))
-                .unwrap_or("pending block".into()),
-            self.timestamp.as_u64(),
-            self.transactions.len()
-        )
-    }
-}
-
-impl From<ethers::types::Block<H256>> for Block {
-    fn from(value: ethers::prelude::Block<H256>) -> Self {
-        Self {
-            number: value.number.map(|u| u.as_u64()),
-            hash: value.hash.map(|h| h.0.into()),
-            timestamp: value.timestamp.into(),
-            transactions: value.transactions.into_iter().map(|h| Hash::from(h.0)).collect(),
-        }
-    }
-}
-
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
+/// This is further restritect to already mined blocks.
 #[derive(Debug, Clone)]
 pub struct Log {
     /// Contract address
@@ -66,11 +28,11 @@ pub struct Log {
     /// Raw log data
     pub data: Box<[u8]>,
     /// Transaction index
-    pub tx_index: Option<u64>,
+    pub tx_index: u64,
     /// Corresponding block number
-    pub block_number: Option<u64>,
+    pub block_number: u64,
     /// Log index
-    pub log_index: Option<U256>,
+    pub log_index: U256,
 }
 
 impl From<ethers::types::Log> for Log {
@@ -79,9 +41,9 @@ impl From<ethers::types::Log> for Log {
             address: value.address.into(),
             topics: value.topics.into_iter().map(Hash::from).collect(),
             data: Box::from(value.data.as_ref()),
-            tx_index: value.transaction_index.map(|u| u.as_u64()),
-            block_number: value.block_number.map(|u| u.as_u64()),
-            log_index: value.log_index.map(|u| u.into()),
+            tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
+            block_number: value.block_number.expect("block id must be present").as_u64(),
+            log_index: value.log_index.expect("log index must be present").into(),
         }
     }
 }
@@ -97,23 +59,7 @@ impl From<Log> for ethers::abi::RawLog {
 
 impl Display for Log {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "log of {} with {} topics", self.address, self.topics.len())
-    }
-}
-
-/// Represents a mined block optionally with filtered logs (according to some `LogFilter`)
-/// corresponding to the block.
-#[derive(Debug, Clone)]
-pub struct BlockWithLogs {
-    /// Block with TX hashes.
-    pub block: Block,
-    /// Filtered logs of interest corresponding to the block, if any filtering was requested.
-    pub logs: Vec<Log>,
-}
-
-impl Display for BlockWithLogs {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} and {} logs", self.block, self.logs.len())
+        write!(f, "log in block #{} of {} with {} topics", self.block_number, self.address, self.topics.len())
     }
 }
 
@@ -194,14 +140,13 @@ pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
-    /// Starts streaming the blocks with logs from the given `start_block_number`.
+    /// Starts streaming logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.
-    /// The given `filter` are applied to retrieve the logs for each retrieved block.
-    /// If the filter `is_empty()`, no logs are fetched, only blocks.
+    /// The given `filter` are applied to retrieve the logs, the function fails if the filter is empty.
     /// The streaming stops only when the corresponding channel is closed by the returned receiver.
-    async fn try_block_with_logs_stream(
+    async fn try_stream_logs(
         &self,
         start_block_number: Option<u64>,
         filter: LogFilter,
-    ) -> Result<UnboundedReceiver<BlockWithLogs>>;
+    ) -> Result<UnboundedReceiver<Log>>;
 }

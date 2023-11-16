@@ -30,6 +30,7 @@ use std::{
     ops::Add,
     str::FromStr,
 };
+use std::fmt::Debug;
 
 use crate::{
     errors::{
@@ -432,7 +433,7 @@ impl From<HalfKey> for HalfKeyChallenge {
 
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, PartialOrd, Ord)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct Hash {
     hash: [u8; Self::SIZE],
@@ -446,7 +447,14 @@ impl Default for Hash {
     }
 }
 
-impl std::fmt::Display for Hash {
+impl Debug for Hash {
+    // Intentionally same as Display
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_hex().as_str())
+    }
+}
+
+impl Display for Hash {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.to_hex().as_str())
     }

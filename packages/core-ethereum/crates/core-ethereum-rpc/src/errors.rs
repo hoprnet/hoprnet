@@ -14,6 +14,9 @@ pub enum RpcError {
     #[error("block with such id does not (yet) exist")]
     NoSuchBlock,
 
+    #[error("filter does not contain any criteria")]
+    FilterIsEmpty,
+
     #[error("non-specific RPC error occurred: {0}")]
     GeneralError(String),
 

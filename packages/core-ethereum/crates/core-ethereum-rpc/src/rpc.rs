@@ -26,6 +26,7 @@ pub struct RpcOperationsConfig {
     pub contract_addrs: ContractAddresses,
     pub max_http_retries: u32,
     pub expected_block_time: Duration,
+    pub logs_page_size: u64,
     pub tx_polling_interval: Duration,
 }
 
@@ -35,6 +36,7 @@ impl Default for RpcOperationsConfig {
             chain_id: 100,
             contract_addrs: Default::default(),
             max_http_retries: 3,
+            logs_page_size: 50,
             expected_block_time: Duration::from_secs(5),
             tx_polling_interval: Duration::from_secs(7),
         }
@@ -139,7 +141,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 #[cfg(test)]
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{Block, HoprRpcOperations, TypedTransaction};
+    use crate::{HoprRpcOperations, TypedTransaction};
     use bindings::hopr_token::HoprToken;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::Hash;
@@ -148,7 +150,7 @@ pub mod tests {
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::{Http, JsonRpcClient, Middleware};
     use futures::StreamExt;
-    use primitive_types::H160;
+    use primitive_types::{H160, H256};
     use std::str::FromStr;
     use std::time::Duration;
     use utils_types::primitives::{Address, BalanceType, U256};
@@ -187,7 +189,7 @@ pub mod tests {
         tx_hash: Hash,
         rpc: &RpcOperations<P>,
         timeout: Duration,
-    ) -> Block {
+    ) -> ethers::types::Block<H256> {
         let mut stream = rpc.provider.watch_blocks().await.unwrap();
         let prov_clone = rpc.provider.clone();
 
@@ -200,7 +202,7 @@ pub mod tests {
                     .map(|tx| Hash::from(tx.0))
                     .any(|h| h.eq(&tx_hash))
                 {
-                    return Some(Block::from(block));
+                    return Some(block);
                 }
             }
             None

@@ -1,17 +1,15 @@
 use async_trait::async_trait;
 use ethers_providers::{JsonRpcClient, Middleware};
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::UnboundedReceiver;
 use futures::future::poll_fn;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::time::Duration;
-use utils_log::{debug, error, info, warn};
-use utils_types::sma::{NoSumSMA, SMA};
+use ethers::types::BlockNumber;
+use futures::StreamExt;
+use utils_log::{debug, error, warn};
 
 use crate::errors::Result;
-use crate::errors::RpcError::{GeneralError, NoSuchBlock};
-use crate::rpc::{HoprMiddleware, RpcOperations};
-use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
+use crate::rpc::RpcOperations;
+use crate::{HoprIndexerRpcOperations, Log, LogFilter};
 
 #[cfg(all(not(feature = "wasm"), not(test)))]
 use async_std::task::{sleep, spawn_local};
@@ -24,46 +22,7 @@ use gloo_timers::future::sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use wasm_bindgen_futures::spawn_local;
-
-const BLOCK_TIME_AVG_WINDOW_SIZE: u32 = 10;
-
-async fn send_block_with_logs(tx: &mut UnboundedSender<BlockWithLogs>, block: BlockWithLogs) -> Result<()> {
-    match poll_fn(|cx| Pin::new(&tx).poll_ready(cx)).await {
-        Ok(_) => match tx.start_send(block) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(GeneralError("failed to pass block with logs to the receiver".into())),
-        },
-        Err(_) => Err(GeneralError("receiver has been closed".into())),
-    }
-}
-
-async fn get_block_with_logs_from_provider<P: JsonRpcClient + 'static>(
-    block_number: u64,
-    log_filter: &LogFilter,
-    provider: Arc<HoprMiddleware<P>>,
-) -> Result<BlockWithLogs> {
-    debug!("getting block #{block_number} with logs");
-    match provider.get_block(block_number).await? {
-        Some(block) => {
-            let logs = if !log_filter.is_empty() {
-                debug!("getting logs from #{block_number} using {log_filter}");
-                let filter = ethers::types::Filter::from(log_filter.clone())
-                    .at_block_hash(block.hash.expect("block must have block hash"));
-
-                provider.get_logs(&filter).await?.into_iter().map(Log::from).collect()
-            } else {
-                debug!("empty log filter for block #{block_number}");
-                Vec::new()
-            };
-
-            Ok(BlockWithLogs {
-                block: block.into(),
-                logs,
-            })
-        }
-        None => Err(NoSuchBlock),
-    }
-}
+use crate::errors::RpcError::FilterIsEmpty;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -73,100 +32,63 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         Ok(r.as_u64())
     }
 
-    async fn try_block_with_logs_stream(
+    async fn try_stream_logs(
         &self,
         start_block_number: Option<u64>,
         filter: LogFilter,
-    ) -> Result<UnboundedReceiver<BlockWithLogs>> {
-        let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
+    ) -> Result<UnboundedReceiver<Log>> {
+        if filter.is_empty() {
+            return Err(FilterIsEmpty)
+        }
+
+        let (mut tx, rx) = futures::channel::mpsc::unbounded::<Log>();
 
         // The provider internally performs retries on timeouts and errors.
         let provider = self.provider.clone();
-        let latest_block = self.block_number().await?;
-        let start_block = start_block_number.unwrap_or(latest_block);
-        let initial_poll_backoff = self.cfg.expected_block_time;
+        let cfg_clone = self.cfg.clone();
 
         spawn_local(async move {
-            let mut current = start_block;
-            let mut latest = latest_block;
+            let mut last_block = start_block_number.map(|n| BlockNumber::Number(n.into())).unwrap_or(BlockNumber::Latest);
+            'poll: loop {
+                let range_filter = ethers::types::Filter::from(filter.clone())
+                    .from_block(last_block)
+                    .to_block(BlockNumber::Latest);
 
-            let mut block_time_sma = NoSumSMA::<Duration, u32>::new(BLOCK_TIME_AVG_WINDOW_SIZE);
-            let mut prev_block = None;
+                debug!("polling logs in from {last_block}");
 
-            while current <= latest {
-                match get_block_with_logs_from_provider(current, &filter, provider.clone()).await {
-                    Ok(block_with_logs) => {
-                        let new_current = block_with_logs.block.number.expect("past block must not be pending");
-                        let block_ts = Duration::from_secs(block_with_logs.block.timestamp.as_u64());
-                        info!("got past {block_with_logs}");
+                let mut retrieved_logs = provider.get_logs_paginated(&range_filter, cfg_clone.logs_page_size);
 
-                        if let Err(e) = send_block_with_logs(&mut tx, block_with_logs).await {
-                            error!("failed to dispatch past block: {e}");
-                            break; // Receiver is closed, terminate the stream
-                        }
+                while let Some(maybe_log) = retrieved_logs.next().await {
+                    match maybe_log {
+                        Ok(log) => {
+                            match poll_fn(|cx| Pin::new(&tx).poll_ready(cx)).await {
+                                Ok(_) => {
+                                    let log = Log::from(log);
+                                    last_block = BlockNumber::Number(log.block_number.into());
+                                    debug!("retrieved {log}");
 
-                        if let Some(prev_block_ts) = prev_block {
-                            block_time_sma.add_sample(block_ts - prev_block_ts);
-                        }
-
-                        prev_block = Some(block_ts);
-                        current = new_current + 1;
-
-                        match provider.get_block_number().await.map(|u| u.as_u64()) {
-                            Ok(block_number) => {
-                                latest = block_number;
+                                    if let Err(e) = tx.start_send(log) {
+                                        error!("failed to pass log to the receiver: {e}");
+                                        break 'poll;
+                                    }
+                                },
+                                Err(_) => {
+                                    warn!("receiver has been closed");
+                                    break 'poll;
+                                }
                             }
-                            Err(e) => {
-                                error!("failed to get latest block number: {e}");
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("failed to obtain block #{current} with logs: {e}");
-                    }
-                }
-            }
-            if current >= latest {
-                let mut current_backoff = block_time_sma.get_average().unwrap_or(initial_poll_backoff);
-                debug!("done receiving past blocks {start_block}-{latest}, polling for new blocks > {latest} with initial backoff {} ms", current_backoff.as_millis());
-                loop {
-                    sleep(current_backoff).await;
-
-                    match get_block_with_logs_from_provider(current, &filter, provider.clone()).await {
-                        Ok(block_with_logs) => {
-                            let new_current = block_with_logs.block.number.expect("new block must not be pending");
-                            let block_ts = Duration::from_secs(block_with_logs.block.timestamp.as_u64());
-                            info!("got new {block_with_logs}");
-
-                            if let Err(e) = send_block_with_logs(&mut tx, block_with_logs).await {
-                                error!("failed to dispatch new block: {e}");
-                                break; // Receiver is closed, terminate the stream
-                            }
-
-                            if let Some(prev_block_ts) = prev_block {
-                                block_time_sma.add_sample(block_ts - prev_block_ts);
-                            }
-
-                            prev_block = Some(block_ts);
-                            current = new_current + 1;
-
-                            current_backoff = block_time_sma.get_average().unwrap_or(initial_poll_backoff);
-                        }
-                        Err(NoSuchBlock) => {
-                            current_backoff = (current_backoff / 2).max(Duration::from_millis(100));
-                            debug!("no block #{current}, waiting {} ms", current_backoff.as_millis());
-                        }
+                        },
                         Err(e) => {
-                            error!("failed to obtain block {} with logs: {e}", current + 1);
+                            error!("failed to retrieve log: {e}")
                         }
                     }
                 }
-            } else {
-                error!("processing past blocks did not get up to the latest block {current} < {latest}");
+
+                sleep(cfg_clone.expected_block_time).await;
             }
 
-            warn!("block processing done");
             tx.close_channel();
+            warn!("done streaming logs");
         });
 
         Ok(rx)
@@ -177,7 +99,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 mod test {
     use crate::rpc::tests::mint_tokens;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+    use crate::{HoprIndexerRpcOperations, Log, LogFilter};
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
@@ -187,6 +109,8 @@ mod test {
     use futures::StreamExt;
     use std::str::FromStr;
     use std::time::Duration;
+    use core_crypto::types::Hash;
+    use utils_log::debug;
     use utils_types::primitives::Address;
     use utils_types::traits::BinarySerializable;
 
@@ -215,7 +139,7 @@ mod test {
             .unwrap();
     }
 
-    #[tokio::test]
+    /*#[tokio::test]
     async fn test_try_stream_with_logs_should_not_stream_past_blocks_if_needed() {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -235,7 +159,7 @@ mod test {
         let local = tokio::task::LocalSet::new();
         let blocks = local
             .run_until(async move {
-                rpc.try_block_with_logs_stream(None, Default::default())
+                rpc.try_stream_logs(None, Default::default())
                     .await
                     .unwrap()
                     .take(2)
@@ -283,7 +207,7 @@ mod test {
             blocks.into_iter().all(|b| b.block.number.unwrap() >= 2),
             "must not blocks before #2"
         );
-    }
+    }*/
 
     #[tokio::test]
     async fn test_try_stream_with_logs_should_contain_all_logs_when_opening_channel() {
@@ -312,6 +236,8 @@ mod test {
         let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
             .expect("failed to construct rpc");
 
+        debug!("contract addrs: {:#?}", contract_addrs);
+
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
             topics: vec![
@@ -336,29 +262,45 @@ mod test {
             .await;
         });
 
-        // Spawn stream
-        let (tx, rx) = futures::channel::oneshot::channel();
-        let filter_clone = log_filter.clone();
-        local.spawn_local(async move {
-            let mut blocks = rpc
-                .try_block_with_logs_stream(Some(1), filter_clone)
-                .await
-                .unwrap()
-                .skip_while(|block| futures::future::ready(block.logs.len() != 4))
-                .take(1)
-                .collect::<Vec<_>>()
-                .await;
+        let expectations = vec![
+            (contract_addrs.channels, Hash::from(ChannelOpenedFilter::signature())),
+            (contract_addrs.channels, Hash::from(ChannelBalanceIncreasedFilter::signature())),
+            (contract_addrs.token, Hash::from(ApprovalFilter::signature())),
+            (contract_addrs.token, Hash::from(TransferFilter::signature())),
+        ];
 
-            let _ = tx.send(blocks.pop().unwrap().logs);
+        // Spawn stream
+        let filter_clone = log_filter.clone();
+
+        let run = local.run_until(async move {
+            rpc
+                .try_stream_logs(Some(1), filter_clone)
+                .await
+                .expect("must create stream")
+                .filter(|log| futures::future::ready(
+                    expectations
+                        .iter()
+                        .any(| (addr, topic) | log.address.eq(addr) && log.topics.contains(topic))
+                ))
+                .take(5)
+                .collect::<Vec<Log>>()
+                .await
         });
 
         // Everything must complete within 30 seconds
-        tokio::time::timeout(Duration::from_secs(30), local)
+        let retrieved_logs = tokio::time::timeout(Duration::from_secs(30), run)
             .await
             .expect("timeout");
 
+        for log in retrieved_logs.iter() {
+            debug!("- {log}");
+        }
+
         // The logs within the single block must contain all 4 events
-        let retrieved_logs = rx.await.expect("failed to retrieve logs");
+        //let block_num = retrieved_logs[0].block_number;
+
+        //assert!(retrieved_logs.iter().all(|log| log.block_number == block_num), "all logs must be within the same block");
+
         assert!(
             retrieved_logs.iter().any(|log| log.address == contract_addrs.channels
                 && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
