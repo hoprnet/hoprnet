@@ -285,7 +285,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
         acked_tickets.sort();
         acked_tickets.dedup();
 
-        let channel_epoch = acked_tickets[0].ticket.channel_epoch;
+        let channel_epoch = channel_entry.channel_epoch;
 
         let mut final_value = Balance::zero(BalanceType::HOPR);
 
@@ -297,7 +297,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
                 )));
             }
 
-            if acked_ticket.ticket.channel_epoch != channel_epoch {
+            if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
                 return Err(ProtocolTicketAggregation("Channel epochs do not match".to_owned()));
             }
 
