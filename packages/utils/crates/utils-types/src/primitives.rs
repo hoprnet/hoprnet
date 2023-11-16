@@ -987,7 +987,8 @@ mod tests {
     #[test]
     fn u256_conversions() {
         let u256_ethereum =
-            primitive_types::U256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap();
+            primitive_types::U256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957")
+                .unwrap();
 
         assert_eq!(
             U256::from(u256_ethereum),
@@ -998,7 +999,8 @@ mod tests {
 
         assert_eq!(
             primitive_types::U256::from(u256),
-            primitive_types::U256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957").unwrap()
+            primitive_types::U256::from_str("ef35a3f4fda07a4719ed5960b40ac51e67f013c1c444662eaff3b3d217492957")
+                .unwrap()
         );
     }
 }

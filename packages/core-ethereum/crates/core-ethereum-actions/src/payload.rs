@@ -19,12 +19,12 @@ use core_crypto::{
     types::VrfParameters,
 };
 use core_ethereum_misc::ContractAddresses;
+use core_ethereum_rpc::{create_eip1559_transaction, TypedTransaction};
 use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use ethers::{
     abi::AbiEncode,
     types::{Address as EthereumAddress, H160, H256, U256},
 };
-use core_ethereum_rpc::{create_eip1559_transaction, TypedTransaction};
 use utils_types::{
     primitives::{Address, Balance, BalanceType},
     traits::BinarySerializable,
@@ -89,10 +89,14 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
 
 fn approve_tx(spender: Address, amount: Balance) -> TypedTransaction {
     let mut tx = create_eip1559_transaction();
-    tx.set_data(ApproveCall {
-        spender: H160::from_slice(&spender.to_bytes()),
-        value: U256::from_big_endian(&amount.value().to_bytes()),
-    }.encode().into());
+    tx.set_data(
+        ApproveCall {
+            spender: H160::from_slice(&spender.to_bytes()),
+            value: U256::from_big_endian(&amount.value().to_bytes()),
+        }
+        .encode()
+        .into(),
+    );
     tx
 }
 
@@ -100,10 +104,14 @@ fn transfer_tx(destination: Address, amount: Balance) -> TypedTransaction {
     let mut tx = create_eip1559_transaction();
     match amount.balance_type() {
         BalanceType::HOPR => {
-            tx.set_data(TransferCall {
-                recipient: H160::from_slice(&destination.to_bytes()),
-                amount: U256::from_big_endian(&amount.amount().to_bytes()),
-            }.encode().into());
+            tx.set_data(
+                TransferCall {
+                    recipient: H160::from_slice(&destination.to_bytes()),
+                    amount: U256::from_big_endian(&amount.amount().to_bytes()),
+                }
+                .encode()
+                .into(),
+            );
         }
         BalanceType::Native => {
             tx.set_value(primitive_types::U256::from(amount.value()));
@@ -114,9 +122,13 @@ fn transfer_tx(destination: Address, amount: Balance) -> TypedTransaction {
 
 fn register_safe_tx(safe_addr: Address) -> TypedTransaction {
     let mut tx = create_eip1559_transaction();
-    tx.set_data(RegisterSafeByNodeCall {
-        safe_addr: safe_addr.into(),
-    }.encode().into());
+    tx.set_data(
+        RegisterSafeByNodeCall {
+            safe_addr: safe_addr.into(),
+        }
+        .encode()
+        .into(),
+    );
     tx
 }
 
@@ -124,7 +136,7 @@ fn register_safe_tx(safe_addr: Address) -> TypedTransaction {
 #[derive(Debug, Clone)]
 pub struct BasicPayloadGenerator {
     me: Address,
-    contract_addrs: ContractAddresses
+    contract_addrs: ContractAddresses,
 }
 
 impl BasicPayloadGenerator {
@@ -156,23 +168,26 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
 
     fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
         let mut tx = create_eip1559_transaction();
-        tx.set_data(match &announcement.key_binding {
-            Some(binding) => {
-                let serialized_signature = binding.signature.to_bytes();
+        tx.set_data(
+            match &announcement.key_binding {
+                Some(binding) => {
+                    let serialized_signature = binding.signature.to_bytes();
 
-                BindKeysAnnounceCall {
-                    ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
-                    ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                    ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
+                    BindKeysAnnounceCall {
+                        ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
+                        ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
+                        ed_25519_pub_key: H256::from_slice(&binding.packet_key.to_bytes()).into(),
+                        base_multiaddr: announcement.to_multiaddress_str(),
+                    }
+                    .encode()
+                }
+                None => AnnounceCall {
                     base_multiaddr: announcement.to_multiaddress_str(),
                 }
-                .encode()
+                .encode(),
             }
-            None => AnnounceCall {
-                base_multiaddr: announcement.to_multiaddress_str(),
-            }
-            .encode(),
-        }.into());
+            .into(),
+        );
         tx.set_to(primitive_types::H160::from(self.contract_addrs.announcements));
         Ok(tx)
     }
@@ -189,10 +204,14 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         }
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(FundChannelCall {
-            account: EthereumAddress::from_slice(&dest.to_bytes()),
-            amount: amount.value().as_u128(),
-        }.encode().into());
+        tx.set_data(
+            FundChannelCall {
+                account: EthereumAddress::from_slice(&dest.to_bytes()),
+                amount: amount.value().as_u128(),
+            }
+            .encode()
+            .into(),
+        );
         tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
 
         Ok(tx)
@@ -204,9 +223,13 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         }
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(CloseIncomingChannelCall {
-            source: EthereumAddress::from_slice(&source.to_bytes()),
-        }.encode().into());
+        tx.set_data(
+            CloseIncomingChannelCall {
+                source: EthereumAddress::from_slice(&source.to_bytes()),
+            }
+            .encode()
+            .into(),
+        );
         tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
 
         Ok(tx)
@@ -220,10 +243,13 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         }
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(InitiateOutgoingChannelClosureCall {
-            destination: EthereumAddress::from_slice(&destination.to_bytes()),
-        }
-        .encode().into());
+        tx.set_data(
+            InitiateOutgoingChannelClosureCall {
+                destination: EthereumAddress::from_slice(&destination.to_bytes()),
+            }
+            .encode()
+            .into(),
+        );
         tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
 
         Ok(tx)
@@ -237,10 +263,13 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
         }
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(FinalizeOutgoingChannelClosureCall {
-            destination: H160::from_slice(&destination.to_bytes()),
-        }
-        .encode().into());
+        tx.set_data(
+            FinalizeOutgoingChannelClosureCall {
+                destination: H160::from_slice(&destination.to_bytes()),
+            }
+            .encode()
+            .into(),
+        );
         tx.set_to(primitive_types::H160::from(self.contract_addrs.channels));
         Ok(tx)
     }
@@ -327,13 +356,16 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         };
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(ExecTransactionFromModuleCall {
-            to: H160::from_slice(&self.contract_addrs.announcements.to_bytes()),
-            value: U256::zero(),
-            data: call_data.into(),
-            operation: Operation::Call as u8,
-        }
-        .encode().into());
+        tx.set_data(
+            ExecTransactionFromModuleCall {
+                to: H160::from_slice(&self.contract_addrs.announcements.to_bytes()),
+                value: U256::zero(),
+                data: call_data.into(),
+                operation: Operation::Call as u8,
+            }
+            .encode()
+            .into(),
+        );
         tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
         Ok(tx)
     }
@@ -368,11 +400,14 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         }
 
         let mut tx = create_eip1559_transaction();
-        tx.set_data(CloseIncomingChannelSafeCall {
-            self_: H160::from_slice(&self.me.to_bytes()),
-            source: EthereumAddress::from_slice(&source.to_bytes()),
-        }
-        .encode().into());
+        tx.set_data(
+            CloseIncomingChannelSafeCall {
+                self_: H160::from_slice(&self.me.to_bytes()),
+                source: EthereumAddress::from_slice(&source.to_bytes()),
+            }
+            .encode()
+            .into(),
+        );
         tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
         Ok(tx)
     }
@@ -413,7 +448,6 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
         tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
         tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
         Ok(tx)
-
     }
 
     fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> Result<TypedTransaction> {
@@ -441,10 +475,13 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 
     fn deregister_node_by_safe(&self) -> Result<TypedTransaction> {
         let mut tx = create_eip1559_transaction();
-        tx.set_data(DeregisterNodeBySafeCall {
-            node_addr: H160::from_slice(&self.me.to_bytes()),
-        }
-        .encode().into());
+        tx.set_data(
+            DeregisterNodeBySafeCall {
+                node_addr: H160::from_slice(&self.me.to_bytes()),
+            }
+            .encode()
+            .into(),
+        );
         tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
 
         Ok(tx)

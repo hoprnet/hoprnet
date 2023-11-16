@@ -19,9 +19,9 @@ use utils_types::traits::BinarySerializable;
 
 use crate::{config::HoprLibConfig, constants};
 
+use core_ethereum_actions::transaction_queue::TransactionExecutor;
 #[cfg(feature = "wasm")]
 use core_transport::wasm_impls::HoprTransport;
-use core_ethereum_actions::transaction_queue::TransactionExecutor;
 
 /// Enum differentiator for loop component futures.
 ///

@@ -48,7 +48,7 @@ pub enum CoreEthereumActionsError {
     RpcError(#[from] RpcError),
 
     #[error(transparent)]
-    GeneralError(#[from] GeneralError)
+    GeneralError(#[from] GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, CoreEthereumActionsError>;

@@ -16,11 +16,7 @@ pub trait NodeActions {
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<TransactionCompleted>;
 
     /// Announces node on-chain with key binding
-    async fn announce(
-        &self,
-        multiaddr: &Multiaddr,
-        offchain_key: &OffchainKeypair,
-    ) -> Result<TransactionCompleted>;
+    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<TransactionCompleted>;
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted>;
 }
@@ -38,17 +34,11 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
         self.tx_sender.send(Transaction::Withdraw(recipient, amount)).await
     }
 
-    async fn announce(
-        &self,
-        multiaddr: &Multiaddr,
-        offchain_key: &OffchainKeypair,
-    ) -> Result<TransactionCompleted> {
+    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<TransactionCompleted> {
         let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))?;
 
         info!("initiating announcement {announcement_data}");
-        self.tx_sender
-            .send(Transaction::Announce(announcement_data))
-            .await
+        self.tx_sender.send(Transaction::Announce(announcement_data)).await
     }
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted> {

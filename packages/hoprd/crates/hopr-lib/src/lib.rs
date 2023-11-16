@@ -28,10 +28,7 @@ use utils_log::{error, info};
 use utils_types::primitives::{Address, Balance, BalanceType, Snapshot, U256};
 
 #[cfg(feature = "wasm")]
-use {
-    core_ethereum_db::db::wasm::Database,
-    core_transport::wasm_impls::HoprTransport,
-};
+use {core_ethereum_db::db::wasm::Database, core_transport::wasm_impls::HoprTransport};
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
 use utils_misc::time::native::current_timestamp;
@@ -77,10 +74,10 @@ pub use wasm_impl::Hopr;
 
 #[cfg(feature = "wasm")]
 mod native {
+    use core_ethereum_actions::transaction_queue::TransactionExecutor;
     use core_ethereum_actions::{
         channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
     };
-    use core_ethereum_actions::transaction_queue::TransactionExecutor;
     use core_ethereum_api::ChannelEntry;
     use core_transport::{wasm_impls::PublicNodesResult, TicketStatistics};
     use core_types::{
@@ -336,7 +333,9 @@ mod native {
                 info!("Registering safe by node");
 
                 if self.me_onchain() == self.staking_safe_address {
-                    return Err(errors::HoprLibError::GeneralError("cannot self as staking safe address".into()));
+                    return Err(errors::HoprLibError::GeneralError(
+                        "cannot self as staking safe address".into(),
+                    ));
                 }
 
                 if let Ok(_) = self
@@ -773,14 +772,16 @@ mod native {
 pub mod wasm_impl {
     use super::*;
 
+    use core_ethereum_actions::payload::SafePayloadGenerator;
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
     use js_sys::{Array, JsString};
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
-    use core_ethereum_actions::payload::SafePayloadGenerator;
 
+    use core_ethereum_api::executors::wasm::{
+        WasmEthereumClient, WasmEthereumTransactionExecutor, WasmTaggingPayloadGenerator,
+    };
     use core_ethereum_api::ChannelEntry;
-    use core_ethereum_api::executors::wasm::{WasmEthereumClient, WasmEthereumTransactionExecutor, WasmTaggingPayloadGenerator};
     use core_ethereum_misc::ContractAddresses;
     use core_transport::{Hash, TicketStatistics};
     use utils_log::{debug, warn};
@@ -867,6 +868,7 @@ pub mod wasm_impl {
             )
             .expect("Valid configuration leads to valid network");
 
+            // TODO: this needs refactoring of the config structures
             let contract_addrs = ContractAddresses {
                 announcements: Address::from_str(&chain_config.announcements).unwrap(),
                 channels: Address::from_str(&chain_config.channels).unwrap(),
@@ -878,6 +880,13 @@ pub mod wasm_impl {
                 safe_registry: Address::from_str(&chain_config.node_safe_registry).unwrap(),
                 module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
             };
+
+            // Replace this with an EthereumTransactionExecutor with RpcEthereumClient with NodeJs HTTP requestor
+            // and after the full migration with Native HTTP requestor.
+            let tx_exec = WasmEthereumTransactionExecutor::new(
+                WasmEthereumClient::new(send_eth_tx),
+                WasmTaggingPayloadGenerator(SafePayloadGenerator::new(&me_onchain, contract_addrs)),
+            );
 
             Self {
                 hopr: super::native::Hopr::new(
@@ -898,10 +907,7 @@ pub mod wasm_impl {
                         }
                     },
                     chain_config,
-                    WasmEthereumTransactionExecutor::new(
-                        WasmEthereumClient::new(send_eth_tx),
-                        WasmTaggingPayloadGenerator(SafePayloadGenerator::new(&me_onchain, contract_addrs))
-                    ),
+                    tx_exec,
                     chain_query.clone(),
                     move |data: ApplicationData| {
                         if let Err(e) = on_received.call1(&JsValue::null(), &data.into()) {

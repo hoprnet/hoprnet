@@ -196,7 +196,8 @@ impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
 /// Otherwise, a new block is mined per transaction.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
-    let mut anvil = ethers::utils::Anvil::new().path(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"));
+    let mut anvil = ethers::utils::Anvil::new()
+        .path(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../.foundry/bin/anvil"));
 
     if let Some(bt) = block_time {
         anvil = anvil.block_time(bt.as_secs());

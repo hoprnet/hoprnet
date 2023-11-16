@@ -7,10 +7,7 @@ use utils_misc::utils::wasm::js_value_to_error_msg;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use serde::{
-    de::{DeserializeOwned},
-    Serialize,
-};
+use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
 use crate::nodejs::helper::{Request, Response};

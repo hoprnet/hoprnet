@@ -40,7 +40,9 @@ const verbose = debug('hopr-core-ethereum:verbose:indexer')
 
 const getSyncPercentage = (start: number, current: number, end: number) =>
   (((current - start) / (end - start)) * 100).toFixed(2)
-const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = { maxDelay: 1_800_000 /*constants.MAX_TRANSACTION_BACKOFF*/ }
+const backoffOption: Parameters<typeof retryWithBackoffThenThrow>[1] = {
+  maxDelay: 1_800_000 /*constants.MAX_TRANSACTION_BACKOFF*/
+}
 
 // Metrics
 const metric_indexerErrors = create_multi_counter(
@@ -864,7 +866,7 @@ class Indexer extends (EventEmitter as new () => IndexerEventEmitter) {
           log('listener %s on %s timed out and thus removed', eventType, tx)
           setImmediate(reject, tx)
         },
-        900_000, /*constants.INDEXER_TIMEOUT,*/
+        900_000 /*constants.INDEXER_TIMEOUT,*/,
         `Timeout while indexer waiting for confirming transaction ${tx}`
       )
 

@@ -277,7 +277,10 @@ export default class HoprCoreEthereum extends EventEmitter {
   }
 
   private cachedGetNativeBalance = (address: string) =>
-    cacheNoArgAsyncFunction<Balance>(() => this.uncachedGetNativeBalance(address), 30_000 /*constants.PROVIDER_CACHE_TTL*/)
+    cacheNoArgAsyncFunction<Balance>(
+      () => this.uncachedGetNativeBalance(address),
+      30_000 /*constants.PROVIDER_CACHE_TTL*/
+    )
 
   public async getNativeBalance(address: string, useCache: boolean = false): Promise<Balance> {
     return useCache ? this.cachedGetNativeBalance(address)() : this.uncachedGetNativeBalance(address)

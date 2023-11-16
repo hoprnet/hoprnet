@@ -102,5 +102,5 @@ export {
   WasmVecAddress,
   WasmVecChannelEntry,
   HoprTransport,
-  PingConfig,
+  PingConfig
 } from '../../hoprd/lib/hoprd_hoprd.js'

@@ -11,9 +11,9 @@ use utils_types::primitives::Address;
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "wasm")]
-use { wasm_bindgen::prelude::* };
 use core_ethereum_actions::transaction_queue::TransactionExecutor;
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]

@@ -522,9 +522,7 @@ impl From<Hash> for primitive_types::H256 {
 
 impl From<primitive_types::H256> for Hash {
     fn from(value: primitive_types::H256) -> Self {
-        Self {
-            hash: value.0
-        }
+        Self { hash: value.0 }
     }
 }
 
