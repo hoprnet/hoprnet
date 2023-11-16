@@ -36,7 +36,8 @@ if [ "${#current_version_splitted[*]}" == "2" ]
 then
   # Get Release Candidate Number
   pre_release=${current_version_splitted[1]/rc\.}
-else 
+elif [ "${release_type}" == "ReleaseCandidate" ]
+then
   # Reset the release candidate for new release name
   pre_release=0
 fi
@@ -61,12 +62,10 @@ case "$release_type" in
     unset pre_release
     ;;
   Minor)
-    unset pre_release
     patch_version=0
     minor_version=$((minor_version+1))
     ;;
   Major)
-    unset pre_release
     patch_version=0
     minor_version=0
     major_version=$((major_version+1))
