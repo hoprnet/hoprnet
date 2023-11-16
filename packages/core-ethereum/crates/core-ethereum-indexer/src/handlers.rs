@@ -326,6 +326,8 @@ where
                     db.update_channel_and_snapshot(&channel_id, &channel, snapshot).await?;
 
                     if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
+                        // Reset the current_ticket_index to zero
+                        db.set_current_ticket_index(&channel_id, U256::zero()).await?;
                         self.cbs.own_channel_updated(&channel);
                     }
                 } else {
