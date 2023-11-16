@@ -292,11 +292,10 @@ where
 
                     db.update_channel_and_snapshot(&channel_closed.channel_id.try_into()?, &channel, snapshot)
                         .await?;
-
-                    // Reset the current_ticket_index to zero
-                    db.set_current_ticket_index(&channel_closed.channel_id.try_into()?, U256::zero()).await?;
-
+                    
                     if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
+                        // Reset the current_ticket_index to zero
+                        db.set_current_ticket_index(&channel_closed.channel_id.try_into()?, U256::zero()).await?;
                         self.cbs.own_channel_updated(&channel);
                     }
                 } else {
@@ -317,9 +316,6 @@ where
                     channel_id.to_string(),
                     maybe_channel.is_some()
                 );
-
-                // Reset the current_ticket_index to zero
-                db.set_current_ticket_index(&channel_id, U256::zero()).await?;
 
                 if let Some(mut channel) = maybe_channel {
                     // set all channel fields like we do on-chain on close
@@ -347,6 +343,8 @@ where
                         .await?;
 
                     if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
+                        // Reset the current_ticket_index to zero
+                        db.set_current_ticket_index(&channel_id, U256::zero()).await?;
                         self.cbs.own_channel_updated(&new_channel);
                     }
                 }
