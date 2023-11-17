@@ -60,12 +60,15 @@ async def create_channel(src, dest, funding: int, close_from_dest=False):
 
 
 async def get_channel(src, dest, include_closed=False):
-    open_channels = await src["api"].all_channels(include_closed=include_closed)
+    all_channels = await src["api"].all_channels(include_closed=include_closed)
+    print(all_channels)
+
     channels = [
         oc
-        for oc in open_channels.all
+        for oc in all_channels.all
         if oc.source_address == src["address"] and oc.destination_address == dest["address"]
     ]
+    print(channels)
 
     return channels[0] if len(channels) > 0 else None
 
@@ -83,9 +86,10 @@ async def get_channel_seen_from_dst(src, dest, include_closed=False):
 
 async def check_channel_status(src, dest, status):
     assert status in ["Open", "PendingToClose", "Closed"]
+    include_closed = status == "Closed"
     while True:
-        channel = await get_channel(src, dest, include_closed=False)
-        channel_seen_from_dst = await get_channel_seen_from_dst(src, dest, include_closed=False)
+        channel = await get_channel(src, dest, include_closed)
+        channel_seen_from_dst = await get_channel_seen_from_dst(src, dest, include_closed)
         if (
             channel is not None
             and channel.status == status
@@ -451,7 +455,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
                         swarm7[i[0]], swarm7[i[1]], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=True
                     )
                 )
-                for i in [[src, dest], [dest, src]]
+                for i in [[src, dest]]
             ]
         )
 

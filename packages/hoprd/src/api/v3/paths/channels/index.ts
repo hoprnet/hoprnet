@@ -133,10 +133,10 @@ const GET: Operation = [
 
     try {
       let channels
-      if (fullTopology === 'true') {
+      if (String(fullTopology).toLowerCase() === 'true') {
         channels = await getAllChannels(node)
       } else {
-        channels = await getChannels(node, includingClosed === 'true')
+        channels = await getChannels(node, String(includingClosed).toLowerCase() === 'true')
       }
 
       return res.status(200).send(channels)
