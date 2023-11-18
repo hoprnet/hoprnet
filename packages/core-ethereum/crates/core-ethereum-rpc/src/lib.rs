@@ -2,12 +2,14 @@ use async_trait::async_trait;
 use core_crypto::types::Hash;
 use primitive_types::H256;
 use std::fmt::{Display, Formatter};
+use std::pin::Pin;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::Result;
 
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 pub use futures::channel::mpsc::UnboundedReceiver;
+use futures::Stream;
 
 pub mod errors;
 pub mod indexer;
@@ -149,9 +151,9 @@ pub trait HoprIndexerRpcOperations {
     /// If no `start_block_number` is given, the stream starts from the latest block.
     /// The given `filter` are applied to retrieve the logs, the function fails if the filter is empty.
     /// The streaming stops only when the corresponding channel is closed by the returned receiver.
-    async fn try_stream_logs(
-        &self,
+    fn try_stream_logs<'a>(
+        &'a self,
         start_block_number: Option<u64>,
         filter: LogFilter,
-    ) -> Result<UnboundedReceiver<Log>>;
+    ) -> Result<Pin<Box<dyn Stream<Item = Log> + 'a>>>;
 }

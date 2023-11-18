@@ -1,28 +1,24 @@
+use async_stream::stream;
 use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
-use futures::channel::mpsc::UnboundedReceiver;
-use futures::future::poll_fn;
-use futures::StreamExt;
+use futures::{Stream, TryStreamExt};
 use std::pin::Pin;
-use utils_log::{debug, error, warn};
+use utils_log::debug;
 
 use crate::errors::Result;
+use crate::errors::RpcError::FilterIsEmpty;
 use crate::rpc::RpcOperations;
 use crate::{HoprIndexerRpcOperations, Log, LogFilter};
 
 #[cfg(all(not(feature = "wasm"), not(test)))]
-use async_std::task::{sleep, spawn_local};
+use async_std::task::sleep;
 
 #[cfg(test)]
-use tokio::{task::spawn_local, time::sleep};
+use tokio::time::sleep;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
-
-use crate::errors::RpcError::FilterIsEmpty;
-#[cfg(all(feature = "wasm", not(test)))]
-use wasm_bindgen_futures::spawn_local;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -32,26 +28,20 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         Ok(r.as_u64())
     }
 
-    async fn try_stream_logs(
-        &self,
+    fn try_stream_logs<'a>(
+        &'a self,
         start_block_number: Option<u64>,
         filter: LogFilter,
-    ) -> Result<UnboundedReceiver<Log>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Log> + 'a>>> {
         if filter.is_empty() {
             return Err(FilterIsEmpty);
         }
 
-        let (mut tx, rx) = futures::channel::mpsc::unbounded::<Log>();
-
-        // The provider internally performs retries on timeouts and errors.
-        let provider = self.provider.clone();
-        let cfg_clone = self.cfg.clone();
-
-        spawn_local(async move {
+        Ok(Box::pin(stream! {
             let mut last_log_block = start_block_number
                 .map(|n| BlockNumber::Number(n.into()))
                 .unwrap_or(BlockNumber::Latest);
-            'poll: loop {
+            loop {
                 let range_filter = ethers::types::Filter::from(filter.clone())
                     .from_block(last_log_block)
                     .to_block(BlockNumber::Latest);
@@ -64,40 +54,20 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         .unwrap_or("latest block".into())
                 );
 
-                let mut retrieved_logs = provider.get_logs_paginated(&range_filter, cfg_clone.logs_page_size);
+                // The provider internally performs retries on timeouts and errors.
+                let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
 
-                while let Some(maybe_log) = retrieved_logs.next().await {
-                    match maybe_log {
-                        Ok(log) => match poll_fn(|cx| Pin::new(&tx).poll_ready(cx)).await {
-                            Ok(_) => {
-                                let log = Log::from(log);
-                                last_log_block = BlockNumber::Number((log.block_number + 1).into());
-                                debug!("retrieved {log}");
+                while let Ok(Some(log)) = retrieved_logs.try_next().await {
+                    let log = Log::from(log);
+                    last_log_block = BlockNumber::Number((log.block_number + 1).into());
+                    debug!("retrieved {log}");
 
-                                if let Err(e) = tx.start_send(log) {
-                                    error!("failed to pass log to the receiver: {e}");
-                                    break 'poll;
-                                }
-                            }
-                            Err(_) => {
-                                warn!("receiver has been closed");
-                                break 'poll;
-                            }
-                        },
-                        Err(e) => {
-                            error!("failed to retrieve log: {e}")
-                        }
-                    }
+                    yield log;
                 }
 
-                sleep(cfg_clone.expected_block_time).await;
+                sleep(self.cfg.expected_block_time).await;
             }
-
-            tx.close_channel();
-            warn!("done streaming logs");
-        });
-
-        Ok(rx)
+        }))
     }
 }
 
@@ -164,7 +134,9 @@ mod test {
     async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let block_time = Duration::from_secs(1);
+
+        let anvil = create_anvil(Some(block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
@@ -184,6 +156,7 @@ mod test {
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
             contract_addrs: contract_addrs.clone(),
+            expected_block_time: block_time,
             ..RpcOperationsConfig::default()
         };
 
@@ -207,7 +180,7 @@ mod test {
 
         // Spawn channel funding
         local.spawn_local(async move {
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(block_time * 2).await;
             fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
@@ -227,11 +200,8 @@ mod test {
         ];
 
         // Spawn stream
-        let filter_clone = log_filter.clone();
-
         let run = local.run_until(async move {
-            rpc.try_stream_logs(Some(1), filter_clone)
-                .await
+            rpc.try_stream_logs(Some(1), log_filter)
                 .expect("must create stream")
                 .filter(|log| {
                     futures::future::ready(
@@ -291,7 +261,9 @@ mod test {
     async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let anvil = create_anvil(Some(Duration::from_secs(1)));
+        let block_time = Duration::from_secs(1);
+
+        let anvil = create_anvil(Some(block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
 
@@ -311,6 +283,7 @@ mod test {
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
             contract_addrs: contract_addrs.clone(),
+            expected_block_time: block_time,
             ..RpcOperationsConfig::default()
         };
 
@@ -332,7 +305,7 @@ mod test {
 
         // Spawn channel funding
         local.spawn_local(async move {
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(block_time * 2).await;
             fund_channel(
                 chain_key_1.public().to_address(),
                 contract_instances.token,
@@ -350,11 +323,8 @@ mod test {
         ];
 
         // Spawn stream
-        let filter_clone = log_filter.clone();
-
         let run = local.run_until(async move {
-            rpc.try_stream_logs(Some(1), filter_clone)
-                .await
+            rpc.try_stream_logs(Some(1), log_filter)
                 .expect("must create stream")
                 .filter(|log| {
                     futures::future::ready(
