@@ -1,6 +1,7 @@
 import asyncio
 import itertools
 import json
+import re
 import os
 import random
 import subprocess
@@ -214,40 +215,16 @@ async def test_hoprd_swarm_connectivity(swarm7):
     )
 
 
-def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
-    """
-    Tests run in bash file that more or less need to be run in the future python fixture.
-    """
-    with open("/tmp/hopr-smoke-test-anvil.cfg") as f:
-        data = json.load(f)
-
-    anvil_private_key = data["private_keys"][0]
-
-    env_vars = os.environ.copy()
-    env_vars.update(
-        {
-            "HOPRD_API_TOKEN": f"{DEFAULT_API_TOKEN}",
-            "PRIVATE_KEY": f"{anvil_private_key}",
-        }
-    )
-
-    nodes_api_as_str = " ".join(list(map(lambda x: f"\"localhost:{x['api_port']}\"", swarm7.values())))
-
-    log_file_path = f"/tmp/hopr-smoke-{__name__}.log"
-    subprocess.run(
-        [
-            "bash",
-            "-o",
-            "pipefail",
-            "-c",
-            f"./tests/test_after_fixture_ready.sh {nodes_api_as_str} 2>&1 | tee --append {log_file_path}",
-        ],
-        shell=False,
-        capture_output=True,
-        env=env_vars,
-        # timeout=2000,
-        check=True,
-    )
+@pytest.mark.asyncio
+async def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
+    for node_id, node_args in swarm7.items():
+        addr = await node_args["api"].get_address("native")
+        assert re.match("^0x[0-9a-fA-F]{40}$", addr) is not None
+        balances = await node_args["api"].balances()
+        native_balance = int(balances.native.split(" ")[0])
+        hopr_balance = int(balances.safe_hopr.split(" ")[0])
+        assert native_balance > 0
+        assert hopr_balance > 0
 
 
 @pytest.mark.asyncio

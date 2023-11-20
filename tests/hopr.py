@@ -275,19 +275,19 @@ class HoprdAPI:
         _, response = self.__call_api(TicketsApi, "tickets_get_statistics")
         return response
 
-    async def get_address(self, address: str):
+    async def get_address(self, address_type: str):
         """
         Returns the address of the node.
         :param: address: str = "hopr" | "native"
         :return: address: str | undefined
         """
-        status, response = self.__call_api(AccountApi, "account_get_address", address)
+        status, response = self.__call_api(AccountApi, "account_get_address")
         if status:
-            if not hasattr(response, address):
-                log.error(f"No {address} returned from the API")
+            if not hasattr(response, address_type):
+                log.error(f"No {address_type} returned from the API")
                 return None
 
-            return getattr(response, address)
+            return getattr(response, address_type)
         else:
             return None
 
