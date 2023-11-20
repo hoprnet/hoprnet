@@ -233,18 +233,23 @@ def mirror_contract_data(dest_file_path, src_file_path, src_network, dest_networ
 
 def reuse_pregenerated_identities():
     # remove existing identity files in tmp folder, .safe.args
-    for f in os.listdir(FIXTURE_FILES_DIR):
-        suffixes = [ f"{FIXTURE_FILES_PREFIX}_*.safe.args", f"{FIXTURE_FILES_PREFIX}_*.id"]
-        if any([fnmatch.fnmatch(f, pattern) for pattern in suffixes]):
-            os.remove(f"{FIXTURE_FILES_DIR}/{f}")
+    suffixes = [f"{FIXTURE_FILES_PREFIX}_*.safe.args", f"{FIXTURE_FILES_PREFIX}_*.id"]
+
+    def is_relevant_file(f):
+        return any([fnmatch.fnmatch(f, pattern) for pattern in suffixes])
+
+    for f in filter(is_relevant_file, os.listdir(FIXTURE_FILES_DIR)):
+        os.remove(f"{FIXTURE_FILES_DIR}/{f}")
 
     # we copy and rename the files according to the expected file name format and destination folder
     node_nr = 0
     id_files = sorted(os.listdir(PREGENERATED_IDENTITIES_DIR))
-    for f in id_files if fnmatch.fnmatch(f, "*.id"):
-          shutil.copyfile(
-                f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}_{node_nr}.id"
-          )
+
+    def is_relevant_file(f):
+        return fnmatch.fnmatch(f, "*.id")
+
+    for f in filter(is_relevant_file, id_files):
+        shutil.copyfile(f"{PREGENERATED_IDENTITIES_DIR}/{f}", f"{FIXTURE_FILES_DIR}{FIXTURE_FILES_PREFIX}_{node_nr}.id")
 
 
 def create_local_safes(nodes_args, private_key):
