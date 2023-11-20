@@ -1,15 +1,11 @@
 import asyncio
 import itertools
-import json
 import re
-import os
 import random
-import subprocess
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
 from conftest import (
-    DEFAULT_API_TOKEN,
     NODES,
     OPEN_CHANNEL_FUNDING_VALUE,
     TICKET_AGGREGATION_THRESHOLD,
