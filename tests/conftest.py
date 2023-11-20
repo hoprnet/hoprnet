@@ -115,6 +115,7 @@ NODES = {
         "api_token": DEFAULT_API_TOKEN,
         "dir": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5",
         "host_addr": "localhost",
+        "cfg_file": f"{FIXTURE_FILES_DIR}{NODE_NAME_PREFIX}_5.cfg.yaml",
     },
     "6": {
         "api_port": 19096,
@@ -138,7 +139,7 @@ def cleanup_node(args):
     try:
         proc = args["proc"]
         proc.kill()
-    except:
+    except Exception:
         pass
 
 
@@ -330,7 +331,7 @@ def collect_node_information(node_args):
             assert resp.status == 200
             data = json.loads(resp.read())
             return (data["hopr"], data["native"])
-        except:
+        except Exception:
             sleep(0.1)
 
 
