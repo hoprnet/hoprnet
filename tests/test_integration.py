@@ -61,14 +61,12 @@ async def create_channel(src, dest, funding: int, close_from_dest=False):
 
 async def get_channel(src, dest, include_closed=False):
     all_channels = await src["api"].all_channels(include_closed=include_closed)
-    print(all_channels)
 
     channels = [
         oc
         for oc in all_channels.all
         if oc.source_address == src["address"] and oc.destination_address == dest["address"]
     ]
-    print(channels)
 
     return channels[0] if len(channels) > 0 else None
 
