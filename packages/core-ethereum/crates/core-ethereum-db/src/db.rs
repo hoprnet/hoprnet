@@ -124,6 +124,8 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
         if current_index < index {
             let _evicted = self.db.set(prefixed_key, &index).await?;
             // Ignoring evicted value
+            // flush the db after setter
+            self.db.flush().await?;
         }
         Ok(())
     }
