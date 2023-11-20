@@ -181,7 +181,7 @@ def setup_node(args):
         cmd = cmd + [f"--configurationFilePath={args['cfg_file']}"]
 
     # remove previous databases
-    shutil.rmtree(args["dir"])
+    shutil.rmtree(args["dir"], ignore_errors=True)
 
     logging.info(f"Starting up a node with cmd: {cmd} and env {custom_env}")
     proc = subprocess.Popen(
@@ -393,7 +393,9 @@ def swarm7(request):
             nodes[node_id]["peer_id"] = peer_id
             nodes[node_id]["address"] = address
 
-        logging.info("Node setup finished")
+        logging.info("Node setup finished, waiting 10 seconds before proceeding")
+        sleep(10)
+
         yield nodes
     except Exception as e:
         logging.error(f"Creating a 7 node cluster - FAILED: {e}")

@@ -367,9 +367,11 @@ async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoi
         assert balance_str_to_int(balance_before.safe_hopr) - balance_str_to_int(
             balance_after.safe_hopr
         ) == balance_str_to_int(hopr_amount)
+
         assert balance_str_to_int(balance_before.safe_hopr_allowance) - balance_str_to_int(
             balance_after.safe_hopr_allowance
         ) == balance_str_to_int(hopr_amount)
+
         assert balance_str_to_int(balance_after.native) < balance_str_to_int(balance_before.native)
 
 
