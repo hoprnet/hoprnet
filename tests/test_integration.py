@@ -81,7 +81,12 @@ async def check_channel_status(src, dest, status):
     while True:
         channel = await get_channel(src, dest, include_closed=False)
         channel_seen_from_dst = await get_channel_seen_from_dst(src, dest, include_closed=False)
-        if channel is not None and channel.status == status and channel_seen_from_dst is not None and channel_seen_from_dst.status == status:
+        if (
+            channel is not None
+            and channel.status == status
+            and channel_seen_from_dst is not None
+            and channel_seen_from_dst.status == status
+        ):
             break
         else:
             await asyncio.sleep(CHECK_RETRY_INTERVAL)
