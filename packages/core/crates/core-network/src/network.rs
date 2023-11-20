@@ -174,7 +174,8 @@ pub struct PeerStatus {
     id: PeerId,
     pub origin: PeerOrigin,
     pub is_public: bool,
-    pub last_seen: u64, // timestamp
+    pub last_seen: u64,         // timestamp
+    pub last_seen_latency: u64, // duration in ms
     quality: f64,
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
@@ -192,6 +193,7 @@ impl PeerStatus {
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
             last_seen: 0,
+            last_seen_latency: 0,
             backoff,
             quality: 0.0,
             metadata: HashMap::new(),
@@ -383,7 +385,13 @@ impl<T: NetworkExternalActions> Network<T> {
                 });
             }
 
-            if ping_result.is_err() {
+            if let Ok(latency) = ping_result {
+                entry.last_seen = self.network_actions_api.create_timestamp();
+                entry.last_seen_latency = latency;
+                entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
+                entry.backoff = self.cfg.backoff_min;
+                entry.update_quality(1.0_f64.min(entry.quality + self.cfg.quality_step));
+            } else {
                 entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
                 entry.update_quality(0.0_f64.max(entry.quality - self.cfg.quality_step));
 
@@ -400,11 +408,6 @@ impl<T: NetworkExternalActions> Network<T> {
                     self.network_actions_api
                         .emit(NetworkEvent::PeerOffline(entry.id.clone()));
                 }
-            } else {
-                entry.last_seen = self.network_actions_api.create_timestamp();
-                entry.heartbeats_succeeded = entry.heartbeats_succeeded + 1;
-                entry.backoff = self.cfg.backoff_min;
-                entry.update_quality(1.0_f64.min(entry.quality + self.cfg.quality_step));
             }
 
             self.refresh_network_status(&entry);
@@ -611,6 +614,7 @@ pub mod wasm {
             origin: PeerOrigin,
             is_public: bool,
             last_seen: u64,
+            last_seen_latency: u64,
             quality: f64,
             heartbeats_sent: u64,
             heartbeats_succeeded: u64,
@@ -630,6 +634,7 @@ pub mod wasm {
                 origin,
                 is_public,
                 last_seen,
+                last_seen_latency,
                 quality,
                 heartbeats_sent,
                 heartbeats_succeeded,
