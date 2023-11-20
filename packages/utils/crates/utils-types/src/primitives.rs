@@ -1083,7 +1083,7 @@ pub mod wasm {
 
         #[wasm_bindgen(js_name = "to_string")]
         pub fn _to_string(&self) -> String {
-            format!("{} {}", self.value.to_string(), self.balance_type)
+            format!("{} {}", self.value, self.balance_type)
         }
 
         #[wasm_bindgen]

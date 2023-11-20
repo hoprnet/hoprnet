@@ -1,3 +1,4 @@
+use utils_log::error;
 use async_stream::stream;
 use async_trait::async_trait;
 use ethers::types::BlockNumber;
@@ -9,7 +10,7 @@ use utils_log::debug;
 use crate::errors::Result;
 use crate::errors::RpcError::FilterIsEmpty;
 use crate::rpc::RpcOperations;
-use crate::{HoprIndexerRpcOperations, Log, LogFilter};
+use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter, Log};
 
 #[cfg(all(not(feature = "wasm"), not(test)))]
 use async_std::task::sleep;
@@ -32,37 +33,62 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
         &'a self,
         start_block_number: Option<u64>,
         filter: LogFilter,
-    ) -> Result<Pin<Box<dyn Stream<Item = Log> + 'a>>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>> {
         if filter.is_empty() {
             return Err(FilterIsEmpty);
         }
 
         Ok(Box::pin(stream! {
-            let mut last_log_block = start_block_number
-                .map(|n| BlockNumber::Number(n.into()))
-                .unwrap_or(BlockNumber::Latest);
+            let mut from_block;
+            let mut current_block = 0;
+
             loop {
-                let range_filter = ethers::types::Filter::from(filter.clone())
-                    .from_block(last_log_block)
-                    .to_block(BlockNumber::Latest);
+                match self.block_number().await {
+                    Ok(cb) => {
+                        from_block = cb;
 
-                debug!(
-                    "polling logs since {}",
-                    last_log_block
-                        .as_number()
-                        .map(|b| format!("block #{b}"))
-                        .unwrap_or("latest block".into())
-                );
+                        if current_block == 0 {
+                            // On first iteration, decide whether to use current block number
+                            // or the given one.
+                            from_block = start_block_number.unwrap_or(cb);
+                        }
 
-                // The provider internally performs retries on timeouts and errors.
-                let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
+                        current_block = cb;
 
-                while let Ok(Some(log)) = retrieved_logs.try_next().await {
-                    let log = Log::from(log);
-                    last_log_block = BlockNumber::Number((log.block_number + 1).into());
-                    debug!("retrieved {log}");
+                        // Range is inclusive
+                        let range_filter = ethers::types::Filter::from(filter.clone())
+                            .from_block(BlockNumber::Number(from_block.into()))
+                            .to_block(BlockNumber::Number(current_block.into()));
 
-                    yield log;
+                        debug!("polling logs between {} - {}", from_block, current_block);
+
+                        // The provider internally performs retries on timeouts and errors.
+                        let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
+
+                        let mut current_block_log = BlockWithLogs::default();
+
+                        while let Ok(Some(log)) = retrieved_logs.try_next().await {
+                            let log = Log::from(log);
+
+                            // This assumes the logs are arriving ordered by blocks
+                            if current_block_log.block_id == 0 {
+                                current_block_log.block_id = log.block_number;
+                            }
+
+                            if current_block_log.block_id != log.block_number {
+                                debug!("completed {current_block_log}");
+                                yield current_block_log;
+
+                                current_block_log = BlockWithLogs::default();
+                                current_block_log.block_id = log.block_number;
+                            }
+
+                            debug!("retrieved {log}");
+                        }
+
+                        yield current_block_log;
+                    }
+                    Err(e) => error!("failed to obtain current block number from chain: {e}")
                 }
 
                 sleep(self.cfg.expected_block_time).await;
@@ -75,7 +101,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 mod test {
     use crate::rpc::tests::mint_tokens;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{HoprIndexerRpcOperations, Log, LogFilter};
+    use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
@@ -203,16 +229,9 @@ mod test {
         let run = local.run_until(async move {
             rpc.try_stream_logs(Some(1), log_filter)
                 .expect("must create stream")
-                .filter(|log| {
-                    futures::future::ready(
-                        expectations
-                            .iter()
-                            .any(|(addr, topic)| log.address.eq(addr) && log.topics.contains(topic)),
-                    )
-                })
                 .skip(2) // first transfer and approval are related to minting
-                .take(4)
-                .collect::<Vec<Log>>()
+                .take(1)
+                .collect::<Vec<BlockWithLogs>>()
                 .await
         });
 
@@ -221,8 +240,7 @@ mod test {
             .await
             .expect("timeout");
 
-        // The logs within the single block must contain all 4 events
-        let block_num = retrieved_logs[0].block_number;
+        // There must be a single block that contains all 4 events
 
         assert!(
             retrieved_logs.iter().all(|log| log.block_number == block_num),

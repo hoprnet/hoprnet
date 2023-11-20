@@ -140,6 +140,17 @@ pub trait HoprRpcOperations {
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct BlockWithLogs {
+    pub block_id: u64,
+    pub logs: Vec<Log>
+}
+impl Display for BlockWithLogs {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "block #{} with {} logs", self.block_id, self.logs.len())
+    }
+}
+
 /// Trait with RPC provider functionality required by the Indexer.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -155,5 +166,5 @@ pub trait HoprIndexerRpcOperations {
         &'a self,
         start_block_number: Option<u64>,
         filter: LogFilter,
-    ) -> Result<Pin<Box<dyn Stream<Item = Log> + 'a>>>;
+    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
 }
