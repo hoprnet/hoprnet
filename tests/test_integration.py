@@ -65,11 +65,28 @@ async def get_channel(src, dest, include_closed=False):
     return channels[0] if len(channels) > 0 else None
 
 
+async def get_channel_seen_from_dst(src, dest, include_closed=False):
+    open_channels = await dest["api"].all_channels(include_closed=include_closed)
+    channels = [
+        oc
+        for oc in open_channels.all
+        if oc.source_address == src["address"] and oc.destination_address == dest["address"]
+    ]
+
+    return channels[0] if len(channels) > 0 else None
+
+
 async def check_channel_status(src, dest, status):
     assert status in ["Open", "PendingToClose", "Closed"]
     while True:
         channel = await get_channel(src, dest, include_closed=False)
-        if channel is not None and channel.status == status:
+        channel_seen_from_dst = await get_channel_seen_from_dst(src, dest, include_closed=False)
+        if (
+            channel is not None
+            and channel.status == status
+            and channel_seen_from_dst is not None
+            and channel_seen_from_dst.status == status
+        ):
             break
         else:
             await asyncio.sleep(CHECK_RETRY_INTERVAL)

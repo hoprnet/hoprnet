@@ -147,6 +147,8 @@ mod tests {
         impl HoprCoreEthereumDbActions for Db {
             async fn get_current_ticket_index(&self, channel_id: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
             async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
+            async fn increase_current_ticket_index(&mut self, channel_id: &Hash) -> core_ethereum_db::errors::Result<()>;
+            async fn ensure_current_ticket_index_gte(&mut self, channel_id: &Hash, index: U256) -> core_ethereum_db::errors::Result<()>;
             async fn get_tickets(&self, signer: Option<Address>) -> core_ethereum_db::errors::Result<Vec<Ticket>>;
             async fn get_unrealized_balance(&self, signer: &Hash) -> core_ethereum_db::errors::Result<Balance>;
             async fn get_channel_epoch(&self, channel: &Hash) -> core_ethereum_db::errors::Result<Option<U256>>;
@@ -553,5 +555,55 @@ mod tests {
             .expect("db must contain ticket index");
 
         assert_eq!(dummy_index, idx, "ticket index mismatch");
+    }
+
+    #[async_std::test]
+    async fn test_db_should_increase_ticket_index() {
+        let mut db = CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            SENDER_PRIV_KEY.public().to_address(),
+        );
+
+        let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
+
+        // increase current ticket index of a non-existing channel, the result should be 1
+        db.increase_current_ticket_index(&dummy_channel).await.unwrap();
+        let idx = db
+            .get_current_ticket_index(&dummy_channel)
+            .await
+            .unwrap()
+            .expect("db must contain ticket index");
+        assert_eq!(idx, U256::one(), "ticket index mismatch. Expecting 1");
+
+        // increase current ticket index of an existing channel where previous value is 1, the result should be 2
+        db.increase_current_ticket_index(&dummy_channel).await.unwrap();
+        let idx = db
+            .get_current_ticket_index(&dummy_channel)
+            .await
+            .unwrap()
+            .expect("db must contain ticket index");
+        assert_eq!(idx, U256::new("2"), "ticket index mismatch. Expecting 2");
+    }
+
+    #[async_std::test]
+    async fn test_db_should_ensure_ticket_index_not_smaller_than_given_index() {
+        let mut db = CoreEthereumDb::new(
+            DB::new(RustyLevelDbShim::new_in_memory()),
+            SENDER_PRIV_KEY.public().to_address(),
+        );
+
+        let dummy_channel = Hash::new(&[0xffu8; Hash::SIZE]);
+        let dummy_index = U256::new("123");
+
+        // the ticket index should be equal or greater than the given dummy index
+        db.ensure_current_ticket_index_gte(&dummy_channel, dummy_index)
+            .await
+            .unwrap();
+        let idx = db
+            .get_current_ticket_index(&dummy_channel)
+            .await
+            .unwrap()
+            .expect("db must contain ticket index");
+        assert_eq!(idx, dummy_index, "ticket index mismatch. Expecting 2");
     }
 }
