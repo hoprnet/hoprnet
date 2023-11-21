@@ -885,7 +885,11 @@ pub mod wasm_impl {
             // and after the full migration with Native HTTP requestor.
             let tx_exec = WasmEthereumTransactionExecutor::new(
                 WasmEthereumClient::new(send_eth_tx),
-                WasmTaggingPayloadGenerator(SafePayloadGenerator::new(&me_onchain, contract_addrs, cfg.safe_module.module_address)),
+                WasmTaggingPayloadGenerator(SafePayloadGenerator::new(
+                    &me_onchain,
+                    contract_addrs,
+                    cfg.safe_module.module_address,
+                )),
             );
 
             Self {

@@ -307,7 +307,7 @@ impl SafePayloadGenerator {
         Self {
             me: chain_keypair.into(),
             contract_addrs,
-            module
+            module,
         }
     }
 }
