@@ -7,10 +7,10 @@ use std::pin::Pin;
 use utils_log::debug;
 use utils_log::error;
 
-use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 use crate::errors::Result;
 use crate::errors::RpcError::FilterIsEmpty;
 use crate::rpc::RpcOperations;
+use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
@@ -100,13 +100,13 @@ mod test {
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
     use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_ethereum_misc::{ContractAddresses, ContractInstances, create_anvil, create_rpc_client_to_anvil};
+    use core_ethereum_misc::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
     use utils_log::debug;
     use utils_types::primitives::Address;
 
-    use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
-    use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::rpc::tests::mint_tokens;
+    use crate::rpc::{RpcOperations, RpcOperationsConfig};
+    use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 
     async fn fund_channel<M: Middleware + 'static>(
         counterparty: Address,

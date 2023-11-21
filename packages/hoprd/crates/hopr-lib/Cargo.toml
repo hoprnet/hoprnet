@@ -36,7 +36,7 @@ core-strategy = { workspace = true }        # TODO: better organize and cleanup,
 core-ethereum-actions = { workspace = true }
 core-ethereum-api = { workspace = true }
 core-ethereum-db = { workspace = true, default-features = false }
-core-ethereum-misc = { workspace = true }
+core-ethereum-types = { workspace = true }
 real-base = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true }

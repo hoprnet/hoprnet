@@ -15,8 +15,8 @@ use bindings::{
     hopr_token::{ApproveCall, TransferCall},
 };
 use core_crypto::{keypairs::ChainKeypair, types::VrfParameters};
-use core_ethereum_misc::ContractAddresses;
 use core_ethereum_rpc::{create_eip1559_transaction, TypedTransaction};
+use core_ethereum_types::ContractAddresses;
 use core_types::{acknowledgement::AcknowledgedTicket, announcement::AnnouncementData};
 use ethers::{
     abi::AbiEncode,

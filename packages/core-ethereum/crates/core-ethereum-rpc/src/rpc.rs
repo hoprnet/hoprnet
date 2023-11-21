@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_crypto::types::Hash;
-use core_ethereum_misc::{ContractAddresses, ContractInstances};
+use core_ethereum_types::{ContractAddresses, ContractInstances};
 use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;

@@ -3,18 +3,18 @@ use async_std::channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_types::actions::Action;
 use core_types::acknowledgement::AcknowledgedTicketStatus;
 use core_types::announcement::AnnouncementData;
 use core_types::{
     acknowledgement::{AcknowledgedTicket, AcknowledgedTicketStatus::BeingRedeemed},
     channels::{
-        ChannelDirection, ChannelEntry,
+        ChannelDirection,
         ChannelStatus::{Closed, Open, PendingToClose},
     },
 };
 use futures::future::Either;
 use futures::{pin_mut, FutureExt};
-use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -55,53 +55,6 @@ lazy_static::lazy_static! {
         "Number of timed out transactions"
     )
     .unwrap();
-}
-
-/// Enumerates all possible on-chain state change requests
-#[derive(Clone, PartialEq, Debug)]
-pub enum Transaction {
-    /// Redeem the given acknowledged ticket
-    RedeemTicket(AcknowledgedTicket),
-
-    /// Open channel to the given destination with the given stake
-    OpenChannel(Address, Balance),
-
-    /// Fund channel with the given ID and amount
-    FundChannel(ChannelEntry, Balance),
-
-    /// Close channel with the given source and destination
-    CloseChannel(ChannelEntry, ChannelDirection),
-
-    /// Withdraw given balance to the given address
-    Withdraw(Address, Balance),
-
-    /// Announce node on-chain
-    Announce(AnnouncementData),
-
-    /// Register safe address with this node
-    RegisterSafe(Address),
-}
-
-impl Display for Transaction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Transaction::RedeemTicket(ack) => write!(f, "redeem tx of {ack}"),
-            Transaction::OpenChannel(dst, amount) => write!(f, "open channel tx to {dst} with {amount}"),
-            Transaction::FundChannel(channel, amount) => write!(
-                f,
-                "fund channel tx for channel from {} to {} with {amount}",
-                channel.source, channel.destination
-            ),
-            Transaction::CloseChannel(channel, direction) => write!(
-                f,
-                "closure tx of {} channel from {} to {}",
-                direction, channel.source, channel.destination
-            ),
-            Transaction::Withdraw(destination, amount) => write!(f, "withdraw tx of {amount} to {destination}"),
-            Transaction::Announce(data) => write!(f, "announce tx of {}", data.to_multiaddress_str()),
-            Transaction::RegisterSafe(safe_address) => write!(f, "register safe tx {safe_address}"),
-        }
-    }
 }
 
 /// Implements execution of each `Transaction` and also **awaits** its confirmation.
@@ -148,11 +101,11 @@ type TransactionFinisher = futures::channel::oneshot::Sender<TransactionResult>;
 /// Sends a future Ethereum transaction into the `TransactionQueue`.
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub struct TransactionSender(Sender<(Transaction, TransactionFinisher)>);
+pub struct TransactionSender(Sender<(Action, TransactionFinisher)>);
 
 impl TransactionSender {
     /// Delivers the future transaction into the `TransactionQueue` for processing.
-    pub async fn send(&self, transaction: Transaction) -> Result<TransactionCompleted> {
+    pub async fn send(&self, transaction: Action) -> Result<TransactionCompleted> {
         let completer = futures::channel::oneshot::channel();
         self.0
             .send((transaction, completer.0))
@@ -172,8 +125,8 @@ impl TransactionSender {
 /// method of the `TransactionExecutor` to execute it and await its confirmation.
 pub struct TransactionQueue<Db: HoprCoreEthereumDbActions> {
     db: Arc<RwLock<Db>>,
-    queue_send: Sender<(Transaction, TransactionFinisher)>,
-    queue_recv: Receiver<(Transaction, TransactionFinisher)>,
+    queue_send: Sender<(Action, TransactionFinisher)>,
+    queue_recv: Receiver<(Action, TransactionFinisher)>,
     tx_exec: Rc<Box<dyn TransactionExecutor>>, // TODO: Make this Arc once TransactionExecutor is Send
 }
 
@@ -203,10 +156,10 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
     async fn execute_transaction(
         db: Arc<RwLock<Db>>,
         tx_exec: Rc<Box<dyn TransactionExecutor>>,
-        tx: Transaction,
+        tx: Action,
     ) -> TransactionResult {
         match tx {
-            Transaction::RedeemTicket(mut ack) => match &ack.status {
+            Action::RedeemTicket(mut ack) => match &ack.status {
                 BeingRedeemed { .. } => {
                     let res = tx_exec.redeem_ticket(ack.clone()).await;
                     match &res {
@@ -232,9 +185,9 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 _ => Failure(format!("invalid state of {ack}")),
             },
 
-            Transaction::OpenChannel(address, stake) => tx_exec.fund_channel(address, stake).await,
+            Action::OpenChannel(address, stake) => tx_exec.fund_channel(address, stake).await,
 
-            Transaction::FundChannel(channel, amount) => {
+            Action::FundChannel(channel, amount) => {
                 if channel.status == Open {
                     tx_exec.fund_channel(channel.destination, amount).await
                 } else {
@@ -242,7 +195,7 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 }
             }
 
-            Transaction::CloseChannel(channel, direction) => match direction {
+            Action::CloseChannel(channel, direction) => match direction {
                 ChannelDirection::Incoming => match channel.status {
                     Open | PendingToClose => tx_exec.close_incoming_channel(channel.source).await,
                     Closed => {
@@ -272,9 +225,9 @@ impl<Db: HoprCoreEthereumDbActions + 'static> TransactionQueue<Db> {
                 },
             },
 
-            Transaction::Withdraw(recipient, amount) => tx_exec.withdraw(recipient, amount).await,
-            Transaction::Announce(data) => tx_exec.announce(data).await,
-            Transaction::RegisterSafe(safe_address) => tx_exec.register_safe(safe_address).await,
+            Action::Withdraw(recipient, amount) => tx_exec.withdraw(recipient, amount).await,
+            Action::Announce(data) => tx_exec.announce(data).await,
+            Action::RegisterSafe(safe_address) => tx_exec.register_safe(safe_address).await,
         }
     }
 

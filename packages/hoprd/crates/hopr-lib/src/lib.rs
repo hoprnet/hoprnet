@@ -782,7 +782,7 @@ pub mod wasm_impl {
         WasmEthereumClient, WasmEthereumTransactionExecutor, WasmTaggingPayloadGenerator,
     };
     use core_ethereum_api::ChannelEntry;
-    use core_ethereum_misc::ContractAddresses;
+    use core_ethereum_types::ContractAddresses;
     use core_transport::{Hash, TicketStatistics};
     use utils_log::{debug, warn};
     use utils_types::{

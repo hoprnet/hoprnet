@@ -1131,8 +1131,8 @@ dependencies = [
  "bindings",
  "core-crypto",
  "core-ethereum-db",
- "core-ethereum-misc",
  "core-ethereum-rpc",
+ "core-ethereum-types",
  "core-types",
  "env_logger",
  "ethers",
@@ -1168,8 +1168,8 @@ dependencies = [
  "core-crypto",
  "core-ethereum-actions",
  "core-ethereum-db",
- "core-ethereum-misc",
  "core-ethereum-rpc",
+ "core-ethereum-types",
  "core-path",
  "core-types",
  "futures",
@@ -1246,35 +1246,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-ethereum-misc"
-version = "0.7.0"
-dependencies = [
- "async-std",
- "bindings",
- "console_error_panic_hook",
- "core-crypto",
- "core-ethereum-db",
- "env_logger",
- "ethers",
- "futures",
- "hex",
- "hex-literal",
- "mockall",
- "multiaddr",
- "serde",
- "thiserror",
- "tokio",
- "utils-db",
- "utils-log",
- "utils-misc",
- "utils-types",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-opt",
- "wasm-pack",
-]
-
-[[package]]
 name = "core-ethereum-rpc"
 version = "0.1.0"
 dependencies = [
@@ -1285,7 +1256,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
- "core-ethereum-misc",
+ "core-ethereum-types",
  "core-types",
  "env_logger",
  "ethers",
@@ -1311,6 +1282,29 @@ dependencies = [
  "validator",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "core-ethereum-types"
+version = "0.7.0"
+dependencies = [
+ "async-std",
+ "bindings",
+ "console_error_panic_hook",
+ "core-crypto",
+ "core-types",
+ "env_logger",
+ "ethers",
+ "hex",
+ "hex-literal",
+ "mockall",
+ "serde",
+ "tokio",
+ "utils-log",
+ "utils-misc",
+ "utils-types",
+ "wasm-opt",
+ "wasm-pack",
 ]
 
 [[package]]
@@ -1396,7 +1390,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
- "core-ethereum-misc",
+ "core-ethereum-types",
  "core-path",
  "core-types",
  "env_logger",
@@ -1537,8 +1531,8 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-ethereum-db",
- "core-ethereum-misc",
  "core-ethereum-rpc",
+ "core-ethereum-types",
  "core-network",
  "core-p2p",
  "core-packet",
@@ -2977,7 +2971,7 @@ dependencies = [
  "core-ethereum-actions",
  "core-ethereum-api",
  "core-ethereum-db",
- "core-ethereum-misc",
+ "core-ethereum-types",
  "core-path",
  "core-strategy",
  "core-transport",
@@ -3014,7 +3008,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-ethereum-db",
  "core-ethereum-indexer",
- "core-ethereum-misc",
+ "core-ethereum-types",
  "core-network",
  "core-strategy",
  "core-transport",

@@ -3,6 +3,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_types::actions::Action;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::acknowledgement::AcknowledgedTicketStatus::{BeingAggregated, BeingRedeemed, Untouched};
 use core_types::channels::{generate_channel_id, ChannelEntry};
@@ -17,7 +18,7 @@ use crate::errors::{
     CoreEthereumActionsError::{InvalidArguments, NotAWinningTicket, WrongTicketState},
     Result,
 };
-use crate::transaction_queue::{Transaction, TransactionCompleted, TransactionSender};
+use crate::transaction_queue::{TransactionCompleted, TransactionSender};
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -91,7 +92,7 @@ where
     Db: HoprCoreEthereumDbActions,
 {
     set_being_redeemed(db.write().await.deref_mut(), &mut ack_ticket, *EMPTY_TX_HASH).await?;
-    on_chain_tx_sender.send(Transaction::RedeemTicket(ack_ticket)).await
+    on_chain_tx_sender.send(Action::RedeemTicket(ack_ticket)).await
 }
 
 #[async_trait(? Send)]

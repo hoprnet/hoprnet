@@ -40,7 +40,7 @@ core-crypto = { workspace = true, default-features = false }
 core-ethereum-actions = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-rpc = { workspace = true, default-features = false }
-core-ethereum-misc = { workspace = true, default-features = false }
+core-ethereum-types = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }

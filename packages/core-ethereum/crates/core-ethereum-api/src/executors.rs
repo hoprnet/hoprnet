@@ -19,7 +19,6 @@ pub trait EthereumClient<T: Into<TypedTransaction>> {
     /// Sends transaction to the blockchain and returns its hash.
     /// Does not poll for transaction completion.
     async fn post_transaction(&self, tx: T) -> Result<Hash>;
-
 }
 
 /// Instantiation of `EthereumClient` using `HoprRpcOperations`.

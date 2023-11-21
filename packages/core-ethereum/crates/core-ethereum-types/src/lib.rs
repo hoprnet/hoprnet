@@ -17,6 +17,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use utils_types::primitives::Address;
 
+pub mod actions;
 pub mod constants;
 
 /// Holds addresses of all smart contracts.

@@ -1,5 +1,5 @@
 [package]
-name = "core-ethereum-misc"
+name = "core-ethereum-types"
 version = "0.7.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -14,18 +14,12 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
 ethers = { workspace = true }
-futures = { workspace = true }
 hex-literal = "0.4.1"
-multiaddr = "0.18"
 serde = "1.0"
-thiserror = { workspace = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
 
 bindings = { workspace = true }
 core-crypto = { workspace = true }
-core-ethereum-db = { workspace = true }
-utils-db = { workspace = true }
+core-types = { workspace = true }
 utils-misc = { workspace = true }
 utils-log = { workspace = true }
 utils-types = { workspace = true }
@@ -52,5 +46,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "core-crypto/wasm", "core-ethereum-db/wasm", "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
+wasm = [ "core-crypto/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
