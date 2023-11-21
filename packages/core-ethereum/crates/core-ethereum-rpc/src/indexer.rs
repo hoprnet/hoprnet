@@ -1,17 +1,9 @@
-use std::pin::Pin;
-
-#[cfg(all(not(feature = "wasm"), not(test)))]
-use async_std::task::sleep;
 use async_stream::stream;
 use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
 use futures::{Stream, TryStreamExt};
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
-#[cfg(test)]
-use tokio::time::sleep;
-
+use std::pin::Pin;
 use utils_log::debug;
 use utils_log::error;
 
@@ -19,6 +11,15 @@ use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
 use crate::errors::Result;
 use crate::errors::RpcError::FilterIsEmpty;
 use crate::rpc::RpcOperations;
+
+#[cfg(all(feature = "wasm", not(test)))]
+use gloo_timers::future::sleep;
+
+#[cfg(test)]
+use tokio::time::sleep;
+
+#[cfg(all(not(feature = "wasm"), not(test)))]
+use async_std::task::sleep;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
