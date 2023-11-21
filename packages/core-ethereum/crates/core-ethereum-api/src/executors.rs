@@ -1,5 +1,5 @@
-use async_lock::Mutex;
 use async_trait::async_trait;
+use async_lock::Mutex;
 use core_crypto::types::Hash;
 use core_ethereum_actions::payload::PayloadGenerator;
 use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionResult};
