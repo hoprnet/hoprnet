@@ -20,6 +20,13 @@ use utils_types::primitives::Address;
 pub mod actions;
 pub mod constants;
 
+pub use ethers::core::types::transaction::eip2718::TypedTransaction;
+
+/// Short-hand for creating new EIP1559 transaction object.
+pub fn create_eip1559_transaction() -> TypedTransaction {
+    TypedTransaction::Eip1559(Eip1559TransactionRequest::new())
+}
+
 /// Holds addresses of all smart contracts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ContractAddresses {

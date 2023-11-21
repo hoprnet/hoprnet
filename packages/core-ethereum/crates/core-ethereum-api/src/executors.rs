@@ -3,7 +3,8 @@ use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_actions::payload::PayloadGenerator;
 use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionResult};
-use core_ethereum_rpc::{HoprRpcOperations, TypedTransaction};
+use core_ethereum_rpc::HoprRpcOperations;
+use core_ethereum_types::TypedTransaction;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::announcement::AnnouncementData;
 use std::marker::PhantomData;
@@ -164,7 +165,7 @@ pub mod wasm {
     use async_trait::async_trait;
     use core_crypto::types::Hash;
     use core_ethereum_actions::payload::PayloadGenerator;
-    use core_ethereum_rpc::TypedTransaction;
+    use core_ethereum_types::TypedTransaction;
     use core_types::acknowledgement::AcknowledgedTicket;
     use core_types::announcement::AnnouncementData;
     use js_sys::{JsString, Promise};
