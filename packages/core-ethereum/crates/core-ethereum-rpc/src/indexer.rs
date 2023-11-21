@@ -44,14 +44,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
             loop {
                 match self.block_number().await {
                     Ok(cb) => {
-                        from_block = cb;
-
-                        if current_block == 0 {
-                            // On first iteration, decide whether to use current block number
-                            // or the given one.
-                            from_block = start_block_number.unwrap_or(cb);
-                        }
-
+                        // On first iteration, decide whether to use current block number or the given one.
+                        from_block = if current_block == 0 { start_block_number.unwrap_or(cb) } else { cb };
                         current_block = cb;
 
                         // Range is inclusive
