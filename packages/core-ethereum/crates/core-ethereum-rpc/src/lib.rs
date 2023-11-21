@@ -1,15 +1,16 @@
-use async_trait::async_trait;
-use core_crypto::types::Hash;
-use primitive_types::H256;
 use std::fmt::{Display, Formatter};
 use std::pin::Pin;
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
-use crate::errors::Result;
-
+use async_trait::async_trait;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 pub use futures::channel::mpsc::UnboundedReceiver;
 use futures::Stream;
+use primitive_types::H256;
+
+use core_crypto::types::Hash;
+use utils_types::primitives::{Address, Balance, BalanceType, U256};
+
+use crate::errors::Result;
 
 pub mod errors;
 pub mod indexer;
@@ -143,11 +144,21 @@ pub trait HoprRpcOperations {
 #[derive(Debug, Clone, Default)]
 pub struct BlockWithLogs {
     pub block_id: u64,
-    pub logs: Vec<Log>
+    pub logs: Vec<Log>,
 }
 impl Display for BlockWithLogs {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "block #{} with {} logs", self.block_id, self.logs.len())
+    }
+}
+
+impl BlockWithLogs {
+    pub fn is_empty(&self) -> bool {
+        self.logs.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.logs.len()
     }
 }
 

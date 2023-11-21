@@ -1,25 +1,24 @@
-use utils_log::error;
+use std::pin::Pin;
+
+#[cfg(all(not(feature = "wasm"), not(test)))]
+use async_std::task::sleep;
 use async_stream::stream;
 use async_trait::async_trait;
 use ethers::types::BlockNumber;
 use ethers_providers::{JsonRpcClient, Middleware};
 use futures::{Stream, TryStreamExt};
-use std::pin::Pin;
-use utils_log::debug;
-
-use crate::errors::Result;
-use crate::errors::RpcError::FilterIsEmpty;
-use crate::rpc::RpcOperations;
-use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter, Log};
-
-#[cfg(all(not(feature = "wasm"), not(test)))]
-use async_std::task::sleep;
-
+#[cfg(all(feature = "wasm", not(test)))]
+use gloo_timers::future::sleep;
 #[cfg(test)]
 use tokio::time::sleep;
 
-#[cfg(all(feature = "wasm", not(test)))]
-use gloo_timers::future::sleep;
+use utils_log::debug;
+use utils_log::error;
+
+use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
+use crate::errors::Result;
+use crate::errors::RpcError::FilterIsEmpty;
+use crate::rpc::RpcOperations;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -65,16 +64,11 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         // The provider internally performs retries on timeouts and errors.
                         let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
 
-                        let mut current_block_log = BlockWithLogs::default();
-
+                        let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
                         while let Ok(Some(log)) = retrieved_logs.try_next().await {
                             let log = Log::from(log);
 
                             // This assumes the logs are arriving ordered by blocks
-                            if current_block_log.block_id == 0 {
-                                current_block_log.block_id = log.block_number;
-                            }
-
                             if current_block_log.block_id != log.block_number {
                                 debug!("completed {current_block_log}");
                                 yield current_block_log;
@@ -84,8 +78,10 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             }
 
                             debug!("retrieved {log}");
+                            current_block_log.logs.push(log);
                         }
 
+                        debug!("retrieved complete {current_block_log}");
                         yield current_block_log;
                     }
                     Err(e) => error!("failed to obtain current block number from chain: {e}")
@@ -99,21 +95,23 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
 #[cfg(test)]
 mod test {
-    use crate::rpc::tests::mint_tokens;
-    use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
-    use bindings::hopr_channels::*;
-    use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
-    use core_crypto::keypairs::{ChainKeypair, Keypair};
-    use core_crypto::types::Hash;
-    use core_ethereum_misc::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
+    use std::str::FromStr;
+    use std::time::Duration;
+
     use ethers::contract::EthEvent;
     use ethers_providers::{Http, Middleware};
     use futures::StreamExt;
-    use std::str::FromStr;
-    use std::time::Duration;
+
+    use bindings::hopr_channels::*;
+    use bindings::hopr_token::{ApprovalFilter, HoprToken, TransferFilter};
+    use core_crypto::keypairs::{ChainKeypair, Keypair};
+    use core_ethereum_misc::{ContractAddresses, ContractInstances, create_anvil, create_rpc_client_to_anvil};
     use utils_log::debug;
     use utils_types::primitives::Address;
+
+    use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+    use crate::rpc::{RpcOperations, RpcOperationsConfig};
+    use crate::rpc::tests::mint_tokens;
 
     async fn fund_channel<M: Middleware + 'static>(
         counterparty: Address,
@@ -215,21 +213,12 @@ mod test {
             .await;
         });
 
-        let expectations = vec![
-            (contract_addrs.channels, Hash::from(ChannelOpenedFilter::signature())),
-            (
-                contract_addrs.channels,
-                Hash::from(ChannelBalanceIncreasedFilter::signature()),
-            ),
-            (contract_addrs.token, Hash::from(ApprovalFilter::signature())),
-            (contract_addrs.token, Hash::from(TransferFilter::signature())),
-        ];
-
         // Spawn stream
+        let count_filtered_topics = log_filter.topics.len();
         let run = local.run_until(async move {
             rpc.try_stream_logs(Some(1), log_filter)
                 .expect("must create stream")
-                .skip(2) // first transfer and approval are related to minting
+                .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
                 .take(1)
                 .collect::<Vec<BlockWithLogs>>()
                 .await
@@ -240,34 +229,30 @@ mod test {
             .await
             .expect("timeout");
 
-        // There must be a single block that contains all 4 events
+        // The last block must contain all 4 events
+        let last_block_logs = retrieved_logs.last().unwrap().clone().logs;
 
         assert!(
-            retrieved_logs.iter().all(|log| log.block_number == block_num),
-            "all logs must be within the same block"
-        );
-
-        assert!(
-            retrieved_logs.iter().any(|log| log.address == contract_addrs.channels
+            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
                 && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
             "must contain channel open"
         );
         assert!(
-            retrieved_logs.iter().any(|log| log.address == contract_addrs.channels
+            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
                 && log
                     .topics
                     .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
             "must contain channel balance increase"
         );
         assert!(
-            retrieved_logs
+            last_block_logs
                 .iter()
                 .any(|log| log.address == contract_addrs.token
                     && log.topics.contains(&ApprovalFilter::signature().0.into())),
             "must contain token approval"
         );
         assert!(
-            retrieved_logs
+            last_block_logs
                 .iter()
                 .any(|log| log.address == contract_addrs.token
                     && log.topics.contains(&TransferFilter::signature().0.into())),
@@ -332,27 +317,14 @@ mod test {
             .await;
         });
 
-        let expectations = vec![
-            (contract_addrs.channels, Hash::from(ChannelOpenedFilter::signature())),
-            (
-                contract_addrs.channels,
-                Hash::from(ChannelBalanceIncreasedFilter::signature()),
-            ),
-        ];
-
         // Spawn stream
+        let count_filtered_topics = log_filter.topics.len();
         let run = local.run_until(async move {
             rpc.try_stream_logs(Some(1), log_filter)
                 .expect("must create stream")
-                .filter(|log| {
-                    futures::future::ready(
-                        expectations
-                            .iter()
-                            .any(|(addr, topic)| log.address.eq(addr) && log.topics.contains(topic)),
-                    )
-                })
-                .take(2)
-                .collect::<Vec<Log>>()
+                .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
+                .take(1)
+                .collect::<Vec<BlockWithLogs>>()
                 .await
         });
 
@@ -361,21 +333,16 @@ mod test {
             .await
             .expect("timeout");
 
-        // The logs within the single block must contain both events
-        let block_num = retrieved_logs[0].block_number;
+        // The last block must contain all 2 events
+        let last_block_logs = retrieved_logs.first().unwrap().clone().logs;
 
         assert!(
-            retrieved_logs.iter().all(|log| log.block_number == block_num),
-            "all logs must be within the same block"
-        );
-
-        assert!(
-            retrieved_logs.iter().any(|log| log.address == contract_addrs.channels
+            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
                 && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
             "must contain channel open"
         );
         assert!(
-            retrieved_logs.iter().any(|log| log.address == contract_addrs.channels
+            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
                 && log
                     .topics
                     .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
