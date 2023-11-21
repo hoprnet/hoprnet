@@ -1,6 +1,6 @@
-use core_ethereum_misc::errors::CoreEthereumError;
 use thiserror::Error;
 use utils_db::errors::DbError;
+use utils_types::errors::GeneralError;
 
 #[derive(Debug, Error)]
 pub enum CoreEthereumActionsError {
@@ -34,17 +34,17 @@ pub enum CoreEthereumActionsError {
     #[error("on-chain submission of transaction failed: {0}")]
     TransactionSubmissionFailed(String),
 
+    #[error("invalid argument: {0}")]
+    InvalidArguments(String),
+
+    #[error("invalid state: {0}")]
+    InvalidState(String),
+
     #[error(transparent)]
     DbError(#[from] DbError),
 
     #[error(transparent)]
-    OtherError(#[from] CoreEthereumError),
-
-    #[error("{0}")]
-    InvalidArguments(String),
-
-    #[error("{0}")]
-    InvalidState(String),
+    GeneralError(#[from] GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, CoreEthereumActionsError>;

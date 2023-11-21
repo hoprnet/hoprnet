@@ -7,7 +7,6 @@ import {
   Address,
   get_contract_data,
   resolve_network,
-  WasmTxExecutor,
   Balance,
   retryWithBackoffThenThrow,
   durations,
@@ -257,15 +256,6 @@ export async function createHoprNode(
     ${cfg.safe_module.module_address.to_hex()}, ${resolvedContractAddresses.hopr_node_safe_registry_address}, ${
     resolvedContractAddresses.hopr_token_address
   }`)
-  let tx_executor = new WasmTxExecutor(
-    connector.sendTransaction.bind(connector),
-    chainKeypair,
-    Address.from_string(resolvedContractAddresses.hopr_channels_address),
-    Address.from_string(resolvedContractAddresses.hopr_announcements_address),
-    cfg.safe_module.module_address,
-    Address.from_string(resolvedContractAddresses.hopr_node_safe_registry_address),
-    Address.from_string(resolvedContractAddresses.hopr_token_address)
-  )
 
   // NODE Rust to TS hacked setup before fully migrating everything
   let message_emitter = new WasmHoprMessageEmitter()
@@ -305,7 +295,7 @@ export async function createHoprNode(
     db,
     tagBloomFilter,
     storeTagBloomFilterContent,
-    tx_executor,
+    connector.sendTransaction.bind(connector),
     message_emitter as WasmHoprMessageEmitter,
     chain_query as WasmChainQuery,
     onReceivedMessage,

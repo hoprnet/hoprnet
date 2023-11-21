@@ -11,8 +11,10 @@ use utils_types::primitives::Address;
 
 use serde::{Deserialize, Serialize};
 
+use core_ethereum_actions::transaction_queue::TransactionExecutor;
 #[cfg(feature = "wasm")]
-use {core_ethereum_actions::transaction_queue::wasm::WasmTxExecutor, wasm_bindgen::prelude::*};
+use wasm_bindgen::prelude::*;
+
 #[derive(Deserialize, Serialize, Clone, Copy)]
 #[serde(rename_all(deserialize = "lowercase"))]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
@@ -322,10 +324,10 @@ impl ProtocolConfig {
 }
 
 #[cfg(feature = "wasm")]
-pub fn build_chain_components<Db>(
+pub fn build_chain_components<Db, TxExec: TransactionExecutor + 'static>(
     me: Address,
     db: Arc<RwLock<Db>>,
-    tx_executor: WasmTxExecutor,
+    tx_executor: TxExec,
 ) -> (TransactionQueue<Db>, CoreEthereumActions<Db>)
 where
     Db: HoprCoreEthereumDbActions + Clone + 'static,

@@ -1,6 +1,6 @@
 [package]
-name = "core-ethereum-misc"
-version = "0.6.0"
+name = "core-ethereum-types"
+version = "0.7.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -13,16 +13,13 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
-hex = { workspace = true }
-thiserror = { workspace = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.36", features = ["futures-core-03-stream"], optional = true }
-multiaddr = "0.18"
-ethers = { workspace = true, default-features = false, features = ["ethers-solc"] }
+ethers = { workspace = true }
+hex-literal = "0.4.1"
+serde = "1.0"
 
+bindings = { workspace = true }
 core-crypto = { workspace = true }
-core-ethereum-db = { workspace = true }
-utils-db = { workspace = true }
+core-types = { workspace = true }
 utils-misc = { workspace = true }
 utils-log = { workspace = true }
 utils-types = { workspace = true }
@@ -32,6 +29,7 @@ async-std = "1.12.0"
 env_logger = "0.10"
 mockall = "0.11.4"
 hex-literal = "0.4"
+tokio = { version = "1", features = ["macros"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 hex = { workspace = true }
@@ -48,5 +46,5 @@ wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "core-crypto/wasm", "core-ethereum-db/wasm", "utils-db/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
+wasm = [ "core-crypto/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]
