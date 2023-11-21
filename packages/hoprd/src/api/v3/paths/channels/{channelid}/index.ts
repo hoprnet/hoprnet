@@ -17,6 +17,8 @@ import type { Operation } from 'express-openapi'
 
 const closingRequests = new Map<string, DeferType<void>>()
 
+const log = debug('hoprd:api:v3:channel-close')
+
 /**
  * Closes a channel with channel id.
  * @returns Channel status and receipt.
@@ -35,8 +37,6 @@ export async function closeChannel(
       receipt: string
     }
 > {
-  const log = debug('hoprd:api:v3:channel-close')
-
   const channelIdHash = Hash.deserialize(stringToU8a(channelIdStr))
 
   const channel = await node.getChannelFromHash(channelIdHash)
@@ -106,7 +106,12 @@ const DELETE: Operation = [
         .status(200)
         .send({ receipt: closingResult.receipt, channelStatus: channel_status_to_string(closingResult.channelStatus) })
     } else {
-      res.status(422).send({ status: closingResult.reason })
+      if (closingResult.reason == 'CHANNEL_NOT_FOUND') {
+        res.status(404).send()
+      } else {
+        log(`channel ${channelid} could not be closed: ${closingResult.reason}`)
+        res.status(422).send({ status: closingResult.reason })
+      }
     }
   }
 ]
@@ -164,6 +169,9 @@ DELETE.apiDoc = {
     },
     '403': {
       $ref: '#/components/responses/Forbidden'
+    },
+    '404': {
+      $ref: '#/components/responses/NotFound'
     },
     '422': {
       description: 'Unknown failure.',

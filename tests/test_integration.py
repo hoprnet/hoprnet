@@ -34,7 +34,7 @@ def passive_node():
 
 
 @asynccontextmanager
-async def create_channel(src, dest, funding: int, close_from_dest=False):
+async def create_channel(src, dest, funding: int, close_from_dest=True):
     channel = await src["api"].open_channel(dest["address"], str(int(funding)))
     assert channel is not None
     await asyncio.wait_for(check_channel_status(src, dest, status="Open"), 10.0)
@@ -213,7 +213,7 @@ async def test_hoprd_swarm_connectivity(swarm7):
 
 @pytest.mark.asyncio
 async def test_hoprd_protocol_post_fixture_setup_tests(swarm7):
-    for node_id, node_args in swarm7.items():
+    for _, node_args in swarm7.items():
         addr = await node_args["api"].get_address("native")
         assert re.match("^0x[0-9a-fA-F]{40}$", addr) is not None
         balances = await node_args["api"].balances()
@@ -354,7 +354,7 @@ async def test_hoprd_api_should_redeem_tickets_in_channel_using_redeem_endpoint(
     message_count = 2
 
     async with create_channel(
-        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=True
+        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
     ) as channel:
         packets = [f"Channel redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
 
@@ -425,7 +425,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
             *[
                 channels.enter_async_context(
                     create_channel(
-                        swarm7[i[0]], swarm7[i[1]], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=True
+                        swarm7[i[0]], swarm7[i[1]], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
                     )
                 )
                 for i in [[src, dest]]
@@ -462,7 +462,7 @@ async def test_hoprd_should_create_redeemable_tickets_on_routing_in_1_hop_to_sel
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10 * 9)
 
     async with create_channel(
-        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=True
+        swarm7[src], swarm7[dest], funding=message_count * TICKET_PRICE_PER_HOP, close_from_dest=False
     ) as channel_id:
         # ensure ticket stats are what we expect before starting
         statistics_before = await swarm7[dest]["api"].get_tickets_statistics()
