@@ -17,7 +17,9 @@ use crate::errors::Result;
 #[async_trait(? Send)]
 pub trait EthereumClient<T: Into<TypedTransaction>> {
     /// Sends transaction to the blockchain and returns its hash.
+    /// Does not poll for transaction completion.
     async fn post_transaction(&self, tx: T) -> Result<Hash>;
+
 }
 
 /// Instantiation of `EthereumClient` using `HoprRpcOperations`.
@@ -66,12 +68,6 @@ where
             _data: PhantomData,
         }
     }
-
-    /// Submits transaction and awaits until it is confirmed mined by the indexer
-    async fn process_transaction(&self, tx: T) -> Result<Hash> {
-        // TODO: send request to indexer to await this TX
-        self.client.post_transaction(tx).await
-    }
 }
 
 #[async_trait(? Send)]
@@ -83,7 +79,7 @@ where
 {
     async fn redeem_ticket(&self, acked_ticket: AcknowledgedTicket) -> TransactionResult {
         match self.payload_generator.redeem_ticket(acked_ticket) {
-            Ok(tx) => match self.process_transaction(tx).await {
+            Ok(tx) => match self.client.post_transaction(tx).await {
                 Ok(tx_hash) => TransactionResult::TicketRedeemed { tx_hash },
                 Err(e) => TransactionResult::Failure(e.to_string()),
             },
@@ -93,7 +89,7 @@ where
 
     async fn fund_channel(&self, destination: Address, balance: Balance) -> TransactionResult {
         match self.payload_generator.fund_channel(destination, balance) {
-            Ok(tx) => match self.process_transaction(tx).await {
+            Ok(tx) => match self.client.post_transaction(tx).await {
                 Ok(tx_hash) => TransactionResult::ChannelFunded { tx_hash },
                 Err(e) => TransactionResult::Failure(e.to_string()),
             },
@@ -103,7 +99,7 @@ where
 
     async fn initiate_outgoing_channel_closure(&self, dst: Address) -> TransactionResult {
         match self.payload_generator.initiate_outgoing_channel_closure(dst) {
-            Ok(tx) => match self.process_transaction(tx).await {
+            Ok(tx) => match self.client.post_transaction(tx).await {
                 Ok(tx_hash) => TransactionResult::ChannelClosureInitiated { tx_hash },
                 Err(e) => TransactionResult::Failure(e.to_string()),
             },
@@ -113,7 +109,7 @@ where
 
     async fn finalize_outgoing_channel_closure(&self, dst: Address) -> TransactionResult {
         match self.payload_generator.finalize_outgoing_channel_closure(dst) {
-            Ok(tx) => match self.process_transaction(tx).await {
+            Ok(tx) => match self.client.post_transaction(tx).await {
                 Ok(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
                 Err(e) => TransactionResult::Failure(e.to_string()),
             },
@@ -123,7 +119,7 @@ where
 
     async fn close_incoming_channel(&self, src: Address) -> TransactionResult {
         match self.payload_generator.close_incoming_channel(src) {
-            Ok(tx) => match self.process_transaction(tx).await {
+            Ok(tx) => match self.client.post_transaction(tx).await {
                 Ok(tx_hash) => TransactionResult::ChannelClosed { tx_hash },
                 Err(e) => TransactionResult::Failure(e.to_string()),
             },
@@ -133,7 +129,7 @@ where
 
     async fn withdraw(&self, recipient: Address, amount: Balance) -> TransactionResult {
         match self.payload_generator.transfer(recipient, amount) {
-            Ok(tx) => match self.process_transaction(tx).await {
+            Ok(tx) => match self.client.post_transaction(tx).await {
                 Ok(tx_hash) => TransactionResult::Withdrawn { tx_hash },
                 Err(e) => TransactionResult::Failure(e.to_string()),
             },
@@ -143,7 +139,7 @@ where
 
     async fn announce(&self, data: AnnouncementData) -> TransactionResult {
         match self.payload_generator.announce(data) {
-            Ok(tx) => match self.process_transaction(tx).await {
+            Ok(tx) => match self.client.post_transaction(tx).await {
                 Ok(tx_hash) => TransactionResult::Announced { tx_hash },
                 Err(e) => TransactionResult::Failure(e.to_string()),
             },
@@ -153,7 +149,7 @@ where
 
     async fn register_safe(&self, safe_address: Address) -> TransactionResult {
         match self.payload_generator.register_safe_by_node(safe_address) {
-            Ok(tx) => match self.process_transaction(tx).await {
+            Ok(tx) => match self.client.post_transaction(tx).await {
                 Ok(tx_hash) => TransactionResult::SafeRegistered { tx_hash },
                 Err(e) => TransactionResult::Failure(e.to_string()),
             },
