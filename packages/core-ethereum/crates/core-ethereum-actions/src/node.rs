@@ -1,10 +1,10 @@
-use crate::errors::{CoreEthereumActionsError, Result};
-use crate::transaction_queue::{Transaction, TransactionCompleted};
+use crate::errors::{CoreEthereumActionsError::InvalidArguments, Result};
+use crate::transaction_queue::TransactionCompleted;
 use crate::CoreEthereumActions;
 use async_trait::async_trait;
 use core_crypto::keypairs::OffchainKeypair;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
-use core_ethereum_misc::errors::CoreEthereumError::InvalidArguments;
+use core_ethereum_types::actions::Action;
 use core_types::announcement::{AnnouncementData, KeyBinding};
 use multiaddr::Multiaddr;
 use utils_log::info;
@@ -17,12 +17,7 @@ pub trait NodeActions {
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<TransactionCompleted>;
 
     /// Announces node on-chain with key binding
-    async fn announce(
-        &self,
-        multiaddr: &Multiaddr,
-        offchain_key: &OffchainKeypair,
-        use_safe: bool,
-    ) -> Result<TransactionCompleted>;
+    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<TransactionCompleted>;
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted>;
 }
@@ -37,27 +32,19 @@ impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<
         // TODO: should we check native/token balance here before withdrawing ?
 
         info!("initiating withdrawal of {amount} to {recipient}");
-        self.tx_sender.send(Transaction::Withdraw(recipient, amount)).await
+        self.tx_sender.send(Action::Withdraw(recipient, amount)).await
     }
 
-    async fn announce(
-        &self,
-        multiaddr: &Multiaddr,
-        offchain_key: &OffchainKeypair,
-        use_safe: bool,
-    ) -> Result<TransactionCompleted> {
-        let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))
-            .map_err(|e| CoreEthereumActionsError::OtherError(e.into()))?;
+    async fn announce(&self, multiaddr: &Multiaddr, offchain_key: &OffchainKeypair) -> Result<TransactionCompleted> {
+        let announcement_data = AnnouncementData::new(multiaddr, Some(KeyBinding::new(self.me, offchain_key)))?;
 
-        info!("initiating annoucement {announcement_data}");
-        self.tx_sender
-            .send(Transaction::Announce(announcement_data, use_safe))
-            .await
+        info!("initiating announcement {announcement_data}");
+        self.tx_sender.send(Action::Announce(announcement_data)).await
     }
 
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<TransactionCompleted> {
         info!("initiating safe address registration of {safe_address}");
-        self.tx_sender.send(Transaction::RegisterSafe(safe_address)).await
+        self.tx_sender.send(Action::RegisterSafe(safe_address)).await
     }
 }
 
@@ -137,7 +124,7 @@ mod tests {
                     .await
                     .err()
                     .unwrap(),
-                CoreEthereumActionsError::OtherError(_)
+                CoreEthereumActionsError::InvalidArguments(_)
             ),
             "should not allow to withdraw 0"
         );

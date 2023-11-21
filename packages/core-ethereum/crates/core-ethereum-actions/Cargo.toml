@@ -1,6 +1,6 @@
 [package]
 name = "core-ethereum-actions"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -32,7 +32,7 @@ wasm-bindgen-futures = { workspace = true, features = ["futures-core-03-stream"]
 bindings = { workspace = true }
 core-crypto = { workspace = true }
 core-ethereum-db = { workspace = true }
-core-ethereum-misc = { workspace = true }
+core-ethereum-types = { workspace = true }
 core-types = { workspace = true }
 utils-db = { workspace = true }
 utils-metrics = { workspace = true, optional = true, default-features = false }
@@ -53,6 +53,6 @@ wasm-opt = ['-O', '--enable-reference-types']
 [features]
 default = ["wasm"]
 wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:wasm-bindgen-futures", "dep:gloo-timers", "dep:serde-wasm-bindgen",
-    "core-ethereum-db/wasm", "core-ethereum-misc/wasm", "core-crypto/wasm", "core-types/wasm",
+    "core-ethereum-db/wasm", "core-ethereum-types/wasm", "core-crypto/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
 prometheus = [ "dep:utils-metrics" ]

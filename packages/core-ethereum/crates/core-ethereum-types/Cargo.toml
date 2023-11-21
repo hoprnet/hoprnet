@@ -1,0 +1,50 @@
+[package]
+name = "core-ethereum-types"
+version = "0.7.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Core-Ethereum-specific interaction with the backend database"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+console_error_panic_hook = { version = "0.1.7", optional = true }
+ethers = { workspace = true }
+hex-literal = "0.4.1"
+serde = "1.0"
+
+bindings = { workspace = true }
+core-crypto = { workspace = true }
+core-types = { workspace = true }
+utils-misc = { workspace = true }
+utils-log = { workspace = true }
+utils-types = { workspace = true }
+
+[dev-dependencies]
+async-std = "1.12.0"
+env_logger = "0.10"
+mockall = "0.11.4"
+hex-literal = "0.4"
+tokio = { version = "1", features = ["macros"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+hex = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+wasm-pack = { workspace = true }
+wasm-opt = { workspace = true }
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-reference-types']
+
+[features]
+default = ["console_error_panic_hook", "wasm"]
+wasm = [ "core-crypto/wasm", "utils-log/wasm", "utils-types/wasm", "utils-misc/wasm" ]
+console_error_panic_hook = [ "dep:console_error_panic_hook" ]
