@@ -299,13 +299,15 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
 pub struct SafePayloadGenerator {
     me: Address,
     contract_addrs: ContractAddresses,
+    module: Address,
 }
 
 impl SafePayloadGenerator {
-    pub fn new(chain_keypair: &ChainKeypair, contract_addrs: ContractAddresses) -> Self {
+    pub fn new(chain_keypair: &ChainKeypair, contract_addrs: ContractAddresses, module: Address) -> Self {
         Self {
             me: chain_keypair.into(),
             contract_addrs,
+            module
         }
     }
 }
@@ -363,7 +365,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
             .encode()
             .into(),
         );
-        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        tx.set_to(primitive_types::H160::from(self.module));
         Ok(tx)
     }
 
@@ -387,7 +389,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 
         let mut tx = create_eip1559_transaction();
         tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        tx.set_to(primitive_types::H160::from(self.module));
         Ok(tx)
     }
 
@@ -405,7 +407,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
             .encode()
             .into(),
         );
-        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        tx.set_to(primitive_types::H160::from(self.module));
         Ok(tx)
     }
 
@@ -424,7 +426,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 
         let mut tx = create_eip1559_transaction();
         tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        tx.set_to(primitive_types::H160::from(self.module));
         Ok(tx)
     }
 
@@ -443,7 +445,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 
         let mut tx = create_eip1559_transaction();
         tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        tx.set_to(primitive_types::H160::from(self.module));
         Ok(tx)
     }
 
@@ -460,7 +462,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
 
         let mut tx = create_eip1559_transaction();
         tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        tx.set_to(primitive_types::H160::from(self.module));
         Ok(tx)
     }
 
@@ -479,7 +481,7 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
             .encode()
             .into(),
         );
-        tx.set_to(primitive_types::H160::from(self.contract_addrs.module_implementation));
+        tx.set_to(primitive_types::H160::from(self.module));
 
         Ok(tx)
     }
