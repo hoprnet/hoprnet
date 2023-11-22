@@ -4,7 +4,7 @@ use futures::{channel::mpsc::UnboundedSender, pin_mut, StreamExt};
 use std::{collections::VecDeque, sync::Arc};
 use utils_log::{debug, error, info};
 
-use crate::traits::{ChainLogHandler, SignificantChainEvent};
+use crate::{traits::{ChainLogHandler, SignificantChainEvent}, errors::CoreEthereumIndexerError};
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_rpc::{HoprIndexerRpcOperations, Log, LogFilter};
 use utils_types::primitives::{Snapshot, U256};
@@ -86,148 +86,185 @@ impl Default for IndexerConfig {
     }
 }
 
-pub async fn start_indexing_process<T, U, V>(
-    rpc: T,
-    db_processor: U,
-    db: Arc<RwLock<V>>,
-    cfg: IndexerConfig,
-    tx_significant_events: UnboundedSender<SignificantChainEvent>,
-) -> crate::errors::Result<()>
+#[derive(Debug)]
+pub struct Indexer<T, U, V>
 where
     T: HoprIndexerRpcOperations + 'static,
     U: ChainLogHandler + 'static,
     V: HoprCoreEthereumDbActions + 'static,
 {
-    info!("Starting indexer...");
+    rpc: Option<T>,
+    db_processor: Option<U>,
+    db: Arc<RwLock<V>>,
+    cfg: IndexerConfig,
+    egress: UnboundedSender<SignificantChainEvent>,
+}
 
-    let latest_block_in_db = db.read().await.get_latest_block_number().await?.map(|v| v as u64);
+impl<T, U, V> Indexer<T, U, V>
+where
+    T: HoprIndexerRpcOperations + 'static,
+    U: ChainLogHandler + 'static,
+    V: HoprCoreEthereumDbActions + 'static,
+{
+    pub fn new(
+        rpc: T,
+        db_processor: U,
+        db: Arc<RwLock<V>>,
+        cfg: IndexerConfig,
+        egress: UnboundedSender<SignificantChainEvent>,
+    ) -> Self {
+        Self { rpc: Some(rpc), db_processor: Some(db_processor), db, cfg, egress }
+    }
 
-    info!("Latest saved block {:?}", latest_block_in_db);
+    pub async fn start(&mut self) -> crate::errors::Result<()>
+    where
+        T: HoprIndexerRpcOperations + 'static,
+        U: ChainLogHandler + 'static,
+        V: HoprCoreEthereumDbActions + 'static,
+    {
+        if let None = self.rpc {
+            return Err(CoreEthereumIndexerError::ProcessError("indexer is already started".into()));
+        } else if let None = self.db_processor {
+            return Err(CoreEthereumIndexerError::ProcessError("indexer is already started".into()));
+        }
 
-    let mut topics = vec![];
-    topics.extend(crate::constants::topics::announcement());
-    topics.extend(crate::constants::topics::channel());
-    topics.extend(crate::constants::topics::node_safe_registry());
-    topics.extend(crate::constants::topics::network_registry());
-    topics.extend(crate::constants::topics::ticket_price_oracle());
-    // TODO: if (fetchTokenTransactions)
-    // // Actively query for logs to prevent polling done by Ethers.js
-    // // that don't retry on failed attempts and thus makes the indexer
-    // // handle errors produced by internal Ethers.js provider calls
-    topics.extend(crate::constants::topics::token());
+        info!("Starting indexer...");
 
-    let log_filter = LogFilter {
-        address: db_processor.contract_addresses(),
-        topics: topics.into_iter().map(Hash::from).collect(),
-    };
+        let rpc = self.rpc.take().expect("rpc should be present");
+        let db_processor = self.db_processor.take().expect("db_processor should be present");
+        let db = self.db.clone();
+        let tx_significant_events = self.egress.clone();
 
-    info!("Building indexer background process");
-    let (tx, rx) = futures::channel::oneshot::channel::<()>();
+        let latest_block_in_db = self.db.read().await.get_latest_block_number().await?.map(|v| v as u64);
 
-    let (tx_proc, rx_proc) = futures::channel::mpsc::unbounded::<Log>();
+        info!("Latest saved block {:?}", latest_block_in_db);
 
-    spawn_local(async move {
-        let mut tx = Some(tx);
+        let mut topics = vec![];
+        topics.extend(crate::constants::topics::announcement());
+        topics.extend(crate::constants::topics::channel());
+        topics.extend(crate::constants::topics::node_safe_registry());
+        topics.extend(crate::constants::topics::network_registry());
+        topics.extend(crate::constants::topics::ticket_price_oracle());
+        // TODO: if (fetchTokenTransactions)
+        // // Actively query for logs to prevent polling done by Ethers.js
+        // // that don't retry on failed attempts and thus makes the indexer
+        // // handle errors produced by internal Ethers.js provider calls
+        topics.extend(crate::constants::topics::token());
 
-        let block_stream = rpc
-            .try_stream_logs(latest_block_in_db.clone(), log_filter)
-            .expect("block stream should be constructible");
+        let log_filter = LogFilter {
+            address: db_processor.contract_addresses(),
+            topics: topics.into_iter().map(Hash::from).collect(),
+        };
 
-        let chain_head_on_indexing_start = rpc.block_number().await.unwrap_or(0);
-        let indexing_scope = chain_head_on_indexing_start - latest_block_in_db.unwrap_or(0);
-        let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
+        info!("Building indexer background process");
+        let (tx, rx) = futures::channel::oneshot::channel::<()>();
 
-        pin_mut!(block_stream);
-        while let Some(block_with_logs) = block_stream.next().await {
-            debug!("Processed block number: {}", block_with_logs.block_id);
+        let (tx_proc, rx_proc) = futures::channel::mpsc::unbounded::<Log>();
 
-            if block_with_logs.logs.len() > 0 {
-                // Assuming sorted and properly organized blocks,
-                // the following lines are just a sanity safety mechanism
-                let mut logs = block_with_logs.logs;
-                logs.sort_by(log_comparator);
-                unconfirmed_events.push_back(logs);
-            }
+        let finalization = self.cfg.finalization;
+        spawn_local(async move {
+            let mut tx = Some(tx);
 
-            let current_block = block_with_logs.block_id;
-            if tx.is_some() {
-                info!(
-                    "Sync progress {:.2}% @ block {}",
-                    (chain_head_on_indexing_start - current_block) as f64 / (indexing_scope as f64),
-                    current_block
-                );
+            let block_stream = rpc
+                .try_stream_logs(latest_block_in_db.clone(), log_filter)
+                .expect("block stream should be constructible");
 
-                if current_block == chain_head_on_indexing_start {
-                    let _ = tx.take().expect("tx should be present").send(());
+            let chain_head_on_indexing_start = rpc.block_number().await.unwrap_or(0);
+            let indexing_scope = chain_head_on_indexing_start - latest_block_in_db.unwrap_or(0);
+            let mut unconfirmed_events = VecDeque::<Vec<Log>>::new();
+
+            pin_mut!(block_stream);
+            while let Some(block_with_logs) = block_stream.next().await {
+                debug!("Processed block number: {}", block_with_logs.block_id);
+
+                if block_with_logs.logs.len() > 0 {
+                    // Assuming sorted and properly organized blocks,
+                    // the following lines are just a sanity safety mechanism
+                    let mut logs = block_with_logs.logs;
+                    logs.sort_by(log_comparator);
+                    unconfirmed_events.push_back(logs);
                 }
-            }
 
-            while let Some(logs) = unconfirmed_events.get(0) {
-                if let Some(log) = logs.get(0) {
-                    if log.block_number + cfg.finalization <= current_block {
-                        if let Err(error) = db
-                            .write()
-                            .await
-                            .update_latest_block_number(log.block_number as u32)
-                            .await
-                        {
-                            error!("failed to write the latest block number into the database: {}", error);
-                        }
+                let current_block = block_with_logs.block_id;
+                if tx.is_some() {
+                    info!(
+                        "Sync progress {:.2}% @ block {}",
+                        (chain_head_on_indexing_start - current_block) as f64 / (indexing_scope as f64),
+                        current_block
+                    );
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        {
-                            METRIC_INDEXER_CURRENT_BLOCK.set(log.block_number as f64);
-                        }
+                    if current_block == chain_head_on_indexing_start {
+                        let _ = tx.take().expect("tx should be present").send(());
+                    }
+                }
 
-                        if let Some(logs) = unconfirmed_events.pop_front() {
-                            debug!("processing logs: {:?}", logs);
+                while let Some(logs) = unconfirmed_events.get(0) {
+                    if let Some(log) = logs.get(0) {
+                        if log.block_number + finalization <= current_block {
+                            if let Err(error) = db
+                                .write()
+                                .await
+                                .update_latest_block_number(log.block_number as u32)
+                                .await
+                            {
+                                error!("failed to write the latest block number into the database: {}", error);
+                            }
 
-                            for log in logs.into_iter() {
-                                if let Err(error) = tx_proc.unbounded_send(log) {
-                                    error!("failed to send and process logs: {}", error)
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_INDEXER_CURRENT_BLOCK.set(log.block_number as f64);
+                            }
+
+                            if let Some(logs) = unconfirmed_events.pop_front() {
+                                debug!("processing logs: {:?}", logs);
+
+                                for log in logs.into_iter() {
+                                    if let Err(error) = tx_proc.unbounded_send(log) {
+                                        error!("failed to send and process logs: {}", error)
+                                    }
                                 }
                             }
+
+                            continue;
                         }
-
-                        continue;
                     }
-                }
 
-                break;
+                    break;
+                }
             }
-        }
-    });
+        });
 
-    spawn_local(async move {
-        let rx = rx_proc;
+        spawn_local(async move {
+            let rx = rx_proc;
 
-        pin_mut!(rx);
-        while let Some(log) = rx.next().await {
-            let snapshot = Snapshot::new(
-                U256::from(log.block_number),
-                U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
-                U256::from(log.log_index),
-            );
+            pin_mut!(rx);
+            while let Some(log) = rx.next().await {
+                let snapshot = Snapshot::new(
+                    U256::from(log.block_number),
+                    U256::from(log.tx_index), // TODO: unused, kept for ABI compatibility of DB
+                    U256::from(log.log_index),
+                );
 
-            match db_processor
-                .on_event(log.address.clone(), log.block_number as u32, log.into(), snapshot)
-                .await
-            {
-                Ok(Some(event)) => {
-                    if let Err(e) = tx_significant_events.unbounded_send(event.clone()) {
-                        error!("failed to generate a significant chain event: {}", e);
+                match db_processor
+                    .on_event(log.address.clone(), log.block_number as u32, log.into(), snapshot)
+                    .await
+                {
+                    Ok(Some(event)) => {
+                        if let Err(e) = tx_significant_events.unbounded_send(event.clone()) {
+                            error!("failed to generate a significant chain event: {}", e);
+                        }
+                    },
+                    Ok(None) => {},
+                    Err(_) => {
+                        error!("failed to process logs");
                     }
-                },
-                Ok(None) => {},
-                Err(_) => {
-                    error!("failed to process logs");
-                }
-            };
-        }
-    });
+                };
+            }
+        });
 
-    rx.await
-        .map_err(|_| crate::errors::CoreEthereumIndexerError::ProcessError("Error during indexing start".into()))
+        rx.await
+            .map_err(|_| crate::errors::CoreEthereumIndexerError::ProcessError("Error during indexing start".into()))
+    }
 }
 
 #[cfg(test)]
@@ -309,8 +346,9 @@ pub mod tests {
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
         let (indexing, _) = join!(
-            start_indexing_process(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events),
+            indexer.start(),
             async move {
                 async_std::task::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
@@ -344,8 +382,9 @@ pub mod tests {
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
         let (indexing, _) = join!(
-            start_indexing_process(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events),
+            indexer.start(),
             async move {
                 async_std::task::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
@@ -382,8 +421,9 @@ pub mod tests {
         assert!(tx.start_send(expected.clone()).is_ok());
 
         let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events);
         let _ = join!(
-            start_indexing_process(rpc, handlers, db.clone(), IndexerConfig::default(), tx_events),
+            indexer.start(),
             async move {
                 async_std::task::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
@@ -434,8 +474,9 @@ pub mod tests {
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
         let (tx_events, _) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
         let _ = join!(
-            start_indexing_process(rpc, handlers, db.clone(), cfg, tx_events),
+            indexer.start(),
             async move {
                 async_std::task::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
@@ -496,9 +537,8 @@ pub mod tests {
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
         let (tx_events, rx_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
-        assert!(start_indexing_process(rpc, handlers, db.clone(), cfg, tx_events)
-            .await
-            .is_ok());
+        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events);
+        assert!(indexer.start().await.is_ok());
 
         tx.close_channel();
 

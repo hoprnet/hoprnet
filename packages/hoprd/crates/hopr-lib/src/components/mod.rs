@@ -90,6 +90,9 @@ where
     FSaveTbf: Fn(Box<[u8]>) + 'static,
     TxExec: TransactionExecutor + 'static,
 {
+    use core_ethereum_api::SignificantChainEvent;
+    use utils_types::traits::PeerIdLike;
+
     let identity: libp2p_identity::Keypair = (&me).into();
 
     let (network, network_events_tx, network_events_rx) =
@@ -113,19 +116,23 @@ where
 
     let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
 
-    let on_channel_event_tx: futures::channel::mpsc::UnboundedSender<core_types::channels::ChannelEntry> =
-        crate::processes::spawn_channel_update_handling(
+    let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
+    let (tx_indexer_events, rx_indexer_events) = futures::channel::mpsc::unbounded::<SignificantChainEvent>();
+    let indexer_refreshing_loop =
+        crate::processes::spawn_refresh_process_for_chain_events(
+            me.public().to_peerid(),
             core_transport::Keypair::public(&me_onchain).to_address(),
             db.clone(),
             multi_strategy.clone(),
+            rx_indexer_events,
             channel_graph.clone(),
+            indexer_updater.clone()
         );
 
-    let hopr_chain_api = crate::chain::build_chain_api(
+    let hopr_chain_api: HoprChain = crate::chain::build_chain_api(
         me_onchain.clone(),
         db.clone(),
         chain_actions.clone(),
-        on_channel_event_tx,
         channel_graph.clone(),
     );
 
@@ -143,7 +150,6 @@ where
         channel_graph.clone(),
     );
 
-    let (indexer_updater, indexer_update_rx) = build_index_updater(db.clone(), network.clone());
 
     let (mut heartbeat, hb_ping_rx, hb_pong_tx) = build_heartbeat(
         cfg.protocol,
@@ -176,6 +182,7 @@ where
     let multistrategy_clone = multi_strategy.clone();
 
     let ready_loops: Vec<Pin<Box<dyn futures::Future<Output = HoprLoopComponents>>>> = vec![
+        Box::pin(async move { indexer_refreshing_loop.map(|_| HoprLoopComponents::Indexing).await }),
         Box::pin(async move { heartbeat.heartbeat_loop().map(|_| HoprLoopComponents::Heartbeat).await }),
         Box::pin(
             p2p_loop(

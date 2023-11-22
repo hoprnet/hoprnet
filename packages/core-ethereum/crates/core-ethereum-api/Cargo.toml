@@ -14,7 +14,7 @@ default = ["console_error_panic_hook", "wasm", "prometheus"]
 console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
     "dep:js-sys", "dep:serde-wasm-bindgen",
-    "core-ethereum-db/wasm", "core-ethereum-actions/wasm", "core-ethereum-rpc/wasm",
+    "core-ethereum-db/wasm", "core-ethereum-actions/wasm", "core-ethereum-rpc/wasm", "core-ethereum-indexer/wasm",
     "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
@@ -39,6 +39,7 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 core-crypto = { workspace = true, default-features = false }
 core-ethereum-actions = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
+core-ethereum-indexer = { workspace = true, default-features = false }
 core-ethereum-rpc = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false }

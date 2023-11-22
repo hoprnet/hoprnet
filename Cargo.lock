@@ -1168,6 +1168,7 @@ dependencies = [
  "core-crypto",
  "core-ethereum-actions",
  "core-ethereum-db",
+ "core-ethereum-indexer",
  "core-ethereum-rpc",
  "core-ethereum-types",
  "core-path",

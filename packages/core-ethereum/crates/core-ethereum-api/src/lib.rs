@@ -2,6 +2,7 @@ pub mod errors;
 pub mod executors;
 
 pub use core_types::channels::ChannelEntry;
+pub use core_ethereum_indexer::traits::SignificantChainEvent;
 
 use async_lock::RwLock;
 use core_ethereum_db::db::CoreEthereumDb;
@@ -9,7 +10,6 @@ use core_ethereum_db::db::CoreEthereumDb;
 use futures::channel::mpsc::UnboundedSender;
 use futures::SinkExt;
 use std::sync::Arc;
-use utils_log::info;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_actions::CoreEthereumActions;
@@ -31,26 +31,13 @@ pub trait ChainQueries {
     async fn clone(&self) -> Self;
 }
 
-/// This is used by the indexer to emit events when a change on channel entry is detected.
-#[derive(Clone)]
-pub struct ChannelEventEmitter {
-    pub tx: UnboundedSender<ChannelEntry>,
-}
-
-impl ChannelEventEmitter {
-    pub async fn send_event(&self, channel: &ChannelEntry) {
-        let mut sender = self.tx.clone();
-        let _ = sender.send(*channel).await;
-    }
-}
-
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+    // indexer: Indexer<>,      // TODO: we need RPC at this point
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-    channel_events: ChannelEventEmitter,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
 
@@ -58,17 +45,29 @@ impl HoprChain {
     pub fn new(
         me_onchain: ChainKeypair,
         db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
+        // rpc...
+        // contract_addresses: ContractAddresses,
+        // safe_address: Address,
+        // indexer_events_tx: UnboundedSender<SignificantChainEvent>
         chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-        channel_events: ChannelEventEmitter,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
+        // TODO:
+        // let db_processor = ContractEventHandlers::new(contract_addresses, safe_address, me_onchain.public(), db.clone());
+        // let indexer = Indexer::new(rpc.clone(), db_processor, db.clone(), IndexerConfig::default(), indexer_events_tx);
         Self {
             me_onchain,
             db,
+            // indexer,
             chain_actions,
-            channel_events,
             channel_graph,
         }
+    }
+
+    pub async fn sync_chain(&mut self) -> errors::Result<()> {
+        Ok(())
+        // TODO:
+        // indexer.start().await
     }
 
     pub fn me_onchain(&self) -> Address {
@@ -108,15 +107,6 @@ impl HoprChain {
 
     pub async fn safe_allowance(&self) -> errors::Result<Balance> {
         Ok(self.db.read().await.get_staking_safe_allowance().await?)
-    }
-
-    pub async fn on_ticket_redeemed(&self, channel: &ChannelEntry, ticket_amount: &Balance) {
-        info!("redeemed ticket worth {ticket_amount} in {channel}");
-    }
-
-    pub async fn on_channel_event(&self, entry: &ChannelEntry) {
-        //utils_log::debug!("Received a channel event {:?}", entry);
-        self.channel_events.send_event(entry).await;
     }
 
     pub fn actions_ref(&self) -> &CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>> {

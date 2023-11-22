@@ -5,7 +5,6 @@ use core_ethereum_actions::{transaction_queue::TransactionQueue, CoreEthereumAct
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
 use core_transport::ChainKeypair;
-use futures::channel::mpsc::UnboundedSender;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
 
@@ -343,14 +342,12 @@ pub fn build_chain_api(
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
-    channel_updates: UnboundedSender<core_types::channels::ChannelEntry>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
     core_ethereum_api::HoprChain::new(
         me_onchain,
         db,
         chain_actions,
-        core_ethereum_api::ChannelEventEmitter { tx: channel_updates },
         channel_graph,
     )
 }

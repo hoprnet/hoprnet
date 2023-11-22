@@ -12,12 +12,6 @@ pub enum SignificantChainEvent {
     NetworkRegistryUpdate(Address, bool),
 }
 
-#[async_trait]
-#[cfg_attr(test, mockall::automock)]
-pub trait IndexerEventPublisher {
-    async fn publish(&self, event: SignificantChainEvent);
-}
-
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(? Send)]
 pub trait ChainLogHandler {
