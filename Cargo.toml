@@ -16,7 +16,7 @@ members = [
     "packages/core-ethereum/crates/core-ethereum-api",
     "packages/core-ethereum/crates/core-ethereum-db",
     "packages/core-ethereum/crates/core-ethereum-indexer",
-    "packages/core-ethereum/crates/core-ethereum-misc",
+    "packages/core-ethereum/crates/core-ethereum-types",
     "packages/core-ethereum/crates/core-ethereum-rpc",
     "packages/ethereum/crates/bindings",
     "packages/hopli",
@@ -67,7 +67,7 @@ bindings = { path = "packages/ethereum/crates/bindings", default-features = fals
 core-ethereum-actions = { path = "packages/core-ethereum/crates/core-ethereum-actions", default-features = false }
 core-ethereum-api = { path = "packages/core-ethereum/crates/core-ethereum-api", default-features = false }
 core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
-core-ethereum-misc = { path = "packages/core-ethereum/crates/core-ethereum-misc", default-features = false }
+core-ethereum-types = { path = "packages/core-ethereum/crates/core-ethereum-types", default-features = false }
 core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }
 core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }
 core-misc = { path = "packages/core/crates/core-misc", default-features = false }
