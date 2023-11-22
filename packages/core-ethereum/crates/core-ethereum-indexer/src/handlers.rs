@@ -173,6 +173,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_decreased.channel_id.into(), &channel, snapshot)
                         .await?;
 
+                    // TODO: emit of channel update was here.
                     // we need to infer the amount since the actual amount is not part of any event
                     let amount = old_balance.sub(&channel.balance);
                     return Ok(Some(SignificantChainEvent::TicketRedeem(channel.clone(), amount.clone())));
@@ -189,9 +190,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&balance_increased.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
-                        return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
-                    }
+                    return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -218,8 +217,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                         // Reset the current_ticket_index to zero
                         db.set_current_ticket_index(&channel_closed.channel_id.into(), U256::zero())
                             .await?;
-                        return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
                     }
+                    return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
@@ -261,8 +260,8 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
 
                 if source.eq(&self.chain_key) || destination.eq(&self.chain_key) {
                     db.set_current_ticket_index(&channel_id, U256::zero()).await?;
-                    return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
                 }
+                return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
             }
             HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
                 let maybe_channel = db.get_channel(&ticket_redeemed.channel_id.into()).await?;
@@ -293,9 +292,7 @@ impl<U: HoprCoreEthereumDbActions> ContractEventHandlers<U> {
                     db.update_channel_and_snapshot(&closure_initiated.channel_id.into(), &channel, snapshot)
                         .await?;
 
-                    if channel.source.eq(&self.chain_key) || channel.destination.eq(&self.chain_key) {
-                        return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
-                    }
+                    return Ok(Some(SignificantChainEvent::ChannelUpdate(channel.clone())));
                 } else {
                     return Err(CoreEthereumIndexerError::ChannelDoesNotExist);
                 }
