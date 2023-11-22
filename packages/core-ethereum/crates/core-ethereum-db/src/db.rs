@@ -180,11 +180,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
         Ok(if let Some(balance) = channel_balance {
             if let Some(unrealized_balance) = self.cached_unrealized_value.get(channel) {
+                debug!("channel {channel} has unrealized balance {unrealized_balance} to be subtracted from balance {balance}");
                 balance.sub(unrealized_balance)
             } else {
+                debug!("channel {channel} has no unrealized balance to be subtracted from balance {balance}");
                 balance
             }
         } else {
+            debug!("channel {channel} has no unrealized balance because it does not exist");
             Balance::zero(BalanceType::HOPR)
         })
     }
