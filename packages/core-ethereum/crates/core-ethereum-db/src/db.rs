@@ -65,19 +65,53 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> CoreEthereum
         //     self.cleanup_invalid_channel_tickets(channel).await?
         // }
 
+        let mut cached_channel: HashMap<Hash, (u32, u64)> = HashMap::new(); // channel_id: (channel_epoch, ticket_index)
         debug!("Fetching all tickets to calculate the unrealized value in tracked channels...");
+
         let tickets = self.get_tickets(None).await?;
         info!("Calculating unrealized balance for {} tickets...", tickets.len());
-        for ticket in tickets.into_iter() {
-            let unrealized_balance = self
-                .cached_unrealized_value
-                .get(&ticket.channel_id)
-                .map(|b| b.clone())
-                .unwrap_or(Balance::zero(BalanceType::HOPR))
-                .add(&ticket.amount);
 
-            self.cached_unrealized_value
-                .insert(ticket.channel_id, unrealized_balance);
+        for ticket in tickets.into_iter() {
+            // get the corresponding channel info from the cached_channel, or from the db
+            let (channel_epoch, ticket_index) = {
+                if let Some((current_channel_epoch, current_ticket_index)) =
+                    cached_channel.get(&ticket.channel_id).map(|c| c.clone())
+                {
+                    // from the cached_channel
+                    (current_channel_epoch, current_ticket_index)
+                } else {
+                    // read from db
+                    let (channel_epoch, ticket_index) = {
+                        if let Some(channel_entry) = self.get_channel(&ticket.channel_id).await? {
+                            // update the cached value
+                            (
+                                channel_entry.channel_epoch.as_u32(),
+                                channel_entry.ticket_index.as_u64(),
+                            )
+                        } else {
+                            (0u32, 0u64)
+                        }
+                    };
+                    // update the cached value
+                    cached_channel.insert(ticket.channel_id, (channel_epoch, ticket_index));
+                    (channel_epoch, ticket_index)
+                }
+            };
+
+            if ticket.channel_epoch == channel_epoch && ticket.index >= ticket_index {
+                // only calculate unrealized balance if ticket is issued of the current channel_epoch and index larger than or equal to the ticket_index in the channel
+                // do nothing to tickets that is issued to channel_epoch larger than the current channel_epoch
+                // TODO: for other tickets (of previous channel epoch; or of the current channel epoch but index smaller than ticket_index in the channel), remove it from the db
+                let unrealized_balance = self
+                    .cached_unrealized_value
+                    .get(&ticket.channel_id)
+                    .map(|b| b.clone())
+                    .unwrap_or(Balance::zero(BalanceType::HOPR))
+                    .add(&ticket.amount);
+
+                self.cached_unrealized_value
+                    .insert(ticket.channel_id, unrealized_balance);
+            }
         }
 
         Ok(())
@@ -180,11 +214,14 @@ impl<T: AsyncKVStorage<Key = Box<[u8]>, Value = Box<[u8]>> + Clone> HoprCoreEthe
 
         Ok(if let Some(balance) = channel_balance {
             if let Some(unrealized_balance) = self.cached_unrealized_value.get(channel) {
+                debug!("channel {channel} has unrealized balance {unrealized_balance} to be subtracted from balance {balance}");
                 balance.sub(unrealized_balance)
             } else {
+                debug!("channel {channel} has no unrealized balance to be subtracted from balance {balance}");
                 balance
             }
         } else {
+            debug!("channel {channel} has no unrealized balance because it does not exist");
             Balance::zero(BalanceType::HOPR)
         })
     }
@@ -2627,6 +2664,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        // generate_ack_tickets only creates tickets of the current epoch but with smaller ticket indexes
         let (tickets, channel) = generate_ack_tickets(&mut inner_db, 1).await;
 
         // Store ack tickets
@@ -2646,11 +2684,73 @@ mod tests {
             .await
             .expect("should initialize cache without any issues");
 
-        let ticket_balance = tickets
-            .iter()
-            .fold(Balance::zero(BalanceType::HOPR), |acc, n| acc.add(&n.ticket.amount));
+        let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
+        assert_eq!(unrealized_balance, Ok(channel.balance)); //
+    }
+
+    #[async_std::test]
+    async fn test_db_should_initialize_catch_when_restarting_with_old_database_with_tickets_from_various_epoch_and_indexes(
+    ) {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let tickets_to_generate_per_epoch = 5u64;
+        let start_index = 17u64;
+        let current_channel_epoch = 7u32;
+        let current_channel_ticket_index = 20u64;
+        let current_channel_total_balance = Balance::new_from_str("1000000000000000000", BalanceType::HOPR); // 1 HOPR
+
+        let inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        let mut db = CoreEthereumDb::new(inner_db, BOB_KEYPAIR.public().to_address());
+        let _tickets_from_previous_epoch = create_acknowledged_tickets(
+            &mut db,
+            tickets_to_generate_per_epoch,
+            current_channel_epoch - 1,
+            start_index,
+        )
+        .await;
+        let tickets_from_current_epoch = create_acknowledged_tickets(
+            &mut db,
+            tickets_to_generate_per_epoch,
+            current_channel_epoch,
+            start_index,
+        )
+        .await;
+        let _tickets_from_next_epoch = create_acknowledged_tickets(
+            &mut db,
+            tickets_to_generate_per_epoch,
+            current_channel_epoch + 1,
+            start_index,
+        )
+        .await;
+        let ticket_balance = tickets_from_current_epoch[0].ticket.amount;
+
+        let channel = ChannelEntry::new(
+            ALICE_KEYPAIR.public().to_address(),
+            BOB_KEYPAIR.public().to_address(),
+            current_channel_total_balance,
+            current_channel_ticket_index.into(),
+            ChannelStatus::Open,
+            current_channel_epoch.into(),
+            0_u32.into(),
+        );
+
+        db.update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
+            .await
+            .unwrap();
 
         let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
-        assert_eq!(unrealized_balance, Ok(channel.balance.sub(&ticket_balance)));
+        assert_eq!(unrealized_balance, Ok(current_channel_total_balance));
+
+        db.init_cache()
+            .await
+            .expect("should initialize cache without any issues");
+
+        let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
+        // Among all the 15 (3 epoch * 5 tickets3 epoch * 5 tickets) tickets, only 2 (start_index + tickets_to_generate_per_epoch - current_channel_ticket_index) tickets from the current epoch
+        let cumulated_ticket_balance = ticket_balance.mul(&Balance::new(2_u32.into(), BalanceType::HOPR));
+        assert_eq!(
+            unrealized_balance,
+            Ok(current_channel_total_balance.sub(&cumulated_ticket_balance))
+        );
     }
 }
