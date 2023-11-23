@@ -2664,6 +2664,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let mut inner_db = DB::new(RustyLevelDbShim::new_in_memory());
+        // generate_ack_tickets only creates tickets of the current epoch but with smaller ticket indexes
         let (tickets, channel) = generate_ack_tickets(&mut inner_db, 1).await;
 
         // Store ack tickets
@@ -2683,12 +2684,12 @@ mod tests {
             .await
             .expect("should initialize cache without any issues");
 
-        let ticket_balance = tickets
-            .iter()
-            .fold(Balance::zero(BalanceType::HOPR), |acc, n| acc.add(&n.ticket.amount));
+        // let ticket_balance = tickets
+        //     .iter()
+        //     .fold(Balance::zero(BalanceType::HOPR), |acc, n| acc.add(&n.ticket.amount));
 
         let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
-        assert_eq!(unrealized_balance, Ok(channel.balance.sub(&ticket_balance)));
+        assert_eq!(unrealized_balance, Ok(channel.balance)); //
     }
 
     #[async_std::test]
