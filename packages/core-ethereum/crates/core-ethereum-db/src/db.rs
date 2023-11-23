@@ -2684,10 +2684,6 @@ mod tests {
             .await
             .expect("should initialize cache without any issues");
 
-        // let ticket_balance = tickets
-        //     .iter()
-        //     .fold(Balance::zero(BalanceType::HOPR), |acc, n| acc.add(&n.ticket.amount));
-
         let unrealized_balance = db.get_unrealized_balance(&channel.get_id()).await;
         assert_eq!(unrealized_balance, Ok(channel.balance)); //
     }
