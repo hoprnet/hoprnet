@@ -77,10 +77,6 @@ export class WasmChainQuery {
     return (await this.connector.getNativeBalance(this.smartContractInfo().safeAddress, true)).to_string()
   }
 
-  public async getPacketKeyOf(address: Address) {
-    return this.connector.getPacketKeyOf(address)
-  }
-
   public async isNodeSafeNotRegistered(): Promise<boolean> {
     return await this.connector.isNodeSafeNotRegistered()
   }

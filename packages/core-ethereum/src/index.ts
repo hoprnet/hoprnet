@@ -21,22 +21,7 @@ import {
 
 import { TransactionPayload } from './transaction-manager.js'
 
-import Indexer from './indexer/index.js'
 import { EventEmitter } from 'events'
-import type { IndexerEventsNames, IndexerEventsType } from './indexer/types.js'
-
-export {
-  BlockEventName,
-  BlockProcessedEventName,
-  StatusEventName,
-  PeerEventName,
-  NetworkRegistryEligibilityChangedEventName,
-  NetworkRegistryStatusChangedEventName,
-  NetworkRegistryNodeAllowedEventName,
-  NetworkRegistryNodeNotAllowedEventName,
-  ChannelUpdateEventNames,
-  TicketRedeemedEventNames
-} from './indexer/types.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -65,7 +50,6 @@ export type SafeModuleOptions = {
 export default class HoprCoreEthereum extends EventEmitter {
   private static _instance: HoprCoreEthereum
 
-  public indexer: Indexer
   private chain: ChainWrapper
   private started: boolean
   // Used to store ongoing operations to prevent duplicate redemption attempts
@@ -80,13 +64,6 @@ export default class HoprCoreEthereum extends EventEmitter {
     super()
 
     log(`[DEBUG] initialized Rust DB... ${JSON.stringify(this.db.toString(), null, 2)} `)
-
-    this.indexer = new Indexer(
-      this.chainKeypair.public().to_address(),
-      this.db,
-      this.options.confirmations,
-      2000 // constants.INDEXER_BLOCK_RANGE
-    )
   }
 
   public static async createInstance(
@@ -165,8 +142,6 @@ export default class HoprCoreEthereum extends EventEmitter {
         await this.chain.waitUntilReady()
 
         // indexer starts
-        await this.indexer.start(this.chain, this.chain.getGenesisBlock(), this.safeModuleOptions.safeAddress)
-
         // Debug log used in e2e integration tests, please don't change
         log(`using blockchain address ${this.chainKeypair.to_address().to_hex()}`)
         log('Connector started')
@@ -184,23 +159,32 @@ export default class HoprCoreEthereum extends EventEmitter {
    */
   async stop(): Promise<void> {
     log('Stopping connector...')
-    await this.indexer.stop()
   }
 
-  private async sendTransactionInternal(txPayload: TransactionPayload, eventName: IndexerEventsNames) {
-    return await this.chain.sendTransaction(true, txPayload, (txHash: string) =>
-      this.setTxHandler(`${eventName}${txHash}`, txHash)
+  private async sendTransactionInternal(txPayload: TransactionPayload) {
+    return await this.chain.sendTransaction(true, txPayload, (_txHash: string) =>
+    {
+      const deferred = {} as DeferType<string>
+
+      deferred.promise = new Promise<string>((resolve, _reject) => {
+        resolve("TODO: Needs to be done in HoprChain ")
+      }) 
+
+      return deferred
+    }
+    // 
+    // this.setTxHandler(`${eventName}${txHash}`, txHash)
     )
   }
 
-  public async sendTransaction(txPayload: WasmTransactionPayload, eventName: IndexerEventsNames) {
+  public async sendTransaction(txPayload: WasmTransactionPayload) {
     let innerPayload: TransactionPayload = {
       data: txPayload.data,
       to: txPayload.to,
       value: txPayload.value != '' ? BigNumber.from(txPayload.value) : BigNumber.from(0)
     }
 
-    let txResult = await this.sendTransactionInternal(innerPayload, eventName)
+    let txResult = await this.sendTransactionInternal(innerPayload)
 
     if (txResult.code == SendTransactionStatus.SUCCESS) {
       return {
@@ -215,29 +199,10 @@ export default class HoprCoreEthereum extends EventEmitter {
     }
   }
 
-  public setTxHandler(evt: IndexerEventsType, tx: string): DeferType<string> {
-    return this.indexer.resolvePendingTransaction(evt, tx)
-  }
-
-  public getOpenChannelsFrom(p: Address) {
-    return this.indexer.getOpenChannelsFrom(p)
-  }
-
-  public async getAccount(addr: Address) {
-    return this.indexer.getAccount(addr)
-  }
-
-  public getChainKeyOf(addr: Address) {
-    return this.indexer.getChainKeyOf(addr)
-  }
-
-  public getPacketKeyOf(addr: Address) {
-    return this.indexer.getPacketKeyOf(addr)
-  }
-
-  public getRandomOpenChannel() {
-    return this.indexer.getRandomOpenChannel()
-  }
+    // TODO: needs to observe state in the Rust HoprChain code on updates
+  // public setTxHandler(evt: IndexerEventsType, tx: string): DeferType<string> {
+  //   //return this.indexer.resolvePendingTransaction(evt, tx)
+  // }
 
   /**
    * Retrieves HOPR balance of the node, optionally uses the indexer.
@@ -414,4 +379,4 @@ export default class HoprCoreEthereum extends EventEmitter {
 // export { useFixtures } from './indexer/index.mock.js'
 export { sampleChainOptions } from './ethereum.mock.js'
 
-export { ChannelEntry, Indexer, ChainWrapper, createChainWrapper, SmartContractConfig, Hash }
+export { ChannelEntry, ChainWrapper, createChainWrapper, SmartContractConfig, Hash }

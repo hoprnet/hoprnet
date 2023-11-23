@@ -490,7 +490,7 @@ mod native {
 
         /// List of all accounts announced on the chain
         pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
-            Ok(self.chain_api.accounts_announced_on_chain().await?)
+            Ok(self.chain_api.db().read().await.get_accounts().await?)
         }
 
         /// Get the channel entry from Hash.
