@@ -10,14 +10,18 @@ use primitive_types::H256;
 use core_crypto::types::Hash;
 use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
-use crate::errors::Result;
+use crate::errors::{HttpRequestError, Result};
 
 pub mod errors;
 pub mod indexer;
 pub mod rpc;
 
 //#[cfg(target_arch = "wasm32")]
-mod wasm;
+#[cfg(feature = "wasm")]
+mod nodejs;
+
+mod client;
+mod helper;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 /// This is further restritect to already mined blocks.
@@ -112,6 +116,15 @@ impl From<LogFilter> for ethers::types::Filter {
     }
 }
 
+/// Abstraction for HTTP client that perform HTTP POST with JSON data.
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+pub trait HttpPostRequestor: Send + Sync {
+    /// Performs HTTP POST of JSON data to the given URL
+    /// and obtains the JSON response.
+    async fn http_post(&self, url: &str, json_data: &str) -> std::result::Result<String, HttpRequestError>;
+}
+
 /// Short-hand for creating new EIP1559 transaction object.
 pub fn create_eip1559_transaction() -> TypedTransaction {
     TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
@@ -141,9 +154,12 @@ pub trait HoprRpcOperations {
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
 }
 
+/// Structure containing filtered logs that all belong to the same block.
 #[derive(Debug, Clone, Default)]
 pub struct BlockWithLogs {
+    /// Block number
     pub block_id: u64,
+    /// Filtered logs belonging to this block.
     pub logs: Vec<Log>,
 }
 impl Display for BlockWithLogs {
@@ -153,10 +169,12 @@ impl Display for BlockWithLogs {
 }
 
 impl BlockWithLogs {
+    /// Returns `true` if no logs are contained within this block.
     pub fn is_empty(&self) -> bool {
         self.logs.is_empty()
     }
 
+    /// Returns the number of logs within this block.
     pub fn len(&self) -> usize {
         self.logs.len()
     }

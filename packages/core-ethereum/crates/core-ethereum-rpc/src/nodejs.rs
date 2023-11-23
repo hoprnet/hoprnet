@@ -1,5 +1,7 @@
-use crate::wasm::{HttpPostRequestor, HttpRequestError};
 use async_trait::async_trait;
+
+use crate::errors::HttpRequestError;
+use crate::HttpPostRequestor;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm"))]
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast};

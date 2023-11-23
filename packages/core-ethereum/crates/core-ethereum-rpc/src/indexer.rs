@@ -90,11 +90,10 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
     use std::time::Duration;
 
     use ethers::contract::EthEvent;
-    use ethers_providers::{Http, Middleware};
+    use ethers_providers::Middleware;
     use futures::StreamExt;
 
     use bindings::hopr_channels::*;
@@ -104,7 +103,8 @@ mod test {
     use utils_log::debug;
     use utils_types::primitives::Address;
 
-    use crate::rpc::tests::mint_tokens;
+    use crate::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::rpc::tests::{mint_tokens, ReqwestRequestor};
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 
@@ -135,12 +135,10 @@ mod test {
         let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let rpc = RpcOperations::new(
-            Http::from_str(&anvil.endpoint()).unwrap(),
-            &chain_key_0,
-            Default::default(),
-        )
-        .expect("failed to construct rpc");
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+
+        let rpc = RpcOperations::new(client, &chain_key_0, Default::default(), SimpleJsonRpcRetryPolicy)
+            .expect("failed to construct rpc");
 
         let b1 = rpc.block_number().await.expect("should get block number");
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -179,8 +177,10 @@ mod test {
             ..RpcOperationsConfig::default()
         };
 
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
-            .expect("failed to construct rpc");
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+
+        let rpc =
+            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
@@ -285,8 +285,10 @@ mod test {
             ..RpcOperationsConfig::default()
         };
 
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
-            .expect("failed to construct rpc");
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+
+        let rpc =
+            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.channels],

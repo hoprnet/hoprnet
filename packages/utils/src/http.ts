@@ -8,7 +8,10 @@ export async function post(url: string, json_data: string): Promise<string> {
   try {
     let response = await axios.post(url, json_data, {
       timeout: 30_000,
-      maxRedirects: 3
+      maxRedirects: 3,
+      headers: {
+        'Content-Type': 'application/json'
+      }
     })
 
     return response.data.toString()

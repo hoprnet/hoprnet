@@ -7,9 +7,7 @@ use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::signers::{LocalWallet, Signer, Wallet};
 use ethers::types::BlockId;
-use ethers_providers::{
-    HttpRateLimitRetryPolicy, JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy,
-};
+use ethers_providers::{JsonRpcClient, Middleware, Provider, RetryClient, RetryClientBuilder, RetryPolicy};
 use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -53,16 +51,16 @@ pub struct RpcOperations<P: JsonRpcClient + 'static> {
     contract_instances: ContractInstances<HoprMiddleware<P>>,
 }
 
-impl<P: JsonRpcClient + 'static> RpcOperations<P>
-where
-    HttpRateLimitRetryPolicy: RetryPolicy<<P as JsonRpcClient>::Error>,
-{
-    pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
+impl<P: JsonRpcClient + 'static> RpcOperations<P> {
+    pub fn new<R>(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig, retry_policy: R) -> Result<Self>
+    where
+        R: RetryPolicy<<P as JsonRpcClient>::Error> + 'static,
+    {
         let provider_client = RetryClientBuilder::default()
             .rate_limit_retries(5)
             .timeout_retries(cfg.max_http_retries)
             .initial_backoff(Duration::from_millis(500))
-            .build(json_rpc, Box::<HttpRateLimitRetryPolicy>::default());
+            .build(json_rpc, Box::new(retry_policy));
 
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?;
         let provider = Arc::new(
@@ -142,18 +140,24 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, TypedTransaction};
+    use async_trait::async_trait;
     use bindings::hopr_token::HoprToken;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::Hash;
     use core_ethereum_types::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
     use ethers::prelude::BlockId;
     use ethers::types::Eip1559TransactionRequest;
-    use ethers_providers::{Http, JsonRpcClient, Middleware};
+    use ethers_providers::{JsonRpcClient, Middleware};
     use futures::StreamExt;
     use primitive_types::{H160, H256};
-    use std::str::FromStr;
+    use reqwest::header::{HeaderValue, CONTENT_TYPE};
+    use reqwest::Client;
     use std::time::Duration;
     use utils_types::primitives::{Address, BalanceType, U256};
+
+    use crate::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::errors::HttpRequestError;
+    use crate::HttpPostRequestor;
 
     pub async fn mint_tokens<M: Middleware + 'static>(
         hopr_token: HoprToken<M>,
@@ -223,6 +227,34 @@ pub mod tests {
         .expect("expected block")
     }
 
+    #[derive(Debug)]
+    pub struct ReqwestRequestor;
+
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    impl HttpPostRequestor for ReqwestRequestor {
+        async fn http_post(&self, url: &str, json_data: &str) -> Result<String, HttpRequestError> {
+            Client::builder()
+                .build()
+                .map_err(|_| HttpRequestError::InterfaceError("failed to build client".into()))?
+                .post(url)
+                .header(CONTENT_TYPE, HeaderValue::from_str("application/json").unwrap())
+                .body(Vec::from(json_data.as_bytes()))
+                .send()
+                .await
+                .map_err(|e| {
+                    if e.is_status() {
+                        HttpRequestError::HttpError(e.status().unwrap().as_u16())
+                    } else {
+                        HttpRequestError::InterfaceError(e.to_string())
+                    }
+                })?
+                .text()
+                .await
+                .map_err(|e| HttpRequestError::InterfaceError(format!("body: {}", e.to_string())))
+        }
+    }
+
     #[tokio::test]
     async fn test_should_send_tx() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -235,8 +267,11 @@ pub mod tests {
             tx_polling_interval: Duration::from_millis(10),
             ..RpcOperationsConfig::default()
         };
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
-            .expect("failed to construct rpc");
+
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+
+        let rpc =
+            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
         let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
@@ -262,8 +297,10 @@ pub mod tests {
             tx_polling_interval: Duration::from_millis(10),
             ..RpcOperationsConfig::default()
         };
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
-            .expect("failed to construct rpc");
+
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+        let rpc =
+            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
         let balance_1 = rpc.get_balance(BalanceType::Native).await.unwrap();
         assert!(balance_1.value().as_u64() > 0, "balance must be greater than 0");
@@ -310,8 +347,9 @@ pub mod tests {
         )
         .await;
 
-        let rpc = RpcOperations::new(Http::from_str(&anvil.endpoint()).unwrap(), &chain_key_0, cfg)
-            .expect("failed to construct rpc");
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+        let rpc =
+            RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
         let balance = rpc.get_balance(BalanceType::HOPR).await.unwrap();
         assert_eq!(amount, balance.value().as_u64(), "invalid balance");
