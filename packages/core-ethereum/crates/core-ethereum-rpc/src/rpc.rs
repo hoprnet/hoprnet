@@ -145,7 +145,7 @@ pub mod tests {
     use bindings::hopr_token::HoprToken;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::Hash;
-    use core_ethereum_misc::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
+    use core_ethereum_types::{create_anvil, create_rpc_client_to_anvil, ContractAddresses, ContractInstances};
     use ethers::prelude::BlockId;
     use ethers::types::Eip1559TransactionRequest;
     use ethers_providers::{Http, JsonRpcClient, Middleware};
