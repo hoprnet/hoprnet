@@ -128,11 +128,6 @@ async def check_unredeemed_tickets_value(src, value):
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_rejected_tickets(src, count):
-    while int((await src["api"].get_tickets_statistics()).rejected) < count:
-        await asyncio.sleep(CHECK_RETRY_INTERVAL)
-
-
 async def check_all_tickets_redeemed(src, channel_id=None):
     if channel_id is not None:
         while len(await src["api"].channel_get_tickets(channel_id)) > 0:
