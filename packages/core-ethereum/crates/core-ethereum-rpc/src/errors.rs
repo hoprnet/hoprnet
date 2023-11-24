@@ -71,17 +71,7 @@ pub enum HttpRequestError {
     HttpError(u16),
 
     #[error("unrecognized error: {0}")]
-    UnknownError(String)
-}
-
-impl HttpRequestError {
-    pub fn status(&self) -> Option<u16> {
-        if let HttpRequestError::HttpError(status) = self {
-            Some(*status)
-        } else {
-            None
-        }
-    }
+    UnknownError(String),
 }
 
 /// Errors for `JsonRpcProviderClient`

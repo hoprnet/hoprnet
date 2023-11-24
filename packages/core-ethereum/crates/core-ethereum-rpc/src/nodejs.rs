@@ -52,8 +52,9 @@ impl HttpPostRequestor for NodeJsHttpPostRequestor {
                 }
             }
             Err(err) => {
-                let error = serde_wasm_bindgen::from_value::<NodeJsHttpError>(err)
-                    .map_err(|e| HttpRequestError::InterfaceError(format!("failed to deserialize error object: {e}")))?;
+                let error = serde_wasm_bindgen::from_value::<NodeJsHttpError>(err).map_err(|e| {
+                    HttpRequestError::InterfaceError(format!("failed to deserialize error object: {e}"))
+                })?;
                 Err(error.into())
             }
         }
