@@ -66,7 +66,7 @@ impl<M: Middleware> NetworkRegistryProxy<M> {
 }
 
 /// Holds instances to contracts.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ContractInstances<M: Middleware> {
     pub token: HoprToken<M>,
     pub channels: HoprChannels<M>,
@@ -77,6 +77,31 @@ pub struct ContractInstances<M: Middleware> {
     pub price_oracle: HoprTicketPriceOracle<M>,
     pub stake_factory: HoprNodeStakeFactory<M>,
     pub module_implementation: HoprNodeManagementModule<M>,
+}
+
+impl<M: Middleware> Clone for ContractInstances<M> {
+    fn clone(&self) -> Self {
+        // Requires manual clone implementation, because `M` is usually never `Clone`
+        let client = self.token.client();
+        Self {
+            token: HoprToken::new(self.token.address(), client.clone()),
+            channels: HoprChannels::new(self.channels.address(), client.clone()),
+            announcements: HoprAnnouncements::new(self.announcements.address(), client.clone()),
+            network_registry: HoprNetworkRegistry::new(self.network_registry.address(), client.clone()),
+            network_registry_proxy: match &self.network_registry_proxy {
+                NetworkRegistryProxy::Dummy(nr) => {
+                    NetworkRegistryProxy::Dummy(HoprDummyProxyForNetworkRegistry::new(nr.address(), client.clone()))
+                }
+                NetworkRegistryProxy::Safe(nr) => {
+                    NetworkRegistryProxy::Safe(HoprSafeProxyForNetworkRegistry::new(nr.address(), client.clone()))
+                }
+            },
+            safe_registry: HoprNodeSafeRegistry::new(self.safe_registry.address(), client.clone()),
+            price_oracle: HoprTicketPriceOracle::new(self.price_oracle.address(), client.clone()),
+            stake_factory: HoprNodeStakeFactory::new(self.stake_factory.address(), client.clone()),
+            module_implementation: HoprNodeManagementModule::new(self.module_implementation.address(), client.clone()),
+        }
+    }
 }
 
 impl<M: Middleware> ContractInstances<M> {

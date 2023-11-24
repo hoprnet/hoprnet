@@ -44,6 +44,7 @@ impl Default for RpcOperationsConfig {
 pub(crate) type HoprMiddleware<P> =
     NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
 
+#[derive(Debug, Clone)]
 pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
     pub(crate) provider: Arc<HoprMiddleware<P>>,

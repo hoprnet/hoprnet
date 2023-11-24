@@ -143,8 +143,8 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
             JsonRpcProviderClientError::JsonRpcError(err) => self.should_retry_on_json_rpc_error(err),
 
             // HTTP & transport errors: Only retry HTTP Too Many Requests and Timeouts
-            JsonRpcProviderClientError::BackendError(HttpRequestError::Timeout) |
-            JsonRpcProviderClientError::BackendError(HttpRequestError::HttpError(429)) => true,
+            JsonRpcProviderClientError::BackendError(HttpRequestError::Timeout)
+            | JsonRpcProviderClientError::BackendError(HttpRequestError::HttpError(429)) => true,
 
             // Everything else is not retried and immediately considered an error
             _ => false,
@@ -175,10 +175,10 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 pub mod tests {
     use async_trait::async_trait;
     use core_ethereum_types::create_anvil;
-    use reqwest::header::{HeaderValue, CONTENT_TYPE};
-    use std::time::Duration;
     use ethers_providers::JsonRpcClient;
     use futures::FutureExt;
+    use reqwest::header::{HeaderValue, CONTENT_TYPE};
+    use std::time::Duration;
 
     use crate::client::JsonRpcProviderClient;
     use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
@@ -189,10 +189,12 @@ pub mod tests {
 
     impl Default for ReqwestRequestor {
         fn default() -> Self {
-            Self(reqwest::Client::builder()
-                .timeout(Duration::from_secs(5))
-                .build()
-                .expect("failed to build Reqwest client"))
+            Self(
+                reqwest::Client::builder()
+                    .timeout(Duration::from_secs(5))
+                    .build()
+                    .expect("failed to build Reqwest client"),
+            )
         }
     }
 
@@ -233,7 +235,10 @@ pub mod tests {
         for _ in 0..3 {
             tokio::time::sleep(block_time).await;
 
-            let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await.expect("should get block number");
+            let number: ethers::types::U64 = client
+                .request("eth_blockNumber", ())
+                .await
+                .expect("should get block number");
 
             assert!(number.as_u64() > last_number, "next block number must be greater");
             last_number = number.as_u64();
@@ -245,7 +250,10 @@ pub mod tests {
         let anvil = create_anvil(None);
         let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
 
-        let err = client.request::<_, ethers::types::U64>("eth_blockNumber_bla", ()).await.expect_err("expected error");
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber_bla", ())
+            .await
+            .expect_err("expected error");
         assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(..)));
     }
 
@@ -261,7 +269,10 @@ pub mod tests {
 
         let client = JsonRpcProviderClient::new("localhost".into(), mock_requestor);
 
-        let err = client.request::<_, ethers::types::U64>("eth_blockNumber", ()).await.expect_err("expected error");
-        assert!(matches!(err, JsonRpcProviderClientError::SerdeJson{..}));
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+        assert!(matches!(err, JsonRpcProviderClientError::SerdeJson { .. }));
     }
 }

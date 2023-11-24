@@ -12,14 +12,14 @@ use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HttpRequestError, Result};
 
+pub mod client;
 pub mod errors;
 pub mod indexer;
 pub mod rpc;
 
 #[cfg(feature = "wasm")]
-mod nodejs;
+pub mod nodejs;
 
-mod client;
 mod helper;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.

@@ -37,6 +37,7 @@ impl From<NodeJsHttpError> for HttpRequestError {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct NodeJsHttpPostRequestor;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]

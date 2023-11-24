@@ -23,6 +23,7 @@ pub trait EthereumClient<T: Into<TypedTransaction>> {
 }
 
 /// Instantiation of `EthereumClient` using `HoprRpcOperations`.
+#[derive(Clone)]
 pub struct RpcEthereumClient<Rpc: HoprRpcOperations> {
     rpc: Arc<Mutex<Rpc>>,
 }
