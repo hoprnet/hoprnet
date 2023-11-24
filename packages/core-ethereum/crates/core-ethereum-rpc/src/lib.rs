@@ -118,6 +118,7 @@ impl From<LogFilter> for ethers::types::Filter {
 /// Abstraction for HTTP client that perform HTTP POST with JSON data.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(test, mockall::automock)]
 pub trait HttpPostRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
     /// and obtains the JSON response.

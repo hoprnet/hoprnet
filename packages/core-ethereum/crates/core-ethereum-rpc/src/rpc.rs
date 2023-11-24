@@ -236,7 +236,7 @@ pub mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
 
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
@@ -266,7 +266,7 @@ pub mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 
@@ -315,7 +315,7 @@ pub mod tests {
         )
         .await;
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
 

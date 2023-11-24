@@ -1268,6 +1268,7 @@ dependencies = [
  "hex-literal",
  "js-sys",
  "lazy_static",
+ "mockall",
  "pin-project",
  "primitive-types",
  "reqwest",

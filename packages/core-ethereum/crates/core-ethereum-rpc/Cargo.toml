@@ -50,6 +50,7 @@ env_logger = "0.10"
 hex-literal = "0.4"
 reqwest = "0.11.22"
 tokio = { version = "1", features = ["macros"] }
+mockall = "0.11.4"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']

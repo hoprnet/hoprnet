@@ -173,24 +173,31 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::errors::HttpRequestError;
-    use crate::HttpPostRequestor;
     use async_trait::async_trait;
     use core_ethereum_types::create_anvil;
     use reqwest::header::{HeaderValue, CONTENT_TYPE};
-    use reqwest::Client;
     use std::time::Duration;
+    use ethers_providers::JsonRpcClient;
+    use futures::FutureExt;
+
+    use crate::client::JsonRpcProviderClient;
+    use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
+    use crate::{HttpPostRequestor, MockHttpPostRequestor};
 
     #[derive(Debug)]
-    pub struct ReqwestRequestor;
+    pub struct ReqwestRequestor(reqwest::Client);
+
+    impl Default for ReqwestRequestor {
+        fn default() -> Self {
+            Self(reqwest::Client::builder().build().expect("failed to build Reqwest client"))
+        }
+    }
 
     #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
     #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     impl HttpPostRequestor for ReqwestRequestor {
         async fn http_post(&self, url: &str, json_data: &str) -> Result<String, HttpRequestError> {
-            Client::builder()
-                .build()
-                .map_err(|_| HttpRequestError::InterfaceError("failed to build client".into()))?
+            self.0
                 .post(url)
                 .header(CONTENT_TYPE, HeaderValue::from_str("application/json").unwrap())
                 .body(Vec::from(json_data.as_bytes()))
@@ -199,8 +206,10 @@ pub mod tests {
                 .map_err(|e| {
                     if e.is_status() {
                         HttpRequestError::HttpError(e.status().unwrap().as_u16())
+                    } else if e.is_timeout() {
+                        HttpRequestError::Timeout
                     } else {
-                        HttpRequestError::InterfaceError(e.to_string())
+                        HttpRequestError::UnknownError(e.to_string())
                     }
                 })?
                 .text()
@@ -214,6 +223,42 @@ pub mod tests {
         let block_time = Duration::from_secs(1);
 
         let anvil = create_anvil(Some(block_time));
-        tokio::time::sleep(block_time).await;
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+
+        let mut last_number = 0;
+
+        for _ in 0..3 {
+            tokio::time::sleep(block_time).await;
+
+            let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await.expect("should get block number");
+
+            assert!(number.as_u64() > last_number, "next block number must be greater");
+            last_number = number.as_u64();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_client_should_fail_on_malformed_request() {
+        let anvil = create_anvil(None);
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
+
+        let err = client.request::<_, ethers::types::U64>("eth_blockNumber_bla", ()).await.expect_err("expected error");
+        assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(..)));
+    }
+
+    #[tokio::test]
+    async fn test_client_should_fail_on_malformed_response() {
+        let mut mock_requestor = MockHttpPostRequestor::new();
+
+        mock_requestor
+            .expect_http_post()
+            .once()
+            .withf(|url, _| url == "localhost")
+            .returning(|_, _| futures::future::ok("}{malformed".to_string()).boxed());
+
+        let client = JsonRpcProviderClient::new("localhost".into(), mock_requestor);
+
+        let err = client.request::<_, ethers::types::U64>("eth_blockNumber", ()).await.expect_err("expected error");
+        assert!(matches!(err, JsonRpcProviderClientError::SerdeJson{..}));
     }
 }

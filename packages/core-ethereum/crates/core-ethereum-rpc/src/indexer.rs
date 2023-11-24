@@ -136,7 +136,7 @@ mod test {
         let anvil = create_anvil(Some(Duration::from_secs(1)));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
 
         let rpc = RpcOperations::new(client, &chain_key_0, Default::default(), SimpleJsonRpcRetryPolicy)
             .expect("failed to construct rpc");
@@ -178,7 +178,7 @@ mod test {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
 
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
@@ -286,7 +286,7 @@ mod test {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor);
+        let client = JsonRpcProviderClient::new(&anvil.endpoint(), ReqwestRequestor::default());
 
         let rpc =
             RpcOperations::new(client, &chain_key_0, cfg, SimpleJsonRpcRetryPolicy).expect("failed to construct rpc");
