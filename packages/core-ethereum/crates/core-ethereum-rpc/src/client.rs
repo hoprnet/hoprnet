@@ -189,7 +189,10 @@ pub mod tests {
 
     impl Default for ReqwestRequestor {
         fn default() -> Self {
-            Self(reqwest::Client::builder().build().expect("failed to build Reqwest client"))
+            Self(reqwest::Client::builder()
+                .timeout(Duration::from_secs(5))
+                .build()
+                .expect("failed to build Reqwest client"))
         }
     }
 
