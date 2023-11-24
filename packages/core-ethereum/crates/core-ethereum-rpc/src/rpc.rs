@@ -140,7 +140,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 pub mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, TypedTransaction};
-    use async_trait::async_trait;
     use bindings::hopr_token::HoprToken;
     use core_crypto::keypairs::{ChainKeypair, Keypair};
     use core_crypto::types::Hash;
@@ -150,14 +149,11 @@ pub mod tests {
     use ethers_providers::{JsonRpcClient, Middleware};
     use futures::StreamExt;
     use primitive_types::{H160, H256};
-    use reqwest::header::{HeaderValue, CONTENT_TYPE};
-    use reqwest::Client;
     use std::time::Duration;
     use utils_types::primitives::{Address, BalanceType, U256};
 
+    use crate::client::tests::ReqwestRequestor;
     use crate::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
-    use crate::errors::HttpRequestError;
-    use crate::HttpPostRequestor;
 
     pub async fn mint_tokens<M: Middleware + 'static>(
         hopr_token: HoprToken<M>,
@@ -225,34 +221,6 @@ pub mod tests {
             timeout.as_secs()
         ))
         .expect("expected block")
-    }
-
-    #[derive(Debug)]
-    pub struct ReqwestRequestor;
-
-    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-    impl HttpPostRequestor for ReqwestRequestor {
-        async fn http_post(&self, url: &str, json_data: &str) -> Result<String, HttpRequestError> {
-            Client::builder()
-                .build()
-                .map_err(|_| HttpRequestError::InterfaceError("failed to build client".into()))?
-                .post(url)
-                .header(CONTENT_TYPE, HeaderValue::from_str("application/json").unwrap())
-                .body(Vec::from(json_data.as_bytes()))
-                .send()
-                .await
-                .map_err(|e| {
-                    if e.is_status() {
-                        HttpRequestError::HttpError(e.status().unwrap().as_u16())
-                    } else {
-                        HttpRequestError::InterfaceError(e.to_string())
-                    }
-                })?
-                .text()
-                .await
-                .map_err(|e| HttpRequestError::InterfaceError(format!("body: {}", e.to_string())))
-        }
     }
 
     #[tokio::test]

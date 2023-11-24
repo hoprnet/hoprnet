@@ -59,7 +59,7 @@ where
 }
 
 /// Error abstraction for `HttpRequestor`.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum HttpRequestError {
     #[error("error on js-wasm interface: {0}")]
     InterfaceError(String),

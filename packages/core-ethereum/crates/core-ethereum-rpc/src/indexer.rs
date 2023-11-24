@@ -103,8 +103,9 @@ mod test {
     use utils_log::debug;
     use utils_types::primitives::Address;
 
+    use crate::client::tests::ReqwestRequestor;
     use crate::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
-    use crate::rpc::tests::{mint_tokens, ReqwestRequestor};
+    use crate::rpc::tests::mint_tokens;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 

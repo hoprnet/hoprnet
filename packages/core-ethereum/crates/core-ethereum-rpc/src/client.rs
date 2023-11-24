@@ -88,13 +88,43 @@ impl<Req: HttpPostRequestor + Debug> JsonRpcClient for JsonRpcProviderClient<Req
 #[derive(Debug)]
 pub struct SimpleJsonRpcRetryPolicy;
 
+impl SimpleJsonRpcRetryPolicy {
+    fn should_retry_on_json_rpc_error(&self, err: &JsonRpcError) -> bool {
+        let JsonRpcError { code, message, .. } = err;
+
+        // Alchemy throws it this way
+        if *code == 429 {
+            return true;
+        }
+
+        // This is an Infura error code for `exceeded project rate limit`
+        if *code == -32005 {
+            return true;
+        }
+
+        // Alternative alchemy error for specific IPs
+        if *code == -32016 && message.contains("rate limit") {
+            return true;
+        }
+
+        match message.as_str() {
+            // This is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
+            "header not found" => true,
+            // also thrown by Infura if out of budget for the day and rate-limited
+            "daily request count exceeded, request rate limited" => true,
+            _ => false,
+        }
+    }
+}
+
 impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
     fn should_retry(&self, error: &JsonRpcProviderClientError) -> bool {
         // There are 3 error cases:
-        // - serialization error of request/response
-        // - JSON RPC error
-        // - HTTP error
+        // - serialization errors of request/response
+        // - JSON RPC errors
+        // - HTTP & transport errors
         match error {
+            // Serialization error
             JsonRpcProviderClientError::SerdeJson { text, .. } => {
                 // some providers send invalid JSON RPC in the error case (no `id:u64`), but the
                 // text should be a `JsonRpcError`
@@ -108,34 +138,16 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
                 }
                 false
             }
-            JsonRpcProviderClientError::JsonRpcError(JsonRpcError { code, message, .. }) => {
-                // Alchemy throws it this way
-                if *code == 429 {
-                    return true;
-                }
 
-                // This is an Infura error code for `exceeded project rate limit`
-                if *code == -32005 {
-                    return true;
-                }
+            // JSON-RPC error
+            JsonRpcProviderClientError::JsonRpcError(err) => self.should_retry_on_json_rpc_error(err),
 
-                // Alternative alchemy error for specific IPs
-                if *code == -32016 && message.contains("rate limit") {
-                    return true;
-                }
+            // HTTP & transport errors: Only retry HTTP Too Many Requests and Timeouts
+            JsonRpcProviderClientError::BackendError(HttpRequestError::Timeout) |
+            JsonRpcProviderClientError::BackendError(HttpRequestError::HttpError(429)) => true,
 
-                match message.as_str() {
-                    // This is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
-                    "header not found" => true,
-                    // also thrown by Infura if out of budget for the day and rate-limited
-                    "daily request count exceeded, request rate limited" => true,
-                    _ => false,
-                }
-            }
-            JsonRpcProviderClientError::BackendError(err) => {
-                err == HttpRequestError::HttpError(429) ||  // too many requests should be retried
-                err == HttpRequestError::Timeout // timeouts are retried as well
-            }
+            // Everything else is not retried and immediately considered an error
+            _ => false,
         }
     }
 
@@ -160,4 +172,48 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 }
 
 #[cfg(test)]
-mod tests {}
+pub mod tests {
+    use crate::errors::HttpRequestError;
+    use crate::HttpPostRequestor;
+    use async_trait::async_trait;
+    use core_ethereum_types::create_anvil;
+    use reqwest::header::{HeaderValue, CONTENT_TYPE};
+    use reqwest::Client;
+    use std::time::Duration;
+
+    #[derive(Debug)]
+    pub struct ReqwestRequestor;
+
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    impl HttpPostRequestor for ReqwestRequestor {
+        async fn http_post(&self, url: &str, json_data: &str) -> Result<String, HttpRequestError> {
+            Client::builder()
+                .build()
+                .map_err(|_| HttpRequestError::InterfaceError("failed to build client".into()))?
+                .post(url)
+                .header(CONTENT_TYPE, HeaderValue::from_str("application/json").unwrap())
+                .body(Vec::from(json_data.as_bytes()))
+                .send()
+                .await
+                .map_err(|e| {
+                    if e.is_status() {
+                        HttpRequestError::HttpError(e.status().unwrap().as_u16())
+                    } else {
+                        HttpRequestError::InterfaceError(e.to_string())
+                    }
+                })?
+                .text()
+                .await
+                .map_err(|e| HttpRequestError::InterfaceError(format!("body: {}", e.to_string())))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_client_should_get_block_number() {
+        let block_time = Duration::from_secs(1);
+
+        let anvil = create_anvil(Some(block_time));
+        tokio::time::sleep(block_time).await;
+    }
+}
