@@ -326,12 +326,14 @@ create-local-identity: id_dir=/tmp/
 create-local-identity: id_password=local
 create-local-identity: id_prefix=.identity-local_
 create-local-identity: ## run HOPRd from local repo
-	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" \
+	if [ ! -f "${id_dir}${id_prefix}0.id" ]; then \
+		ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" \
 		hopli identity \
 		--action create \
 		--identity-directory "${id_dir}" \
 		--identity-prefix "${id_prefix}" \
-		--number 1
+		--number 1; \
+	fi
 
 .PHONY: run-local
 run-local: id_path=`pwd`/.identity-local.id
@@ -348,10 +350,11 @@ run-local: ## run HOPRd from local repo
 
 .PHONY: run-local-with-safe
 run-local-with-safe: network=anvil-localhost
+run-local-with-safe: id_dir=/tmp/
 run-local-with-safe: ## run HOPRd from local repo. use the most recently created id file as node. create a safe and a module for the said node
-	id_path=$$(find $$(pwd) -name ".identity-local*.id" | sort -r | head -n 1) && \
-    	args=$$(make create-safe-module id_path="$$id_path" | grep -oE "(\-\-safeAddress.*)") && \
-    	make run-local id_path="$$id_path" network="${network}" args="$$args"
+	id_path=`find $(id_dir) -name ".identity-local*.id" | sort -r | head -n 1`; \
+	args=`make create-safe-module id_path="$${id_path}" | grep -oE "(--safeAddress.*)"`; \
+		 make run-local id_path="$${id_path}" network="${network}" args="$${args}"
 
 run-local-dev-compose: ## run local development Compose setup
 	echo "Starting Anvil on host"
@@ -369,7 +372,7 @@ fund-local-all: id_dir=/tmp/
 fund-local-all: id_password=local
 fund-local-all: id_prefix=
 fund-local-all: ## use faucet script to fund all the local identities
-	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli faucet \
 		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
@@ -381,7 +384,7 @@ create-safe-module-all: id_dir=/tmp/
 create-safe-module-all: id_password=local
 create-safe-module-all: id_prefix=
 create-safe-module-all: ## create a safe and a module and add all the nodes from local identities to the module
-	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli create-safe-module \
 		--network anvil-localhost \
 		--identity-prefix "${id_prefix}" \
@@ -394,7 +397,7 @@ create-safe-module: id_path=/tmp/local-alice.id
 create-safe-module: hopr_amount=10
 create-safe-module: native_amount=1
 create-safe-module: ## create a safe and a module, and add a node to the module
-	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 		hopli create-safe-module \
 		--network anvil-localhost \
 		--identity-from-path "${id_path}" \
@@ -409,7 +412,7 @@ deploy-safe-module: ## Deploy a safe and a module, and add a node to the module
 ifeq ($(origin PRIVATE_KEY),undefined)
 	echo "<PRIVATE_KEY> environment variable missing" >&2 && exit 1
 endif
-	ETHERSCAN_API_KEY="" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY="${PRIVATE_KEY}" \
+	ETHERSCAN_API_KEY="anykey" IDENTITY_PASSWORD="${id_password}" PRIVATE_KEY="${PRIVATE_KEY}" \
 		hopli create-safe-module \
 		--network "${network}" \
 		--identity-from-path "${id_path}" \
@@ -584,9 +587,10 @@ generate-python-sdk: ## generate Python SDK via Swagger Codegen
 generate-python-sdk: build-docs-api			# not using the official swagger-codegen-cli as it does not offer a multiplatform image
 	mkdir -p ./hoprd-sdk-python/
 	rm -rf ./hoprd-sdk-python/*
-	docker run --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
+	docker run --pull always --rm -v $$(pwd):/local parsertongue/swagger-codegen-cli:latest generate -l python \
 		-o /local/hoprd-sdk-python -i /local/packages/hoprd/rest-api-v3-full-spec.json \
 		-c /local/scripts/python-sdk-config.json
+	patch ./hoprd-sdk-python/ ./scripts/sdk-python.patch
 
 .PHONY: help
 help:
