@@ -727,7 +727,11 @@ mod tests {
 
         let actions = CoreEthereumActions::new(*ALICE, db.clone(), tx_sender.clone());
 
-        let tx_res = actions.close_channel(*BOB, ChannelDirection::Outgoing, false).await.unwrap().await;
+        let tx_res = actions
+            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .await
+            .unwrap()
+            .await;
 
         match tx_res {
             TransactionResult::ChannelClosureInitiated { tx_hash } => {
@@ -751,7 +755,11 @@ mod tests {
             .await
             .unwrap();
 
-        let tx_res = actions.close_channel(*BOB, ChannelDirection::Outgoing, false).await.unwrap().await;
+        let tx_res = actions
+            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .await
+            .unwrap()
+            .await;
 
         match tx_res {
             TransactionResult::ChannelClosed { tx_hash } => {
@@ -785,7 +793,7 @@ mod tests {
             .await
             .update_channel_and_snapshot(&channel.get_id(), &channel, &Snapshot::default())
             .await
-            ;
+            .unwrap();
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();

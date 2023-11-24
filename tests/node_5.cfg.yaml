@@ -23,7 +23,7 @@ hopr:
     quality_offline_threshold: 0.3
     quality_step: 0.1
     quality_avg_window_size: 25
-    quality_avg_window_size: 25ignore_timeframe: 600
+    ignore_timeframe: 600
     backoff_exponent: 1.5
     backoff_min: 2
     backoff_max: 300
