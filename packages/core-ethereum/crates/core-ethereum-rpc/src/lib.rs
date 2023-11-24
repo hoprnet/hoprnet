@@ -16,7 +16,6 @@ pub mod errors;
 pub mod indexer;
 pub mod rpc;
 
-//#[cfg(target_arch = "wasm32")]
 #[cfg(feature = "wasm")]
 mod nodejs;
 

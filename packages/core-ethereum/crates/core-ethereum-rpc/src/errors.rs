@@ -64,8 +64,24 @@ pub enum HttpRequestError {
     #[error("error on js-wasm interface: {0}")]
     InterfaceError(String),
 
+    #[error("connection timed out")]
+    Timeout,
+
     #[error("http error - status {0}")]
     HttpError(u16),
+
+    #[error("unrecognized error: {0}")]
+    UnknownError(String)
+}
+
+impl HttpRequestError {
+    pub fn status(&self) -> Option<u16> {
+        if let HttpRequestError::HttpError(status) = self {
+            Some(*status)
+        } else {
+            None
+        }
+    }
 }
 
 /// Errors for `JsonRpcProviderClient`
