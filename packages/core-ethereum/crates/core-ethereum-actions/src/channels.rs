@@ -45,11 +45,11 @@ pub trait ChannelActions {
 impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActions<Db> {
     async fn open_channel(&self, destination: Address, amount: Balance) -> Result<TransactionCompleted> {
         if self.me == destination {
-            return Err(InvalidArguments("cannot open channel to self".into()).into());
+            return Err(InvalidArguments("cannot open channel to self".into()));
         }
 
         if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments("invalid balance or balance type given".into()).into());
+            return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
         let allowance = self.db.read().await.get_staking_safe_allowance().await?;
@@ -85,7 +85,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
 
     async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<TransactionCompleted> {
         if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments("invalid balance or balance type given".into()).into());
+            return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
         let allowance = self.db.read().await.get_staking_safe_allowance().await?;
@@ -107,7 +107,7 @@ impl<Db: HoprCoreEthereumDbActions + Clone> ChannelActions for CoreEthereumActio
                     info!("initiating funding of {channel} with {amount}");
                     self.tx_sender.send(Action::FundChannel(channel, amount)).await
                 } else {
-                    Err(InvalidState(format!("channel {channel_id} is not opened")).into())
+                    Err(InvalidState(format!("channel {channel_id} is not opened")))
                 }
             }
             None => Err(ChannelDoesNotExist),

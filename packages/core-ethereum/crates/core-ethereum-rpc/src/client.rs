@@ -85,6 +85,7 @@ impl<Req: HttpPostRequestor + Debug> JsonRpcClient for JsonRpcProviderClient<Req
     }
 }
 
+/// Retry policy to use with the RPC Provider
 #[derive(Debug)]
 pub struct SimpleJsonRpcRetryPolicy;
 

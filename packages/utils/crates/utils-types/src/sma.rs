@@ -25,6 +25,9 @@ pub trait SMA<T> {
     fn is_window_full(&self) -> bool {
         self.len() == self.window_size()
     }
+
+    /// Indicates whether there are no samples.
+    fn is_empty(&self) -> bool;
 }
 
 /// Basic implementation of Simple Moving Average (SMA).
@@ -68,6 +71,10 @@ where
 
     fn len(&self) -> usize {
         self.window.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.window.is_empty()
     }
 }
 
