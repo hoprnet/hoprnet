@@ -1,7 +1,6 @@
-use std::{pin::Pin, sync::Arc, time::Duration};
-
 use async_std::sync::RwLock;
 use futures::{channel::mpsc::unbounded, FutureExt};
+use std::{pin::Pin, sync::Arc, time::Duration};
 
 use core_ethereum_api::HoprChain;
 use core_ethereum_db::db::CoreEthereumDb;
@@ -17,9 +16,9 @@ use utils_db::rusty::RustyLevelDbShim;
 use utils_log::{debug, info};
 use utils_types::traits::BinarySerializable;
 
+use crate::chain::ChainNetworkConfig;
 use crate::{config::HoprLibConfig, constants};
 
-use core_ethereum_actions::transaction_queue::TransactionExecutor;
 #[cfg(feature = "wasm")]
 use core_transport::wasm_impls::HoprTransport;
 
@@ -68,8 +67,9 @@ impl std::fmt::Display for HoprLoopComponents {
 
 /// Main builder of the hopr lib components
 #[cfg(feature = "wasm")]
-pub fn build_components<FOnReceived, FOnSent, FSaveTbf, TxExec>(
+pub fn build_components<FOnReceived, FOnSent, FSaveTbf>(
     cfg: HoprLibConfig,
+    chain_config: ChainNetworkConfig,
     me: OffchainKeypair,
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
@@ -77,7 +77,6 @@ pub fn build_components<FOnReceived, FOnSent, FSaveTbf, TxExec>(
     on_final_packet: FOnReceived,
     tbf: TagBloomFilter,
     save_tbf: FSaveTbf,
-    tx_executor: TxExec,
     my_multiaddresses: Vec<Multiaddr>, // TODO: needed only because there's no STUN ATM
 ) -> (
     HoprTransport,
@@ -88,7 +87,6 @@ where
     FOnReceived: Fn(ApplicationData) + 'static,
     FOnSent: Fn(HalfKeyChallenge) + 'static,
     FSaveTbf: Fn(Box<[u8]>) + 'static,
-    TxExec: TransactionExecutor + 'static,
 {
     let identity: libp2p_identity::Keypair = (&me).into();
 
@@ -99,8 +97,8 @@ where
 
     let ticket_aggregation = build_ticket_aggregation(db.clone(), &me_onchain);
 
-    let (tx_queue, chain_actions) =
-        crate::chain::build_chain_components(me_onchain.public().to_address(), db.clone(), tx_executor);
+    let (tx_queue, chain_actions, rpc_operations) =
+        crate::chain::build_chain_components(&me_onchain, chain_config, cfg.safe_module.module_address, db.clone());
 
     let multi_strategy = Arc::new(MultiStrategy::new(
         cfg.strategy,
@@ -125,6 +123,7 @@ where
         me_onchain.clone(),
         db.clone(),
         chain_actions.clone(),
+        rpc_operations.clone(),
         on_channel_event_tx,
         channel_graph.clone(),
     );

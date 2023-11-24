@@ -1,17 +1,23 @@
+use std::time::Duration;
 use std::{str::FromStr, sync::Arc};
 
-use async_std::sync::RwLock;
+use async_std::sync::{Mutex, RwLock};
 use core_ethereum_actions::{transaction_queue::TransactionQueue, CoreEthereumActions};
 use core_ethereum_db::{db::CoreEthereumDb, traits::HoprCoreEthereumDbActions};
 use core_path::channel_graph::ChannelGraph;
-use core_transport::ChainKeypair;
+use core_transport::{ChainKeypair, Keypair};
 use futures::channel::mpsc::UnboundedSender;
+use serde::{Deserialize, Serialize};
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::Address;
 
-use serde::{Deserialize, Serialize};
+use core_ethereum_actions::payload::SafePayloadGenerator;
+use core_ethereum_api::executors::{EthereumTransactionExecutor, RpcEthereumClient};
+use core_ethereum_api::{build_json_rpc_client, JsonRpcClient};
+use core_ethereum_rpc::client::SimpleJsonRpcRetryPolicy;
+use core_ethereum_rpc::rpc::{RpcOperations, RpcOperationsConfig};
+use core_ethereum_types::ContractAddresses;
 
-use core_ethereum_actions::transaction_queue::TransactionExecutor;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -324,25 +330,66 @@ impl ProtocolConfig {
 }
 
 #[cfg(feature = "wasm")]
-pub fn build_chain_components<Db, TxExec: TransactionExecutor + 'static>(
-    me: Address,
+pub fn build_chain_components<Db>(
+    me_onchain: &ChainKeypair,
+    chain_config: ChainNetworkConfig,
+    module_address: Address,
     db: Arc<RwLock<Db>>,
-    tx_executor: TxExec,
-) -> (TransactionQueue<Db>, CoreEthereumActions<Db>)
+) -> (
+    TransactionQueue<Db>,
+    CoreEthereumActions<Db>,
+    Arc<Mutex<RpcOperations<JsonRpcClient>>>,
+)
 where
     Db: HoprCoreEthereumDbActions + Clone + 'static,
 {
-    let tx_queue = TransactionQueue::new(db.clone(), Box::new(tx_executor));
+    let rpc_client = build_json_rpc_client(
+        &chain_config.chain.default_provider, // TODO: is this the right value ?
+    );
 
-    let chain_actions = CoreEthereumActions::new(me, db, tx_queue.new_sender());
+    // TODO: this needs refactoring of the config structures
+    let contract_addrs = ContractAddresses {
+        announcements: Address::from_str(&chain_config.announcements).unwrap(),
+        channels: Address::from_str(&chain_config.channels).unwrap(),
+        token: Address::from_str(&chain_config.token).unwrap(),
+        price_oracle: Address::from_str(&chain_config.ticket_price_oracle).unwrap(),
+        network_registry: Address::from_str(&chain_config.network_registry).unwrap(),
+        network_registry_proxy: Address::from_str(&chain_config.network_registry_proxy).unwrap(),
+        stake_factory: Address::from_str(&chain_config.node_stake_v2_factory).unwrap(),
+        safe_registry: Address::from_str(&chain_config.node_safe_registry).unwrap(),
+        module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
+    };
 
-    (tx_queue, chain_actions)
+    let rpc_cfg = RpcOperationsConfig {
+        chain_id: chain_config.chain.chain_id as u64,
+        contract_addrs: contract_addrs.clone(),
+        max_http_retries: 10,                        // TODO: expose this value
+        expected_block_time: Duration::from_secs(7), // TODO: expose this value
+        ..RpcOperationsConfig::default()
+    };
+
+    let rpc_operations = Arc::new(Mutex::new(
+        RpcOperations::new(rpc_client, &me_onchain, rpc_cfg, SimpleJsonRpcRetryPolicy)
+            .expect("failed to initialize RPC"),
+    ));
+
+    let ethereum_tx_executor = EthereumTransactionExecutor::new(
+        RpcEthereumClient::new(rpc_operations.clone()),
+        SafePayloadGenerator::new(&me_onchain, contract_addrs, module_address),
+    );
+
+    let tx_queue = TransactionQueue::new(db.clone(), Box::new(ethereum_tx_executor));
+
+    let chain_actions = CoreEthereumActions::new(me_onchain.public().to_address(), db, tx_queue.new_sender());
+
+    (tx_queue, chain_actions, rpc_operations)
 }
 
 pub fn build_chain_api(
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
+    rpc_operations: Arc<Mutex<RpcOperations<JsonRpcClient>>>,
     channel_updates: UnboundedSender<core_types::channels::ChannelEntry>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
@@ -350,6 +397,7 @@ pub fn build_chain_api(
         me_onchain,
         db,
         chain_actions,
+        rpc_operations,
         core_ethereum_api::ChannelEventEmitter { tx: channel_updates },
         channel_graph,
     )
@@ -364,6 +412,7 @@ pub mod wasm {
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsValue;
 
+    #[allow(non_snake_case)]
     #[wasm_bindgen(getter_with_clone)]
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct ChainConfiguration {

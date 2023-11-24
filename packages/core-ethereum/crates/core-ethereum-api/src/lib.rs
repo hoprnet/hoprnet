@@ -3,7 +3,7 @@ pub mod executors;
 
 pub use core_types::channels::ChannelEntry;
 
-use async_lock::RwLock;
+use async_lock::{Mutex, RwLock};
 use core_ethereum_db::db::CoreEthereumDb;
 
 use futures::channel::mpsc::UnboundedSender;
@@ -14,6 +14,7 @@ use utils_log::info;
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
+use core_ethereum_rpc::rpc::RpcOperations;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
 use utils_types::primitives::{Address, Balance};
@@ -44,12 +45,30 @@ impl ChannelEventEmitter {
     }
 }
 
+#[cfg(feature = "wasm")]
+pub type JsonRpcClient = core_ethereum_rpc::client::JsonRpcProviderClient<core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor>;
+
+#[cfg(not(feature = "wasm"))]
+pub type JsonRpcClient = ethers::providers::Http;
+
+#[cfg(feature = "wasm")]
+pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
+    core_ethereum_rpc::client::JsonRpcProviderClient::new(base_url, core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor)
+}
+
+#[cfg(not(feature = "wasm"))]
+pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
+    use std::str::FromStr;
+    ethers::providers::Http::from_str(base_url).expect("invalid provider URL")
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
     db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
+    rpc_operations: Arc<Mutex<RpcOperations<JsonRpcClient>>>,
     channel_events: ChannelEventEmitter,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
 }
@@ -59,6 +78,7 @@ impl HoprChain {
         me_onchain: ChainKeypair,
         db: Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>>,
         chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
+        rpc_operations: Arc<Mutex<RpcOperations<JsonRpcClient>>>,
         channel_events: ChannelEventEmitter,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
     ) -> Self {
@@ -66,6 +86,7 @@ impl HoprChain {
             me_onchain,
             db,
             chain_actions,
+            rpc_operations,
             channel_events,
             channel_graph,
         }
@@ -136,6 +157,10 @@ impl HoprChain {
     // NOTE: needed early in the initialization to sync
     pub fn db(&self) -> Arc<RwLock<CoreEthereumDb<utils_db::rusty::RustyLevelDbShim>>> {
         self.db.clone()
+    }
+
+    pub fn rpc(&self) -> Arc<Mutex<RpcOperations<JsonRpcClient>>> {
+        self.rpc_operations.clone()
     }
 }
 

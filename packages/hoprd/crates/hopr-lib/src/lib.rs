@@ -74,7 +74,6 @@ pub use wasm_impl::Hopr;
 
 #[cfg(feature = "wasm")]
 mod native {
-    use core_ethereum_actions::transaction_queue::TransactionExecutor;
     use core_ethereum_actions::{
         channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
     };
@@ -111,7 +110,7 @@ mod native {
     }
 
     impl Hopr {
-        pub fn new<FOnReceived, FOnSent, FSaveTbf, TxExec>(
+        pub fn new<FOnReceived, FOnSent, FSaveTbf>(
             cfg: crate::config::HoprLibConfig,
             me: &OffchainKeypair,
             me_onchain: &ChainKeypair,
@@ -120,7 +119,6 @@ mod native {
             tbf: core_types::protocol::TagBloomFilter,
             save_tbf: FSaveTbf,
             chain_config: ChainNetworkConfig,
-            tx_executor: TxExec,
             #[cfg(feature = "wasm")] chain_query: chain::wasm::WasmChainQuery, // chain operations currently only in JS
             on_received: FOnReceived, // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: FOnSent,         // passed emit on the WasmHoprMessageEmitter on packet sent
@@ -129,7 +127,6 @@ mod native {
             FOnReceived: Fn(ApplicationData) + 'static,
             FOnSent: Fn(HalfKeyChallenge) + 'static,
             FSaveTbf: Fn(Box<[u8]>) + 'static,
-            TxExec: TransactionExecutor + 'static,
         {
             // let mut packetCfg = PacketInteractionConfig::new(packetKeypair, chainKeypair)
             // packetCfg.check_unrealized_balance = cfg.chain.check_unrealized_balance
@@ -138,6 +135,7 @@ mod native {
 
             let (transport_api, chain_api, processes) = components::build_components(
                 cfg.clone(),
+                chain_config.clone(),
                 me.clone(),
                 me_onchain.clone(),
                 db,
@@ -145,7 +143,6 @@ mod native {
                 on_received,
                 tbf,
                 save_tbf,
-                tx_executor,
                 my_addresses,
             );
 
@@ -772,17 +769,12 @@ mod native {
 pub mod wasm_impl {
     use super::*;
 
-    use core_ethereum_actions::payload::SafePayloadGenerator;
     use core_types::acknowledgement::wasm::AcknowledgedTicket;
     use js_sys::{Array, JsString};
     use std::str::FromStr;
     use wasm_bindgen::prelude::*;
 
-    use core_ethereum_api::executors::wasm::{
-        WasmEthereumClient, WasmEthereumTransactionExecutor, WasmTaggingPayloadGenerator,
-    };
     use core_ethereum_api::ChannelEntry;
-    use core_ethereum_types::ContractAddresses;
     use core_transport::{Hash, TicketStatistics};
     use utils_log::{debug, warn};
     use utils_types::{
@@ -847,7 +839,6 @@ pub mod wasm_impl {
             db: Database,
             tbf: core_types::protocol::TagBloomFilter,
             save_tbf: js_sys::Function,
-            send_eth_tx: js_sys::Function,
             msg_emitter: WasmHoprMessageEmitter, // emitter api delegating the 'on' operation for WSS
             chain_query: chain::wasm::WasmChainQuery, // chain operations currently only in JS
             on_received: js_sys::Function,       // passed emit on the WasmHoprMessageEmitter on packet received
@@ -868,30 +859,6 @@ pub mod wasm_impl {
             )
             .expect("Valid configuration leads to valid network");
 
-            // TODO: this needs refactoring of the config structures
-            let contract_addrs = ContractAddresses {
-                announcements: Address::from_str(&chain_config.announcements).unwrap(),
-                channels: Address::from_str(&chain_config.channels).unwrap(),
-                token: Address::from_str(&chain_config.token).unwrap(),
-                price_oracle: Address::from_str(&chain_config.ticket_price_oracle).unwrap(),
-                network_registry: Address::from_str(&chain_config.network_registry).unwrap(),
-                network_registry_proxy: Address::from_str(&chain_config.network_registry_proxy).unwrap(),
-                stake_factory: Address::from_str(&chain_config.node_stake_v2_factory).unwrap(),
-                safe_registry: Address::from_str(&chain_config.node_safe_registry).unwrap(),
-                module_implementation: Address::from_str(&chain_config.module_implementation).unwrap(),
-            };
-
-            // Replace this with an EthereumTransactionExecutor with RpcEthereumClient with NodeJs HTTP requestor
-            // and after the full migration with Native HTTP requestor.
-            let tx_exec = WasmEthereumTransactionExecutor::new(
-                WasmEthereumClient::new(send_eth_tx),
-                WasmTaggingPayloadGenerator(SafePayloadGenerator::new(
-                    &me_onchain,
-                    contract_addrs,
-                    cfg.safe_module.module_address,
-                )),
-            );
-
             Self {
                 hopr: super::native::Hopr::new(
                     cfg,
@@ -911,7 +878,6 @@ pub mod wasm_impl {
                         }
                     },
                     chain_config,
-                    tx_exec,
                     chain_query.clone(),
                     move |data: ApplicationData| {
                         if let Err(e) = on_received.call1(&JsValue::null(), &data.into()) {
