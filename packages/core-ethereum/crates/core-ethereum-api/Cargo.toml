@@ -23,7 +23,6 @@ prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus"]
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
-ethers = { workspace = true }
 futures = { workspace = true }
 primitive-types = "0.12"
 hex = { workspace = true }

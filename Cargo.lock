@@ -1172,7 +1172,6 @@ dependencies = [
  "core-ethereum-types",
  "core-path",
  "core-types",
- "ethers",
  "futures",
  "gloo-timers 0.3.0",
  "hex",
