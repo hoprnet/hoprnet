@@ -47,6 +47,7 @@ pub struct RpcOperationsConfig {
     pub expected_block_time: Duration,
     /// Single log fetch chunk size
     /// Defaults to 50
+    #[validate(range(min = 2))]
     pub logs_page_size: u64,
     /// Interval for polling on TX submission
     /// Defaults to 7 seconds.
