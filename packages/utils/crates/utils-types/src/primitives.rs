@@ -68,7 +68,7 @@ impl Address {
 
     /// Checks if the address is all zeroes.
     pub fn is_zero(&self) -> bool {
-        self.addr == [0u8; Self::SIZE]
+        self.addr.iter().all(|e| 0_u8.eq(e))
     }
 }
 

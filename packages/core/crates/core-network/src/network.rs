@@ -203,7 +203,7 @@ impl PeerStatus {
 
     pub fn update_quality(&mut self, new_value: f64) {
         self.quality = new_value;
-        self.quality_avg.add_sample(new_value);
+        self.quality_avg.push(new_value);
     }
 
     /// Gets metadata associated with the peer
@@ -213,7 +213,7 @@ impl PeerStatus {
 
     /// Gets the average quality of this peer
     pub fn get_average_quality(&self) -> f64 {
-        self.quality_avg.get_average().unwrap_or_default()
+        self.quality_avg.average().unwrap_or_default()
     }
 
     /// Gets the immediate node quality
@@ -640,7 +640,7 @@ pub mod wasm {
                 heartbeats_succeeded,
                 backoff,
                 metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
-                quality_avg: NoSumSMA::new_with_samples(quality_window, &[quality]),
+                quality_avg: NoSumSMA::new_with_samples(quality_window, vec![quality]),
             }
         }
     }
