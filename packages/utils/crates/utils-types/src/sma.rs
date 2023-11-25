@@ -74,7 +74,7 @@ where
 
 impl<T, D> NoSumSMA<T, D>
 where
-    T: for <'a> Sum<&'a T> + Div<D, Output = T>,
+    T: for<'a> Sum<&'a T> + Div<D, Output = T>,
     D: From<u32>,
 {
     /// Creates an empty SMA instance with the given window size.
@@ -97,7 +97,7 @@ where
 
 impl<T, D> Display for NoSumSMA<T, D>
 where
-    T: for <'a> Sum<&'a T> + Div<D, Output = T> + Default + Display,
+    T: for<'a> Sum<&'a T> + Div<D, Output = T> + Default + Display,
     D: From<u32>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -188,7 +188,6 @@ where
         write!(f, "{}", self.average().unwrap_or_default())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
