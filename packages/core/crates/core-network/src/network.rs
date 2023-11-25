@@ -12,7 +12,7 @@ use validator::Validate;
 
 use crate::constants::DEFAULT_NETWORK_QUALITY_THRESHOLD;
 use utils_log::{info, warn};
-use utils_types::sma::{NoSumSMA, SMA};
+use utils_types::sma::{SingleSumSMA, SMA};
 
 #[cfg(all(feature = "prometheus", not(test), not(feature = "wasm")))]
 use utils_misc::time::native::current_timestamp;
@@ -180,7 +180,7 @@ pub struct PeerStatus {
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
-    quality_avg: NoSumSMA<f64>,
+    quality_avg: SingleSumSMA<f64>,
     metadata: HashMap<String, String>,
 }
 
@@ -197,7 +197,7 @@ impl PeerStatus {
             backoff,
             quality: 0.0,
             metadata: HashMap::new(),
-            quality_avg: NoSumSMA::new(quality_window),
+            quality_avg: SingleSumSMA::new(quality_window),
         }
     }
 
@@ -640,7 +640,7 @@ pub mod wasm {
                 heartbeats_succeeded,
                 backoff,
                 metadata: js_map_to_hash_map(peer_metadata).unwrap_or(HashMap::new()),
-                quality_avg: NoSumSMA::new_with_samples(quality_window, vec![quality]),
+                quality_avg: SingleSumSMA::new_with_samples(quality_window, vec![quality]),
             }
         }
     }

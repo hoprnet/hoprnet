@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
-use utils_types::sma::{NoSumSMA, SMA};
+use utils_types::sma::{SingleSumSMA, SMA};
 use utils_types::traits::PeerIdLike;
 use validator::Validate;
 
@@ -98,7 +98,7 @@ where
     network: Arc<RwLock<Network<Net>>>,
     chain_actions: A,
     cfg: PromiscuousStrategyConfig,
-    sma: RwLock<NoSumSMA<u32>>,
+    sma: RwLock<SingleSumSMA<u32>>,
 }
 
 impl<Db, Net, A> PromiscuousStrategy<Db, Net, A>
@@ -117,7 +117,7 @@ where
             db,
             network,
             chain_actions,
-            sma: RwLock::new(NoSumSMA::new(cfg.min_network_size_samples)),
+            sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples)),
             cfg,
         }
     }
@@ -128,7 +128,7 @@ where
 
         let sma = self.sma.read().await;
         if sma.len() >= sma.window_size() {
-            Some(sma.average().unwrap_or_default())
+            Some(sma.average().unwrap())
         } else {
             info!(
                 "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",

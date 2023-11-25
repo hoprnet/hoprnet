@@ -194,53 +194,32 @@ where
 mod tests {
     use crate::sma::{NoSumSMA, SingleSumSMA, SMA};
 
-    #[test]
-    fn test_nosum_sma_empty() {
-        let sma = NoSumSMA::<u32, u32>::new(3);
-        assert_eq!(3, sma.window_size(), "invalid windows size");
+    fn test_sma<T: SMA<u32>>(mut sma: T, window_size: usize) {
+        assert_eq!(window_size, sma.window_size(), "invalid windows size");
         assert!(sma.average().is_none(), "invalid empty average");
 
         assert!(sma.is_empty(), "should be empty");
         assert_eq!(0, sma.len(), "len is invalid");
+
+        sma.push(0);
+        sma.push(1);
+        sma.push(2);
+        sma.push(3);
+
+        assert_eq!(Some(2), sma.average(), "invalid average");
+        assert_eq!(3, sma.window_size(), "window size is invalid");
+
+        assert!(!sma.is_empty(), "should not be empty");
+        assert_eq!(3, sma.len(), "len is invalid");
     }
 
     #[test]
     fn test_nosum_sma_should_calculate_avg_correctly() {
-        let mut sma = NoSumSMA::<u32, u32>::new(3);
-        sma.push(0);
-        sma.push(1);
-        sma.push(2);
-        sma.push(3);
-
-        assert_eq!(Some(2), sma.average(), "invalid average");
-        assert_eq!(3, sma.window_size(), "window size is invalid");
-
-        assert!(!sma.is_empty(), "should not be empty");
-        assert_eq!(3, sma.len(), "len is invalid");
-    }
-
-    #[test]
-    fn test_single_sum_sma_empty() {
-        let sma = SingleSumSMA::<u32, u32>::new(3);
-        assert_eq!(3, sma.window_size(), "invalid windows size");
-        assert!(sma.average().is_none(), "invalid empty average");
-
-        assert!(sma.is_empty(), "should be empty");
-        assert_eq!(0, sma.len(), "len is invalid");
+        test_sma(NoSumSMA::<u32, u32>::new(3), 3);
     }
 
     #[test]
     fn test_single_sum_sma_should_calculate_avg_correctly() {
-        let mut sma = SingleSumSMA::<u32, u32>::new(3);
-        sma.push(0);
-        sma.push(1);
-        sma.push(2);
-        sma.push(3);
-
-        assert_eq!(Some(2), sma.average(), "invalid average");
-        assert_eq!(3, sma.window_size(), "window size is invalid");
-
-        assert!(!sma.is_empty(), "should not be empty");
-        assert_eq!(3, sma.len(), "len is invalid");
+        test_sma(SingleSumSMA::<u32, u32>::new(3), 3);
     }
 }
