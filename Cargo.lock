@@ -1064,7 +1064,7 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "core-crypto"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "aes 0.8.3",
  "blake2",
@@ -1084,6 +1084,7 @@ dependencies = [
  "k256",
  "libp2p-identity",
  "parameterized",
+ "primitive-types",
  "rand 0.8.5",
  "serde",
  "sha2 0.10.7",
@@ -6264,7 +6265,7 @@ dependencies = [
 
 [[package]]
 name = "utils-types"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bincode",
  "console_error_panic_hook",

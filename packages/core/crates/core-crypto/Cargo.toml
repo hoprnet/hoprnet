@@ -1,6 +1,6 @@
 [package]
 name = "core-crypto"
-version = "0.5.2"
+version = "0.5.3"
 description = "Core cryptographic primitives and functions used in the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -28,6 +28,7 @@ hkdf = "0.12"
 js-sys = { workspace = true, optional = true }
 k256 = { version = "0.13.0", features = ["arithmetic", "ecdh", "hash2curve", "serde"] }
 libp2p-identity = { workspace = true }
+primitive-types = "0.12"
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
