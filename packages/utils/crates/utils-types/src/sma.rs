@@ -88,7 +88,10 @@ where
     }
 
     /// Creates SMA instance given window size and some initial samples.
-    pub fn new_with_samples(window_size: u32, initial_samples: Vec<T>) -> Self {
+    pub fn new_with_samples<I>(window_size: u32, initial_samples: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+    {
         let mut ret = Self::new(window_size);
         initial_samples.into_iter().for_each(|s| ret.push(s));
         ret
@@ -172,7 +175,10 @@ where
     }
 
     /// Creates SMA instance given window size and some initial samples.
-    pub fn new_with_samples(window_size: u32, initial_samples: Vec<T>) -> Self {
+    pub fn new_with_samples<I>(window_size: u32, initial_samples: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+    {
         let mut ret = Self::new(window_size);
         initial_samples.into_iter().for_each(|s| ret.push(s));
         ret
