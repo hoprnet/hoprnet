@@ -53,7 +53,7 @@ pub type JsonRpcClient = ethers::providers::Http;
 
 #[cfg(feature = "wasm")]
 pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
-    core_ethereum_rpc::client::JsonRpcProviderClient::new(base_url, core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor)
+    core_ethereum_rpc::client::JsonRpcProviderClient::new(base_url, core_ethereum_rpc::nodejs::NodeJsHttpPostRequestor::default())
 }
 
 #[cfg(not(feature = "wasm"))]
