@@ -1,63 +1,38 @@
-use async_trait::async_trait;
-use core_crypto::types::Hash;
-use primitive_types::H256;
 use std::fmt::{Display, Formatter};
-use utils_types::primitives::{Address, Balance, BalanceType, U256};
-use utils_types::traits::BinarySerializable;
+use std::pin::Pin;
 
-use crate::errors::Result;
-
+use async_trait::async_trait;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
-pub use ethers::types::TxHash;
 pub use futures::channel::mpsc::UnboundedReceiver;
+use futures::Stream;
+use primitive_types::H256;
 
+use core_crypto::types::Hash;
+use utils_types::primitives::{Address, Balance, BalanceType, U256};
+
+use crate::errors::{HttpRequestError, Result};
+
+/// Extended `JsonRpcClient` abstraction
+/// This module contains custom implementation of `ethers::providers::JsonRpcClient`
+/// which allows usage of non-`reqwest` based HTTP clients.
+pub mod client;
 pub mod errors;
-//pub mod indexer;
-//pub mod rpc;
 
-//#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
-//pub mod nodejs;
+/// Indexer specific trait implementation (`HoprIndexerRpcOperations`)
+pub mod indexer;
 
-/// A type containing selected fields from  the `eth_getBlockByHash`/`eth_getBlockByNumber` RPC
-/// calls.
-#[derive(Debug, Clone)]
-pub struct Block {
-    /// Block number
-    pub number: Option<u64>,
-    /// Block hash if any.
-    pub hash: Option<Hash>,
-    /// Block timestamp
-    pub timestamp: U256,
-    /// Transaction hashes within this block
-    pub transactions: Vec<Hash>,
-}
+/// General purpose high-level RPC operations implementation (`HoprRpcOperations`)
+pub mod rpc;
 
-impl Display for Block {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} (@ {}) with {} txs",
-            self.number
-                .map(|i| format!("block #{i}"))
-                .unwrap_or("pending block".into()),
-            self.timestamp.as_u64(),
-            self.transactions.len()
-        )
-    }
-}
+/// Node.js based HTTP client
+#[cfg(feature = "wasm")]
+pub mod nodejs;
 
-impl From<ethers::types::Block<H256>> for Block {
-    fn from(value: ethers::prelude::Block<H256>) -> Self {
-        Self {
-            number: value.number.map(|u| u.as_u64()),
-            hash: value.hash.map(|h| h.0.into()),
-            timestamp: value.timestamp.into(),
-            transactions: value.transactions.into_iter().map(|h| Hash::from(h.0)).collect(),
-        }
-    }
-}
+/// Helper types required by `client` module.
+mod helper;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
+/// This is further restricted to already mined blocks.
 #[derive(Debug, Clone)]
 pub struct Log {
     /// Contract address
@@ -67,22 +42,22 @@ pub struct Log {
     /// Raw log data
     pub data: Box<[u8]>,
     /// Transaction index
-    pub tx_index: Option<u64>,
+    pub tx_index: u64,
     /// Corresponding block number
-    pub block_number: Option<u64>,
+    pub block_number: u64,
     /// Log index
-    pub log_index: Option<U256>,
+    pub log_index: U256,
 }
 
 impl From<ethers::types::Log> for Log {
     fn from(value: ethers::prelude::Log) -> Self {
         Self {
             address: value.address.into(),
-            topics: value.topics.into_iter().map(|h| Hash::from(h.0)).collect(),
+            topics: value.topics.into_iter().map(Hash::from).collect(),
             data: Box::from(value.data.as_ref()),
-            tx_index: value.transaction_index.map(|u| u.as_u64()),
-            block_number: value.block_number.map(|u| u.as_u64()),
-            log_index: value.log_index.map(|u| u.into()),
+            tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
+            block_number: value.block_number.expect("block id must be present").as_u64(),
+            log_index: value.log_index.expect("log index must be present").into(),
         }
     }
 }
@@ -90,7 +65,7 @@ impl From<ethers::types::Log> for Log {
 impl From<Log> for ethers::abi::RawLog {
     fn from(value: Log) -> Self {
         ethers::abi::RawLog {
-            topics: value.topics.iter().map(|h| H256::from_slice(&h.to_bytes())).collect(),
+            topics: value.topics.into_iter().map(H256::from).collect(),
             data: value.data.into(),
         }
     }
@@ -98,33 +73,23 @@ impl From<Log> for ethers::abi::RawLog {
 
 impl Display for Log {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "log of {} with {} topics", self.address, self.topics.len())
-    }
-}
-
-/// Represents a mined block optionally with filtered logs (according to some `LogFilter`)
-/// corresponding to the block.
-#[derive(Debug, Clone)]
-pub struct BlockWithLogs {
-    /// Block with TX hashes.
-    pub block: Block,
-    /// Filtered logs of interest corresponding to the block, if any filtering was requested.
-    pub logs: Vec<Log>,
-}
-
-impl Display for BlockWithLogs {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} and {} logs", self.block, self.logs.len())
+        write!(
+            f,
+            "log in block #{} of {} with {} topics",
+            self.block_number,
+            self.address,
+            self.topics.len()
+        )
     }
 }
 
 /// Represents a filter to extract logs containing specific contract events from a block.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LogFilter {
     /// Contract addresses
     pub address: Vec<Address>,
     /// Event topics
-    pub topics: Vec<TxHash>,
+    pub topics: Vec<Hash>,
 }
 
 impl LogFilter {
@@ -136,7 +101,12 @@ impl LogFilter {
 
 impl Display for LogFilter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "filter of {} with {} topics", self.address.len(), self.topics.len())
+        write!(
+            f,
+            "filter of {} contracts with {} topics",
+            self.address.len(),
+            self.topics.len()
+        )
     }
 }
 
@@ -152,6 +122,21 @@ impl From<LogFilter> for ethers::types::Filter {
             )
             .topic0(value.topics)
     }
+}
+
+/// Abstraction for HTTP client that perform HTTP POST with JSON data.
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(test, mockall::automock)]
+pub trait HttpPostRequestor: Send + Sync {
+    /// Performs HTTP POST of JSON data to the given URL
+    /// and obtains the JSON response.
+    async fn http_post(&self, url: &str, json_data: &str) -> std::result::Result<String, HttpRequestError>;
+}
+
+/// Short-hand for creating new EIP1559 transaction object.
+pub fn create_eip1559_transaction() -> TypedTransaction {
+    TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
 }
 
 /// Trait defining general set of operations an RPC provider
@@ -178,21 +163,46 @@ pub trait HoprRpcOperations {
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash>;
 }
 
-/// Extension of `HoprRpcOperations` trait with functionality required by the Indexer.
+/// Structure containing filtered logs that all belong to the same block.
+#[derive(Debug, Clone, Default)]
+pub struct BlockWithLogs {
+    /// Block number
+    pub block_id: u64,
+    /// Filtered logs belonging to this block.
+    pub logs: Vec<Log>,
+}
+impl Display for BlockWithLogs {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "block #{} with {} logs", self.block_id, self.logs.len())
+    }
+}
+
+impl BlockWithLogs {
+    /// Returns `true` if no logs are contained within this block.
+    pub fn is_empty(&self) -> bool {
+        self.logs.is_empty()
+    }
+
+    /// Returns the number of logs within this block.
+    pub fn len(&self) -> usize {
+        self.logs.len()
+    }
+}
+
+/// Trait with RPC provider functionality required by the Indexer.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
-    /// Starts streaming the blocks with logs from the given `start_block_number`.
+    /// Starts streaming logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.
-    /// The given `filter` are applied to retrieve the logs for each retrieved block.
-    /// If the filter `is_empty()`, no logs are fetched, only blocks.
+    /// The given `filter` are applied to retrieve the logs, the function fails if the filter is empty.
     /// The streaming stops only when the corresponding channel is closed by the returned receiver.
-    async fn try_block_with_logs_stream(
-        &self,
+    fn try_stream_logs<'a>(
+        &'a self,
         start_block_number: Option<u64>,
         filter: LogFilter,
-    ) -> Result<UnboundedReceiver<BlockWithLogs>>;
+    ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + 'a>>>;
 }

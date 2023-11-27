@@ -26,7 +26,7 @@ pub trait NodeActions {
 impl<Db: HoprCoreEthereumDbActions + Clone> NodeActions for CoreEthereumActions<Db> {
     async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<TransactionCompleted> {
         if amount.eq(&amount.of_same("0")) {
-            return Err(InvalidArguments("cannot withdraw zero amount".into()).into());
+            return Err(InvalidArguments("cannot withdraw zero amount".into()));
         }
 
         // TODO: should we check native/token balance here before withdrawing ?

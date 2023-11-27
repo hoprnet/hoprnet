@@ -67,6 +67,7 @@ bindings = { path = "packages/ethereum/crates/bindings", default-features = fals
 core-ethereum-actions = { path = "packages/core-ethereum/crates/core-ethereum-actions", default-features = false }
 core-ethereum-api = { path = "packages/core-ethereum/crates/core-ethereum-api", default-features = false }
 core-ethereum-db = { path = "packages/core-ethereum/crates/core-ethereum-db", default-features = false }
+core-ethereum-rpc = { path = "packages/core-ethereum/crates/core-ethereum-rpc", default-features = false }
 core-ethereum-types = { path = "packages/core-ethereum/crates/core-ethereum-types", default-features = false }
 core-ethereum-indexer = { path = "packages/core-ethereum/crates/core-ethereum-indexer", default-features = false }
 core-crypto = { path = "packages/core/crates/core-crypto", default-features = false }

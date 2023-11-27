@@ -44,6 +44,7 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 core-network = { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
+core-ethereum-types = { workspace = true, default-features = false }
 core-path = { workspace = true, default-features = false }
 core-p2p = { workspace = true, default-features = false }
 core-packet = { workspace = true, default-features = false }

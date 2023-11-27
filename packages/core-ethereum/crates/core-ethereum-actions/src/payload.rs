@@ -288,9 +288,9 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
     }
 
     fn deregister_node_by_safe(&self) -> Result<TypedTransaction> {
-        return Err(InvalidState(
+        Err(InvalidState(
             "Can only deregister an address if Safe is activated".into(),
-        ));
+        ))
     }
 }
 

@@ -9,7 +9,7 @@ use crate::{
 use core_crypto::{
     derivation::derive_vrf_parameters,
     errors::CryptoError::{InvalidChallenge, InvalidVrfValues, SignatureVerification},
-    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    keypairs::{ChainKeypair, OffchainKeypair},
     types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, Response, VrfParameters},
 };
 use serde::{Deserialize, Serialize};
@@ -152,10 +152,10 @@ impl AcknowledgedTicket {
         chain_keypair: &ChainKeypair,
         domain_separator: &Hash,
     ) -> CoreTypesResult<AcknowledgedTicket> {
-        if signer.eq(&chain_keypair.public().to_address()) {
+        if signer.eq(&chain_keypair.into()) {
             return Err(LoopbackTicket);
         }
-        if generate_channel_id(&signer, &chain_keypair.public().to_address()).ne(&ticket.channel_id) {
+        if generate_channel_id(&signer, &chain_keypair.into()).ne(&ticket.channel_id) {
             return Err(InvalidTicketRecipient);
         }
 

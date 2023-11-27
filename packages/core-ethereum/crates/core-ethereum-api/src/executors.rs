@@ -1,11 +1,14 @@
+use async_lock::Mutex;
 use async_trait::async_trait;
 use core_crypto::types::Hash;
 use core_ethereum_actions::payload::PayloadGenerator;
 use core_ethereum_actions::transaction_queue::{TransactionExecutor, TransactionResult};
+use core_ethereum_rpc::HoprRpcOperations;
 use core_ethereum_types::TypedTransaction;
 use core_types::acknowledgement::AcknowledgedTicket;
 use core_types::announcement::AnnouncementData;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use utils_types::primitives::{Address, Balance};
 
 use crate::errors::Result;
@@ -17,6 +20,26 @@ pub trait EthereumClient<T: Into<TypedTransaction>> {
     /// Sends transaction to the blockchain and returns its hash.
     /// Does not poll for transaction completion.
     async fn post_transaction(&self, tx: T) -> Result<Hash>;
+}
+
+/// Instantiation of `EthereumClient` using `HoprRpcOperations`.
+#[derive(Clone)]
+pub struct RpcEthereumClient<Rpc: HoprRpcOperations> {
+    rpc: Arc<Mutex<Rpc>>,
+}
+
+impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
+    pub fn new(rpc: Arc<Mutex<Rpc>>) -> Self {
+        Self { rpc }
+    }
+}
+
+#[async_trait(? Send)]
+impl<Rpc: HoprRpcOperations> EthereumClient<TypedTransaction> for RpcEthereumClient<Rpc> {
+    async fn post_transaction(&self, tx: TypedTransaction) -> Result<Hash> {
+        let res = self.rpc.lock().await.send_transaction(tx).await?;
+        Ok(res)
+    }
 }
 
 /// Implementation of `TransactionExecutor` using the given `EthereumClient` and corresponding
