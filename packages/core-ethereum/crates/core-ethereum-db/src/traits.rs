@@ -15,8 +15,14 @@ pub trait HoprCoreEthereumDbActions {
     // core only part
     async fn get_current_ticket_index(&self, channel_id: &Hash) -> Result<Option<U256>>;
     async fn set_current_ticket_index(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
+    async fn increase_current_ticket_index(&mut self, channel_id: &Hash) -> Result<()>;
+    async fn ensure_current_ticket_index_gte(&mut self, channel_id: &Hash, index: U256) -> Result<()>;
 
     async fn get_tickets(&self, signer: Option<Address>) -> Result<Vec<Ticket>>;
+
+    async fn get_unrealized_balance(&self, channel: &Hash) -> Result<Balance>;
+
+    async fn get_channel_epoch(&self, channel: &Hash) -> Result<Option<U256>>;
 
     async fn cleanup_invalid_channel_tickets(&mut self, channel: &ChannelEntry) -> Result<()>;
 

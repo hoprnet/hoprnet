@@ -1199,6 +1199,7 @@ dependencies = [
  "console_error_panic_hook",
  "core-crypto",
  "core-types",
+ "env_logger",
  "hex",
  "hex-literal",
  "js-sys",
