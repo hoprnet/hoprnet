@@ -8,7 +8,6 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
-# TODO: change this to a binary crate once the migration is complete
 [lib]
 crate-type = ["cdylib", "rlib"]
 
@@ -38,6 +37,7 @@ core-ethereum-api = { workspace = true }
 core-ethereum-rpc = { workspace = true }
 core-ethereum-db = { workspace = true, default-features = false }
 core-ethereum-types = { workspace = true }
+core-ethereum-indexer = { workspace = true }
 real-base = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true }
@@ -72,6 +72,7 @@ wasm = [
     "core-ethereum-actions/wasm",
     "core-ethereum-api/wasm",
     "core-ethereum-db/wasm",
+    "core-ethereum-indexer/wasm",
     "core-ethereum-rpc/wasm",
     "real-base/wasm",
     "utils-db/wasm",
@@ -80,5 +81,5 @@ wasm = [
     "utils-misc/wasm",
     "utils-types/wasm",
 ]
-prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "dep:utils-metrics"]
+prometheus = ["core-transport/prometheus", "core-ethereum-api/prometheus", "core-ethereum-indexer/prometheus",  "dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

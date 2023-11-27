@@ -390,7 +390,6 @@ pub fn build_chain_api(
     db: Arc<RwLock<CoreEthereumDb<RustyLevelDbShim>>>,
     chain_actions: CoreEthereumActions<CoreEthereumDb<RustyLevelDbShim>>,
     rpc_operations: Arc<Mutex<RpcOperations<JsonRpcClient>>>,
-    channel_updates: UnboundedSender<core_types::channels::ChannelEntry>,
     channel_graph: Arc<RwLock<ChannelGraph>>,
 ) -> core_ethereum_api::HoprChain {
     core_ethereum_api::HoprChain::new(
@@ -398,7 +397,6 @@ pub fn build_chain_api(
         db,
         chain_actions,
         rpc_operations,
-        core_ethereum_api::ChannelEventEmitter { tx: channel_updates },
         channel_graph,
     )
 }

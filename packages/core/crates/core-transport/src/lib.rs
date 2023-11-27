@@ -20,6 +20,10 @@ pub use {
     core_network::network::{Health, PeerStatus},
     core_p2p::libp2p_identity,
     core_types::protocol::ApplicationData,
+    crate::{
+        multiaddrs::decapsulate_p2p_protocol,
+        processes::indexer::{IndexerActions, IndexerToProcess, PeerEligibility},
+    },
     multiaddr::Multiaddr,
     p2p::{api, p2p_loop},
     timer::UniversalTimer,
@@ -247,8 +251,6 @@ pub struct PublicNodesResult {
 
 #[cfg(feature = "wasm")]
 pub mod wasm_impls {
-    use crate::processes::indexer::IndexerToProcess;
-
     use super::*;
     use core_crypto::keypairs::Keypair;
     use core_crypto::types::Hash;
@@ -265,7 +267,6 @@ pub mod wasm_impls {
     use futures::future::{select, Either};
     use futures::pin_mut;
     use js_sys::JsString;
-    use utils_log::debug;
     use utils_types::primitives::{Address, Balance, BalanceType};
     use utils_types::traits::PeerIdLike;
     use wasm_bindgen::prelude::*;
@@ -343,49 +344,8 @@ pub mod wasm_impls {
             &self.me
         }
 
-        pub async fn on_peer_announcement(&self, id: PeerId, address: Address, multiaddrs: Vec<Multiaddr>) {
-            if id != self.me {
-                // decapsulate the `p2p/<peer_id>` to remove duplicities
-                let mas = multiaddrs
-                    .into_iter()
-                    .map(|ma| crate::multiaddrs::decapsulate_p2p_protocol(&ma))
-                    .filter(|v| !v.is_empty())
-                    .collect::<Vec<_>>();
-
-                if mas.len() > 0 {
-                    self.indexer
-                        .emit_indexer_update(IndexerToProcess::Announce(id.clone(), mas))
-                        .await;
-
-                    if self
-                        .db
-                        .read()
-                        .await
-                        .is_allowed_to_access_network(&address)
-                        .await
-                        .unwrap_or(false)
-                    {
-                        self.indexer
-                            .emit_indexer_update(IndexerToProcess::EligibilityUpdate(id, true.into()))
-                            .await;
-                    }
-                }
-            } else {
-                debug!("Skipping announcements for {}", id);
-            }
-        }
-
-        pub async fn on_network_registry_update(&self, address: &Address, allowed: bool) {
-            match self.db.read().await.get_packet_key(address).await {
-                Ok(pk) => {
-                    if let Some(pk) = pk {
-                        self.indexer
-                            .emit_indexer_update(IndexerToProcess::EligibilityUpdate(pk.to_peerid(), allowed.into()))
-                            .await;
-                    }
-                }
-                Err(e) => error!("on_network_registry_node_allowed failed with: {}", e),
-            }
+        pub fn index_updater(&self) -> IndexerActions {
+            self.indexer.clone()
         }
 
         pub async fn ping(&self, peer: &PeerId) -> Option<std::time::Duration> {
@@ -507,22 +467,22 @@ pub mod wasm_impls {
                 .await?)
         }
 
-        pub async fn get_public_nodes(&self) -> errors::Result<Vec<PublicNodesResult>> {
+        pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
             let db = self.db.read().await;
 
             let mut public_nodes = vec![];
 
             for node in db.get_public_node_accounts().await?.into_iter() {
                 if let Ok(Some(v)) = db.get_packet_key(&node.chain_addr).await {
-                    public_nodes.push(PublicNodesResult {
-                        id: v.to_peerid_str().into(),
-                        address: node.chain_addr.clone(),
-                        multiaddrs: if let Some(ma) = node.get_multiaddr_str() {
-                            vec![JsString::from(ma)]
+                    public_nodes.push((
+                        v.to_peerid(),
+                        node.chain_addr,
+                        if let Some(ma) = node.get_multiaddr() {
+                            vec![ma]
                         } else {
                             vec![]
-                        },
-                    })
+                        }
+                    ))
                 }
             }
 

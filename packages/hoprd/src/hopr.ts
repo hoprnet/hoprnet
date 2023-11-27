@@ -7,7 +7,6 @@ import {
   Address,
   get_contract_data,
   resolve_network,
-  Balance,
   retryWithBackoffThenThrow,
   durations,
   MIN_NATIVE_BALANCE,
@@ -17,26 +16,15 @@ import {
   HalfKeyChallenge,
   ApplicationData,
   TagBloomFilter,
-  OffchainPublicKey,
-  ChannelEntry,
   defer
 } from '@hoprnet/hopr-utils'
 
 import HoprCoreEthereum, {
-  Indexer,
-  ChannelUpdateEventNames,
-  TicketRedeemedEventNames,
-  PeerEventName,
-  NetworkRegistryNodeAllowedEventName,
-  NetworkRegistryNodeNotAllowedEventName,
-  NetworkRegistryEligibilityChangedEventName
 } from '@hoprnet/hopr-core-ethereum'
 
 import EventEmitter from 'events'
 import path from 'path'
 import { rmSync, readFileSync, writeFileSync } from 'fs'
-import { Multiaddr } from '@multiformats/multiaddr'
-import { PeerId } from '@libp2p/interface-peer-id'
 import { HoprProcesses } from '../lib/hoprd_hoprd.js'
 
 const log = debug(`hopr-lib:create-components`)
@@ -87,14 +75,6 @@ export class WasmChainQuery {
 
   public async getSafeNativeBalance(): Promise<string> {
     return (await this.connector.getNativeBalance(this.smartContractInfo().safeAddress, true)).to_string()
-  }
-
-  public indexer(): Indexer {
-    return this.connector.indexer
-  }
-
-  public async getPacketKeyOf(address: Address) {
-    return this.connector.getPacketKeyOf(address)
   }
 
   public async isNodeSafeNotRegistered(): Promise<boolean> {
@@ -304,49 +284,6 @@ export async function createHoprNode(
 
   log('Setting up the indexer events...')
   let hc = HoprCoreEthereum.getInstance()
-  let indexer = hc.indexer
-  indexer.on(NetworkRegistryEligibilityChangedEventName, async (address: Address, allowed: boolean) => {
-    // If account is no longer eligible to register nodes, we might need to close existing connections,
-    // otherwise there is nothing to do
-    if (!allowed) {
-      let pk: OffchainPublicKey
-      try {
-        pk = await hc.getPacketKeyOf(address)
-      } catch (err) {
-        // node has not announced itself, so we don't need to care
-        return
-      }
-
-      const peer = pk.to_peerid_str()
-      await hopr.unregister(peer)
-    }
-  })
-
-  indexer.on(PeerEventName, async (peerData: { id: PeerId; address: Address; multiaddrs: Multiaddr[] }) => {
-    const peer = peerData.id.toString()
-    const address = peerData.address
-    const mas = peerData.multiaddrs.map((ma) => ma.toString())
-    await hopr.onPeerAnnouncement(peer, address, mas)
-  })
-
-  indexer.on(NetworkRegistryNodeAllowedEventName, async (node: Address) => {
-    await hopr.onNetworkRegistryUpdate(node, true)
-  })
-
-  indexer.on(NetworkRegistryNodeNotAllowedEventName, async (node: Address) => {
-    await hopr.onNetworkRegistryUpdate(node, false)
-  })
-
-  // subscribe so we can process channel close events
-  indexer.on(ChannelUpdateEventNames, async (channel: ChannelEntry) => {
-    log(`Connector calling onOwnChannelUpdated with: ${channel.to_string()}`)
-    await hopr.onOwnChannelUpdated(channel)
-  })
-
-  // subscribe so we can process channel ticket redeemed events
-  indexer.on(TicketRedeemedEventNames, async (channel: ChannelEntry, ticketAmount: Balance) => {
-    await hopr.onTicketRedeemed(channel, ticketAmount)
-  })
 
   let continueStartup = defer<void>()
   hc.on('hopr:connector:created', () => {
@@ -363,7 +300,6 @@ export async function createHoprNode(
 
   let processes = await hopr.run()
 
-  // start the indexer
   await hc.start()
 
   return { node: hopr, loops: processes }

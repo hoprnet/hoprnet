@@ -171,6 +171,7 @@ pub struct BlockWithLogs {
     /// Filtered logs belonging to this block.
     pub logs: Vec<Log>,
 }
+
 impl Display for BlockWithLogs {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "block #{} with {} logs", self.block_id, self.logs.len())
@@ -190,6 +191,7 @@ impl BlockWithLogs {
 }
 
 /// Trait with RPC provider functionality required by the Indexer.
+#[cfg_attr(test, mockall::automock)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait HoprIndexerRpcOperations {

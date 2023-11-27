@@ -55,7 +55,6 @@ export {
   get_package_version,
   HalfKey,
   HalfKeyChallenge,
-  Handlers,
   Hash,
   Health,
   health_to_string,

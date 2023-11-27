@@ -1,6 +1,6 @@
 use multiaddr::Multiaddr;
 
-pub(crate) fn decapsulate_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
+pub fn decapsulate_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
     Multiaddr::from_iter(ma.iter().filter(|v| {
         if let multiaddr::Protocol::P2p(_) = v {
             false

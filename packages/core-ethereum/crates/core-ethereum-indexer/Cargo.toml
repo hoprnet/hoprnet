@@ -13,10 +13,13 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
+async-trait = { workspace = true }
+async-lock = { workspace = true }
 thiserror = "1.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 ethers = { workspace = true, default-features = false, features = ["abigen"] }
 ethnum = { version = "1.3.2", features = ["serde"] }
+futures = { workspace = true }
 lazy_static = { workspace = true }
 primitive-types = "0.12.1"
 wasm-bindgen = { workspace = true, optional = true }
@@ -31,18 +34,23 @@ bindings = { workspace = true, default-features = false }
 core-types = { workspace = true, default-features = false }
 core-crypto = { workspace = true, default-features = false }
 core-ethereum-db = { workspace = true, default-features = false }
+core-ethereum-rpc = { workspace = true, default-features = false }
 utils-db = { workspace = true, default-features = false }
 utils-log = { workspace = true, default-features = false }
+utils-metrics = { workspace = true, optional = true }
 utils-misc = { workspace = true, default-features = false }
 utils-types = { workspace = true, default-features = false }
 
 [dev-dependencies]
+env_logger = "0.10"
 hex-literal = "0.4"
+mockall = "0.11"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-O', '--enable-reference-types']
 
 [features]
 default = ["console_error_panic_hook", "wasm"]
-wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+wasm = [ "dep:wasm-bindgen", "dep:js-sys", "dep:serde-wasm-bindgen", "dep:wasm-bindgen-futures", "core-ethereum-db/wasm", "core-ethereum-rpc/wasm", "core-crypto/wasm", "core-types/wasm", "utils-db/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-misc/wasm", "utils-types/wasm" ]
+prometheus = ["dep:utils-metrics"]
 console_error_panic_hook = [ "dep:console_error_panic_hook" ]

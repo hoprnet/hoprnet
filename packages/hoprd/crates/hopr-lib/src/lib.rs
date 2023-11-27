@@ -78,12 +78,14 @@ mod native {
         channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
     };
     use core_ethereum_api::ChannelEntry;
-    use core_transport::{wasm_impls::PublicNodesResult, TicketStatistics};
+    use core_transport::PeerEligibility;
+    use core_transport::TicketStatistics;
     use core_types::{
         account::AccountEntry,
         acknowledgement::AcknowledgedTicket,
         channels::{generate_channel_id, ChannelStatus, Ticket},
     };
+    use utils_log::debug;
     use utils_types::traits::PeerIdLike;
 
     use crate::wasm_impl::{CloseChannelResult, OpenChannelResult};
@@ -102,9 +104,7 @@ mod native {
         chain_api: HoprChain,
         processes: Option<Vec<Pin<Box<dyn futures::Future<Output = components::HoprLoopComponents>>>>>,
         chain_cfg: ChainNetworkConfig,
-        #[cfg(feature = "wasm")]
-        chain_query: chain::wasm::WasmChainQuery,
-        // TODO: remove once the entire construction happens in the new() method
+        #[cfg(feature = "wasm")] chain_query: chain::wasm::WasmChainQuery,   // TODO: remove once the entire construction happens in the new() method
         staking_safe_address: Address,
         staking_module_address: Address,
     }
@@ -263,60 +263,26 @@ mod native {
                 .await
                 .map_err(core_transport::errors::HoprTransportError::from)?;
 
-            let mut allowed_initial_nodes = vec![];
 
-            for node in self.transport_api.get_public_nodes().await?.into_iter() {
-                let peer_id: String = node.id.clone().into();
-                if let Ok(peer_id) = PeerId::from_str(peer_id.as_str()) {
-                    if self.transport_api.is_allowed_to_access_network(&peer_id).await {
-                        allowed_initial_nodes.push(node)
-                    }
+            info!("Loading initial peers");
+            let index_updater = self.transport_api.index_updater();
+            for (peer_id, _address, multiaddresses) in self.transport_api.get_public_nodes().await?.into_iter() {
+                if self.transport_api.is_allowed_to_access_network(&peer_id).await {
+                    debug!("Using initial public node '{peer_id}'");
+                    index_updater.emit_indexer_update(
+                        core_transport::IndexerToProcess::EligibilityUpdate(peer_id.clone(), PeerEligibility::Eligible)
+                    ).await;
+                    index_updater.emit_indexer_update(
+                        core_transport::IndexerToProcess::Announce(peer_id, multiaddresses)
+                    ).await;
                 }
             }
 
-            info!(
-                "Using initial nodes: {:?}",
-                allowed_initial_nodes
-                    .iter()
-                    .map(|v| {
-                        let n: String = v.id.clone().into();
-                        n
-                    })
-                    .collect::<Vec<_>>()
-            );
-
-            // TODO: public nodes result should be native, not wasm based
-            info!("Loading initial peers");
-            for node in allowed_initial_nodes.into_iter() {
-                self.transport_api.on_network_registry_update(&node.address, true).await;
-
-                self.transport_api
-                    .on_peer_announcement(
-                        {
-                            let peer: String = node.id.into();
-                            PeerId::from_str(&peer).expect("Should be a valid PeerId string")
-                        },
-                        node.address.clone(),
-                        node.multiaddrs
-                            .iter()
-                            .map(|v| {
-                                let ma: String = v.into();
-                                Multiaddr::from_str(&ma).expect("Should be a valid Multiaddr string")
-                            })
-                            .collect::<Vec<_>>(),
-                    )
-                    .await;
-            }
-
-            // TODO: this state now lives in the loops and cannot be extracted in the setup without
-            // fully migrating the rest of the hopr-lib packages
-            // self.state = State::Indexing;
+            self.state = State::Indexing;
 
             // wait for the indexer sync
-            // info!("Starting chain interaction, which will trigger the indexer");
-            // if let Err(_) = ck.startChainSync().await {
-            //     panic!("Failed to start the chain operations");
-            // }
+            info!("Starting chain interaction, which will trigger the indexer");
+            self.chain_api.sync_chain().await?;
 
             // Possibly register node-safe pair to NodeSafeRegistry. Following that the
             // connector is set to use safe tx variants.
@@ -382,11 +348,9 @@ mod native {
                 }
             }
 
-            // Note: this is not how a normal binary would return the operation, but it
-            // is a valid way for WASM environment to yield `&mut` work to JS
-            // info!("# STARTED NODE");
-            // info!("ID {}", self.transport_api.me());
-            // info!("Protocol version {}", constants::APP_VERSION);
+            info!("# STARTED NODE");
+            info!("ID {}", self.transport_api.me());
+            info!("Protocol version {}", constants::APP_VERSION);
 
             Ok(self.processes.take().expect("processes should be present in the node"))
         }
@@ -398,7 +362,7 @@ mod native {
         }
 
         /// Get the list of all announced public nodes in the network
-        pub async fn get_public_nodes(&self) -> errors::Result<Vec<PublicNodesResult>> {
+        pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
             Ok(self.transport_api.get_public_nodes().await?)
         }
 
@@ -485,24 +449,9 @@ mod native {
             self.transport_api.network_health().await
         }
 
-        /// Called whenever a peer is announced
-        /// @param peer newly announced peer
-        pub async fn on_peer_announcement(&self, peer: PeerId, address: Address, multiaddresses: Vec<Multiaddr>) {
-            if self.me_peer_id() != peer {
-                self.transport_api
-                    .on_peer_announcement(peer, address, multiaddresses)
-                    .await
-            }
-        }
-
         /// Unregister a peer from the network
         pub async fn unregister(&self, peer: &PeerId) {
             self.transport_api.network_unregister(&peer).await
-        }
-
-        /// Called whenever the network registry changes
-        pub async fn on_network_registry_update(&self, address: &Address, allowed: bool) {
-            self.transport_api.on_network_registry_update(address, allowed).await
         }
 
         /// List all peers connected to this
@@ -538,7 +487,7 @@ mod native {
 
         /// List of all accounts announced on the chain
         pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
-            Ok(self.chain_api.accounts_announced_on_chain().await?)
+            Ok(self.chain_api.db().read().await.get_accounts().await?)
         }
 
         /// Get the channel entry from Hash.
@@ -591,21 +540,6 @@ mod native {
                 TransactionResult::Withdrawn { tx_hash } => Ok(tx_hash),
                 _ => Err(errors::HoprLibError::GeneralError("withdraw transaction failed".into())),
             }
-        }
-
-        /// Callback function used to react to on-chain channel update events.
-        /// Specifically we trigger the strategy on channel close handler.
-        pub async fn on_own_channel_updated(&self, channel: &ChannelEntry) {
-            self.chain_api.on_channel_event(channel).await
-        }
-
-        /// Callback function used to react to on-chain channel ticket redeem events.
-        /// Specifically we resolve the pending balance of the ticket.
-        ///
-        /// @param channel object
-        /// @param ticket amount
-        pub async fn on_ticket_redeemed(&self, channel: &ChannelEntry, value: &Balance) {
-            self.chain_api.on_ticket_redeemed(channel, value).await
         }
 
         pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> errors::Result<OpenChannelResult> {
@@ -967,11 +901,23 @@ pub mod wasm_impl {
         /// Get the list of all announced public nodes in the network
         #[wasm_bindgen(js_name = getPublicNodes)]
         pub async fn _get_public_nodes(&self) -> Result<js_sys::Array, JsError> {
-            Ok(self
+            Ok(js_sys::Array::from_iter(self
                 .hopr
                 .get_public_nodes()
-                .await
-                .map(|v| v.into_iter().map(JsValue::from).collect())?)
+                .await?
+                .into_iter()
+                .map(|(peer_id, address, multiaddresses)| {
+                    PublicNodesResult {
+                        id: peer_id.to_string().into(),
+                        address: address,
+                        multiaddrs: multiaddresses
+                            .into_iter()
+                            .map(|ma| JsString::from(ma.to_string()))
+                            .collect(),
+                    }
+                })
+                .map(JsValue::from)
+            ))
         }
 
         /// Test whether the peer with PeerId is allowed to access the network
@@ -1146,36 +1092,6 @@ pub mod wasm_impl {
             self.hopr.network_health().await.into()
         }
 
-        /// Called whenever a peer is announced
-        /// @param peer newly announced peer
-        #[wasm_bindgen(js_name = onPeerAnnouncement)]
-        pub async fn _on_peer_announcement(&self, peer: JsString, address: Address, multiaddresses: js_sys::Array) {
-            let peer: String = peer.into();
-            match core_transport::libp2p_identity::PeerId::from_str(&peer) {
-                Ok(peer) => {
-                    if &peer != &self.hopr.me_peer_id() {
-                        let mas = multiaddresses
-                            .to_vec()
-                            .into_iter()
-                            .filter_map(|v| {
-                                let v: String = JsString::from(v).into();
-                                Multiaddr::from_str(&v).ok()
-                            })
-                            .collect::<Vec<Multiaddr>>();
-
-                        self.hopr.on_peer_announcement(peer, address, mas).await
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to parse peer id {}, cannot announce multiaddresses: {}",
-                        peer,
-                        e.to_string()
-                    );
-                }
-            }
-        }
-
         /// Unregister a peer from the network
         #[wasm_bindgen(js_name = unregister)]
         pub async fn _unregister(&self, peer: JsString) {
@@ -1190,12 +1106,6 @@ pub mod wasm_impl {
                     );
                 }
             }
-        }
-
-        /// Called whenever the network registry changes
-        #[wasm_bindgen(js_name = onNetworkRegistryUpdate)]
-        pub async fn _on_network_registry_update(&self, address: &Address, allowed: bool) {
-            self.hopr.on_network_registry_update(address, allowed).await
         }
 
         /// List all peers connected to this
@@ -1341,16 +1251,6 @@ pub mod wasm_impl {
                 .withdraw(recipient.clone(), amount.clone())
                 .await
                 .map_err(JsError::from)
-        }
-
-        #[wasm_bindgen(js_name = onOwnChannelUpdated)]
-        pub async fn _on_own_channel_updated(&self, channel: &ChannelEntry) {
-            self.hopr.on_own_channel_updated(channel).await
-        }
-
-        #[wasm_bindgen(js_name = onTicketRedeemed)]
-        pub async fn _on_ticket_redeemed(&self, channel: &ChannelEntry, value: &Balance) {
-            self.hopr.on_ticket_redeemed(channel, &value).await
         }
 
         #[wasm_bindgen(js_name = openChannel)]
