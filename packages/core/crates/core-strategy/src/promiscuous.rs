@@ -128,7 +128,7 @@ where
 
         let sma = self.sma.read().await;
         if sma.len() >= sma.window_size() {
-            Some(sma.average().unwrap())
+            sma.average()
         } else {
             info!(
                 "not yet enough samples ({} out of {}) of network size to perform a strategy tick, skipping.",

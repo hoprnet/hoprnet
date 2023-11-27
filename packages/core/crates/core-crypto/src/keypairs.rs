@@ -1,4 +1,11 @@
+use digest::Digest;
+use generic_array::{ArrayLength, GenericArray};
+use sha2::Sha512;
 use std::fmt::Debug;
+use subtle::{Choice, ConstantTimeEq};
+use utils_types::traits::PeerIdLike;
+use utils_types::{primitives::Address, traits::BinarySerializable};
+use zeroize::ZeroizeOnDrop;
 
 use crate::errors;
 use crate::errors::CryptoError::InvalidInputValue;
@@ -6,12 +13,6 @@ use crate::random::{random_bytes, random_group_element};
 use crate::shared_keys::Scalar;
 use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
 use crate::utils::SecretValue;
-use digest::Digest;
-use generic_array::{ArrayLength, GenericArray};
-use sha2::Sha512;
-use subtle::{Choice, ConstantTimeEq};
-use utils_types::{primitives::Address, traits::BinarySerializable};
-use zeroize::ZeroizeOnDrop;
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
@@ -106,6 +107,12 @@ impl From<&OffchainKeypair> for libp2p_identity::Keypair {
     fn from(value: &OffchainKeypair) -> Self {
         libp2p_identity::Keypair::ed25519_from_bytes(value.0.clone()).expect("invalid offchain keypair")
         // must not happen
+    }
+}
+
+impl From<&OffchainKeypair> for libp2p_identity::PeerId {
+    fn from(value: &OffchainKeypair) -> Self {
+        value.1.to_peerid()
     }
 }
 
