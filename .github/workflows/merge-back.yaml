@@ -29,13 +29,15 @@ jobs:
           ref: master
 
       - name: Merge back
-
         run: |
+          set -x
           git fetch
+          git config --global user.email 'tech@hoprnet.org'
+          git config --global user.name 'Hopr Bot'
           git checkout release/${{ github.event.inputs.release_name }}
           git checkout -b merge-back-release-${{ github.event.inputs.release_name }}
           git merge master > /tmp/merge.log || true
-
+          cat /tmp/merge.log
           # Check if there are conflicts
           conflicts=$(grep "CONFLICT" /tmp/merge.log | grep -v package.json | wc -l)
           if [[ "$conflicts" -gt "0" ]];
@@ -61,6 +63,5 @@ jobs:
           git push --set-upstream origin merge-back-release-${RELEASE_NAME}
           today=`date +%Y-%m-%d`
           gh pr create --title "Merge back from ${RELEASE_NAME} - ${today}" --base master --label merge-back --assignee ${{ github.actor }} --reviewer hoprnet/hopr-development --body "The scope of this PR is to merge back to master all the bug fixing found in release ${RELEASE_NAME}"
-
         env:
           GH_TOKEN: ${{ github.token }}
