@@ -44,7 +44,7 @@ jobs:
           if [[ "$conflicts" -gt "0" ]];
           then
             echo "There are conflicts in source code files"
-            echo "exit 1"
+            exit 1
           fi
 
           # Resolve conflicts for package.json
@@ -56,7 +56,7 @@ jobs:
                 git add packages/$package/package.json
               else
                 echo "Review changes manully for ./packages/$package/package.json"
-                echo exit 1
+                exit 1
               fi
             fi
           done
