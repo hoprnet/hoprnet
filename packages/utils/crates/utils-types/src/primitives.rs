@@ -332,6 +332,10 @@ impl Balance {
     pub fn to_formatted_string(&self) -> String {
         format!("{} {}", self.amount_base_units(), self.balance_type)
     }
+
+    pub fn to_value_string(&self) -> String {
+        self.value.to_string()
+    }
 }
 
 impl PartialEq for Balance {
@@ -937,6 +941,24 @@ mod tests {
         assert_eq!("123.000000000000000 HOPR", b2.to_formatted_string());
         assert_eq!("0.00123000000000000 HOPR", b3.to_formatted_string());
         assert_eq!("0.12300000000000000 HOPR", b4.to_formatted_string());
+    }
+
+    #[test]
+    fn balance_test_value_string() {
+        let mut base = "123".to_string();
+        for _ in 0..Balance::SCALE - 3 {
+            base += "0";
+        }
+
+        let b1 = Balance::new_from_str(&base, BalanceType::HOPR);
+        let b2 = b1.imul(100);
+        let b3 = Balance::new_from_str(&base[..Balance::SCALE - 3], BalanceType::HOPR);
+        let b4 = Balance::new_from_str(&base[..Balance::SCALE - 1], BalanceType::HOPR);
+
+        assert_eq!("123000000000000000", b1.to_value_string());
+        assert_eq!("123000000000000000", b2.to_value_string());
+        assert_eq!("123000000000000", b3.to_value_string());
+        assert_eq!("12300000000000000", b4.to_value_string());
     }
 
     #[test]

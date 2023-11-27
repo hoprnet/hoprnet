@@ -30,13 +30,22 @@ describe('GET /account/balances', () => {
     const res = await request(service).get('/api/v3/account/balances')
     expect(res.status).to.equal(200)
     expect(res).to.satisfyApiSpec
+
+    // ensure all values are present
     expect(res.body).to.deep.equal({
-      native: nativeBalance.to_string(),
-      hopr: balance.to_string(),
-      safeNative: nativeBalance.to_string(),
-      safeHopr: balance.to_string(),
-      safeHoprAllowance: balance.to_string()
+      native: nativeBalance.to_value_string(),
+      hopr: balance.to_value_string(),
+      safeNative: nativeBalance.to_value_string(),
+      safeHopr: balance.to_value_string(),
+      safeHoprAllowance: balance.to_value_string()
     })
+
+    // ensure the balances are numbers without units, we assume wei always
+    expect(!!Number(res.body.native)).to.be.true
+    expect(!!Number(res.body.hopr)).to.be.true
+    expect(!!Number(res.body.safeNative)).to.be.true
+    expect(!!Number(res.body.safeHopr)).to.be.true
+    expect(!!Number(res.body.safeHoprAllowance)).to.be.true
   })
 
   it('should return 422 when either of balances node calls fail', async () => {
