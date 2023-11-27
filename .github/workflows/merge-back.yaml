@@ -29,11 +29,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: master
+          fetch-depth: 0
 
       - name: Merge back
         run: |
           set -x
-          git fetch
           git config --global user.email 'tech@hoprnet.org'
           git config --global user.name 'Hopr Bot'
           git checkout release/${{ github.event.inputs.release_name }}
