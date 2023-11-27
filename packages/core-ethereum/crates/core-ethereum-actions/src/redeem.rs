@@ -70,7 +70,7 @@ where
         BeingRedeemed { tx_hash: txh } => {
             // If there's already some hash set for this ticket, do not allow unsetting it
             if txh != Hash::default() && tx_hash == Hash::default() {
-                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")).into());
+                return Err(InvalidArguments(format!("cannot unset tx hash of {ack_ticket}")));
             }
         }
     }

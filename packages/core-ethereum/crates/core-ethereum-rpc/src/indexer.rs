@@ -7,10 +7,12 @@ use std::pin::Pin;
 use utils_log::debug;
 use utils_log::error;
 
-use crate::errors::Result;
-use crate::errors::RpcError::FilterIsEmpty;
+use crate::errors::{Result, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
+
+#[cfg(feature = "prometheus")]
+use crate::rpc::METRIC_COUNT_RPC_CALLS;
 
 #[cfg(all(feature = "wasm", not(test)))]
 use gloo_timers::future::sleep;
@@ -26,6 +28,10 @@ use async_std::task::sleep;
 impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
     async fn block_number(&self) -> Result<u64> {
         let r = self.provider.get_block_number().await?;
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS.increment();
+
         Ok(r.as_u64())
     }
 
@@ -58,6 +64,10 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 
                         // The provider internally performs retries on timeouts and errors.
                         let mut retrieved_logs = self.provider.get_logs_paginated(&range_filter, self.cfg.logs_page_size);
+
+                        // This will be only approximate, since we have no way of tracking how does the Stream internally make additional queries
+                        #[cfg(feature = "prometheus")]
+                        METRIC_COUNT_RPC_CALLS.increment();
 
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
                         while let Ok(Some(log)) = retrieved_logs.try_next().await {

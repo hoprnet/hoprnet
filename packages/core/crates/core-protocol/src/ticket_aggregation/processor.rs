@@ -45,6 +45,7 @@ use wasm_bindgen_futures::spawn_local;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use utils_metrics::metrics::SimpleCounter;
+use utils_types::primitives::U256;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -271,7 +272,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             })?;
 
         let channel_id = generate_channel_id(&(&self.chain_key).into(), &destination);
-        let channel_balance = self
+        let channel_entry = self
             .db
             .read()
             .await
@@ -279,13 +280,13 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .await?
             .ok_or(ProtocolTicketAggregation(format!(
                 "channel {channel_id} does not exist"
-            )))?
-            .balance;
+            )))?;
+        let channel_balance = channel_entry.balance;
 
         acked_tickets.sort();
         acked_tickets.dedup();
 
-        let channel_epoch = acked_tickets[0].ticket.channel_epoch;
+        let channel_epoch = channel_entry.channel_epoch;
 
         let mut final_value = Balance::zero(BalanceType::HOPR);
 
@@ -297,7 +298,7 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
                 )));
             }
 
-            if acked_ticket.ticket.channel_epoch != channel_epoch {
+            if U256::from(acked_ticket.ticket.channel_epoch) != channel_epoch {
                 return Err(ProtocolTicketAggregation("Channel epochs do not match".to_owned()));
             }
 
@@ -340,6 +341,16 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_AGGREGATION_COUNT.increment();
+
+        info!("after ticket aggregation, ensure the current ticket index is larger than the last index and the on-chain index");
+        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
+        let current_ticket_index_from_acked_tickets = U256::from(last_acked_ticket.ticket.index).addn(1);
+        let current_ticket_index_gte = current_ticket_index_from_acked_tickets.max(channel_entry.ticket_index);
+        self.db
+            .write()
+            .await
+            .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_gte)
+            .await?;
 
         Ticket::new(
             &destination,
@@ -419,6 +430,10 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
                 ProtocolTicketAggregation("Missing domain separator".into())
             })?;
 
+        // calculate the new current ticket index
+        let current_ticket_index_from_aggregated_ticket =
+            U256::from(aggregated_ticket.index).addn(aggregated_ticket.index_offset);
+
         let acked_aggregated_ticket = AcknowledgedTicket::new(
             aggregated_ticket,
             first_stored_ticket.response.clone(),
@@ -454,6 +469,13 @@ impl<Db: HoprCoreEthereumDbActions> TicketAggregationProcessor<Db> {
             .write()
             .await
             .replace_acked_tickets_by_aggregated_ticket(acked_aggregated_ticket.clone())
+            .await?;
+
+        info!("ensure the current ticket index is not smaller than the the aggregated ticket index + offset");
+        self.db
+            .write()
+            .await
+            .ensure_current_ticket_index_gte(&channel_id, current_ticket_index_from_aggregated_ticket)
             .await?;
 
         Ok(acked_aggregated_ticket)

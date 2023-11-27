@@ -18,7 +18,7 @@ wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:gloo-timers",
     "core-crypto/wasm", "core-path/wasm", "core-types/wasm",
     "utils-db/wasm", "utils-misc/wasm", "utils-log/wasm", "utils-metrics?/wasm", "utils-types/wasm"
 ]
-prometheus = ["dep:utils-metrics"]
+prometheus = ["dep:utils-metrics", "core-ethereum-rpc/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }

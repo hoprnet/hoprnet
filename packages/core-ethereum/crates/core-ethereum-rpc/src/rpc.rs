@@ -18,6 +18,19 @@ use validator::Validate;
 use crate::errors::Result;
 use crate::HoprRpcOperations;
 
+#[cfg(feature = "prometheus")]
+use utils_metrics::metrics::SimpleCounter;
+
+#[cfg(feature = "prometheus")]
+lazy_static::lazy_static! {
+     pub(crate) static ref METRIC_COUNT_RPC_CALLS: SimpleCounter = SimpleCounter::new(
+        "core_ethereum_counter_rpc_calls",
+        "Number of RPC calls"
+    )
+    .unwrap();
+}
+
+/// Configuration of the RPC related parameters.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
     pub chain_id: u64,
@@ -25,6 +38,8 @@ pub struct RpcOperationsConfig {
     pub max_http_retries: u32,
     pub expected_block_time: Duration,
     pub logs_page_size: u64,
+    /// Interval for polling on TX submission
+    /// Defaults to 7 seconds.
     pub tx_polling_interval: Duration,
 }
 
@@ -33,7 +48,7 @@ impl Default for RpcOperationsConfig {
         Self {
             chain_id: 100,
             contract_addrs: Default::default(),
-            max_http_retries: 3,
+            max_http_retries: 5,
             logs_page_size: 50,
             expected_block_time: Duration::from_secs(5),
             tx_polling_interval: Duration::from_secs(7),
@@ -44,6 +59,7 @@ impl Default for RpcOperationsConfig {
 pub(crate) type HoprMiddleware<P> =
     NonceManagerMiddleware<SignerMiddleware<Provider<RetryClient<P>>, Wallet<SigningKey>>>;
 
+/// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug, Clone)]
 pub struct RpcOperations<P: JsonRpcClient + 'static> {
     me: Address,
@@ -58,8 +74,8 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         R: RetryPolicy<<P as JsonRpcClient>::Error> + 'static,
     {
         let provider_client = RetryClientBuilder::default()
-            .rate_limit_retries(5)
-            .timeout_retries(cfg.max_http_retries)
+            .rate_limit_retries(cfg.max_http_retries)
+            .timeout_retries(cfg.max_http_retries) // Note that this does not take effect when using Si
             .initial_backoff(Duration::from_millis(500))
             .build(json_rpc, Box::new(retry_policy));
 
@@ -84,11 +100,16 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
-        Ok(self
+        let ts = self
             .provider
             .get_block(BlockId::Number(block_number.into()))
             .await?
-            .map(|b| b.timestamp.as_u64()))
+            .map(|b| b.timestamp.as_u64());
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS.increment();
+
+        Ok(ts)
     }
 
     async fn get_balance(&self, balance_type: BalanceType) -> Result<Balance> {
@@ -96,10 +117,18 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             BalanceType::Native => {
                 let addr: H160 = self.me.into();
                 let native = self.provider.get_balance(addr, None).await?;
+
+                #[cfg(feature = "prometheus")]
+                METRIC_COUNT_RPC_CALLS.increment();
+
                 Ok(Balance::new(native.into(), BalanceType::Native))
             }
             BalanceType::HOPR => {
                 let token_balance = self.contract_instances.token.balance_of(self.me.into()).call().await?;
+
+                #[cfg(feature = "prometheus")]
+                METRIC_COUNT_RPC_CALLS.increment();
+
                 Ok(Balance::new(token_balance.into(), BalanceType::HOPR))
             }
         }
@@ -112,6 +141,10 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .try_get_target(target.into())
             .call()
             .await?;
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS.increment();
+
         Ok(exists.then_some(target.into()))
     }
 
@@ -122,17 +155,29 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             .node_to_safe(node_address.into())
             .call()
             .await?;
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS.increment();
+
         Ok(addr.into())
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
         let owner = self.contract_instances.module_implementation.owner().call().await?;
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS.increment();
+
         Ok(owner.into())
     }
 
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<Hash> {
         // Also fills the transaction including the EIP1559 fee estimates from the provider
         let sent_tx = self.provider.send_transaction(tx, None).await?;
+
+        #[cfg(feature = "prometheus")]
+        METRIC_COUNT_RPC_CALLS.increment();
+
         Ok(sent_tx.0.into())
     }
 }

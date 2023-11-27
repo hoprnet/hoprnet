@@ -34,6 +34,7 @@ serde-wasm-bindgen = { workspace = true, optional = true }
 [dev-dependencies]
 async-std = { version = "1.12.0", features = ["attributes"] }
 wasm-bindgen-test = "0.3.30"
+env_logger = "0.10.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 wasm-pack = { workspace = true }

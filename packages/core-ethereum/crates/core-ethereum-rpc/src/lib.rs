@@ -12,18 +12,27 @@ use utils_types::primitives::{Address, Balance, BalanceType, U256};
 
 use crate::errors::{HttpRequestError, Result};
 
+/// Extended `JsonRpcClient` abstraction
+/// This module contains custom implementation of `ethers::providers::JsonRpcClient`
+/// which allows usage of non-`reqwest` based HTTP clients.
 pub mod client;
 pub mod errors;
+
+/// Indexer specific trait implementation (`HoprIndexerRpcOperations`)
 pub mod indexer;
+
+/// General purpose high-level RPC operations implementation (`HoprRpcOperations`)
 pub mod rpc;
 
+/// Node.js based HTTP client
 #[cfg(feature = "wasm")]
 pub mod nodejs;
 
+/// Helper types required by `client` module.
 mod helper;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
-/// This is further restritect to already mined blocks.
+/// This is further restricted to already mined blocks.
 #[derive(Debug, Clone)]
 pub struct Log {
     /// Contract address
