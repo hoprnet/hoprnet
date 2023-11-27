@@ -10,9 +10,11 @@ on:
       release_name:
         type: choice
         required: true
-        description: 'Name of the release'
+        description: 'From release branch'
         options:
           - providence
+          # - saint-louis
+          # - singapore
 
 concurrency:
   group: merge-back
@@ -35,7 +37,6 @@ jobs:
           git config --global user.email 'tech@hoprnet.org'
           git config --global user.name 'Hopr Bot'
           git checkout release/${{ github.event.inputs.release_name }}
-          git checkout -b merge-back-release-${{ github.event.inputs.release_name }}
           git merge master > /tmp/merge.log || true
           cat /tmp/merge.log
           # Check if there are conflicts
@@ -59,6 +60,7 @@ jobs:
               fi
             fi
           done
+          git checkout -b merge-back-release-${{ github.event.inputs.release_name }}
           git commit -am "Merge branch 'master' into merge-back-release-${RELEASE_NAME}"
           git push --set-upstream origin merge-back-release-${RELEASE_NAME}
           today=`date +%Y-%m-%d`
