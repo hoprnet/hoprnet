@@ -8,19 +8,22 @@ use async_lock::RwLock;
 use core_ethereum_db::db::CoreEthereumDb;
 use futures::channel::mpsc::UnboundedSender;
 use std::sync::Arc;
+use ethers::utils::__serde_json::value::Index;
 
 use core_crypto::keypairs::{ChainKeypair, Keypair};
 use core_ethereum_actions::CoreEthereumActions;
 use core_ethereum_db::traits::HoprCoreEthereumDbActions;
 use core_ethereum_indexer::block::{Indexer, IndexerConfig};
 use core_ethereum_indexer::handlers::ContractEventHandlers;
+use core_ethereum_rpc::HoprRpcOperations;
 use core_ethereum_rpc::rpc::RpcOperations;
 use core_ethereum_types::ContractAddresses;
 use core_types::account::AccountEntry;
 use utils_db::rusty::RustyLevelDbShim;
+use utils_log::info;
 use utils_types::primitives::{Address, Balance};
 
-use crate::errors::HoprChainError;
+use crate::errors::{Result, HoprChainError};
 
 #[async_trait::async_trait]
 pub trait ChainQueries {
@@ -54,6 +57,27 @@ pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
 pub fn build_json_rpc_client(base_url: &str) -> JsonRpcClient {
     use std::str::FromStr;
     ethers::providers::Http::from_str(base_url).expect("invalid provider URL")
+}
+
+pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(me: Address, safe_address: Address, rpc: &Rpc) -> Result<bool>{
+    let target_address = rpc.get_module_target_address().await?;
+    if target_address != safe_address {
+        // cannot proceed when the safe address is not the target/owner of given module
+        return Err(HoprChainError::Api("safe is not a target of module".into()));
+    }
+
+    let registered_address = rpc.get_safe_from_node_safe_registry(me).await?;
+    info!("currently registered Safe address in NodeSafeRegistry = {registered_address}");
+
+    if registered_address.is_zero() {
+        info!("Node is not associated with a Safe in NodeSafeRegistry yet");
+        Ok(true)
+    } else if registered_address != safe_address {
+        Err(HoprChainError::Api("Node is associated with a different Safe in NodeSafeRegistry".into()))
+    } else {
+        info!("Node is associated with correct Safe in NodeSafeRegistry");
+        Ok(false)
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]

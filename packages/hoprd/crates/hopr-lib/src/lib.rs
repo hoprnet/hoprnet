@@ -77,7 +77,8 @@ mod native {
     use core_ethereum_actions::{
         channels::ChannelActions, redeem::TicketRedeemActions, transaction_queue::TransactionResult,
     };
-    use core_ethereum_api::ChannelEntry;
+    use core_ethereum_api::{can_register_with_safe, ChannelEntry};
+    use core_ethereum_rpc::HoprRpcOperations;
     use core_transport::PeerEligibility;
     use core_transport::TicketStatistics;
     use core_types::{
@@ -87,6 +88,7 @@ mod native {
     };
     use utils_log::debug;
     use utils_types::traits::PeerIdLike;
+    use crate::errors::HoprLibError;
 
     use crate::wasm_impl::{CloseChannelResult, OpenChannelResult};
 
@@ -105,7 +107,6 @@ mod native {
         processes: Option<Vec<Pin<Box<dyn futures::Future<Output = components::HoprLoopComponents>>>>>,
         chain_cfg: ChainNetworkConfig,
         #[cfg(feature = "wasm")]
-        chain_query: chain::wasm::WasmChainQuery, // TODO: remove once the entire construction happens in the new() method
         staking_safe_address: Address,
         staking_module_address: Address,
     }
@@ -120,7 +121,6 @@ mod native {
             tbf: core_types::protocol::TagBloomFilter,
             save_tbf: FSaveTbf,
             chain_config: ChainNetworkConfig,
-            #[cfg(feature = "wasm")] chain_query: chain::wasm::WasmChainQuery, // chain operations currently only in JS
             on_received: FOnReceived, // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: FOnSent,         // passed emit on the WasmHoprMessageEmitter on packet sent
         ) -> Self
@@ -170,7 +170,6 @@ mod native {
                 chain_api,
                 processes: Some(processes),
                 chain_cfg: chain_config,
-                chain_query,
                 staking_safe_address: cfg.safe_module.safe_address,
                 staking_module_address: cfg.safe_module.module_address,
             }
@@ -204,6 +203,15 @@ mod native {
             self.aliases.read().await.clone()
         }
 
+        pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
+            self
+                .chain_api
+                .rpc()
+                .get_balance(balance_type)
+                .await
+                .map_err(|e| HoprLibError::ChainApi(e.into()))
+        }
+
         pub fn chain_config(&self) -> ChainNetworkConfig {
             self.chain_cfg.clone()
         }
@@ -219,9 +227,10 @@ mod native {
 
             info!("Starting hopr node...");
 
-            if let Err(_) = self.chain_query.waitForFunds().await {
+            // TODO: add wait for funds function
+            /*if let Err(_) = self.chain_query.waitForFunds().await {
                 panic!("Failed to wait for the funds")
-            }
+            }*/
 
             self.aliases
                 .write()
@@ -230,15 +239,7 @@ mod native {
 
             self.state = State::Initializing;
 
-            let balance = self
-                .chain_query
-                .getNativeBalance()
-                .await
-                .map_err(|_| errors::HoprLibError::GeneralError("Failed to fetch own balance".to_owned()))
-                .map(|v| {
-                    info!("{}", v.as_string().unwrap().as_str());
-                    Balance::from_str(v.as_string().unwrap().as_str()).expect("balance should be deserializable")
-                })?;
+            let balance = self.get_balance(BalanceType::Native)?;
 
             let minimum_balance = Balance::new(U256::new(constants::MIN_NATIVE_BALANCE), BalanceType::Native);
 
@@ -289,12 +290,7 @@ mod native {
 
             // Possibly register node-safe pair to NodeSafeRegistry. Following that the
             // connector is set to use safe tx variants.
-            if self
-                .chain_query
-                .canRegisterWithSafe()
-                .await
-                .map(|v| v.as_bool().unwrap_or(false))
-                .unwrap_or(false)
+            if can_register_with_safe(self.me_onchain(), self.staking_safe_address, self.chain_api.rpc()).await?
             {
                 info!("Registering safe by node");
 
@@ -761,8 +757,6 @@ pub mod wasm_impl {
     #[wasm_bindgen]
     pub struct Hopr {
         hopr: super::native::Hopr,
-        /// object for querying chain through WASM
-        chain_query: chain::wasm::WasmChainQuery,
         /// Message emitting for WASM environments
         msg_emitter: processes::wasm::WasmHoprMessageEmitter,
     }
@@ -778,7 +772,6 @@ pub mod wasm_impl {
             tbf: core_types::protocol::TagBloomFilter,
             save_tbf: js_sys::Function,
             msg_emitter: WasmHoprMessageEmitter, // emitter api delegating the 'on' operation for WSS
-            chain_query: chain::wasm::WasmChainQuery, // chain operations currently only in JS
             on_received: js_sys::Function,       // passed emit on the WasmHoprMessageEmitter on packet received
             on_sent: js_sys::Function,           // passed emit on the WasmHoprMessageEmitter on packet sent
         ) -> Self {
@@ -816,7 +809,6 @@ pub mod wasm_impl {
                         }
                     },
                     chain_config,
-                    chain_query.clone(),
                     move |data: ApplicationData| {
                         if let Err(e) = on_received.call1(&JsValue::null(), &data.into()) {
                             error!("failed to call on_received_packet closure: {:?}", e.as_string());
@@ -831,7 +823,6 @@ pub mod wasm_impl {
                         }
                     },
                 ),
-                chain_query,
                 msg_emitter,
             }
         }
@@ -1328,11 +1319,7 @@ pub mod wasm_impl {
 
         #[wasm_bindgen(js_name = getBalance)]
         pub async fn _balance(&self) -> Result<Balance, JsError> {
-            match self.chain_query.getBalance().await {
-                Ok(balance) => Ok(Balance::from_str(balance.as_string().unwrap().as_str())
-                    .map_err(|_| JsError::new("Error converting balance from string"))?),
-                Err(e) => Err(JsError::new(format!("Encountered issue: {:?}", e).as_str())),
-            }
+            Ok(self.hopr.get_balance(BalanceType::HOPR)?)
         }
 
         #[wasm_bindgen(js_name = getSafeBalance)]
@@ -1346,11 +1333,7 @@ pub mod wasm_impl {
 
         #[wasm_bindgen(js_name = getNativeBalance)]
         pub async fn _native_balance(&self) -> Result<Balance, JsError> {
-            match self.chain_query.getNativeBalance().await {
-                Ok(balance) => Ok(Balance::from_str(balance.as_string().unwrap().as_str())
-                    .map_err(|_| JsError::new("Error converting balance from string"))?),
-                Err(e) => Err(JsError::new(format!("Encountered issue: {:?}", e).as_str())),
-            }
+            Ok(self.hopr.get_balance(BalanceType::Native)?)
         }
 
         #[wasm_bindgen(js_name = getSafeNativeBalance)]
